@@ -76,10 +76,8 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
 
 export interface SaveNewsIndexerMatchInput {
   predictionId: string
-  articleUrl: string
-  articleTitle: string
-  articleSource: string | null
-  publishedAt: string | null
+  /** The evidence set fed to the Oracle: [{ url, title, source, publishedDate }, ...]. */
+  sources: Prisma.InputJsonValue
   externalProbability: number
   ciLow: number
   ciHigh: number
@@ -98,7 +96,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
       data: {
         predictionId: input.predictionId,
         summary: '',
-        sources: [{ url: input.articleUrl, title: input.articleTitle, source: input.articleSource, publishedDate: input.publishedAt }],
+        sources: input.sources,
         externalProbability: input.externalProbability,
         externalReasoning: 'TruthMachine Oracle (news-indexer match)',
         oracleSnapshot: input.oracleSnapshot,
