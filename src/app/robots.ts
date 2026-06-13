@@ -35,11 +35,11 @@ export default function robots(): MetadataRoute.Robots {
         // Internal architecture docs served as static HTML (also carry a
         // noindex meta tag) — not indexable content.
         '/docs/',
-        // OG image generation routes — image/png responses, not indexable pages.
-        // Social platforms (Twitter, LinkedIn, etc.) ignore robots.txt so sharing
-        // previews are unaffected; this stops Google treating them as soft-404 pages.
-        '/opengraph-image',
-        '/*/opengraph-image',
+        // NOTE: the OG image routes (/opengraph-image, /*/opengraph-image) are
+        // intentionally NOT disallowed. They return 200 image/png, so Google treats
+        // them as image resources (not soft-404 pages); blocking them only filled
+        // Search Console's "Blocked by robots.txt" report with ~one entry per
+        // forecast×locale (every page's og:image points at one) for no benefit.
       ],
     },
     sitemap: `${baseUrl}/sitemap.xml`,
