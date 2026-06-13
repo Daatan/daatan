@@ -175,7 +175,16 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
         summary.sampleItems = items.slice(0, 5).map(i => i.title)
 
         const hotTopicsStart = Date.now()
-        const hotTopics = detectHotTopics(items, bot.hotnessMinSources, bot.hotnessWindowHours)
+        let hotTopics = detectHotTopics(items, bot.hotnessMinSources, bot.hotnessWindowHours)
+        // Fallback rung: if nothing cleared the multi-source bar, retry at
+        // minSources=1 so we still anchor on real news before dropping to
+        // LLM-only sourceless generation.
+        if (hotTopics.length === 0 && bot.hotnessMinSources > 1) {
+          hotTopics = detectHotTopics(items, 1, bot.hotnessWindowHours)
+          if (hotTopics.length > 0) {
+            log.info({ botId: bot.id, count: hotTopics.length }, 'No multi-source topics; using single-source fallback rung')
+          }
+        }
         metrics.hotTopicsDetectionMs = Date.now() - hotTopicsStart
         summary.hotTopics = hotTopics
 
