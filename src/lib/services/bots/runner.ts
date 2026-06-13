@@ -20,6 +20,7 @@
 import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { fetchRssFeeds, detectHotTopics, type HotTopic } from '@/lib/services/bots/rss'
+import { fetchOracleSources, MAX_ORACLE_SOURCES_PER_RUN } from '@/lib/services/bots/oracleSource'
 import { type BotWithUser, log, countTodayActions, countThisHourActions, logBotAction } from './shared'
 import { processTopic } from './forecastCreate'
 import { processSourcelessForecast } from './sourceless'
@@ -161,14 +162,38 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
 
     // ── Forecast creation ────────────────────────────────────────────────
     if (bot.canCreateForecasts) {
-      const feedUrls = bot.newsSources as string[]
+      const allSources = bot.newsSources as string[]
+      // `oracle: <query>` entries route through the paid Oracle /search; everything
+      // else (RSS URLs and `Search:` Google News queries) goes through fetchRssFeeds.
+      const isOracle = (s: string) => s.trim().toLowerCase().startsWith('oracle:')
+      const oracleQueries = allSources
+        .filter(isOracle)
+        .map((s) => s.trim().slice('oracle:'.length).trim())
+        .filter(Boolean)
+      const feedUrls = allSources.filter((s) => !isOracle(s))
 
       const initialForecastCount = await countTodayActions(bot.id, 'CREATED_FORECAST')
-      if (feedUrls.length > 0 && initialForecastCount < bot.maxForecastsPerDay) {
+      if ((feedUrls.length > 0 || oracleQueries.length > 0) && initialForecastCount < bot.maxForecastsPerDay) {
         const metrics = startMetrics()
 
+        // Cap paid Oracle searches per run; extras are ignored until the next run.
+        const cappedOracleQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
+        if (oracleQueries.length > cappedOracleQueries.length) {
+          log.info(
+            { botId: bot.id, configured: oracleQueries.length, cap: MAX_ORACLE_SOURCES_PER_RUN },
+            'Capping oracle: source queries for this run',
+          )
+        }
+
         const rssFetchStart = Date.now()
-        const items = await fetchRssFeeds(feedUrls)
+        const [rssItems, oracleItems] = await Promise.all([
+          fetchRssFeeds(feedUrls),
+          fetchOracleSources(cappedOracleQueries, {
+            windowHours: bot.hotnessWindowHours,
+            meta: { source: 'bot-sourcing', userId: bot.userId },
+          }),
+        ])
+        const items = [...rssItems, ...oracleItems]
         metrics.rssFeatchDurationMs = Date.now() - rssFetchStart
 
         summary.fetchedCount = items.length
@@ -273,8 +298,8 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
           },
           'Forecast creation batch completed (performance metrics)',
         )
-      } else if (feedUrls.length === 0) {
-        log.warn({ botId: bot.id }, 'No RSS sources configured')
+      } else if (feedUrls.length === 0 && oracleQueries.length === 0) {
+        log.warn({ botId: bot.id }, 'No news sources configured')
       }
     }
 
