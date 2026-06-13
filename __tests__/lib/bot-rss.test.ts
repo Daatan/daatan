@@ -160,6 +160,32 @@ describe('detectHotTopics', () => {
     ]
     expect(detectHotTopics(items, 2, 24)).toEqual([])
   })
+
+  it('clusters on short keywords like "AI" that the old length filter discarded', () => {
+    // "ai" and "chip" are the only shared tokens; the previous length>3 filter
+    // dropped "ai", leaving a single overlap and no cluster. Now they cluster.
+    const items = [
+      makeItem('AI chip demand surges', 'source-a'),
+      makeItem('AI chip shortage worsens', 'source-b'),
+    ]
+    const topics = detectHotTopics(items, 2, 24)
+    expect(topics).toHaveLength(1)
+    expect(topics[0].sourceCount).toBe(2)
+  })
+
+  it('produces the same clusters regardless of item order (deterministic)', () => {
+    const a = makeItem('OpenAI releases new language model gpt', 'alpha')
+    const b = makeItem('OpenAI releases language model gpt today', 'beta')
+    const c = makeItem('OpenAI new language model gpt release', 'gamma')
+
+    const forward = detectHotTopics([a, b, c], 2, 24)
+    const reversed = detectHotTopics([c, b, a], 2, 24)
+
+    expect(forward).toHaveLength(1)
+    expect(reversed).toHaveLength(1)
+    expect(forward[0].sourceCount).toBe(3)
+    expect(reversed[0].sourceCount).toBe(3)
+  })
 })
 
 describe('fetchRssFeeds', () => {
@@ -257,8 +283,6 @@ describe('fetchRssFeeds', () => {
         title: 'Good Feed',
         items: [{ title: 'Good headline', link: 'https://goodfeed.com/1', pubDate: '2026-02-01T00:00:00Z' }],
       })
-    // Mock fetch to fail for the fallback too
-    mockFetch.mockResolvedValueOnce({ ok: false })
 
     const results = await fetchRssFeeds([
       'https://badfeed.com/rss',
@@ -271,7 +295,6 @@ describe('fetchRssFeeds', () => {
 
   it('returns empty array when all feeds fail', async () => {
     mockParseURL.mockRejectedValue(new Error('Timeout'))
-    mockFetch.mockResolvedValue({ ok: false })
 
     const results = await fetchRssFeeds(['https://bad1.com/rss', 'https://bad2.com/rss'])
     expect(results).toEqual([])
@@ -310,19 +333,68 @@ describe('fetchRssFeeds', () => {
     expect(mockParseURL).toHaveBeenCalledWith(expect.stringContaining('news.google.com/rss/search?q=bitcoin'))
   })
 
-  it('falls back to HTML scraping when RSS fails but URL is valid', async () => {
+  it('returns empty (no HTML scrape fallback) when a feed is not valid RSS', async () => {
     mockParseURL.mockRejectedValue(new Error('Not RSS'))
-    mockFetch.mockResolvedValue({
-      ok: true,
-      text: async () => '<html><body><a href="/news/1">Valid Headline From Page</a></body></html>',
-    })
 
     const results = await fetchRssFeeds(['https://example.com/news'])
 
-    expect(results).toHaveLength(1)
-    expect(results[0].title).toBe('Valid Headline From Page')
-    expect(results[0].source).toBe('example.com')
-    expect(results[0].url).toBe('https://example.com/news/1')
+    expect(results).toEqual([])
+  })
+
+  // ── Google News per-article publisher attribution ─────────────────────────
+
+  it('uses the per-item <source> element as the source for Google News results', async () => {
+    mockParseURL.mockResolvedValue({
+      title: 'Google News',
+      items: [
+        {
+          title: 'OpenAI ships new model - The Verge',
+          link: 'https://news.google.com/articles/1',
+          pubDate: '2026-02-01T00:00:00Z',
+          sourceTag: { _: 'The Verge', $: { url: 'https://www.theverge.com' } },
+        },
+        {
+          title: 'OpenAI ships new model - Reuters',
+          link: 'https://news.google.com/articles/2',
+          pubDate: '2026-02-01T00:00:00Z',
+          sourceTag: { _: 'Reuters', $: { url: 'https://www.reuters.com' } },
+        },
+      ],
+    })
+
+    const results = await fetchRssFeeds(['Search: openai model'])
+
+    expect(results.map(r => r.source)).toEqual(['The Verge', 'Reuters'])
+    // The " - Publisher" suffix is stripped from the title for cleaner clustering
+    expect(results.map(r => r.title)).toEqual(['OpenAI ships new model', 'OpenAI ships new model'])
+  })
+
+  it('falls back to the " - Publisher" title suffix when no <source> element is present', async () => {
+    mockParseURL.mockResolvedValue({
+      title: 'Google News',
+      items: [
+        { title: 'Senate passes the bill - Politico', link: 'https://news.google.com/a/1', pubDate: '2026-02-01T00:00:00Z' },
+      ],
+    })
+
+    const results = await fetchRssFeeds(['Search: senate bill'])
+
+    expect(results[0].source).toBe('Politico')
+    expect(results[0].title).toBe('Senate passes the bill')
+  })
+
+  it('does not strip " - " suffixes or override source for ordinary (non-Google-News) feeds', async () => {
+    mockParseURL.mockResolvedValue({
+      title: 'The Verge',
+      items: [
+        { title: 'A look at design - and why it matters', link: 'https://theverge.com/1', pubDate: '2026-02-01T00:00:00Z' },
+      ],
+    })
+
+    const results = await fetchRssFeeds(['https://www.theverge.com/rss/index.xml'])
+
+    expect(results[0].source).toBe('The Verge')
+    expect(results[0].title).toBe('A look at design - and why it matters')
   })
 
   // ── SSRF URL validation tests ─────────────────────────────────────────────
