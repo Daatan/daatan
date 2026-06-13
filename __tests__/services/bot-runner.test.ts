@@ -57,6 +57,14 @@ vi.mock('@/lib/services/bots/rss', () => ({
   detectHotTopics: vi.fn(),
 }))
 
+// ─── Oracle source mock ──────────────────────────────────────────────────────
+// Default: no oracle items. The exported cap constant must be preserved so the
+// runner's slice(0, MAX_ORACLE_SOURCES_PER_RUN) behaves like production.
+vi.mock('@/lib/services/bots/oracleSource', () => ({
+  fetchOracleSources: vi.fn().mockResolvedValue([]),
+  MAX_ORACLE_SOURCES_PER_RUN: 3,
+}))
+
 // ─── Commitment mock ─────────────────────────────────────────────────────────
 vi.mock('@/lib/services/commitment', () => ({
   createCommitment: vi.fn(),
@@ -489,6 +497,52 @@ describe('runDueBots — maxForecastsPerDay cap', () => {
 
     expect(summaries[0].errors).toBeGreaterThanOrEqual(1)
     expect(summaries[0].forecastsCreated).toBe(0)
+  })
+
+  it('routes "oracle:" entries to fetchOracleSources (capped) and the rest to fetchRssFeeds', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { fetchRssFeeds, detectHotTopics } = await import('@/lib/services/bots/rss')
+    const { fetchOracleSources } = await import('@/lib/services/bots/oracleSource')
+    const { runDueBots } = await import('@/lib/services/bots')
+
+    const bot = makeBot({
+      maxForecastsPerDay: 5,
+      maxVotesPerDay: 0,
+      hotnessWindowHours: 8,
+      newsSources: [
+        'https://feeds.bbci.co.uk/news/rss.xml',
+        'oracle: ukraine ceasefire',
+        'oracle: opec oil quota',
+        'oracle: fed rate decision',
+        'oracle: fourth query dropped',
+        'Search: trending headlines',
+      ],
+    })
+    vi.mocked(prisma.botConfig.findMany).mockResolvedValue([bot] as any)
+    vi.mocked(prisma.botRunLog.count).mockResolvedValue(0)
+    vi.mocked(fetchRssFeeds).mockResolvedValue([])
+    vi.mocked(fetchOracleSources).mockResolvedValue([])
+    vi.mocked(detectHotTopics).mockReturnValue([])
+    // No hot topics → sourceless path; make the LLM skip so no DB writes happen.
+    mockGenerateContent.mockResolvedValue({ text: '{"skip": true}' })
+    vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+    vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
+    vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)
+
+    await runDueBots()
+
+    // Non-oracle entries (RSS URL + Search:) go to fetchRssFeeds; oracle: entries excluded.
+    expect(fetchRssFeeds).toHaveBeenCalledWith([
+      'https://feeds.bbci.co.uk/news/rss.xml',
+      'Search: trending headlines',
+    ])
+
+    // Four oracle: queries configured, but capped to 3 per run; prefixes stripped.
+    expect(fetchOracleSources).toHaveBeenCalledTimes(1)
+    const [queries, opts] = vi.mocked(fetchOracleSources).mock.calls[0]
+    expect(queries).toEqual(['ukraine ceasefire', 'opec oil quota', 'fed rate decision'])
+    expect(opts.windowHours).toBe(8)
+    expect(opts.meta).toMatchObject({ source: 'bot-sourcing', userId: bot.userId })
   })
 
   it('creates a sourceless forecast when no hot topics and under daily cap', async () => {
