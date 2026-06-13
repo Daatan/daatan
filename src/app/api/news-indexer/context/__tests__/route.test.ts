@@ -136,4 +136,50 @@ describe('POST /api/news-indexer/context', () => {
     })
     expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
   })
+
+  it('feeds the whole article set to the Oracle and returns per-article sources', async () => {
+    const ORACLE_TWO_SOURCES = {
+      ...ORACLE_WITH_SOURCE,
+      articles_used: 2,
+      sources: [
+        ORACLE_WITH_SOURCE.sources[0],
+        {
+          source_id: 'aj',
+          source_name: 'Al Jazeera',
+          url: 'https://aljazeera.com/news/y',
+          stance: -0.3,
+          certainty: 0.6,
+          credibility_weight: 1.0,
+          claims: ['AJ claim'],
+        },
+      ],
+    }
+    vi.mocked(getOracleForecast).mockResolvedValue(ORACLE_TWO_SOURCES as never)
+
+    const res = await POST(
+      post('test-secret', {
+        predictionId: 'pred-1',
+        triggerArticleUrl: 'https://aljazeera.com/news/y',
+        articles: [
+          { url: 'https://bbc.com/news/x', title: 'BBC', snippet: 's1', source: 'bbc.com', similarity: 0.5 },
+          { url: 'https://aljazeera.com/news/y', title: 'AJ', snippet: 's2', source: 'aljazeera.com', similarity: 0.7 },
+        ],
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    // Oracle saw both articles (aggregation, not last-write-wins).
+    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    expect(opts?.articles).toHaveLength(2)
+
+    // Per-article enrichment for the whole set is returned.
+    expect(body.sources).toHaveLength(2)
+    // Top-level echoes the *trigger* article's enrichment (the AJ one).
+    expect(body).toMatchObject({ ok: true, stance: -0.3, certainty: 0.6, claim: 'AJ claim', probability: 75 })
+
+    // The snapshot persists the full evidence set as sources.
+    const [{ sources }] = vi.mocked(saveNewsIndexerMatch).mock.calls[0]
+    expect(sources).toHaveLength(2)
+  })
 })
