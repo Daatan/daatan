@@ -241,7 +241,7 @@ const STOP_WORDS = new Set([
  * tokens are kept (≥2 chars), so load-bearing acronyms like "AI", "EU", "oil"
  * survive clustering instead of being discarded by a length filter.
  */
-function extractKeywords(title: string): string[] {
+export function extractKeywords(title: string): string[] {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')

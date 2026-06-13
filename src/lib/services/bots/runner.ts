@@ -229,7 +229,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
           orderBy: { createdAt: 'desc' },
           take: 50,
         })
-        const existingTitles = recentForecasts.map(f => f.claimText).join('\n- ')
+        const existingTitles = recentForecasts.map(f => f.claimText)
 
         for (const topic of hotTopics) {
           // Rate limit check (note: subject to TOCTOU if multiple instances run simultaneously)

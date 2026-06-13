@@ -17,6 +17,7 @@ import {
   MIN_RESOLVE_DAYS,
   MAX_RESOLVE_DAYS,
 } from './shared'
+import { isLocalDuplicate } from './dedup'
 import { createAndStake } from './stake'
 
 export async function processTopic(
@@ -25,14 +26,22 @@ export async function processTopic(
   sourceUrls: string[],
   llm: ReturnType<typeof createBotLLMService>,
   dryRun: boolean,
-  existingTitles: string,
+  existingTitles: string[],
 ): Promise<'created' | 'skipped' | 'error'> {
   try {
+    // Local pre-dedup: a confident keyword-overlap match skips the LLM dedup
+    // round-trip entirely. Borderline cases fall through to the LLM check below.
+    if (isLocalDuplicate(topicTitle, existingTitles)) {
+      log.info({ botId: bot.id, topic: topicTitle }, 'Topic already covered (local dedup), skipping')
+      await logBotAction(bot.id, 'SKIPPED', { title: topicTitle, urls: sourceUrls }, null, 'topic already covered (local dedup)', dryRun)
+      return 'skipped'
+    }
+
     // Dedup check: use cached existing titles to avoid N+1 query
     const dedupTemplate = await getPromptTemplate('dedupe-check')
     const dedupPrompt = fillPrompt(dedupTemplate, {
       topicTitle,
-      existingTitles,
+      existingTitles: existingTitles.join('\n- '),
     })
 
     let dedupResult

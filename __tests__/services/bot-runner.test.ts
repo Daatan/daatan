@@ -52,10 +52,12 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
 }))
 
 // ─── RSS mock ────────────────────────────────────────────────────────────────
-vi.mock('@/lib/services/bots/rss', () => ({
-  fetchRssFeeds: vi.fn(),
-  detectHotTopics: vi.fn(),
-}))
+// Partial mock: stub the network fetch + detection, but keep the real
+// extractKeywords (used by the local dedup path) so its behaviour is exercised.
+vi.mock('@/lib/services/bots/rss', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/services/bots/rss')>()
+  return { ...actual, fetchRssFeeds: vi.fn(), detectHotTopics: vi.fn() }
+})
 
 // ─── Oracle source mock ──────────────────────────────────────────────────────
 // Default: no oracle items. The exported cap constant must be preserved so the
@@ -475,6 +477,33 @@ describe('runDueBots — maxForecastsPerDay cap', () => {
 
     expect(summaries[0].skipped).toBe(1)
     expect(summaries[0].forecastsCreated).toBe(0)
+  })
+
+  it('skips a topic via local dedup without making any LLM call', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { fetchRssFeeds, detectHotTopics } = await import('@/lib/services/bots/rss')
+    const { runDueBots } = await import('@/lib/services/bots')
+
+    const bot = makeBot({ maxForecastsPerDay: 5, maxVotesPerDay: 0 })
+    vi.mocked(prisma.botConfig.findMany).mockResolvedValue([bot] as any)
+    vi.mocked(prisma.botRunLog.count).mockResolvedValue(0)
+    vi.mocked(fetchRssFeeds).mockResolvedValue([])
+    vi.mocked(detectHotTopics).mockReturnValue([
+      { title: 'Bitcoin price hits record high', items: [], sourceCount: 3 },
+    ] as any)
+    // A recent forecast with heavy keyword overlap → local Jaccard catches it.
+    vi.mocked(prisma.prediction.findMany).mockResolvedValue([
+      { claimText: 'Bitcoin price hits a record high today' },
+    ] as any)
+    vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
+    vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)
+
+    const summaries = await runDueBots()
+
+    expect(summaries[0].skipped).toBe(1)
+    expect(summaries[0].forecastsCreated).toBe(0)
+    // The whole point: no LLM round-trip was needed to detect the duplicate.
+    expect(mockGenerateContent).not.toHaveBeenCalled()
   })
 
   it('increments errors when no hot topics and LLM generation fails', async () => {
