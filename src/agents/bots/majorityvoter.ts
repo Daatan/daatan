@@ -10,8 +10,8 @@ export const majorityVoter: BotDefinition = {
     newsSources: [
         "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
         "https://feeds.bbci.co.uk/news/rss.xml",
-        "https://www.reuters.com/arc/outboundfeeds/news-one-feed-global/",
-        "https://apnews.com/feed/",
+        "https://feeds.npr.org/1001/rss.xml",
+        "https://abcnews.go.com/abcnews/topstories",
         "search: top news trending headlines global stories"
     ],
     intervalMinutes: 180,

@@ -8,10 +8,10 @@ export const foxNewsFan: BotDefinition = {
     forecastPrompt: "Focus on US political developments: new legislation, polling shifts, or election news. Identify ONE story where conservative voters are highly engaged or there is a clear partisan debate. Create a testable forecast about a specific outcome. Example: 'The House will vote on [Bill Name] before [Date]', 'Candidate X's polling lead will exceed 5% in the next [Poll Source] survey'. Focus on clear, verifiable political events. Resolution window: 14-90 days.",
     votePrompt: 'Review political forecasts. Vote YES on outcomes that align with conservative political momentum or polling leads. Vote NO on legislative efforts that face significant congressional opposition.',
     newsSources: [
-        "https://feeds.foxnews.com/feeds/politics/",
+        "https://moxie.foxnews.com/google-publisher/politics.xml",
         "https://www.washingtontimes.com/rss/headlines/news/politics/",
         "https://www.nationalreview.com/feed/",
-        "https://www.politico.com/rss/politics.xml",
+        "https://thehill.com/news/feed/",
         "search: US Senate Congress legislation election polling"
     ],
     intervalMinutes: 240,

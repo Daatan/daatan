@@ -9,7 +9,7 @@ export const hacker: BotDefinition = {
     votePrompt: 'Review tech-related forecasts. Vote YES on predictions about security breaches, product delays, AI breakthroughs, or crypto regulation—only when you find credible technical evidence or hacker community consensus suggests high probability. Vote NO on overly optimistic corporate claims about shipping timelines.',
     newsSources: [
         "https://news.ycombinator.com/rss",
-        "https://slashdot.org/index.rss",
+        "https://rss.slashdot.org/Slashdot/slashdot",
         "https://www.theverge.com/rss/index.xml",
         "https://techcrunch.com/feed/",
         "search: AI LLM security vulnerability"
