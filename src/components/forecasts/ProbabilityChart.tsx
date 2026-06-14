@@ -28,17 +28,36 @@ type ChartOption = {
   text: string
 }
 
+type ChartMarketPoint = {
+  createdAt: string
+  probability: number
+}
+
 type Props = {
   commitments: ChartCommitment[]
   snapshots: ChartSnapshot[]
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE' | 'NUMERIC_THRESHOLD'
   options: ChartOption[]
+  /** Linked Polymarket YES-price history, oldest first. Drives the "Market" line. */
+  polymarketSnapshots?: ChartMarketPoint[]
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
 
-export default function ProbabilityChart({ commitments, snapshots, outcomeType, options }: Props) {
-  if (commitments.length < 3 || outcomeType === 'NUMERIC_THRESHOLD') return null
+export default function ProbabilityChart({
+  commitments,
+  snapshots,
+  outcomeType,
+  options,
+  polymarketSnapshots = [],
+}: Props) {
+  if (outcomeType === 'NUMERIC_THRESHOLD') return null
+
+  // The Polymarket YES price is a binary probability, so we only plot it on
+  // binary forecasts. When a linked market has history we render the chart even
+  // with <3 commitments, so the market line shows before the community moves.
+  const showMarket = outcomeType === 'BINARY' && polymarketSnapshots.length > 0
+  if (commitments.length < 3 && !showMarket) return null
 
   const sortedCommits = [...commitments].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -48,10 +67,15 @@ export default function ProbabilityChart({ commitments, snapshots, outcomeType, 
     .filter(s => s.externalProbability != null)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
-  // One data point per event (commitment or Oracle run), sorted chronologically
+  const sortedMarket = [...polymarketSnapshots].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  )
+
+  // One data point per event (commitment, Oracle run, or market snapshot), sorted chronologically
   const allTs = [
     ...sortedCommits.map(c => new Date(c.createdAt).getTime()),
     ...sortedSnaps.map(s => new Date(s.createdAt).getTime()),
+    ...sortedMarket.map(m => new Date(m.createdAt).getTime()),
   ].sort((a, b) => a - b)
   const uniqueTs = [...new Set(allTs)]
 
@@ -61,9 +85,13 @@ export default function ProbabilityChart({ commitments, snapshots, outcomeType, 
     // Carry AI estimate forward as a step function
     const latestAi = upToSnaps.length > 0 ? upToSnaps[upToSnaps.length - 1].externalProbability : null
 
+    const upToMarket = sortedMarket.filter(m => new Date(m.createdAt).getTime() <= ts)
+    const latestMarket = upToMarket.length > 0 ? upToMarket[upToMarket.length - 1].probability : null
+
     const point: Record<string, number | string | null> = {
       label: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       ai: latestAi ?? null,
+      market: latestMarket,
     }
 
     if (outcomeType === 'BINARY') {
@@ -151,6 +179,18 @@ export default function ProbabilityChart({ commitments, snapshots, outcomeType, 
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
+              dot={false}
+              connectNulls
+            />
+          )}
+
+          {showMarket && (
+            <Line
+              type="monotone"
+              dataKey="market"
+              name="Market (Polymarket)"
+              stroke="#EC4899"
+              strokeWidth={2}
               dot={false}
               connectNulls
             />
