@@ -16,6 +16,40 @@ type Source = {
   publishedDate?: string | null
 }
 
+/** A source domain with how many distinct articles in this update came from it. */
+type GroupedSource = { source: string; url: string; count: number }
+
+/** Domain label for a source — its `source` field, else the URL host (sans www). */
+function sourceDomain(src: Source): string {
+  if (src.source) return src.source
+  try {
+    return new URL(src.url).hostname.replace(/^www\./, '')
+  } catch {
+    return src.title || src.url
+  }
+}
+
+/**
+ * Collapse an update's raw source list into one entry per domain, deduping
+ * identical article URLs. Avoids the wall of repeated "aljazeera.com /
+ * middleeasteye.net" chips when an update cites many articles from a few sources.
+ */
+export function groupSources(sources: Source[]): GroupedSource[] {
+  const byDomain = new Map<string, { source: string; url: string; urls: Set<string> }>()
+  for (const s of sources) {
+    if (!s?.url) continue
+    const key = sourceDomain(s)
+    const existing = byDomain.get(key)
+    if (existing) existing.urls.add(s.url)
+    else byDomain.set(key, { source: key, url: s.url, urls: new Set([s.url]) })
+  }
+  return Array.from(byDomain.values()).map(e => ({
+    source: e.source,
+    url: e.url,
+    count: e.urls.size,
+  }))
+}
+
 /** Single source entry within an Oracle forecast snapshot (camelCase variant used in UI). */
 type OracleSnapshotSource = {
   sourceId: string
@@ -404,23 +438,27 @@ export default function ContextTimeline({
                     {formatDate(snap.createdAt)}
                   </div>
                   <p className="text-sm text-gray-300 leading-relaxed">{snap.summary}</p>
-                  {/* Sources */}
-                  {(snap.sources as Source[])?.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {(snap.sources as Source[]).map((src, i) => (
-                        <a
-                          key={i}
-                          href={src.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 text-xs text-blue-500 hover:text-cobalt-light hover:underline"
-                        >
-                          {src.source || src.title}
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  {/* Sources — grouped by domain, deduped, with a per-source count */}
+                  {(() => {
+                    const grouped = groupSources((snap.sources as Source[]) ?? [])
+                    if (grouped.length === 0) return null
+                    return (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {grouped.map((g, i) => (
+                          <a
+                            key={i}
+                            href={g.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-xs text-blue-500 hover:text-cobalt-light hover:underline"
+                          >
+                            {g.source}{g.count > 1 ? ` (${g.count})` : ''}
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
-import ContextTimeline from '../ContextTimeline'
+import ContextTimeline, { groupSources } from '../ContextTimeline'
 import enMessages from '../../../../messages/en.json'
 
 const mockFetch = vi.fn()
@@ -337,5 +337,36 @@ describe('ContextTimeline', () => {
     await waitFor(() => {
       expect(screen.getByText('2 previous updates')).toBeInTheDocument()
     })
+  })
+})
+
+describe('groupSources', () => {
+  it('collapses many articles from the same domain into one entry with a count', () => {
+    const grouped = groupSources([
+      { title: 'a', url: 'https://aljazeera.com/1', source: 'aljazeera.com' },
+      { title: 'b', url: 'https://aljazeera.com/2', source: 'aljazeera.com' },
+      { title: 'c', url: 'https://middleeasteye.net/1', source: 'middleeasteye.net' },
+    ])
+    expect(grouped).toEqual([
+      { source: 'aljazeera.com', url: 'https://aljazeera.com/1', count: 2 },
+      { source: 'middleeasteye.net', url: 'https://middleeasteye.net/1', count: 1 },
+    ])
+  })
+
+  it('dedupes identical article URLs so a source is never double-counted', () => {
+    const grouped = groupSources([
+      { title: 'a', url: 'https://aljazeera.com/1', source: 'aljazeera.com' },
+      { title: 'a-dup', url: 'https://aljazeera.com/1', source: 'aljazeera.com' },
+    ])
+    expect(grouped).toEqual([{ source: 'aljazeera.com', url: 'https://aljazeera.com/1', count: 1 }])
+  })
+
+  it('falls back to the URL host when source is missing', () => {
+    const grouped = groupSources([{ title: 'x', url: 'https://www.reuters.com/world/x' }])
+    expect(grouped).toEqual([{ source: 'reuters.com', url: 'https://www.reuters.com/world/x', count: 1 }])
+  })
+
+  it('ignores entries without a URL', () => {
+    expect(groupSources([{ title: 'x', url: '' }])).toEqual([])
   })
 })
