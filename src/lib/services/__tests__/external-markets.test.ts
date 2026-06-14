@@ -14,6 +14,8 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+vi.mock('@/lib/services/embedding', () => ({ embedText: vi.fn() }))
+
 import {
   normalizeGammaMarket,
   polymarketProvider,
@@ -21,8 +23,10 @@ import {
   resolveMarketByUrl,
   syncLinkedMarkets,
   suggestMarkets,
+  suggestMarketMatch,
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
+import { embedText } from '@/lib/services/embedding'
 
 /** Build a minimal fetch Response stand-in. */
 function jsonResponse(data: unknown, ok = true, status = 200) {
@@ -225,6 +229,47 @@ describe('suggestMarkets', () => {
   it('returns [] for an empty query without calling the API', async () => {
     global.fetch = vi.fn()
     expect(await suggestMarkets('  ')).toEqual([])
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('suggestMarketMatch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+  })
+
+  it('returns the best candidate when similarity clears the threshold', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // claim == candidate → cosine 1
+
+    const match = await suggestMarketMatch('Will X definitely happen this year?')
+
+    expect(match).not.toBeNull()
+    expect(match!.externalMarketId).toBe('m1')
+    expect(match!.score).toBe(100)
+    expect(match!.providerLabel).toBe('Polymarket')
+  })
+
+  it('returns null when no candidate is similar enough', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(embedText).mockImplementation(async (t: string) =>
+      t.includes('definitely') ? [1, 0, 0] : [0, 1, 0], // orthogonal → cosine 0
+    )
+
+    expect(await suggestMarketMatch('Will X definitely happen this year?')).toBeNull()
+  })
+
+  it('returns null when embeddings are unavailable', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(embedText).mockResolvedValue(null)
+
+    expect(await suggestMarketMatch('Will X definitely happen this year?')).toBeNull()
+  })
+
+  it('returns null for a too-short claim without calling out', async () => {
+    global.fetch = vi.fn()
+    expect(await suggestMarketMatch('short')).toBeNull()
     expect(global.fetch).not.toHaveBeenCalled()
   })
 })

@@ -13,6 +13,9 @@ import {
   ChevronLeft,
   Check,
   Loader2,
+  TrendingUp,
+  ExternalLink,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { StepNewsAnchor } from './steps/StepNewsAnchor'
@@ -52,6 +55,17 @@ export type PredictionFormData = {
   externalMarketId?: string
 }
 
+/** A "same question" market surfaced after the claim step (see /api/forecasts/suggest-market). */
+type MarketMatch = {
+  externalMarketId: string
+  provider: 'POLYMARKET' | 'KALSHI'
+  providerLabel: string
+  question: string
+  yesProbability: number
+  url: string
+  score: number
+}
+
 const STEPS = [
   { id: 1, title: 'News Anchor', icon: Newspaper, description: 'Select a news story' },
   { id: 2, title: 'Prediction', icon: FileText, description: 'Write your claim' },
@@ -74,6 +88,8 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
   const [submitMode, setSubmitMode] = useState<'draft' | 'publish'>('publish')
   const [estimates, setEstimates] = useState({ create: 5000, publish: 1500 })
   const [error, setError] = useState<string | null>(null)
+  const [marketMatch, setMarketMatch] = useState<MarketMatch | null>(null)
+  const [matchDismissed, setMatchDismissed] = useState(false)
 
   const [formData, setFormData] = useState<PredictionFormData>({
     claimText: initialClaim,
@@ -153,7 +169,35 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
     setFormData(prev => ({ ...prev, ...updates }))
   }
 
+  // After the claim step, look for a "same question" market to offer linking.
+  // Non-blocking: we advance immediately and surface the prompt when it returns.
+  const checkMarketMatch = async (claimText: string) => {
+    try {
+      const res = await fetch('/api/forecasts/suggest-market', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimText }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.match) {
+        setMarketMatch(data.match)
+        setMatchDismissed(false)
+      }
+    } catch {
+      // best-effort — a missing suggestion never blocks creation
+    }
+  }
+
   const handleNext = () => {
+    if (
+      currentStep === 2 &&
+      !formData.externalMarketId &&
+      !matchDismissed &&
+      formData.claimText.trim().length >= 10
+    ) {
+      void checkMarketMatch(formData.claimText)
+    }
     if (currentStep < 4) {
       setCurrentStep(prev => prev + 1)
     }
@@ -358,6 +402,61 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       {error && (
         <div className="mb-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg text-red-400">
           {error}
+        </div>
+      )}
+
+      {/* "Same question" market match — offered after the claim step */}
+      {marketMatch && !matchDismissed && !formData.externalMarketId && (
+        <div className="mb-6 p-4 rounded-xl border border-pink-500/40 bg-pink-500/5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400 mb-1">
+                <TrendingUp className="w-4 h-4" />
+                Similar market on {marketMatch.providerLabel} · {marketMatch.score}% match
+              </div>
+              <a
+                href={marketMatch.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-text-secondary hover:text-pink-300 inline-flex items-center gap-1"
+              >
+                <span className="truncate">{marketMatch.question}</span>
+                <ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+              <p className="mt-0.5 text-xs text-gray-500">Currently {marketMatch.yesProbability}% YES</p>
+            </div>
+            <button
+              onClick={() => setMatchDismissed(true)}
+              className="text-gray-400 hover:text-gray-200 shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => {
+                updateFormData({ externalMarketId: marketMatch.externalMarketId })
+                setMarketMatch(null)
+              }}
+              className="px-3 py-1.5 text-sm font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded-lg"
+            >
+              Link this market
+            </button>
+            <button
+              onClick={() => setMatchDismissed(true)}
+              className="px-3 py-1.5 text-sm text-gray-300 hover:text-white"
+            >
+              No, keep separate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Linked-market confirmation */}
+      {formData.externalMarketId && marketMatch && (
+        <div className="mb-6 p-3 rounded-xl border border-pink-500/40 bg-pink-500/5 flex items-center gap-2 text-sm text-pink-300">
+          <Check className="w-4 h-4" /> Linked to the {marketMatch.providerLabel} market.
         </div>
       )}
 
