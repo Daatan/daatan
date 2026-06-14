@@ -1,5 +1,5 @@
 'use client'
-import { Calendar, Target } from 'lucide-react'
+import { Calendar, Target, TrendingUp, ExternalLink } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { Prediction } from './types'
 
@@ -11,6 +11,11 @@ interface Props {
 
 export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }: Props) {
   const t = useTranslations('forecast')
+  const market = prediction.polymarketMarket
+  const marketProbability =
+    market && market.snapshots.length > 0
+      ? market.snapshots[market.snapshots.length - 1].probability
+      : null
   return (
     <>
       <div className={variant === 'mobile' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
@@ -51,6 +56,33 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
             )}
           </div>
         </div>
+
+        {market && (
+          <a
+            href={`https://polymarket.com/event/${market.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm hover:border-pink-500/60 transition-colors group"
+          >
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Polymarket
+              <ExternalLink className="w-3 h-3 ml-auto text-gray-500 group-hover:text-pink-400" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              {marketProbability != null ? (
+                <span className="text-white font-semibold text-lg">{marketProbability}%</span>
+              ) : (
+                <span className="text-gray-400 italic text-xs">Awaiting price</span>
+              )}
+              {market.resolved && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400">
+                  Resolved
+                </span>
+              )}
+            </div>
+          </a>
+        )}
       </div>
     </>
   )

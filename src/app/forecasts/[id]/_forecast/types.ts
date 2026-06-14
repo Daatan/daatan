@@ -71,6 +71,12 @@ export type Prediction = {
       text: string
     } | null
   }>
+  polymarketMarket?: {
+    slug: string
+    question: string
+    resolved: boolean
+    snapshots: Array<{ createdAt: string; probability: number }>
+  } | null
   totalCuCommitted?: number
   userCommitment?: {
     id: string
