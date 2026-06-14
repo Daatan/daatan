@@ -64,6 +64,37 @@ describe('ProbabilityChart gating', () => {
     expect(screen.getByText(HEADING)).toBeInTheDocument()
   })
 
+  it('renders with ≥3 AI updates even when there are <3 commitments', () => {
+    render(
+      <ProbabilityChart
+        commitments={[]}
+        snapshots={[
+          { createdAt: '2026-06-14T01:00:00Z', externalProbability: 40 },
+          { createdAt: '2026-06-14T02:00:00Z', externalProbability: 55 },
+          { createdAt: '2026-06-14T03:00:00Z', externalProbability: 60 },
+        ]}
+        outcomeType="BINARY"
+        options={[]}
+      />,
+    )
+    expect(screen.getByText(HEADING)).toBeInTheDocument()
+  })
+
+  it('stays hidden with fewer than 3 AI updates and no commitments', () => {
+    render(
+      <ProbabilityChart
+        commitments={[]}
+        snapshots={[
+          { createdAt: '2026-06-14T01:00:00Z', externalProbability: 40 },
+          { createdAt: '2026-06-14T02:00:00Z', externalProbability: 55 },
+        ]}
+        outcomeType="BINARY"
+        options={[]}
+      />,
+    )
+    expect(screen.queryByText(HEADING)).toBeNull()
+  })
+
   it('does not render the market line for multiple-choice forecasts', () => {
     // Market history is binary; an MC forecast with <3 commitments stays hidden.
     render(
