@@ -17,8 +17,8 @@ const log = createLogger('cron-external-market-sync')
  * Read-only against each provider's API; best-effort (never throws). Hourly is
  * plenty — prices move slowly relative to the chart's resolution.
  *
- * EC2 crontab (run hourly):
- *   17 * * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/external-market-sync
+ * Triggered hourly by the External Market Sync GitHub Actions workflow
+ * (.github/workflows/external-market-sync.yml), same as heartbeat/search-health.
  */
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
