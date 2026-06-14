@@ -295,12 +295,12 @@ model Prediction {
   evidenceLinks     Json? // Array of evidence URLs
   resolutionNote    String?   @db.Text
 
-  // Polymarket link (opt-in — only some forecasts are linked; see PolymarketMarket).
-  // Linking is admin-authoritative; AI only suggests candidates.
-  polymarketMarketId   String?           @map("polymarket_market_id")
-  polymarketMarket     PolymarketMarket? @relation(fields: [polymarketMarketId], references: [id], onDelete: SetNull)
-  polymarketLinkedAt   DateTime?         @map("polymarket_linked_at")
-  polymarketLinkMethod String?           @map("polymarket_link_method") @db.VarChar(20) // 'manual' | 'ai-confirmed'
+  // External prediction-market link (opt-in — only some forecasts are linked).
+  // Linking is admin-authoritative or via URL import; AI only suggests candidates.
+  externalMarketId         String?         @map("external_market_id")
+  externalMarket           ExternalMarket? @relation(fields: [externalMarketId], references: [id], onDelete: SetNull)
+  externalMarketLinkedAt   DateTime?       @map("external_market_linked_at")
+  externalMarketLinkMethod String?         @map("external_market_link_method") @db.VarChar(20) // 'manual' | 'ai-confirmed' | 'imported'
 
   // Relations
   options          PredictionOption[]
@@ -316,7 +316,7 @@ model Prediction {
   @@index([newsAnchorId])
   @@index([resolveByDatetime])
   @@index([isPublic])
-  @@index([polymarketMarketId])
+  @@index([externalMarketId])
   @@map("predictions")
 }
 
@@ -349,16 +349,24 @@ model ContextSnapshot {
 }
 
 // ============================================
-// POLYMARKET (external prediction-market link + price history)
+// EXTERNAL PREDICTION MARKETS (Polymarket / Kalshi link + price history)
 // ============================================
 
-/// A cached Polymarket market that one or more Daatan forecasts link to.
-/// Metadata is refreshed from the Gamma API by the polymarket-sync cron.
-model PolymarketMarket {
-  id          String @id @default(cuid())
-  conditionId String @unique @map("condition_id") // Polymarket's stable market id
-  slug        String @map("slug") // URL slug, e.g. "will-x-happen-by-2026"
-  question    String @db.Text
+enum MarketProvider {
+  POLYMARKET
+  KALSHI
+}
+
+/// A cached external prediction market (Polymarket or Kalshi) that one or more
+/// Daatan forecasts link to. Metadata + price are refreshed by the
+/// external-market-sync cron. `embedding` powers suggest-on-create (Phase D).
+model ExternalMarket {
+  id         String         @id @default(cuid())
+  provider   MarketProvider @default(POLYMARKET)
+  externalId String         @map("external_id") // provider's stable id (Polymarket conditionId / Kalshi ticker)
+  slug       String         @map("slug") // URL slug / ticker
+  url        String         @map("url") // canonical market URL
+  question   String         @db.Text
 
   outcomes Json // e.g. ["Yes","No"] — outcome labels in price order
 
@@ -367,29 +375,33 @@ model PolymarketMarket {
   resolvedOutcome String?   @map("resolved_outcome") @db.VarChar(100)
   lastSyncedAt    DateTime? @map("last_synced_at")
 
+  // Semantic embedding of `question` for suggest-on-create (pgvector, 768-dim).
+  embedding Unsupported("vector(768)")?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   predictions Prediction[]
-  snapshots   PolymarketPriceSnapshot[]
+  snapshots   ExternalMarketPriceSnapshot[]
 
+  @@unique([provider, externalId])
   @@index([slug])
-  @@map("polymarket_markets")
+  @@map("external_markets")
 }
 
 /// Point-in-time YES probability for a linked market (drives the history chart).
 /// Keyed by market, not prediction — multiple forecasts may link the same market.
-model PolymarketPriceSnapshot {
-  id       String           @id @default(cuid())
-  marketId String           @map("market_id")
-  market   PolymarketMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+model ExternalMarketPriceSnapshot {
+  id       String         @id @default(cuid())
+  marketId String         @map("market_id")
+  market   ExternalMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
   probability Int // 0–100, the YES outcome price
 
   createdAt DateTime @default(now())
 
   @@index([marketId, createdAt])
-  @@map("polymarket_price_snapshots")
+  @@map("external_market_price_snapshots")
 }
 
 // ============================================

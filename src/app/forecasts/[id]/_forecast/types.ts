@@ -71,8 +71,10 @@ export type Prediction = {
       text: string
     } | null
   }>
-  polymarketMarket?: {
+  externalMarket?: {
+    provider: 'POLYMARKET' | 'KALSHI'
     slug: string
+    url: string
     question: string
     resolved: boolean
     snapshots: Array<{ createdAt: string; probability: number }>

@@ -80,7 +80,7 @@ async function getPrediction(idOrSlug: string) {
           },
         },
       },
-      polymarketMarket: {
+      externalMarket: {
         include: {
           snapshots: {
             orderBy: { createdAt: 'asc' },
@@ -116,12 +116,14 @@ async function getPrediction(idOrSlug: string) {
       ...c,
       createdAt: c.createdAt.toISOString(),
     })),
-    polymarketMarket: prediction.polymarketMarket
+    externalMarket: prediction.externalMarket
       ? {
-          slug: prediction.polymarketMarket.slug,
-          question: prediction.polymarketMarket.question,
-          resolved: prediction.polymarketMarket.resolved,
-          snapshots: prediction.polymarketMarket.snapshots.map(s => ({
+          provider: prediction.externalMarket.provider,
+          slug: prediction.externalMarket.slug,
+          url: prediction.externalMarket.url,
+          question: prediction.externalMarket.question,
+          resolved: prediction.externalMarket.resolved,
+          snapshots: prediction.externalMarket.snapshots.map(s => ({
             createdAt: s.createdAt.toISOString(),
             probability: s.probability,
           })),

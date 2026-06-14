@@ -3,19 +3,19 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError } from '@/lib/api-error'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { resolveMarketByUrl, suggestMarkets } from '@/lib/services/polymarket'
+import { resolveMarketByUrl, suggestMarkets } from '@/lib/services/external-markets'
 import { createLogger } from '@/lib/logger'
 
-const log = createLogger('admin-forecast-polymarket')
+const log = createLogger('admin-forecast-external-market')
 
 export const dynamic = 'force-dynamic'
 
 const linkSchema = z.object({ url: z.string().min(1) })
 
 /**
- * GET /api/admin/forecasts/[id]/polymarket
- * AI/keyword suggestions for markets matching the forecast's claim. Suggestion
- * only — an admin still confirms via POST. Admin-gated.
+ * GET /api/admin/forecasts/[id]/external-market
+ * Candidate markets (Polymarket / Kalshi) matching the forecast's claim.
+ * Suggestion only — an admin still confirms via POST. Admin-gated.
  */
 export const GET = withAuth(
   async (_request, _user, { params }) => {
@@ -32,8 +32,8 @@ export const GET = withAuth(
 )
 
 /**
- * POST /api/admin/forecasts/[id]/polymarket  body: { url }
- * Resolve a pasted Polymarket URL and link it to the forecast (manual link).
+ * POST /api/admin/forecasts/[id]/external-market  body: { url }
+ * Resolve a pasted market URL (Polymarket / Kalshi) and link it (manual link).
  */
 export const POST = withAuth(
   async (request, _user, { params }) => {
@@ -46,36 +46,36 @@ export const POST = withAuth(
     if (!prediction) return apiError('Forecast not found', 404)
 
     const market = await resolveMarketByUrl(url)
-    if (!market) return apiError('Could not resolve a Polymarket market from that URL', 422)
+    if (!market) return apiError('Could not resolve a market from that URL', 422)
 
     await prisma.prediction.update({
       where: { id: params.id },
       data: {
-        polymarketMarketId: market.id,
-        polymarketLinkedAt: new Date(),
-        polymarketLinkMethod: 'manual',
+        externalMarketId: market.id,
+        externalMarketLinkedAt: new Date(),
+        externalMarketLinkMethod: 'manual',
       },
     })
-    log.info({ predictionId: params.id, marketId: market.id }, 'Linked Polymarket market')
+    log.info({ predictionId: params.id, marketId: market.id }, 'Linked external market')
     return NextResponse.json({ market })
   },
   { roles: ['ADMIN'] },
 )
 
 /**
- * DELETE /api/admin/forecasts/[id]/polymarket — unlink the market.
+ * DELETE /api/admin/forecasts/[id]/external-market — unlink the market.
  */
 export const DELETE = withAuth(
   async (_request, _user, { params }) => {
     await prisma.prediction.update({
       where: { id: params.id },
       data: {
-        polymarketMarketId: null,
-        polymarketLinkedAt: null,
-        polymarketLinkMethod: null,
+        externalMarketId: null,
+        externalMarketLinkedAt: null,
+        externalMarketLinkMethod: null,
       },
     })
-    log.info({ predictionId: params.id }, 'Unlinked Polymarket market')
+    log.info({ predictionId: params.id }, 'Unlinked external market')
     return NextResponse.json({ ok: true })
   },
   { roles: ['ADMIN'] },
