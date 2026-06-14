@@ -63,6 +63,9 @@ export const createPredictionSchema = z.object({
 
   // AI confidence estimate (0–100), set at creation by express flow or bots
   confidence: z.number().int().min(0).max(100).optional(),
+
+  // External market link, set when the forecast was imported from a PM/Kalshi URL
+  externalMarketId: z.string().cuid().optional(),
 }).superRefine((data, ctx) => {
   const payload = data.outcomePayload as Record<string, unknown> | undefined
 

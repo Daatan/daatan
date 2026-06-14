@@ -28,8 +28,12 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
   const [isExtracting, setIsExtracting] = useState(false)
   const [selectedAnchor, setSelectedAnchor] = useState<NewsAnchor | null>(null)
   const [skipNews, setSkipNews] = useState(!formData.newsAnchorId && !formData.newsAnchorUrl)
+  const [marketImport, setMarketImport] = useState<{ providerLabel: string; question: string; url: string } | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
 
   const isUrl = /^https?:\/\/[^\s]+$/i.test(url.trim())
+  // A pasted Polymarket/Kalshi market URL is imported into the forecast, not treated as a news anchor.
+  const isMarketUrl = /^https?:\/\/(www\.)?(polymarket|kalshi)\.com\//i.test(url.trim())
 
   const handleSelectAnchor = useCallback((anchor: NewsAnchor) => {
     setSelectedAnchor(anchor)
@@ -45,7 +49,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
   // Auto-fetch title when URL is pasted
   useEffect(() => {
     const fetchTitle = async () => {
-      if (isUrl && !title && !isSearching && !isExtracting) {
+      if (isUrl && !isMarketUrl && !title && !isSearching && !isExtracting) {
         setIsSearching(true)
         try {
           const response = await fetch(`/api/news-anchors?url=${encodeURIComponent(url.trim())}`)
@@ -83,7 +87,41 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
 
     const timer = setTimeout(fetchTitle, 500)
     return () => clearTimeout(timer)
-  }, [url, isUrl, title, isSearching, isExtracting, handleSelectAnchor])
+  }, [url, isUrl, isMarketUrl, title, isSearching, isExtracting, handleSelectAnchor])
+
+  // Auto-import a pasted Polymarket/Kalshi URL → prefill the forecast from the market.
+  useEffect(() => {
+    if (!isMarketUrl || formData.externalMarketId || isImporting) return
+    const timer = setTimeout(async () => {
+      setIsImporting(true)
+      try {
+        const res = await fetch('/api/forecasts/import-market', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url.trim() }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setMarketImport({ providerLabel: data.providerLabel, question: data.claimText, url: data.url })
+          updateFormData({
+            externalMarketId: data.externalMarketId,
+            claimText: data.claimText,
+            // ISO → YYYY-MM-DD for the date input; only when the market has an end date.
+            ...(data.resolveByDatetime ? { resolveByDatetime: data.resolveByDatetime.slice(0, 10) } : {}),
+          })
+          setSkipNews(true)
+        } else {
+          const d = await res.json().catch(() => ({}))
+          log.warn({ status: res.status, error: d.error }, 'Market import failed')
+        }
+      } catch (e) {
+        log.warn({ err: e }, 'Market import errored')
+      } finally {
+        setIsImporting(false)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [url, isMarketUrl, formData.externalMarketId, isImporting, updateFormData])
 
   const handleUrlSubmit = async () => {
     if (!url) return
@@ -240,9 +278,35 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 className={`w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isUrl ? 'border-blue-300 bg-cobalt/10/30' : 'border-navy-600'}`}
               />
             </div>
+            {isMarketUrl && (
+              <p className="mt-2 text-xs text-pink-400 flex items-center gap-1.5">
+                {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isImporting ? 'Importing market…' : 'Prediction market detected — importing as a forecast.'}
+              </p>
+            )}
           </div>
 
-          <div className={`transition-all duration-300 origin-top ${isUrl ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 overflow-hidden'}`}>
+          {marketImport && (
+            <div className="p-4 rounded-lg border border-pink-500/40 bg-pink-500/5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400 mb-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                Imported from {marketImport.providerLabel}
+              </div>
+              <p className="text-sm text-text-secondary">
+                The claim and resolution date were prefilled from this market. You can edit them in the next steps.
+              </p>
+              <a
+                href={marketImport.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs text-pink-400 hover:text-pink-300"
+              >
+                View market <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+
+          <div className={`transition-all duration-300 origin-top ${isUrl && !isMarketUrl ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 overflow-hidden'}`}>
             <label htmlFor="title" className="block text-sm font-medium text-text-secondary mb-2">
               Article Title
             </label>

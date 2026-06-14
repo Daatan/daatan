@@ -159,6 +159,8 @@ export interface CreateForecastInput {
   confidence?: number | null
   newsAnchorId?: string
   tags?: string[]
+  /** When the forecast was created by importing an external market (PM/Kalshi), link it. */
+  externalMarketId?: string
 }
 
 export async function createForecast(input: CreateForecastInput) {
@@ -193,6 +195,9 @@ export async function createForecast(input: CreateForecastInput) {
           isPublic: input.isPublic ?? true,
           source: input.source ?? null,
           confidence: input.confidence ?? null,
+          externalMarketId: input.externalMarketId,
+          externalMarketLinkedAt: input.externalMarketId ? new Date() : undefined,
+          externalMarketLinkMethod: input.externalMarketId ? 'imported' : undefined,
           shareToken,
           tags: input.tags?.length
             ? {

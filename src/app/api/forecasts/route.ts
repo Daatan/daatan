@@ -173,6 +173,7 @@ export const POST = withAuth(async (request, user) => {
       confidence: data.confidence,
       newsAnchorId,
       tags: data.tags,
+      externalMarketId: data.externalMarketId,
     })
 
     withRetry(() => translatePredictionToAllLocales(prediction!.id), {

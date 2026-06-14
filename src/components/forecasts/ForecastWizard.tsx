@@ -47,6 +47,9 @@ export type PredictionFormData = {
   // Step 4: Publish
   cuCommitted?: number
   isPublic: boolean
+
+  // Set when the forecast was imported from a Polymarket/Kalshi URL (links the market on create)
+  externalMarketId?: string
 }
 
 const STEPS = [
@@ -218,6 +221,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
           resolveByDatetime: localEndOfDay(formData.resolveByDatetime).toISOString(),
           isPublic: formData.isPublic,
           source: (!formData.newsAnchorId && !formData.newsAnchorUrl) ? 'manual' : undefined,
+          externalMarketId: formData.externalMarketId || undefined,
         }),
       })
 
