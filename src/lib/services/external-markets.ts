@@ -1,11 +1,21 @@
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import { embedText } from '@/lib/services/embedding'
 import type { ExternalMarket, MarketProvider as MarketProviderEnum } from '@prisma/client'
 
 const log = createLogger('external-markets')
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com'
 const FETCH_TIMEOUT_MS = 8_000
+/** Cosine similarity above which a market is treated as "the same question". */
+const MATCH_THRESHOLD = 0.8
+/** How many keyword candidates to embed-and-rank per suggest. */
+const MATCH_CANDIDATES = 8
+
+const PROVIDER_LABEL: Record<ProviderId, string> = {
+  POLYMARKET: 'Polymarket',
+  KALSHI: 'Kalshi',
+}
 
 /**
  * Multi-provider external prediction-market integration (Polymarket + Kalshi).
@@ -355,4 +365,66 @@ export async function suggestMarkets(query: string, limit = 5): Promise<MarketSu
   if (!q) return []
   const perProvider = await Promise.all(PROVIDERS.map(p => p.suggest(q, limit)))
   return perProvider.flat().slice(0, limit)
+}
+
+/** A keyword candidate that cleared the embedding-similarity bar, plus its cached id. */
+export interface MarketMatch extends MarketSuggestion {
+  externalMarketId: string
+  providerLabel: string
+  /** Cosine similarity to the claim, 0–100. */
+  score: number
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0
+  let na = 0
+  let nb = 0
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]
+    na += a[i] * a[i]
+    nb += b[i] * b[i]
+  }
+  return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0
+}
+
+/**
+ * Suggest-on-create: keyword-prefilter candidate markets for a claim, embed the
+ * claim + each candidate question, and return the single best match if its cosine
+ * similarity clears MATCH_THRESHOLD ("very similar / same question"). The winning
+ * market is cached so the returned `externalMarketId` can be linked directly.
+ * Best-effort — returns null on no candidates, no embeddings, or no strong match.
+ */
+export async function suggestMarketMatch(claimText: string): Promise<MarketMatch | null> {
+  const q = claimText.trim()
+  if (q.length < 10) return null
+
+  const candidates = await suggestMarkets(q, MATCH_CANDIDATES)
+  if (candidates.length === 0) return null
+
+  const claimVec = await embedText(q)
+  if (!claimVec) return null
+
+  const candidateVecs = await Promise.all(candidates.map(c => embedText(c.question)))
+
+  let best: { cand: MarketSuggestion; score: number } | null = null
+  for (let i = 0; i < candidates.length; i++) {
+    const vec = candidateVecs[i]
+    if (!vec) continue
+    const score = cosineSimilarity(claimVec, vec)
+    if (!best || score > best.score) best = { cand: candidates[i], score }
+  }
+
+  if (!best || best.score < MATCH_THRESHOLD) return null
+
+  const { cand, score } = best
+  // Cache the winner so we have an id to link.
+  const market = await resolveMarketByUrl(cand.url)
+  if (!market) return null
+
+  return {
+    ...cand,
+    externalMarketId: market.id,
+    providerLabel: PROVIDER_LABEL[cand.provider] ?? cand.provider,
+    score: Math.round(score * 100),
+  }
 }
