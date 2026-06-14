@@ -55,7 +55,7 @@ describe('ProbabilityChart gating', () => {
         snapshots={[]}
         outcomeType="BINARY"
         options={[]}
-        polymarketSnapshots={[
+        marketSnapshots={[
           { createdAt: '2026-06-01', probability: 60 },
           { createdAt: '2026-06-02', probability: 65 },
         ]}
@@ -72,7 +72,7 @@ describe('ProbabilityChart gating', () => {
         snapshots={[]}
         outcomeType="MULTIPLE_CHOICE"
         options={[{ id: 'a', text: 'A' }]}
-        polymarketSnapshots={[{ createdAt: '2026-06-01', probability: 60 }]}
+        marketSnapshots={[{ createdAt: '2026-06-01', probability: 60 }]}
       />,
     )
     expect(screen.queryByText(HEADING)).toBeNull()
@@ -85,7 +85,7 @@ describe('ProbabilityChart gating', () => {
         snapshots={[]}
         outcomeType="NUMERIC_THRESHOLD"
         options={[]}
-        polymarketSnapshots={[{ createdAt: '2026-06-01', probability: 60 }]}
+        marketSnapshots={[{ createdAt: '2026-06-01', probability: 60 }]}
       />,
     )
     expect(screen.queryByText(HEADING)).toBeNull()

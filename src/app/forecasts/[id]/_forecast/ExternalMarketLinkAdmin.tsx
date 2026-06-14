@@ -7,7 +7,8 @@ import { TrendingUp, Loader2, ExternalLink, X } from 'lucide-react'
 import type { Prediction } from './types'
 
 type Suggestion = {
-  conditionId: string
+  provider: 'POLYMARKET' | 'KALSHI'
+  externalId: string
   slug: string
   question: string
   yesProbability: number
@@ -18,12 +19,17 @@ interface Props {
   prediction: Prediction
 }
 
+const PROVIDER_LABEL: Record<string, string> = {
+  POLYMARKET: 'Polymarket',
+  KALSHI: 'Kalshi',
+}
+
 /**
- * Admin-only control to link/unlink a Polymarket market to this forecast.
- * Manual is authoritative (paste a URL); "Suggest matches" offers AI/keyword
- * candidates that the admin still confirms. Renders nothing for non-admins.
+ * Admin-only control to link/unlink an external market (Polymarket / Kalshi) to
+ * this forecast. Manual is authoritative (paste a URL); "Suggest matches" offers
+ * candidates the admin still confirms. Renders nothing for non-admins.
  */
-export function PolymarketLinkAdmin({ prediction }: Props) {
+export function ExternalMarketLinkAdmin({ prediction }: Props) {
   const { data: session } = useSession()
   const router = useRouter()
   const [url, setUrl] = useState('')
@@ -32,8 +38,8 @@ export function PolymarketLinkAdmin({ prediction }: Props) {
 
   if (session?.user?.role !== 'ADMIN') return null
 
-  const market = prediction.polymarketMarket
-  const endpoint = `/api/admin/forecasts/${prediction.id}/polymarket`
+  const market = prediction.externalMarket
+  const endpoint = `/api/admin/forecasts/${prediction.id}/external-market`
 
   async function link(targetUrl: string) {
     if (!targetUrl.trim()) return
@@ -48,7 +54,7 @@ export function PolymarketLinkAdmin({ prediction }: Props) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Link failed')
       }
-      toast.success('Polymarket market linked')
+      toast.success('Market linked')
       setUrl('')
       setSuggestions(null)
       router.refresh()
@@ -89,17 +95,20 @@ export function PolymarketLinkAdmin({ prediction }: Props) {
   return (
     <div className="mb-8 p-4 border border-pink-500/30 rounded-xl bg-navy-700">
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-pink-400 mb-3">
-        <TrendingUp className="w-3.5 h-3.5" /> Polymarket link (admin)
+        <TrendingUp className="w-3.5 h-3.5" /> External market link (admin)
       </div>
 
       {market ? (
         <div className="flex items-center justify-between gap-3">
           <a
-            href={`https://polymarket.com/event/${market.slug}`}
+            href={market.url}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-gray-200 hover:text-pink-300 inline-flex items-center gap-1 min-w-0"
           >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 shrink-0">
+              {PROVIDER_LABEL[market.provider] ?? market.provider}
+            </span>
             <span className="truncate">{market.question}</span>
             <ExternalLink className="w-3 h-3 shrink-0" />
           </a>
@@ -117,7 +126,7 @@ export function PolymarketLinkAdmin({ prediction }: Props) {
             <input
               value={url}
               onChange={e => setUrl(e.target.value)}
-              placeholder="https://polymarket.com/event/…"
+              placeholder="https://polymarket.com/event/… or kalshi.com/…"
               className="flex-1 px-3 py-2 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
             />
             <button
@@ -137,13 +146,18 @@ export function PolymarketLinkAdmin({ prediction }: Props) {
           {suggestions && suggestions.length > 0 && (
             <ul className="space-y-1">
               {suggestions.map(s => (
-                <li key={s.conditionId}>
+                <li key={`${s.provider}-${s.externalId}`}>
                   <button
                     onClick={() => link(s.url)}
                     disabled={busy}
                     className="w-full text-left text-xs px-2 py-1.5 rounded bg-navy-800 hover:bg-navy-600 text-gray-300 flex items-center justify-between gap-2 disabled:opacity-50"
                   >
-                    <span className="truncate">{s.question}</span>
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/80 shrink-0">
+                        {PROVIDER_LABEL[s.provider] ?? s.provider}
+                      </span>
+                      <span className="truncate">{s.question}</span>
+                    </span>
                     <span className="text-pink-400 font-semibold shrink-0">{s.yesProbability}%</span>
                   </button>
                 </li>

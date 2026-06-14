@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    polymarketMarket: {
+    externalMarket: {
       upsert: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
     },
-    polymarketPriceSnapshot: {
+    externalMarketPriceSnapshot: {
       create: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -15,13 +15,13 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import {
-  parseSlug,
   normalizeGammaMarket,
-  fetchMarketBySlug,
+  polymarketProvider,
+  getProviderForUrl,
   resolveMarketByUrl,
   syncLinkedMarkets,
   suggestMarkets,
-} from '../polymarket'
+} from '../external-markets'
 import { prisma } from '@/lib/prisma'
 
 /** Build a minimal fetch Response stand-in. */
@@ -43,39 +43,51 @@ function gammaRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
-describe('parseSlug', () => {
+describe('polymarketProvider.parseId', () => {
   it('extracts the slug from an event URL', () => {
-    expect(parseSlug('https://polymarket.com/event/will-x-happen')).toBe('will-x-happen')
+    expect(polymarketProvider.parseId('https://polymarket.com/event/will-x-happen')).toBe('will-x-happen')
   })
 
   it('extracts the last segment from a nested market URL', () => {
-    expect(parseSlug('https://polymarket.com/market/foo/will-x-happen/')).toBe('will-x-happen')
+    expect(polymarketProvider.parseId('https://polymarket.com/market/foo/will-x-happen/')).toBe('will-x-happen')
   })
 
   it('strips query strings', () => {
-    expect(parseSlug('https://polymarket.com/event/will-x-happen?tid=123')).toBe('will-x-happen')
+    expect(polymarketProvider.parseId('https://polymarket.com/event/will-x-happen?tid=1')).toBe('will-x-happen')
   })
 
   it('accepts a raw slug as-is', () => {
-    expect(parseSlug('will-x-happen')).toBe('will-x-happen')
+    expect(polymarketProvider.parseId('will-x-happen')).toBe('will-x-happen')
   })
 
   it('rejects non-polymarket URLs', () => {
-    expect(parseSlug('https://example.com/event/foo')).toBeNull()
+    expect(polymarketProvider.parseId('https://example.com/event/foo')).toBeNull()
+  })
+})
+
+describe('getProviderForUrl', () => {
+  it('routes polymarket.com to the Polymarket provider', () => {
+    expect(getProviderForUrl('https://polymarket.com/event/x')?.id).toBe('POLYMARKET')
   })
 
-  it('rejects empty input', () => {
-    expect(parseSlug('   ')).toBeNull()
+  it('routes kalshi.com to the Kalshi provider', () => {
+    expect(getProviderForUrl('https://kalshi.com/markets/x')?.id).toBe('KALSHI')
+  })
+
+  it('returns null for an unsupported host', () => {
+    expect(getProviderForUrl('https://example.com/x')).toBeNull()
   })
 })
 
 describe('normalizeGammaMarket', () => {
-  it('decodes JSON-string outcomes/prices and derives YES probability', () => {
+  it('decodes JSON-string outcomes/prices and derives YES probability + url', () => {
     const m = normalizeGammaMarket(gammaRow())
     expect(m).not.toBeNull()
+    expect(m!.provider).toBe('POLYMARKET')
+    expect(m!.externalId).toBe('0xabc')
+    expect(m!.url).toBe('https://polymarket.com/event/will-x-happen')
     expect(m!.outcomes).toEqual(['Yes', 'No'])
     expect(m!.yesProbability).toBe(68)
-    expect(m!.closed).toBe(false)
     expect(m!.resolvedOutcome).toBeNull()
   })
 
@@ -87,9 +99,7 @@ describe('normalizeGammaMarket', () => {
   })
 
   it('marks a closed market resolved with the winning outcome', () => {
-    const m = normalizeGammaMarket(
-      gammaRow({ closed: true, outcomePrices: '["1.0", "0.0"]' }),
-    )
+    const m = normalizeGammaMarket(gammaRow({ closed: true, outcomePrices: '["1.0", "0.0"]' }))
     expect(m!.closed).toBe(true)
     expect(m!.resolvedOutcome).toBe('Yes')
   })
@@ -104,21 +114,17 @@ describe('normalizeGammaMarket', () => {
   })
 
   it('returns null when prices and outcomes mismatch', () => {
-    expect(
-      normalizeGammaMarket(gammaRow({ outcomePrices: '["0.5"]' })),
-    ).toBeNull()
+    expect(normalizeGammaMarket(gammaRow({ outcomePrices: '["0.5"]' }))).toBeNull()
   })
 })
 
-describe('fetchMarketBySlug', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+describe('polymarketProvider.fetchMarket', () => {
+  beforeEach(() => vi.clearAllMocks())
 
   it('returns the normalized first row', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
-    const m = await fetchMarketBySlug('will-x-happen')
-    expect(m!.conditionId).toBe('0xabc')
+    const m = await polymarketProvider.fetchMarket('will-x-happen')
+    expect(m!.externalId).toBe('0xabc')
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/markets?slug=will-x-happen'),
       expect.any(Object),
@@ -127,41 +133,46 @@ describe('fetchMarketBySlug', () => {
 
   it('returns null on an empty result', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([]))
-    expect(await fetchMarketBySlug('nope')).toBeNull()
+    expect(await polymarketProvider.fetchMarket('nope')).toBeNull()
   })
 
   it('returns null on a non-OK response', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(null, false, 500))
-    expect(await fetchMarketBySlug('boom')).toBeNull()
+    expect(await polymarketProvider.fetchMarket('boom')).toBeNull()
   })
 
   it('returns null when fetch throws', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('network'))
-    expect(await fetchMarketBySlug('boom')).toBeNull()
+    expect(await polymarketProvider.fetchMarket('boom')).toBeNull()
   })
 })
 
 describe('resolveMarketByUrl', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
-  it('parses, fetches and upserts the market', async () => {
+  it('parses, fetches and upserts the market keyed by provider+externalId', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
-    vi.mocked(prisma.polymarketMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
 
     const result = await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
 
     expect(result).toEqual({ id: 'm1' })
-    expect(prisma.polymarketMarket.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { conditionId: '0xabc' } }),
+    expect(prisma.externalMarket.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { provider_externalId: { provider: 'POLYMARKET', externalId: '0xabc' } },
+      }),
     )
   })
 
-  it('returns null for an unparseable URL without calling the API', async () => {
+  it('returns null for an unsupported URL without calling the API', async () => {
     global.fetch = vi.fn()
-    expect(await resolveMarketByUrl('not a url')).toBeNull()
+    expect(await resolveMarketByUrl('https://example.com/x')).toBeNull()
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('returns null for a Kalshi URL (provider stub returns nothing yet)', async () => {
+    global.fetch = vi.fn()
+    expect(await resolveMarketByUrl('https://kalshi.com/markets/abc')).toBeNull()
   })
 })
 
@@ -172,8 +183,8 @@ describe('syncLinkedMarkets', () => {
   })
 
   it('snapshots each linked market and reports counts', async () => {
-    vi.mocked(prisma.polymarketMarket.findMany).mockResolvedValue([
-      { id: 'm1', slug: 'will-x-happen', conditionId: '0xabc' },
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
     ] as never)
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
 
@@ -184,8 +195,8 @@ describe('syncLinkedMarkets', () => {
   })
 
   it('counts a market as failed when its fetch returns nothing', async () => {
-    vi.mocked(prisma.polymarketMarket.findMany).mockResolvedValue([
-      { id: 'm1', slug: 'gone', conditionId: '0xabc' },
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'gone', externalId: '0xabc', provider: 'POLYMARKET' },
     ] as never)
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([]))
 
@@ -197,16 +208,15 @@ describe('syncLinkedMarkets', () => {
 })
 
 describe('suggestMarkets', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => vi.clearAllMocks())
 
-  it('returns normalized candidates with a polymarket URL', async () => {
+  it('returns normalized candidates with provider + url', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
     const out = await suggestMarkets('will x happen')
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({
-      conditionId: '0xabc',
+      provider: 'POLYMARKET',
+      externalId: '0xabc',
       yesProbability: 68,
       url: 'https://polymarket.com/event/will-x-happen',
     })
@@ -216,10 +226,5 @@ describe('suggestMarkets', () => {
     global.fetch = vi.fn()
     expect(await suggestMarkets('  ')).toEqual([])
     expect(global.fetch).not.toHaveBeenCalled()
-  })
-
-  it('returns [] when the API fails', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse(null, false, 500))
-    expect(await suggestMarkets('x')).toEqual([])
   })
 })

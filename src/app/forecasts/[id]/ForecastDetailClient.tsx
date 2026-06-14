@@ -33,7 +33,7 @@ import { ResolutionInfo } from './_forecast/ResolutionInfo'
 import { BotApprovalSection } from './_forecast/BotApprovalSection'
 import { SimilarForecasts } from './_forecast/SimilarForecasts'
 import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
-import { PolymarketLinkAdmin } from './_forecast/PolymarketLinkAdmin'
+import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import ProbabilityChart from '@/components/forecasts/ProbabilityChart'
 import type { Prediction } from './_forecast/types'
 
@@ -670,8 +670,8 @@ export default function ForecastDetailClient({
         options={prediction.options}
       />
 
-      {/* Admin-only Polymarket link control (renders nothing for non-admins) */}
-      <PolymarketLinkAdmin prediction={prediction} />
+      {/* Admin-only external-market link control (renders nothing for non-admins) */}
+      <ExternalMarketLinkAdmin prediction={prediction} />
 
       {/* Probability chart — shown when ≥3 commitments OR a linked market has history */}
       <ProbabilityChart
@@ -679,7 +679,7 @@ export default function ForecastDetailClient({
         snapshots={initialContextSnapshots ?? []}
         outcomeType={prediction.outcomeType}
         options={prediction.options}
-        polymarketSnapshots={prediction.polymarketMarket?.snapshots ?? []}
+        marketSnapshots={prediction.externalMarket?.snapshots ?? []}
       />
 
       {/* Commitments List */}

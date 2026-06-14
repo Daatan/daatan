@@ -38,8 +38,8 @@ type Props = {
   snapshots: ChartSnapshot[]
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE' | 'NUMERIC_THRESHOLD'
   options: ChartOption[]
-  /** Linked Polymarket YES-price history, oldest first. Drives the "Market" line. */
-  polymarketSnapshots?: ChartMarketPoint[]
+  /** Linked external-market YES-price history, oldest first. Drives the "Market" line. */
+  marketSnapshots?: ChartMarketPoint[]
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
@@ -49,14 +49,14 @@ export default function ProbabilityChart({
   snapshots,
   outcomeType,
   options,
-  polymarketSnapshots = [],
+  marketSnapshots = [],
 }: Props) {
   if (outcomeType === 'NUMERIC_THRESHOLD') return null
 
-  // The Polymarket YES price is a binary probability, so we only plot it on
-  // binary forecasts. When a linked market has history we render the chart even
-  // with <3 commitments, so the market line shows before the community moves.
-  const showMarket = outcomeType === 'BINARY' && polymarketSnapshots.length > 0
+  // The market YES price is a binary probability, so we only plot it on binary
+  // forecasts. When a linked market has history we render the chart even with
+  // <3 commitments, so the market line shows before the community moves.
+  const showMarket = outcomeType === 'BINARY' && marketSnapshots.length > 0
   if (commitments.length < 3 && !showMarket) return null
 
   const sortedCommits = [...commitments].sort(
@@ -67,7 +67,7 @@ export default function ProbabilityChart({
     .filter(s => s.externalProbability != null)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
-  const sortedMarket = [...polymarketSnapshots].sort(
+  const sortedMarket = [...marketSnapshots].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   )
 
