@@ -13,6 +13,16 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
+// getOracleForecast fires logOracleCall() without awaiting it (telemetry is
+// best-effort). The real implementation hits prisma; left unmocked it runs a DB
+// write that outlives the test and settles during worker teardown, which trips
+// vitest's "Closing rpc while onUserConsoleLog was pending" flake. Stub it to a
+// resolved no-op so the test is hermetic. oracleFetch/getOracleConfig stay real.
+vi.mock('@/lib/services/oracleClient', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/services/oracleClient')>()
+  return { ...actual, logOracleCall: vi.fn().mockResolvedValue(undefined) }
+})
+
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
