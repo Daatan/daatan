@@ -31,7 +31,7 @@ Run the production release checklist for the daatan project. Follow every step i
 
 ## Verify production
 
-9. Run: `curl -s https://daatan.com/api/system/version` and confirm the returned version matches.
+9. Run: `curl -s https://daatan.com/api/health` and confirm the returned JSON shows the expected `version`, `env: "production"`, and `db: true` (HTTP 200; 503 if the DB is unhealthy).
 10. Run: `curl -o /dev/null -s -w "%{http_code}" https://daatan.com/` and confirm HTTP 200.
 
 ## Done
