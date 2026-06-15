@@ -11,6 +11,22 @@ export const TRANSLATABLE_FIELDS = ['claimText', 'detailsText', 'resolutionRules
 type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number]
 
 /**
+ * Full English language names for the translate prompt. The prompt's
+ * {{language}} slot must receive a real language name ("Hebrew") — passing the
+ * bare locale code ("he") is ambiguous (it reads as the English word "he") and
+ * yields noticeably more literal, stilted output. Falls back to the code itself
+ * for any locale not listed here.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  he: 'Hebrew',
+  ru: 'Russian',
+  eo: 'Esperanto',
+}
+
+export const languageName = (locale: string): string => LANGUAGE_NAMES[locale] ?? locale
+
+/**
  * Translates a prediction to all non-default locales in the background.
  */
 export async function translatePredictionToAllLocales(predictionId: string): Promise<void> {
@@ -25,7 +41,7 @@ export async function translatePredictionToAllLocales(predictionId: string): Pro
 
 export async function callGeminiTranslate(text: string, language: string): Promise<string> {
   const template = await getPromptTemplate('translate')
-  const prompt = fillPrompt(template, { text, language })
+  const prompt = fillPrompt(template, { text, language: languageName(language) })
 
   const response = await llmService.generateContent({
     prompt,
