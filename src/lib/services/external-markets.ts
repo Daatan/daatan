@@ -12,6 +12,55 @@ const MATCH_THRESHOLD = 0.8
 /** How many keyword candidates to embed-and-rank per suggest. */
 const MATCH_CANDIDATES = 8
 
+/** Words that carry no search signal — articles, prepositions, conjunctions, and
+ *  the boilerplate verbs/qualifiers common in forecast claims. */
+const QUERY_STOPWORDS = new Set([
+  'a', 'an', 'the', 'of', 'or', 'and', 'to', 'in', 'on', 'for', 'by', 'be', 'will', 'is', 'are',
+  'was', 'were', 'between', 'with', 'from', 'at', 'as', 'that', 'this', 'it', 'its', 'they', 'their',
+  'than', 'then', 'officially', 'official', 'formally', 'formal', 'sign', 'signed', 'signs',
+  'announce', 'announced', 'announces', 'reach', 'reached', 'within', 'before', 'after', 'during',
+  'over', 'about', 'into', 'per', 'whether',
+])
+
+/** Acronyms Polymarket spells differently in titles — the literal token "usa"
+ *  matches no market and zeroes out search, so normalize it (and "u.s."/"u.s.a"). */
+const TOKEN_ALIASES: Record<string, string> = { usa: 'us', 'u.s.a': 'us', 'u.s': 'us' }
+
+/** Max tokens to keep in a search query — long strings return no results. */
+const MAX_QUERY_TOKENS = 6
+
+/**
+ * Turn a verbose forecast claim into a short, search-friendly query. Polymarket's
+ * search returns nothing for long natural-language strings and weights the
+ * leading tokens heavily, so we keep only salient content words and order them by
+ * salience: extracted entities first, then capitalized words from the claim
+ * (proper nouns the market titles key on), then the remaining keywords. Known
+ * acronyms are normalized, stopwords dropped, and the length capped.
+ */
+export function buildMarketSearchQuery(claimText: string, entities: string[] = []): string {
+  const clean = (s: string) => s.replace(/\([^)]*\)/g, ' ').replace(/[^A-Za-z0-9\s.]/g, ' ')
+  const norm = (w: string): string => {
+    const lw = w.toLowerCase().replace(/\.+$/, '')
+    return TOKEN_ALIASES[lw] ?? lw
+  }
+  const keep = (w: string) => w.length >= 2 && !QUERY_STOPWORDS.has(w)
+
+  const entityTokens = entities.flatMap(e => clean(e).split(/\s+/)).map(norm).filter(keep)
+  const claimWords = clean(claimText).split(/\s+/).filter(Boolean)
+  const properTokens = claimWords.filter(w => /^[A-Z]/.test(w)).map(norm).filter(keep)
+  const restTokens = claimWords.map(norm).filter(keep)
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const w of [...entityTokens, ...properTokens, ...restTokens]) {
+    if (seen.has(w)) continue
+    seen.add(w)
+    out.push(w)
+    if (out.length >= MAX_QUERY_TOKENS) break
+  }
+  return out.join(' ')
+}
+
 const PROVIDER_LABEL: Record<ProviderId, string> = {
   POLYMARKET: 'Polymarket',
   KALSHI: 'Kalshi',
@@ -187,24 +236,42 @@ export const polymarketProvider: MarketProvider = {
   },
 
   async suggest(query: string, limit: number): Promise<MarketSuggestion[]> {
-    const rows = await gammaFetch<Record<string, unknown>[]>(
-      `/markets?closed=false&active=true&limit=${limit}&order=volume24hr&ascending=false&_q=${encodeURIComponent(query)}`,
-    )
-    if (!rows) return []
-    const out: MarketSuggestion[] = []
-    for (const raw of rows) {
-      const m = normalizeGammaMarket(raw)
-      if (!m) continue
-      out.push({
-        provider: m.provider,
-        externalId: m.externalId,
-        slug: m.slug,
-        question: m.question,
-        yesProbability: m.yesProbability,
-        url: m.url,
-      })
+    // Use Polymarket's purpose-built search rather than `/markets?_q=` (which
+    // ignores the query and just returns the highest-volume markets). Each event
+    // carries a `markets[]` whose rows are shaped like Gamma market rows, so we
+    // reuse normalizeGammaMarket. Open markets only — closed ones can't be linked.
+    const collect = async (q: string): Promise<MarketSuggestion[]> => {
+      const data = await gammaFetch<{ events?: { markets?: Record<string, unknown>[] }[] }>(
+        `/public-search?q=${encodeURIComponent(q)}`,
+      )
+      const out: MarketSuggestion[] = []
+      const seen = new Set<string>()
+      for (const ev of data?.events ?? []) {
+        for (const raw of ev.markets ?? []) {
+          const m = normalizeGammaMarket(raw)
+          if (!m || m.closed || seen.has(m.externalId)) continue
+          seen.add(m.externalId)
+          out.push({
+            provider: m.provider,
+            externalId: m.externalId,
+            slug: m.slug,
+            question: m.question,
+            yesProbability: m.yesProbability,
+            url: m.url,
+          })
+        }
+      }
+      return out
     }
-    return out.slice(0, limit)
+
+    let results = await collect(query)
+    // Search returns nothing for over-long / rare-token queries; retry once with
+    // just the first two words (broader recall) before giving up.
+    const words = query.split(/\s+/).filter(Boolean)
+    if (results.length === 0 && words.length > 2) {
+      results = await collect(words.slice(0, 2).join(' '))
+    }
+    return results.slice(0, limit)
   },
 }
 
@@ -367,6 +434,35 @@ export async function suggestMarkets(query: string, limit = 5): Promise<MarketSu
   return perProvider.flat().slice(0, limit)
 }
 
+/**
+ * Ranked suggestions for a forecast's claim (the admin "Suggest matches" panel):
+ * build a keyword-reduced query from the claim + extracted entities, search each
+ * provider, then — when embeddings are available — re-rank candidates by cosine
+ * similarity to the full claim so the closest question floats to the top. Falls
+ * back to raw search order if embeddings are unavailable. Best-effort.
+ */
+export async function suggestMarketsForClaim(
+  claimText: string,
+  entities: string[] = [],
+  limit = 5,
+): Promise<MarketSuggestion[]> {
+  const query = buildMarketSearchQuery(claimText, entities)
+  if (!query) return []
+
+  const candidates = await suggestMarkets(query, 15)
+  if (candidates.length <= 1) return candidates.slice(0, limit)
+
+  const claimVec = await embedText(claimText.trim())
+  if (!claimVec) return candidates.slice(0, limit)
+
+  const vecs = await Promise.all(candidates.map(c => embedText(c.question)))
+  return candidates
+    .map((c, i) => ({ c, score: vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : -1 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.c)
+}
+
 /** A keyword candidate that cleared the embedding-similarity bar, plus its cached id. */
 export interface MarketMatch extends MarketSuggestion {
   externalMarketId: string
@@ -398,7 +494,7 @@ export async function suggestMarketMatch(claimText: string): Promise<MarketMatch
   const q = claimText.trim()
   if (q.length < 10) return null
 
-  const candidates = await suggestMarkets(q, MATCH_CANDIDATES)
+  const candidates = await suggestMarkets(buildMarketSearchQuery(q), MATCH_CANDIDATES)
   if (candidates.length === 0) return null
 
   const claimVec = await embedText(q)

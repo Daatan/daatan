@@ -23,7 +23,9 @@ import {
   resolveMarketByUrl,
   syncLinkedMarkets,
   suggestMarkets,
+  suggestMarketsForClaim,
   suggestMarketMatch,
+  buildMarketSearchQuery,
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
 import { embedText } from '@/lib/services/embedding'
@@ -45,6 +47,20 @@ function gammaRow(overrides: Record<string, unknown> = {}) {
     closed: false,
     ...overrides,
   }
+}
+
+/**
+ * URL-aware fetch mock. `suggest()` hits `/public-search` (events→markets shape),
+ * while `fetchMarket()` hits `/markets?slug=` (a flat array). Route each to the
+ * right shape; `searchRows` populates the single search event's `markets[]`.
+ */
+function gammaFetchMock(searchRows: Record<string, unknown>[], marketRows = [gammaRow()]) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input).includes('/public-search')) {
+      return jsonResponse({ events: [{ markets: searchRows }] })
+    }
+    return jsonResponse(marketRows)
+  })
 }
 
 describe('polymarketProvider.parseId', () => {
@@ -214,8 +230,8 @@ describe('syncLinkedMarkets', () => {
 describe('suggestMarkets', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns normalized candidates with provider + url', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+  it('returns normalized candidates from public-search events with provider + url', async () => {
+    global.fetch = gammaFetchMock([gammaRow()])
     const out = await suggestMarkets('will x happen')
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({
@@ -224,12 +240,107 @@ describe('suggestMarkets', () => {
       yesProbability: 68,
       url: 'https://polymarket.com/event/will-x-happen',
     })
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/public-search?q='),
+      expect.any(Object),
+    )
+  })
+
+  it('skips closed markets and dedupes by externalId', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xopen', slug: 'a' }),
+      gammaRow({ conditionId: '0xopen', slug: 'a' }), // dup
+      gammaRow({ conditionId: '0xclosed', slug: 'b', closed: true }),
+    ])
+    const out = await suggestMarkets('will x happen')
+    expect(out).toHaveLength(1)
+    expect(out[0].externalId).toBe('0xopen')
+  })
+
+  it('retries with the first two words when the full query finds nothing', async () => {
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/public-search')) {
+        // Empty unless the query is exactly the two-word fallback "iran peace".
+        const hit = url.endsWith('q=' + encodeURIComponent('iran peace'))
+        return jsonResponse({ events: hit ? [{ markets: [gammaRow()] }] : [] })
+      }
+      return jsonResponse([gammaRow()])
+    })
+    global.fetch = fetchSpy
+    const out = await suggestMarkets('iran peace deal memorandum')
+    expect(out).toHaveLength(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 
   it('returns [] for an empty query without calling the API', async () => {
     global.fetch = vi.fn()
     expect(await suggestMarkets('  ')).toEqual([])
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildMarketSearchQuery', () => {
+  it('reduces a verbose claim to salient keywords and drops boilerplate', () => {
+    const q = buildMarketSearchQuery(
+      'A memorandum of understanding (MoU) or a peace deal between Iran and the USA will be officially signed',
+    )
+    // Parenthetical "(MoU)" and stopwords/boilerplate ("officially", "signed") gone.
+    expect(q).not.toContain('mou')
+    expect(q).not.toContain('officially')
+    expect(q).not.toContain('signed')
+    // "usa" normalized to "us" (the literal token "usa" zeroes out Polymarket search).
+    expect(q).not.toMatch(/\busa\b/)
+    expect(q.split(' ')).toContain('iran')
+    expect(q.split(' ')).toContain('peace')
+  })
+
+  it('promotes capitalized proper nouns to the front even without entities', () => {
+    // Polymarket weights leading tokens, so "Iran"/"USA" must lead, not the
+    // boilerplate "memorandum"/"understanding" that opens the sentence.
+    const q = buildMarketSearchQuery(
+      'A memorandum of understanding (MoU) or a peace deal between Iran and the USA will be officially signed',
+    )
+    expect(q.split(' ').slice(0, 2)).toEqual(['iran', 'us'])
+  })
+
+  it('caps the query length', () => {
+    const q = buildMarketSearchQuery(
+      'alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo',
+    )
+    expect(q.split(' ').length).toBeLessThanOrEqual(6)
+  })
+
+  it('puts extracted entities first and dedupes', () => {
+    const q = buildMarketSearchQuery('peace deal happens', ['Iran', 'Iran'])
+    expect(q.startsWith('iran')).toBe(true)
+    expect(q.split(' ').filter(w => w === 'iran')).toHaveLength(1)
+  })
+})
+
+describe('suggestMarketsForClaim', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('re-ranks candidates by similarity to the claim', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xfar', slug: 'far', question: 'Unrelated question?' }),
+      gammaRow({ conditionId: '0xnear', slug: 'near', question: 'Iran peace deal signed?' }),
+    ])
+    vi.mocked(embedText).mockImplementation(async (t: string) =>
+      t.includes('Iran') ? [1, 0, 0] : [0, 1, 0],
+    )
+    const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
+    expect(out[0].externalId).toBe('0xnear')
+  })
+
+  it('falls back to search order when embeddings are unavailable', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0x1', slug: 's1' }),
+      gammaRow({ conditionId: '0x2', slug: 's2' }),
+    ])
+    vi.mocked(embedText).mockResolvedValue(null)
+    const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
+    expect(out.map(m => m.externalId)).toEqual(['0x1', '0x2'])
   })
 })
 
@@ -240,7 +351,7 @@ describe('suggestMarketMatch', () => {
   })
 
   it('returns the best candidate when similarity clears the threshold', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    global.fetch = gammaFetchMock([gammaRow()])
     vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // claim == candidate → cosine 1
 
     const match = await suggestMarketMatch('Will X definitely happen this year?')
@@ -252,7 +363,7 @@ describe('suggestMarketMatch', () => {
   })
 
   it('returns null when no candidate is similar enough', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    global.fetch = gammaFetchMock([gammaRow()])
     vi.mocked(embedText).mockImplementation(async (t: string) =>
       t.includes('definitely') ? [1, 0, 0] : [0, 1, 0], // orthogonal → cosine 0
     )
@@ -261,7 +372,7 @@ describe('suggestMarketMatch', () => {
   })
 
   it('returns null when embeddings are unavailable', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    global.fetch = gammaFetchMock([gammaRow()])
     vi.mocked(embedText).mockResolvedValue(null)
 
     expect(await suggestMarketMatch('Will X definitely happen this year?')).toBeNull()
