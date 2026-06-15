@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart from '../ProbabilityChart'
+import ProbabilityChart, { communityProbability } from '../ProbabilityChart'
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -120,5 +120,33 @@ describe('ProbabilityChart gating', () => {
       />,
     )
     expect(screen.queryByText(HEADING)).toBeNull()
+  })
+})
+
+describe('communityProbability (mean of committers\' implied estimates)', () => {
+  it('returns null with no commitments', () => {
+    expect(communityProbability([])).toBeNull()
+  })
+
+  it('maps the signed stake to implied P(YES): +100 → 100, 0 → 50, −100 → 0', () => {
+    expect(communityProbability([{ cuCommitted: 100 }])).toBe(100)
+    expect(communityProbability([{ cuCommitted: 0 }])).toBe(50)
+    expect(communityProbability([{ cuCommitted: -100 }])).toBe(0)
+  })
+
+  it('averages estimates rather than reporting a YES/NO share', () => {
+    // Two YES stakes of differing confidence: mean(1.0, 0.6) = 0.8 → 80%.
+    // The old CU-weighted share reported 100% here (both on the YES side).
+    expect(communityProbability([{ cuCommitted: 100 }, { cuCommitted: 20 }])).toBe(80)
+  })
+
+  it('a YES and an opposing NO average toward the middle', () => {
+    // mean(1.0, 0.0) = 0.5 → 50%
+    expect(communityProbability([{ cuCommitted: 100 }, { cuCommitted: -100 }])).toBe(50)
+  })
+
+  it('three moderate YES stakes do not pin to 100%', () => {
+    // mean of (0.75, 0.75, 0.75) = 0.75 → 75% (was 100% under the share formula)
+    expect(communityProbability([{ cuCommitted: 50 }, { cuCommitted: 50 }, { cuCommitted: 50 }])).toBe(75)
   })
 })
