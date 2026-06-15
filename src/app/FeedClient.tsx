@@ -298,7 +298,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
               }`}
             >
               <Tag className="w-3.5 h-3.5" />
-              Tags
+              {t('tags')}
               {selectedTags.length > 0 && (
                 <span className="ml-0.5 bg-white/20 text-xs rounded-full px-1.5 py-0.5 leading-none">
                   {selectedTags.length}

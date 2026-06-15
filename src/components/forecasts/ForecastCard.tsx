@@ -425,7 +425,7 @@ export default function ForecastCard({
                 title={showTranslated ? tt('showOriginal') : tt('translate')}
               >
                 <Languages className="w-3 h-3" />
-                {showTranslated ? 'Original' : 'Hebrew'}
+                {showTranslated ? tt('showOriginal') : tt('translate')}
               </button>
             )}
           </div>
@@ -441,7 +441,7 @@ export default function ForecastCard({
           {!prediction.newsAnchor && prediction.source === 'manual' && (
             <div className="mb-4">
               <span className="inline-flex items-center gap-1 text-xs text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded-full border border-purple-400/20">
-                Personal
+                {t('personalBadge')}
               </span>
             </div>
           )}

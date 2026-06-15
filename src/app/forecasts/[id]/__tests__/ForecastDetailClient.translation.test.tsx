@@ -125,8 +125,8 @@ describe('ForecastDetailClient Translation', () => {
       expect(screen.getByText(/תורגם על ידי בינה מלאכותית/i)).toBeInTheDocument()
     })
 
-    // Toggle button should be showing "הצג מקור" (Show original)
-    const toggleBtn = screen.getByText('הצג מקור')
+    // Toggle button should be showing "נוסח מקורי" (Show original)
+    const toggleBtn = screen.getByText('נוסח מקורי')
     expect(toggleBtn).toBeInTheDocument()
 
     // Click toggle to show original
@@ -136,8 +136,8 @@ describe('ForecastDetailClient Translation', () => {
     // Disclaimer should be hidden
     expect(screen.queryByText(/תורגם על ידי בינה מלאכותית/i)).toBeNull()
 
-    // Click again to show translated (label is now "תרגם")
-    fireEvent.click(screen.getByText('תרגם'))
+    // Click again to show translated (label is now "חזרה לתרגום")
+    fireEvent.click(screen.getByText('חזרה לתרגום'))
     expect(screen.getByText('תרגום כותרת')).toBeInTheDocument()
   })
 

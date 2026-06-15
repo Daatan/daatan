@@ -99,8 +99,8 @@ describe('ForecastCard Translation', () => {
       expect(screen.getByText('תרגום לעברית')).toBeInTheDocument()
     })
 
-    // Should show the toggle button (currently labeled "Original" in Hebrew context)
-    const toggleBtn = screen.getByText('Original')
+    // Should show the toggle button (labeled "נוסח מקורי" in Hebrew context)
+    const toggleBtn = screen.getByText('נוסח מקורי')
     expect(toggleBtn).toBeInTheDocument()
 
     // Click toggle to show original
@@ -109,7 +109,7 @@ describe('ForecastCard Translation', () => {
     expect(screen.queryByText('תרגום לעברית')).toBeNull()
 
     // Click again to show translated
-    fireEvent.click(screen.getByText('Hebrew'))
+    fireEvent.click(screen.getByText('חזרה לתרגום'))
     expect(screen.getByText('תרגום לעברית')).toBeInTheDocument()
   })
 

@@ -12,41 +12,42 @@
     "submit": "שלח",
     "search": "חיפוש",
     "signIn": "התחבר",
-    "signOut": "התנתק",
+    "signOut": "התנתקות",
     "noResults": "לא נמצאו תוצאות"
   },
   "nav": {
-    "feed": "פיד",
-    "create": "יצירה",
+    "feed": "תחזיות",
+    "create": "צור תחזית",
     "notifications": "התראות",
-    "commitments": "ההתחייבויות שלי",
+    "commitments": "התחזיות שלי",
     "activity": "פעילות",
-    "leaderboard": "טבלת מובילים",
+    "leaderboard": "מובילים",
     "profile": "פרופיל",
     "settings": "הגדרות",
-    "about": "אודות",
+    "about": "על דעתן",
     "contact": "צור קשר",
-    "retroanalysis": "ניתוח רטרו",
+    "retroanalysis": "דעתן בדיעבד",
     "admin": "ניהול",
-    "tagline": "מעקב תחזיות"
+    "tagline": "תחזיות שבונות רקורד"
   },
   "feed": {
-    "title": "פיד",
+    "title": "תחזיות",
     "discover": "גלה תחזיות פעילות והתחייב ל-CU שלך",
-    "newForecast": "תחזית חדשה",
+    "newForecast": "צור תחזית",
     "filters": {
       "open": "פתוח",
       "closingSoon": "נסגר בקרוב",
       "awaitingResolution": "ממתין להכרעה",
       "resolved": "הוכרע",
-      "all": "הכל",
-      "needsReview": "ממתין לבדיקה"
+      "all": "הכול",
+      "needsReview": "בבדיקה"
     },
     "sort": {
       "newest": "חדש ביותר",
-      "byDeadline": "לפי מועד",
-      "mostStaked": "הכי מושקע"
+      "byDeadline": "לפי תאריך הכרעה",
+      "mostStaked": "הכי פופולרי"
     },
+    "tags": "תגיות",
     "openForecasts": "תחזיות פתוחות",
     "closingSoon": "נסגר בקרוב",
     "awaitingResolution": "ממתין להכרעה",
@@ -72,7 +73,7 @@
     "loading": "טוען את הפיד שלך..."
   },
   "forecast": {
-    "create": "תחזית חדשה",
+    "create": "צור תחזית",
     "createTitle": "יצירת תחזית",
     "similarWarningTitle": "תחזיות דומות כבר קיימות — האם שלך היא כפולה?",
     "similarWarningHint": "אתה עדיין יכול להמשיך אם התחזית שלך שונה.",
@@ -88,13 +89,15 @@
     "unresolvable": "לא ניתן להכרעה",
     "willHappen": "יקרה",
     "wontHappen": "לא יקרה",
+    "neutral": "ניטרלי",
+    "myEstimate": "ההערכה שלי: {outcome}, ברמת ביטחון של {confidence}%",
     "commitCU": "התחייב CU",
     "resolveBy": "הכרעה עד",
     "deadline": "תאריך הכרעה",
     "locked": "נעול",
     "source": "מקור",
     "anonymous": "אנונימי",
-    "commitmentsLabel": "התחייבויות",
+    "commitmentsLabel": "משתתפים",
     "committedLabel": "הותחייב",
     "resolve": "פתור",
     "edit": "ערוך",
@@ -339,13 +342,14 @@
     "deleteError": "כישלון במחיקת החשבון. נסו שוב."
   },
   "profile": {
-    "title": "פרופיל",
+    "title": "הרקורד שלי",
     "editProfile": "ערוך פרופיל",
     "website": "אתר אינטרנט",
     "joined": "הצטרף",
     "predictions": "תחזיות",
-    "created": "נוצרו",
+    "created": "יצרתי",
     "participated": "השתתפתי",
+    "resolved": "הוכרעו",
     "topicBreakdown": "לפי נושא",
     "brierScore": "ציון בריאר",
     "scored": "ניקוד",
@@ -390,8 +394,8 @@
     "saveError": "כישלון בעדכון הפרופיל"
   },
   "translate": {
-    "translate": "תרגם",
-    "showOriginal": "הצג מקור",
+    "translate": "חזרה לתרגום",
+    "showOriginal": "נוסח מקורי",
     "translatedTo": "מתורגם",
     "translating": "מתרגם...",
     "disclaimer": "תורגם על ידי בינה מלאכותית - הטקסט המקורי הוא המחייב במקרה של סתירה."
@@ -491,7 +495,7 @@
   },
   "forecastsFeed": {
     "title": "תחזיות",
-    "newForecast": "תחזית חדשה",
+    "newForecast": "צור תחזית",
     "errorLoading": "שגיאה בטעינת תחזיות:",
     "searchPlaceholder": "חיפוש תחזיות…",
     "search": "חיפוש",
