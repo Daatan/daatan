@@ -1,30 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Capture what gets sent to the LLM so we can assert on the filled prompt.
-// vi.hoisted lets the mock fn exist before the (hoisted) vi.mock factory runs.
-const { generateContent } = vi.hoisted(() => ({
-  generateContent: vi.fn(async (_args: { prompt: string; temperature?: number }) => ({
-    text: 'תרגום',
-  })),
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    prediction: { findUnique: vi.fn() },
+    predictionTranslation: { findMany: vi.fn(), upsert: vi.fn() },
+  },
 }))
-
-vi.mock('@/lib/llm', () => ({ llmService: { generateContent } }))
-
-// Use the real fillPrompt; stub only the template fetch to a known translate prompt.
-vi.mock('@/lib/llm/bedrock-prompts', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/llm/bedrock-prompts')>(
-    '@/lib/llm/bedrock-prompts',
-  )
-  return {
-    ...actual,
-    getPromptTemplate: vi.fn(async () => 'Translate into {{language}}.\n\n{{text}}'),
-  }
-})
-
-vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+vi.mock('@/lib/llm', () => ({ llmService: { generateContent: vi.fn() } }))
 vi.mock('@/lib/services/telegram', () => ({ notifyTranslationFailed: vi.fn() }))
 
-import { callGeminiTranslate, languageName } from '../translation'
+import { translatePrediction, sourceHash, callGeminiTranslate, languageName } from '../translation'
+import { prisma } from '@/lib/prisma'
+import { llmService } from '@/lib/llm'
+
+const PREDICTION = {
+  claimText: 'Ebola will spread to the USA by 2026',
+  detailsText: 'Original details, version 1.',
+  resolutionRules: 'YES if confirmed by the CDC.',
+}
 
 describe('languageName', () => {
   it('maps known locale codes to full English language names', () => {
@@ -39,19 +32,80 @@ describe('languageName', () => {
   })
 })
 
-describe('callGeminiTranslate', () => {
-  beforeEach(() => generateContent.mockClear())
+describe('sourceHash', () => {
+  it('is deterministic and differs for different text', () => {
+    expect(sourceHash('abc')).toBe(sourceHash('abc'))
+    expect(sourceHash('abc')).not.toBe(sourceHash('abd'))
+    expect(sourceHash('abc')).toHaveLength(64)
+  })
+})
 
-  it('passes the full language name (not the locale code) into the prompt', async () => {
-    await callGeminiTranslate('Ebola will spread', 'he')
-    const arg = generateContent.mock.calls[0][0]
-    expect(arg.prompt).toContain('Translate into Hebrew.')
-    expect(arg.prompt).not.toContain('Translate into he.')
-    expect(arg.prompt).toContain('Ebola will spread')
+describe('callGeminiTranslate prompt', () => {
+  it('targets the named language, includes context, and trims output', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: ' שלום ' } as never)
+    const out = await callGeminiTranslate('Hello', 'he', 'the forecast claim')
+    expect(out).toBe('שלום') // trimmed
+    const prompt = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
+    expect(prompt).toContain('Hebrew') // full language name, not "he"
+    expect(prompt).not.toContain(' he ')
+    expect(prompt).toContain('the forecast claim')
+    expect(prompt).toContain('Hello')
+  })
+})
+
+describe('translatePrediction — content-aware cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(PREDICTION as never)
+    vi.mocked(prisma.predictionTranslation.upsert).mockResolvedValue({} as never)
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'TRANSLATED' } as never)
   })
 
-  it('trims surrounding whitespace from the model output', async () => {
-    generateContent.mockResolvedValueOnce({ text: '  שלום  ' })
-    expect(await callGeminiTranslate('hi', 'he')).toBe('שלום')
+  it('serves the cache only when the source hash matches (no LLM call)', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'claimText', translatedText: 'he-claim', sourceHash: sourceHash(PREDICTION.claimText) },
+      { fieldName: 'detailsText', translatedText: 'he-details', sourceHash: sourceHash(PREDICTION.detailsText) },
+      { fieldName: 'resolutionRules', translatedText: 'he-rules', sourceHash: sourceHash(PREDICTION.resolutionRules) },
+    ] as never)
+
+    const result = await translatePrediction('p1', 'he')
+
+    expect(result.detailsText).toBe('he-details')
+    expect(llmService.generateContent).not.toHaveBeenCalled()
+    expect(prisma.predictionTranslation.upsert).not.toHaveBeenCalled()
+  })
+
+  it('re-translates a field whose source changed (stale hash)', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'claimText', translatedText: 'he-claim', sourceHash: sourceHash(PREDICTION.claimText) },
+      // detailsText was rewritten — cached hash is for the OLD text
+      { fieldName: 'detailsText', translatedText: 'STALE he-details', sourceHash: sourceHash('Old details that no longer match') },
+      { fieldName: 'resolutionRules', translatedText: 'he-rules', sourceHash: sourceHash(PREDICTION.resolutionRules) },
+    ] as never)
+
+    const result = await translatePrediction('p1', 'he')
+
+    // only detailsText re-translated
+    expect(llmService.generateContent).toHaveBeenCalledOnce()
+    expect(result.detailsText).toBe('TRANSLATED')
+    // re-translated with the new source hash + the claim as context
+    expect(prisma.predictionTranslation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: { translatedText: 'TRANSLATED', sourceHash: sourceHash(PREDICTION.detailsText) },
+      }),
+    )
+    const prompt = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
+    expect(prompt).toContain(PREDICTION.claimText) // claim passed as context for detailsText
+  })
+
+  it('re-translates legacy rows with a null source hash', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'claimText', translatedText: 'legacy', sourceHash: null },
+    ] as never)
+
+    await translatePrediction('p1', 'he')
+
+    // claimText (null hash) re-translated; detailsText + rules have no row → also translated
+    expect(llmService.generateContent).toHaveBeenCalledTimes(3)
   })
 })
