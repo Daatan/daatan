@@ -15,14 +15,21 @@ export function sourceHash(text: string): string {
   return createHash('sha256').update(text).digest('hex')
 }
 
-/** Locale code → language name, so the model gets a clear target. */
+/**
+ * Full English language names for the translate prompt. The model needs a real
+ * language name ("Hebrew") — the bare locale code ("he") is ambiguous (it reads
+ * as the English word "he") and yields more literal, stilted output. Falls back
+ * to the code itself for any locale not listed here.
+ */
 const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
   he: 'Hebrew',
   ru: 'Russian',
   eo: 'Esperanto',
   ar: 'Arabic',
-  en: 'English',
 }
+
+export const languageName = (locale: string): string => LANGUAGE_NAMES[locale] ?? locale
 
 /**
  * Translates a prediction to all non-default locales in the background.
@@ -49,7 +56,7 @@ export async function callGeminiTranslate(
   language: string,
   context?: string,
 ): Promise<string> {
-  const target = LANGUAGE_NAMES[language] ?? language
+  const target = languageName(language)
   const prompt = [
     `You are a professional translator localizing a prediction-market forecast into ${target}.`,
     '',

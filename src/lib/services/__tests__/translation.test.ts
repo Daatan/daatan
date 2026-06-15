@@ -9,7 +9,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/llm', () => ({ llmService: { generateContent: vi.fn() } }))
 vi.mock('@/lib/services/telegram', () => ({ notifyTranslationFailed: vi.fn() }))
 
-import { translatePrediction, sourceHash, callGeminiTranslate } from '../translation'
+import { translatePrediction, sourceHash, callGeminiTranslate, languageName } from '../translation'
 import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
 
@@ -18,6 +18,19 @@ const PREDICTION = {
   detailsText: 'Original details, version 1.',
   resolutionRules: 'YES if confirmed by the CDC.',
 }
+
+describe('languageName', () => {
+  it('maps known locale codes to full English language names', () => {
+    expect(languageName('he')).toBe('Hebrew')
+    expect(languageName('ru')).toBe('Russian')
+    expect(languageName('eo')).toBe('Esperanto')
+    expect(languageName('en')).toBe('English')
+  })
+
+  it('falls back to the raw code for unknown locales', () => {
+    expect(languageName('xx')).toBe('xx')
+  })
+})
 
 describe('sourceHash', () => {
   it('is deterministic and differs for different text', () => {
@@ -28,12 +41,13 @@ describe('sourceHash', () => {
 })
 
 describe('callGeminiTranslate prompt', () => {
-  it('targets the named language and includes context when given', async () => {
+  it('targets the named language, includes context, and trims output', async () => {
     vi.mocked(llmService.generateContent).mockResolvedValue({ text: ' שלום ' } as never)
     const out = await callGeminiTranslate('Hello', 'he', 'the forecast claim')
     expect(out).toBe('שלום') // trimmed
     const prompt = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
-    expect(prompt).toContain('Hebrew') // mapped from "he"
+    expect(prompt).toContain('Hebrew') // full language name, not "he"
+    expect(prompt).not.toContain(' he ')
     expect(prompt).toContain('the forecast claim')
     expect(prompt).toContain('Hello')
   })
