@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError } from '@/lib/api-error'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { resolveMarketByUrl, suggestMarkets } from '@/lib/services/external-markets'
+import { resolveMarketByUrl, suggestMarketsForClaim } from '@/lib/services/external-markets'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('admin-forecast-external-market')
@@ -21,11 +21,14 @@ export const GET = withAuth(
   async (_request, _user, { params }) => {
     const prediction = await prisma.prediction.findUnique({
       where: { id: params.id },
-      select: { claimText: true },
+      select: { claimText: true, extractedEntities: true },
     })
     if (!prediction) return apiError('Forecast not found', 404)
 
-    const suggestions = await suggestMarkets(prediction.claimText)
+    const suggestions = await suggestMarketsForClaim(
+      prediction.claimText,
+      prediction.extractedEntities,
+    )
     return NextResponse.json({ suggestions })
   },
   { roles: ['ADMIN'] },
