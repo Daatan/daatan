@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { buildProfileUrl } from './profile-url'
 import type { ProfileTab } from '@/lib/services/profile'
 
@@ -26,11 +27,12 @@ export function ProfileTabs({
 }: ProfileTabsProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const t = useTranslations('profile')
 
   const tabs: { key: ProfileTab; label: string; count: number }[] = [
-    { key: 'created', label: 'Created', count: createdTotal },
-    { key: 'participated', label: 'Participated', count: participatedTotal },
-    { key: 'resolved', label: 'Resolved', count: resolvedTotal },
+    { key: 'created', label: t('created'), count: createdTotal },
+    { key: 'participated', label: t('participated'), count: participatedTotal },
+    { key: 'resolved', label: t('resolved'), count: resolvedTotal },
   ]
 
   const activeTotal = tabs.find(t => t.key === activeTab)?.count ?? 0
