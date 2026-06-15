@@ -44,6 +44,21 @@ type Props = {
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
 
+/**
+ * Community probability for a binary forecast: the mean of committers' stated
+ * estimates. Each commit's implied P(YES) is (cuCommitted + 100) / 200 — the
+ * signed confidence stake (−100..100, so 0 → 50%, +100 → 100%, −100 → 0%).
+ * This matches the canonical definition in commitment.ts
+ * (communityProbabilityAtCommit). It is deliberately NOT a CU-weighted YES/NO
+ * share, which over-reports consensus (a handful of all-YES stakes → 100%).
+ * Returns a 0–100 integer, or null when there are no commitments.
+ */
+export function communityProbability(commits: { cuCommitted: number }[]): number | null {
+  if (commits.length === 0) return null
+  const mean = commits.reduce((sum, c) => sum + (c.cuCommitted + 100) / 200, 0) / commits.length
+  return Math.round(mean * 100)
+}
+
 export default function ProbabilityChart({
   commitments,
   snapshots,
@@ -99,11 +114,8 @@ export default function ProbabilityChart({
     }
 
     if (outcomeType === 'BINARY') {
-      if (upToCommits.length > 0) {
-        const yes = upToCommits.filter(c => c.binaryChoice).reduce((s, c) => s + c.cuCommitted, 0)
-        const total = upToCommits.reduce((s, c) => s + Math.abs(c.cuCommitted), 0)
-        point.community = total > 0 ? Math.round((yes / total) * 100) : 50
-      }
+      const community = communityProbability(upToCommits)
+      if (community != null) point.community = community
     } else {
       // MULTIPLE_CHOICE: rolling share per option
       for (const opt of options) {
