@@ -25,6 +25,9 @@ const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast
     contextTiming: {
       create: vi.fn().mockResolvedValue({}),
     },
+    predictionTranslation: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn(),
   },
 }))
@@ -310,7 +313,8 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     expect(predictionUpdateCall.data.confidence).toBe(60)
     expect(predictionUpdateCall.data.aiCiLow).toBe(50)
     expect(predictionUpdateCall.data.aiCiHigh).toBe(70)
-    expect(ops).toHaveLength(2)
+    // ops: contextSnapshot.create, prediction.update, predictionTranslation.deleteMany
+    expect(ops).toHaveLength(3)
   })
 
   it('clears aiCiLow/aiCiHigh on LLM-fallback path (no Oracle CI available)', async () => {

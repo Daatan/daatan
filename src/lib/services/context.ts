@@ -70,6 +70,13 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
         aiCiHigh: input.aiCiHigh,
       },
     }),
+    // Invalidate stale detailsText translations: this update overwrites the
+    // English summary, so any cached he/ru/eo translation is now out of date.
+    // Dropping the rows makes SSR fall back to the source until the next
+    // on-demand re-translation (which the content-aware cache also enforces).
+    prisma.predictionTranslation.deleteMany({
+      where: { predictionId: input.predictionId, fieldName: 'detailsText' },
+    }),
   ])
   return snapshot
 }
