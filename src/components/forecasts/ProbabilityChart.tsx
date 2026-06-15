@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  Brush,
 } from 'recharts'
 
 type ChartSnapshot = {
@@ -43,6 +44,18 @@ type Props = {
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
+
+// Axis ticks show the date; the tooltip header adds the time so events on the
+// same day (which previously collapsed to one ambiguous label) are distinct.
+const fmtDate = (ts: number) =>
+  new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const fmtDateTime = (ts: number) =>
+  new Date(ts).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
 /**
  * Community probability for a binary forecast: the mean of committers' stated
@@ -108,7 +121,7 @@ export default function ProbabilityChart({
     const latestMarket = upToMarket.length > 0 ? upToMarket[upToMarket.length - 1].probability : null
 
     const point: Record<string, number | string | null> = {
-      label: new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      ts,
       ai: latestAi ?? null,
       market: latestMarket,
     }
@@ -132,15 +145,18 @@ export default function ProbabilityChart({
       <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
         Probability over time
       </h3>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" />
           <XAxis
-            dataKey="label"
+            dataKey="ts"
+            type="number"
+            scale="time"
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={fmtDate}
             tick={{ fill: '#718096', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            interval="preserveStartEnd"
           />
           <YAxis
             domain={[0, 100]}
@@ -158,6 +174,7 @@ export default function ProbabilityChart({
               fontSize: 12,
             }}
             labelStyle={{ color: '#A0AEC0' }}
+            labelFormatter={(ts) => (typeof ts === 'number' ? fmtDateTime(ts) : ts)}
             formatter={(value, name) => [typeof value === 'number' ? `${Math.round(value)}%` : value, name as string]}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: '#A0AEC0', paddingTop: '8px' }} />
@@ -189,7 +206,7 @@ export default function ProbabilityChart({
 
           {sortedSnaps.length > 0 && (
             <Line
-              type="monotone"
+              type="stepAfter"
               dataKey="ai"
               name="AI (Oracle)"
               stroke="#FBBF24"
@@ -202,13 +219,24 @@ export default function ProbabilityChart({
 
           {showMarket && (
             <Line
-              type="monotone"
+              type="stepAfter"
               dataKey="market"
               name="Market (Polymarket)"
               stroke="#EC4899"
               strokeWidth={2}
               dot={false}
               connectNulls
+            />
+          )}
+
+          {data.length > 2 && (
+            <Brush
+              dataKey="ts"
+              height={20}
+              stroke="#4A5568"
+              fill="#1A202C"
+              travellerWidth={8}
+              tickFormatter={(ts: number) => fmtDate(ts)}
             />
           )}
         </LineChart>
