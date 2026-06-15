@@ -157,7 +157,7 @@ jobs:
       - name: Restore version-drift notification cache
         if: matrix.env.name == 'production'
         id: drift-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: /tmp/drift-notified
           key: version-drift-notified-${{ hashFiles('/tmp/drift-key.txt') }}
@@ -220,7 +220,7 @@ jobs:
 
       - name: Save version-drift notification cache
         if: matrix.env.name == 'production' && steps.drift.outputs.save_cache == 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: /tmp/drift-notified
           key: version-drift-notified-${{ hashFiles('/tmp/drift-key.txt') }}
@@ -241,10 +241,10 @@ jobs:
             tag: staging
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
@@ -326,7 +326,7 @@ jobs:
       contents: read
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
