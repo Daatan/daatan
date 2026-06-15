@@ -21,6 +21,14 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
       ? 'Kalshi'
       : 'Polymarket'
     : ''
+  // Always resolve a usable market URL: some early links stored an empty `url`,
+  // which would render a dead `href=""`. Fall back to the slug-derived URL.
+  const marketUrl = market
+    ? market.url ||
+      (market.provider === 'KALSHI'
+        ? `https://kalshi.com/markets/${market.slug}`
+        : `https://polymarket.com/event/${market.slug}`)
+    : ''
   return (
     <>
       <div className={variant === 'mobile' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
@@ -64,7 +72,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
 
         {market && (
           <a
-            href={market.url}
+            href={marketUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm hover:border-pink-500/60 transition-colors group"
@@ -85,6 +93,9 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
                   Resolved
                 </span>
               )}
+            </div>
+            <div className="mt-1.5 text-[11px] font-medium text-pink-400 group-hover:text-pink-300">
+              View on {providerLabel} →
             </div>
           </a>
         )}

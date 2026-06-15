@@ -49,3 +49,36 @@ describe('ForecastInfoPanel — Tags box', () => {
     expect(screen.queryByText('None')).toBeNull()
   })
 })
+
+describe('ForecastInfoPanel — linked market card', () => {
+  const withMarket = (url: string) =>
+    ({
+      ...basePrediction,
+      externalMarket: {
+        provider: 'POLYMARKET',
+        slug: 'will-x-happen',
+        url,
+        question: 'Will X happen?',
+        resolved: false,
+        snapshots: [{ createdAt: '2026-06-01', probability: 62 }],
+      },
+    }) as unknown as Prediction
+
+  it('shows a clickable "View on Polymarket" link to the market url', () => {
+    wrap(withMarket('https://polymarket.com/event/will-x-happen'))
+    const link = screen.getByText('View on Polymarket →').closest('a')
+    expect(link).toHaveAttribute('href', 'https://polymarket.com/event/will-x-happen')
+    expect(screen.getByText('62%')).toBeInTheDocument()
+  })
+
+  it('falls back to a slug-derived url when the stored url is empty', () => {
+    wrap(withMarket(''))
+    const link = screen.getByText('View on Polymarket →').closest('a')
+    expect(link).toHaveAttribute('href', 'https://polymarket.com/event/will-x-happen')
+  })
+
+  it('shows no market card (and no link option) when not connected', () => {
+    wrap(basePrediction)
+    expect(screen.queryByText(/View on/)).toBeNull()
+  })
+})
