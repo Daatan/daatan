@@ -328,7 +328,7 @@ function getProviderById(id: ProviderId): MarketProvider | null {
 
 /** Upsert a normalized market into the cache (keyed by provider + externalId). */
 async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
-  return prisma.externalMarket.upsert({
+  const market = await prisma.externalMarket.upsert({
     where: { provider_externalId: { provider: m.provider, externalId: m.externalId } },
     create: {
       provider: m.provider,
@@ -353,6 +353,21 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
       lastSyncedAt: new Date(),
     },
   })
+
+  // Seed an initial price snapshot so the forecast history chart's "Market" line
+  // shows as soon as a market is linked/imported, instead of staying empty until
+  // the first hourly sync cron happens to run (GitHub schedules are irregular).
+  // Only when none exist yet — the hourly sync owns the ongoing time series.
+  const snapshotCount = await prisma.externalMarketPriceSnapshot.count({
+    where: { marketId: market.id },
+  })
+  if (snapshotCount === 0) {
+    await prisma.externalMarketPriceSnapshot.create({
+      data: { marketId: market.id, probability: m.yesProbability },
+    })
+  }
+
+  return market
 }
 
 /**

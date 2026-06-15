@@ -140,6 +140,11 @@ export default function ProbabilityChart({
     return point
   })
 
+  // A line with a single data point draws no visible segment, so a forecast that
+  // only has e.g. one market snapshot (just linked) would show an empty chart.
+  // Render dots in that degenerate case so the lone value is still visible.
+  const showDots = data.length === 1
+
   return (
     <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
       <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
@@ -186,7 +191,7 @@ export default function ProbabilityChart({
               name="Community"
               stroke="#A0AEC0"
               strokeWidth={2}
-              dot={false}
+              dot={showDots}
               connectNulls
             />
           )}
@@ -199,7 +204,7 @@ export default function ProbabilityChart({
               name={opt.text}
               stroke={OPTION_COLORS[i % OPTION_COLORS.length]}
               strokeWidth={2}
-              dot={false}
+              dot={showDots}
               connectNulls
             />
           ))}
@@ -212,7 +217,7 @@ export default function ProbabilityChart({
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
-              dot={false}
+              dot={showDots}
               connectNulls
             />
           )}
@@ -224,7 +229,7 @@ export default function ProbabilityChart({
               name="Market (Polymarket)"
               stroke="#EC4899"
               strokeWidth={2}
-              dot={false}
+              dot={showDots}
               connectNulls
             />
           )}
