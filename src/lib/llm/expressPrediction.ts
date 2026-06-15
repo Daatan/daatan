@@ -150,11 +150,19 @@ export async function generateExpressPrediction(
   skipSources?: boolean,
   meta: OracleCallMeta = { source: 'express-creation' }
 ): Promise<ExpressPredictionResult> {
-  // Proactive Content Moderation
-  onProgress?.('checking', { message: 'Checking content…' })
-  const moderation = await checkContent(userInput, 'forecast')
-  if (moderation.isOffensive) {
-    throw new Error(`OFFENSIVE_INPUT: ${moderation.reason}`)
+  // Proactive content moderation — only for free-text input. A bare URL is the
+  // intended input for the article-import path, but the LLM moderator
+  // intermittently mis-flags it as "spam" (a non-deterministic false positive —
+  // the same URL passes on retry). The generated claim is still moderated at
+  // forecast-create time (checkContent in POST /api/forecasts), so skipping the
+  // raw-URL check here is safe.
+  const isUrlInput = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
+  if (!isUrlInput) {
+    onProgress?.('checking', { message: 'Checking content…' })
+    const moderation = await checkContent(userInput, 'forecast')
+    if (moderation.isOffensive) {
+      throw new Error(`OFFENSIVE_INPUT: ${moderation.reason}`)
+    }
   }
 
   // Source-free path: skip web search entirely

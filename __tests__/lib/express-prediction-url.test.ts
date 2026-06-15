@@ -188,12 +188,11 @@ describe('generateExpressPrediction', () => {
     it('fetches article, extracts topic, and searches for related articles', async () => {
       mockFetchUrlContent.mockResolvedValue('Bitcoin Rally Reaches New Heights...')
       
-      // 1. Moderation, 2. Topic extraction, 3. Structured prediction
+      // URL input skips moderation: 1. Topic extraction, 2. Structured prediction
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: 'Bitcoin price rally 2026' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
-      
+
       mockOracleSearch.mockResolvedValue(mockArticles)
 
       const result = await generateExpressPrediction(testUrl)
@@ -202,8 +201,8 @@ describe('generateExpressPrediction', () => {
       expect(mockFetchUrlContent).toHaveBeenCalledWith(testUrl)
 
       // Should extract topic via LLM
-      expect(mockGenerateContent).toHaveBeenCalledTimes(3)
-      const topicCall = mockGenerateContent.mock.calls[1][0] // second call
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2)
+      const topicCall = mockGenerateContent.mock.calls[0][0] // first call (no moderation for URLs)
       expect(topicCall.prompt).toContain('Extract the main topic')
 
       // Should search for related articles using extracted topic
@@ -216,7 +215,6 @@ describe('generateExpressPrediction', () => {
     it('uses original URL as news anchor, not search results', async () => {
       mockFetchUrlContent.mockResolvedValue('Article about climate change...')
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: 'European climate policy' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       mockOracleSearch.mockResolvedValue(mockArticles)
@@ -229,7 +227,6 @@ describe('generateExpressPrediction', () => {
     it('deduplicates original URL from search results', async () => {
       mockFetchUrlContent.mockResolvedValue('Some article content here...')
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: 'test topic' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       
@@ -250,21 +247,19 @@ describe('generateExpressPrediction', () => {
       mockOracleSearch.mockResolvedValue(mockArticles)
       
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       const result = await generateExpressPrediction(testUrl)
 
       // Should fall back to using URL as search query
       expect(mockOracleSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
-      expect(mockGenerateContent).toHaveBeenCalledTimes(2) 
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1)
       expect(result.newsAnchor!.url).toBe('https://cnn.com/btc')
     })
 
     it('falls back to URL as search topic when topic extraction fails', async () => {
       mockFetchUrlContent.mockResolvedValue('Some article content...')
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockRejectedValueOnce(new Error('LLM error')) // topic extraction fails
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) }) 
       mockOracleSearch.mockResolvedValue(mockArticles)
@@ -279,7 +274,6 @@ describe('generateExpressPrediction', () => {
     it('works when related article search returns empty', async () => {
       mockFetchUrlContent.mockResolvedValue('Article about a niche topic...')
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: 'niche topic' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       mockOracleSearch.mockResolvedValue([])
@@ -293,8 +287,7 @@ describe('generateExpressPrediction', () => {
     it('strips quotes from extracted topic', async () => {
       mockFetchUrlContent.mockResolvedValue('Article content...')
       mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
-        .mockResolvedValueOnce({ text: '"Bitcoin rally 2026"' }) 
+        .mockResolvedValueOnce({ text: '"Bitcoin rally 2026"' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       mockOracleSearch.mockResolvedValue(mockArticles)
 
@@ -328,17 +321,15 @@ describe('generateExpressPrediction', () => {
       mockOracleSearch.mockResolvedValue(mockArticles)
       mockFetchUrlContent.mockResolvedValue('Some fetched content.')
       
-      // 1. Moderation
-      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
-      
       if (isUrl) {
-        // 2. Topic, 3. Prediction
+        // URL skips moderation: 1. Topic, 2. Prediction
         mockGenerateContent
           .mockResolvedValueOnce({ text: 'extracted topic' })
           .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       } else {
-        // 2. Search-query extraction, 3. Prediction
+        // 1. Moderation, 2. Search-query extraction, 3. Prediction
         mockGenerateContent
+          .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
           .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
           .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       }
