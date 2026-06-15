@@ -13,10 +13,23 @@ export async function GET(request: NextRequest) {
 
   const predictions = await prisma.prediction.findMany({
     where: { status: 'ACTIVE' },
-    select: { id: true, claimText: true },
+    select: {
+      id: true,
+      claimText: true,
+      // claimText translations let news-indexer build a multilingual forecast
+      // embedding, so articles in he/ar/ru match an English-authored claim.
+      translations: {
+        where: { fieldName: 'claimText' },
+        select: { language: true, translatedText: true },
+      },
+    },
   })
 
   return NextResponse.json(
-    predictions.map(p => ({ id: p.id, question: p.claimText })),
+    predictions.map(p => ({
+      id: p.id,
+      question: p.claimText,
+      translations: p.translations.map(t => ({ language: t.language, text: t.translatedText })),
+    })),
   )
 }
