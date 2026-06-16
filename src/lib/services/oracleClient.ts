@@ -46,6 +46,8 @@ interface LogOracleCallInput {
   providerChain?: string[]
   query?: string | null
   resultCount?: number | null
+  /** Why the call failed / came back empty; null on success. */
+  failureReason?: string | null
 }
 
 const PRUNE_DAYS = 30
@@ -54,11 +56,14 @@ const PRUNE_DAYS = 30
  * Record one Oracle call (any type, success or failure) for the admin usage
  * stats. Fire-and-forget: never throws — callers invoke as `void logOracleCall(...)`.
  * Also prunes rows older than {@link PRUNE_DAYS} on each write.
+ *
+ * Returns the created row's id (or null on failure) so a caller that later
+ * takes the LLM fallback can attribute it via {@link recordOracleFallback}.
  */
-export async function logOracleCall(input: LogOracleCallInput): Promise<void> {
+export async function logOracleCall(input: LogOracleCallInput): Promise<string | null> {
   try {
     const cutoff = new Date(Date.now() - PRUNE_DAYS * 24 * 60 * 60 * 1000)
-    await prisma.$transaction([
+    const [created] = await prisma.$transaction([
       prisma.oracleCallLog.create({
         data: {
           callType: input.callType,
@@ -73,12 +78,33 @@ export async function logOracleCall(input: LogOracleCallInput): Promise<void> {
           providerChain: input.providerChain ?? [],
           query: input.query ?? null,
           resultCount: input.resultCount ?? null,
+          failureReason: input.failureReason ?? null,
         },
+        select: { id: true },
       }),
       prisma.oracleCallLog.deleteMany({ where: { createdAt: { lt: cutoff } } }),
     ])
+    return created.id
   } catch (err) {
     log.warn({ err }, 'failed to write oracle call log')
+    return null
+  }
+}
+
+/**
+ * Mark a logged Oracle call as having fallen back to the LLM, recording the
+ * probability the fallback produced. Fire-and-forget: never throws. No-op when
+ * `id` is null (the original log write failed).
+ */
+export async function recordOracleFallback(id: string | null, fallbackProbability: number | null): Promise<void> {
+  if (!id) return
+  try {
+    await prisma.oracleCallLog.update({
+      where: { id },
+      data: { fellBackToLlm: true, fallbackProbability: fallbackProbability ?? null },
+    })
+  } catch (err) {
+    log.warn({ err }, 'failed to record oracle fallback')
   }
 }
 

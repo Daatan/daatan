@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       publishedDate: a.publishedAt ?? undefined,
     }))
 
-    const oracleForecast = await getOracleForecast(
+    const { forecast: oracleForecast } = await getOracleForecast(
       prediction.claimText,
       { articles },
       { source: 'news-indexer', predictionId: prediction.id },

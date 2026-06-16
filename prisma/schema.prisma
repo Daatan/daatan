@@ -973,6 +973,17 @@ model OracleCallLog {
   query         String?
   resultCount   Int?
 
+  // Why a call failed/came back empty. Plain string (not enum) so new reasons
+  // don't need a migration. Transport (daatan-derived): timeout | network |
+  // http_5xx | http_4xx. EMPTY (passed through from the Oracle's `reason`):
+  // no_search_results | all_articles_off_topic | all_fetches_failed |
+  // extraction_errors | no_usable_predictions | no_result | oracle_timeout. Else unknown.
+  failureReason String?
+  // True when the caller abandoned the Oracle result and used the LLM fallback.
+  fellBackToLlm       Boolean @default(false)
+  // The 0–100 probability the LLM fallback produced (set with fellBackToLlm).
+  fallbackProbability Int?
+
   durationMs Int
   createdAt  DateTime @default(now())
 

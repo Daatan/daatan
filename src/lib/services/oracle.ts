@@ -7,6 +7,8 @@ import {
   type OracleCallMeta,
 } from '@/lib/services/oracleClient'
 
+export { recordOracleFallback } from '@/lib/services/oracleClient'
+
 const log = createLogger('oracle')
 
 const EXPECTED_API_VERSION = '0.1'
@@ -58,10 +60,38 @@ export interface OracleForecastResponse {
   sources: OracleSource[]
   /** True if the Oracle couldn't produce a real forecast (stub response). */
   placeholder: boolean
+  /** True when the Oracle ran but had no usable articles (mean/ci are not a real estimate). */
+  insufficient_data?: boolean
+  /** Why the Oracle couldn't answer; see the failure-reason vocabulary on OracleCallLog. */
+  reason?: string
   /** Search provider that served the underlying article search (retro /forecast & /search; may be 'caller'/'search_cache'/'none'). */
   provider?: string
   /** Ordered search fallback chain retro tried, in order. */
   provider_chain?: string[]
+}
+
+/** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the
+ *  id of the logged call, so a caller can attribute its LLM fallback to it. */
+export interface OracleForecastResult {
+  forecast: OracleForecastResponse | null
+  logId: string | null
+}
+
+/**
+ * Map the Oracle's `reason` (EMPTY responses) onto the OracleCallLog vocabulary.
+ * Retro's internal `timeout` is renamed to `oracle_timeout` so it never collides
+ * with a daatan-side client/transport timeout. */
+function emptyFailureReason(reason: string | undefined): string {
+  if (!reason) return 'insufficient_data'
+  return reason === 'timeout' ? 'oracle_timeout' : reason
+}
+
+/** Classify a thrown fetch error into a transport failure reason. AbortSignal.timeout()
+ *  rejects with a `TimeoutError`; everything else is treated as a network failure. */
+function transportFailureReason(err: unknown): 'timeout' | 'network' {
+  return err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    ? 'timeout'
+    : 'network'
 }
 
 interface OracleHealthResponse {
@@ -89,22 +119,24 @@ export interface OracleLeaderboardResponse {
 }
 
 /**
- * Call the TruthMachine Oracle API and return the full forecast payload.
+ * Call the TruthMachine Oracle API and return the full forecast payload plus the
+ * id of the logged call.
  *
- * Returns `null` if the Oracle is not configured, returned a placeholder
+ * `forecast` is `null` if the Oracle is not configured, returned a placeholder
  * response, had no usable articles, or failed for any reason (timeout,
- * non-OK status, network error). Never throws — safe to call
- * fire-and-forget style.
+ * non-OK status, network error). `logId` is the OracleCallLog row id (null when
+ * unconfigured or the log write failed) so a caller that then takes the LLM
+ * fallback can attribute it via {@link recordOracleFallback}. Never throws.
  */
 export const getOracleForecast = async (
   question: string,
   options?: { articles?: ArticleInput[]; timeoutMs?: number },
   meta: OracleCallMeta = { source: 'other' },
-): Promise<OracleForecastResponse | null> => {
+): Promise<OracleForecastResult> => {
   const cfg = getOracleConfig()
   if (!cfg) {
     log.debug('Oracle not configured — skipping')
-    return null
+    return { forecast: null, logId: null }
   }
 
   const t0 = Date.now()
@@ -136,8 +168,8 @@ export const getOracleForecast = async (
     if (!res.ok) {
       const errorBody = await res.text().catch(() => '(unreadable)')
       log.warn({ status: res.status, body: errorBody, durationMs: Date.now() - t0 }, 'Oracle returned non-OK status')
-      void logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question })
-      return null
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, failureReason: res.status >= 500 ? 'http_5xx' : 'http_4xx' })
+      return { forecast: null, logId }
     }
 
     const data: OracleForecastResponse = await res.json()
@@ -145,14 +177,14 @@ export const getOracleForecast = async (
 
     if (data.placeholder) {
       log.debug('Oracle returned placeholder response — no real forecast available')
-      void logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine })
-      return null
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason) })
+      return { forecast: null, logId }
     }
 
     if (typeof data.mean !== 'number' || data.articles_used === 0) {
-      log.debug({ articlesUsed: data.articles_used }, 'Oracle returned no usable articles')
-      void logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used })
-      return null
+      log.debug({ articlesUsed: data.articles_used, reason: data.reason }, 'Oracle returned no usable articles')
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
+      return { forecast: null, logId }
     }
 
     log.info(
@@ -165,28 +197,28 @@ export const getOracleForecast = async (
       },
       'Oracle forecast',
     )
-    void logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used })
-    return data
+    const logId = await logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used })
+    return { forecast: data, logId }
   } catch (err) {
     log.warn({ err, durationMs: Date.now() - t0 }, 'Oracle request failed')
-    void logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, query: question })
-    return null
+    const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, query: question, failureReason: transportFailureReason(err) })
+    return { forecast: null, logId }
   }
 }
 
 /**
  * Thin back-compat wrapper: returns just the scaled probability in [0, 1],
  * or null if the Oracle path wasn't usable. Prefer `getOracleForecast` when
- * you also want the sources or confidence interval.
+ * you also want the sources, confidence interval, or the log id.
  */
 export const getOracleProbability = async (
   question: string,
   meta: OracleCallMeta = { source: 'other' },
   options?: { timeoutMs?: number },
 ): Promise<number | null> => {
-  const data = await getOracleForecast(question, { timeoutMs: options?.timeoutMs }, meta)
-  if (!data) return null
-  return (data.mean + 1) / 2
+  const { forecast } = await getOracleForecast(question, { timeoutMs: options?.timeoutMs }, meta)
+  if (!forecast) return null
+  return (forecast.mean + 1) / 2
 }
 
 /**

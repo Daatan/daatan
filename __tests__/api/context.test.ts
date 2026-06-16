@@ -8,10 +8,11 @@ const { mockAuth } = vi.hoisted(() => ({
 }))
 vi.mock('@/auth', () => ({ auth: mockAuth }))
 
-const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast } = vi.hoisted(() => ({
+const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast, mockRecordOracleFallback } = vi.hoisted(() => ({
   mockOracleSearch: vi.fn(),
   mockGenerateContent: vi.fn(),
-  mockGetOracleForecast: vi.fn().mockResolvedValue(null),
+  mockGetOracleForecast: vi.fn().mockResolvedValue({ forecast: null, logId: null }),
+  mockRecordOracleFallback: vi.fn().mockResolvedValue(undefined),
   mockPrisma: {
     prediction: {
       findFirst: vi.fn(),
@@ -35,6 +36,7 @@ const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast
 vi.mock('@/lib/services/oracle', () => ({
   DEFAULT_MAX_ARTICLES: 30,
   getOracleForecast: (...args: unknown[]) => mockGetOracleForecast(...args),
+  recordOracleFallback: (...args: unknown[]) => mockRecordOracleFallback(...args),
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({
@@ -290,14 +292,17 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     mockGenerateContent.mockResolvedValue({ text: 'Summary' })
     // Oracle returns stance in [-1, 1]; route maps to percent via (v+1)/2 * 100
     mockGetOracleForecast.mockResolvedValueOnce({
-      question: 'Bitcoin will reach $100k',
-      mean: 0.2,      // → 60%
-      std: 0.1,
-      ci_low: 0.0,    // → 50%
-      ci_high: 0.4,   // → 70%
-      articles_used: 3,
-      sources: [],
-      placeholder: false,
+      forecast: {
+        question: 'Bitcoin will reach $100k',
+        mean: 0.2,      // → 60%
+        std: 0.1,
+        ci_low: 0.0,    // → 50%
+        ci_high: 0.4,   // → 70%
+        articles_used: 3,
+        sources: [],
+        placeholder: false,
+      },
+      logId: 'log-1',
     })
     mockPrisma.$transaction.mockResolvedValue([{ id: 'snap1', summary: 'Summary', sources: [], createdAt: new Date() }, {}])
     mockPrisma.contextSnapshot.findMany.mockResolvedValue([])
@@ -332,7 +337,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       { title: 'N', url: 'https://example.com', source: 'X', publishedDate: '2026-02-20', snippet: '.' },
     ])
     mockGenerateContent.mockResolvedValue({ text: 'Summary' })
-    mockGetOracleForecast.mockResolvedValueOnce(null)
+    mockGetOracleForecast.mockResolvedValueOnce({ forecast: null, logId: 'log-1' })
     mockPrisma.$transaction.mockResolvedValue([{ id: 'snap1', summary: 'Summary', sources: [], createdAt: new Date() }, {}])
     mockPrisma.contextSnapshot.findMany.mockResolvedValue([])
 
