@@ -34,7 +34,7 @@ import { BotApprovalSection } from './_forecast/BotApprovalSection'
 import { SimilarForecasts } from './_forecast/SimilarForecasts'
 import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
-import ProbabilityChart from '@/components/forecasts/ProbabilityChart'
+import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
@@ -304,9 +304,7 @@ export default function ForecastDetailClient({
 
             {/* Confidence/Probability - Moved to top */}
             {prediction.status === 'ACTIVE' && prediction.outcomeType === 'BINARY' && (() => {
-              const yesTokens = prediction.commitments.filter(c => c.binaryChoice === true).reduce((sum, c) => sum + c.cuCommitted, 0)
-              const noTokens = prediction.commitments.filter(c => c.binaryChoice === false).reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
-              const prob = (yesTokens + noTokens) > 0 ? Math.round((yesTokens / (yesTokens + noTokens)) * 100) : 50
+              const prob = communityProbability(prediction.commitments) ?? 50
               return (
                 <div
                   className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-teal text-sm font-medium border border-teal/20"
@@ -435,9 +433,7 @@ export default function ForecastDetailClient({
       {/* Probability Display (Interactive Gauge) */}
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
-          const yesTokens = prediction.commitments.filter(c => c.binaryChoice === true).reduce((sum, c) => sum + c.cuCommitted, 0)
-          const noTokens = prediction.commitments.filter(c => c.binaryChoice === false).reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
-          const marketProb = (yesTokens + noTokens) > 0 ? Math.round((yesTokens / (yesTokens + noTokens)) * 100) : 50
+          const marketProb = communityProbability(prediction.commitments) ?? 50
           const aiVal = aiEstimate?.probability ?? prediction.confidence ?? null
 
           return (
