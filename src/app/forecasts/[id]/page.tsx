@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -241,6 +241,12 @@ export default async function ForecastDetailPage({ params }: Props) {
     prediction._count.commitments === 0
   ) {
     notFound()
+  }
+
+  // Canonicalize the URL: when reached by raw id, send the viewer to the
+  // human-readable slug (matches the canonical/og URLs in generateMetadata).
+  if (prediction.slug && id !== prediction.slug) {
+    permanentRedirect(`/forecasts/${prediction.slug}`)
   }
 
   const [initialComments, initialContextSnapshots] = await Promise.all([
