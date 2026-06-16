@@ -106,6 +106,20 @@ describe('getOracleForecast', () => {
     expect(headers['Content-Type']).toBe('application/json')
   })
 
+  it('maps supplied articles to the Oracle snake_case `published_date`', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleForecast('Q?', {
+      articles: [
+        { url: 'https://x.com/a', title: 'T', snippet: 'S', source: 'X', publishedDate: '2026-06-14' },
+      ],
+    })
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.articles[0].published_date).toBe('2026-06-14')
+    // the camelCase key must not leak through to the Oracle
+    expect(body.articles[0].publishedDate).toBeUndefined()
+  })
+
   it('returns null when the response is a placeholder', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
