@@ -29,7 +29,24 @@ export const POST = withAuth(async (request, user, { params }) => {
   const { result, prediction } = resolveResult
 
   notifyForecastResolved(prediction, outcome, prediction.commitments.length)
-  notifyNewsIndexerResolution(prediction.id, outcome)
+
+  // Forecast-level probabilities (0–1) so the crowd & our model join the news-indexer
+  // reliability ELO ladder. Only meaningful for BINARY; community = mean of the crowd's
+  // committed P(YES), AI = the denormalized Oracle estimate (prediction.confidence, 0–100).
+  let communityProbability: number | null = null
+  let aiProbability: number | null = null
+  if (prediction.outcomeType === 'BINARY') {
+    const probs = prediction.commitments
+      .map((c) => c.probability)
+      .filter((p): p is number => p != null)
+    if (probs.length > 0) {
+      communityProbability = probs.reduce((a, b) => a + b, 0) / probs.length
+    }
+    if (prediction.confidence != null) {
+      aiProbability = prediction.confidence / 100
+    }
+  }
+  notifyNewsIndexerResolution(prediction.id, outcome, communityProbability, aiProbability)
 
   const forecastLink = `/forecasts/${prediction.slug || prediction.id}`
   for (const commitment of prediction.commitments) {
