@@ -115,7 +115,20 @@ export const getOracleForecast = async (
       body: JSON.stringify({
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
-        ...(options?.articles?.length ? { articles: options.articles } : {}),
+        // Oracle's ArticleInput uses snake_case `published_date`; map from our
+        // camelCase `publishedDate` so recency weighting on the Oracle side
+        // actually receives the date (otherwise it's dropped and treated as now).
+        ...(options?.articles?.length
+          ? {
+              articles: options.articles.map(a => ({
+                url: a.url,
+                title: a.title,
+                snippet: a.snippet,
+                source: a.source,
+                published_date: a.publishedDate,
+              })),
+            }
+          : {}),
       }),
       timeoutMs: options?.timeoutMs ?? FORECAST_TIMEOUT_MS,
     })
