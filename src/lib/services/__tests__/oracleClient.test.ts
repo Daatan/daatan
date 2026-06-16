@@ -14,7 +14,7 @@ vi.mock('@/env', () => ({ env: mockEnv }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     oracleCallLog: { create: vi.fn(() => ({})), deleteMany: vi.fn(() => ({})) },
-    $transaction: vi.fn(async () => undefined),
+    $transaction: vi.fn(async () => [{ id: 'log-1' }, { count: 0 }]),
   },
 }))
 vi.mock('@/lib/logger', () => ({
@@ -113,7 +113,9 @@ describe('logOracleCall', () => {
         providerChain: [],
         query: 'Will X happen?',
         resultCount: 9,
+        failureReason: null,
       },
+      select: { id: true },
     })
     // Also prunes old rows.
     expect(mockDeleteMany).toHaveBeenCalledTimes(1)
@@ -130,10 +132,15 @@ describe('logOracleCall', () => {
     expect(data.resultCount).toBeNull()
   })
 
-  it('never throws when the write fails', async () => {
+  it('returns the created row id', async () => {
+    const id = await logOracleCall({ callType: 'SEARCH', status: 'OK', meta: { source: 'research' }, durationMs: 5 })
+    expect(id).toBe('log-1')
+  })
+
+  it('never throws and returns null when the write fails', async () => {
     mockCreate.mockImplementationOnce(() => { throw new Error('db down') })
     await expect(
       logOracleCall({ callType: 'SEARCH', status: 'OK', meta: { source: 'research' }, durationMs: 5 }),
-    ).resolves.toBeUndefined()
+    ).resolves.toBeNull()
   })
 })

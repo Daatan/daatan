@@ -23,6 +23,9 @@ type RecentCall = {
   resultCount: number | null
   durationMs: number
   createdAt: string
+  failureReason: string | null
+  fellBackToLlm: boolean
+  fallbackProbability: number | null
   user: { id: string; name: string | null; username: string | null } | null
   prediction: { id: string; slug: string | null; claimText: string } | null
 }
@@ -34,6 +37,8 @@ type OracleStats = {
   byCallType: Breakdown[]
   byEngine: Breakdown[]
   byStatus: { key: string; callCount: number }[]
+  byFailureReason: { key: string; callCount: number }[]
+  fallback: { count: number; rate: number; avgProbability: number | null; extremeCount: number }
   recent: RecentCall[]
 }
 
@@ -148,6 +153,62 @@ function BreakdownTable({ title, label, rows }: { title: string; label: string; 
                   <td className="py-2 text-gray-500">
                     {row.lastSeenAt ? new Date(row.lastSeenAt).toLocaleString() : '—'}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function FailuresAndFallback({
+  byFailureReason,
+  fallback,
+}: {
+  byFailureReason: { key: string; callCount: number }[]
+  fallback: { count: number; rate: number; avgProbability: number | null; extremeCount: number }
+}) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-medium text-gray-700">Failures &amp; fallback</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3 border border-navy-600 rounded-lg bg-navy-700">
+          <div className="text-xs text-gray-400 uppercase tracking-wide">LLM fallbacks</div>
+          <div className="text-xl font-bold tabular-nums">{fallback.count}</div>
+        </div>
+        <div className="p-3 border border-navy-600 rounded-lg bg-navy-700">
+          <div className="text-xs text-gray-400 uppercase tracking-wide">Fallback rate</div>
+          <div className="text-xl font-bold tabular-nums" title="Share of FORECAST calls that fell back to the LLM">{fallback.rate}%</div>
+        </div>
+        <div className="p-3 border border-navy-600 rounded-lg bg-navy-700">
+          <div className="text-xs text-gray-400 uppercase tracking-wide">Avg fallback prob.</div>
+          <div className="text-xl font-bold tabular-nums">
+            {fallback.avgProbability != null ? `${fallback.avgProbability}%` : '—'}
+          </div>
+        </div>
+        <div className="p-3 border border-navy-600 rounded-lg bg-navy-700">
+          <div className="text-xs text-gray-400 uppercase tracking-wide" title="Fallbacks above 85% or below 10%">Extreme fallbacks</div>
+          <div className="text-xl font-bold tabular-nums text-red-400">{fallback.extremeCount}</div>
+        </div>
+      </div>
+      {byFailureReason.length === 0 ? (
+        <p className="text-sm text-gray-400">No failures recorded yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-6 font-medium">Failure reason</th>
+                <th className="py-2 font-medium text-right">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byFailureReason.map(row => (
+                <tr key={row.key} className="border-b last:border-0">
+                  <td className="py-2 pr-6 font-mono">{row.key}</td>
+                  <td className="py-2 text-right tabular-nums">{row.callCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -349,6 +410,8 @@ export default function OracleTab() {
           <BreakdownTable title="By source" label="Source" rows={stats.bySource} />
           <BreakdownTable title="By call type" label="Call type" rows={stats.byCallType} />
           <BreakdownTable title="By search engine" label="Engine" rows={stats.byEngine} />
+
+          <FailuresAndFallback byFailureReason={stats.byFailureReason} fallback={stats.fallback} />
 
           <RecentCallsTable rows={stats.recent} />
         </>

@@ -7,7 +7,7 @@ import { llmService } from '@/lib/llm'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, DEFAULT_MAX_ARTICLES, type OracleSource } from '@/lib/services/oracle'
+import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, type OracleSource } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import {
@@ -163,7 +163,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
 
         // Oracle estimation starts immediately; LLM runs concurrently below
         const estimationWork: Promise<EstimationResult> = (async () => {
-            const oracleForecast = await getOracleForecast(prediction.claimText, {
+            const { forecast: oracleForecast, logId: oracleLogId } = await getOracleForecast(prediction.claimText, {
                 articles: searchResults.map(r => ({
                     url: r.url,
                     title: r.title,
@@ -222,6 +222,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.detailsText ?? '',
                     articlesMapped
                 )
+                void recordOracleFallback(oracleLogId, chances.probability)
                 log.info(
                     {
                         predictionId: prediction.id,

@@ -104,7 +104,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('returns the per-article Oracle output so news-indexer can store it', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue(ORACLE_WITH_SOURCE as never)
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     const res = await POST(post('test-secret'))
     expect(res.status).toBe(200)
@@ -121,7 +121,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('returns null enrichment when the Oracle has no usable forecast', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue(null as never)
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
     const res = await POST(post('test-secret'))
     expect(res.status).toBe(200)
@@ -154,7 +154,7 @@ describe('POST /api/news-indexer/context', () => {
         },
       ],
     }
-    vi.mocked(getOracleForecast).mockResolvedValue(ORACLE_TWO_SOURCES as never)
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
 
     const res = await POST(
       post('test-secret', {

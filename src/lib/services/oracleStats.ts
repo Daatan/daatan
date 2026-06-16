@@ -60,12 +60,15 @@ export async function getOracleUsageStats(
   if (filters?.callType) where.callType = filters.callType
   if (filters?.status) where.status = filters.status
 
-  const [bySourceRows, byTypeRows, byEngineRows, byStatusRows, totalsRows, recent] = await Promise.all([
+  const [bySourceRows, byTypeRows, byEngineRows, byStatusRows, byReasonRows, totalsRows, fallbackAgg, extremeFallbackCount, recent] = await Promise.all([
     prisma.oracleCallLog.groupBy({ by: ['source', 'status'], where, _count: { _all: true }, _avg: { durationMs: true }, _max: { createdAt: true } }),
     prisma.oracleCallLog.groupBy({ by: ['callType', 'status'], where, _count: { _all: true }, _avg: { durationMs: true }, _max: { createdAt: true } }),
     prisma.oracleCallLog.groupBy({ by: ['searchEngine', 'status'], where, _count: { _all: true }, _avg: { durationMs: true }, _max: { createdAt: true } }),
     prisma.oracleCallLog.groupBy({ by: ['status'], where, _count: { _all: true } }),
+    prisma.oracleCallLog.groupBy({ by: ['failureReason'], where: { ...where, NOT: { failureReason: null } }, _count: { _all: true } }),
     prisma.oracleCallLog.aggregate({ where, _count: { _all: true }, _avg: { durationMs: true } }),
+    prisma.oracleCallLog.aggregate({ where: { ...where, fellBackToLlm: true }, _count: { _all: true }, _avg: { fallbackProbability: true } }),
+    prisma.oracleCallLog.count({ where: { ...where, fellBackToLlm: true, OR: [{ fallbackProbability: { gt: 85 } }, { fallbackProbability: { lt: 10 } }] } }),
     prisma.oracleCallLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -74,6 +77,7 @@ export async function getOracleUsageStats(
         id: true, callType: true, source: true, status: true, httpStatus: true,
         searchEngine: true, provider: true, providerChain: true, query: true,
         resultCount: true, durationMs: true, createdAt: true,
+        failureReason: true, fellBackToLlm: true, fallbackProbability: true,
         user: { select: { id: true, name: true, username: true } },
         prediction: { select: { id: true, slug: true, claimText: true } },
       },
@@ -82,6 +86,11 @@ export async function getOracleUsageStats(
 
   const totalCalls = totalsRows._count._all
   const errorCalls = byStatusRows.find(r => r.status === 'ERROR')?._count._all ?? 0
+
+  // Fallback rate is measured against FORECAST calls — the only call type that falls back.
+  const byCallType = fold(byTypeRows, r => r.callType)
+  const forecastCalls = byCallType.find(r => r.key === 'FORECAST')?.callCount ?? 0
+  const fallbackCount = fallbackAgg._count._all
 
   return {
     windowDays,
@@ -92,9 +101,18 @@ export async function getOracleUsageStats(
       avgDurationMs: totalsRows._avg.durationMs != null ? Math.round(totalsRows._avg.durationMs) : null,
     },
     bySource: fold(bySourceRows, r => r.source),
-    byCallType: fold(byTypeRows, r => r.callType),
+    byCallType,
     byEngine: fold(byEngineRows, r => r.searchEngine ?? '—'),
     byStatus: byStatusRows.map(r => ({ key: r.status, callCount: r._count._all })),
+    byFailureReason: byReasonRows
+      .map(r => ({ key: r.failureReason ?? 'unknown', callCount: r._count._all }))
+      .sort((a, b) => b.callCount - a.callCount),
+    fallback: {
+      count: fallbackCount,
+      rate: forecastCalls > 0 ? Math.round((fallbackCount / forecastCalls) * 100) : 0,
+      avgProbability: fallbackAgg._avg.fallbackProbability != null ? Math.round(fallbackAgg._avg.fallbackProbability) : null,
+      extremeCount: extremeFallbackCount,
+    },
     recent,
   }
 }
