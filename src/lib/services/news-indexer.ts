@@ -11,7 +11,17 @@ function toLedgerOutcome(outcome: string): LedgerOutcome {
   return 'ANNULLED'  // void | unresolvable
 }
 
-export function notifyNewsIndexerResolution(forecastId: string, outcome: string): void {
+/**
+ * Notify news-indexer that a forecast resolved. The optional forecast-level
+ * probabilities (0–1) let the crowd ('community') and our model ('oracle') join
+ * the source reliability ELO ladder as players — see news-indexer worker/ratings.py.
+ */
+export function notifyNewsIndexerResolution(
+  forecastId: string,
+  outcome: string,
+  communityProbability?: number | null,
+  aiProbability?: number | null,
+): void {
   if (!env.NEWS_INDEXER_URL || !env.NEWS_INDEXER_API_KEY) return
 
   const ledgerOutcome = toLedgerOutcome(outcome)
@@ -21,7 +31,12 @@ export function notifyNewsIndexerResolution(forecastId: string, outcome: string)
       'x-api-key': env.NEWS_INDEXER_API_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ forecastId, outcome: ledgerOutcome }),
+    body: JSON.stringify({
+      forecastId,
+      outcome: ledgerOutcome,
+      ...(communityProbability != null && { communityProbability }),
+      ...(aiProbability != null && { aiProbability }),
+    }),
   }).catch((err: unknown) => {
     log.warn({ err }, 'news-indexer /resolve call failed')
   })
