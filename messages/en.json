@@ -413,6 +413,17 @@
     "previousUpdates": "{count} previous update",
     "previousUpdatesPlural": "{count} previous updates"
   },
+  "sources": {
+    "title": "Sources behind the AI estimate",
+    "subtitle": "Publications the Oracle weighed when forming its estimate — grouped by the stance each took on the claim.",
+    "favorsYes": "Favors YES",
+    "favorsNo": "Favors NO",
+    "neutral": "Neutral",
+    "by": "by {author}",
+    "certainty": "{value}% certainty",
+    "count": "{count} publication",
+    "countPlural": "{count} publications"
+  },
   "footer": {
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
