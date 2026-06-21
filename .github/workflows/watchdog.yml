@@ -48,18 +48,21 @@ jobs:
             # -w format: http_code then num_redirects on separate lines.
             # NOTE: no leading \n — body goes to file so stdout is only the -w trailer.
             # head -1 = http_code, tail -1 = num_redirects.
-            # Suffix with || true so a curl failure (timeout, DNS, etc) doesn't
-            # trip the step's `bash -e` before we reach the failure-handling
-            # block below — without this, an outage produces a step exit code
-            # but never sets the `failed=true` output, and the Telegram alert
-            # step (gated on that output) silently skips. Today's outage proved
-            # this: watchdog ran during the outage, curl timed out (exit 28),
-            # the step aborted, and no alert was sent.
+            #
+            # Capture curl's REAL exit code. The previous form `curl ... ) || true`
+            # followed by `CURL_EXIT=$?` was broken: `$?` then read the exit of
+            # `true` (always 0), so the curl-error branch below was dead code. On
+            # the 2026-06-20 cert-expiry outage curl exited 60, was treated as a
+            # success, then `cat` on the never-written body file aborted the step
+            # under `bash -e` before `failed=true` was set — so the Telegram alert
+            # silently skipped for ~18h. `cmd || CURL_EXIT=$?` keeps `$?` pointing
+            # at curl while still not tripping `bash -e`.
+            rm -f /tmp/curl_body.txt /tmp/curl_err.txt
+            CURL_EXIT=0
             HTTP_AND_REDIRECTS=$(curl -L --max-redirs 5 --max-time 15 \
               -w "%{http_code}\n%{num_redirects}" \
               -o /tmp/curl_body.txt \
-              "$url" 2>/tmp/curl_err.txt) || true
-            CURL_EXIT=$?
+              "$url" 2>/tmp/curl_err.txt) || CURL_EXIT=$?
 
             # curl non-zero exit: map common codes to human-readable reasons
             if [ $CURL_EXIT -ne 0 ]; then
@@ -69,6 +72,7 @@ jobs:
                 7)  REASON="connection refused" ;;
                 28) REASON="timed out (>15s)" ;;
                 35) REASON="SSL/TLS handshake failed" ;;
+                60) REASON="SSL certificate problem (expired/invalid)" ;;
                 47) REASON="too many redirects" ;;
                 *)  REASON="curl error $CURL_EXIT" ;;
               esac
@@ -79,7 +83,7 @@ jobs:
 
             HTTP=$(echo "$HTTP_AND_REDIRECTS" | head -1)
             NUM_REDIRECTS=$(echo "$HTTP_AND_REDIRECTS" | tail -1)
-            BODY=$(cat /tmp/curl_body.txt)
+            BODY=$(cat /tmp/curl_body.txt 2>/dev/null || true)
 
             # Any redirect from a canonical HTTPS URL is suspicious — flag it.
             # If we followed redirects and the final status is OK, that masks loops
