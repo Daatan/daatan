@@ -33,6 +33,8 @@ import { ResolutionInfo } from './_forecast/ResolutionInfo'
 import { BotApprovalSection } from './_forecast/BotApprovalSection'
 import { SimilarForecasts } from './_forecast/SimilarForecasts'
 import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
+import { ContributingSources } from '@/components/forecasts/ContributingSources'
+import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import type { Prediction } from './_forecast/types'
@@ -44,11 +46,13 @@ export default function ForecastDetailClient({
   isLocalized,
   initialComments,
   initialContextSnapshots,
+  initialContributingSources,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
   initialComments?: Comment[]
   initialContextSnapshots?: ContextSnapshot[]
+  initialContributingSources?: ContributingSource[]
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -687,6 +691,10 @@ export default function ForecastDetailClient({
           ? () => fetch(`/api/forecasts/${prediction.id}`).then(r => r.json()).then(setPrediction)
           : undefined}
       />
+
+      {/* Publications that fed the Oracle — a roster of "AI forecasters",
+          shown like the human commitments above but in its own section. */}
+      <ContributingSources sources={initialContributingSources ?? []} />
 
       {/* Author credit. If the author also voted, they're already tagged
           "author" in the Forecasts History list above, so skip this. */}

@@ -7,6 +7,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline } from '@/lib/services/context'
+import { getContributingSources } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 
@@ -249,9 +250,10 @@ export default async function ForecastDetailPage({ params }: Props) {
     permanentRedirect(`/forecasts/${prediction.slug}`)
   }
 
-  const [initialComments, initialContextSnapshots] = await Promise.all([
+  const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
+    getContributingSources(prediction.id),
   ])
   const slug = prediction.slug || prediction.id
   const articleJsonLd = {
@@ -354,6 +356,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         initialData={prediction}
         initialComments={initialComments}
         initialContextSnapshots={initialContextSnapshots}
+        initialContributingSources={initialContributingSources}
       />
     </>
   )

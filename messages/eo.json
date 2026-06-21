@@ -413,6 +413,17 @@
     "previousUpdates": "{count} antaŭa ĝisdatigo",
     "previousUpdatesPlural": "{count} antaŭaj ĝisdatigoj"
   },
+  "sources": {
+    "title": "Fontoj malantaŭ la AI-takso",
+    "subtitle": "Publikaĵoj kiujn la Orakolo pesis dum formado de sia takso — grupigitaj laŭ la sinteno kiun ĉiu prenis pri la aserto.",
+    "favorsYes": "Favoras JES",
+    "favorsNo": "Favoras NE",
+    "neutral": "Neŭtrala",
+    "by": "de {author}",
+    "certainty": "{value}% certeco",
+    "count": "{count} publikaĵo",
+    "countPlural": "{count} publikaĵoj"
+  },
   "footer": {
     "privacy": "Privateca Politiko",
     "terms": "Uzkondiĉoj",
