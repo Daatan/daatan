@@ -1,0 +1,74 @@
+name: TLS Cert Expiry Watch
+#
+# Proactive companion to watchdog.yml. The 5-minute watchdog only notices an
+# EXPIRED cert (curl error 60) AFTER the site is already down over HTTPS. This
+# job warns DAYS ahead: it reads the served leaf certificate's notAfter and
+# alerts Telegram when fewer than WARN_DAYS remain, so a stalled renewal can be
+# fixed before it becomes an outage (cf. the 2026-06-20 cert-expiry outage).
+# Runs from a GitHub Actions runner — independent of the EC2 box and SSM.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # 06:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  cert-expiry:
+    name: Cert expiry ${{ matrix.env.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - name: production
+            host: daatan.com
+          - name: staging
+            host: staging.daatan.com
+    steps:
+      - name: Check days until expiry
+        id: check
+        run: |
+          WARN_DAYS=14
+          HOST="${{ matrix.env.host }}"
+
+          # Read the served leaf cert's notAfter. -servername sets SNI so we get
+          # the cert nginx actually serves for this vhost.
+          END=$(echo | openssl s_client -servername "$HOST" -connect "$HOST":443 2>/dev/null \
+            | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+
+          if [ -z "$END" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=could not read certificate (TLS handshake failed?)" >> "$GITHUB_OUTPUT"
+            echo "Could not read certificate for $HOST"
+            exit 0
+          fi
+
+          END_EPOCH=$(date -d "$END" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS=$(( (END_EPOCH - NOW_EPOCH) / 86400 ))
+          echo "$HOST cert expires $END ($DAYS days remaining)"
+
+          if [ "$DAYS" -lt "$WARN_DAYS" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=expires in ${DAYS}d (on ${END})" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Alert via Telegram
+        if: steps.check.outputs.failed == 'true'
+        run: |
+          ENV="${{ matrix.env.name }}"
+          REASON="${{ steps.check.outputs.reason }}"
+          # Cert problems are high-signal → clean channel for prod, noisy for staging.
+          CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
+          if [ "$ENV" = "production" ]; then
+            CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
+            CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
+          fi
+          MSG="🔐 <b>[$ENV] TLS certificate ${REASON}</b>%0A%0AHost: ${{ matrix.env.host }}%0ARenew the cert (certbot loop) before HTTPS starts failing."
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=$CHAT_ID" \
+            -d "text=$MSG" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"
