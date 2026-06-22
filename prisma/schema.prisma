@@ -634,6 +634,11 @@ model PredictionTranslation {
   fieldName      String     @db.VarChar(50) // "claimText" | "detailsText" | "resolutionRules"
   language       String     @db.VarChar(10) // ISO 639-1 e.g. "he"
   translatedText String     @db.Text
+  // SHA-256 of the source text this translation was produced from. The cache is a
+  // hit only when it matches the current source, so an edited field (e.g.
+  // detailsText rewritten by a context update) re-translates instead of serving
+  // a stale translation. Null on legacy rows → treated as stale (re-translate once).
+  sourceHash     String?    @map("source_hash") @db.VarChar(64)
   createdAt      DateTime   @default(now())
 
   @@unique([predictionId, fieldName, language])
@@ -967,6 +972,17 @@ model OracleCallLog {
   providerChain String[]
   query         String?
   resultCount   Int?
+
+  // Why a call failed/came back empty. Plain string (not enum) so new reasons
+  // don't need a migration. Transport (daatan-derived): timeout | network |
+  // http_5xx | http_4xx. EMPTY (passed through from the Oracle's `reason`):
+  // no_search_results | all_articles_off_topic | all_fetches_failed |
+  // extraction_errors | no_usable_predictions | no_result | oracle_timeout. Else unknown.
+  failureReason String?
+  // True when the caller abandoned the Oracle result and used the LLM fallback.
+  fellBackToLlm       Boolean @default(false)
+  // The 0–100 probability the LLM fallback produced (set with fellBackToLlm).
+  fallbackProbability Int?
 
   durationMs Int
   createdAt  DateTime @default(now())

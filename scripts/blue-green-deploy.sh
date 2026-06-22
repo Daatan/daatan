@@ -121,6 +121,17 @@ for _i in 1 2 3 4 5; do
     docker exec "$DB_CONTAINER" pg_isready -q 2>/dev/null && break || sleep 1
 done
 
+# ─── Phase 1b: Ensure TLS cert renewal loop is running ──────────────────────────
+# The certbot service runs `certbot renew` on a 12h loop and is what keeps the
+# Let's Encrypt cert fresh. Nothing else restarts it — if it stops (manual
+# `docker rm`, host reboot, a stray `compose down`) renewals silently halt and
+# the cert eventually expires, taking the whole site down over HTTPS (exactly
+# the outage on 2026-06-20). Re-assert it on every deploy so a missing renewal
+# loop can never outlive a single deploy cycle. Non-fatal: never block a deploy.
+echo ""
+echo "🔐 Phase 1b: Ensuring TLS cert renewal loop (certbot) is running..."
+docker compose -f $COMPOSE_FILE up -d certbot || echo "⚠️  Could not start certbot service (continuing deploy)"
+
 # ─── Phase 2: Build new image (old container still serving traffic) ─────────────
 echo ""
 echo "🔨 Phase 2: Building new image (old container still serving traffic)..."

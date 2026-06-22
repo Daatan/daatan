@@ -28,11 +28,14 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/services/oracleClient')>()
   return {
     ...actual,
-    logOracleCall: vi.fn().mockResolvedValue(undefined),
+    logOracleCall: vi.fn().mockResolvedValue('log-1'),
   }
 })
 
 import { getOracleForecast, getOracleProbability, BOT_FORECAST_TIMEOUT_MS } from '../oracle'
+import { logOracleCall } from '@/lib/services/oracleClient'
+
+const mockLogOracleCall = vi.mocked(logOracleCall)
 
 const sampleSources = [
   {
@@ -85,7 +88,7 @@ describe('getOracleForecast', () => {
       json: async () => fullPayload,
     })
 
-    const data = await getOracleForecast('Will X happen?')
+    const { forecast: data, logId } = await getOracleForecast('Will X happen?')
     expect(data).not.toBeNull()
     expect(data?.mean).toBe(0.3)
     expect(data?.ci_low).toBe(0.05)
@@ -93,6 +96,7 @@ describe('getOracleForecast', () => {
     expect(data?.articles_used).toBe(4)
     expect(data?.sources).toHaveLength(2)
     expect(data?.sources[0].source_name).toBe('Reuters')
+    expect(logId).toBe('log-1')
   })
 
   it('sends the x-api-key header and posts to /forecast', async () => {
@@ -106,32 +110,72 @@ describe('getOracleForecast', () => {
     expect(headers['Content-Type']).toBe('application/json')
   })
 
+  it('maps supplied articles to the Oracle snake_case `published_date`', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleForecast('Q?', {
+      articles: [
+        { url: 'https://x.com/a', title: 'T', snippet: 'S', source: 'X', publishedDate: '2026-06-14' },
+      ],
+    })
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.articles[0].published_date).toBe('2026-06-14')
+    // the camelCase key must not leak through to the Oracle
+    expect(body.articles[0].publishedDate).toBeUndefined()
+  })
+
   it('returns null when the response is a placeholder', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ ...fullPayload, placeholder: true }),
+      json: async () => ({ ...fullPayload, placeholder: true, reason: 'no_search_results' }),
     })
-    expect(await getOracleForecast('Q?')).toBeNull()
+    const { forecast } = await getOracleForecast('Q?')
+    expect(forecast).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'no_search_results' }))
   })
 
-  it('returns null when articles_used is 0', async () => {
+  it('returns null when articles_used is 0, passing through the Oracle reason', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ ...fullPayload, articles_used: 0 }),
+      json: async () => ({ ...fullPayload, articles_used: 0, reason: 'all_articles_off_topic' }),
     })
-    expect(await getOracleForecast('Q?')).toBeNull()
+    const { forecast } = await getOracleForecast('Q?')
+    expect(forecast).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_articles_off_topic' }))
   })
 
-  it('returns null on non-OK HTTP status', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) })
-    expect(await getOracleForecast('Q?')).toBeNull()
+  it('renames the Oracle internal timeout reason to oracle_timeout', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...fullPayload, articles_used: 0, reason: 'timeout' }),
+    })
+    await getOracleForecast('Q?')
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'oracle_timeout' }))
   })
 
-  it('returns null when fetch throws (timeout / network error)', async () => {
-    fetchMock.mockRejectedValueOnce(new Error('timeout'))
-    expect(await getOracleForecast('Q?')).toBeNull()
+  it('classifies a non-OK 5xx status as http_5xx', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
+    const { forecast } = await getOracleForecast('Q?')
+    expect(forecast).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'ERROR', failureReason: 'http_5xx' }))
+  })
+
+  it('classifies a thrown TimeoutError as a timeout failure', async () => {
+    const err = new Error('aborted')
+    err.name = 'TimeoutError'
+    fetchMock.mockRejectedValueOnce(err)
+    const { forecast } = await getOracleForecast('Q?')
+    expect(forecast).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'ERROR', failureReason: 'timeout' }))
+  })
+
+  it('classifies a generic thrown error as a network failure', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    await getOracleForecast('Q?')
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'network' }))
   })
 })
 

@@ -10,6 +10,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline } from '@/lib/services/context'
+import { getContributingSources } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
 
@@ -198,9 +199,10 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [initialComments, initialContextSnapshots] = await Promise.all([
+  const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
+    getContributingSources(prediction.id),
   ])
 
   // Apply cached translations — never triggers Gemini, read-only
@@ -256,6 +258,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           isLocalized={isLocalized}
           initialComments={initialComments}
           initialContextSnapshots={initialContextSnapshots}
+          initialContributingSources={initialContributingSources}
         />
       </Suspense>
     </>

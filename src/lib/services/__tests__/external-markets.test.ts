@@ -9,6 +9,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     externalMarketPriceSnapshot: {
       create: vi.fn(),
+      count: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -193,6 +194,28 @@ describe('resolveMarketByUrl', () => {
   it('returns null for a Kalshi URL (provider stub returns nothing yet)', async () => {
     global.fetch = vi.fn()
     expect(await resolveMarketByUrl('https://kalshi.com/markets/abc')).toBeNull()
+  })
+
+  it('seeds an initial price snapshot when the market has none yet', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()])) // yesProbability 68
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(0)
+
+    await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 68 },
+    })
+  })
+
+  it('does not seed a snapshot when the market already has history', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(5)
+
+    await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(prisma.externalMarketPriceSnapshot.create).not.toHaveBeenCalled()
   })
 })
 

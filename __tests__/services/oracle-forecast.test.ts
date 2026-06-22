@@ -62,7 +62,7 @@ describe('getOracleForecast', () => {
     mockEnv.ORACLE_URL = undefined
     mockEnv.ORACLE_API_KEY = undefined
     const result = await getOracleForecast('Will X happen?')
-    expect(result).toBeNull()
+    expect(result.forecast).toBeNull()
   })
 
   it('sends articles in request body when provided', async () => {
@@ -102,37 +102,37 @@ describe('getOracleForecast', () => {
     mockFetch.mockResolvedValue(okResponse(makeOracleResponse({ placeholder: true })))
 
     const result = await getOracleForecast('Will X happen?')
-    expect(result).toBeNull()
+    expect(result.forecast).toBeNull()
   })
 
   it('returns null when articles_used is 0', async () => {
     mockFetch.mockResolvedValue(okResponse(makeOracleResponse({ articles_used: 0 })))
 
     const result = await getOracleForecast('Will X happen?')
-    expect(result).toBeNull()
+    expect(result.forecast).toBeNull()
   })
 
   it('returns null on non-OK HTTP status', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 503 } as Response)
 
     const result = await getOracleForecast('Will X happen?')
-    expect(result).toBeNull()
+    expect(result.forecast).toBeNull()
   })
 
   it('returns null on fetch error (never throws)', async () => {
     mockFetch.mockRejectedValue(new Error('network error'))
 
     const result = await getOracleForecast('Will X happen?')
-    expect(result).toBeNull()
+    expect(result.forecast).toBeNull()
   })
 
   it('returns full forecast payload on success', async () => {
     const payload = makeOracleResponse({ mean: 0.4, articles_used: 5 })
     mockFetch.mockResolvedValue(okResponse(payload))
 
-    const result = await getOracleForecast('Will X happen?')
-    expect(result).not.toBeNull()
-    expect(result!.mean).toBe(0.4)
-    expect(result!.articles_used).toBe(5)
+    const { forecast } = await getOracleForecast('Will X happen?')
+    expect(forecast).not.toBeNull()
+    expect(forecast!.mean).toBe(0.4)
+    expect(forecast!.articles_used).toBe(5)
   })
 })

@@ -33,8 +33,10 @@ import { ResolutionInfo } from './_forecast/ResolutionInfo'
 import { BotApprovalSection } from './_forecast/BotApprovalSection'
 import { SimilarForecasts } from './_forecast/SimilarForecasts'
 import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
+import { ContributingSources } from '@/components/forecasts/ContributingSources'
+import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
-import ProbabilityChart from '@/components/forecasts/ProbabilityChart'
+import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
@@ -44,11 +46,13 @@ export default function ForecastDetailClient({
   isLocalized,
   initialComments,
   initialContextSnapshots,
+  initialContributingSources,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
   initialComments?: Comment[]
   initialContextSnapshots?: ContextSnapshot[]
+  initialContributingSources?: ContributingSource[]
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -304,9 +308,7 @@ export default function ForecastDetailClient({
 
             {/* Confidence/Probability - Moved to top */}
             {prediction.status === 'ACTIVE' && prediction.outcomeType === 'BINARY' && (() => {
-              const yesTokens = prediction.commitments.filter(c => c.binaryChoice === true).reduce((sum, c) => sum + c.cuCommitted, 0)
-              const noTokens = prediction.commitments.filter(c => c.binaryChoice === false).reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
-              const prob = (yesTokens + noTokens) > 0 ? Math.round((yesTokens / (yesTokens + noTokens)) * 100) : 50
+              const prob = communityProbability(prediction.commitments) ?? 50
               return (
                 <div
                   className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-teal text-sm font-medium border border-teal/20"
@@ -435,9 +437,7 @@ export default function ForecastDetailClient({
       {/* Probability Display (Interactive Gauge) */}
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
-          const yesTokens = prediction.commitments.filter(c => c.binaryChoice === true).reduce((sum, c) => sum + c.cuCommitted, 0)
-          const noTokens = prediction.commitments.filter(c => c.binaryChoice === false).reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
-          const marketProb = (yesTokens + noTokens) > 0 ? Math.round((yesTokens / (yesTokens + noTokens)) * 100) : 50
+          const marketProb = communityProbability(prediction.commitments) ?? 50
           const aiVal = aiEstimate?.probability ?? prediction.confidence ?? null
 
           return (
@@ -691,6 +691,10 @@ export default function ForecastDetailClient({
           ? () => fetch(`/api/forecasts/${prediction.id}`).then(r => r.json()).then(setPrediction)
           : undefined}
       />
+
+      {/* Publications that fed the Oracle — a roster of "AI forecasters",
+          shown like the human commitments above but in its own section. */}
+      <ContributingSources sources={initialContributingSources ?? []} />
 
       {/* Author credit. If the author also voted, they're already tagged
           "author" in the Forecasts History list above, so skip this. */}

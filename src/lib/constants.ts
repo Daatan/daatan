@@ -21,5 +21,6 @@ export const STANDARD_TAGS = [
     "Middle East",
     "Asia",
     "Energy",
-    "Space"
+    "Space",
+    "Israeli Elections 2026"
 ]

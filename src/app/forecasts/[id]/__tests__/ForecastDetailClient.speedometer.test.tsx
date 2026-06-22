@@ -64,6 +64,11 @@ const renderPrediction = async (commitments: { binaryChoice: boolean; cuCommitte
 }
 
 describe('Speedometer — probability calculation', () => {
+  // Community probability = the per-person average of each commit's implied
+  // P(YES) = (confidence + 100) / 200, where confidence (cuCommitted) is signed:
+  // YES is positive, NO is negative. This matches the chart line and the
+  // canonical communityProbabilityAtCommit stored per-commit. It deliberately is
+  // NOT a CU-weighted YES/NO share (which read 100% off a single YES stake).
   beforeEach(() => {
     speedometerMock.mockClear()
     vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as any)
@@ -82,33 +87,35 @@ describe('Speedometer — probability calculation', () => {
     )
   })
 
-  it('uses CU amounts, not headcount — 2 CU yes vs 100 CU no = ~2%', async () => {
-    await renderPrediction([
-      { binaryChoice: true,  cuCommitted: 2   },
-      { binaryChoice: false, cuCommitted: 100 },
-    ])
-    // 2 / 102 ≈ 1.96% → rounds to 2
+  it('one committer shows their own probability, not 100% — +32 → 66%', async () => {
+    // The reported bug: a single YES stake read 100% (CU-share). Now it reflects
+    // the committer's stated confidence: (32 + 100) / 200 = 66%.
+    await renderPrediction([{ binaryChoice: true, cuCommitted: 32 }])
+    const call = (speedometerMock.mock.calls[0] as unknown as [{ percentage: number }])[0]
+    expect(call.percentage).not.toBe(100)
+    expect(call.percentage).toBe(66)
+  })
+
+  it('one full-confidence YES (+100) → 100%', async () => {
+    await renderPrediction([{ binaryChoice: true, cuCommitted: 100 }])
     expect(speedometerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ percentage: 2 }),
+      expect.objectContaining({ percentage: 100 }),
       expect.anything()
     )
   })
 
-  it('headcount would give 50% but CU gives 2% — regression guard', async () => {
-    // Reported bug: 2 persons (2 CU vs 100 CU) was showing 50% (headcount) instead of 2% (CU)
-    await renderPrediction([
-      { binaryChoice: true,  cuCommitted: 2   },
-      { binaryChoice: false, cuCommitted: 100 },
-    ])
-    const call = (speedometerMock.mock.calls[0] as unknown as [{ percentage: number }])[0]
-    expect(call.percentage).not.toBe(50)
-    expect(call.percentage).toBe(2)
+  it('one NO committer (−32) → 34%', async () => {
+    await renderPrediction([{ binaryChoice: false, cuCommitted: -32 }])
+    expect(speedometerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ percentage: 34 }),
+      expect.anything()
+    )
   })
 
-  it('shows 50% when yes and no CU are equal', async () => {
+  it('averages opposing views equally — +50 and −50 → 50%', async () => {
     await renderPrediction([
-      { binaryChoice: true,  cuCommitted: 50 },
-      { binaryChoice: false, cuCommitted: 50 },
+      { binaryChoice: true,  cuCommitted: 50  },
+      { binaryChoice: false, cuCommitted: -50 },
     ])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 50 }),
@@ -116,37 +123,15 @@ describe('Speedometer — probability calculation', () => {
     )
   })
 
-  it('shows 100% when all CU is on yes', async () => {
+  it('per-person average, not CU-weighted — +100 and −20 → 70%', async () => {
+    // (1.00 + 0.40) / 2 = 0.70. A stake-weighted share would skew this; we average
+    // the two opinions equally.
     await renderPrediction([
-      { binaryChoice: true, cuCommitted: 200 },
-      { binaryChoice: true, cuCommitted: 100 },
+      { binaryChoice: true,  cuCommitted: 100 },
+      { binaryChoice: false, cuCommitted: -20 },
     ])
     expect(speedometerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ percentage: 100 }),
-      expect.anything()
-    )
-  })
-
-  it('shows 0% when all CU is on no', async () => {
-    await renderPrediction([
-      { binaryChoice: false, cuCommitted: 100 },
-      { binaryChoice: false, cuCommitted: 50  },
-    ])
-    expect(speedometerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ percentage: 0 }),
-      expect.anything()
-    )
-  })
-
-  it('weights by CU — one large staker outweighs many small ones', async () => {
-    // 10 persons × 1 CU yes = 10 CU; 1 person × 90 CU no = 90 CU
-    // headcount: 10/11 = 91% — wrong; CU: 10/100 = 10% — correct
-    await renderPrediction([
-      ...Array(10).fill({ binaryChoice: true,  cuCommitted: 1 }),
-      { binaryChoice: false, cuCommitted: 90 },
-    ])
-    expect(speedometerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ percentage: 10 }),
+      expect.objectContaining({ percentage: 70 }),
       expect.anything()
     )
   })

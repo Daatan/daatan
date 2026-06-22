@@ -316,7 +316,7 @@
     "commitmentResolved": "Прогноз разрешён",
     "commentOnForecast": "Комментарий к вашему прогнозу",
     "replyToComment": "Ответ на ваш комментарий",
-    "newCommitment": "Новое обязательство к вашему прогнозу",
+    "newCommitment": "Новая ставка на ваш прогноз",
     "mention": "@Упоминание",
     "systemAnnouncements": "Системные объявления",
     "pushEnabled": "Push-уведомления включены на этом устройстве.",
@@ -412,6 +412,17 @@
     "lastUpdated": "Последнее обновление",
     "previousUpdates": "{count} предыдущее обновление",
     "previousUpdatesPlural": "{count} предыдущих обновлений"
+  },
+  "sources": {
+    "title": "Источники оценки ИИ",
+    "subtitle": "Публикации, которые Оракул учёл при формировании оценки, — сгруппированы по позиции каждой из них по утверждению.",
+    "favorsYes": "За ДА",
+    "favorsNo": "За НЕТ",
+    "neutral": "Нейтрально",
+    "by": "автор: {author}",
+    "certainty": "уверенность {value}%",
+    "count": "{count} публикация",
+    "countPlural": "{count} публикаций"
   },
   "footer": {
     "privacy": "Политика конфиденциальности",

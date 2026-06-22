@@ -1,7 +1,7 @@
+import { createHash } from 'crypto'
 import { llmService } from '@/lib/llm'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
-import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { locales, defaultLocale } from '@/i18n/config'
 import { notifyTranslationFailed } from '@/lib/services/telegram'
 
@@ -9,6 +9,27 @@ const log = createLogger('translation-service')
 
 export const TRANSLATABLE_FIELDS = ['claimText', 'detailsText', 'resolutionRules'] as const
 type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number]
+
+/** SHA-256 of a source string — the content key for the translation cache. */
+export function sourceHash(text: string): string {
+  return createHash('sha256').update(text).digest('hex')
+}
+
+/**
+ * Full English language names for the translate prompt. The model needs a real
+ * language name ("Hebrew") — the bare locale code ("he") is ambiguous (it reads
+ * as the English word "he") and yields more literal, stilted output. Falls back
+ * to the code itself for any locale not listed here.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  he: 'Hebrew',
+  ru: 'Russian',
+  eo: 'Esperanto',
+  ar: 'Arabic',
+}
+
+export const languageName = (locale: string): string => LANGUAGE_NAMES[locale] ?? locale
 
 /**
  * Translates a prediction to all non-default locales in the background.
@@ -23,9 +44,37 @@ export async function translatePredictionToAllLocales(predictionId: string): Pro
   )
 }
 
-export async function callGeminiTranslate(text: string, language: string): Promise<string> {
-  const template = await getPromptTemplate('translate')
-  const prompt = fillPrompt(template, { text, language })
+/**
+ * Translate one field. The prompt is kept in-repo (not the generic Bedrock
+ * `translate` prompt) because translation quality is critical and benefits from
+ * versioned review: it sets a news/forecasting register, keeps proper nouns and
+ * acronyms, renders YES/NO outcomes naturally (not literal calques), and can use
+ * the forecast claim as disambiguating context.
+ */
+export async function callGeminiTranslate(
+  text: string,
+  language: string,
+  context?: string,
+): Promise<string> {
+  const target = languageName(language)
+  const prompt = [
+    `You are a professional translator localizing a prediction-market forecast into ${target}.`,
+    '',
+    `Translate the text below into natural, fluent ${target} as a native news editor would write it — convey the exact meaning, do not translate word for word.`,
+    '',
+    'Rules:',
+    `- Keep proper nouns, organisation names and acronyms (CDC, WHO, USA, UN, …) in their standard ${target} form; never invent a translation for them.`,
+    '- Keep all numbers, dates and units exactly as given.',
+    '- For forecast resolution wording, render the binary outcomes (the equivalents of "YES" and "NO") naturally and unambiguously — avoid literal one-word calques.',
+    '- Match the concise register of news/analysis writing.',
+    '- Return ONLY the translated text: no quotes, no notes, no explanation.',
+    context
+      ? `\nContext — this text is part of the forecast: "${context}". Use it only to disambiguate terms and grammatical agreement; translate ONLY the text below.`
+      : '',
+    '',
+    'Text to translate:',
+    text,
+  ].join('\n')
 
   const response = await llmService.generateContent({
     prompt,
@@ -63,32 +112,39 @@ export async function translatePrediction(
       language,
       fieldName: { in: fieldsToTranslate },
     },
-    select: { fieldName: true, translatedText: true },
+    select: { fieldName: true, translatedText: true, sourceHash: true },
   })
 
-  const cachedMap = new Map(cached.map((c) => [c.fieldName, c.translatedText]))
+  const cachedMap = new Map(cached.map((c) => [c.fieldName, c]))
 
   const result: Partial<Record<TranslatableField, string>> = {}
 
   for (const field of fieldsToTranslate) {
     const sourceText = prediction[field] as string
+    const hash = sourceHash(sourceText)
 
-    if (cachedMap.has(field)) {
-      result[field] = cachedMap.get(field)!
+    // Cache hit only when the translation was produced from the *current* source.
+    // A stale row (source edited, or legacy row with null hash) falls through and
+    // re-translates, so an updated detailsText is never served as old Hebrew.
+    const hit = cachedMap.get(field)
+    if (hit && hit.sourceHash === hash) {
+      result[field] = hit.translatedText
       continue
     }
 
-    // Translate and cache
+    // Give non-claim fields the claim as disambiguating context.
+    const context = field === 'claimText' ? undefined : prediction.claimText || undefined
+
     try {
       log.info({ predictionId, field, language }, 'Translating field')
-      const translated = await callGeminiTranslate(sourceText, language)
+      const translated = await callGeminiTranslate(sourceText, language, context ?? undefined)
 
       await prisma.predictionTranslation.upsert({
         where: {
           predictionId_fieldName_language: { predictionId, fieldName: field, language },
         },
-        create: { predictionId, fieldName: field, language, translatedText: translated },
-        update: { translatedText: translated },
+        create: { predictionId, fieldName: field, language, translatedText: translated, sourceHash: hash },
+        update: { translatedText: translated, sourceHash: hash },
       })
 
       result[field] = translated

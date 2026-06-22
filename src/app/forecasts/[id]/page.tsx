@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
@@ -7,6 +7,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline } from '@/lib/services/context'
+import { getContributingSources } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 
@@ -243,9 +244,16 @@ export default async function ForecastDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [initialComments, initialContextSnapshots] = await Promise.all([
+  // Canonicalize the URL: when reached by raw id, send the viewer to the
+  // human-readable slug (matches the canonical/og URLs in generateMetadata).
+  if (prediction.slug && id !== prediction.slug) {
+    permanentRedirect(`/forecasts/${prediction.slug}`)
+  }
+
+  const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
+    getContributingSources(prediction.id),
   ])
   const slug = prediction.slug || prediction.id
   const articleJsonLd = {
@@ -348,6 +356,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         initialData={prediction}
         initialComments={initialComments}
         initialContextSnapshots={initialContextSnapshots}
+        initialContributingSources={initialContributingSources}
       />
     </>
   )
