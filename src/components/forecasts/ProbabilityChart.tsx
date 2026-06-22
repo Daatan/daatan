@@ -131,10 +131,11 @@ export default function ProbabilityChart({
     return point
   })
 
-  // A line with a single data point draws no visible segment, so a forecast that
-  // only has e.g. one market snapshot (just linked) would show an empty chart.
-  // Render dots in that degenerate case so the lone value is still visible.
-  const showDots = data.length === 1
+  // A line with few data points draws a barely-visible (or zero-length) segment,
+  // so a sparse forecast — e.g. two same-day Oracle estimates, or a lone market
+  // snapshot — would read as an empty chart. Render point markers while the series
+  // is sparse so each value is legible; drop them once the trend is dense.
+  const showDots = data.length <= 5
 
   return (
     <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">

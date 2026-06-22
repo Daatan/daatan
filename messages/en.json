@@ -417,11 +417,13 @@
   },
   "sources": {
     "title": "Sources behind the AI estimate",
-    "subtitle": "Publications the Oracle weighed when forming its estimate — grouped by the stance each took on the claim.",
-    "favorsYes": "Favors YES",
-    "favorsNo": "Favors NO",
-    "neutral": "Neutral",
-    "by": "by {author}",
+    "subtitle": "Publications that fed the Oracle, shown as voters — each takes a side on the claim by the stance of its reporting.",
+    "voteYes": "YES",
+    "voteNo": "NO",
+    "voteNeutral": "Neutral",
+    "pressLeanYes": "Press leans YES · {pct}%",
+    "pressLeanNo": "Press leans NO · {pct}%",
+    "pressSplit": "Press is evenly split",
     "certainty": "{value}% certainty",
     "count": "{count} publication",
     "countPlural": "{count} publications"
