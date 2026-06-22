@@ -1,12 +1,16 @@
 import type { Metadata } from 'next'
 import { Info } from 'lucide-react'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'על דעתן',
   alternates: { canonical: 'https://daatan.com/he/about' },
 }
 
-export default function LocaleAboutPage() {
+export default async function LocaleAboutPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  if (locale !== 'he') redirect('/about')
+
   return (
     <div dir="rtl" className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-6 lg:mb-8">
