@@ -11,6 +11,9 @@ import {
   Legend,
   Brush,
 } from 'recharts'
+// Canonical community-probability lives in @/lib/forecast-math so the feed card
+// and this chart agree. Re-exported below for existing importers.
+import { communityProbability } from '@/lib/forecast-math'
 
 type ChartSnapshot = {
   createdAt: string
@@ -57,20 +60,7 @@ const fmtDateTime = (ts: number) =>
     minute: '2-digit',
   })
 
-/**
- * Community probability for a binary forecast: the mean of committers' stated
- * estimates. Each commit's implied P(YES) is (cuCommitted + 100) / 200 — the
- * signed confidence stake (−100..100, so 0 → 50%, +100 → 100%, −100 → 0%).
- * This matches the canonical definition in commitment.ts
- * (communityProbabilityAtCommit). It is deliberately NOT a CU-weighted YES/NO
- * share, which over-reports consensus (a handful of all-YES stakes → 100%).
- * Returns a 0–100 integer, or null when there are no commitments.
- */
-export function communityProbability(commits: { cuCommitted: number }[]): number | null {
-  if (commits.length === 0) return null
-  const mean = commits.reduce((sum, c) => sum + (c.cuCommitted + 100) / 200, 0) / commits.length
-  return Math.round(mean * 100)
-}
+export { communityProbability }
 
 export default function ProbabilityChart({
   commitments,
@@ -85,10 +75,11 @@ export default function ProbabilityChart({
   // forecasts. When a linked market has history we render the chart even with
   // <3 commitments, so the market line shows before the community moves.
   const showMarket = outcomeType === 'BINARY' && marketSnapshots.length > 0
-  // Likewise render once there are ≥3 AI (Oracle) updates, so a forecast with a
-  // rich estimate history shows the chart even before the community has moved.
+  // Likewise render once there are ≥2 AI (Oracle) updates, so a forecast with an
+  // estimate trend shows the chart even before the community has moved. Two points
+  // is the minimum that draws a line (a single estimate is just a dot).
   const aiPointCount = snapshots.filter(s => s.externalProbability != null).length
-  const showAiHistory = aiPointCount >= 3
+  const showAiHistory = aiPointCount >= 2
   if (commitments.length < 3 && !showMarket && !showAiHistory) return null
 
   const sortedCommits = [...commitments].sort(

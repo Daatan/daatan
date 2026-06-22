@@ -64,14 +64,13 @@ describe('ProbabilityChart gating', () => {
     expect(screen.getByText(HEADING)).toBeInTheDocument()
   })
 
-  it('renders with ≥3 AI updates even when there are <3 commitments', () => {
+  it('renders with ≥2 AI updates even when there are <3 commitments', () => {
     render(
       <ProbabilityChart
         commitments={[]}
         snapshots={[
           { createdAt: '2026-06-14T01:00:00Z', externalProbability: 40 },
           { createdAt: '2026-06-14T02:00:00Z', externalProbability: 55 },
-          { createdAt: '2026-06-14T03:00:00Z', externalProbability: 60 },
         ]}
         outcomeType="BINARY"
         options={[]}
@@ -80,13 +79,13 @@ describe('ProbabilityChart gating', () => {
     expect(screen.getByText(HEADING)).toBeInTheDocument()
   })
 
-  it('stays hidden with fewer than 3 AI updates and no commitments', () => {
+  it('stays hidden with a single AI update and no commitments', () => {
+    // One estimate is just a dot, not a trend — keep the chart hidden.
     render(
       <ProbabilityChart
         commitments={[]}
         snapshots={[
           { createdAt: '2026-06-14T01:00:00Z', externalProbability: 40 },
-          { createdAt: '2026-06-14T02:00:00Z', externalProbability: 55 },
         ]}
         outcomeType="BINARY"
         options={[]}

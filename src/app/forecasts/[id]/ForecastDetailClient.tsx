@@ -18,6 +18,7 @@ import {
   Languages,
   Info,
   Share2,
+  PenLine,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useTranslations, useLocale } from 'next-intl'
@@ -327,8 +328,13 @@ export default function ForecastDetailClient({
               </span>
             )}
             {!prediction.newsAnchor && prediction.source === 'manual' && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-purple-400 bg-purple-400/10 rounded-full border border-purple-400/20">
-                {t('personalBadge')}
+              <span
+                className="inline-flex items-center justify-center w-7 h-7 text-purple-400 bg-purple-400/10 rounded-full border border-purple-400/20"
+                title={t('personalBadge')}
+                aria-label={t('personalBadge')}
+                data-testid="personal-origin"
+              >
+                <PenLine className="w-4 h-4" />
               </span>
             )}
             {locale !== 'en' && (
