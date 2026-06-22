@@ -132,8 +132,13 @@ const Sidebar = () => {
       return !authRequiredRoutes.includes(item.href)
     })
 
+  const SUPPORTED_LOCALES = ['he', 'ru', 'eo']
+  const localeMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
+  const currentLocale = localeMatch && SUPPORTED_LOCALES.includes(localeMatch[1]) ? localeMatch[1] : null
+
   const navLinks = filteredNavItems.map(item => ({
     ...item,
+    href: currentLocale && item.href === '/about' ? `/${currentLocale}/about` : item.href,
     label: t(item.labelKey)
   }))
 
