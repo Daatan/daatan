@@ -151,6 +151,7 @@
     "legendCommunity": "קהילה",
     "communityProbabilityTooltip": "הסכמת הקהילה — ההסתברות הממוצעת על פני כל ההצבעות",
     "topOptionShareTooltip": "האפשרות המובילה: {text} ({pct}% מההצבעות)",
+    "filterByTagTooltip": "עיון בתחזיות עם התגית \"{tag}\"",
     "legendYou": "אתה",
     "legendAI": "בינה מלאכותית",
     "signInToVote": "התחברו כדי להצביע",

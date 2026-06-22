@@ -151,6 +151,7 @@
     "legendCommunity": "Komunumo",
     "communityProbabilityTooltip": "Komunuma interkonsento — la averaĝa probablo tra ĉiuj voĉdonoj",
     "topOptionShareTooltip": "Gvida opcio: {text} ({pct}% de voĉdonoj)",
+    "filterByTagTooltip": "Foliumi prognozojn kun la etikedo \"{tag}\"",
     "legendYou": "Vi",
     "legendAI": "AI",
     "signInToVote": "Ensalutu por voĉdoni",

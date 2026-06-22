@@ -151,6 +151,7 @@
     "legendCommunity": "Сообщество",
     "communityProbabilityTooltip": "Консенсус сообщества — средняя вероятность по всем голосам",
     "topOptionShareTooltip": "Лидирующий вариант: {text} ({pct}% голосов)",
+    "filterByTagTooltip": "Прогнозы с тегом «{tag}»",
     "legendYou": "Вы",
     "legendAI": "ИИ",
     "signInToVote": "Войдите, чтобы голосовать",

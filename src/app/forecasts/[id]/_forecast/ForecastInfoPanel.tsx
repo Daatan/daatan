@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { Calendar, Target, TrendingUp, ExternalLink } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { Prediction } from './types'
@@ -57,12 +58,14 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
           <div className="flex flex-wrap gap-1">
             {prediction.tags && prediction.tags.length > 0 ? (
               prediction.tags.map((tag) => (
-                <span
+                <Link
                   key={tag.id}
-                  className="px-2 py-0.5 bg-navy-800 text-gray-400 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600"
+                  href={`/?tags=${encodeURIComponent(tag.name)}`}
+                  title={t('filterByTagTooltip', { tag: tag.name })}
+                  className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600 transition-colors"
                 >
                   {tag.name}
-                </span>
+                </Link>
               ))
             ) : (
               <span className="text-gray-400 italic text-xs">None</span>

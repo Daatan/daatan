@@ -409,12 +409,14 @@ export default function ForecastCard({
             {prediction.tags && prediction.tags.length > 0 && (
               <>
                 {prediction.tags.slice(0, 2).map((tag) => (
-                  <span
+                  <Link
                     key={tag.name}
-                    className="px-2 py-0.5 bg-cobalt/10 text-blue-600 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20"
+                    href={`/?tags=${encodeURIComponent(tag.name)}`}
+                    title={t('filterByTagTooltip', { tag: tag.name })}
+                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-blue-600 hover:bg-cobalt/20 hover:text-blue-400 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
                     {tag.name}
-                  </span>
+                  </Link>
                 ))}
               </>
             )}
