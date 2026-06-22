@@ -75,10 +75,11 @@ export default function ProbabilityChart({
   // forecasts. When a linked market has history we render the chart even with
   // <3 commitments, so the market line shows before the community moves.
   const showMarket = outcomeType === 'BINARY' && marketSnapshots.length > 0
-  // Likewise render once there are ≥3 AI (Oracle) updates, so a forecast with a
-  // rich estimate history shows the chart even before the community has moved.
+  // Likewise render once there are ≥2 AI (Oracle) updates, so a forecast with an
+  // estimate trend shows the chart even before the community has moved. Two points
+  // is the minimum that draws a line (a single estimate is just a dot).
   const aiPointCount = snapshots.filter(s => s.externalProbability != null).length
-  const showAiHistory = aiPointCount >= 3
+  const showAiHistory = aiPointCount >= 2
   if (commitments.length < 3 && !showMarket && !showAiHistory) return null
 
   const sortedCommits = [...commitments].sort(
