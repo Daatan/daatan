@@ -159,32 +159,32 @@ describe('ForecastCard source badge', () => {
     } as any)
   })
 
-  it('shows the no-source-link badge when source is manual and no news anchor', () => {
+  it('shows the personal-origin marker when source is manual and no news anchor', () => {
     const prediction = { ...basePrediction, source: 'manual', newsAnchor: null }
     renderWithIntl(<ForecastCard prediction={prediction} />)
-    expect(screen.getByText('No source link')).toBeInTheDocument()
+    expect(screen.getByTestId('personal-origin')).toBeInTheDocument()
   })
 
-  it('does not show the no-source-link badge when news anchor is present', () => {
+  it('does not show the personal-origin marker when news anchor is present', () => {
     const prediction = {
       ...basePrediction,
       source: 'manual',
       newsAnchor: { id: 'a1', title: 'Some article', source: 'Reuters', imageUrl: null },
     }
     renderWithIntl(<ForecastCard prediction={prediction} />)
-    expect(screen.queryByText('No source link')).toBeNull()
+    expect(screen.queryByTestId('personal-origin')).toBeNull()
   })
 
-  it('does not show the no-source-link badge when source is null', () => {
+  it('does not show the personal-origin marker when source is null', () => {
     const prediction = { ...basePrediction, source: null, newsAnchor: null }
     renderWithIntl(<ForecastCard prediction={prediction} />)
-    expect(screen.queryByText('No source link')).toBeNull()
+    expect(screen.queryByTestId('personal-origin')).toBeNull()
   })
 
-  it('does not show the no-source-link badge when source is bot', () => {
+  it('does not show the personal-origin marker when source is bot', () => {
     const prediction = { ...basePrediction, source: 'bot', newsAnchor: null }
     renderWithIntl(<ForecastCard prediction={prediction} />)
-    expect(screen.queryByText('No source link')).toBeNull()
+    expect(screen.queryByTestId('personal-origin')).toBeNull()
   })
 })
 

@@ -7,6 +7,7 @@ import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { createLogger } from '@/lib/logger'
 import { notifyIndexNow } from '@/lib/services/indexnow'
+import { communityProbability } from '@/lib/forecast-math'
 
 const log = createLogger('forecast')
 
@@ -95,6 +96,10 @@ export function enrichPredictions(
 
     let yesCount = 0
     let noCount = 0
+    // Canonical community probability (mean of stated P(YES)) — the same number
+    // the detail page shows. Kept separate from yes/noCount, which are CU-weighted
+    // stake sums used only for the YES/NO split bar.
+    let communityProb: number | null = null
     if (pred.outcomeType === 'BINARY' && commitments) {
       yesCount = commitments
         .filter(c => c.binaryChoice === true)
@@ -102,6 +107,7 @@ export function enrichPredictions(
       noCount = commitments
         .filter(c => c.binaryChoice === false)
         .reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
+      communityProb = communityProbability(commitments)
     }
 
     const options = pred.options?.map((opt) => ({
@@ -111,7 +117,7 @@ export function enrichPredictions(
         : 0,
     })) ?? []
 
-    return { ...pred, totalCuCommitted, userHasCommitted, yesCount, noCount, options }
+    return { ...pred, totalCuCommitted, userHasCommitted, yesCount, noCount, communityProbability: communityProb, options }
   })
 
   if (!query.isCuSort) return enriched

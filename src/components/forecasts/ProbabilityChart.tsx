@@ -11,6 +11,9 @@ import {
   Legend,
   Brush,
 } from 'recharts'
+// Canonical community-probability lives in @/lib/forecast-math so the feed card
+// and this chart agree. Re-exported below for existing importers.
+import { communityProbability } from '@/lib/forecast-math'
 
 type ChartSnapshot = {
   createdAt: string
@@ -57,20 +60,7 @@ const fmtDateTime = (ts: number) =>
     minute: '2-digit',
   })
 
-/**
- * Community probability for a binary forecast: the mean of committers' stated
- * estimates. Each commit's implied P(YES) is (cuCommitted + 100) / 200 — the
- * signed confidence stake (−100..100, so 0 → 50%, +100 → 100%, −100 → 0%).
- * This matches the canonical definition in commitment.ts
- * (communityProbabilityAtCommit). It is deliberately NOT a CU-weighted YES/NO
- * share, which over-reports consensus (a handful of all-YES stakes → 100%).
- * Returns a 0–100 integer, or null when there are no commitments.
- */
-export function communityProbability(commits: { cuCommitted: number }[]): number | null {
-  if (commits.length === 0) return null
-  const mean = commits.reduce((sum, c) => sum + (c.cuCommitted + 100) / 200, 0) / commits.length
-  return Math.round(mean * 100)
-}
+export { communityProbability }
 
 export default function ProbabilityChart({
   commitments,
