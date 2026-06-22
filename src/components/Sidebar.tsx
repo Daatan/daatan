@@ -29,7 +29,7 @@ import {
   Search,
 } from 'lucide-react'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 type NavItem = {
   href: string
@@ -132,13 +132,11 @@ const Sidebar = () => {
       return !authRequiredRoutes.includes(item.href)
     })
 
-  const SUPPORTED_LOCALES = ['he', 'ru', 'eo']
-  const localeMatch = pathname.match(/^\/([a-z]{2})(\/|$)/)
-  const currentLocale = localeMatch && SUPPORTED_LOCALES.includes(localeMatch[1]) ? localeMatch[1] : null
+  const currentLocale = useLocale()
 
   const navLinks = filteredNavItems.map(item => ({
     ...item,
-    href: currentLocale && item.href === '/about' ? `/${currentLocale}/about` : item.href,
+    href: currentLocale !== 'en' && item.href === '/about' ? `/${currentLocale}/about` : item.href,
     label: t(item.labelKey)
   }))
 
