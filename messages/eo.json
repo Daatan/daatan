@@ -417,11 +417,13 @@
   },
   "sources": {
     "title": "Fontoj malantaŭ la AI-takso",
-    "subtitle": "Publikaĵoj kiujn la Orakolo pesis dum formado de sia takso — grupigitaj laŭ la sinteno kiun ĉiu prenis pri la aserto.",
-    "favorsYes": "Favoras JES",
-    "favorsNo": "Favoras NE",
-    "neutral": "Neŭtrala",
-    "by": "de {author}",
+    "subtitle": "Publikaĵoj kiuj nutris la Orakolon, montritaj kiel voĉdonantoj — ĉiu prenas flankon pri la aserto laŭ la sinteno de sia raportado.",
+    "voteYes": "JES",
+    "voteNo": "NE",
+    "voteNeutral": "Neŭtrala",
+    "pressLeanYes": "La gazetaro klinas al JES · {pct}%",
+    "pressLeanNo": "La gazetaro klinas al NE · {pct}%",
+    "pressSplit": "La gazetaro estas egale dividita",
     "certainty": "{value}% certeco",
     "count": "{count} publikaĵo",
     "countPlural": "{count} publikaĵoj"
