@@ -19,16 +19,19 @@ describe('SourcesTab', () => {
     global.fetch = mockFetch
   })
 
-  it('renders the summary and rows grouped by type, with status badges', async () => {
+  it('renders the summary and rows grouped by type, with status badges and impact', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
         total: 2,
         enabled: 1,
         sources: [
-          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true },
-          { type: 'youtube', name: 'BBC News', locator: 'UC123', language: 'en', enabled: false },
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', impact: { matches: 7, forecastsAffected: 5, last30dMatches: 2, lastMatchedAt: '2026-06-22T00:00:00+00:00' } },
+          { type: 'youtube', name: 'BBC News', locator: 'UC123', language: 'en', enabled: false,
+            domain: null, impact: { matches: 0, forecastsAffected: 0, last30dMatches: 0, lastMatchedAt: null } },
         ],
+        unconfigured: [],
       }),
     })
 
@@ -41,6 +44,34 @@ describe('SourcesTab', () => {
     expect(screen.getByText('Disabled')).toBeInTheDocument()
     // RSS locator renders as a link; youtube channel id as plain text.
     expect(screen.getByRole('link', { name: /phys\.org\/rss-feed/ })).toBeInTheDocument()
+    // Impact: Phys.org shows its forecast count + 30d badge; the un-measurable youtube row shows n/a.
+    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('2 in 30d')).toBeInTheDocument()
+    expect(screen.getByText('n/a')).toBeInTheDocument()
+  })
+
+  it('renders the "suggested sources to add" section from unconfigured domains', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 1,
+        enabled: 1,
+        sources: [
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', impact: { matches: 1, forecastsAffected: 1, last30dMatches: 0, lastMatchedAt: null } },
+        ],
+        unconfigured: [
+          { domain: 'apnews.com', matches: 9, forecastsAffected: 6, last30dMatches: 3, lastMatchedAt: '2026-06-21T00:00:00+00:00' },
+        ],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('Suggested sources to add (1)')).toBeInTheDocument())
+    const link = screen.getByRole('link', { name: /apnews\.com/ })
+    expect(link).toHaveAttribute('href', 'https://apnews.com')
+    expect(screen.getByText('6')).toBeInTheDocument()
   })
 
   it('surfaces an error when the request fails', async () => {
