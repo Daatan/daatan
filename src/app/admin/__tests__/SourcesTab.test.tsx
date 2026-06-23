@@ -50,6 +50,31 @@ describe('SourcesTab', () => {
     expect(screen.getByText('n/a')).toBeInTheDocument()
   })
 
+  it('shows "shared with" instead of a duplicated number for sibling feeds of one outlet', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 2,
+        enabled: 2,
+        sources: [
+          { type: 'rss', name: 'BBC Middle East', locator: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', language: 'en', enabled: true,
+            domain: 'feeds.bbci.co.uk', impact: { matches: 12, forecastsAffected: 7, last30dMatches: 12, lastMatchedAt: '2026-06-22T00:00:00+00:00', sharedWith: null } },
+          { type: 'rss', name: 'BBC Russian', locator: 'https://feeds.bbci.co.uk/russian/rss.xml', language: 'ru', enabled: true,
+            domain: 'feeds.bbci.co.uk', impact: { matches: 0, forecastsAffected: 0, last30dMatches: 0, lastMatchedAt: null, sharedWith: 'BBC Middle East' } },
+        ],
+        unconfigured: [],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('BBC Russian')).toBeInTheDocument())
+    // The owner shows the real number; the sibling shows "shared with …", not a duplicate 7.
+    expect(screen.getByText('7')).toBeInTheDocument()
+    expect(screen.getByText('shared with BBC Middle East')).toBeInTheDocument()
+    expect(screen.queryAllByText('7')).toHaveLength(1)
+  })
+
   it('renders the "suggested sources to add" section from unconfigured domains', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

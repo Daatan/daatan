@@ -694,6 +694,7 @@
     "sourcesImpact": "Efiko",
     "sourcesImpactNa": "n/a",
     "sourcesImpact30d": "{count} en 30 tagoj",
+    "sourcesSharedWith": "kunhavata kun {name}",
     "sourcesDomain": "Domajno",
     "sourcesSuggestedTitle": "Sugestitaj fontoj por aldoni",
     "sourcesSuggestedHint": "Eldonejoj kies artikoloj jam movas prognozojn sed ne estas agorditaj kiel fluoj — kandidatoj por aldono.",

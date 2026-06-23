@@ -8,6 +8,7 @@ type Impact = {
   forecastsAffected: number
   last30dMatches: number
   lastMatchedAt: string | null
+  sharedWith?: string | null
 }
 
 type Source = {
@@ -138,7 +139,8 @@ export default function SourcesTab() {
                       {rows.map((s, i) => {
                         const imp = impactOf(s)
                         const measurable = !!s.domain
-                        const dim = measurable && imp.forecastsAffected === 0
+                        const shared = imp.sharedWith
+                        const dim = measurable && !shared && imp.forecastsAffected === 0
                         return (
                           <tr key={`${s.name}-${i}`} className={`border-t border-navy-700 ${dim ? 'opacity-50' : ''}`}>
                             <td className="px-3 py-2 font-medium text-white">{s.name}</td>
@@ -153,7 +155,11 @@ export default function SourcesTab() {
                               </span>
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap">
-                              {measurable ? (
+                              {shared ? (
+                                <span className="text-[11px] text-gray-500 italic">
+                                  {t('sourcesSharedWith', { name: shared })}
+                                </span>
+                              ) : measurable ? (
                                 <span className="inline-flex items-baseline gap-1.5">
                                   <span className={`font-bold ${imp.forecastsAffected > 0 ? 'text-white' : 'text-gray-500'}`}>
                                     {imp.forecastsAffected}
