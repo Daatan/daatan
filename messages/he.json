@@ -478,7 +478,10 @@
     "pressSplit": "התקשורת חצויה באופן שווה",
     "certainty": "{value}% ודאות",
     "count": "פרסום אחד",
-    "countPlural": "{count} פרסומים"
+    "countPlural": "{count} פרסומים",
+    "originOracle": "נותח ב-AI",
+    "originIndexer": "באינדקס",
+    "originBoth": "שניהם"
   },
   "footer": {
     "privacy": "מדיניות פרטיות",

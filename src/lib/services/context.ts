@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
@@ -126,4 +126,54 @@ export async function listContextSnapshots(predictionId: string) {
     where: { predictionId },
     orderBy: { createdAt: 'desc' },
   })
+}
+
+/**
+ * The most recent context snapshot that carries an Oracle estimate, for a
+ * forecast (= prediction). Used to surface the Oracle's analysed sources as
+ * voters. Returns null when no analyze run has produced an oracleSnapshot.
+ */
+export async function getLatestOracleSnapshot(predictionId: string) {
+  return prisma.contextSnapshot.findFirst({
+    where: { predictionId, oracleSnapshot: { not: Prisma.DbNull } },
+    orderBy: { createdAt: 'desc' },
+    select: { oracleSnapshot: true, createdAt: true },
+  })
+}
+
+export interface SaveOracleSnapshotInput {
+  predictionId: string
+  /** The enriched Oracle source roster: EnrichedOracleSource[] under `{ sources }`. */
+  oracleSnapshot: Prisma.InputJsonValue
+  confidence: number | null
+  aiCiLow: number | null
+  aiCiHigh: number | null
+}
+
+/**
+ * Persist ONLY an Oracle snapshot (for the active-forecast backfill): creates a
+ * ContextSnapshot carrying the oracleSnapshot and refreshes the probability fields,
+ * WITHOUT touching detailsText/contextUpdatedAt or translations — so it never
+ * clobbers a user-written context summary. Mirrors saveNewsIndexerMatch.
+ */
+export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Promise<void> {
+  await prisma.$transaction([
+    prisma.contextSnapshot.create({
+      data: {
+        predictionId: input.predictionId,
+        summary: '',
+        sources: [],
+        externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
+        oracleSnapshot: input.oracleSnapshot,
+      },
+    }),
+    prisma.prediction.update({
+      where: { id: input.predictionId },
+      data: {
+        ...(input.confidence !== null && { confidence: input.confidence }),
+        aiCiLow: input.aiCiLow,
+        aiCiHigh: input.aiCiHigh,
+      },
+    }),
+  ])
 }

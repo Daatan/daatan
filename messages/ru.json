@@ -478,7 +478,10 @@
     "pressSplit": "Мнения прессы поровну разделились",
     "certainty": "уверенность {value}%",
     "count": "{count} публикация",
-    "countPlural": "{count} публикаций"
+    "countPlural": "{count} публикаций",
+    "originOracle": "Проанализировано ИИ",
+    "originIndexer": "В индексе",
+    "originBoth": "Оба"
   },
   "footer": {
     "privacy": "Политика конфиденциальности",

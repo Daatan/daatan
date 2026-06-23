@@ -7,7 +7,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline } from '@/lib/services/context'
-import { getContributingSources } from '@/lib/services/forecast-sources'
+import { getForecastVoters } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 
@@ -254,7 +254,7 @@ export default async function ForecastDetailPage({ params }: Props) {
   const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
-    getContributingSources(prediction.id),
+    getForecastVoters(prediction.id),
   ])
   const slug = prediction.slug || prediction.id
   const articleJsonLd = {
