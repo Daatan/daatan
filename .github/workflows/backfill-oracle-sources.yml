@@ -18,10 +18,10 @@ on:
         default: staging
       limit:
         description: Forecasts per round (small = shorter requests, avoids proxy timeouts)
-        default: '5'
+        default: '3'
       max_rounds:
         description: Safety cap on rounds
-        default: '40'
+        default: '80'
 
 jobs:
   backfill:
@@ -41,21 +41,32 @@ jobs:
           if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
           echo "Target: $BASE (limit=${{ inputs.limit }}/round, up to ${{ inputs.max_rounds }} rounds)"
 
+          # A round writes a snapshot (or an empty "attempted" marker) for every
+          # forecast it touches, so `remaining` strictly decreases and the loop
+          # converges. A slow/timed-out round is transient — log and retry, don't abort.
+          errstreak=0
           for i in $(seq 1 ${{ inputs.max_rounds }}); do
-            BODY=$(curl -s --max-time 120 -X POST \
+            BODY=$(curl -s --max-time 180 -X POST \
               -H "x-cron-secret: $BOT_RUNNER_SECRET" \
-              "$BASE/api/admin/forecasts/backfill-oracle-sources?limit=${{ inputs.limit }}")
-            echo "round $i: $BODY"
+              "$BASE/api/admin/forecasts/backfill-oracle-sources?limit=${{ inputs.limit }}") || BODY=""
+            echo "round $i: ${BODY:-<no response>}"
 
             REMAINING=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('remaining','ERR'))" 2>/dev/null || echo ERR)
-            if [ "$REMAINING" = "ERR" ]; then
-              echo "❌ Unexpected response (auth failure or error) — aborting"
-              exit 1
-            fi
             if [ "$REMAINING" = "0" ]; then
-              echo "✅ Drained — no active forecasts left without an Oracle snapshot"
+              echo "✅ Drained — every active forecast now has an Oracle snapshot (or attempted marker)"
               exit 0
             fi
+            if [ "$REMAINING" = "ERR" ]; then
+              errstreak=$((errstreak + 1))
+              echo "round $i: no/invalid response (transient) — streak $errstreak"
+              if [ "$errstreak" -ge 5 ]; then
+                echo "❌ 5 consecutive bad responses — likely auth/server error, aborting"
+                exit 1
+              fi
+              sleep 8
+              continue
+            fi
+            errstreak=0
             sleep 3
           done
 
