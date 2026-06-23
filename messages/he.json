@@ -93,6 +93,7 @@
     "myEstimate": "ההערכה שלי: {outcome}, ברמת ביטחון של {confidence}%",
     "commitCU": "התחייב CU",
     "resolveBy": "הכרעה עד",
+    "creationDate": "תאריך יצירה",
     "deadline": "תאריך הכרעה",
     "locked": "נעול",
     "source": "מקור",

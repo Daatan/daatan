@@ -80,6 +80,7 @@ async function getPrediction(idOrSlug: string) {
   const { outcomePayload, evidenceLinks } = prediction
   return {
     ...prediction,
+    createdAt: prediction.createdAt.toISOString(),
     resolveByDatetime: prediction.resolveByDatetime.toISOString(),
     contextUpdatedAt: prediction.contextUpdatedAt?.toISOString(),
     publishedAt: prediction.publishedAt?.toISOString(),
