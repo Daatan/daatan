@@ -141,6 +141,24 @@ export async function getLatestOracleSnapshot(predictionId: string) {
   })
 }
 
+/**
+ * Mark a forecast as Oracle-attempted when the Oracle produced no usable sources
+ * (no articles / no estimate). Writes an empty oracleSnapshot marker so the backfill
+ * stops re-selecting it (it now HAS a non-null oracleSnapshot) and the loop converges.
+ * Touches nothing on the prediction — no estimate, no CI, no detailsText.
+ */
+export async function markOracleAttempted(predictionId: string, reason: string): Promise<void> {
+  await prisma.contextSnapshot.create({
+    data: {
+      predictionId,
+      summary: '',
+      sources: [],
+      externalReasoning: `TruthMachine Oracle (backfill: ${reason})`,
+      oracleSnapshot: { sources: [], empty: true, reason },
+    },
+  })
+}
+
 export interface SaveOracleSnapshotInput {
   predictionId: string
   /** The enriched Oracle source roster: EnrichedOracleSource[] under `{ sources }`. */

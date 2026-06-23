@@ -3,7 +3,7 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources } from '@/lib/services/oracle-snapshot'
-import { saveOracleSnapshotOnly } from '@/lib/services/context'
+import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('oracle-backfill')
@@ -27,14 +27,20 @@ export async function refreshOracleSnapshot(prediction: { id: string; claimText:
     source: 'context-update',
     predictionId: prediction.id,
   })
-  if (!searchResults || searchResults.length === 0) return { status: 'no-articles' }
+  if (!searchResults || searchResults.length === 0) {
+    await markOracleAttempted(prediction.id, 'no-articles')
+    return { status: 'no-articles' }
+  }
 
   const { forecast } = await getOracleForecast(
     prediction.claimText,
     { articles: searchResults },
     { source: 'context-update', predictionId: prediction.id },
   )
-  if (forecast === null) return { status: 'no-oracle' }
+  if (forecast === null) {
+    await markOracleAttempted(prediction.id, 'no-oracle')
+    return { status: 'no-oracle' }
+  }
 
   const articleMeta = await getArticleMetaByUrl(forecast.sources.map(s => s.url))
   const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
