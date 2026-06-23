@@ -478,7 +478,10 @@
     "pressSplit": "Press is evenly split",
     "certainty": "{value}% certainty",
     "count": "{count} publication",
-    "countPlural": "{count} publications"
+    "countPlural": "{count} publications",
+    "originOracle": "AI-analysed",
+    "originIndexer": "Indexed",
+    "originBoth": "Both"
   },
   "footer": {
     "privacy": "Privacy Policy",

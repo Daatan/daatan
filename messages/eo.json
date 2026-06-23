@@ -478,7 +478,10 @@
     "pressSplit": "La gazetaro estas egale dividita",
     "certainty": "{value}% certeco",
     "count": "{count} publikaĵo",
-    "countPlural": "{count} publikaĵoj"
+    "countPlural": "{count} publikaĵoj",
+    "originOracle": "AI-analizita",
+    "originIndexer": "Indeksita",
+    "originBoth": "Ambaŭ"
   },
   "footer": {
     "privacy": "Privateca Politiko",

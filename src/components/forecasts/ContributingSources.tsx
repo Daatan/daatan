@@ -3,6 +3,7 @@
 import { Newspaper, ExternalLink } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
+import { canonicalKey } from '@/lib/utils/canonical-url'
 
 type Side = 'yes' | 'no' | 'neutral'
 
@@ -49,11 +50,13 @@ function articleProbYes(s: ContributingSource): number {
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
   const t = useTranslations('sources')
 
-  // One voter per article — dedupe only exact-duplicate URLs.
+  // One voter per article — dedupe by canonical URL (same key the merge service uses).
   const seen = new Set<string>()
   const unique = sources.filter((s) => {
-    if (!s.url || seen.has(s.url)) return false
-    seen.add(s.url)
+    if (!s.url) return false
+    const key = canonicalKey(s.url)
+    if (seen.has(key)) return false
+    seen.add(key)
     return true
   })
 
@@ -76,10 +79,18 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     neutral: { label: t('voteNeutral'), head: 'text-gray-400', badge: 'bg-gray-500/20 text-gray-400' },
   }
 
+  const originLabel = (origin: ContributingSource['origin']): string | null => {
+    if (origin === 'oracle') return `🔮 ${t('originOracle')}`
+    if (origin === 'both') return `🔮🗞 ${t('originBoth')}`
+    if (origin === 'indexer') return `🗞 ${t('originIndexer')}`
+    return null
+  }
+
   const VoterCard = ({ s, side }: { s: ContributingSource; side: Side }) => {
     const name = s.author || outletLabel(s)
     const subtitleOutlet = s.author ? outletLabel(s) : null
     const date = fmtDate(s.publishedAt)
+    const origin = originLabel(s.origin)
     const meta = sideMeta[side]
     return (
       <a
@@ -96,6 +107,9 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
               {meta.label}{s.certainty != null ? ` ${Math.round(s.certainty * 100)}%` : ''}
             </span>
           </div>
+          {origin && (
+            <span className="inline-block text-[10px] font-medium text-gray-400 mt-0.5">{origin}</span>
+          )}
           {(subtitleOutlet || date) && (
             <p className="text-xs text-gray-400 mt-0.5 truncate">
               {[subtitleOutlet, date].filter(Boolean).join(' · ')}

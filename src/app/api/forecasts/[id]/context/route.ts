@@ -7,7 +7,9 @@ import { llmService } from '@/lib/llm'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, type OracleSource } from '@/lib/services/oracle'
+import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
+import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
+import { enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import {
@@ -177,6 +179,12 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 const prob = toPercent(oracleForecast.mean)
                 const ciLow = toPercent(oracleForecast.ci_low)
                 const ciHigh = toPercent(oracleForecast.ci_high)
+                // Attach authors to the Oracle's sources (it omits them); best-effort,
+                // never blocks the estimate. Title/date come from the input articles below.
+                const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map(s => s.url))
+                const authorByUrl = new Map(
+                    [...articleMeta.entries()].map(([url, m]) => [url, m.author]),
+                )
                 log.info(
                     {
                         predictionId: prediction.id,
@@ -198,15 +206,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         ciLow,
                         ciHigh,
                         articlesUsed: oracleForecast.articles_used,
-                        sources: oracleForecast.sources.map((s: OracleSource) => ({
-                            sourceId: s.source_id,
-                            sourceName: s.source_name,
-                            url: s.url,
-                            stance: s.stance,
-                            certainty: s.certainty,
-                            credibilityWeight: s.credibility_weight,
-                            claims: s.claims,
-                        })),
+                        sources: enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl),
                     },
                 }
             }
