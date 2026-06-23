@@ -694,6 +694,7 @@
     "sourcesImpact": "השפעה",
     "sourcesImpactNa": "לא רלוונטי",
     "sourcesImpact30d": "{count} ב-30 ימים",
+    "sourcesSharedWith": "משותף עם {name}",
     "sourcesDomain": "דומיין",
     "sourcesSuggestedTitle": "מקורות מומלצים להוספה",
     "sourcesSuggestedHint": "אתרי חדשות שהכתבות שלהם כבר משפיעות על תחזיות אך אינם מוגדרים כפידים — מועמדים להוספה.",

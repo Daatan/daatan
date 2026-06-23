@@ -694,6 +694,7 @@
     "sourcesImpact": "Влияние",
     "sourcesImpactNa": "н/д",
     "sourcesImpact30d": "{count} за 30 дн.",
+    "sourcesSharedWith": "общий с {name}",
     "sourcesDomain": "Домен",
     "sourcesSuggestedTitle": "Рекомендуемые источники для добавления",
     "sourcesSuggestedHint": "Издания, чьи статьи уже влияют на прогнозы, но не настроены как фиды — кандидаты на добавление.",

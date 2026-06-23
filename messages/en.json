@@ -694,6 +694,7 @@
     "sourcesImpact": "Impact",
     "sourcesImpactNa": "n/a",
     "sourcesImpact30d": "{count} in 30d",
+    "sourcesSharedWith": "shared with {name}",
     "sourcesDomain": "Domain",
     "sourcesSuggestedTitle": "Suggested sources to add",
     "sourcesSuggestedHint": "Outlets whose articles already move forecasts but aren't configured feeds — candidates to add.",
