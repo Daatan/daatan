@@ -460,6 +460,12 @@ Manually trigger a bot run.
 ### `GET /api/admin/bots/[id]/logs`
 Fetch recent bot run logs.
 
+### `GET /api/admin/news-indexer/sources` — Admin
+Proxy to the news-indexer `/sources` list (the configured `sources.yaml` joined to per-source forecast-match impact). Backs the admin **Sources** tab. Returns the news-indexer payload verbatim with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
+
+### `POST /api/admin/news-indexer/match` — Admin
+Proxy to the news-indexer `/match` endpoint — re-match a single article URL against active forecasts on demand. Body: `{ articleUrl: string }` (must be a valid URL). Returns the news-indexer response (`{ matches, queued }`) with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
+
 ---
 
 ## IBI Analysis (Admin only)
@@ -521,7 +527,7 @@ Liveness + readiness probe. Returns `200` when the DB is reachable, `503` when i
 ```json
 {
   "status": "ok",         // "ok" | "degraded"
-  "version": "1.10.1",    // app version from src/lib/version.ts
+  "version": "1.18.0",    // app version from src/lib/version.ts
   "commit": "e3a594f",    // short GIT_COMMIT baked at build time
   "timestamp": "2026-04-16T17:31:45.056Z",
   "env": "production",    // APP_ENV
