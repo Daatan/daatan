@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
-import { Inter } from 'next/font/google'
+import { Inter, Heebo } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], display: 'swap' })
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+// Hebrew glyphs aren't in Inter; Heebo covers them and matches Inter's geometry.
+const heebo = Heebo({ subsets: ['hebrew', 'latin'], display: 'swap', variable: '--font-heebo' })
 import { StagingBanner } from '@/components/StagingBanner'
 import { NextBanner } from '@/components/NextBanner'
 import Sidebar from '@/components/Sidebar'
@@ -111,7 +113,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={isRtl(locale) ? 'rtl' : 'ltr'} suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={`${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
         <GoogleAnalytics measurementId={gaMeasurementId} isStaging={isStaging} />
         <NextIntlClientProvider messages={messages}>
           <SessionWrapper>
