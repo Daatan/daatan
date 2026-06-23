@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type { PredictionFormData } from '../ForecastWizard'
 import { TagSelector } from '@/components/ui/TagSelector'
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export const StepPrediction = ({ formData, updateFormData }: Props) => {
+  const t = useTranslations('wizard')
   const [isSuggesting, setIsSuggesting] = useState(false)
   const lastSuggestedClaim = useRef('')
 
@@ -58,23 +60,23 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-white mb-2">
-          Write Your Forecast
+          {t('writeForecast')}
         </h2>
         <p className="text-gray-500">
-          Make a specific, testable claim about what will happen.
+          {t('writeForecastDesc')}
         </p>
       </div>
 
       {/* Claim Text */}
       <div>
         <label htmlFor="claimText" className="block text-sm font-medium text-text-secondary mb-2">
-          Prediction Claim *
+          {t('claimLabel')}
         </label>
         <textarea
           id="claimText"
           value={formData.claimText}
           onChange={(e) => updateFormData({ claimText: e.target.value })}
-          placeholder="e.g., Bitcoin will reach $100,000 before July 2026"
+          placeholder={t('claimPlaceholder')}
           rows={3}
           maxLength={500}
           className={`w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border ${isClaimTooShort ? 'border-amber-500' : 'border-navy-600'
@@ -84,7 +86,7 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
           {isClaimTooShort && (
             <p className="text-sm text-amber-600 flex items-center gap-1">
               <AlertCircle className="w-4 h-4" />
-              Claim must be at least 10 characters
+              {t('claimTooShort')}
             </p>
           )}
           <p className="text-sm text-gray-400 ml-auto">{claimLength}/500</p>
@@ -94,14 +96,14 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
       {/* Details Text */}
       <div>
         <label htmlFor="detailsText" className="block text-sm font-medium text-text-secondary mb-2">
-          Additional Details
-          <span className="text-gray-400 font-normal ml-2">(optional)</span>
+          {t('detailsLabel')}
+          <span className="text-gray-400 font-normal ml-2">{t('optional')}</span>
         </label>
         <textarea
           id="detailsText"
           value={formData.detailsText || ''}
           onChange={(e) => updateFormData({ detailsText: e.target.value })}
-          placeholder="Add context, conditions, or criteria for resolution..."
+          placeholder={t('detailsPlaceholder')}
           rows={4}
           maxLength={5000}
           className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"
@@ -113,12 +115,12 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-text-secondary flex items-center gap-2">
-            Tags
-            <span className="text-gray-400 font-normal ml-1">(optional, max 5)</span>
+            {t('tagsLabel')}
+            <span className="text-gray-400 font-normal ml-1">{t('tagsOptional')}</span>
             {isSuggesting && (
               <span className="flex items-center gap-1.5 text-blue-600 text-xs font-bold animate-pulse ml-2 px-2 py-0.5 bg-cobalt/10 rounded-full border border-cobalt/20">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                AI is categorizing...
+                {t('aiCategorizing')}
               </span>
             )}
           </label>
@@ -126,10 +128,10 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
         <TagSelector
           selectedTags={formData.tags || []}
           onChange={(tags) => updateFormData({ tags })}
-          placeholder="Add tags (e.g. Politics, Crypto)..."
+          placeholder={t('tagsPlaceholder')}
         />
         <p className="text-xs text-gray-400 mt-2 italic">
-          Tip: You can skip tags and proceed directly to the next step.
+          {t('tagsTip')}
         </p>
       </div>
 
@@ -138,12 +140,12 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
 
       {/* Tips */}
       <div className="p-4 bg-amber-900/20 border border-amber-700/40 rounded-lg">
-        <h3 className="font-medium text-amber-800 mb-2">💡 Tips for good predictions</h3>
+        <h3 className="font-medium text-amber-800 mb-2">{t('tipsTitle')}</h3>
         <ul className="text-sm text-amber-400 space-y-1">
-          <li>• Be specific and measurable</li>
-          <li>• Include a clear timeframe</li>
-          <li>• Define what counts as success</li>
-          <li>• Avoid ambiguous language</li>
+          <li>• {t('tip1')}</li>
+          <li>• {t('tip2')}</li>
+          <li>• {t('tip3')}</li>
+          <li>• {t('tip4')}</li>
         </ul>
       </div>
     </div>

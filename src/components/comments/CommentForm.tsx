@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Send } from 'lucide-react'
 import type { Comment } from './CommentThread'
 import { createClientLogger } from '@/lib/client-logger'
@@ -23,8 +24,9 @@ export default function CommentForm({
   parentId,
   onCommentAdded,
   onCancel,
-  placeholder = 'Share your thoughts...',
+  placeholder,
 }: CommentFormProps) {
+  const t = useTranslations('comments')
   const [text, setText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -53,11 +55,11 @@ export default function CommentForm({
         onCancel?.()
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Failed to post comment')
+        toast.error(error.error || t('postFailed'))
       }
     } catch (error) {
       log.error({ err: error }, 'Error posting comment')
-      toast.error('Failed to post comment')
+      toast.error(t('postFailed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -68,7 +70,7 @@ export default function CommentForm({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('shareThoughts')}
         rows={parentId ? 2 : 3}
         maxLength={2000}
         className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cobalt resize-none"
@@ -86,7 +88,7 @@ export default function CommentForm({
               onClick={onCancel}
               disabled={isSubmitting}
             >
-              Cancel
+              {t('cancel')}
             </Button>
           )}
           <Button
@@ -95,7 +97,7 @@ export default function CommentForm({
             disabled={!text.trim()}
             leftIcon={<Send className="w-4 h-4" />}
           >
-            Post
+            {t('post')}
           </Button>
         </div>
       </div>

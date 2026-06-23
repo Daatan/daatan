@@ -3,10 +3,23 @@ import { UserProfileView } from '../UserProfileView'
 import { describe, it, expect, vi } from 'vitest'
 import type { ProfileScores, ProfileTabResult } from '@/lib/services/profile'
 
-// Mock next-intl
-vi.mock('next-intl/server', () => ({
-  getTranslations: () => Promise.resolve((key: string) => key),
-}))
+// Mock next-intl — resolve real en.json `profile` values so translated strings
+// render as English in assertions (with basic {var} interpolation + .raw).
+vi.mock('next-intl/server', async () => {
+  const en = (await import('../../../../messages/en.json')).default
+  const dict = ((en as Record<string, unknown>).profile ?? {}) as Record<string, string>
+  const t = (key: string, vars?: Record<string, string | number>) => {
+    let msg = dict[key] ?? key
+    if (vars) {
+      for (const [k, v] of Object.entries(vars)) {
+        msg = msg.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+      }
+    }
+    return msg
+  }
+  t.raw = (key: string) => dict[key] ?? key
+  return { getTranslations: () => Promise.resolve(t) }
+})
 
 // Mock next/image
 vi.mock('next/image', () => ({

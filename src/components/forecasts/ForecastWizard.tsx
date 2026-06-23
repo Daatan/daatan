@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { analytics } from '@/lib/analytics'
 import { localEndOfDay } from '@/lib/utils/date'
 import {
@@ -67,11 +68,11 @@ type MarketMatch = {
 }
 
 const STEPS = [
-  { id: 1, title: 'News Anchor', icon: Newspaper, description: 'Select a news story' },
-  { id: 2, title: 'Prediction', icon: FileText, description: 'Write your claim' },
-  { id: 3, title: 'Outcome', icon: Target, description: 'Define resolution' },
-  { id: 4, title: 'Publish', icon: Rocket, description: 'Commit & publish' },
-]
+  { id: 1, titleKey: 'stepNewsAnchorTitle', icon: Newspaper, descKey: 'stepNewsAnchorDesc' },
+  { id: 2, titleKey: 'stepPredictionTitle', icon: FileText, descKey: 'stepPredictionDesc' },
+  { id: 3, titleKey: 'stepOutcomeTitle', icon: Target, descKey: 'stepOutcomeDesc' },
+  { id: 4, titleKey: 'stepPublishTitle', icon: Rocket, descKey: 'stepPublishDesc' },
+] as const
 
 interface ForecastWizardProps {
   isExpressFlow?: boolean
@@ -82,6 +83,7 @@ const DRAFT_KEY = 'daatan:forecast-draft'
 
 export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: ForecastWizardProps) => {
   const router = useRouter()
+  const t = useTranslations('wizard')
   const [currentStep, setCurrentStep] = useState(isExpressFlow ? 2 : 1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitPhase, setSubmitPhase] = useState<SubmitPhase>('creating')
@@ -215,17 +217,17 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
     if (!asDraft) {
       if (!formData.claimText || formData.claimText.length < 10) {
         setCurrentStep(2)
-        setError('Prediction claim must be at least 10 characters.')
+        setError(t('errClaimMin'))
         return
       }
       if (!formData.resolutionRules || formData.resolutionRules.trim().length < 10) {
         setCurrentStep(3)
-        setError('Resolution rules are required (minimum 10 characters).')
+        setError(t('errRulesRequired'))
         return
       }
       if (!formData.resolveByDatetime || localEndOfDay(formData.resolveByDatetime) <= new Date()) {
         setCurrentStep(3)
-        setError('Resolution date must be in the future.')
+        setError(t('errDateFuture'))
         return
       }
     }
@@ -281,7 +283,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
           const targetStep = fieldToStep[firstField]
           if (targetStep) setCurrentStep(targetStep)
         }
-        throw new Error(data.error || 'Failed to create prediction')
+        throw new Error(data.error || t('errCreateFailed'))
       }
 
       const prediction = await response.json()
@@ -297,7 +299,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
 
         if (!publishResponse.ok) {
           const data = await publishResponse.json()
-          throw new Error(data.error || 'Failed to publish prediction')
+          throw new Error(data.error || t('errPublishFailed'))
         }
         recordDuration('forecast-publish', performance.now() - publishStart)
       }
@@ -313,7 +315,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       router.push(`/forecasts/${prediction.slug || prediction.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(err instanceof Error ? err.message : t('errGeneric'))
     } finally {
       setIsSubmitting(false)
     }
@@ -385,8 +387,8 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
                     {isCompleted ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Icon className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </div>
                   <div className="hidden sm:block text-left min-w-0">
-                    <div className="font-medium text-sm truncate">{step.title}</div>
-                    <div className="text-xs text-gray-500 truncate">{step.description}</div>
+                    <div className="font-medium text-sm truncate">{t(step.titleKey)}</div>
+                    <div className="text-xs text-gray-500 truncate">{t(step.descKey)}</div>
                   </div>
                 </button>
                 {index < filteredSteps.length - 1 && (
@@ -412,7 +414,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400 mb-1">
                 <TrendingUp className="w-4 h-4" />
-                Similar market on {marketMatch.providerLabel} · {marketMatch.score}% match
+                {t('marketMatch', { provider: marketMatch.providerLabel, score: marketMatch.score })}
               </div>
               <a
                 href={marketMatch.url}
@@ -423,12 +425,12 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
                 <span className="truncate">{marketMatch.question}</span>
                 <ExternalLink className="w-3 h-3 shrink-0" />
               </a>
-              <p className="mt-0.5 text-xs text-gray-500">Currently {marketMatch.yesProbability}% YES</p>
+              <p className="mt-0.5 text-xs text-gray-500">{t('marketYes', { pct: marketMatch.yesProbability })}</p>
             </div>
             <button
               onClick={() => setMatchDismissed(true)}
               className="text-gray-400 hover:text-gray-200 shrink-0"
-              aria-label="Dismiss"
+              aria-label={t('dismiss')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -441,13 +443,13 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
               }}
               className="px-3 py-1.5 text-sm font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded-lg"
             >
-              Link this market
+              {t('linkMarket')}
             </button>
             <button
               onClick={() => setMatchDismissed(true)}
               className="px-3 py-1.5 text-sm text-gray-300 hover:text-white"
             >
-              No, keep separate
+              {t('keepSeparate')}
             </button>
           </div>
         </div>
@@ -456,7 +458,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       {/* Linked-market confirmation */}
       {formData.externalMarketId && marketMatch && (
         <div className="mb-6 p-3 rounded-xl border border-pink-500/40 bg-pink-500/5 flex items-center gap-2 text-sm text-pink-300">
-          <Check className="w-4 h-4" /> Linked to the {marketMatch.providerLabel} market.
+          <Check className="w-4 h-4" /> {t('linkedToMarket', { provider: marketMatch.providerLabel })}
         </div>
       )}
 
@@ -473,7 +475,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
           variant="ghost"
           leftIcon={<ChevronLeft className="w-5 h-5" />}
         >
-          Back
+          {t('back')}
         </Button>
 
         <div className="flex gap-2 sm:gap-3">
@@ -484,7 +486,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
                 loading={isSubmitting}
                 variant="outline"
               >
-                Save Draft
+                {t('saveDraft')}
               </Button>
               <Button
                 onClick={() => handleSubmit(false)}
@@ -492,8 +494,8 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
                 disabled={!canProceed()}
                 leftIcon={!isSubmitting && <Rocket className="w-5 h-5" />}
               >
-                <span className="hidden sm:inline">Publish Prediction</span>
-                <span className="sm:hidden">Publish</span>
+                <span className="hidden sm:inline">{t('publishPrediction')}</span>
+                <span className="sm:hidden">{t('publish')}</span>
               </Button>
             </>
           ) : (
@@ -502,7 +504,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
               disabled={!canProceed()}
               rightIcon={<ChevronRight className="w-5 h-5" />}
             >
-              Next
+              {t('next')}
             </Button>
           )}
         </div>

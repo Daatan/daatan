@@ -12,10 +12,27 @@ vi.mock('next/navigation', () => ({
 // Mock analytics to avoid noise
 vi.mock('@/lib/analytics', () => ({ analytics: { forecastCreated: vi.fn() } }))
 
-// Mock next-intl to avoid NextIntlClientProvider requirement
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}))
+// Mock next-intl to avoid NextIntlClientProvider requirement.
+// Resolve real en.json values so the wizard's translated strings render as
+// English in assertions (with basic {var} interpolation).
+vi.mock('next-intl', async () => {
+  const en = (await import('../../../../messages/en.json')).default
+  const translator = (ns: string) => {
+    const dict = ((en as Record<string, unknown>)[ns] ?? {}) as Record<string, string>
+    const t = (key: string, vars?: Record<string, string | number>) => {
+      let msg = dict[key] ?? key
+      if (vars) {
+        for (const [k, v] of Object.entries(vars)) {
+          msg = msg.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+        }
+      }
+      return msg
+    }
+    t.rich = (key: string) => dict[key] ?? key
+    return t
+  }
+  return { useTranslations: (ns: string) => translator(ns) }
+})
 
 /** Render the wizard with step 4 active and controllable formData via sessionStorage. */
 async function renderAtStep4(overrides: Record<string, unknown> = {}) {

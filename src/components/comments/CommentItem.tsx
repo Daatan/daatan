@@ -29,6 +29,7 @@ export default function CommentItem({
   const { data: session } = useSession()
   const locale = useLocale()
   const t = useTranslations('translate')
+  const tc = useTranslations('comments')
   const [showReplyForm, setShowReplyForm] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(comment.text)
@@ -108,7 +109,7 @@ export default function CommentItem({
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this comment?')) return
+    if (!confirm(tc('deleteConfirm'))) return
 
     try {
       const response = await fetch(`/api/comments/${comment.id}`, {
@@ -202,7 +203,7 @@ export default function CommentItem({
               {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
             </span>
             {comment.updatedAt !== comment.createdAt && (
-              <span className="text-gray-400 text-xs">(edited)</span>
+              <span className="text-gray-400 text-xs">{tc('edited')}</span>
             )}
           </div>
 
@@ -220,7 +221,7 @@ export default function CommentItem({
                   onClick={handleUpdate}
                   className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                 >
-                  Save
+                  {tc('save')}
                 </button>
                 <button
                   onClick={() => {
@@ -229,7 +230,7 @@ export default function CommentItem({
                   }}
                   className="px-3 py-1 text-text-secondary text-sm hover:bg-navy-700 rounded-lg"
                 >
-                  Cancel
+                  {tc('cancel')}
                 </button>
               </div>
             </div>
@@ -294,7 +295,7 @@ export default function CommentItem({
                 className="flex items-center gap-1 px-2 py-1 text-gray-400 hover:bg-navy-700 rounded-lg transition-colors"
               >
                 <Reply className="w-4 h-4" />
-                Reply
+                {tc('reply')}
               </button>
             )}
 
@@ -323,7 +324,7 @@ export default function CommentItem({
                     className="flex items-center gap-1 px-2 py-1 text-gray-400 hover:bg-navy-700 rounded-lg transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
-                    Edit
+                    {tc('edit')}
                   </button>
                 )}
                 {canDelete && (
@@ -332,7 +333,7 @@ export default function CommentItem({
                     className="flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-900/20 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete
+                    {tc('delete')}
                   </button>
                 )}
               </>
@@ -347,7 +348,7 @@ export default function CommentItem({
                 parentId={comment.id}
                 onCommentAdded={handleReplyAdded}
                 onCancel={() => setShowReplyForm(false)}
-                placeholder="Write a reply..."
+                placeholder={tc('writeReply')}
               />
             </div>
           )}
@@ -361,10 +362,10 @@ export default function CommentItem({
             >
               <MessageSquare className="w-4 h-4" />
               {isLoadingReplies
-                ? 'Loading...'
+                ? tc('loading')
                 : showReplies
-                ? 'Hide replies'
-                : `Show ${comment._count.replies} ${comment._count.replies === 1 ? 'reply' : 'replies'}`}
+                ? tc('hideReplies')
+                : tc('showReplies', { count: comment._count.replies })}
             </button>
           )}
 
