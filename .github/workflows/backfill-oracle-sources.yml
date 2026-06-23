@@ -1,0 +1,62 @@
+name: Backfill Oracle Sources
+
+# Populates the Oracle source roster (the "sources behind the AI estimate" panel)
+# for ACTIVE forecasts created before per-source capture existed. Drives the
+# admin route POST /api/admin/forecasts/backfill-oracle-sources in bounded rounds
+# until `remaining` reaches 0. Auth is the x-cron-secret (BOT_RUNNER_SECRET) header,
+# same as the cron routes — the secret only ever lives in the Actions runner.
+#
+# Manual, on-demand: Actions → Backfill Oracle Sources → Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to backfill
+        type: choice
+        options: [staging, production]
+        default: staging
+      limit:
+        description: Forecasts per round (small = shorter requests, avoids proxy timeouts)
+        default: '5'
+      max_rounds:
+        description: Safety cap on rounds
+        default: '40'
+
+jobs:
+  backfill:
+    name: Backfill ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drive backfill until drained
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          if [ "${{ inputs.target }}" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
+          echo "Target: $BASE (limit=${{ inputs.limit }}/round, up to ${{ inputs.max_rounds }} rounds)"
+
+          for i in $(seq 1 ${{ inputs.max_rounds }}); do
+            BODY=$(curl -s --max-time 120 -X POST \
+              -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+              "$BASE/api/admin/forecasts/backfill-oracle-sources?limit=${{ inputs.limit }}")
+            echo "round $i: $BODY"
+
+            REMAINING=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('remaining','ERR'))" 2>/dev/null || echo ERR)
+            if [ "$REMAINING" = "ERR" ]; then
+              echo "❌ Unexpected response (auth failure or error) — aborting"
+              exit 1
+            fi
+            if [ "$REMAINING" = "0" ]; then
+              echo "✅ Drained — no active forecasts left without an Oracle snapshot"
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "⚠️ Hit max_rounds with $REMAINING still remaining — re-run to continue"
