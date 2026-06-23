@@ -30,6 +30,9 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `SCRAPINGBEE_API_KEY` | ✅ | — | ScrapingBee (fallback fetch) |
 | `ORACLE_URL` | ✅ | — | TruthMachine Oracle base URL (typically `https://oracle.daatan.com`) |
 | `ORACLE_API_KEY` | ✅ | — | Shared `x-api-key` for the Oracle; canonical copy at `openclaw/oracle-api-key` (legacy naming — OpenClaw is decommissioned, prefix retained for back-compat) |
+| `NEWS_INDEXER_SECRET` | ✅ | — | Inbound: shared secret validating the news-indexer → Daatan freshness push (`x-news-indexer-secret`) |
+| `NEWS_INDEXER_URL` | ✅ | — | Outbound: news-indexer base URL (e.g. `https://scrapper.daatan.com`) for the admin **Sources** panel + article matching |
+| `NEWS_INDEXER_API_KEY` | ✅ | — | Outbound: `x-api-key` Daatan sends to the news-indexer service |
 | `GA_MEASUREMENT_ID_PROD` | ✅ | — | Google Analytics 4 — production |
 | `GA_MEASUREMENT_ID_STAGING` | ✅ | — | Google Analytics 4 — staging |
 | `TELEGRAM_BOT_TOKEN` | ✅ | ✅ | @DaatanClawBot token |
@@ -444,4 +447,4 @@ A:
 
 ---
 
-Last updated: April 16, 2026
+Last updated: June 24, 2026
