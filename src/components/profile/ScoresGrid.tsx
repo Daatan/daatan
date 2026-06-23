@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server'
 import { GlickoChart } from './GlickoChart'
 import { CalibrationChart } from './CalibrationChart'
 import type { ProfileScores, TopicStat } from '@/lib/services/profile'
@@ -74,118 +75,120 @@ function SignedCard({
   )
 }
 
-export function ScoresGrid({ scores, user, userId, selectedTag, tagName }: ScoresGridProps) {
+export async function ScoresGrid({ scores, user, userId, selectedTag, tagName }: ScoresGridProps) {
+  const t = await getTranslations('profile')
   const tag = tagName ?? selectedTag
+  const tagSuffix = tag ? ` · ${tag}` : ''
 
   return (
     <div className="mb-8 space-y-4">
-      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Performance</p>
+      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{t('performance')}</p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         <ScoreCard
-          label="ELO Rating"
+          label={t('eloRating')}
           value={String(Math.round(user.eloRating))}
-          sub="global (head-to-head)"
+          sub={t('eloSub')}
           color="blue"
-          title="ELO head-to-head rating. Updated each time a prediction resolves and you are compared against other committers."
+          title={t('eloTitle')}
         />
         <ScoreCard
-          label="Glicko-2"
-          value={`μ ${Math.round(user.mu)}`}
-          sub={`global · ± ${Math.round(user.sigma)} uncertainty`}
+          label={t('glickoLabel')}
+          value={t('glickoValue', { mu: Math.round(user.mu) })}
+          sub={t('glickoSub', { sigma: Math.round(user.sigma) })}
           color="blue"
-          title="Glicko-2 skill estimate. μ = mean skill, σ = uncertainty. Leaderboard rank = μ − 3σ (conservative floor)."
+          title={t('glickoTitle')}
         />
         {scores.avgBrierScore !== null && (
           <ScoreCard
-            label={`Brier Score${tag ? ` · ${tag}` : ''}`}
+            label={`${t('brierScore')}${tagSuffix}`}
             value={scores.avgBrierScore.toFixed(3)}
-            sub={`${scores.brierCount} scored · lower is better${scores.brierCount < 5 ? ' · limited data' : ''}`}
+            sub={`${t('brierSub', { count: scores.brierCount })}${scores.brierCount < 5 ? t('brierLimited') : ''}`}
             color="purple"
-            title="(probability − outcome)². Lower is better. Only computed when you enter a % YES estimate at stake time."
+            title={t('brierTitle')}
           />
         )}
         {scores.accuracy !== null && (
           <ScoreCard
-            label={`Accuracy${tag ? ` · ${tag}` : ''}`}
+            label={`${t('accuracy')}${tagSuffix}`}
             value={`${Math.round(scores.accuracy * 100)}%`}
-            sub={`${scores.accuracyResolved} resolved`}
-            title="% of resolved predictions where rsChange > 0 (you gained RS). Min 3 resolved to display."
+            sub={t('accuracySub', { count: scores.accuracyResolved })}
+            title={t('accuracyTitle')}
           />
         )}
         {scores.truthScore !== null && (
           <SignedCard
-            label="TruthScore"
+            label={t('truthScore')}
             value={Number(scores.truthScore.toFixed(4))}
-            sub="avg peer / prediction"
-            title="Average peer score per prediction. How consistently you beat community consensus. Min 3 to display."
+            sub={t('truthSub')}
+            title={t('truthTitle')}
           />
         )}
         {scores.weightedPeerScore !== null ? (
           <SignedCard
-            label={`Wtd. Peer Score${tag ? ` · ${tag}` : ''}`}
+            label={`${t('wtdPeer')}${tagSuffix}`}
             value={Number(scores.weightedPeerScore.toFixed(4))}
-            sub="Metaculus-style decay"
-            title="Metaculus-style time-weighted peer score. Recent predictions count more (0.95^(days/30) decay)."
+            sub={t('wtdPeerSub')}
+            title={t('wtdPeerTitle')}
           />
         ) : scores.weightedPeerCount > 0 && (
           <ScoreCard
-            label="Wtd. Peer Score"
+            label={t('wtdPeer')}
             value="—"
-            sub={`need ${3 - scores.weightedPeerCount} more peer-scored`}
+            sub={t('wtdPeerNeed', { count: 3 - scores.weightedPeerCount })}
             color="muted"
             muted
-            title="Metaculus-style time-weighted peer score. Requires 3+ peer-scored predictions to display."
+            title={t('wtdPeerTitleNeed')}
           />
         )}
         {scores.peerScoreSum !== null && (
           <SignedCard
-            label={`Peer Score${tag ? ` · ${tag}` : ''}`}
+            label={`${t('peerScore')}${tagSuffix}`}
             value={Number(scores.peerScoreSum.toFixed(2))}
-            sub={`${scores.peerScoreCount} scored`}
-            title="How much better you were than the community consensus at commit time. Positive = beat the crowd."
+            sub={t('peerSub', { count: scores.peerScoreCount })}
+            title={t('peerTitle')}
           />
         )}
         {scores.roi !== null && (
           <SignedCard
-            label="ROI"
+            label={t('roi')}
             value={Number(scores.roi.toFixed(2))}
-            sub="RS / resolved prediction"
-            title="Average net RS change per resolved prediction. Min 3 resolved to display."
+            sub={t('roiSub')}
+            title={t('roiTitle')}
           />
         )}
         {scores.aiScoreSum !== null && (
           <SignedCard
-            label={`AI Score${tag ? ` · ${tag}` : ''}`}
+            label={`${t('aiScore')}${tagSuffix}`}
             value={Number(scores.aiScoreSum.toFixed(2))}
-            sub={`${scores.aiScoreCount} scored`}
-            title="How much better you were than the AI estimate at commit time. Positive = beat the AI."
+            sub={t('aiSub', { count: scores.aiScoreCount })}
+            title={t('aiTitle')}
           />
         )}
         {scores.rsTagDelta !== null && (
           <SignedCard
             label={`RS · ${tag}`}
             value={Number(scores.rsTagDelta.toFixed(1))}
-            title={`Net RS change for all resolved predictions in tag: ${tag}`}
+            title={t('rsTagTitle', { tag: tag ?? '' })}
           />
         )}
         <ScoreCard
-          label="Reputation"
-          value={`${user.rs.toFixed(1)} RS`}
-          sub="global · pool-based"
+          label={t('reputation')}
+          value={t('reputationValue', { rs: user.rs.toFixed(1) })}
+          sub={t('reputationSub')}
           color="muted"
           muted
-          title="Legacy Reputation Score — earned from pool-weighted correct predictions. Global, not tag-filterable."
+          title={t('reputationTitle')}
         />
       </div>
 
       {scores.topicBreakdown.length > 0 && !selectedTag && (
-        <TopicBreakdown topics={scores.topicBreakdown} />
+        <TopicBreakdown topics={scores.topicBreakdown} title={t('peerByTopic')} />
       )}
 
       <div className="bg-navy-800 rounded-xl border border-navy-600 p-3">
         <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">
-          Glicko-2 Skill History{tag ? ` · ${tag}` : ''}
+          {t('glickoHistory')}{tagSuffix}
         </p>
         <GlickoChart userId={userId} selectedTag={selectedTag} />
       </div>
@@ -193,9 +196,9 @@ export function ScoresGrid({ scores, user, userId, selectedTag, tagName }: Score
       {scores.calibration.length >= 2 && (
         <div className="bg-navy-800 rounded-xl border border-navy-600 p-3">
           <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">
-            Calibration{tag ? ` · ${tag}` : ''}
+            {t('calibration')}{tagSuffix}
           </p>
-          <p className="text-[10px] text-gray-600 mb-2">How well predicted % matches actual outcomes — diagonal = perfect</p>
+          <p className="text-[10px] text-gray-600 mb-2">{t('calibrationDesc')}</p>
           <CalibrationChart calibration={scores.calibration} />
         </div>
       )}
@@ -203,10 +206,10 @@ export function ScoresGrid({ scores, user, userId, selectedTag, tagName }: Score
   )
 }
 
-function TopicBreakdown({ topics }: { topics: TopicStat[] }) {
+function TopicBreakdown({ topics, title }: { topics: TopicStat[]; title: string }) {
   return (
     <div>
-      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">Peer score by topic</p>
+      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">{title}</p>
       <div className="flex flex-wrap gap-2">
         {topics.map(topic => (
           <div

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import CommentItem from './CommentItem'
 import CommentForm from './CommentForm'
@@ -44,6 +45,7 @@ interface CommentThreadProps {
 
 export default function CommentThread({ predictionId, initialComments }: CommentThreadProps) {
   const { data: session } = useSession()
+  const t = useTranslations('comments')
   const [comments, setComments] = useState<Comment[]>(initialComments ?? [])
   const [isLoading, setIsLoading] = useState(initialComments == null)
 
@@ -85,7 +87,7 @@ export default function CommentThread({ predictionId, initialComments }: Comment
       <div className="flex items-center gap-2">
         <MessageSquare className="w-5 h-5 text-gray-500" />
         <h3 className="text-lg font-semibold text-white">
-          Discussion ({comments.length})
+          {t('discussion', { count: comments.length })}
         </h3>
       </div>
 
@@ -105,7 +107,7 @@ export default function CommentThread({ predictionId, initialComments }: Comment
       ) : comments.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-          <p>No comments yet. Be the first to share your thoughts!</p>
+          <p>{t('noComments')}</p>
         </div>
       ) : (
         <div className="space-y-4">

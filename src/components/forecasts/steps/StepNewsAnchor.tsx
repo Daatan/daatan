@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { Link as LinkIcon, X, ExternalLink, Loader2, Wand2, CheckCircle2 } from 'lucide-react'
 import type { PredictionFormData } from '../ForecastWizard'
 import { createClientLogger } from '@/lib/client-logger'
@@ -22,6 +23,7 @@ type NewsAnchor = {
 }
 
 export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
+  const t = useTranslations('wizard')
   const [url, setUrl] = useState(formData.newsAnchorUrl || '')
   const [title, setTitle] = useState(formData.newsAnchorTitle || '')
   const [isSearching, setIsSearching] = useState(false)
@@ -225,10 +227,10 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-white mb-2">
-          Select News Anchor
+          {t('anchorTitle')}
         </h2>
         <p className="text-gray-500">
-          Link your prediction to a specific news story or event. This provides context and helps with resolution.
+          {t('anchorDesc')}
         </p>
       </div>
 
@@ -248,14 +250,14 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
               </a>
               {selectedAnchor._count.predictions > 0 && (
                 <p className="text-xs text-gray-500 mt-2">
-                  {selectedAnchor._count.predictions} prediction{selectedAnchor._count.predictions > 1 ? 's' : ''} linked
+                  {t('predictionsLinked', { count: selectedAnchor._count.predictions })}
                 </p>
               )}
             </div>
             <button
               onClick={handleClear}
               className="p-1 text-gray-400 hover:text-gray-600"
-              aria-label="Remove anchor"
+              aria-label={t('removeAnchor')}
             >
               <X className="w-5 h-5" />
             </button>
@@ -265,7 +267,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
         <div className="space-y-4">
           <div>
             <label htmlFor="url" className="block text-sm font-medium text-text-secondary mb-2">
-              Article URL
+              {t('articleUrl')}
             </label>
             <div className="relative">
               <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -274,14 +276,14 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 id="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com/article"
+                placeholder={t('urlPlaceholder')}
                 className={`w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isUrl ? 'border-blue-300 bg-cobalt/10/30' : 'border-navy-600'}`}
               />
             </div>
             {isMarketUrl && (
               <p className="mt-2 text-xs text-pink-400 flex items-center gap-1.5">
                 {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {isImporting ? 'Importing market…' : 'Prediction market detected — importing as a forecast.'}
+                {isImporting ? t('importingMarket') : t('marketDetected')}
               </p>
             )}
           </div>
@@ -290,10 +292,10 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             <div className="p-4 rounded-lg border border-pink-500/40 bg-pink-500/5">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400 mb-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                Imported from {marketImport.providerLabel}
+                {t('importedFrom', { provider: marketImport.providerLabel })}
               </div>
               <p className="text-sm text-text-secondary">
-                The claim and resolution date were prefilled from this market. You can edit them in the next steps.
+                {t('importedDesc')}
               </p>
               <a
                 href={marketImport.url}
@@ -301,14 +303,14 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 rel="noopener noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-xs text-pink-400 hover:text-pink-300"
               >
-                View market <ExternalLink className="w-3 h-3" />
+                {t('viewMarket')} <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           )}
 
           <div className={`transition-all duration-300 origin-top ${isUrl && !isMarketUrl ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 overflow-hidden'}`}>
             <label htmlFor="title" className="block text-sm font-medium text-text-secondary mb-2">
-              Article Title
+              {t('articleTitle')}
             </label>
             <div className="relative">
               <input
@@ -316,7 +318,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={isSearching ? 'Fetching title...' : 'Enter article headline'}
+                placeholder={isSearching ? t('fetchingTitle') : t('enterHeadline')}
                 disabled={isSearching}
                 className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-navy-800"
               />
@@ -335,12 +337,12 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
               {isExtracting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>AI is working its magic...</span>
+                  <span>{t('aiWorking')}</span>
                 </>
               ) : (
                 <>
                   <Wand2 className="w-5 h-5" />
-                  <span>AI Magic Extract</span>
+                  <span>{t('aiMagicExtract')}</span>
                 </>
               )}
             </button>
@@ -350,7 +352,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
               disabled={!isUrl || !title || isSearching || isExtracting}
               className="flex-1 py-3.5 px-6 rounded-xl bg-navy-700 text-text-secondary font-semibold border-2 border-navy-600 hover:bg-navy-800 hover:border-navy-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Add Manually
+              {t('addManually')}
             </button>
           </div>
         </div>
@@ -362,9 +364,9 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             <Wand2 className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-medium text-blue-900 text-sm">AI Magic Extract</h4>
+            <h4 className="font-medium text-blue-900 text-sm">{t('aiMagicExtract')}</h4>
             <p className="text-sm text-cobalt-light mt-0.5">
-              Paste a URL and click Magic Extract. We&apos;ll automatically identify the prediction, resolution date, and options for you.
+              {t('magicExtractDesc')}
             </p>
           </div>
         </div>
@@ -379,11 +381,11 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-sm font-medium text-text-secondary group-hover:text-white">
-            Create prediction without a URL
+            {t('createWithoutUrl')}
           </span>
         </label>
         <p className="text-xs text-gray-500 mt-2 ml-8">
-          You can create a prediction based on your own analysis or general knowledge without linking to a specific article.
+          {t('createWithoutUrlDesc')}
         </p>
       </div>
 
@@ -393,9 +395,9 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-medium text-green-900 text-sm">Ready to proceed</h4>
+            <h4 className="font-medium text-green-900 text-sm">{t('readyToProceed')}</h4>
             <p className="text-sm text-teal mt-0.5">
-              You can now write your prediction claim and define the resolution criteria.
+              {t('readyToProceedDesc')}
             </p>
           </div>
         </div>

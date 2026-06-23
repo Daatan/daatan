@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Check, Loader2 } from 'lucide-react'
 
 export type SubmitPhase = 'creating' | 'publishing' | 'done'
@@ -23,6 +24,7 @@ type StepState = 'done' | 'active' | 'pending'
  * background after the response and are intentionally not shown here.
  */
 export function SubmitProgress({ mode, phase, createEstimateMs, publishEstimateMs }: SubmitProgressProps) {
+  const t = useTranslations('wizard')
   const [elapsed, setElapsed] = useState(0)
   const startRef = useRef<number>(Date.now())
 
@@ -41,13 +43,13 @@ export function SubmitProgress({ mode, phase, createEstimateMs, publishEstimateM
   const secondsLeft = Math.max(0, Math.ceil((activeEstimate - elapsed) / 1000))
 
   const steps: { key: string; label: string; state: StepState }[] = [
-    { key: 'check', label: 'Checking content…', state: phase === 'creating' ? 'active' : 'done' },
-    { key: 'save', label: 'Saving…', state: phase === 'creating' ? 'pending' : 'done' },
+    { key: 'check', label: t('checking'), state: phase === 'creating' ? 'active' : 'done' },
+    { key: 'save', label: t('saving'), state: phase === 'creating' ? 'pending' : 'done' },
   ]
   if (mode === 'publish') {
     steps.push({
       key: 'publish',
-      label: 'Publishing…',
+      label: t('publishingStep'),
       state: phase === 'publishing' ? 'active' : phase === 'done' ? 'done' : 'pending',
     })
   }
@@ -77,7 +79,7 @@ export function SubmitProgress({ mode, phase, createEstimateMs, publishEstimateM
                 />
               </span>
               <span className="tabular-nums whitespace-nowrap w-24 text-right">
-                {overrun ? 'Almost there…' : `~${secondsLeft}s left`}
+                {overrun ? t('almostThere') : t('secondsLeft', { seconds: secondsLeft })}
               </span>
             </span>
           )}

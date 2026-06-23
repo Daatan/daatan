@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { PredictionFormData } from '../ForecastWizard'
 
 type Props = {
@@ -17,8 +18,10 @@ type Props = {
 }
 
 export const StepPublish = ({ formData, updateFormData }: Props) => {
+  const t = useTranslations('wizard')
+
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'Not set'
+    if (!dateStr) return t('notSet')
     return new Date(dateStr).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -30,17 +33,17 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
   const getOutcomeDescription = () => {
     switch (formData.outcomeType) {
       case 'BINARY':
-        return 'Binary (Will happen / Won\'t happen)'
+        return t('outcomeBinary')
       case 'MULTIPLE_CHOICE':
-        return `Multiple Choice (${formData.outcomeOptions?.length || 0} options)`
+        return t('outcomeMultiple', { count: formData.outcomeOptions?.length || 0 })
       case 'NUMERIC_THRESHOLD':
         if (formData.numericThreshold) {
           const { metric, direction, threshold } = formData.numericThreshold
           return `${metric} ${direction} ${threshold}`
         }
-        return 'Numeric Threshold'
+        return t('outcomeNumericFallback')
       default:
-        return 'Not set'
+        return t('notSet')
     }
   }
 
@@ -48,10 +51,10 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-white mb-2">
-          Review & Publish
+          {t('reviewTitle')}
         </h2>
         <p className="text-gray-500">
-          Review your prediction before publishing. Once published, it cannot be edited.
+          {t('reviewDesc')}
         </p>
       </div>
 
@@ -62,7 +65,7 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
           <div className="p-4 bg-navy-800 border-b border-navy-600">
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
               <Newspaper className="w-4 h-4" />
-              News Anchor
+              {t('newsAnchorLabel')}
             </div>
             <p className="font-medium text-white">{formData.newsAnchorTitle}</p>
             {formData.newsAnchorUrl && (
@@ -82,9 +85,9 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
         <div className="p-4 border-b border-navy-600">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
             <FileText className="w-4 h-4" />
-            Prediction
+            {t('predictionLabel')}
           </div>
-          <p className="font-medium text-white text-lg">{formData.claimText || 'No claim set'}</p>
+          <p className="font-medium text-white text-lg">{formData.claimText || t('noClaimSet')}</p>
           {formData.detailsText && (
             <p className="text-gray-300 mt-2">{formData.detailsText}</p>
           )}
@@ -103,7 +106,7 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
         <div className="p-4 border-b border-navy-600">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
             <Target className="w-4 h-4" />
-            Outcome Type
+            {t('reviewOutcomeType')}
           </div>
           <p className="font-medium text-white">{getOutcomeDescription()}</p>
 
@@ -125,7 +128,7 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
         <div className="p-4">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
             <Calendar className="w-4 h-4" />
-            Resolution Date
+            {t('reviewResolutionDate')}
           </div>
           <p className="font-medium text-white">{formatDate(formData.resolveByDatetime)}</p>
           {formData.resolutionRules && (
@@ -139,12 +142,10 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium text-white">
-              {formData.isPublic ? 'Public' : 'Unlisted'}
+              {formData.isPublic ? t('public') : t('unlisted')}
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
-              {formData.isPublic
-                ? 'Visible in the public feed'
-                : 'Only people with the link can see this'}
+              {formData.isPublic ? t('publicDesc') : t('unlistedDesc')}
             </p>
           </div>
           <button
@@ -157,9 +158,9 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
             }`}
           >
             {formData.isPublic ? (
-              <><Eye className="w-4 h-4" /> Public</>
+              <><Eye className="w-4 h-4" /> {t('public')}</>
             ) : (
-              <><EyeOff className="w-4 h-4" /> Unlisted</>
+              <><EyeOff className="w-4 h-4" /> {t('unlisted')}</>
             )}
           </button>
         </div>
@@ -167,28 +168,26 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
 
       {/* Publish Checklist */}
       <div className="p-4 bg-teal/10 border border-green-200 rounded-lg">
-        <h3 className="font-medium text-green-800 mb-3">Ready to publish?</h3>
+        <h3 className="font-medium text-green-800 mb-3">{t('readyToPublish')}</h3>
         <ul className="space-y-2">
           <li className="flex items-center gap-2 text-sm text-teal">
             <Check className="w-4 h-4" />
-            {formData.isPublic
-              ? 'Your prediction will be visible to all users'
-              : 'Your prediction will be unlisted — share the link to invite others'}
+            {formData.isPublic ? t('checklistPublic') : t('checklistUnlisted')}
           </li>
           <li className="flex items-center gap-2 text-sm text-teal">
             <Check className="w-4 h-4" />
-            Others can weigh in to agree or disagree
+            {t('checklistAgree')}
           </li>
           <li className="flex items-center gap-2 text-sm text-teal">
             <Check className="w-4 h-4" />
-            It will be resolved by {formatDate(formData.resolveByDatetime)}
+            {t('checklistResolved', { date: formatDate(formData.resolveByDatetime) })}
           </li>
         </ul>
       </div>
 
       {/* Draft Notice */}
       <p className="text-sm text-gray-500 text-center">
-        Not ready yet? You can <span className="font-medium">Save as Draft</span> and publish later.
+        {t.rich('draftNotice', { b: (chunks) => <span className="font-medium">{chunks}</span> })}
       </p>
     </div>
   )

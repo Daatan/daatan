@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-  ToggleLeft, 
-  List, 
-  TrendingUp, 
+import { useTranslations } from 'next-intl'
+import {
+  ToggleLeft,
+  List,
+  TrendingUp,
   Calendar,
   Plus,
   Trash2,
@@ -19,27 +20,13 @@ type Props = {
 }
 
 const OUTCOME_TYPES = [
-  { 
-    value: 'BINARY', 
-    label: 'Binary', 
-    icon: ToggleLeft,
-    description: 'Will happen / Won\'t happen',
-  },
-  { 
-    value: 'MULTIPLE_CHOICE', 
-    label: 'Multiple Choice', 
-    icon: List,
-    description: 'One option out of many',
-  },
-  { 
-    value: 'NUMERIC_THRESHOLD', 
-    label: 'Numeric', 
-    icon: TrendingUp,
-    description: 'Metric crosses a value',
-  },
-]
+  { value: 'BINARY', labelKey: 'typeBinary', icon: ToggleLeft, descKey: 'typeBinaryDesc' },
+  { value: 'MULTIPLE_CHOICE', labelKey: 'typeMultiple', icon: List, descKey: 'typeMultipleDesc' },
+  { value: 'NUMERIC_THRESHOLD', labelKey: 'typeNumeric', icon: TrendingUp, descKey: 'typeNumericDesc' },
+] as const
 
 export const StepOutcome = ({ formData, updateFormData }: Props) => {
+  const t = useTranslations('wizard')
   const [options, setOptions] = useState<string[]>(formData.outcomeOptions || ['', ''])
   
   const minDate = new Date().toISOString().split('T')[0]
@@ -74,17 +61,17 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-white mb-2">
-          Define Outcome & Resolution Date
+          {t('outcomeTitle')}
         </h2>
         <p className="text-gray-500">
-          How will this prediction be resolved?
+          {t('outcomeDesc')}
         </p>
       </div>
 
       {/* Outcome Type */}
       <div>
         <label className="block text-sm font-medium text-text-secondary mb-3">
-          Outcome Type *
+          {t('outcomeTypeLabel')}
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {OUTCOME_TYPES.map((type) => {
@@ -106,9 +93,9 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
               >
                 <Icon className={`w-6 h-6 mb-2 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
                 <div className={`font-medium ${isSelected ? 'text-cobalt-light' : 'text-white'}`}>
-                  {type.label}
+                  {t(type.labelKey)}
                 </div>
-                <div className="text-sm text-gray-500">{type.description}</div>
+                <div className="text-sm text-gray-500">{t(type.descKey)}</div>
               </button>
             )
           })}
@@ -119,7 +106,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
       {formData.outcomeType === 'MULTIPLE_CHOICE' && (
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-3">
-            Options *
+            {t('optionsLabel')}
           </label>
           <div className="space-y-2">
             {options.map((option, index) => (
@@ -131,7 +118,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                   type="text"
                   value={option}
                   onChange={(e) => handleOptionChange(index, e.target.value)}
-                  placeholder={`Option ${index + 1}`}
+                  placeholder={t('optionPlaceholder', { n: index + 1 })}
                   className="flex-1 px-4 py-2 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
                   maxLength={500}
                 />
@@ -140,7 +127,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                     type="button"
                     onClick={() => handleRemoveOption(index)}
                     className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                    aria-label="Remove option"
+                    aria-label={t('removeOption')}
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -155,7 +142,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
               className="mt-3 flex items-center gap-2 text-blue-600 hover:text-cobalt-light transition-colors"
             >
               <Plus className="w-5 h-5" />
-              Add Option
+              {t('addOption')}
             </button>
           )}
         </div>
@@ -166,7 +153,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
         <div className="space-y-4">
           <div>
             <label htmlFor="metric" className="block text-sm font-medium text-text-secondary mb-2">
-              Metric *
+              {t('metricLabel')}
             </label>
             <input
               type="text"
@@ -180,7 +167,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                   direction: formData.numericThreshold?.direction || 'above',
                 },
               })}
-              placeholder="e.g., Bitcoin price in USD"
+              placeholder={t('metricPlaceholder')}
               className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
             />
           </div>
@@ -188,7 +175,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="direction" className="block text-sm font-medium text-text-secondary mb-2">
-                Direction *
+                {t('directionLabel')}
               </label>
               <select
                 id="direction"
@@ -203,15 +190,15 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                 })}
                 className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent bg-navy-700 text-white"
               >
-                <option value="above">Goes above</option>
-                <option value="below">Goes below</option>
-                <option value="exactly">Reaches exactly</option>
+                <option value="above">{t('dirAbove')}</option>
+                <option value="below">{t('dirBelow')}</option>
+                <option value="exactly">{t('dirExactly')}</option>
               </select>
             </div>
 
             <div>
               <label htmlFor="threshold" className="block text-sm font-medium text-text-secondary mb-2">
-                Threshold Value *
+                {t('thresholdLabel')}
               </label>
               <input
                 type="number"
@@ -236,7 +223,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
       {/* Resolution Date */}
       <div>
         <label htmlFor="resolveByDatetime" className="block text-sm font-medium text-text-secondary mb-2">
-          Resolution Date *
+          {t('resolutionDateLabel')}
         </label>
         <div className="relative">
           <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -254,7 +241,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
         {isDateInPast && (
           <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
             <AlertCircle className="w-4 h-4" />
-            Resolution date must be in the future
+            {t('dateInPast')}
           </p>
         )}
       </div>
@@ -262,13 +249,13 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
       {/* Resolution Rules */}
       <div>
         <label htmlFor="resolutionRules" className="block text-sm font-medium text-text-secondary mb-2">
-          Resolution Rules <span className="text-red-400">*</span>
+          {t('resolutionRulesLabel')} <span className="text-red-400">*</span>
         </label>
         <textarea
           id="resolutionRules"
           value={formData.resolutionRules || ''}
           onChange={(e) => updateFormData({ resolutionRules: e.target.value })}
-          placeholder="How should this be resolved? What sources will be used?"
+          placeholder={t('resolutionRulesPlaceholder')}
           rows={3}
           maxLength={2000}
           className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"

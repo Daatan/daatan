@@ -47,6 +47,12 @@ export async function UserProfileView({
 }: UserProfileViewProps) {
   const t = await getTranslations('profile')
   const tagName = selectedTag ? (userTags.find(tg => tg.slug === selectedTag)?.name ?? selectedTag) : null
+  const cardLabels: CardLabels = {
+    yes: t('cardYes'),
+    no: t('cardNo'),
+    staked: t('cardStaked'),
+    probYesTemplate: t.raw('cardProbYes'),
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -76,14 +82,14 @@ export async function UserProfileView({
           {/* Name + meta */}
           <div className="flex-1 text-center md:text-left min-w-0">
             <div className="flex items-center justify-center md:justify-start gap-3 mb-2 flex-wrap">
-              <h1 className="text-3xl sm:text-4xl font-black text-white">{user.name || 'Anonymous'}</h1>
+              <h1 className="text-3xl sm:text-4xl font-black text-white">{user.name || t('anonymous')}</h1>
               {user.role && <RoleBadge role={user.role as 'USER' | 'RESOLVER' | 'ADMIN'} size="md" />}
               {isOwnProfile && (
                 <>
                   <Link
                     href="/profile/edit"
                     className="p-2 hover:bg-navy-600 rounded-lg transition-colors"
-                    title="Edit profile"
+                    title={t('editProfile')}
                   >
                     <Settings className="w-5 h-5 text-gray-400 hover:text-gray-200" />
                   </Link>
@@ -144,16 +150,16 @@ export async function UserProfileView({
             <div className="flex items-center justify-center gap-2 mb-1">
               <Activity className="w-4 h-4 text-blue-400" />
               <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                Skill Rating
+                {t('skillRating')}
               </span>
             </div>
-            <p className="text-3xl font-black" title="Glicko-2 μ (mean skill estimate)">
+            <p className="text-3xl font-black" title={t('skillMuTitle')}>
               {Math.round(user.mu)}
             </p>
-            <p className="text-xs text-gray-400 mt-1" title="Glicko-2 σ — lower means more data">
-              ± {Math.round(user.sigma)} uncertainty
+            <p className="text-xs text-gray-400 mt-1" title={t('skillSigmaTitle')}>
+              {t('uncertainty', { sigma: Math.round(user.sigma) })}
             </p>
-            <p className="text-[10px] text-gray-600 mt-0.5">Glicko-2 · 1500 = avg</p>
+            <p className="text-[10px] text-gray-600 mt-0.5">{t('glickoAvg')}</p>
           </div>
         </div>
       </div>
@@ -176,13 +182,28 @@ export async function UserProfileView({
         resolvedTotal={tabData.resolvedTotal}
       >
         {tabData.tab === 'created' && (
-          <CreatedList items={tabData.createdItems} isOwnProfile={isOwnProfile} />
+          <CreatedList
+            items={tabData.createdItems}
+            isOwnProfile={isOwnProfile}
+            emptyDesc={isOwnProfile ? t('noForecasts') : t('noPublicForecasts')}
+            createLabel={t('createForecast')}
+          />
         )}
         {tabData.tab === 'participated' && (
-          <CommitmentList items={tabData.participatedItems} showScores={false} />
+          <CommitmentList
+            items={tabData.participatedItems}
+            showScores={false}
+            emptyDesc={t('noParticipationsFound')}
+            labels={cardLabels}
+          />
         )}
         {tabData.tab === 'resolved' && (
-          <CommitmentList items={tabData.resolvedItems} showScores />
+          <CommitmentList
+            items={tabData.resolvedItems}
+            showScores
+            emptyDesc={t('noParticipationsFound')}
+            labels={cardLabels}
+          />
         )}
       </ProfileTabs>
     </div>
@@ -192,9 +213,13 @@ export async function UserProfileView({
 function CreatedList({
   items,
   isOwnProfile,
+  emptyDesc,
+  createLabel,
 }: {
   items: Prediction[]
   isOwnProfile: boolean
+  emptyDesc: string
+  createLabel: string
 }) {
   if (items.length === 0) {
     return (
@@ -202,10 +227,10 @@ function CreatedList({
         variant="dashed"
         icon={<Sparkles className="w-7 h-7 text-purple-400" />}
         iconBgClass="bg-purple-900/20"
-        description={isOwnProfile ? 'No forecasts created yet' : 'No public forecasts found'}
+        description={emptyDesc}
         action={
           isOwnProfile
-            ? { label: 'Create a Forecast', href: '/create', variant: 'purple' }
+            ? { label: createLabel, href: '/create', variant: 'purple' }
             : undefined
         }
       />
@@ -220,12 +245,23 @@ function CreatedList({
   )
 }
 
+type CardLabels = {
+  yes: string
+  no: string
+  staked: string
+  probYesTemplate: string
+}
+
 function CommitmentList({
   items,
   showScores,
+  emptyDesc,
+  labels,
 }: {
   items: CommitmentForList[]
   showScores: boolean
+  emptyDesc: string
+  labels: CardLabels
 }) {
   if (items.length === 0) {
     return (
@@ -233,7 +269,7 @@ function CommitmentList({
         variant="dashed"
         icon={<TrendingUp className="w-7 h-7 text-blue-400" />}
         iconBgClass="bg-cobalt/10"
-        description="No participations found"
+        description={emptyDesc}
       />
     )
   }
@@ -244,6 +280,7 @@ function CommitmentList({
           key={commitment.id}
           commitment={commitment}
           showScores={showScores}
+          labels={labels}
         />
       ))}
     </div>
@@ -253,18 +290,20 @@ function CommitmentList({
 function CommitmentCard({
   commitment,
   showScores,
+  labels,
 }: {
   commitment: CommitmentForList
   showScores: boolean
+  labels: CardLabels
 }) {
   const probLabel =
     commitment.probability != null
-      ? `${Math.round(commitment.probability * 100)}% YES`
+      ? labels.probYesTemplate.replace('{pct}', String(Math.round(commitment.probability * 100)))
       : commitment.binaryChoice != null
         ? commitment.binaryChoice
-          ? 'YES'
-          : 'NO'
-        : 'Staked'
+          ? labels.yes
+          : labels.no
+        : labels.staked
 
   const isCorrect = (commitment.rsChange ?? 0) > 0
 
