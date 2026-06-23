@@ -18,7 +18,7 @@ vi.mock('next-intl/server', async () => {
     return msg
   }
   t.raw = (key: string) => dict[key] ?? key
-  return { getTranslations: () => Promise.resolve(t) }
+  return { getTranslations: () => Promise.resolve(t), getLocale: () => Promise.resolve('en') }
 })
 
 // Mock next/image

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useLocale, useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
+import { dateFnsLocale } from '@/lib/utils/date-fns-locale'
 import { ThumbsUp, Lightbulb, ThumbsDown, Reply, Trash2, Edit2, MessageSquare, Loader2, Languages, Info } from 'lucide-react'
 import CommentForm from './CommentForm'
 import type { Comment } from './CommentThread'
@@ -200,7 +201,7 @@ export default function CommentItem({
             </div>
             <span className="text-gray-500">·</span>
             <span className="text-gray-500">
-              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: dateFnsLocale(locale) })}
             </span>
             {comment.updatedAt !== comment.createdAt && (
               <span className="text-gray-400 text-xs">{tc('edited')}</span>
