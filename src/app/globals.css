@@ -38,7 +38,10 @@ html {
 body {
   background-color: var(--color-navy-900);
   color: var(--color-white);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
