@@ -9,7 +9,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { PredictionFormData } from '../ForecastWizard'
 
 type Props = {
@@ -19,10 +19,11 @@ type Props = {
 
 export const StepPublish = ({ formData, updateFormData }: Props) => {
   const t = useTranslations('wizard')
+  const locale = useLocale()
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return t('notSet')
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return new Date(dateStr).toLocaleDateString(locale, {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

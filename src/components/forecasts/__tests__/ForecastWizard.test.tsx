@@ -31,7 +31,7 @@ vi.mock('next-intl', async () => {
     t.rich = (key: string) => dict[key] ?? key
     return t
   }
-  return { useTranslations: (ns: string) => translator(ns) }
+  return { useTranslations: (ns: string) => translator(ns), useLocale: () => 'en' }
 })
 
 /** Render the wizard with step 4 active and controllable formData via sessionStorage. */

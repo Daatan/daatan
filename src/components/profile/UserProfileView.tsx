@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import Image from 'next/image'
 import { TrendingUp, Award, Settings, Globe, Twitter, Sparkles, Activity } from 'lucide-react'
 import { ShareProfileButton } from '@/components/profile/ShareProfileButton'
@@ -46,6 +46,7 @@ export async function UserProfileView({
   tabData,
 }: UserProfileViewProps) {
   const t = await getTranslations('profile')
+  const locale = await getLocale()
   const tagName = selectedTag ? (userTags.find(tg => tg.slug === selectedTag)?.name ?? selectedTag) : null
   const cardLabels: CardLabels = {
     yes: t('cardYes'),
@@ -134,7 +135,7 @@ export async function UserProfileView({
                   {t('joined')}
                 </span>
                 <span className="text-sm font-bold text-text-secondary">
-                  {new Date(user.createdAt).toLocaleDateString('en-US', {
+                  {new Date(user.createdAt).toLocaleDateString(locale, {
                     month: 'long',
                     year: 'numeric',
                   })}
