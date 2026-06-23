@@ -93,6 +93,7 @@
     "myEstimate": "Мой прогноз: {outcome}, с уверенностью {confidence}%",
     "commitCU": "Поставить CU",
     "resolveBy": "Решение до",
+    "creationDate": "Дата создания",
     "deadline": "Дата решения",
     "locked": "Заблокировано",
     "source": "Источник",

@@ -36,6 +36,23 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
+            {t('creationDate')}
+          </div>
+          <div className="text-white font-semibold truncate" suppressHydrationWarning>
+            {isMounted && new Date(prediction.createdAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+          </div>
+        </div>
+
+        <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+            <Calendar className="w-3.5 h-3.5" />
             {t('deadline')}
           </div>
           <div className="text-white font-semibold truncate" suppressHydrationWarning>

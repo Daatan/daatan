@@ -10,6 +10,7 @@ export type Prediction = {
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE' | 'NUMERIC_THRESHOLD'
   outcomePayload?: Record<string, unknown>
   status: string
+  createdAt: string
   lockedAt?: string | null
   resolveByDatetime: string
   contextUpdatedAt?: string

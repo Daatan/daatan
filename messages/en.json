@@ -93,6 +93,7 @@
     "myEstimate": "My estimate: {outcome}, at {confidence}% confidence",
     "commitCU": "Commit Forecast",
     "resolveBy": "Resolve by",
+    "creationDate": "Creation date",
     "deadline": "Resolution date",
     "locked": "Locked",
     "source": "Source",

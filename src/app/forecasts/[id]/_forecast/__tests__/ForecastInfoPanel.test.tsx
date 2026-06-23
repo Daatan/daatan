@@ -12,6 +12,7 @@ const basePrediction = {
   claimText: 'Test claim',
   outcomeType: 'BINARY',
   status: 'ACTIVE',
+  createdAt: '2026-03-01T08:00:00.000Z',
   resolveByDatetime: '2026-04-16T23:59:59.000Z',
   author: { id: 'u1', name: 'User', username: 'user', image: null, rs: 100, role: 'USER' },
 } as unknown as Prediction
@@ -22,6 +23,14 @@ const wrap = (prediction: Prediction) =>
       <ForecastInfoPanel prediction={prediction} isMounted />
     </NextIntlClientProvider>,
   )
+
+describe('ForecastInfoPanel — Creation date box', () => {
+  it('renders the "Creation date" card above the resolution date', () => {
+    wrap(basePrediction)
+    expect(screen.getByText('Creation date')).toBeInTheDocument()
+    expect(screen.getByText('Resolution date')).toBeInTheDocument()
+  })
+})
 
 describe('ForecastInfoPanel — Tags box', () => {
   it('renders "None" when the forecast has an empty tags array', () => {
