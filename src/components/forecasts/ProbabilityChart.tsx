@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -59,6 +60,17 @@ const fmtDateTime = (ts: number) =>
     hour: '2-digit',
     minute: '2-digit',
   })
+// On a tight (last-day) window the date alone repeats on every tick, so show the hour instead.
+const fmtHour = (ts: number) =>
+  new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric' })
+
+const DAY_MS = 86_400_000
+type RangeKey = '24h' | '7d' | 'all'
+const RANGES: { key: RangeKey; label: string; span: number }[] = [
+  { key: '24h', label: '24h', span: DAY_MS },
+  { key: '7d', label: '7d', span: 7 * DAY_MS },
+  { key: 'all', label: 'All', span: Infinity },
+]
 
 export { communityProbability }
 
@@ -69,6 +81,11 @@ export default function ProbabilityChart({
   options,
   marketSnapshots = [],
 }: Props) {
+  // `picked` is the user's explicit range choice; null → use the data-driven default.
+  // `brush` tracks manual brush dragging, so presets and fine control coexist.
+  const [picked, setPicked] = useState<RangeKey | null>(null)
+  const [brush, setBrush] = useState<{ s: number; e: number } | null>(null)
+
   if (outcomeType === 'NUMERIC_THRESHOLD') return null
 
   // The market YES price is a binary probability, so we only plot it on binary
@@ -144,11 +161,47 @@ export default function ProbabilityChart({
   const showAiDots = aiPointCount <= 5
   const showMarketDots = sortedMarket.length <= 5
 
+  // Range presets drive the brush window (which zooms the chart). Default to the
+  // tightest preset that still shows ≥2 points, so the chart opens on recent
+  // activity without going blank; the brush stays underneath for fine control.
+  const showPresets = data.length > 2
+  const maxTs = data.length ? (data[data.length - 1].ts as number) : 0
+  const minTs = data.length ? (data[0].ts as number) : 0
+  const pointsWithin = (span: number) => data.filter(d => (d.ts as number) >= maxTs - span).length
+  const defaultRange: RangeKey =
+    maxTs - minTs <= DAY_MS ? 'all'
+    : pointsWithin(DAY_MS) >= 2 ? '24h'
+    : pointsWithin(7 * DAY_MS) >= 2 ? '7d'
+    : 'all'
+  const range = picked ?? defaultRange
+  const rangeSpan = RANGES.find(r => r.key === range)!.span
+  const presetStart =
+    range === 'all' ? 0 : Math.max(0, data.findIndex(d => (d.ts as number) >= maxTs - rangeSpan))
+  const brushStart = brush ? brush.s : presetStart
+  const brushEnd = brush ? brush.e : data.length - 1
+
   return (
     <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
-      <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
-        Probability over time
-      </h3>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+          Probability over time
+        </h3>
+        {showPresets && (
+          <div className="flex items-center gap-1">
+            {RANGES.map(r => (
+              <button
+                key={r.key}
+                onClick={() => { setPicked(r.key); setBrush(null) }}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors ${
+                  range === r.key ? 'bg-navy-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" />
@@ -157,7 +210,7 @@ export default function ProbabilityChart({
             type="number"
             scale="time"
             domain={['dataMin', 'dataMax']}
-            tickFormatter={fmtDate}
+            tickFormatter={range === '24h' ? fmtHour : fmtDate}
             tick={{ fill: '#718096', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
@@ -233,13 +286,18 @@ export default function ProbabilityChart({
             />
           )}
 
-          {data.length > 2 && (
+          {showPresets && (
             <Brush
               dataKey="ts"
               height={20}
               stroke="#4A5568"
               fill="#1A202C"
               travellerWidth={8}
+              startIndex={brushStart}
+              endIndex={brushEnd}
+              onChange={(r: { startIndex?: number; endIndex?: number }) => {
+                if (r.startIndex != null && r.endIndex != null) setBrush({ s: r.startIndex, e: r.endIndex })
+              }}
               tickFormatter={(ts: number) => fmtDate(ts)}
             />
           )}
