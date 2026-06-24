@@ -33,7 +33,7 @@ describe('ContributingSources', () => {
     expect(container.querySelector('[data-testid="contributing-sources"]')).toBeNull()
   })
 
-  it('splits sources into YES / NO / neutral columns with counts', () => {
+  it('splits sources into will / won\'t / neutral columns with counts', () => {
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -44,14 +44,14 @@ describe('ContributingSources', () => {
       />,
     )
     expect(screen.getByText(enMessages.sources.title)).toBeInTheDocument()
-    expect(screen.getByText(/^YES \(1\)$/)).toBeInTheDocument()
-    expect(screen.getByText(/^NO \(1\)$/)).toBeInTheDocument()
-    expect(screen.getByText(/^Neutral \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Won't happen \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Neutral \/ unclear \(1\)$/)).toBeInTheDocument()
   })
 
   it('shows a press-lean summary from the stances', () => {
     // Two YES (certainty 0.5 → P(YES) 0.75 each) and one NO (0.75 → 0.125):
-    // mean ≈ 0.54 → leans YES.
+    // mean ≈ 0.54 → leans toward "will happen".
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -61,7 +61,7 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    expect(screen.getByText(/Press leans YES · \d+%/)).toBeInTheDocument()
+    expect(screen.getByText(/Press leans toward 'will happen' · \d+%/)).toBeInTheDocument()
   })
 
   it('uses the byline as the voter name, with side + confidence', () => {
@@ -69,7 +69,7 @@ describe('ContributingSources', () => {
       <ContributingSources sources={[src({ author: 'Jane Doe', certainty: 0.72, stance: 0.5 })]} />,
     )
     expect(screen.getByText('Jane Doe')).toBeInTheDocument()
-    expect(screen.getByText('YES 72%')).toBeInTheDocument()
+    expect(screen.getByText('will 72%')).toBeInTheDocument()
   })
 
   it('falls back to the outlet name when there is no byline', () => {
@@ -88,6 +88,6 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    expect(screen.getByText(/^YES \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
   })
 })

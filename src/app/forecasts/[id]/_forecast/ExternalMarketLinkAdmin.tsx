@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
-import { TrendingUp, Loader2, ExternalLink, X } from 'lucide-react'
+import { TrendingUp, Loader2, ExternalLink, X, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Prediction } from './types'
 
 type Suggestion = {
@@ -32,6 +32,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 export function ExternalMarketLinkAdmin({ prediction }: Props) {
   const { data: session } = useSession()
   const router = useRouter()
+  const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
@@ -40,6 +41,26 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
 
   const market = prediction.externalMarket
   const endpoint = `/api/admin/forecasts/${prediction.id}/external-market`
+
+  // Collapsed by default — keeps the admin tool out of the way so the resolver
+  // view stays clean. A quiet one-line affordance expands the full control.
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mb-8 inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-pink-400 transition-colors"
+      >
+        <TrendingUp className="w-3.5 h-3.5" />
+        <span>
+          {market
+            ? `${PROVIDER_LABEL[market.provider] ?? market.provider} market linked`
+            : 'Link external market'}
+        </span>
+        <span className="text-gray-600">· admin</span>
+        <ChevronRight className="w-3.5 h-3.5" />
+      </button>
+    )
+  }
 
   async function link(targetUrl: string) {
     if (!targetUrl.trim()) return
@@ -94,8 +115,17 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
 
   return (
     <div className="mb-8 p-4 border border-pink-500/30 rounded-xl bg-navy-700">
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-pink-400 mb-3">
-        <TrendingUp className="w-3.5 h-3.5" /> External market link (admin)
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-pink-400">
+          <TrendingUp className="w-3.5 h-3.5" /> External market link (admin)
+        </div>
+        <button
+          onClick={() => setOpen(false)}
+          aria-label="Collapse"
+          className="text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
       </div>
 
       {market ? (
