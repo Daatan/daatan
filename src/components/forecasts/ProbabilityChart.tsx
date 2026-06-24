@@ -136,6 +136,13 @@ export default function ProbabilityChart({
   // snapshot — would read as an empty chart. Render point markers while the series
   // is sparse so each value is legible; drop them once the trend is dense.
   const showDots = data.length <= 5
+  // The AI and market series carry their last value forward as a step function, so a
+  // single Oracle estimate (or market snapshot) dated AFTER all commitments yields one
+  // non-null point at the right edge — with no segment to draw and dots off (because the
+  // commitments made `data` dense), it's invisible. Decide dots per series by how many
+  // real points each has, so a lone estimate always shows as a marker.
+  const showAiDots = aiPointCount <= 5
+  const showMarketDots = sortedMarket.length <= 5
 
   return (
     <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
@@ -209,7 +216,7 @@ export default function ProbabilityChart({
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
-              dot={showDots}
+              dot={showAiDots}
               connectNulls
             />
           )}
@@ -221,7 +228,7 @@ export default function ProbabilityChart({
               name="Market (Polymarket)"
               stroke="#EC4899"
               strokeWidth={2}
-              dot={showDots}
+              dot={showMarketDots}
               connectNulls
             />
           )}
