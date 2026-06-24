@@ -309,19 +309,33 @@ jobs:
 
       - name: Notify Telegram - Staging Deployment Success
         if: success()
+        env:
+          MSG: |-
+            ✅ [staging] Deployment successful
+
+            v${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
+
+            <a href="${{ steps.pr_info.outputs.url }}">View changes →</a>
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="✅ [staging] Deployment successful%0A%0Av${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}%0A%0A<a href=\"${{ steps.pr_info.outputs.url }}\">View changes →</a>" \
+            --data-urlencode "text=$MSG" \
             -d parse_mode="HTML" \
             -d disable_web_page_preview="true"
 
       - name: Notify Telegram - Staging Deployment Failure
         if: failure()
+        env:
+          MSG: |-
+            ❌ [staging] Deployment failed
+
+            v${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
+
+            <a href="${{ steps.pr_info.outputs.url }}">View changes →</a> · <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View logs →</a>
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="❌ [staging] Deployment failed%0A%0Av${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}%0A%0A<a href=\"${{ steps.pr_info.outputs.url }}\">View changes →</a> · <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View logs →</a>" \
+            --data-urlencode "text=$MSG" \
             -d parse_mode="HTML" \
             -d disable_web_page_preview="true"
 
@@ -522,22 +536,36 @@ jobs:
 
       - name: Notify Telegram - Production Deployment Success
         if: success()
+        env:
+          MSG: |-
+            ✅ [prod] Deployment successful
+
+            v${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}
+
+            <a href="${{ steps.pr_info.outputs.url }}">View changes →</a>
         run: |
           CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
           CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="$CHAT_ID" \
-            -d text="✅ [prod] Deployment successful%0A%0Av${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}%0A%0A<a href=\"${{ steps.pr_info.outputs.url }}\">View changes →</a>" \
+            --data-urlencode "text=$MSG" \
             -d parse_mode="HTML" \
             -d disable_web_page_preview="true"
 
       - name: Notify Telegram - Production Deployment Failure
         if: failure()
+        env:
+          MSG: |-
+            ❌ [prod] Deployment failed
+
+            v${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}
+
+            <a href="${{ steps.pr_info.outputs.url }}">View changes →</a> · <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View logs →</a>
         run: |
           CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
           CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="$CHAT_ID" \
-            -d text="❌ [prod] Deployment failed%0A%0Av${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}%0A%0A<a href=\"${{ steps.pr_info.outputs.url }}\">View changes →</a> · <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View logs →</a>" \
+            --data-urlencode "text=$MSG" \
             -d parse_mode="HTML" \
             -d disable_web_page_preview="true"
