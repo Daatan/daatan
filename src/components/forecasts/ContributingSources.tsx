@@ -1,9 +1,10 @@
 'use client'
 
-import { Newspaper, ExternalLink } from 'lucide-react'
+import { Newspaper, ExternalLink, ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { canonicalKey } from '@/lib/utils/canonical-url'
+import { Avatar } from '@/components/Avatar'
 
 type Side = 'yes' | 'no' | 'neutral'
 
@@ -15,6 +16,19 @@ function getSide(stance: number | null): Side {
   return 'neutral'
 }
 
+/** An outlet's aggregate side, from the mean implied P(will) of its articles. */
+function sideFromMean(m: number): Side {
+  if (m > 0.52) return 'yes'
+  if (m < 0.48) return 'no'
+  return 'neutral'
+}
+
+const dotColor: Record<Side, string> = {
+  yes: 'bg-emerald-500',
+  no: 'bg-rose-500',
+  neutral: 'bg-gray-500',
+}
+
 /** Outlet label — its `source`, else the URL host (sans www), else the title. */
 function outletLabel(s: ContributingSource): string {
   if (s.source) return s.source
@@ -22,6 +36,15 @@ function outletLabel(s: ContributingSource): string {
     return new URL(s.url).hostname.replace(/^www\./, '')
   } catch {
     return s.title || s.url
+  }
+}
+
+/** Registrable host (sans www), the grouping key for an outlet. */
+function outletDomain(s: ContributingSource): string {
+  try {
+    return new URL(s.url).hostname.replace(/^www\./, '').toLowerCase()
+  } catch {
+    return (s.source ?? '').toLowerCase() || 'unknown'
   }
 }
 
@@ -41,13 +64,21 @@ function articleProbYes(s: ContributingSource): number {
   return side === 'yes' ? 0.5 + mag : 0.5 - mag
 }
 
+type OutletGroup = {
+  domain: string
+  name: string
+  articles: ContributingSource[]
+  meanYes: number
+  side: Side
+}
+
 /**
- * The publications that fed the Oracle's estimate, presented as "voters" — the
- * same "will happen / won't happen" language readers use when they vote. A
- * tug-of-war lean bar summarises where the press sits; below it, one compact
- * card per matched article splits into the two columns by the stance it took
- * (article title, outlet and date live in the hover hint). Sits in its own
- * section below the human forecasters and never affects the community number.
+ * The publications that fed the Oracle's estimate, grouped by outlet and shown as
+ * "voters" in the same "will happen / won't happen" language readers use to vote.
+ * A tug-of-war lean bar summarises where the press sits; below it, outlets split
+ * into will / won't / neutral columns by their aggregate stance. An outlet with
+ * several articles is an expandable card listing each; a single-article outlet is
+ * a plain link. Sits below the human forecasters and never affects the community number.
  */
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
   const t = useTranslations('sources')
@@ -64,16 +95,38 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
 
   if (unique.length === 0) return null
 
-  const groups: Record<Side, ContributingSource[]> = { yes: [], no: [], neutral: [] }
-  for (const s of unique) groups[getSide(s.stance)].push(s)
-
-  const meanYes = unique.reduce((sum, s) => sum + articleProbYes(s), 0) / unique.length
-  const leanPct = Math.round(meanYes * 100)
+  // Press lean is article-granular (it's about the coverage), independent of grouping.
+  const pressMeanYes = unique.reduce((sum, s) => sum + articleProbYes(s), 0) / unique.length
+  const leanPct = Math.round(pressMeanYes * 100)
   const summary =
     leanPct > 50 ? t('pressLeanYes', { pct: leanPct })
     : leanPct < 50 ? t('pressLeanNo', { pct: 100 - leanPct })
     : t('pressSplit')
   const countText = unique.length === 1 ? t('count', { count: 1 }) : t('countPlural', { count: unique.length })
+
+  // Group articles by outlet, derive each outlet's aggregate side, bucket into columns.
+  const byDomain = new Map<string, ContributingSource[]>()
+  for (const s of unique) {
+    const d = outletDomain(s)
+    const arr = byDomain.get(d) ?? []
+    arr.push(s)
+    byDomain.set(d, arr)
+  }
+  const outletGroups: OutletGroup[] = [...byDomain.entries()].map(([domain, articles]) => {
+    const meanYes = articles.reduce((sum, a) => sum + articleProbYes(a), 0) / articles.length
+    return {
+      domain,
+      name: articles.find(a => a.source)?.source || domain,
+      articles: [...articles].sort((a, b) => (b.certainty ?? 0) - (a.certainty ?? 0)),
+      meanYes,
+      side: sideFromMean(meanYes),
+    }
+  })
+  const byCol: Record<Side, OutletGroup[]> = { yes: [], no: [], neutral: [] }
+  for (const g of outletGroups) byCol[g.side].push(g)
+  for (const side of ['yes', 'no', 'neutral'] as Side[]) {
+    byCol[side].sort((a, b) => b.articles.length - a.articles.length || b.meanYes - a.meanYes)
+  }
 
   const sideMeta: Record<Side, { label: string; short: string; head: string; badge: string }> = {
     yes: { label: t('voteYes'), short: t('shortYes'), head: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
@@ -88,40 +141,83 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     return null
   }
 
-  // Compact one-row card. The headline, outlet and date move into a native hover
-  // hint so the grid stays scannable — the side + certainty badge carries the signal.
-  const VoterCard = ({ s, side }: { s: ContributingSource; side: Side }) => {
-    const name = s.author || outletLabel(s)
-    const subtitle = [s.author ? outletLabel(s) : null, fmtDate(s.publishedAt), originText(s.origin)]
-      .filter(Boolean)
-      .join(' · ')
-    const hint = [s.title, subtitle].filter(Boolean).join('\n')
-    const meta = sideMeta[side]
+  const Badge = ({ side, pct }: { side: Side; pct: number | null }) => (
+    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${sideMeta[side].badge}`}>
+      {sideMeta[side].short}{side !== 'neutral' && pct != null ? ` ${pct}%` : ''}
+    </span>
+  )
+
+  // One article inside an expanded outlet card: stance dot, headline, per-article badge.
+  const ArticleRow = ({ s }: { s: ContributingSource }) => {
+    const side = getSide(s.stance)
+    const title = s.title || outletLabel(s)
+    const hint = [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')
     return (
       <a
         href={s.url}
         target="_blank"
         rel="noopener noreferrer"
         title={hint || undefined}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-navy-600 bg-navy-700 hover:bg-navy-600 transition-colors group"
+        className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-navy-600 group/row"
       >
-        <Newspaper className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-        <span className="font-medium text-white truncate flex-1 min-w-0">{name}</span>
-        <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${meta.badge}`}>
-          {meta.short}{s.certainty != null ? ` ${Math.round(s.certainty * 100)}%` : ''}
-        </span>
-        <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover:text-gray-300" />
+        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dotColor[side]}`} />
+        <span className="text-xs text-gray-300 flex-1 min-w-0 line-clamp-2 group-hover/row:text-gray-200">{title}</span>
+        <Badge side={side} pct={s.certainty != null ? Math.round(s.certainty * 100) : null} />
+        <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 mt-0.5" />
       </a>
+    )
+  }
+
+  const OutletCard = ({ g }: { g: OutletGroup }) => {
+    const aggPct = g.side === 'yes' ? Math.round(g.meanYes * 100) : g.side === 'no' ? Math.round((1 - g.meanYes) * 100) : null
+
+    // Single-article outlet → a plain link showing the headline inline (no expand).
+    if (g.articles.length === 1) {
+      const s = g.articles[0]
+      const hint = [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')
+      return (
+        <a
+          href={s.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={hint || undefined}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-navy-600 bg-navy-700 hover:bg-navy-600 transition-colors group/card"
+        >
+          <Avatar src={null} name={g.name} size={20} className="shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium text-white truncate">{g.name}</span>
+            {s.title && <span className="block text-xs text-gray-400 truncate group-hover/card:text-gray-300">{s.title}</span>}
+          </span>
+          <Badge side={g.side} pct={aggPct} />
+          <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover/card:text-gray-300" />
+        </a>
+      )
+    }
+
+    // Multi-article outlet → expandable card; native <details>, no React re-render.
+    return (
+      <details className="group/card rounded-lg border border-navy-600 bg-navy-700 overflow-hidden">
+        <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none list-none hover:bg-navy-600 [&::-webkit-details-marker]:hidden">
+          <Avatar src={null} name={g.name} size={20} className="shrink-0" />
+          <span className="font-medium text-white truncate flex-1 min-w-0">{g.name}</span>
+          <span className="shrink-0 text-[10px] text-gray-500">{g.articles.length}</span>
+          <Badge side={g.side} pct={aggPct} />
+          <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open/card:rotate-180" />
+        </summary>
+        <div className="px-2 pb-2 pt-0.5 space-y-0.5 border-t border-navy-600">
+          {g.articles.map((s) => <ArticleRow key={s.url} s={s} />)}
+        </div>
+      </details>
     )
   }
 
   const Column = ({ side }: { side: Side }) => (
     <div>
       <p className={`text-[11px] font-bold uppercase tracking-wide mb-2 ${sideMeta[side].head}`}>
-        {sideMeta[side].label} ({groups[side].length})
+        {sideMeta[side].label} ({byCol[side].length})
       </p>
       <div className="space-y-1.5">
-        {groups[side].map((s) => <VoterCard key={s.url} s={s} side={side} />)}
+        {byCol[side].map((g) => <OutletCard key={g.domain} g={g} />)}
       </div>
     </div>
   )
@@ -147,22 +243,15 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           <div className="absolute inset-y-0 left-0 bg-emerald-500/70" style={{ width: `${leanPct}%` }} />
           <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/50" />
         </div>
-        <div className="flex items-center gap-2 text-[11px] mt-1.5">
-          <span className="text-emerald-400 font-medium">{groups.yes.length} {sideMeta.yes.short}</span>
-          <span className="text-gray-600">·</span>
-          <span className="text-gray-400">{groups.neutral.length} {sideMeta.neutral.short}</span>
-          <span className="text-gray-600">·</span>
-          <span className="text-rose-400 font-medium">{groups.no.length} {sideMeta.no.short}</span>
-        </div>
         <span className="sr-only">{summary}</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {groups.yes.length > 0 && <Column side="yes" />}
-        {groups.no.length > 0 && <Column side="no" />}
+        {byCol.yes.length > 0 && <Column side="yes" />}
+        {byCol.no.length > 0 && <Column side="no" />}
       </div>
 
-      {groups.neutral.length > 0 && (
+      {byCol.neutral.length > 0 && (
         <div className="mt-4 opacity-80">
           <Column side="neutral" />
         </div>

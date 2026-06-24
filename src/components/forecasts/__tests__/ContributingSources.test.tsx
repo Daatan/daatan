@@ -64,19 +64,40 @@ describe('ContributingSources', () => {
     expect(screen.getByText(/Press leans toward 'will happen' · \d+%/)).toBeInTheDocument()
   })
 
-  it('uses the byline as the voter name, with side + confidence', () => {
+  it('shows the outlet name, its headline, and an aggregate side badge', () => {
+    // Single-article outlet → a plain link card. stance 0.5, certainty 0.72 →
+    // implied P(will) 0.86 → aggregate badge "will 86%".
     renderWithIntl(
-      <ContributingSources sources={[src({ author: 'Jane Doe', certainty: 0.72, stance: 0.5 })]} />,
+      <ContributingSources
+        sources={[src({ source: 'Reuters', title: 'Big scoop', certainty: 0.72, stance: 0.5 })]} />,
     )
-    expect(screen.getByText('Jane Doe')).toBeInTheDocument()
-    expect(screen.getByText('will 72%')).toBeInTheDocument()
+    expect(screen.getByText('Reuters')).toBeInTheDocument()
+    expect(screen.getByText('Big scoop')).toBeInTheDocument()
+    expect(screen.getByText('will 86%')).toBeInTheDocument()
   })
 
-  it('falls back to the outlet name when there is no byline', () => {
+  it('falls back to the outlet host when there is no source name', () => {
     renderWithIntl(
-      <ContributingSources sources={[src({ author: null, source: 'Al Jazeera', stance: 0.5 })]} />,
+      <ContributingSources sources={[src({ source: null, url: 'https://www.aljazeera.com/x', stance: 0.5 })]} />,
     )
-    expect(screen.getByText('Al Jazeera')).toBeInTheDocument()
+    expect(screen.getByText('aljazeera.com')).toBeInTheDocument()
+  })
+
+  it('groups multiple articles from one outlet into a single expandable card', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://thehill.com/a', source: 'The Hill', title: 'First piece', stance: 0.5 }),
+          src({ url: 'https://thehill.com/b', source: 'The Hill', title: 'Second piece', stance: 0.4 }),
+        ]}
+      />,
+    )
+    // Both articles lean YES → one outlet in the WILL column, not two cards.
+    expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText('The Hill')).toBeInTheDocument()
+    // <details> renders its children in the DOM even while collapsed.
+    expect(screen.getByText('First piece')).toBeInTheDocument()
+    expect(screen.getByText('Second piece')).toBeInTheDocument()
   })
 
   it('dedupes repeated article URLs', () => {
