@@ -67,6 +67,12 @@ LIMIT $limit
 
 `<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing the constant in `forecast.ts:237`.
 
+> **Known limitation / planned redesign:** this matches on `claimText` alone, so the
+> deadline is embedded as text while the structured `resolveByDatetime` is unused —
+> two "within 90 days" forecasts created months apart embed identically. See
+> [`SIMILAR_FORECASTS.md`](./SIMILAR_FORECASTS.md) for the proposed deadline-aware,
+> two-stage scoring redesign.
+
 ## Backfill
 
 Two backfill paths exist:
