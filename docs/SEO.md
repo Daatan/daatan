@@ -42,6 +42,13 @@ Private forecasts (where `isPublic = false`) get only the Article + BreadcrumbLi
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 
+## Slugs & canonical URLs
+
+Slugs are English (forecasts authored in another language are canonicalized to English at
+creation — see [TRANSLATIONS.md](./TRANSLATIONS.md)). Reaching a forecast by raw id, or by a
+**retired slug** (kept in `prediction_slug_aliases` after a re-slug), 308-redirects to the
+current canonical `/forecasts/[slug]`, so old links and their SEO are preserved.
+
 ## IndexNow
 
 IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL changes, rather than waiting for their crawlers.

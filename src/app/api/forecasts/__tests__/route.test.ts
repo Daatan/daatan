@@ -1,9 +1,16 @@
 import { vi } from 'vitest'
 
-const { mockAuth, mockCheckContent, mockTranslate } = vi.hoisted(() => ({
+const { mockAuth, mockCheckContent, mockTranslate, mockNormalize } = vi.hoisted(() => ({
     mockAuth: vi.fn(),
     mockCheckContent: vi.fn().mockResolvedValue({ isOffensive: false, reason: '' }),
     mockTranslate: vi.fn().mockResolvedValue(undefined),
+    // Mirror the real fast-path: pure-English input is returned unchanged.
+    mockNormalize: vi.fn(async (f: { claimText: string; detailsText?: string | null; resolutionRules?: string | null }) => ({
+        language: 'en',
+        isEnglish: true,
+        english: { claimText: f.claimText, detailsText: f.detailsText ?? null, resolutionRules: f.resolutionRules ?? null },
+        original: { claimText: f.claimText, detailsText: f.detailsText ?? null, resolutionRules: f.resolutionRules ?? null },
+    })),
 }))
 
 vi.mock('@/auth', () => ({
@@ -16,6 +23,9 @@ vi.mock('@/lib/services/moderation', () => ({
 
 vi.mock('@/lib/services/translation', () => ({
     translatePredictionToAllLocales: mockTranslate,
+    normalizeForecastToEnglish: mockNormalize,
+    sourceHash: (s: string) => `hash-${s.length}`,
+    TRANSLATABLE_FIELDS: ['claimText', 'detailsText', 'resolutionRules'],
 }))
 
 import { describe, it, expect, beforeEach } from 'vitest'
