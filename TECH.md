@@ -114,8 +114,8 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
 | `daatan-app` | `daatan-app:<tag>` (prod host) | 3000 (internal) | Production Next.js app |
 | `daatan-app-staging` | `daatan-app:staging-*` (staging host) | 3000 (internal) | Staging Next.js app (active colour) |
 | `daatan-app-next` | `daatan-app:staging-*` (staging host) | 3000 (internal) | Staging blue/green candidate during deploys |
-| `daatan-postgres` | `postgres:16-alpine` (prod host) | 5432 (internal) | Production PostgreSQL (DB: `daatan`) |
-| `daatan-postgres-staging` | `postgres:16-alpine` (staging host) | 5432 (internal) | Staging PostgreSQL (DB: `daatan_staging`) |
+| `daatan-postgres` | `pgvector/pgvector:pg16` (prod host) | 5432 (internal) | Production PostgreSQL (DB: `daatan`) |
+| `daatan-postgres-staging` | `pgvector/pgvector:pg16` (staging host) | 5432 (internal) | Staging PostgreSQL (DB: `daatan_staging`) |
 | `daatan-certbot` | `certbot/certbot` | - | SSL certificate renewal |
 
 ### Volumes
@@ -171,7 +171,6 @@ src/
 │   │   ├── commitments/        # User commitment listing
 │   │   ├── forecasts/          # Forecast CRUD (new system)
 │   │   ├── health/             # Health check endpoint
-│   │   ├── legacy-forecasts/   # Legacy forecast system (deprecated)
 │   │   ├── news-anchors/       # News anchor management
 │   │   ├── notifications/      # Notification endpoints
 │   │   ├── profile/            # User profile update
@@ -222,7 +221,7 @@ src/
 │   ├── services/               # Business logic services
 │   ├── utils/                  # Utility functions
 │   ├── validations/            # Zod schemas
-│   ├── auth.ts                 # NextAuth configuration
+│   │                           # (NextAuth config lives at src/auth.ts, not src/lib/)
 │   ├── prisma.ts               # Prisma client singleton
 │   └── logger.ts               # Pino structured logging
 └── types/                      # TypeScript definitions
@@ -435,7 +434,7 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 
 **Build Stage:**
 - Checkout code
-- Setup Node.js 20
+- Setup Node.js 24
 - Install dependencies (`npm ci`)
 - Build application
 - Run unit tests
@@ -587,7 +586,7 @@ The staging and production databases are **fully independent**. They share no da
 ### NextAuth.js Configuration
 
 ```typescript
-// src/lib/auth.ts
+// src/auth.ts
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -718,7 +717,7 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 ```bash
 # Production
 curl https://daatan.com/api/health
-# Response: {"status":"ok","version":"0.1.19","commit":"abc1234","timestamp":"..."}
+# Response: {"status":"ok","version":"1.18.14","commit":"abc1234","timestamp":"..."}
 
 # Staging
 curl https://staging.daatan.com/api/health
@@ -790,14 +789,14 @@ AWS_PROFILE=daatan
 
 ### Git Hooks (Husky)
 
-**Pre-Commit:**
-- Build verification
-- Run all tests
-- Lint check (warning only)
+**Pre-Commit:** (fast checks only)
+- Version-bump check (`scripts/check-version-bump.sh`)
+- `lint-staged` (lints staged `*.{ts,tsx}` files)
 
 **Pre-Push:**
-- Detect auth-related changes
-- Prompt for manual auth testing
+- Type check (`npm run typecheck`)
+- Targeted tests (`vitest related` on changed `.ts`/`.tsx`, excluding integration tests)
+- Detect auth-related changes (non-blocking warning)
 
 ### Git Workflow
 
