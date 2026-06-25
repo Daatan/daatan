@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
   Brush,
+  ReferenceArea,
 } from 'recharts'
 // Canonical community-probability lives in @/lib/forecast-math so the feed card
 // and this chart agree. Re-exported below for existing importers.
@@ -74,6 +75,28 @@ const RANGES: { key: RangeKey; label: string; span: number }[] = [
 
 export { communityProbability }
 
+/**
+ * Map a [lo, hi] timestamp window (e.g. a drag selection) onto inclusive brush
+ * indices into a time-ascending `tsList`. Returns null when the window is too
+ * narrow to be a deliberate zoom (fewer than two points) so a stray click is
+ * treated as a no-op rather than collapsing the chart.
+ */
+export function tsWindowToIndices(
+  tsList: number[],
+  lo: number,
+  hi: number,
+): { s: number; e: number } | null {
+  if (lo > hi) [lo, hi] = [hi, lo]
+  let s = tsList.findIndex(t => t >= lo)
+  if (s < 0) s = 0
+  let e = -1
+  for (let i = tsList.length - 1; i >= 0; i--) {
+    if (tsList[i] <= hi) { e = i; break }
+  }
+  if (e < 0) e = tsList.length - 1
+  return e - s >= 1 ? { s, e } : null
+}
+
 export default function ProbabilityChart({
   commitments,
   snapshots,
@@ -85,6 +108,10 @@ export default function ProbabilityChart({
   // `brush` tracks manual brush dragging, so presets and fine control coexist.
   const [picked, setPicked] = useState<RangeKey | null>(null)
   const [brush, setBrush] = useState<{ s: number; e: number } | null>(null)
+  // Drag-to-zoom: the two timestamps under the pointer while a selection is in
+  // progress. Both null when not dragging; they drive the live ReferenceArea.
+  const [dragStart, setDragStart] = useState<number | null>(null)
+  const [dragEnd, setDragEnd] = useState<number | null>(null)
 
   if (outcomeType === 'NUMERIC_THRESHOLD') return null
 
@@ -180,6 +207,25 @@ export default function ProbabilityChart({
   const brushStart = brush ? brush.s : presetStart
   const brushEnd = brush ? brush.e : data.length - 1
 
+  // Drag-to-zoom over the plot. recharts hands each mouse event the x value under
+  // the pointer as `activeLabel` (our `ts`). We track the drag span as a live
+  // ReferenceArea, then on release map it to brush indices so it zooms exactly
+  // like the brush/preset path. Double-click clears back to the default window.
+  const onDragStart = (s: { activeLabel?: number | string } | null) => {
+    if (typeof s?.activeLabel === 'number') { setDragStart(s.activeLabel); setDragEnd(s.activeLabel) }
+  }
+  const onDragMove = (s: { activeLabel?: number | string } | null) => {
+    if (dragStart != null && typeof s?.activeLabel === 'number') setDragEnd(s.activeLabel)
+  }
+  const onDragEnd = () => {
+    if (dragStart != null && dragEnd != null && dragStart !== dragEnd) {
+      const window = tsWindowToIndices(data.map(d => d.ts as number), dragStart, dragEnd)
+      if (window) setBrush(window)
+    }
+    setDragStart(null); setDragEnd(null)
+  }
+  const resetZoom = () => { setBrush(null); setPicked(null); setDragStart(null); setDragEnd(null) }
+
   return (
     <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-4">
@@ -202,8 +248,17 @@ export default function ProbabilityChart({
           </div>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={240} className="select-none">
+        <LineChart
+          data={data}
+          margin={{ top: 5, right: 16, left: 0, bottom: 5 }}
+          onMouseDown={onDragStart}
+          onMouseMove={onDragMove}
+          onMouseUp={onDragEnd}
+          onMouseLeave={() => { setDragStart(null); setDragEnd(null) }}
+          onDoubleClick={resetZoom}
+          style={{ cursor: 'crosshair' }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" />
           <XAxis
             dataKey="ts"
@@ -235,6 +290,16 @@ export default function ProbabilityChart({
             formatter={(value, name) => [typeof value === 'number' ? `${Math.round(value)}%` : value, name as string]}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: '#A0AEC0', paddingTop: '8px' }} />
+
+          {dragStart != null && dragEnd != null && dragStart !== dragEnd && (
+            <ReferenceArea
+              x1={Math.min(dragStart, dragEnd)}
+              x2={Math.max(dragStart, dragEnd)}
+              strokeOpacity={0.3}
+              fill="#63B3ED"
+              fillOpacity={0.15}
+            />
+          )}
 
           {outcomeType === 'BINARY' && (
             <Line
@@ -303,6 +368,16 @@ export default function ProbabilityChart({
           )}
         </LineChart>
       </ResponsiveContainer>
+      {showPresets && (
+        <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-600">
+          <span>Drag across the chart to zoom · double-click to reset</span>
+          {brush && (
+            <button onClick={resetZoom} className="text-gray-500 hover:text-gray-300 font-medium">
+              Reset zoom
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
