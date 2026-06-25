@@ -231,6 +231,11 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
       name: prediction.author.name || prediction.author.username,
       url: `https://daatan.com/profile/${prediction.author.username}`,
     },
+    creator: {
+      '@type': 'Person',
+      name: prediction.author.name || prediction.author.username,
+      url: `https://daatan.com/profile/${prediction.author.username}`,
+    },
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
