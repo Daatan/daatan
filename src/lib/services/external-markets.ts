@@ -11,6 +11,13 @@ const FETCH_TIMEOUT_MS = 8_000
 const MATCH_THRESHOLD = 0.8
 /** How many keyword candidates to embed-and-rank per suggest. */
 const MATCH_CANDIDATES = 8
+/** Deadline-gap tuning. A candidate whose market resolves within GRACE days of
+ *  the forecast deadline gets no penalty; beyond that its similarity score
+ *  decays smoothly (DECAY = the gap, in days past grace, that halves the score).
+ *  Soft by design — it re-ranks rather than dropping candidates. */
+const DEADLINE_GRACE_DAYS = 45
+const DEADLINE_DECAY_DAYS = 365
+const MS_PER_DAY = 86_400_000
 
 /** Words that carry no search signal — articles, prepositions, conjunctions, and
  *  the boilerplate verbs/qualifiers common in forecast claims. */
@@ -102,6 +109,8 @@ export interface MarketSuggestion {
   question: string
   yesProbability: number
   url: string
+  /** Market resolution date, used to penalize deadline-mismatched candidates. */
+  endDate: Date | null
 }
 
 /** Each provider knows its URLs and how to fetch/normalize/suggest markets. */
@@ -258,6 +267,7 @@ export const polymarketProvider: MarketProvider = {
             question: m.question,
             yesProbability: m.yesProbability,
             url: m.url,
+            endDate: m.endDate,
           })
         }
       }
@@ -460,6 +470,7 @@ export async function suggestMarketsForClaim(
   claimText: string,
   entities: string[] = [],
   limit = 5,
+  deadline?: Date | null,
 ): Promise<MarketSuggestion[]> {
   const query = buildMarketSearchQuery(claimText, entities)
   if (!query) return []
@@ -472,7 +483,10 @@ export async function suggestMarketsForClaim(
 
   const vecs = await Promise.all(candidates.map(c => embedText(c.question)))
   return candidates
-    .map((c, i) => ({ c, score: vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : -1 }))
+    .map((c, i) => ({
+      c,
+      score: (vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : -1) * deadlineWeight(c.endDate, deadline),
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(s => s.c)
@@ -484,6 +498,24 @@ export interface MarketMatch extends MarketSuggestion {
   providerLabel: string
   /** Cosine similarity to the claim, 0–100. */
   score: number
+}
+
+/**
+ * Soft multiplicative weight in (0, 1] that penalizes a candidate market whose
+ * resolution date sits far from the forecast's deadline. A near-identical
+ * question resolving a year off (e.g. a 2027 Polymarket market matched to a 2026
+ * forecast) thus ranks below a correctly-dated match instead of auto-linking.
+ * Within GRACE days the weight is 1; beyond it it decays as 1/(1 + over/DECAY).
+ * Returns 1 when either date is unknown — we can't judge, so don't penalize.
+ */
+export function deadlineWeight(
+  endDate: Date | null | undefined,
+  deadline: Date | null | undefined,
+): number {
+  if (!endDate || !deadline) return 1
+  const gapDays = Math.abs(endDate.getTime() - deadline.getTime()) / MS_PER_DAY
+  const over = Math.max(0, gapDays - DEADLINE_GRACE_DAYS)
+  return 1 / (1 + over / DEADLINE_DECAY_DAYS)
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -505,7 +537,10 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * market is cached so the returned `externalMarketId` can be linked directly.
  * Best-effort — returns null on no candidates, no embeddings, or no strong match.
  */
-export async function suggestMarketMatch(claimText: string): Promise<MarketMatch | null> {
+export async function suggestMarketMatch(
+  claimText: string,
+  deadline?: Date | null,
+): Promise<MarketMatch | null> {
   const q = claimText.trim()
   if (q.length < 10) return null
 
@@ -521,7 +556,9 @@ export async function suggestMarketMatch(claimText: string): Promise<MarketMatch
   for (let i = 0; i < candidates.length; i++) {
     const vec = candidateVecs[i]
     if (!vec) continue
-    const score = cosineSimilarity(claimVec, vec)
+    // Deadline-adjusted so a same-question market resolving a year off can't
+    // clear the auto-link threshold (the Knicks 2026↔2027 mislink).
+    const score = cosineSimilarity(claimVec, vec) * deadlineWeight(candidates[i].endDate, deadline)
     if (!best || score > best.score) best = { cand: candidates[i], score }
   }
 
