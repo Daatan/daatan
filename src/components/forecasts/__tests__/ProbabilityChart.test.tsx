@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart, { communityProbability } from '../ProbabilityChart'
+import ProbabilityChart, { communityProbability, tsWindowToIndices } from '../ProbabilityChart'
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -147,5 +147,26 @@ describe('communityProbability (mean of committers\' implied estimates)', () => 
   it('three moderate YES stakes do not pin to 100%', () => {
     // mean of (0.75, 0.75, 0.75) = 0.75 → 75% (was 100% under the share formula)
     expect(communityProbability([{ cuCommitted: 50 }, { cuCommitted: 50 }, { cuCommitted: 50 }])).toBe(75)
+  })
+})
+
+describe('tsWindowToIndices (drag-to-zoom span → brush indices)', () => {
+  const ts = [0, 10, 20, 30, 40] // time-ascending
+
+  it('maps an inner window to the enclosing inclusive indices', () => {
+    expect(tsWindowToIndices(ts, 12, 33)).toEqual({ s: 2, e: 3 })
+  })
+
+  it('normalizes a right-to-left drag', () => {
+    expect(tsWindowToIndices(ts, 33, 12)).toEqual({ s: 2, e: 3 })
+  })
+
+  it('clamps a window wider than the data to the full range', () => {
+    expect(tsWindowToIndices(ts, -5, 999)).toEqual({ s: 0, e: 4 })
+  })
+
+  it('returns null for a window too narrow to span two points (a stray click)', () => {
+    expect(tsWindowToIndices(ts, 11, 12)).toBeNull()
+    expect(tsWindowToIndices(ts, 20, 20)).toBeNull()
   })
 })
