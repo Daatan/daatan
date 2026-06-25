@@ -27,6 +27,7 @@ import {
   suggestMarketsForClaim,
   suggestMarketMatch,
   buildMarketSearchQuery,
+  deadlineWeight,
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
 import { embedText } from '@/lib/services/embedding'
@@ -365,6 +366,23 @@ describe('suggestMarketsForClaim', () => {
     const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
     expect(out.map(m => m.externalId)).toEqual(['0x1', '0x2'])
   })
+
+  it('down-ranks an equally-similar market whose resolution date is far from the deadline', async () => {
+    // Both candidates are textually identical (cosine 1); only the resolution
+    // date differs — the one a year off the deadline must lose.
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xfar', slug: 'far', endDate: '2027-12-31T00:00:00Z' }),
+      gammaRow({ conditionId: '0xnear', slug: 'near', endDate: '2026-06-30T00:00:00Z' }),
+    ])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0])
+    const out = await suggestMarketsForClaim(
+      'Will X happen by mid 2026?',
+      [],
+      5,
+      new Date('2026-06-30T00:00:00Z'),
+    )
+    expect(out[0].externalId).toBe('0xnear')
+  })
 })
 
 describe('suggestMarketMatch', () => {
@@ -405,5 +423,47 @@ describe('suggestMarketMatch', () => {
     global.fetch = vi.fn()
     expect(await suggestMarketMatch('short')).toBeNull()
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects a same-question match whose market resolves far from the deadline', async () => {
+    // cosine 1, but the only candidate resolves ~2 years off → adjusted score
+    // decays below MATCH_THRESHOLD, so it must not auto-link (the Knicks mislink).
+    global.fetch = gammaFetchMock([gammaRow({ endDate: '2027-12-31T00:00:00Z' })])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0])
+    const match = await suggestMarketMatch(
+      'Will X definitely happen this year?',
+      new Date('2026-01-01T00:00:00Z'),
+    )
+    expect(match).toBeNull()
+  })
+
+  it('keeps a same-question match when the market resolves near the deadline', async () => {
+    global.fetch = gammaFetchMock([gammaRow({ endDate: '2026-12-31T00:00:00Z' })])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0])
+    const match = await suggestMarketMatch(
+      'Will X definitely happen this year?',
+      new Date('2026-12-15T00:00:00Z'), // 16 days < grace → no penalty
+    )
+    expect(match).not.toBeNull()
+    expect(match!.score).toBe(100)
+  })
+})
+
+describe('deadlineWeight', () => {
+  it('is 1 within the grace window or when a date is unknown', () => {
+    const d = new Date('2026-06-01T00:00:00Z')
+    expect(deadlineWeight(d, d)).toBe(1)
+    expect(deadlineWeight(new Date('2026-06-20T00:00:00Z'), d)).toBe(1) // 19d < grace
+    expect(deadlineWeight(null, d)).toBe(1)
+    expect(deadlineWeight(d, null)).toBe(1)
+  })
+
+  it('decays as the deadline gap grows', () => {
+    const d = new Date('2026-01-01T00:00:00Z')
+    const wYear = deadlineWeight(new Date('2027-01-01T00:00:00Z'), d)
+    expect(wYear).toBeGreaterThan(0)
+    expect(wYear).toBeLessThan(0.6)
+    // A two-year gap is penalized harder than a one-year gap.
+    expect(deadlineWeight(new Date('2028-01-01T00:00:00Z'), d)).toBeLessThan(wYear)
   })
 })

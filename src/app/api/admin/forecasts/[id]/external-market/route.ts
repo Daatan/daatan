@@ -21,13 +21,15 @@ export const GET = withAuth(
   async (_request, _user, { params }) => {
     const prediction = await prisma.prediction.findUnique({
       where: { id: params.id },
-      select: { claimText: true, extractedEntities: true },
+      select: { claimText: true, extractedEntities: true, resolveByDatetime: true },
     })
     if (!prediction) return apiError('Forecast not found', 404)
 
     const suggestions = await suggestMarketsForClaim(
       prediction.claimText,
       prediction.extractedEntities,
+      5,
+      prediction.resolveByDatetime,
     )
     return NextResponse.json({ suggestions })
   },
