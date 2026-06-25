@@ -147,15 +147,18 @@ Already mocked globally in `src/test/setup.ts`
 - Ensure all promises are awaited
 - Check for infinite loops
 
-## Pre-commit Checks
+## Pre-commit & Pre-push Checks
 
-The pre-commit hook automatically runs:
-1. Build verification
-2. All tests
-3. Linter (warning only)
-4. Version bump check (for feature/fix branches)
+The **pre-commit** hook runs fast checks only:
+1. Version-bump check (for feature/fix branches)
+2. `lint-staged` (lints staged `*.{ts,tsx}` files)
 
-If any check fails, the commit is blocked.
+The **pre-push** hook runs the heavier verification:
+1. Type check (`npm run typecheck`)
+2. Targeted tests (`vitest related` on changed `.ts`/`.tsx` files, excluding integration tests)
+3. Auth-change detection (non-blocking warning)
+
+Full test suite + integration tests run in CI. If any blocking check fails, the commit/push is blocked.
 
 ## CI/CD Integration
 

@@ -80,7 +80,7 @@ When a user rejects a forecast, the topic is logged to prevent future duplicate 
 
 **Endpoint:** `POST /api/forecasts/[id]/approve`
 
-**Auth:** Authenticated user (any role)
+**Auth:** Admin or Approver (`roles: ['ADMIN', 'APPROVER']`)
 
 **Behavior:**
 1. Transition forecast from `PENDING_APPROVAL` → `ACTIVE`
@@ -101,7 +101,7 @@ When a user rejects a forecast, the topic is logged to prevent future duplicate 
 
 **Endpoint:** `POST /api/forecasts/[id]/reject`
 
-**Auth:** Authenticated user (any role)
+**Auth:** Admin or Approver (`roles: ['ADMIN', 'APPROVER']`)
 
 **Body (optional):**
 ```json

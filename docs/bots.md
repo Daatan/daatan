@@ -140,7 +140,7 @@ The bot always commits YES (`binaryChoice = true`, positive confidence). Confide
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `modelPreference` | string | `google/gemini-2.0-flash-exp:free` | OpenRouter model slug used for all LLM calls. |
+| `modelPreference` | string | `google/gemini-2.5-flash-preview:free` | OpenRouter model slug used for all LLM calls. |
 
 ---
 
