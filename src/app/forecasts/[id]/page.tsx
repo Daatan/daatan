@@ -8,6 +8,7 @@ import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline } from '@/lib/services/context'
 import { getForecastVoters } from '@/lib/services/forecast-sources'
+import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 
@@ -224,6 +225,10 @@ export default async function ForecastDetailPage({ params }: Props) {
   const prediction = await getPrediction(id)
 
   if (!prediction) {
+    // A retired slug (e.g. fixed during English canonicalization) 308-redirects
+    // to the current canonical slug instead of 404ing.
+    const canonical = await getCanonicalSlugForAlias(id)
+    if (canonical) permanentRedirect(`/forecasts/${canonical}`)
     notFound()
   }
 

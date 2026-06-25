@@ -83,6 +83,110 @@ export async function callGeminiTranslate(
   return response.text.trim()
 }
 
+/** Scripts that unambiguously signal non-English source text (Hebrew, Arabic,
+ *  Syriac, Cyrillic, Greek, Kana, CJK, Hangul). Pure-Latin input skips the LLM
+ *  and is assumed English — Latin-script non-English (fr/de/es) is a known gap. */
+const NON_LATIN_SCRIPT =
+  /[\u0370-\u03FF\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/
+
+export function hasNonLatinScript(text: string): boolean {
+  return NON_LATIN_SCRIPT.test(text)
+}
+
+export interface ForecastTextFields {
+  claimText: string
+  detailsText?: string | null
+  resolutionRules?: string | null
+}
+
+export interface NormalizedForecast {
+  /** Detected source language (ISO 639-1), or null when unknown / assumed English. */
+  language: string | null
+  /** True when no translation happened (already English, or detection failed). */
+  isEnglish: boolean
+  /** English (canonical) version of each field. */
+  english: ForecastTextFields
+  /** The author's original text, unchanged. */
+  original: ForecastTextFields
+}
+
+/**
+ * One Gemini call: detect the source language and translate each non-empty field
+ * to English. Throws on an LLM or parse failure so the caller can fall back.
+ */
+async function detectAndTranslateToEnglish(
+  fields: ForecastTextFields,
+): Promise<{ language: string; english: ForecastTextFields }> {
+  const prompt = [
+    'You are localizing a prediction-market forecast. Detect the language of the',
+    'fields below and translate each NON-EMPTY field into natural, fluent English',
+    '(news/forecasting register; keep proper nouns, acronyms, numbers and dates).',
+    'Respond with ONLY minified JSON, no code fence, exactly this shape:',
+    '{"language":"<ISO 639-1 code of the source>","claimText":"...","detailsText":"...","resolutionRules":"..."}',
+    'Include claimText always; include detailsText / resolutionRules only when their input is non-empty.',
+    '',
+    `claimText: ${fields.claimText}`,
+    fields.detailsText ? `detailsText: ${fields.detailsText}` : '',
+    fields.resolutionRules ? `resolutionRules: ${fields.resolutionRules}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const res = await llmService.generateContent({ prompt, temperature: 0.1 })
+  const match = res.text.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('No JSON object in detect-translate response')
+  const parsed = JSON.parse(match[0]) as Record<string, unknown>
+  const language =
+    typeof parsed.language === 'string' ? parsed.language.toLowerCase().slice(0, 10) : ''
+  if (!language) throw new Error('No language in detect-translate response')
+
+  const pick = (k: TranslatableField, fallback: string | null | undefined) =>
+    typeof parsed[k] === 'string' && (parsed[k] as string).trim()
+      ? (parsed[k] as string).trim()
+      : fallback ?? null
+  return {
+    language,
+    english: {
+      claimText: (pick('claimText', fields.claimText) as string) || fields.claimText,
+      detailsText: pick('detailsText', fields.detailsText),
+      resolutionRules: pick('resolutionRules', fields.resolutionRules),
+    },
+  }
+}
+
+/**
+ * Canonicalize a forecast's text to English. Pure-Latin input is assumed English
+ * and returned unchanged (no LLM). Non-Latin input is detected + translated in a
+ * single Gemini call; on ANY failure the original text is returned unchanged so
+ * forecast creation never breaks. Callers persist `language` as `originalLanguage`
+ * and seed the original text as a same-language translation.
+ */
+export async function normalizeForecastToEnglish(
+  fields: ForecastTextFields,
+): Promise<NormalizedForecast> {
+  const original: ForecastTextFields = {
+    claimText: fields.claimText,
+    detailsText: fields.detailsText ?? null,
+    resolutionRules: fields.resolutionRules ?? null,
+  }
+  const combined = [fields.claimText, fields.detailsText, fields.resolutionRules]
+    .filter(Boolean)
+    .join('\n')
+
+  if (!hasNonLatinScript(combined)) {
+    return { language: 'en', isEnglish: true, english: { ...original }, original }
+  }
+
+  try {
+    const { language, english } = await detectAndTranslateToEnglish(fields)
+    if (language === 'en') return { language: 'en', isEnglish: true, english: { ...original }, original }
+    return { language, isEnglish: false, english, original }
+  } catch (err) {
+    log.error({ err }, 'Forecast English normalization failed; keeping original text')
+    return { language: null, isEnglish: true, english: { ...original }, original }
+  }
+}
+
 /**
  * Returns translated fields for a prediction, fetching from cache or translating on demand.
  * Only translates fields that are non-empty in the source prediction.

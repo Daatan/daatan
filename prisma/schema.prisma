@@ -243,10 +243,15 @@ model Prediction {
   newsAnchor   NewsAnchor? @relation(fields: [newsAnchorId], references: [id])
 
   // Prediction content
-  claimText   String  @db.VarChar(500) // The testable statement
+  claimText   String  @db.VarChar(500) // The testable statement (canonical = English)
   slug        String? @unique // URL-friendly identifier (e.g., "bitcoin-100k-2026")
   detailsText String? @db.Text // Additional conditions/context
   tags        Tag[]
+  // Detected source language of the author's input, ISO 639-1. Null = legacy /
+  // unknown (assumed English). When not English, claimText/detailsText/
+  // resolutionRules are canonicalized to English and the original is kept as a
+  // PredictionTranslation row for this language.
+  originalLanguage String? @map("original_language") @db.VarChar(10)
 
   // Outcome definition
   outcomeType    OutcomeType @default(BINARY)
@@ -309,6 +314,7 @@ model Prediction {
   comments         Comment[]
   contextSnapshots ContextSnapshot[]
   translations     PredictionTranslation[]
+  slugAliases      PredictionSlugAlias[]
   oracleCallLogs   OracleCallLog[]
 
   @@index([status])
@@ -644,6 +650,20 @@ model PredictionTranslation {
   @@unique([predictionId, fieldName, language])
   @@index([language])
   @@map("prediction_translations")
+}
+
+// A forecast's previous slug(s), kept after a re-slug (e.g. a non-English slug
+// fixed during English canonicalization) so the old URL 308-redirects to the
+// current canonical slug instead of 404ing.
+model PredictionSlugAlias {
+  id           String     @id @default(cuid())
+  slug         String     @unique
+  predictionId String     @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([predictionId])
+  @@map("prediction_slug_aliases")
 }
 
 model CommentTranslation {

@@ -1,10 +1,11 @@
 import { Suspense } from 'react'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
+import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import { buildForecastDescription } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
@@ -189,6 +190,9 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
   const prediction = await getPrediction(idOrSlug)
 
   if (!prediction) {
+    // A retired slug 308-redirects to the current canonical slug (locale-prefixed).
+    const canonical = await getCanonicalSlugForAlias(idOrSlug)
+    if (canonical) permanentRedirect(`/${locale}/forecasts/${canonical}`)
     notFound()
   }
 

@@ -8,6 +8,11 @@ import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { createLogger } from '@/lib/logger'
 import { notifyIndexNow } from '@/lib/services/indexnow'
 import { communityProbability } from '@/lib/forecast-math'
+import {
+  normalizeForecastToEnglish,
+  sourceHash,
+  TRANSLATABLE_FIELDS,
+} from '@/lib/services/translation'
 
 const log = createLogger('forecast')
 
@@ -171,7 +176,25 @@ export interface CreateForecastInput {
 
 export async function createForecast(input: CreateForecastInput) {
   const shareToken = crypto.randomBytes(8).toString('hex')
-  const baseSlug = slugify(input.claimText)
+
+  // Canonicalize to English so the URL slug and the default UI are English. The
+  // author's original-language text is preserved below as a translation. On a
+  // pure-English input (or any failure) this is a no-op returning the original.
+  const normalized = await normalizeForecastToEnglish({
+    claimText: input.claimText,
+    detailsText: input.detailsText,
+    resolutionRules: input.resolutionRules,
+  })
+  const claimText = normalized.english.claimText
+  const detailsText = normalized.english.detailsText ?? undefined
+  const resolutionRules = normalized.english.resolutionRules ?? undefined
+  const originalLanguage = normalized.isEnglish ? null : normalized.language
+
+  // A claim that slugifies to nothing meaningful — digits only, or non-Latin
+  // text that survived a failed canonicalization — would otherwise collide into
+  // "2026-1"-style slugs. Fall back to a stable base when there's no letter.
+  const rawSlug = slugify(claimText)
+  const baseSlug = /[a-z]/.test(rawSlug) ? rawSlug : 'forecast'
 
   const existingSlugs = await prisma.prediction
     .findMany({
@@ -190,12 +213,13 @@ export async function createForecast(input: CreateForecastInput) {
         data: {
           authorId: input.authorId,
           newsAnchorId: input.newsAnchorId,
-          claimText: input.claimText,
+          claimText,
           slug: uniqueSlug,
-          detailsText: input.detailsText,
+          detailsText,
+          originalLanguage,
           outcomeType: input.outcomeType as OutcomeType,
           outcomePayload: (input.outcomePayload ?? {}) as object,
-          resolutionRules: input.resolutionRules,
+          resolutionRules,
           resolveByDatetime: new Date(input.resolveByDatetime),
           status: 'DRAFT',
           isPublic: input.isPublic ?? true,
@@ -234,8 +258,24 @@ export async function createForecast(input: CreateForecastInput) {
 
   if (!prediction) throw new Error('Failed to generate a unique URL slug after multiple attempts')
 
-  // Fire-and-forget: store embedding for similar-forecast search
-  embedAndStoreForecast(prediction.id, input.claimText).catch((err) =>
+  // Preserve the author's original-language wording as a translation, so the
+  // source-language UI shows exactly what they wrote and the background job never
+  // re-translates English back into their language. Hashed to the English source
+  // so the translation cache treats these rows as fresh.
+  if (!normalized.isEnglish && normalized.language) {
+    const lang = normalized.language
+    const rows = TRANSLATABLE_FIELDS.flatMap((field) => {
+      const original = normalized.original[field]
+      const english = normalized.english[field]
+      return original && english
+        ? [{ predictionId: prediction!.id, fieldName: field, language: lang, translatedText: original, sourceHash: sourceHash(english) }]
+        : []
+    })
+    if (rows.length) await prisma.predictionTranslation.createMany({ data: rows, skipDuplicates: true })
+  }
+
+  // Fire-and-forget: store embedding for similar-forecast search (English claim)
+  embedAndStoreForecast(prediction.id, claimText).catch((err) =>
     log.error({ err, id: prediction.id }, 'embed failed')
   )
 
@@ -354,6 +394,20 @@ export async function findSimilarForecasts({
 }
 
 // ── Single forecast ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve a (possibly stale) slug to the forecast's current canonical slug via
+ * the slug-alias table. Returns null when the slug isn't a known alias, or when
+ * the forecast no longer has a slug. Used by the page routes to 308-redirect an
+ * old URL (e.g. a non-English slug fixed during canonicalization) to the new one.
+ */
+export async function getCanonicalSlugForAlias(slug: string): Promise<string | null> {
+  const alias = await prisma.predictionSlugAlias.findUnique({
+    where: { slug },
+    select: { prediction: { select: { slug: true } } },
+  })
+  return alias?.prediction.slug ?? null
+}
 
 export async function getForecastById(idOrSlug: string) {
   return prisma.prediction.findFirst({

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { prediction: { findFirst: vi.fn() } },
+  prisma: {
+    prediction: { findFirst: vi.fn() },
+    predictionSlugAlias: { findUnique: vi.fn() },
+  },
 }))
 vi.mock('@/lib/services/embedding', () => ({
   embedText: vi.fn(),
@@ -13,9 +16,10 @@ vi.mock('@/lib/logger', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
-import { getForecastById } from '../forecast'
+import { getForecastById, getCanonicalSlugForAlias } from '../forecast'
 
 const mockFindFirst = vi.mocked(prisma.prediction.findFirst)
+const mockAliasFind = vi.mocked(prisma.predictionSlugAlias.findUnique)
 
 describe('getForecastById', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -32,5 +36,22 @@ describe('getForecastById', () => {
     const em = arg.include?.externalMarket as { select?: { snapshots?: unknown } } | undefined
     expect(em).toBeTruthy()
     expect(em?.select?.snapshots).toBeTruthy()
+  })
+})
+
+describe('getCanonicalSlugForAlias', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns the current canonical slug for a retired alias', async () => {
+    mockAliasFind.mockResolvedValue({ prediction: { slug: 'at-least-two-arab-parties-2026' } } as never)
+    expect(await getCanonicalSlugForAlias('2026-1')).toBe('at-least-two-arab-parties-2026')
+    expect(mockAliasFind).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: '2026-1' } }),
+    )
+  })
+
+  it('returns null when the slug is not a known alias', async () => {
+    mockAliasFind.mockResolvedValue(null as never)
+    expect(await getCanonicalSlugForAlias('nope')).toBeNull()
   })
 })

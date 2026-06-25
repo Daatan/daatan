@@ -9,9 +9,18 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/llm', () => ({ llmService: { generateContent: vi.fn() } }))
 vi.mock('@/lib/services/telegram', () => ({ notifyTranslationFailed: vi.fn() }))
 
-import { translatePrediction, sourceHash, callGeminiTranslate, languageName } from '../translation'
+import {
+  translatePrediction,
+  sourceHash,
+  callGeminiTranslate,
+  languageName,
+  hasNonLatinScript,
+  normalizeForecastToEnglish,
+} from '../translation'
 import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
+
+const HEBREW_CLAIM = 'לפחות שתי מפלגות ערביות יתמודדו בבחירות 2026.'
 
 const PREDICTION = {
   claimText: 'Ebola will spread to the USA by 2026',
@@ -107,5 +116,57 @@ describe('translatePrediction — content-aware cache', () => {
 
     // claimText (null hash) re-translated; detailsText + rules have no row → also translated
     expect(llmService.generateContent).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('hasNonLatinScript', () => {
+  it('flags non-Latin scripts and passes pure-Latin text', () => {
+    expect(hasNonLatinScript(HEBREW_CLAIM)).toBe(true)
+    expect(hasNonLatinScript('Большинство')).toBe(true) // Cyrillic
+    expect(hasNonLatinScript('Will Bitcoin hit $100k by 2026?')).toBe(false)
+    expect(hasNonLatinScript('Café résumé naïve — 2026')).toBe(false) // Latin-1 accents
+  })
+})
+
+describe('normalizeForecastToEnglish', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns English input unchanged without calling the LLM', async () => {
+    const out = await normalizeForecastToEnglish({ claimText: 'Bitcoin hits $100k by 2026' })
+    expect(llmService.generateContent).not.toHaveBeenCalled()
+    expect(out).toMatchObject({ language: 'en', isEnglish: true })
+    expect(out.english.claimText).toBe('Bitcoin hits $100k by 2026')
+    expect(out.original.claimText).toBe('Bitcoin hits $100k by 2026')
+  })
+
+  it('detects + translates non-Latin input, keeping the original', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({
+      text: '{"language":"he","claimText":"At least two Arab parties will run in the 2026 elections."}',
+    } as never)
+
+    const out = await normalizeForecastToEnglish({ claimText: HEBREW_CLAIM })
+
+    expect(out.isEnglish).toBe(false)
+    expect(out.language).toBe('he')
+    expect(out.english.claimText).toBe('At least two Arab parties will run in the 2026 elections.')
+    expect(out.original.claimText).toBe(HEBREW_CLAIM) // author's wording preserved
+  })
+
+  it('treats a detected "en" as already-English (no canonicalization)', async () => {
+    // Latin-1 accents don't trip the script gate, but a stray CJK char would —
+    // if the model still reports English, we keep the source as canonical.
+    vi.mocked(llmService.generateContent).mockResolvedValue({
+      text: '{"language":"en","claimText":"whatever"}',
+    } as never)
+    const out = await normalizeForecastToEnglish({ claimText: 'Tokyo 都 2026 climate pledge holds' })
+    expect(out).toMatchObject({ language: 'en', isEnglish: true })
+    expect(out.english.claimText).toBe('Tokyo 都 2026 climate pledge holds') // unchanged
+  })
+
+  it('falls back to the original (never throws) when the LLM/parse fails', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'not json' } as never)
+    const out = await normalizeForecastToEnglish({ claimText: HEBREW_CLAIM })
+    expect(out).toMatchObject({ language: null, isEnglish: true })
+    expect(out.english.claimText).toBe(HEBREW_CLAIM)
   })
 })
