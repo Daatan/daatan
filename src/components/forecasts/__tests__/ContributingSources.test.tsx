@@ -66,14 +66,15 @@ describe('ContributingSources', () => {
 
   it('shows the outlet name, its headline, and an aggregate side badge', () => {
     // Single-article outlet → a plain link card. stance 0.5, certainty 0.72 →
-    // implied P(will) 0.86 → aggregate badge "will 86%".
+    // implied P(will) 0.86 → aggregate badge "↑ 86%" (the will/won't word is dropped;
+    // the arrow + colour + column carry the side).
     renderWithIntl(
       <ContributingSources
         sources={[src({ source: 'Reuters', title: 'Big scoop', certainty: 0.72, stance: 0.5 })]} />,
     )
     expect(screen.getByText('Reuters')).toBeInTheDocument()
     expect(screen.getByText('Big scoop')).toBeInTheDocument()
-    expect(screen.getByText('will 86%')).toBeInTheDocument()
+    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
   })
 
   it('falls back to the outlet host when there is no source name', () => {

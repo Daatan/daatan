@@ -141,17 +141,28 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     return null
   }
 
-  const Badge = ({ side, pct }: { side: Side; pct: number | null }) => (
-    <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${sideMeta[side].badge}`}>
-      {sideMeta[side].short}{side !== 'neutral' && pct != null ? ` ${pct}%` : ''}
-    </span>
-  )
+  // The will/won't word is dropped to declutter; the side stays clear via colour
+  // (green/red), the column it sits in, an ↑/↓ arrow (colour-blind safe), and the
+  // full label on hover.
+  const Badge = ({ side, pct }: { side: Side; pct: number | null }) => {
+    const arrow = side === 'yes' ? '↑' : side === 'no' ? '↓' : '–'
+    return (
+      <span
+        title={sideMeta[side].label}
+        className={`shrink-0 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded ${sideMeta[side].badge}`}
+      >
+        {arrow}{side !== 'neutral' && pct != null ? ` ${pct}%` : ''}
+      </span>
+    )
+  }
 
   // One article inside an expanded outlet card: stance dot, headline, per-article badge.
   const ArticleRow = ({ s }: { s: ContributingSource }) => {
     const side = getSide(s.stance)
     const title = s.title || outletLabel(s)
-    const hint = [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')
+    const hint = [s.title, [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')]
+      .filter(Boolean)
+      .join('\n')
     return (
       <a
         href={s.url}
@@ -174,7 +185,9 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     // Single-article outlet → a plain link showing the headline inline (no expand).
     if (g.articles.length === 1) {
       const s = g.articles[0]
-      const hint = [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')
+      const hint = [s.title, [s.author, fmtDate(s.publishedAt), originText(s.origin)].filter(Boolean).join(' · ')]
+      .filter(Boolean)
+      .join('\n')
       return (
         <a
           href={s.url}
