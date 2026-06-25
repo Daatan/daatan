@@ -8,6 +8,7 @@ prisma/seed.js
 .env
 .env.*
 !.env.example
+!.env.selfhost.example
 
 # SSH Keys
 *.pem

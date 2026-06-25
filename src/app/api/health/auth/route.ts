@@ -22,16 +22,34 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const shouldVerify = url.searchParams.get('verify') === 'true'
 
+  // Google is optional (only the SaaS edition configures it). When it isn't
+  // configured, report ok without claiming a broken OAuth setup.
+  const clientId = env.GOOGLE_CLIENT_ID
+  const clientSecret = env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    return NextResponse.json({
+      status: 'ok',
+      message: 'Google OAuth is not configured for this edition',
+      edition: env.DAATAN_EDITION,
+      diagnostics: {
+        GOOGLE_CLIENT_ID: { set: false },
+        GOOGLE_CLIENT_SECRET: { set: false },
+        NEXTAUTH_SECRET: { set: true, length: env.NEXTAUTH_SECRET.length },
+        NEXTAUTH_URL: { set: true, value: env.NEXTAUTH_URL }
+      }
+    })
+  }
+
   const diagnostics = {
     GOOGLE_CLIENT_ID: {
       set: true,
       format: 'valid',
-      preview: `${env.GOOGLE_CLIENT_ID.slice(0, 8)}...`
+      preview: `${clientId.slice(0, 8)}...`
     },
     GOOGLE_CLIENT_SECRET: {
       set: true,
-      length: env.GOOGLE_CLIENT_SECRET.length,
-      preview: `${env.GOOGLE_CLIENT_SECRET.slice(0, 4)}...${env.GOOGLE_CLIENT_SECRET.slice(-4)}`
+      length: clientSecret.length,
+      preview: `${clientSecret.slice(0, 4)}...${clientSecret.slice(-4)}`
     },
     NEXTAUTH_SECRET: {
       set: true,
@@ -60,8 +78,8 @@ export async function GET(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        client_secret: env.GOOGLE_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code: 'dummy_verification_code',
         grant_type: 'authorization_code',
         redirect_uri: `${env.NEXTAUTH_URL}/api/auth/callback/google`
