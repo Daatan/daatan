@@ -57,6 +57,17 @@ export default function ForecastDetailClient({
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
+  // router.back() is a no-op (or leaves the site) when the forecast was opened via a
+  // direct link — there's no in-app history to pop. Next's App Router stores a
+  // per-entry `idx` in history.state; `idx === 0` means this is the first entry, so
+  // fall back to the feed instead of a dead "Back" button.
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && (window.history.state?.idx ?? 0) > 0) {
+      router.back()
+    } else {
+      router.push('/')
+    }
+  }
   const { data: session } = useSession()
   const t = useTranslations('forecast')
   const tt = useTranslations('translate')
@@ -260,7 +271,7 @@ export default function ForecastDetailClient({
             {error || t('predictionNotFound')}
           </h2>
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="text-blue-600 hover:underline"
           >
             {t('backToFeed')}
@@ -274,7 +285,7 @@ export default function ForecastDetailClient({
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       {/* Back Link */}
       <button
-        onClick={() => router.back()}
+        onClick={handleBack}
         className="inline-flex items-center gap-1 text-gray-500 hover:text-text-secondary mb-6"
       >
         <ChevronLeft className="w-4 h-4" />
