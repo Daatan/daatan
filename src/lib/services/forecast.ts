@@ -370,6 +370,23 @@ export async function getForecastById(idOrSlug: string) {
           option: { select: { id: true, text: true } },
         },
       },
+      // The detail page refetches /api/forecasts/[id] on mount and overwrites the
+      // SSR prediction, so this must carry externalMarket too — otherwise the linked
+      // market (and its chart line) is wiped after first paint. Shape mirrors the
+      // SSR loader in app/forecasts/[id]/page.tsx; `embedding` is deliberately excluded.
+      externalMarket: {
+        select: {
+          provider: true,
+          slug: true,
+          url: true,
+          question: true,
+          resolved: true,
+          snapshots: {
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true, probability: true },
+          },
+        },
+      },
       _count: { select: { commitments: true } },
     },
   })
