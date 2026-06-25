@@ -1,0 +1,110 @@
+# Daatan — self-hosted edition (single organization)
+#
+# A portable bundle for running Daatan in your own VPC/network. Unlike the
+# production compose, this builds the image locally (no ECR), runs migrations as
+# a one-shot init container, and does NOT include nginx/certbot — terminate TLS
+# at your own ingress/load balancer and forward to the app on :3000.
+#
+# Quick start:
+#   cp .env.selfhost.example .env   # then edit
+#   docker compose -f docker-compose.selfhost.yml up -d --build
+#
+# NOTE: This is Phase 0a scaffolding. STORAGE_DRIVER=local|minio (the `minio`
+# service below) becomes functional with the storage-abstraction PR; until then
+# uploads require STORAGE_DRIVER=s3.
+
+services:
+  # One-shot: applies pending Prisma migrations, then exits. App waits for it.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrations
+    image: daatan-selfhost-migrate:local
+    environment:
+      - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+    image: daatan-selfhost-app:local
+    container_name: daatan-selfhost-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
+      - AUTH_TRUST_HOST=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    # pgvector is required (embeddings / similar-forecasts). Pin a digest in
+    # production self-hosts; see docs/DATABASE_COLLATION.md before changing it.
+    image: pgvector/pgvector:pg16
+    container_name: daatan-selfhost-postgres
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=daatan
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=daatan
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U daatan -d daatan" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional S3-compatible object storage for uploads. Becomes usable with the
+  # storage-abstraction PR (set STORAGE_DRIVER=minio + S3_ENDPOINT=http://minio:9000).
+  # minio:
+  #   image: minio/minio
+  #   container_name: daatan-selfhost-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   ports:
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   environment:
+  #     - MINIO_ROOT_USER=${MINIO_ROOT_USER:-daatan}
+  #     - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-change-me}
+  #   volumes:
+  #     - minio_data:/data
+
+volumes:
+  postgres_data:
+  # minio_data:

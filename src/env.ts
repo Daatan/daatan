@@ -20,13 +20,44 @@ export const env = createEnv({
         'Looks like plain text - must contain numbers or special characters'
       ),
 
-    // Google OAuth
+    // Google OAuth — optional. Required for the SaaS edition (daatan.com); a
+    // self-hosted install authenticates via OIDC/SAML (Phase 1) or credentials.
+    // When both are present, the Google provider is registered (see auth.config.ts).
     GOOGLE_CLIENT_ID: z
       .string()
-      .regex(/\.apps\.googleusercontent\.com$/, 'Must end with .apps.googleusercontent.com'),
+      .regex(/\.apps\.googleusercontent\.com$/, 'Must end with .apps.googleusercontent.com')
+      .optional(),
     GOOGLE_CLIENT_SECRET: z
       .string()
-      .min(10, 'Too short to be valid'),
+      .min(10, 'Too short to be valid')
+      .optional(),
+
+    // Deployment edition. 'saas' (default) = daatan.com behavior, unchanged.
+    // 'self_hosted' = single-org install; gates open-signup defaults, SEO
+    // indexing, admin bootstrap and licensing in later phases.
+    DAATAN_EDITION: z.enum(['saas', 'self_hosted']).default('saas'),
+
+    // Public base URL of this install. Falls back to NEXTAUTH_URL when unset.
+    // Consumed for canonical/SEO/branding from Phase 3 onward.
+    APP_URL: z.string().url().optional(),
+
+    // White-label branding (self-host). Falls back to Daatan defaults when unset.
+    APP_NAME: z.string().min(1).optional(),
+    APP_LOGO_URL: z.string().url().optional(),
+    EMAIL_FROM: z.string().min(1).optional(),
+
+    // Object storage for uploads (avatars). 's3' (default) preserves current
+    // prod behavior; 'local'/'minio' are wired by the storage abstraction
+    // (follow-up PR). UPLOADS_BUCKET_NAME / S3_ENDPOINT used by the s3/minio drivers.
+    STORAGE_DRIVER: z.enum(['s3', 'local', 'minio']).default('s3'),
+    STORAGE_LOCAL_PATH: z.string().min(1).optional(),
+    S3_ENDPOINT: z.string().url().optional(),
+    UPLOADS_BUCKET_NAME: z.string().min(1).optional(),
+
+    // Enterprise SSO (self-host) — generic OIDC. Wired in Phase 1.
+    OIDC_ISSUER: z.string().url().optional(),
+    OIDC_CLIENT_ID: z.string().min(1).optional(),
+    OIDC_CLIENT_SECRET: z.string().min(1).optional(),
 
     // Optional / Other
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -77,6 +108,18 @@ export const env = createEnv({
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    DAATAN_EDITION: process.env.DAATAN_EDITION,
+    APP_URL: process.env.APP_URL,
+    APP_NAME: process.env.APP_NAME,
+    APP_LOGO_URL: process.env.APP_LOGO_URL,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    STORAGE_DRIVER: process.env.STORAGE_DRIVER,
+    STORAGE_LOCAL_PATH: process.env.STORAGE_LOCAL_PATH,
+    S3_ENDPOINT: process.env.S3_ENDPOINT,
+    UPLOADS_BUCKET_NAME: process.env.UPLOADS_BUCKET_NAME,
+    OIDC_ISSUER: process.env.OIDC_ISSUER,
+    OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+    OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,

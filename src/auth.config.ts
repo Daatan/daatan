@@ -8,16 +8,26 @@ import { env } from "@/env"
 // access and therefore live in `src/auth.ts`, which runs on Node.
 const isHosted = env.NEXT_PUBLIC_ENV === 'staging' || env.NEXT_PUBLIC_ENV === 'production'
 
+// Register Google only when credentials are present. The SaaS edition always
+// sets these; a self-hosted install authenticates via OIDC/SAML (Phase 1) or
+// credentials, and boots fine with no Google provider. Locals (not env.*) so
+// TypeScript narrows the optional values to `string` inside the branch.
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = env
+const googleProviders =
+  GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
+    ? [
+        Google({
+          clientId: GOOGLE_CLIENT_ID,
+          clientSecret: GOOGLE_CLIENT_SECRET,
+          allowDangerousEmailAccountLinking: false,
+        }),
+      ]
+    : []
+
 export default {
   secret: env.NEXTAUTH_SECRET,
   trustHost: true,
-  providers: [
-    Google({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      allowDangerousEmailAccountLinking: false,
-    }),
-  ],
+  providers: [...googleProviders],
   session: {
     strategy: 'jwt',
   },
