@@ -271,6 +271,11 @@ export default async function ForecastDetailPage({ params }: Props) {
       name: prediction.author.name || prediction.author.username,
       url: `https://daatan.com/profile/${prediction.author.username}`,
     },
+    creator: {
+      '@type': 'Person',
+      name: prediction.author.name || prediction.author.username,
+      url: `https://daatan.com/profile/${prediction.author.username}`,
+    },
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
@@ -328,6 +333,11 @@ export default async function ForecastDetailPage({ params }: Props) {
             name: 'DAATAN',
             url: 'https://daatan.com',
           },
+          creator: {
+            '@type': 'Organization',
+            name: 'DAATAN',
+            url: 'https://daatan.com',
+          },
           reviewRating: {
             '@type': 'Rating',
             ratingValue: prediction.resolutionOutcome === 'correct' ? 5 : 1,
@@ -339,6 +349,11 @@ export default async function ForecastDetailPage({ params }: Props) {
             '@type': 'Claim',
             name: prediction.claimText,
             author: {
+              '@type': 'Person',
+              name: prediction.author.name || prediction.author.username,
+              url: `https://daatan.com/profile/${prediction.author.username}`,
+            },
+            creator: {
               '@type': 'Person',
               name: prediction.author.name || prediction.author.username,
               url: `https://daatan.com/profile/${prediction.author.username}`,

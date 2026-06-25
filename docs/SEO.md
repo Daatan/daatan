@@ -16,17 +16,21 @@ Forecast detail pages (`src/app/forecasts/[id]/page.tsx`) override with per-fore
 
 ## Structured data (JSON-LD)
 
-Each public forecast page includes two JSON-LD scripts:
+A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the locale-prefixed route emits the first two):
 
-1. **BreadcrumbList** — Home → Forecasts → [claim text]
-2. **Event** (`schema.org/Event`) — maps the forecast to a predictive event:
+1. **Article** (`schema.org/Article`) — `headline`, `description`, `datePublished`, `dateModified`, `author` + `creator` (both the forecast author as Person), `publisher` (DAATAN Organization).
+2. **BreadcrumbList** — Home → Forecasts → [claim text]
+3. **Event** (`schema.org/Event`, public forecasts only) — maps the forecast to a predictive event:
    - `name`: forecast claim text
    - `startDate`: `publishedAt` (or `createdAt` as fallback)
    - `endDate`: `resolveByDatetime`
    - `organizer`: forecast author (Person, with profile URL)
    - `location`: VirtualLocation pointing at the forecast URL
+4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
 
-Private forecasts (where `isPublic = false`) get neither script.
+> **`creator` on the CreativeWork types** (Article, ClaimReview, the nested Claim): added alongside `author` because Google Search Console flags `creator` as a recommended field on CreativeWork-derived items ("Missing field 'creator'"). `creator` mirrors the corresponding `author`.
+
+Private forecasts (where `isPublic = false`) get only the Article + BreadcrumbList scripts.
 
 ## Sitemap
 
