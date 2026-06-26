@@ -11,6 +11,7 @@ import type { Adapter } from "next-auth/adapters"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { notifyNewUserRegistered } from "@/lib/services/telegram"
+import { parseAdminEmails, resolveAdminRole } from "@/lib/auth/oidc"
 
 const log = createLogger('auth')
 
@@ -132,6 +133,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isSignIn = !!user
       const cachedAt = token.cachedAt as number | undefined
       const stale = !cachedAt || Date.now() - cachedAt > TTL
+
+      // Admin bootstrap: promote configured emails (e.g. the org's SSO admins) to
+      // ADMIN on sign-in. No-op when OIDC_ADMIN_EMAILS is unset (the SaaS deploy).
+      // Runs before the DB read below so the cached token picks up the new role.
+      if (isSignIn && token.sub) {
+        const adminRole = resolveAdminRole(user?.email, parseAdminEmails(env.OIDC_ADMIN_EMAILS))
+        if (adminRole) {
+          try {
+            await prisma.user.update({ where: { id: token.sub }, data: { role: adminRole } })
+          } catch (error) {
+            log.error({ err: error }, 'Failed to apply admin-email role mapping')
+          }
+        }
+      }
 
       if ((isSignIn || stale) && token.sub) {
         try {

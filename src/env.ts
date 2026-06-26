@@ -54,10 +54,15 @@ export const env = createEnv({
     S3_ENDPOINT: z.string().url().optional(),
     UPLOADS_BUCKET_NAME: z.string().min(1).optional(),
 
-    // Enterprise SSO (self-host) — generic OIDC. Wired in Phase 1.
+    // Enterprise SSO (self-host) — generic OIDC (Azure AD / Okta / Keycloak /
+    // Google Workspace). The provider is registered when all three are set.
     OIDC_ISSUER: z.string().url().optional(),
     OIDC_CLIENT_ID: z.string().min(1).optional(),
     OIDC_CLIENT_SECRET: z.string().min(1).optional(),
+    // Sign-in button label for the OIDC provider (defaults to "SSO").
+    OIDC_PROVIDER_NAME: z.string().min(1).optional(),
+    // Comma/space-separated emails promoted to ADMIN on sign-in (admin bootstrap).
+    OIDC_ADMIN_EMAILS: z.string().min(1).optional(),
 
     // Optional / Other
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -120,6 +125,8 @@ export const env = createEnv({
     OIDC_ISSUER: process.env.OIDC_ISSUER,
     OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
     OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+    OIDC_PROVIDER_NAME: process.env.OIDC_PROVIDER_NAME,
+    OIDC_ADMIN_EMAILS: process.env.OIDC_ADMIN_EMAILS,
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
