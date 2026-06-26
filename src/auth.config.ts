@@ -24,10 +24,32 @@ const googleProviders =
       ]
     : []
 
+// Generic OIDC provider for enterprise SSO (self-host). Registered only when all
+// three vars are present. A plain config object — no Node-only imports — so this
+// stays Edge-safe (auth.config.ts is bundled into the middleware). Issuer
+// metadata is discovered at runtime in the Node route handler.
+const { OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET } = env
+const oidcProviders =
+  OIDC_ISSUER && OIDC_CLIENT_ID && OIDC_CLIENT_SECRET
+    ? [
+        {
+          id: 'oidc',
+          name: env.OIDC_PROVIDER_NAME || 'SSO',
+          type: 'oidc' as const,
+          issuer: OIDC_ISSUER,
+          clientId: OIDC_CLIENT_ID,
+          clientSecret: OIDC_CLIENT_SECRET,
+          // Single-org self-host: the issuer is the org's trusted IdP, so link to
+          // an existing account with the same email rather than erroring.
+          allowDangerousEmailAccountLinking: true,
+        },
+      ]
+    : []
+
 export default {
   secret: env.NEXTAUTH_SECRET,
   trustHost: true,
-  providers: [...googleProviders],
+  providers: [...googleProviders, ...oidcProviders],
   session: {
     strategy: 'jwt',
   },
