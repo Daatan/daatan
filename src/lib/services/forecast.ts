@@ -10,6 +10,7 @@ import { notifyIndexNow } from '@/lib/services/indexnow'
 import { communityProbability } from '@/lib/forecast-math'
 import {
   normalizeForecastToEnglish,
+  translatePredictionToAllLocales,
   sourceHash,
   TRANSLATABLE_FIELDS,
 } from '@/lib/services/translation'
@@ -407,6 +408,93 @@ export async function getCanonicalSlugForAlias(slug: string): Promise<string | n
     select: { prediction: { select: { slug: true } } },
   })
   return alias?.prediction.slug ?? null
+}
+
+/** Outcome of canonicalizing one existing forecast (see canonicalizeForecastToEnglish). */
+export type CanonicalizeResult = 'canonicalized' | 'english' | 'failed' | 'skipped'
+
+/**
+ * Backfill one existing forecast to the English-canonical model (idempotent).
+ * `skipped` when already processed (original_language set) or missing; `english`
+ * when the source is detected as English (just marks it); `failed` when detection
+ * failed (left untouched for a later retry); `canonicalized` when translated:
+ * English becomes canonical, the old slug is kept as an alias, the new English
+ * slug is set, original_language is recorded, the author's original text is seeded
+ * as a same-language translation, the English claim is re-embedded, and the other
+ * locales are filled.
+ */
+export async function canonicalizeForecastToEnglish(predictionId: string): Promise<CanonicalizeResult> {
+  const p = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { id: true, slug: true, claimText: true, detailsText: true, resolutionRules: true, originalLanguage: true },
+  })
+  if (!p || p.originalLanguage !== null) return 'skipped'
+
+  const norm = await normalizeForecastToEnglish({
+    claimText: p.claimText,
+    detailsText: p.detailsText,
+    resolutionRules: p.resolutionRules,
+  })
+  if (norm.language === null) return 'failed'
+  if (norm.isEnglish) {
+    await prisma.prediction.update({ where: { id: p.id }, data: { originalLanguage: 'en' } })
+    return 'english'
+  }
+
+  const lang = norm.language
+  const rawSlug = slugify(norm.english.claimText)
+  const base = /[a-z]/.test(rawSlug) ? rawSlug : 'forecast'
+  const taken = await prisma.prediction.findMany({
+    where: { slug: { startsWith: base }, NOT: { id: p.id } },
+    select: { slug: true },
+  })
+  const takenSet = new Set(taken.map(t => t.slug).filter((s): s is string => s !== null))
+  let newSlug = base
+  let n = 1
+  while (takenSet.has(newSlug)) newSlug = `${base}-${n++}`
+
+  const seedRows = TRANSLATABLE_FIELDS.flatMap((field) => {
+    const original = norm.original[field]
+    const english = norm.english[field]
+    return original && english
+      ? [{ predictionId: p.id, fieldName: field, language: lang, translatedText: original, sourceHash: sourceHash(english) }]
+      : []
+  })
+
+  await prisma.$transaction(async (tx) => {
+    if (p.slug && p.slug !== newSlug) {
+      await tx.predictionSlugAlias.upsert({
+        where: { slug: p.slug },
+        create: { slug: p.slug, predictionId: p.id },
+        update: { predictionId: p.id },
+      })
+    }
+    await tx.prediction.update({
+      where: { id: p.id },
+      data: {
+        claimText: norm.english.claimText,
+        detailsText: norm.english.detailsText,
+        resolutionRules: norm.english.resolutionRules,
+        slug: newSlug,
+        originalLanguage: lang,
+      },
+    })
+    for (const row of seedRows) {
+      await tx.predictionTranslation.upsert({
+        where: { predictionId_fieldName_language: { predictionId: row.predictionId, fieldName: row.fieldName, language: row.language } },
+        create: row,
+        update: { translatedText: row.translatedText, sourceHash: row.sourceHash },
+      })
+    }
+  })
+
+  await embedAndStoreForecast(p.id, norm.english.claimText).catch((err) =>
+    log.error({ err, id: p.id }, 'embed failed during canonicalization'),
+  )
+  await translatePredictionToAllLocales(p.id).catch((err) =>
+    log.error({ err, id: p.id }, 'locale fill failed during canonicalization'),
+  )
+  return 'canonicalized'
 }
 
 export async function getForecastById(idOrSlug: string) {
