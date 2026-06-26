@@ -11,9 +11,9 @@ const log = createLogger('backfill-english-canonical')
 const MAX_PER_CALL = 25
 
 // Unprocessed forecasts (original_language IS NULL) whose claim has any non-ASCII
-// character. This over-selects accented-Latin English (harmlessly marked `english`)
+// character — detected via `octet_length <> length` (a non-ASCII char is multi-byte
+// in UTF-8). This over-selects accented-Latin English (harmlessly marked `english`)
 // but skips the pure-ASCII majority; the per-row pass decides the precise outcome.
-const NON_ASCII = '[^[:ascii:]]'
 
 function parseLimit(request: NextRequest): number {
   return Math.min(MAX_PER_CALL, Math.max(1, Number(new URL(request.url).searchParams.get('limit')) || 10))
@@ -22,14 +22,14 @@ function parseLimit(request: NextRequest): number {
 async function countRemaining(): Promise<number> {
   const rows = await prisma.$queryRaw<{ count: bigint }[]>`
     SELECT COUNT(*)::bigint AS count FROM predictions
-    WHERE original_language IS NULL AND claim_text ~ ${NON_ASCII}`
+    WHERE original_language IS NULL AND octet_length("claimText") <> length("claimText")`
   return Number(rows[0]?.count ?? 0)
 }
 
 async function runBackfill(limit: number) {
   const candidates = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM predictions
-    WHERE original_language IS NULL AND claim_text ~ ${NON_ASCII}
+    WHERE original_language IS NULL AND octet_length("claimText") <> length("claimText")
     ORDER BY "createdAt" DESC
     LIMIT ${limit}`
 
