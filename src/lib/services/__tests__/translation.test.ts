@@ -16,6 +16,7 @@ import {
   languageName,
   hasNonLatinScript,
   normalizeForecastToEnglish,
+  normalizeTitleForDedup,
 } from '../translation'
 import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
@@ -168,5 +169,29 @@ describe('normalizeForecastToEnglish', () => {
     const out = await normalizeForecastToEnglish({ claimText: HEBREW_CLAIM })
     expect(out).toMatchObject({ language: null, isEnglish: true })
     expect(out.english.claimText).toBe(HEBREW_CLAIM)
+  })
+})
+
+describe('normalizeTitleForDedup', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns an English title unchanged without an LLM call', async () => {
+    const out = await normalizeTitleForDedup('At least one political party will withdraw')
+    expect(llmService.generateContent).not.toHaveBeenCalled()
+    expect(out).toBe('At least one political party will withdraw')
+  })
+
+  it('translates a non-English title so it can match English-canonical existing titles', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({
+      text: '{"language":"he","claimText":"At least one party will withdraw from the Knesset race"}',
+    } as never)
+    const out = await normalizeTitleForDedup(HEBREW_CLAIM)
+    expect(out).toBe('At least one party will withdraw from the Knesset race')
+  })
+
+  it('falls back to the original title when translation fails (fail-open)', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'not json' } as never)
+    const out = await normalizeTitleForDedup(HEBREW_CLAIM)
+    expect(out).toBe(HEBREW_CLAIM)
   })
 })
