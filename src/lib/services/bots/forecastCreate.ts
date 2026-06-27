@@ -18,6 +18,7 @@ import {
   MAX_RESOLVE_DAYS,
 } from './shared'
 import { isLocalDuplicate } from './dedup'
+import { normalizeTitleForDedup } from '../translation'
 import { createAndStake } from './stake'
 
 export async function processTopic(
@@ -29,9 +30,14 @@ export async function processTopic(
   existingTitles: string[],
 ): Promise<'created' | 'skipped' | 'error'> {
   try {
+    // Translate non-English candidates to English so they compare against the
+    // English-canonical existing titles; otherwise cross-language pairs share no
+    // keywords and slip past both the local and LLM dedup checks.
+    const dedupTitle = await normalizeTitleForDedup(topicTitle)
+
     // Local pre-dedup: a confident keyword-overlap match skips the LLM dedup
     // round-trip entirely. Borderline cases fall through to the LLM check below.
-    if (isLocalDuplicate(topicTitle, existingTitles)) {
+    if (isLocalDuplicate(dedupTitle, existingTitles)) {
       log.info({ botId: bot.id, topic: topicTitle }, 'Topic already covered (local dedup), skipping')
       await logBotAction(bot.id, 'SKIPPED', { title: topicTitle, urls: sourceUrls }, null, 'topic already covered (local dedup)', dryRun)
       return 'skipped'
@@ -40,7 +46,7 @@ export async function processTopic(
     // Dedup check: use cached existing titles to avoid N+1 query
     const dedupTemplate = await getPromptTemplate('dedupe-check')
     const dedupPrompt = fillPrompt(dedupTemplate, {
-      topicTitle,
+      topicTitle: dedupTitle,
       existingTitles: existingTitles.join('\n- '),
     })
 

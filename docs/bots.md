@@ -53,8 +53,11 @@ runDueBots()
        Oracle /search queries) → detectHotTopics(minSources)
        If none clear the bar, retry at minSources=1 (single-source rung) before
        falling back to sourceless generation.
-    4. For each hot topic: local keyword-overlap dedup (skips the LLM call on a
-       confident match) → LLM dedup check (borderline only) → LLM forecast generation
+    4. For each hot topic: translate non-English candidate titles to English
+       (`normalizeTitleForDedup`, so cross-language near-duplicates compare in one
+       language against the English-canonical existing titles) → local
+       keyword-overlap dedup (skips the LLM call on a confident match) → LLM dedup
+       check (borderline only) → LLM forecast generation
        If still no topics: LLM-only sourceless forecast (draws on bot persona/knowledge, no RSS anchor)
     5. Create Prediction (DRAFT → ACTIVE or PENDING_APPROVAL)
     6. Auto-stake on own forecast

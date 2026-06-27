@@ -47,4 +47,16 @@ their SEO are preserved. See [SEO.md](./SEO.md).
 
 `scripts/backfill-english-canonical.ts` canonicalizes existing non-Latin forecasts
 (idempotent — only touches rows with `original_language IS NULL`). Dry-run by default;
-pass `--apply` to write. Requires `GEMINI_API_KEY` + `DATABASE_URL`.
+pass `--apply` to write. Requires `GEMINI_API_KEY` + `DATABASE_URL`. For prod, drive it
+via the `backfill-english-canonical` admin endpoint / GitHub Actions workflow rather
+than the script.
+
+## Cross-language dedup
+
+Because every stored `claimText` is English-canonical, the bot dedup gate
+(`src/lib/services/bots/`) translates a non-English candidate title to English via
+`normalizeTitleForDedup` before the keyword-Jaccard and LLM duplicate checks. Without
+this, a Hebrew candidate and an English existing forecast share no keywords, so a
+near-duplicate slips through and two overlapping forecasts get created. Pure-Latin
+candidates skip the translation (no added cost); a translation failure falls back to the
+original text (fail-open, same as the rest of the gate).

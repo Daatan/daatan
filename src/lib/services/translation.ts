@@ -188,6 +188,23 @@ export async function normalizeForecastToEnglish(
 }
 
 /**
+ * Translate a candidate forecast title to English for cross-language dedup.
+ *
+ * The dedup gate compares a candidate against recent forecasts whose stored
+ * claims are English-canonical (see {@link normalizeForecastToEnglish}). A
+ * non-English candidate shares no keywords with them, so the local Jaccard
+ * check scores 0 and the LLM gate can miss the match. Translating the candidate
+ * first puts both sides in the same language. Pure-Latin titles are returned
+ * unchanged (no cost); a translation failure falls back to the original text,
+ * preserving the existing fail-open behaviour.
+ */
+export async function normalizeTitleForDedup(text: string): Promise<string> {
+  if (!hasNonLatinScript(text)) return text
+  const { english } = await normalizeForecastToEnglish({ claimText: text })
+  return english.claimText
+}
+
+/**
  * Returns translated fields for a prediction, fetching from cache or translating on demand.
  * Only translates fields that are non-empty in the source prediction.
  */

@@ -17,6 +17,7 @@ import {
   MAX_RESOLVE_DAYS,
 } from './shared'
 import { isLocalDuplicate } from './dedup'
+import { normalizeTitleForDedup } from '../translation'
 import { createAndStake } from './stake'
 
 export async function processSourcelessForecast(
@@ -95,14 +96,17 @@ export async function processSourcelessForecast(
     }
 
     // Dedup check against existing forecasts using the generated claim. A
-    // confident local keyword-overlap match skips the LLM round-trip.
-    if (isLocalDuplicate(forecast.claimText, existingTitles)) {
+    // confident local keyword-overlap match skips the LLM round-trip. Translate
+    // non-English claims to English first so they compare against the
+    // English-canonical existing titles rather than sharing no keywords.
+    const dedupTitle = await normalizeTitleForDedup(forecast.claimText)
+    if (isLocalDuplicate(dedupTitle, existingTitles)) {
       log.info({ botId: bot.id }, 'Sourceless forecast duplicates existing forecast (local dedup), skipping')
       await logBotAction(bot.id, 'SKIPPED', { title: forecast.claimText }, null, 'duplicate (sourceless path, local dedup)', dryRun)
       return 'skipped'
     }
     const dedupTemplate = await getPromptTemplate('dedupe-check')
-    const dedupPrompt = fillPrompt(dedupTemplate, { topicTitle: forecast.claimText, existingTitles: existingTitles.join('\n- ') })
+    const dedupPrompt = fillPrompt(dedupTemplate, { topicTitle: dedupTitle, existingTitles: existingTitles.join('\n- ') })
     let dedupResult
     try {
       dedupResult = await callLLMWithTimeout(llm, { prompt: dedupPrompt, temperature: 0 })
