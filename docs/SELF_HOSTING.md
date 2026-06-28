@@ -90,7 +90,7 @@ The "SSO" button appears only when all three of `OIDC_ISSUER`/`CLIENT_ID`/`CLIEN
 ${APP_URL}/api/auth/callback/oidc
 ```
 
-On first login a user is auto-provisioned (role `USER`) — **no per-user admin work**.
+On first login a user is auto-provisioned (role `USER`) — **no per-user admin work**. Admins see **Admin → About**, a read-only panel showing the edition, version, and which capabilities/integrations are configured — handy for confirming the install is wired up.
 
 **Bootstrap your admins** without a database edit:
 
@@ -221,7 +221,7 @@ See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated l
 
 - **Required:** `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION`
 - **Branding:** `APP_URL`, `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
-- **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (seeds the first admin via `prisma/seed.ts`)
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
 - **Add-on toggles (off by default):** `ENABLE_AI_FEATURES`, `ENABLE_EXTERNAL_MARKETS`
 - **AI (only when `ENABLE_AI_FEATURES=true`):** `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `ORACLE_URL`, `ORACLE_API_KEY`

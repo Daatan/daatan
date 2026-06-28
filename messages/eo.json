@@ -687,6 +687,7 @@
     "tabBots": "Robotoj",
     "tabOracle": "Orakolo",
     "tabSources": "Fontoj",
+    "tabAbout": "Pri",
     "refresh": "Aktualigi",
     "sourcesTitle": "Fontoj de news-indexer",
     "sourcesSummary": "{enabled} el {total} fontoj ŝaltitaj",
