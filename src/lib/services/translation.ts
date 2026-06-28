@@ -93,6 +93,70 @@ export function hasNonLatinScript(text: string): boolean {
   return NON_LATIN_SCRIPT.test(text)
 }
 
+// Persian uses the Arabic block plus these letters; their presence distinguishes fa from ar.
+const PERSIAN_LETTERS = new Set('پچژگکیﮎﯽ')
+
+/**
+ * Best-effort source-language code from the dominant non-Latin script — for showing the
+ * author the generated forecast in the language they typed in. Covers the scripts users
+ * actually author in (he/ar/fa/ru/el); returns null for Latin or unrecognised text.
+ */
+export function detectScriptLanguage(text: string): string | null {
+  let he = 0, ar = 0, cy = 0, fa = 0, el = 0
+  for (const ch of text) {
+    const o = ch.codePointAt(0) ?? 0
+    if (o >= 0x0590 && o <= 0x05FF) he++
+    else if (o >= 0x0400 && o <= 0x04FF) cy++
+    else if (o >= 0x0600 && o <= 0x06FF) { ar++; if (PERSIAN_LETTERS.has(ch)) fa++ }
+    else if (o >= 0x0370 && o <= 0x03FF) el++
+  }
+  const top = Math.max(he, ar, cy, el)
+  if (top === 0) return null
+  if (he === top) return 'he'
+  if (cy === top) return 'ru'
+  if (el === top) return 'el'
+  return fa > 0 ? 'fa' : 'ar'
+}
+
+export interface LocalizedForecast {
+  language: string
+  claimText: string
+  detailsText: string
+  resolutionRules: string
+  options: string[]
+}
+
+/**
+ * Translate a (just-generated, English) forecast's author-facing text into the language
+ * the author typed in, so the express create preview is shown in their own language. The
+ * English stays canonical; this is display/edit only. Fail-open: any failure (or English
+ * input) returns null and the preview stays English. Option counts must be preserved (for
+ * MULTIPLE_CHOICE) — a mismatch after translation falls back to the original options.
+ */
+export async function localizeForecastForAuthor(
+  fields: { claimText: string; detailsText?: string | null; resolutionRules?: string | null; options?: string[] },
+  authoredText: string,
+): Promise<LocalizedForecast | null> {
+  const lang = detectScriptLanguage(authoredText)
+  if (!lang) return null
+  try {
+    const [claimText, detailsText, resolutionRules, optionsJoined] = await Promise.all([
+      callGeminiTranslate(fields.claimText, lang),
+      fields.detailsText ? callGeminiTranslate(fields.detailsText, lang) : Promise.resolve(''),
+      fields.resolutionRules ? callGeminiTranslate(fields.resolutionRules, lang) : Promise.resolve(''),
+      fields.options?.length ? callGeminiTranslate(fields.options.join('\n'), lang) : Promise.resolve(''),
+    ])
+    const srcOptions = fields.options ?? []
+    const translatedOptions = optionsJoined ? optionsJoined.split('\n').map(s => s.trim()).filter(Boolean) : []
+    // Keep the English options if translation changed their count (MC integrity).
+    const options = translatedOptions.length === srcOptions.length ? translatedOptions : srcOptions
+    return { language: lang, claimText: claimText.trim(), detailsText: detailsText.trim(), resolutionRules: resolutionRules.trim(), options }
+  } catch (err) {
+    log.warn({ err, lang }, 'localizeForecastForAuthor failed; preview stays English')
+    return null
+  }
+}
+
 export interface ForecastTextFields {
   claimText: string
   detailsText?: string | null

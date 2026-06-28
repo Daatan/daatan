@@ -642,6 +642,7 @@
     "hintBeMoreSpecific": "Add specifics like names, dates, or locations",
     "skipSourcesAndRetry": "Create without sources",
     "reviewTitle": "Review Forecast",
+    "reviewInOriginal": "Reviewing in {language} — the public English version is created automatically.",
     "reviewSubtitle": "Review and refine the generated forecast before publishing.",
     "regenerate": "Regenerate",
     "regenerateFromClaimTooltip": "Regenerate from this claim",
