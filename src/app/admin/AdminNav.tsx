@@ -18,6 +18,7 @@ export default function AdminNav({ isAdmin }: { isAdmin: boolean }) {
     { id: 'bots', label: t('tabBots'), adminOnly: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
+    { id: 'about', label: t('tabAbout'), adminOnly: true },
   ]
 
   useEffect(() => {

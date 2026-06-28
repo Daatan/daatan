@@ -4,10 +4,12 @@ import crypto from 'crypto'
 const prisma = new PrismaClient()
 
 async function main() {
-  const adminEmails = [
-    'komapc@gmail.com',
-    'andrey1bar@gmail.com'
-  ]
+  // ADMIN_EMAIL (comma/space separated) seeds the first admin(s) on a self-host
+  // without editing code. Falls back to the SaaS owners when unset, so existing
+  // dev/staging/prod seeding is unchanged.
+  const adminEmails = process.env.ADMIN_EMAIL
+    ? process.env.ADMIN_EMAIL.split(/[,\s]+/).map((e) => e.trim().toLowerCase()).filter(Boolean)
+    : ['komapc@gmail.com', 'andrey1bar@gmail.com']
 
   console.log('Start seeding admins...')
 

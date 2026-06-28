@@ -55,8 +55,10 @@ Branding: `APP_LOGO_URL`, `EMAIL_FROM`.
 - LLM prompt de-DAATAN (`{{appName}}` in `bedrock-prompts.ts`) — AI is off by default; `getPromptTemplate` is a cached hot path, so a separate change.
 - Content pages (`about`, `privacy`) + OG-image routes still say DAATAN.
 - SAML — via a BoxyHQ Jackson sidecar that exposes SAML *as* OIDC (the app only ever speaks OIDC).
-- License-key gate; admin "About" panel; `prisma/seed.ts` admin-email bootstrap.
+- License-key gate (ed25519-signed `LICENSE_KEY`, warn-only) — issuance tooling lives out of repo.
 - Gating the admin-only bot system (LLM-dependent).
+
+> Done since: admin **About** panel (`/admin/about` + `/api/admin/about`) reports edition/version/capabilities/integrations (booleans, no secrets); `ADMIN_EMAIL` env seeds the first admin in `prisma/seed.ts` (falls back to the SaaS owners when unset).
 
 ## Phase / PR history
 
