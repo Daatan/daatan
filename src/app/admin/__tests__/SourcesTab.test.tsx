@@ -50,6 +50,28 @@ describe('SourcesTab', () => {
     expect(screen.getByText('n/a')).toBeInTheDocument()
   })
 
+  it('shows the disabledReason under the Disabled badge', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 2,
+        enabled: 1,
+        sources: [
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', disabledReason: null, impact: { matches: 1, forecastsAffected: 1, last30dMatches: 0, lastMatchedAt: null } },
+          { type: 'rss', name: 'Reuters World', locator: 'https://x/r', language: 'en', enabled: false,
+            domain: 'x', disabledReason: 'DNS failing from eu-central-1', impact: { matches: 0, forecastsAffected: 0, last30dMatches: 0, lastMatchedAt: null } },
+        ],
+        unconfigured: [],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('Reuters World')).toBeInTheDocument())
+    expect(screen.getByText('DNS failing from eu-central-1')).toBeInTheDocument()
+  })
+
   it('shows "shared with" instead of a duplicated number for sibling feeds of one outlet', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
