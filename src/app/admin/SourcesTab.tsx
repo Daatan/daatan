@@ -17,6 +17,7 @@ type Source = {
   locator: string | null
   language: string | null
   enabled: boolean
+  disabledReason?: string | null
   domain?: string | null
   impact?: Impact
 }
@@ -145,7 +146,7 @@ export default function SourcesTab() {
                           <tr key={`${s.name}-${i}`} className={`border-t border-navy-700 ${dim ? 'opacity-50' : ''}`}>
                             <td className="px-3 py-2 font-medium text-white">{s.name}</td>
                             <td className="px-3 py-2 text-gray-400 uppercase">{s.language || '—'}</td>
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-2 max-w-[18rem]">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
                                 s.enabled
                                   ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
@@ -153,6 +154,11 @@ export default function SourcesTab() {
                               }`}>
                                 {s.enabled ? t('sourcesEnabled') : t('sourcesDisabled')}
                               </span>
+                              {!s.enabled && s.disabledReason && (
+                                <p className="mt-1 text-[11px] text-gray-500 leading-snug" title={s.disabledReason}>
+                                  {s.disabledReason}
+                                </p>
+                              )}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap">
                               {shared ? (
