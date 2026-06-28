@@ -48,9 +48,11 @@ Copy `.env.selfhost.example` and fill it in. The essentials:
 | `NEXTAUTH_SECRET` | 32+ char random secret — `openssl rand -hex 32`. |
 | `DAATAN_EDITION` | Set to `self_hosted`. |
 
-### Branding (optional — defaults to Daatan)
+### Branding (required for self-host)
 
-`APP_URL` (canonical/SEO base; falls back to `NEXTAUTH_URL`), `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`.
+`APP_NAME` and `APP_URL` are **required** when `DAATAN_EDITION=self_hosted` — the app fails fast with a clear error if either is missing, so your instance never ships as "DAATAN". `APP_URL` is the canonical/SEO base (falls back to `NEXTAUTH_URL`); `APP_LOGO_URL` and `EMAIL_FROM` are optional overrides.
+
+A self-hosted instance is automatically **`noindex`** (robots + meta) and emits no daatan.com search-verification tags — it won't show up in public search engines.
 
 ---
 

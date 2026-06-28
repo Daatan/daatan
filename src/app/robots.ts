@@ -1,13 +1,13 @@
 import type { MetadataRoute } from 'next'
-import { env } from '@/env'
+import { getAppUrl, shouldIndex } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
 export default function robots(): MetadataRoute.Robots {
-  const isProd = env.NEXT_PUBLIC_ENV === 'production'
-  const baseUrl = 'https://daatan.com'
+  const baseUrl = getAppUrl()
 
-  if (!isProd) {
+  // Non-indexable (any non-prod SaaS env, or any self-hosted instance) → block all.
+  if (!shouldIndex()) {
     return {
       rules: {
         userAgent: '*',

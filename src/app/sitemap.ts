@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
+import { getAppUrl } from '@/lib/branding'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
@@ -36,7 +37,7 @@ const fetchSitemapData = unstable_cache(
   { revalidate: 3600, tags: ['sitemap'] },
 )
 
-const BASE_URL = 'https://daatan.com'
+const BASE_URL = getAppUrl()
 
 // Locales actively submitted to Google (eo intentionally excluded — low-value traffic)
 const SITEMAP_LOCALES = ['he', 'ru'] as const

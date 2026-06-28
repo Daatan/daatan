@@ -25,20 +25,26 @@ import { isRtl } from '@/i18n/config'
 import type { Locale } from '@/i18n/config'
 
 import { env } from '@/env'
-
-const baseUrl = 'https://daatan.com'
+import { getAppName, getAppUrl, getVerificationTokens, shouldIndex } from '@/lib/branding'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const isProd = env.NEXT_PUBLIC_ENV === 'production'
+  // SaaS keeps the literal DAATAN identity (these resolve byte-identically when
+  // APP_* are unset); self-host overrides via APP_NAME / APP_URL.
+  const appName = getAppName()
+  const baseUrl = getAppUrl()
+  const indexable = shouldIndex()
+  const tokens = getVerificationTokens()
+  const defaultTitle = `${appName} — Measurable Forecasts`
+  const description =
+    'Turn opinions into measurable forecasts. Track accuracy over time and build a public track record.'
 
   return {
     metadataBase: new URL(baseUrl),
     title: {
-      default: 'DAATAN — Measurable Forecasts',
-      template: '%s | DAATAN',
+      default: defaultTitle,
+      template: `%s | ${appName}`,
     },
-    description:
-      'Turn opinions into measurable forecasts. Track accuracy over time and build a public track record.',
+    description,
     icons: {
       icon: [
         { url: '/favicon.ico', sizes: 'any' },
@@ -47,41 +53,41 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: '/apple-touch-icon.png',
     },
     manifest: '/manifest.webmanifest',
-    verification: {
-      google: 'ATwti6XWdVyDu_RJlJhqcBsq-Z_lkjA7nq8ooac',
-      other: {
-        'msvalidate.01': 'CAFA7BE0D5D83695993D635831499022',
+    ...(tokens && {
+      verification: {
+        google: tokens.google,
+        other: {
+          'msvalidate.01': tokens.bing,
+        },
       },
-    },
+    }),
     openGraph: {
       type: 'website',
-      siteName: 'DAATAN',
-      title: 'DAATAN — Measurable Forecasts',
-      description:
-        'Turn opinions into measurable forecasts. Track accuracy over time and build a public track record.',
-      url: 'https://daatan.com',
+      siteName: appName,
+      title: defaultTitle,
+      description,
+      url: baseUrl,
     },
     twitter: {
       card: 'summary_large_image',
       site: '@daatan_dev',
-      title: 'DAATAN — Measurable Forecasts',
-      description:
-        'Turn opinions into measurable forecasts. Track accuracy over time and build a public track record.',
+      title: defaultTitle,
+      description,
     },
     alternates: {
       languages: {
-        'x-default': 'https://daatan.com',
-        'en': 'https://daatan.com',
-        'he': 'https://daatan.com/he',
-        'ru': 'https://daatan.com/ru',
+        'x-default': baseUrl,
+        'en': baseUrl,
+        'he': `${baseUrl}/he`,
+        'ru': `${baseUrl}/ru`,
       },
     },
     robots: {
-      index: isProd,
-      follow: isProd,
+      index: indexable,
+      follow: indexable,
       googleBot: {
-        index: isProd,
-        follow: isProd,
+        index: indexable,
+        follow: indexable,
       },
     },
   }
