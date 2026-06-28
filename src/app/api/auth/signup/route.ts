@@ -9,6 +9,7 @@ import { findUserByEmail, findUsernameCollisions, registerUser } from '@/lib/ser
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 import { env } from '@/env'
 import { isEmailDomainAllowed, isOpenSignupEnabled, parseAllowedDomains } from '@/lib/auth/access'
+import { consumeInvite } from '@/lib/services/invite'
 
 const log = createLogger('api-auth-signup')
 
@@ -16,15 +17,11 @@ export async function POST(req: NextRequest) {
   const rl = checkRateLimit(`signup:${clientIp(req)}`, 5, 60 * 60 * 1000)
   if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
-  // Closed-signup gate (self-host). No-op for SaaS, which is always open.
-  if (!isOpenSignupEnabled(env.DAATAN_EDITION, env.SELF_HOST_OPEN_SIGNUP)) {
-    return apiError('Public signup is disabled', 403)
-  }
-
   try {
     const body = await req.json()
     const validatedData = registerSchema.parse(body)
     const { name, email, password } = validatedData
+    const inviteToken = typeof body.invite === 'string' ? body.invite.trim() : ''
 
     // Domain allow-list (self-host). No-op when ALLOWED_EMAIL_DOMAINS is unset.
     if (!isEmailDomainAllowed(email, parseAllowedDomains(env.ALLOWED_EMAIL_DOMAINS))) {
@@ -34,6 +31,15 @@ export async function POST(req: NextRequest) {
     const existingUser = await findUserByEmail(email)
     if (existingUser) {
       return apiError('User with this email already exists', 400)
+    }
+
+    // Open-signup OR a valid single-use invite. No-op for SaaS (always open).
+    // Checked after the email-collision guard so a duplicate signup never burns
+    // an invite; consumeInvite is atomic, so concurrent reuse can't both win.
+    if (!isOpenSignupEnabled(env.DAATAN_EDITION, env.SELF_HOST_OPEN_SIGNUP)) {
+      if (!inviteToken || !(await consumeInvite(inviteToken))) {
+        return apiError('Signup is invite-only', 403)
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)

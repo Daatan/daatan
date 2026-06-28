@@ -33,6 +33,8 @@ vi.mock('bcryptjs', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed_
 
 vi.mock('@/lib/services/telegram', () => ({ notifyNewUserRegistered: vi.fn() }))
 
+vi.mock('@/lib/services/invite', () => ({ consumeInvite: vi.fn() }))
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
 }))
@@ -58,20 +60,42 @@ describe('POST /api/auth/signup — self-host access gates', () => {
     })
   })
 
-  it('blocks public signup with 403 when edition is self_hosted and open-signup is off', async () => {
+  it('blocks closed signup with 403 (invite-only) when self_hosted and no invite is given', async () => {
     mockEnv.DAATAN_EDITION = 'self_hosted'
     const { POST } = await import('@/app/api/auth/signup/route')
     const res = await POST(req(validBody))
     expect(res.status).toBe(403)
-    expect((await res.json()).error).toContain('disabled')
+    expect((await res.json()).error).toContain('invite-only')
   })
 
-  it('allows signup when self_hosted explicitly re-opens it', async () => {
+  it('admits closed signup when a valid invite is supplied and consumed', async () => {
+    mockEnv.DAATAN_EDITION = 'self_hosted'
+    const { consumeInvite } = await import('@/lib/services/invite')
+    vi.mocked(consumeInvite).mockResolvedValue(true)
+    const { POST } = await import('@/app/api/auth/signup/route')
+    const res = await POST(req({ ...validBody, invite: 'good-token' }))
+    expect(res.status).toBe(201)
+    expect(consumeInvite).toHaveBeenCalledWith('good-token')
+  })
+
+  it('rejects closed signup with 403 when the invite is invalid/used', async () => {
+    mockEnv.DAATAN_EDITION = 'self_hosted'
+    const { consumeInvite } = await import('@/lib/services/invite')
+    vi.mocked(consumeInvite).mockResolvedValue(false)
+    const { POST } = await import('@/app/api/auth/signup/route')
+    const res = await POST(req({ ...validBody, invite: 'bad-token' }))
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toContain('invite-only')
+  })
+
+  it('allows signup when self_hosted explicitly re-opens it (no invite needed)', async () => {
     mockEnv.DAATAN_EDITION = 'self_hosted'
     mockEnv.SELF_HOST_OPEN_SIGNUP = 'true'
+    const { consumeInvite } = await import('@/lib/services/invite')
     const { POST } = await import('@/app/api/auth/signup/route')
     const res = await POST(req(validBody))
     expect(res.status).toBe(201)
+    expect(consumeInvite).not.toHaveBeenCalled()
   })
 
   it('rejects an out-of-domain email with 403 when ALLOWED_EMAIL_DOMAINS is set', async () => {

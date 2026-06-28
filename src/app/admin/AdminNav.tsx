@@ -14,6 +14,7 @@ export default function AdminNav({ isAdmin }: { isAdmin: boolean }) {
     { id: 'forecasts', label: t('tabForecasts') },
     { id: 'comments', label: t('tabComments') },
     { id: 'users', label: t('tabUsers'), adminOnly: true },
+    { id: 'invites', label: t('tabInvites'), adminOnly: true },
     { id: 'bots', label: t('tabBots'), adminOnly: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },

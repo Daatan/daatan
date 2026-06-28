@@ -148,6 +148,19 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// Single-use signup invites for the self-hosted edition (the non-SSO onboarding
+// path). `token` stores the SHA-256 of the raw token, never the raw value, so a
+// DB read can't be replayed. Consumed by stamping `acceptedAt`. Intentionally
+// minimal — email-binding, expiry and per-invite roles are additive later.
+model Invite {
+  id         String    @id @default(cuid())
+  token      String    @unique // SHA-256 hex of the raw token
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  @@map("invites")
+}
+
 // ============================================
 // NEWS ANCHORS (Context for predictions)
 // ============================================
