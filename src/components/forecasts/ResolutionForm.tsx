@@ -36,7 +36,7 @@ interface ResolutionFormProps {
 }
 
 export function ResolutionForm({ predictionId, outcomeType, options, onResolved }: ResolutionFormProps) {
-  const { ai } = useCapabilities()
+  const { aiResearch } = useCapabilities()
   const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable'>('correct')
   const [correctOptionId, setCorrectOptionId] = useState<string>('')
   const [evidenceLinks, setEvidenceLinks] = useState<string>('')
@@ -159,7 +159,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
     <form onSubmit={handleSubmit} className="bg-navy-700 rounded-lg border border-navy-600 p-6 space-y-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Resolve Forecast</h3>
-        {ai && (
+        {aiResearch && (
         <Button
           type="button"
           onClick={handleAiResearch}

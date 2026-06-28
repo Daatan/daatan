@@ -152,20 +152,19 @@ A MinIO service is included (commented) in `docker-compose.selfhost.yml` — unc
 
 v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and track per-person calibration/reputation (Brier/Glicko/ELO) — none of which need any external service. The AI/Oracle/search and external-market features are **opt-in and off by default** on self-host, so a fresh install shows no AI buttons and never calls out.
 
-| Flag | Gates | Default (self-host) |
-|------|-------|---------------------|
-| `ENABLE_AI_FEATURES=true` | Oracle co-forecaster, web/news search, LLM estimates — the "Analyze", Express, "Guess Chances", AI extract & tag-suggest, AI-assist-on-resolve surfaces | **off** |
-| `ENABLE_EXTERNAL_MARKETS=true` | Polymarket / Kalshi paste-to-prefill import + suggest-similar | **off** |
+**The LLM key is the switch** — configure one and AI-assisted features appear; configure none and they're hidden (UI gone, API routes 404 — no broken buttons).
 
-When a flag is off, its UI is hidden and its API routes return 404 — there are no broken buttons. To turn AI on, set `ENABLE_AI_FEATURES=true` **and** configure at least one of:
+| Provide… | …to enable |
+|----------|------------|
+| an **LLM key** — `OPENROUTER_API_KEY` (easy default; one key, many models), or `GEMINI_API_KEY`, or `OLLAMA_BASE_URL` (local) | **Express forecast**, "Guess Chances", AI extract & tag-suggest |
+| an LLM key **+** a search backend — `ORACLE_URL` / `ORACLE_API_KEY` | the above **plus "Analyze"** (the search-backed co-forecaster) and resolve-time AI research |
+| `ENABLE_EXTERNAL_MARKETS=true` | Polymarket / Kalshi paste-to-prefill import |
 
-| Var | Role when AI is enabled |
-|-----|--------------------------|
-| `GEMINI_API_KEY` | Cloud LLM (primary). Falls back to a local Ollama at `OLLAMA_BASE_URL` if unset. |
-| `OLLAMA_BASE_URL` | Local LLM fallback. |
-| `ORACLE_URL` / `ORACLE_API_KEY` | Calibrated Oracle co-forecaster; the LLM path is used when unset. |
-
-Within enabled AI, these still degrade gracefully relative to one another (no Oracle → LLM; no LLM → feature skipped).
+Notes:
+- On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracle.
+- `OPENROUTER_MODEL` overrides the default model (`openai/gpt-4o-mini`).
+- `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
+- Providers degrade gracefully relative to one another (Gemini → OpenRouter → Ollama).
 
 ---
 
@@ -223,5 +222,4 @@ See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated l
 - **Branding:** `APP_URL`, `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
 - **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (seeds the first admin via `prisma/seed.ts`)
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
-- **Add-on toggles (off by default):** `ENABLE_AI_FEATURES`, `ENABLE_EXTERNAL_MARKETS`
-- **AI (only when `ENABLE_AI_FEATURES=true`):** `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `ORACLE_URL`, `ORACLE_API_KEY`
+- **AI (a key enables it):** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`; `ORACLE_URL`/`ORACLE_API_KEY` add "Analyze"; `ENABLE_AI_FEATURES` (override), `ENABLE_EXTERNAL_MARKETS`
