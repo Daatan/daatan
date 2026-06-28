@@ -1,0 +1,159 @@
+name: News-Indexer Watchdog
+#
+# Monitors the news-indexer (scrapper.daatan.com) — free disk space + DB / pipeline
+# health — by polling its public /stats endpoint. The news-indexer EC2 is NOT covered
+# by watchdog.yml's disk-watchdog (that targets the daatan-backend instances only), so
+# this fills that gap.
+#
+#   • Runs hourly. ALERT-ONLY: posts a 🚨 to BOTH Telegram channels (clean + noisy)
+#     when something looks suspicious, and stays silent otherwise.
+#   • Once a day (DIGEST_HOUR, UTC) it also posts a plain health digest to the noisy
+#     channel so there's a regular "all good" heartbeat.
+#
+# Disk usage comes from /stats (.disk.used_percent), added by the news-indexer
+# feat/stats-disk-usage change — the app container's / is backed by the EC2 root
+# volume, so it reflects the real host disk. Until that deploys, disk checks are
+# skipped gracefully.
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # hourly, at :17 (off the top-of-hour congestion)
+  workflow_dispatch:
+
+env:
+  STATS_URL: https://scrapper.daatan.com/stats
+  DISK_ALERT_PCT: '80'     # absolute disk-usage alert threshold
+  DISK_DELTA_PCT: '2'      # alert if disk% jumps more than this between hourly runs
+  QUEUE_DEPTH_ALERT: '500' # main-queue depth that looks backed up
+  DIGEST_HOUR: '9'         # UTC hour to post the daily digest
+
+jobs:
+  watch:
+    name: news-indexer health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore previous state
+        uses: actions/cache/restore@v5
+        with:
+          path: /tmp/niwd-prev.json
+          key: niwd-state-${{ github.run_id }}
+          restore-keys: niwd-state-
+
+      - name: Check /stats and evaluate
+        id: check
+        run: |
+          set -uo pipefail
+
+          # --- fetch /stats; an unreachable indexer is itself an alert ---
+          if ! curl -sf --max-time 25 "$STATS_URL" -o /tmp/stats.json; then
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+            printf 'news-indexer /stats is unreachable — the indexer may be down.' | base64 -w0 > /tmp/p.b64
+            echo "problems_b64=$(cat /tmp/p.b64)" >> "$GITHUB_OUTPUT"
+            # still emit a digest line so the daily run isn't blank
+            printf '📊 <b>news-indexer health</b>%%0A🚨 /stats unreachable' | base64 -w0 > /tmp/d.b64
+            echo "digest_b64=$(cat /tmp/d.b64)" >> "$GITHUB_OUTPUT"
+            # preserve prior state (don't overwrite with garbage)
+            exit 0
+          fi
+
+          j() { jq -r "$1" /tmp/stats.json 2>/dev/null; }
+
+          DISK_PCT=$(j '.disk.used_percent // empty')
+          DISK_FREE=$(j '.disk.free_gb // empty')
+          DISK_TOTAL=$(j '.disk.total_gb // empty')
+          DB_MB=$(j '.articles.db_size_mb // 0')
+          ART_TOT=$(j '.articles.total // 0')
+          ART_24=$(j '.articles.last_24h // 0')
+          WSTATUS=$(j '.worker.status // "unknown"')
+          QDEPTH=$(j '.queue.depth // 0')
+          DLQ=$(j '.queue.dlq_depth // 0')
+          M_TOT=$(j '.matches.total // 0')
+          M_24=$(j '.matches.last_24h // 0')
+          STALE=$(j '[.sources[]? | select(.stale==true) | .name] | join(", ")')
+
+          PREV_DISK=""
+          if [ -f /tmp/niwd-prev.json ]; then
+            PREV_DISK=$(jq -r '.disk_pct // empty' /tmp/niwd-prev.json 2>/dev/null || echo "")
+          fi
+
+          gt() { awk "BEGIN{exit !(($1) > ($2))}"; }   # float-safe a>b
+
+          PROBLEMS=()
+
+          if [ -n "$DISK_PCT" ]; then
+            gt "$DISK_PCT" "$DISK_ALERT_PCT" && PROBLEMS+=("💾 Disk ${DISK_PCT}% used (> ${DISK_ALERT_PCT}%); ${DISK_FREE} GB free")
+            if [ -n "$PREV_DISK" ]; then
+              DELTA=$(awk "BEGIN{d=$DISK_PCT-$PREV_DISK; if(d<0)d=-d; printf \"%.1f\", d}")
+              gt "$DELTA" "$DISK_DELTA_PCT" && PROBLEMS+=("💾 Disk jumped ${PREV_DISK}% → ${DISK_PCT}% (Δ ${DELTA}pp > ${DISK_DELTA_PCT}pp)")
+            fi
+          fi
+          [ "$WSTATUS" != "ok" ] && PROBLEMS+=("⚙️ Worker status: ${WSTATUS}")
+          [ "$ART_24" -eq 0 ] 2>/dev/null && PROBLEMS+=("📰 No articles indexed in 24h")
+          [ "$DLQ" -gt 0 ] 2>/dev/null && PROBLEMS+=("📮 DLQ depth ${DLQ}")
+          [ "$QDEPTH" -gt "$QUEUE_DEPTH_ALERT" ] 2>/dev/null && PROBLEMS+=("📮 Queue depth ${QDEPTH} (backed up)")
+          [ -n "$STALE" ] && PROBLEMS+=("🕸️ Stale feed(s): ${STALE}")
+
+          # --- persist state for next run's delta ---
+          echo "{\"disk_pct\": ${DISK_PCT:-null}, \"db_mb\": ${DB_MB:-0}}" > /tmp/niwd-prev.json
+
+          # --- build the daily digest text (HTML, %0A line breaks) ---
+          DISK_LINE="n/a (pending /stats deploy)"
+          [ -n "$DISK_PCT" ] && DISK_LINE="${DISK_PCT}% used · ${DISK_FREE} GB free / ${DISK_TOTAL} GB"
+          STALE_LINE="none"; [ -n "$STALE" ] && STALE_LINE="$STALE"
+          DIGEST=$(printf '📊 <b>news-indexer health</b>%%0A💾 Disk: %s%%0A🗄️ DB: %s MB%%0A📰 Articles: %s total · %s in 24h%%0A⚙️ Worker: %s · queue %s · DLQ %s%%0A🔗 Matches: %s total · %s in 24h%%0A🕸️ Stale feeds: %s' \
+            "$DISK_LINE" "$DB_MB" "$ART_TOT" "$ART_24" "$WSTATUS" "$QDEPTH" "$DLQ" "$M_TOT" "$M_24" "$STALE_LINE")
+          echo "digest_b64=$(printf '%s' "$DIGEST" | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+          if [ ${#PROBLEMS[@]} -gt 0 ]; then
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+            PTEXT=$(printf '• %s%%0A' "${PROBLEMS[@]}")
+            echo "problems_b64=$(printf '%s' "$PTEXT" | base64 -w0)" >> "$GITHUB_OUTPUT"
+            printf 'Problems found:\n'; printf '  %s\n' "${PROBLEMS[@]}"
+          else
+            echo "alert=false" >> "$GITHUB_OUTPUT"
+            echo "All checks OK."
+          fi
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: /tmp/niwd-prev.json
+          key: niwd-state-${{ github.run_id }}
+
+      - name: 🚨 Alert (both channels)
+        if: steps.check.outputs.alert == 'true'
+        env:
+          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CLEAN: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
+          NOISY: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          PROBLEMS=$(echo '${{ steps.check.outputs.problems_b64 }}' | base64 -d)
+          MSG="🚨 <b>news-indexer: something looks off</b>%0A%0A${PROBLEMS}%0A<a href='${STATS_URL}'>open /stats</a>"
+          # both channels; clean falls back to noisy if unset
+          CLEAN="${CLEAN:-$NOISY}"
+          for CHAT in "$CLEAN" "$NOISY"; do
+            [ -z "$CHAT" ] && continue
+            curl -s -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+              -d "chat_id=${CHAT}" -d "text=${MSG}" \
+              -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
+          done
+          # de-dupe when both IDs are the same
+          if [ "$CLEAN" = "$NOISY" ]; then echo "clean==noisy: sent once"; fi
+
+      - name: 📊 Daily digest (noisy channel)
+        env:
+          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          NOISY: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" != "$(printf '%02d' "$DIGEST_HOUR")" ] && [ "$HOUR" != "$DIGEST_HOUR" ]; then
+            echo "Not the digest hour (now ${HOUR}Z, digest at ${DIGEST_HOUR}Z) — skipping digest."
+            exit 0
+          fi
+          [ -z "$NOISY" ] && { echo "No noisy chat id — skipping"; exit 0; }
+          DIGEST=$(echo '${{ steps.check.outputs.digest_b64 }}' | base64 -d)
+          curl -s -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+            -d "chat_id=${NOISY}" -d "text=${DIGEST}" \
+            -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
+          echo "Digest sent."
