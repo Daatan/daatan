@@ -5,7 +5,7 @@ import { toError } from '@/lib/utils/error'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
+import { BrandLogo } from '@/components/BrandLogo'
 import { UserPlus, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useTranslations } from 'next-intl'
@@ -68,7 +68,7 @@ export default function SignupClient() {
       <div className="max-w-md w-full bg-navy-700 rounded-2xl shadow-sm border border-navy-600 p-8 space-y-8">
         <div className="flex flex-col items-center text-center">
           <Link href="/">
-            <Image src="/logo-icon.svg" alt="DAATAN" width={64} height={64} className="mb-4" />
+            <BrandLogo fallbackSrc="/logo-icon.svg" width={64} height={64} className="mb-4" />
           </Link>
           <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
           <p className="text-gray-500 mt-2">{t('description')}</p>

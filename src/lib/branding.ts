@@ -42,6 +42,17 @@ export function getAppLogoUrl(): string {
   return env.APP_LOGO_URL || '/logo-icon.svg'
 }
 
+export interface Branding {
+  appName: string
+  /** Operator logo override (any URL), or null to use each surface's bundled asset. */
+  logoUrl: string | null
+}
+
+/** Snapshot handed to the client BrandingProvider from the root layout. */
+export function getBranding(): Branding {
+  return { appName: getAppName(), logoUrl: env.APP_LOGO_URL ?? null }
+}
+
 /**
  * Whether this instance should be indexed by search engines. A self-hosted
  * (internal) instance is never indexed; SaaS indexes in production only.
