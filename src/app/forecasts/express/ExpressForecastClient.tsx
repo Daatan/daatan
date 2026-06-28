@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Search, FileText, Loader2, AlertCircle, Edit2, RotateCcw, ArrowLeft, X, Plus, List, Trash2, Eye, EyeOff, ShieldCheck, Newspaper, type LucideIcon } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecastsWarning'
 import { createClientLogger } from '@/lib/client-logger'
@@ -36,6 +36,13 @@ interface GeneratedPrediction {
     url: string
     title: string
   }>
+  localized?: {
+    language: string
+    claimText: string
+    detailsText: string
+    resolutionRules: string
+    options: string[]
+  } | null
 }
 
 type Step = 'input' | 'checking' | 'searching' | 'analyzing' | 'generating' | 'review' | 'error'
@@ -46,6 +53,7 @@ export default function ExpressForecastClient({
   onInputChange
 }: ExpressForecastClientProps) {
   const t = useTranslations('expressForecast')
+  const locale = useLocale()
   const router = useRouter()
 
   const ANALYZING_MESSAGES = useMemo(() => [
@@ -83,6 +91,9 @@ export default function ExpressForecastClient({
     isNonLatin: boolean
   } | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  // Non-null when the user typed in a non-English language: the preview/edit is shown in
+  // that language; the English canonical is re-derived on create (createForecast).
+  const [originalLang, setOriginalLang] = useState<string | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isGuessing, setIsGuessing] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
@@ -191,8 +202,15 @@ export default function ExpressForecastClient({
               setPhase(5)
               setProgressMessage(data.data?.message || t('finalizingMsg'))
             } else if (data.stage === 'complete') {
-              setGenerated(data.data)
-              setEditForm(data.data) // Initialize edit form
+              // Non-Latin input → show/edit the preview in the author's language; the
+              // English fields stay under the hood (createForecast re-derives them).
+              const loc = data.data.localized
+              const display = loc
+                ? { ...data.data, claimText: loc.claimText, detailsText: loc.detailsText, resolutionRules: loc.resolutionRules, options: loc.options }
+                : data.data
+              setOriginalLang(loc?.language ?? null)
+              setGenerated(display)
+              setEditForm(display) // Initialize edit form
               setStep('review')
             } else if (data.stage === 'error') {
               if (data.error === 'NO_ARTICLES_FOUND') {
@@ -226,6 +244,7 @@ export default function ExpressForecastClient({
     setGenerated(null)
     setEditForm(null)
     setIsEditing(false)
+    setOriginalLang(null)
     setProgressMessage('')
     setArticlesFound(0)
     setSourcesSummary('')
@@ -628,19 +647,31 @@ export default function ExpressForecastClient({
             </div>
           </div>
 
+          {originalLang && (
+            <div className="flex items-start gap-2 rounded-xl border border-blue-500/30 bg-cobalt/10 px-4 py-3 text-sm text-blue-300">
+              <Sparkles className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                {t('reviewInOriginal', {
+                  language: new Intl.DisplayNames([locale], { type: 'language' }).of(originalLang) || originalLang,
+                })}
+              </span>
+            </div>
+          )}
+
           <div className="space-y-6">
             {/* Claim */}
             <div>
               <h3 className="text-sm font-bold text-text-secondary mb-2">{t('forecastClaim')}</h3>
               {isEditing ? (
                 <textarea
+                  dir="auto"
                   value={editForm?.claimText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, claimText: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={3}
                 />
               ) : (
-                <p className="text-lg text-white">{generated.claimText}</p>
+                <p className="text-lg text-white" dir="auto">{generated.claimText}</p>
               )}
             </div>
 
@@ -778,13 +809,14 @@ export default function ExpressForecastClient({
               <h3 className="text-sm font-bold text-text-secondary mb-2">{t('context')}</h3>
               {isEditing ? (
                 <textarea
+                  dir="auto"
                   value={editForm?.detailsText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, detailsText: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={4}
                 />
               ) : (
-                <p className="text-text-secondary">{generated.detailsText}</p>
+                <p className="text-text-secondary" dir="auto">{generated.detailsText}</p>
               )}
             </div>
 
@@ -793,13 +825,14 @@ export default function ExpressForecastClient({
               <h3 className="text-sm font-bold text-text-secondary mb-2">{t('resolutionRules')}</h3>
               {isEditing ? (
                 <textarea
+                  dir="auto"
                   value={editForm?.resolutionRules}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, resolutionRules: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                 />
               ) : (
-                <p className="text-text-secondary italic">{generated.resolutionRules}</p>
+                <p className="text-text-secondary italic" dir="auto">{generated.resolutionRules}</p>
               )}
             </div>
 

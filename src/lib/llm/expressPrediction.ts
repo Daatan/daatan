@@ -11,6 +11,7 @@ import { hashUrl } from '../utils/hash'
 import { createLogger } from '@/lib/logger'
 import { STANDARD_TAGS } from '@/lib/constants'
 import { checkContent } from '../services/moderation'
+import { localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
 
 const log = createLogger('express-prediction')
 
@@ -118,6 +119,10 @@ export interface ExpressPredictionResult {
     url: string
     title: string
   }>
+  // Author-facing text translated into the language the user typed in (non-Latin input
+  // only), for the create preview. The English fields above stay canonical. Null/absent
+  // for English input or on translation failure.
+  localized?: LocalizedForecast | null
 }
 
 /** Shape of the JSON object returned by the LLM (matches expressPredictionSchema). */
@@ -229,7 +234,11 @@ export async function generateExpressPrediction(
 
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-    return { ...prediction, newsAnchor: null, additionalLinks: [] }
+    const localized = await localizeForecastForAuthor(
+      { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
+      userInput,
+    )
+    return { ...prediction, newsAnchor: null, additionalLinks: [], localized }
   }
 
   const isUrl = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
@@ -470,6 +479,11 @@ URL: ${article.url}
 
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
+  const localized = await localizeForecastForAuthor(
+    { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
+    userInput,
+  )
+
   return {
     ...prediction,
     newsAnchor: anchorArticle
@@ -482,7 +496,8 @@ URL: ${article.url}
         publishedAt: anchorArticle.publishedDate ? new Date(anchorArticle.publishedDate) : undefined
       }
       : null,
-    additionalLinks
+    additionalLinks,
+    localized,
   }
 }
 

@@ -55,6 +55,17 @@ A non-English author edits in **their own language**, never the English canonica
 - An author who rewrites the forecast *in English* (detected by `normalizeForecastToEnglish`)
   falls through to a plain direct update.
 
+### Express create preview
+
+The express flow generates the forecast in **English** (keeps tags/structure correct), then —
+for non-Latin input — `localizeForecastForAuthor` translates the author-facing fields
+(`claimText`/`detailsText`/`resolutionRules`/`options`) into the language the user typed in
+(`detectScriptLanguage`), returned as a `localized` block on the result. `ExpressForecastClient`
+shows/edits that localized text (`dir="auto"`, with a "reviewing in {language}" notice) and sends
+it to `POST /api/forecasts`, where `createForecast` re-derives the English canonical and records
+`originalLanguage`. Fail-open: any translation failure (or English input) leaves the preview in
+English. So the author never sees English from typing to publish.
+
 ## Slug aliases
 
 When a forecast is re-slugged (e.g. a non-English slug fixed during canonicalization),

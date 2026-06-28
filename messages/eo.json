@@ -642,6 +642,7 @@
     "hintBeMoreSpecific": "Aldonu detalojn kiel nomojn, datojn aŭ lokojn",
     "skipSourcesAndRetry": "Krei sen fontoj",
     "reviewTitle": "Kontroli prognozon",
+    "reviewInOriginal": "Kontrolado en {language} — la publika angla versio kreiĝas aŭtomate.",
     "reviewSubtitle": "Kontrolu kaj rafinigu la generitan prognozon antaŭ publikigo.",
     "regenerate": "Regeneri",
     "regenerateFromClaimTooltip": "Regeneri el ĉi tiu aserto",

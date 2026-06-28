@@ -642,6 +642,7 @@
     "hintBeMoreSpecific": "הוסיפו פרטים כמו שמות, תאריכים או מיקומים",
     "skipSourcesAndRetry": "ליצור ללא מקורות",
     "reviewTitle": "בדיקת תחזית",
+    "reviewInOriginal": "סקירה ב{language} — הגרסה הציבורית באנגלית נוצרת אוטומטית.",
     "reviewSubtitle": "בדקו ועדנו את התחזית לפני פרסום.",
     "regenerate": "צרו מחדש",
     "regenerateFromClaimTooltip": "צרו מחדש מטענה זו",

@@ -17,6 +17,8 @@ import {
   hasNonLatinScript,
   normalizeForecastToEnglish,
   normalizeTitleForDedup,
+  detectScriptLanguage,
+  localizeForecastForAuthor,
 } from '../translation'
 import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
@@ -193,5 +195,55 @@ describe('normalizeTitleForDedup', () => {
     vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'not json' } as never)
     const out = await normalizeTitleForDedup(HEBREW_CLAIM)
     expect(out).toBe(HEBREW_CLAIM)
+  })
+})
+
+describe('detectScriptLanguage', () => {
+  it('detects the dominant non-Latin script', () => {
+    expect(detectScriptLanguage(HEBREW_CLAIM)).toBe('he')
+    expect(detectScriptLanguage('Большинство проголосует за')).toBe('ru')
+    expect(detectScriptLanguage('سوف يفوز الحزب')).toBe('ar')
+    expect(detectScriptLanguage('Η κυβέρνηση θα πέσει')).toBe('el')
+  })
+  it('returns null for Latin / undetectable text', () => {
+    expect(detectScriptLanguage('Bitcoin hits $100k by 2026')).toBeNull()
+    expect(detectScriptLanguage('Café résumé 2026')).toBeNull()
+  })
+})
+
+describe('localizeForecastForAuthor', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns null (no LLM) when the author typed in English', async () => {
+    const out = await localizeForecastForAuthor({ claimText: 'X will happen' }, 'English input here')
+    expect(out).toBeNull()
+    expect(llmService.generateContent).not.toHaveBeenCalled()
+  })
+
+  it('translates the author-facing fields into the typed language', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'מתורגם' } as never)
+    const out = await localizeForecastForAuthor(
+      { claimText: 'At least one party withdraws', detailsText: 'context', resolutionRules: 'rules', options: [] },
+      HEBREW_CLAIM,
+    )
+    expect(out).not.toBeNull()
+    expect(out!.language).toBe('he')
+    expect(out!.claimText).toBe('מתורגם')
+  })
+
+  it('keeps the original options if translation changes their count (MC integrity)', async () => {
+    // One generateContent mock for all fields → options "a\nb" becomes a single line.
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'אחד' } as never)
+    const out = await localizeForecastForAuthor(
+      { claimText: 'c', options: ['Yes', 'No', 'Maybe'] },
+      HEBREW_CLAIM,
+    )
+    expect(out!.options).toEqual(['Yes', 'No', 'Maybe'])
+  })
+
+  it('fails open to null when translation throws', async () => {
+    vi.mocked(llmService.generateContent).mockRejectedValue(new Error('LLM down') as never)
+    const out = await localizeForecastForAuthor({ claimText: 'c' }, HEBREW_CLAIM)
+    expect(out).toBeNull()
   })
 })
