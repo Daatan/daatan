@@ -2,7 +2,7 @@ import { generateExpressPrediction, NoArticlesFoundError } from '@/lib/llm/expre
 import { z } from 'zod'
 import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
-import { aiFeaturesEnabled } from '@/lib/capabilities'
+import { aiFeaturesEnabled, aiResearchEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { ForecastAttemptOutcome, Prisma } from '@prisma/client'
@@ -47,10 +47,10 @@ export const POST = withAuth(async (request, user) => {
   const { userInput, skipSources } = generateSchema.parse(body)
   const isUrl = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
 
-  // Check if GEMINI_API_KEY is configured
-  if (!process.env.GEMINI_API_KEY) {
-    return apiError('Service not configured. Please contact administrator.', 503)
-  }
+  // Without a search backend (the LLM-only self-host case) skip the article
+  // search and generate from the user's text alone. The LLM provider itself
+  // (OpenRouter / Gemini / Ollama) is resolved inside llmService.
+  const effectiveSkipSources = skipSources || !aiResearchEnabled()
 
 
   // Create a readable stream for progress updates
@@ -65,7 +65,7 @@ export const POST = withAuth(async (request, user) => {
         }
 
         // Generate prediction with progress updates
-        const result = await generateExpressPrediction(userInput, onProgress, skipSources, { source: 'express-creation', userId: user.id })
+        const result = await generateExpressPrediction(userInput, onProgress, effectiveSkipSources, { source: 'express-creation', userId: user.id })
 
         // Send final result
         const finalMessage = JSON.stringify({ stage: 'complete', data: result }) + '\n'

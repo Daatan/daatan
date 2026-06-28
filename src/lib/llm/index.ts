@@ -4,12 +4,14 @@ import { OpenRouterProvider } from './providers/openrouter'
 import { ResilientLLMService } from './service'
 import type { LLMProvider } from './types'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/env'
 
 const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
 const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
+const openrouterApiKey = process.env.OPENROUTER_API_KEY || ''
 
 // Initialize providers list in priority order
 const providers: LLMProvider[] = []
@@ -28,6 +30,19 @@ if (geminiApiKey) {
   log.warn(
     'GEMINI_API_KEY is not set; Gemini provider will be disabled. ' +
     'Only fallback providers (e.g. Ollama) will be used.',
+  )
+}
+
+// Self-host edition: register OpenRouter when the operator supplies a key, so a
+// single admin key powers the user-facing features (Express, etc.), not just
+// bots. Scoped to self_hosted so the SaaS main service stays Gemini+Ollama
+// (SaaS already uses OpenRouter only inside the bot service — unchanged here).
+if (env.DAATAN_EDITION === 'self_hosted' && openrouterApiKey) {
+  providers.push(
+    new OpenRouterProvider({
+      apiKey: openrouterApiKey,
+      modelName: env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+    }),
   )
 }
 

@@ -35,7 +35,8 @@ describe('GET /api/admin/about', () => {
 
     expect(body.edition).toBe('self_hosted')
     expect(body.appName).toBe('Acme Forecasting')
-    expect(body.capabilities.ai).toBe(false) // self_hosted + ENABLE_AI_FEATURES unset
+    expect(body.capabilities.ai).toBe(true) // self_hosted + GEMINI_API_KEY present → AI on
+    expect(body.capabilities.aiResearch).toBe(true) // + ORACLE configured → Analyze on
     expect(body.auth.oidc).toBe(true)
     expect(body.auth.domainAllowlist).toBe(true)
     expect(body.auth.openSignup).toBe(false)

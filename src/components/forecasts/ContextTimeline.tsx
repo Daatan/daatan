@@ -139,7 +139,7 @@ export default function ContextTimeline({
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [hasFetched, setHasFetched] = useState(hasInitialSnapshots)
   const [isMounted, setIsMounted] = useState(false)
-  const { ai } = useCapabilities()
+  const { aiResearch } = useCapabilities()
   const t = useTranslations('context')
 
   const TIMING_KEY = 'daatan:context-timings'
@@ -313,7 +313,7 @@ export default function ContextTimeline({
           {t('title')}
         </h2>
         <div className="flex items-center gap-2">
-          {canAnalyze && ai && (
+          {canAnalyze && aiResearch && (
             <span
               role="button"
               onClick={(e) => { e.stopPropagation(); handleAnalyze() }}

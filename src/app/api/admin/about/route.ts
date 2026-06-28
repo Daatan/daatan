@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { env } from '@/env'
 import { VERSION } from '@/lib/version'
 import { getAppName, getAppUrl } from '@/lib/branding'
-import { aiFeaturesEnabled, externalMarketsEnabled } from '@/lib/capabilities'
+import { aiFeaturesEnabled, aiResearchEnabled, externalMarketsEnabled } from '@/lib/capabilities'
 import { isOpenSignupEnabled } from '@/lib/auth/access'
 
 /**
@@ -19,6 +19,7 @@ export const GET = withAuth(async () => {
     appUrl: getAppUrl(),
     capabilities: {
       ai: aiFeaturesEnabled(),
+      aiResearch: aiResearchEnabled(),
       externalMarkets: externalMarketsEnabled(),
     },
     auth: {

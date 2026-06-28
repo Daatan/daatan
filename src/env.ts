@@ -85,6 +85,12 @@ export const env = createEnv({
     
     // AI / Analytics
     GEMINI_API_KEY: z.string().min(1).optional(),
+    // LLM providers for the self-host edition. Configuring ANY of these turns on
+    // AI features (Express, Guess, etc.) — the key is the opt-in. OpenRouter is
+    // the easy default (one key, many models). OLLAMA_BASE_URL = a local LLM.
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_MODEL: z.string().min(1).optional(),
+    OLLAMA_BASE_URL: z.string().url().optional(),
     GA_MEASUREMENT_ID: z.string().startsWith('G-').optional(),
 
     // Telegram notifications
@@ -149,6 +155,9 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
+    OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,

@@ -7,7 +7,7 @@ type About = {
   edition: string
   appName: string
   appUrl: string
-  capabilities: { ai: boolean; externalMarkets: boolean }
+  capabilities: { ai: boolean; aiResearch: boolean; externalMarkets: boolean }
   auth: { google: boolean; oidc: boolean; adminEmails: boolean; domainAllowlist: boolean; openSignup: boolean }
   storage: { driver: string }
   integrations: { gemini: boolean; ollama: boolean; oracle: boolean; email: boolean; telegram: boolean; newsIndexer: boolean }
@@ -71,7 +71,8 @@ export default function AboutPanel() {
       <Section
         title="Capabilities"
         rows={[
-          ['AI features', <Flag key="ai" on={data.capabilities.ai} />],
+          ['AI features (Express, Guess…)', <Flag key="ai" on={data.capabilities.ai} />],
+          ['AI research (Analyze, needs search)', <Flag key="ar" on={data.capabilities.aiResearch} />],
           ['External markets', <Flag key="m" on={data.capabilities.externalMarkets} />],
         ]}
       />
