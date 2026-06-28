@@ -15,6 +15,7 @@ export default function SignupClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
+  const invite = searchParams.get('invite') || undefined
 
   const [formData, setFormData] = useState({
     name: '',
@@ -33,7 +34,7 @@ export default function SignupClient() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, invite }),
       })
 
       if (!res.ok) {
