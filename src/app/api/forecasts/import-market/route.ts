@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError } from '@/lib/api-error'
 import { z } from 'zod'
 import { getProviderForUrl, resolveMarketByUrl } from '@/lib/services/external-markets'
+import { externalMarketsEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('forecasts-import-market')
@@ -25,6 +26,10 @@ const PROVIDER_LABEL: Record<string, string> = {
  * can link it. Any signed-in user (the create wizard calls this).
  */
 export const POST = withAuth(async (request) => {
+  if (!externalMarketsEnabled()) {
+    return apiError('External market integrations are not enabled on this instance', 404)
+  }
+
   const { url } = importSchema.parse(await request.json())
 
   const provider = getProviderForUrl(url)

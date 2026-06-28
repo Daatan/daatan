@@ -3,10 +3,15 @@ import { fetchUrlContent } from '@/lib/utils/scraper'
 import { extractPrediction } from '@/lib/llm/gemini'
 import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
+import { aiFeaturesEnabled } from '@/lib/capabilities'
 
 export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req) => {
+  if (!aiFeaturesEnabled()) {
+    return apiError('AI features are not enabled on this instance', 404)
+  }
+
   const { url, text } = await req.json()
 
   let contentToProcess = text

@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { StepNewsAnchor } from './steps/StepNewsAnchor'
 import { StepPrediction } from './steps/StepPrediction'
 import { StepOutcome } from './steps/StepOutcome'
@@ -84,6 +85,7 @@ const DRAFT_KEY = 'daatan:forecast-draft'
 export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: ForecastWizardProps) => {
   const router = useRouter()
   const t = useTranslations('wizard')
+  const { externalMarkets } = useCapabilities()
   const [currentStep, setCurrentStep] = useState(isExpressFlow ? 2 : 1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitPhase, setSubmitPhase] = useState<SubmitPhase>('creating')
@@ -193,6 +195,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
 
   const handleNext = () => {
     if (
+      externalMarkets &&
       currentStep === 2 &&
       !formData.externalMarketId &&
       !matchDismissed &&

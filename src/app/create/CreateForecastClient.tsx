@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Zap, Edit3 } from 'lucide-react'
 import ExpressForecastClient from '@/app/forecasts/express/ExpressForecastClient'
 import { ForecastWizard } from '@/components/forecasts/ForecastWizard'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 interface CreateForecastClientProps {
   userId: string
@@ -12,9 +13,20 @@ interface CreateForecastClientProps {
 
 export default function CreateForecastClient({ userId }: CreateForecastClientProps) {
   const searchParams = useSearchParams()
+  const { ai } = useCapabilities()
   const fromExpress = searchParams.get('from') === 'express'
   const [mode, setMode] = useState<'express' | 'manual'>('express')
   const [sharedUserInput, setSharedUserInput] = useState('')
+
+  // Express is an AI feature — when AI is off (self-host default), only the
+  // manual wizard is available; skip the mode toggle entirely.
+  if (!ai) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <ForecastWizard isExpressFlow={false} />
+      </div>
+    )
+  }
 
   // When redirected from express generation, go straight to the wizard
   if (fromExpress) {

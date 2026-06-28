@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { z } from 'zod'
 import { suggestMarketMatch } from '@/lib/services/external-markets'
+import { externalMarketsEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('forecasts-suggest-market')
@@ -20,6 +21,10 @@ const suggestSchema = z.object({ claimText: z.string().min(1) })
  * Best-effort — never throws on the matching path. Any signed-in user.
  */
 export const POST = withAuth(async (request) => {
+  if (!externalMarketsEnabled()) {
+    return NextResponse.json({ match: null })
+  }
+
   const { claimText } = suggestSchema.parse(await request.json())
 
   const match = await suggestMarketMatch(claimText)

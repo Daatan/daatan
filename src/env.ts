@@ -72,6 +72,13 @@ export const env = createEnv({
     // provider). When unset, no domain restriction (the SaaS default).
     ALLOWED_EMAIL_DOMAINS: z.string().min(1).optional(),
 
+    // Optional add-on features, OFF BY DEFAULT for the self_hosted edition (SaaS
+    // is always on). AI = Oracle co-forecaster + web/news search + LLM estimates
+    // (Analyze, Express, Guess Chances, AI extract/tag-suggest). External markets
+    // = Polymarket/Kalshi import + suggest-similar. Opt in per gate via 'true'.
+    ENABLE_AI_FEATURES: z.enum(['true', 'false']).optional(),
+    ENABLE_EXTERNAL_MARKETS: z.enum(['true', 'false']).optional(),
+
     // Optional / Other
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     NEXTAUTH_DEBUG: z.enum(['true', 'false']).optional(),
@@ -137,6 +144,8 @@ export const env = createEnv({
     OIDC_ADMIN_EMAILS: process.env.OIDC_ADMIN_EMAILS,
     SELF_HOST_OPEN_SIGNUP: process.env.SELF_HOST_OPEN_SIGNUP,
     ALLOWED_EMAIL_DOMAINS: process.env.ALLOWED_EMAIL_DOMAINS,
+    ENABLE_AI_FEATURES: process.env.ENABLE_AI_FEATURES,
+    ENABLE_EXTERNAL_MARKETS: process.env.ENABLE_EXTERNAL_MARKETS,
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
