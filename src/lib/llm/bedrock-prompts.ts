@@ -1,8 +1,21 @@
 import { BedrockAgentClient, GetPromptCommand } from '@aws-sdk/client-bedrock-agent'
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm'
 import { createLogger } from '@/lib/logger'
+import { getAppName } from '@/lib/branding'
 
 const log = createLogger('llm-bedrock-prompts')
+
+/**
+ * Replace the {{appName}} placeholder with the configured brand so prompts are
+ * white-labelled. Applied to every template before it leaves getPromptTemplate,
+ * so it works whether or not the caller runs fillPrompt. For SaaS this resolves
+ * to "DAATAN" — byte-identical to the previous literals. Uses a function
+ * replacement so brand names containing `$` aren't treated as regex specials.
+ */
+function applyAppName(template: string): string {
+  const name = getAppName()
+  return template.replace(/\{\{appName\}\}/g, () => name)
+}
 
 const REGION = process.env.AWS_REGION || 'eu-central-1'
 const bedrock = new BedrockAgentClient({ region: REGION })
@@ -40,7 +53,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
  * before the Bedrock migration and are kept in sync manually.
  */
 const FALLBACK_PROMPTS: Partial<Record<PromptName, string>> = {
-    'express-prediction': `You are a prediction assistant for DAATAN, a reputation-based prediction platform. Your job is to convert user's casual prediction ideas into formal, testable predictions.
+    'express-prediction': `You are a prediction assistant for {{appName}}, a reputation-based prediction platform. Your job is to convert user's casual prediction ideas into formal, testable predictions.
 
 Rules:
 1. Create clear, unambiguous claims that can be objectively verified
@@ -204,7 +217,7 @@ Generate a JSON object with:
 
 Make the prompts highly specific, opinionated, and sharp. Do not be generic.`,
 
-    'suggest-tags': `You are a categorization assistant for DAATAN, a prediction platform.
+    'suggest-tags': `You are a categorization assistant for {{appName}}, a prediction platform.
 Your job is to suggest 1-3 highly relevant tags for a prediction based on its claim and optional details.
 
 ### Standard Tags
@@ -257,7 +270,7 @@ Summary:`,
 Article content:
 {{articleContent}}`,
 
-    'translate': `You are a professional translator for DAATAN, a prediction-market platform. Translate the text below into {{language}}.
+    'translate': `You are a professional translator for {{appName}}, a prediction-market platform. Translate the text below into {{language}}.
 
 Write a natural, fluent translation the way a native {{language}} speaker would phrase it — prioritise idiomatic wording and correct, natural word order over a literal word-for-word rendering, while preserving the exact meaning.
 
@@ -326,14 +339,14 @@ Forecasts about political figures, world events, or sensitive topics are ALLOWED
 Type: {{contentType}}
 Content: "{{text}}"
 
-Respond ONLY with a JSON object: { "isOffensive": true|false, "reason": "A clear, helpful one-sentence explanation of why the content is not allowed (e.g., 'This content promotes violence and is not permitted on DAATAN' or 'This forecast contains hate speech'). If isOffensive is false, return an empty string." }`,
+Respond ONLY with a JSON object: { "isOffensive": true|false, "reason": "A clear, helpful one-sentence explanation of why the content is not allowed (e.g., 'This content promotes violence and is not permitted on {{appName}}' or 'This forecast contains hate speech'). If isOffensive is false, return an empty string." }`,
 }
 
 function getFallbackPrompt(promptName: PromptName, paramName: string, reason: string): string {
     const fallback = FALLBACK_PROMPTS[promptName]
     if (fallback) {
         log.warn({ promptName, paramName, reason }, 'Using hardcoded fallback prompt (Bedrock not configured)')
-        return fallback
+        return applyAppName(fallback)
     }
     throw new Error(`Prompt '${promptName}' has no Bedrock ARN and no hardcoded fallback. Reason: ${reason}`)
 }
@@ -377,13 +390,14 @@ export async function getPromptTemplate(promptName: PromptName): Promise<string>
             return getFallbackPrompt(promptName, paramName, `Bedrock returned no text template for ARN ${promptArn}`)
         }
 
-        // Cache and return
+        // Cache and return (branded, so the placeholder never leaks downstream)
+        const branded = applyAppName(templateText)
         templateCache.set(promptName, {
-            template: templateText,
+            template: branded,
             expiresAt: now + CACHE_TTL_MS
         })
 
-        return templateText
+        return branded
     } catch (error) {
         log.error({ err: error, promptName, paramName, region: REGION }, 'Failed to fetch prompt template from AWS')
         return getFallbackPrompt(promptName, paramName, String(error))
