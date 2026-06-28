@@ -114,12 +114,9 @@ Checklist:
 
 ---
 
-## First real run (recommended order)
+## First real run
 
-1. **Publish the image** — run the `Release self-hosted image` GitHub Action (manual dispatch); make the GHCR package public once.
-2. On a throwaway VM: `compose -f docker-compose.selfhost.pull.yml pull && up -d` with a real `.env`.
-3. Walk Layers 1 → 3 (smoke → edition behavior → Keycloak SSO).
-4. Toggle one add-on (Layer 4) to confirm the opt-in path.
+Follow the copy-paste runbook: [`SELF_HOST_FIRST_RUN.md`](./SELF_HOST_FIRST_RUN.md) — publish the image → write `.env` → boot → smoke → edition behavior → Keycloak SSO → About panel → optional add-on, with expected output and a troubleshooting table at each step.
 
 ## Harness files
 
