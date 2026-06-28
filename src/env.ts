@@ -64,6 +64,14 @@ export const env = createEnv({
     // Comma/space-separated emails promoted to ADMIN on sign-in (admin bootstrap).
     OIDC_ADMIN_EMAILS: z.string().min(1).optional(),
 
+    // Access gating (self-host). Open public credentials signup — only consulted
+    // for the self_hosted edition, where signup is closed by default; set to
+    // 'true' to re-open it. SaaS is always open regardless of this value.
+    SELF_HOST_OPEN_SIGNUP: z.enum(['true', 'false']).optional(),
+    // Comma/space-separated email domains permitted to sign up / sign in (any
+    // provider). When unset, no domain restriction (the SaaS default).
+    ALLOWED_EMAIL_DOMAINS: z.string().min(1).optional(),
+
     // Optional / Other
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     NEXTAUTH_DEBUG: z.enum(['true', 'false']).optional(),
@@ -127,6 +135,8 @@ export const env = createEnv({
     OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
     OIDC_PROVIDER_NAME: process.env.OIDC_PROVIDER_NAME,
     OIDC_ADMIN_EMAILS: process.env.OIDC_ADMIN_EMAILS,
+    SELF_HOST_OPEN_SIGNUP: process.env.SELF_HOST_OPEN_SIGNUP,
+    ALLOWED_EMAIL_DOMAINS: process.env.ALLOWED_EMAIL_DOMAINS,
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,

@@ -12,6 +12,7 @@ import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { notifyNewUserRegistered } from "@/lib/services/telegram"
 import { parseAdminEmails, resolveAdminRole } from "@/lib/auth/oidc"
+import { isEmailDomainAllowed, parseAllowedDomains } from "@/lib/auth/access"
 
 const log = createLogger('auth')
 
@@ -103,6 +104,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
+    // Domain allow-list gate. Applies to every provider (OIDC auto-provisioning,
+    // credentials), so only company identities can ever get an account in a
+    // self-host. No-op when ALLOWED_EMAIL_DOMAINS is unset (the SaaS deploy).
+    async signIn({ user }) {
+      const allowedDomains = parseAllowedDomains(env.ALLOWED_EMAIL_DOMAINS)
+      if (allowedDomains.size === 0) return true
+      if (isEmailDomainAllowed(user?.email, allowedDomains)) return true
+      log.warn({ email: user?.email }, 'Sign-in blocked: email domain not allowed')
+      return false
+    },
     async session({ session, token }: { session: Session; token: JWT }) {
       // First call base session callback.
       // NextAuth's session callback is overloaded (JWT vs database strategy), so we
