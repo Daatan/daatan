@@ -86,7 +86,7 @@ function useTableSort(defaultKey: string, defaultDir: SortDir = 'desc') {
 }
 
 function SortHeader({
-  label, sortKey, sort, onSort, align = 'left', padCls = 'pr-4',
+  label, sortKey, sort, onSort, align = 'left', padCls = 'pr-4', title,
 }: {
   label: string
   sortKey: string
@@ -94,12 +94,14 @@ function SortHeader({
   onSort: (k: string) => void
   align?: 'left' | 'right'
   padCls?: string
+  title?: string
 }) {
   const active = sort.key === sortKey
   return (
     <th
       onClick={() => onSort(sortKey)}
-      className={`py-2 ${padCls} font-medium cursor-pointer select-none hover:text-gray-700 ${align === 'right' ? 'text-right' : ''}`}
+      title={title}
+      className={`py-2 ${padCls} font-medium cursor-pointer select-none hover:text-gray-700 ${align === 'right' ? 'text-right' : ''} ${title ? 'underline decoration-dotted decoration-gray-500 underline-offset-4' : ''}`}
     >
       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
@@ -224,13 +226,51 @@ const RECENT_GETTERS: Record<string, (e: RecentCall) => unknown> = {
   callType: e => e.callType,
   source: e => e.source,
   status: e => e.status,
+  failureReason: e => e.failureReason,
   searchEngine: e => e.searchEngine,
+  provider: e => e.provider,
+  // Fallbacks sort by probability; non-fallback rows sort last (null).
+  fallback: e => (e.fellBackToLlm ? (e.fallbackProbability ?? 0) : null),
   user: e => e.user?.username ?? e.user?.name ?? null,
   resultCount: e => e.resultCount,
   durationMs: e => e.durationMs,
   query: e => e.query,
   prediction: e => e.prediction?.claimText ?? null,
 }
+
+// Human-readable hints for the failureReason codes stored on OracleCallLog,
+// surfaced as a per-row tooltip in the recent-calls table.
+const FAILURE_REASON_HINTS: Record<string, string> = {
+  timeout: 'The Oracle did not respond within the request timeout.',
+  oracle_timeout: 'The Oracle did not respond within the request timeout.',
+  network: 'Network/transport error reaching the Oracle.',
+  http_4xx: 'The Oracle returned a 4xx client error.',
+  http_5xx: 'The Oracle returned a 5xx server error.',
+  no_search_results: 'The search returned zero articles.',
+  insufficient_data: 'Not enough articles for a real estimate (placeholder returned).',
+  placeholder: 'The Oracle returned a placeholder rather than a real estimate.',
+}
+
+export function failureReasonTitle(reason: string): string {
+  return FAILURE_REASON_HINTS[reason] ?? 'Failure/empty reason reported by the Oracle.'
+}
+
+/** "dataforseo → gdelt → caller" — the ordered providers attempted. */
+export function formatProviderChain(chain: string[]): string {
+  return chain.length > 0 ? chain.join(' → ') : ''
+}
+
+// Column-header tooltips that make the Oracle vocabulary self-explanatory.
+const HEADER_HINTS = {
+  type: 'Oracle call type — FORECAST: AI probability estimate; SEARCH: article retrieval; LEADERBOARD/HEALTH/LLM/FETCH_URL: support calls.',
+  source: 'Daatan workflow that triggered this Oracle call (e.g. context-update, bot-voting, express-creation).',
+  status: 'OK: usable result · EMPTY: no usable result (see Detail) · ERROR: call failed (see Detail).',
+  detail: 'Why a call was EMPTY or ERROR — hover a row for the specific reason.',
+  engine: 'Search engine that ultimately served the result. "caller" = articles supplied directly by the caller (no search); "none" = no provider claimed it.',
+  provider: 'Provider that served the result; hover a row for the full provider chain attempted.',
+  fallback: 'Whether a FORECAST fell back to the LLM (with its probability) instead of an article-grounded estimate.',
+  by: 'User or bot that triggered the call (the caller).',
+} as const
 
 function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
   const { sort, toggle } = useTableSort('createdAt')
@@ -246,11 +286,14 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
             <thead>
               <tr className="border-b text-left text-gray-500">
                 <SortHeader label="Time" sortKey="createdAt" sort={sort} onSort={toggle} />
-                <SortHeader label="Type" sortKey="callType" sort={sort} onSort={toggle} />
-                <SortHeader label="Source" sortKey="source" sort={sort} onSort={toggle} />
-                <SortHeader label="Status" sortKey="status" sort={sort} onSort={toggle} />
-                <SortHeader label="Engine" sortKey="searchEngine" sort={sort} onSort={toggle} />
-                <SortHeader label="By" sortKey="user" sort={sort} onSort={toggle} />
+                <SortHeader label="Type" sortKey="callType" sort={sort} onSort={toggle} title={HEADER_HINTS.type} />
+                <SortHeader label="Source" sortKey="source" sort={sort} onSort={toggle} title={HEADER_HINTS.source} />
+                <SortHeader label="Status" sortKey="status" sort={sort} onSort={toggle} title={HEADER_HINTS.status} />
+                <SortHeader label="Detail" sortKey="failureReason" sort={sort} onSort={toggle} title={HEADER_HINTS.detail} />
+                <SortHeader label="Engine" sortKey="searchEngine" sort={sort} onSort={toggle} title={HEADER_HINTS.engine} />
+                <SortHeader label="Provider" sortKey="provider" sort={sort} onSort={toggle} title={HEADER_HINTS.provider} />
+                <SortHeader label="Fallback" sortKey="fallback" sort={sort} onSort={toggle} title={HEADER_HINTS.fallback} />
+                <SortHeader label="By" sortKey="user" sort={sort} onSort={toggle} title={HEADER_HINTS.by} />
                 <SortHeader label="Results" sortKey="resultCount" sort={sort} onSort={toggle} align="right" />
                 <SortHeader label="Duration" sortKey="durationMs" sort={sort} onSort={toggle} align="right" />
                 <SortHeader label="Query" sortKey="query" sort={sort} onSort={toggle} />
@@ -266,7 +309,26 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
                   <td className={`py-2 pr-4 font-mono whitespace-nowrap ${statusClass(entry.status)}`}>
                     {entry.status}{entry.httpStatus != null ? ` (${entry.httpStatus})` : ''}
                   </td>
+                  <td className="py-2 pr-4 font-mono text-gray-400 max-w-[12rem] truncate">
+                    {entry.failureReason ? (
+                      <span className="text-amber-400" title={failureReasonTitle(entry.failureReason)}>{entry.failureReason}</span>
+                    ) : '—'}
+                  </td>
                   <td className="py-2 pr-4 font-mono text-gray-400 whitespace-nowrap">{entry.searchEngine ?? '—'}</td>
+                  <td
+                    className="py-2 pr-4 font-mono text-gray-400 whitespace-nowrap"
+                    title={entry.providerChain.length > 0 ? `chain: ${formatProviderChain(entry.providerChain)}` : undefined}
+                  >
+                    {entry.provider ?? '—'}
+                    {entry.providerChain.length > 1 ? <span className="text-gray-500"> (+{entry.providerChain.length - 1})</span> : null}
+                  </td>
+                  <td className="py-2 pr-4 font-mono whitespace-nowrap">
+                    {entry.fellBackToLlm ? (
+                      <span className="text-purple-400" title="FORECAST fell back to the LLM instead of an article-grounded estimate">
+                        LLM{entry.fallbackProbability != null ? ` ${entry.fallbackProbability}%` : ''}
+                      </span>
+                    ) : <span className="text-gray-500">—</span>}
+                  </td>
                   <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">
                     {entry.user ? (
                       <a href={`/profile/${entry.user.id}`} className="text-blue-500 hover:underline">
