@@ -9,7 +9,9 @@ import {
   getUserCommitment,
   updateForecast,
   deleteForecast,
+  ForecastTranslationUnavailableError,
 } from '@/lib/services/forecast'
+import { getCachedPredictionTranslation } from '@/lib/services/translation'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,10 +63,18 @@ export async function GET(
     // Calculate total CU committed
     const totalCuCommitted = prediction.commitments.reduce((sum, c) => sum + c.cuCommitted, 0)
 
+    // For non-English-authored forecasts, surface the author's original-language text so
+    // the edit form can let them edit in their own language (claimText is English-canonical).
+    const original =
+      prediction.originalLanguage && prediction.originalLanguage !== 'en'
+        ? await getCachedPredictionTranslation(prediction.id, prediction.originalLanguage)
+        : undefined
+
     return NextResponse.json({
       ...prediction,
       totalCuCommitted,
       userCommitment,
+      original,
     })
   } catch (error) {
     return handleRouteError(error, 'Failed to fetch prediction')
@@ -101,9 +111,15 @@ export const PATCH = withAuth(async (request, user, { params }) => {
     return apiError('Forecast is locked and cannot be edited', 400)
   }
 
-  const updated = await updateForecast(id, data)
-
-  return NextResponse.json(updated)
+  try {
+    const updated = await updateForecast(id, data)
+    return NextResponse.json(updated)
+  } catch (err) {
+    if (err instanceof ForecastTranslationUnavailableError) {
+      return apiError('Translation service is temporarily unavailable. Please try again.', 503)
+    }
+    throw err
+  }
 })
 
 // DELETE /api/forecasts/[id] - Delete forecast (DRAFT only, author or admin)

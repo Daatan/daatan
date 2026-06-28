@@ -597,7 +597,25 @@ export interface UpdateForecastData {
   options?: string[]
 }
 
-export async function updateForecast(id: string, data: UpdateForecastData) {
+/** Thrown when an original-language edit can't derive its English canonical because
+ *  translation is down — the route maps this to 503 so the author retries (their text
+ *  stays in the form). We never store untranslated text as the English canonical. */
+export class ForecastTranslationUnavailableError extends Error {
+  constructor() {
+    super('Translation service unavailable; could not derive English canonical')
+    this.name = 'ForecastTranslationUnavailableError'
+  }
+}
+
+const UPDATE_INCLUDE = {
+  author: { select: { id: true, name: true, username: true, image: true } },
+  newsAnchor: true,
+  options: { orderBy: { displayOrder: 'asc' as const } },
+}
+
+/** Direct write: the submitted text IS the canonical (English-authored forecasts, or
+ *  an admin editing in English). Translations are dropped so display re-translates. */
+async function directUpdateForecast(id: string, data: UpdateForecastData) {
   const translatableFieldsChanged =
     data.claimText || data.detailsText !== undefined || data.resolutionRules !== undefined
   if (translatableFieldsChanged) {
@@ -621,13 +639,81 @@ export async function updateForecast(id: string, data: UpdateForecastData) {
         resolveByDatetime: data.resolveByDatetime ? new Date(data.resolveByDatetime) : undefined,
         isPublic: data.isPublic,
       },
-      include: {
-        author: { select: { id: true, name: true, username: true, image: true } },
-        newsAnchor: true,
-        options: { orderBy: { displayOrder: 'asc' } },
-      },
+      include: UPDATE_INCLUDE,
     })
   })
+}
+
+/**
+ * The author edited a non-English forecast in its original language. Re-derive the
+ * English canonical (claimText/detailsText/resolutionRules), re-seed the
+ * original-language translation with the author's exact text, and re-embed — while
+ * KEEPING the slug/URL stable. Other locales re-translate lazily on display.
+ */
+async function saveOriginalLanguageEdit(
+  id: string,
+  lang: string,
+  data: UpdateForecastData,
+  norm: Awaited<ReturnType<typeof normalizeForecastToEnglish>>,
+) {
+  const seedRows = TRANSLATABLE_FIELDS.flatMap((field) => {
+    const original = norm.original[field]
+    const english = norm.english[field]
+    return original && english
+      ? [{ predictionId: id, fieldName: field, language: lang, translatedText: original, sourceHash: sourceHash(english) }]
+      : []
+  })
+
+  const result = await prisma.$transaction(async (tx) => {
+    if (data.options) {
+      await tx.predictionOption.deleteMany({ where: { predictionId: id } })
+      await tx.predictionOption.createMany({
+        data: data.options.map((text, index) => ({ predictionId: id, text, displayOrder: index })),
+      })
+    }
+    await tx.predictionTranslation.deleteMany({ where: { predictionId: id } })
+    if (seedRows.length) await tx.predictionTranslation.createMany({ data: seedRows, skipDuplicates: true })
+    return tx.prediction.update({
+      where: { id },
+      data: {
+        claimText: norm.english.claimText,
+        detailsText: norm.english.detailsText,
+        resolutionRules: norm.english.resolutionRules,
+        resolveByDatetime: data.resolveByDatetime ? new Date(data.resolveByDatetime) : undefined,
+        isPublic: data.isPublic,
+        // slug and originalLanguage are deliberately left unchanged.
+      },
+      include: UPDATE_INCLUDE,
+    })
+  })
+
+  await embedAndStoreForecast(id, norm.english.claimText).catch((err) =>
+    log.error({ err, id }, 'embed failed during original-language edit'),
+  )
+  return result
+}
+
+export async function updateForecast(id: string, data: UpdateForecastData) {
+  const existing = await prisma.prediction.findUnique({
+    where: { id },
+    select: { originalLanguage: true },
+  })
+
+  // Non-English forecast edited by its author in the original language → the submitted
+  // claim text is e.g. Hebrew, not the English canonical. Re-derive English on save.
+  if (existing?.originalLanguage && existing.originalLanguage !== 'en' && data.claimText !== undefined) {
+    const norm = await normalizeForecastToEnglish({
+      claimText: data.claimText,
+      detailsText: data.detailsText ?? null,
+      resolutionRules: data.resolutionRules ?? null,
+    })
+    if (norm.language === null) throw new ForecastTranslationUnavailableError()
+    // If the rewrite is actually English (e.g. an admin switched language), store it
+    // directly via the normal path; otherwise re-derive + re-seed the original.
+    if (!norm.isEnglish) return saveOriginalLanguageEdit(id, existing.originalLanguage, data, norm)
+  }
+
+  return directUpdateForecast(id, data)
 }
 
 /**

@@ -36,6 +36,25 @@ slug is generated:
 
 Bot-authored forecasts are English by construction and bypass this path.
 
+## Editing in the original language
+
+A non-English author edits in **their own language**, never the English canonical:
+
+- The `GET /api/forecasts/[id]` response includes an `original` object (the original-language
+  `claimText`/`detailsText`/`resolutionRules`) whenever `originalLanguage` is a non-`en`
+  code. The edit form (`EditForecastClient`) pre-fills from `original` (RTL-aware) and shows
+  an "editing in {language}" notice; the public *view* already renders per-locale.
+- On save, `updateForecast` detects a non-English `originalLanguage` and, when the submitted
+  claim is still non-English, re-derives the English canonical via `normalizeForecastToEnglish`,
+  re-seeds the original-language translation with the author's exact text, and re-embeds — but
+  **keeps the slug/URL stable** (unlike the create/backfill canonicalization, which sets the
+  slug). Other locales re-translate lazily.
+- If translation is unavailable, the save throws `ForecastTranslationUnavailableError` → the
+  route returns **503** and the author retries; untranslated text is never stored as the
+  English canonical.
+- An author who rewrites the forecast *in English* (detected by `normalizeForecastToEnglish`)
+  falls through to a plain direct update.
+
 ## Slug aliases
 
 When a forecast is re-slugged (e.g. a non-English slug fixed during canonicalization),

@@ -169,6 +169,7 @@
   },
   "Forecasts": {
     "title": "Redakti Prognozon",
+    "editingInOriginal": "Redaktado en {language} — la publika angla versio ĝisdatiĝas aŭtomate.",
     "backToForecast": "Reen al Prognozo",
     "claimLabel": "Aserto-Teksto",
     "detailsLabel": "Detaloj / Kunteksto",

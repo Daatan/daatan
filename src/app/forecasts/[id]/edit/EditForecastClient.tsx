@@ -17,7 +17,7 @@ import {
   LayoutList,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { PrimaryLink } from '@/components/ui/PrimaryLink'
 import { createClientLogger } from '@/lib/client-logger'
@@ -43,7 +43,12 @@ interface Prediction {
   userId: string
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE' | 'NUMERIC_THRESHOLD'
   options: PredictionOption[]
+  originalLanguage?: string | null
+  original?: { claimText?: string; detailsText?: string; resolutionRules?: string }
 }
+
+// RTL scripts whose edit fields need dir="rtl".
+const RTL_LANGS = new Set(['he', 'ar', 'fa', 'ur'])
 
 interface EditForecastClientProps {
   id: string
@@ -51,6 +56,7 @@ interface EditForecastClientProps {
 
 export default function EditForecastClient({ id }: EditForecastClientProps) {
   const router = useRouter()
+  const locale = useLocale()
   const t = useTranslations('Forecasts')
   const f = useTranslations('forecast')
   const [prediction, setPrediction] = useState<Prediction | null>(null)
@@ -59,6 +65,9 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
   const [error, setError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Non-null when the author edits in the forecast's original (non-English) language;
+  // the English canonical is then re-derived server-side on save.
+  const [editLang, setEditLang] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     claimText: '',
@@ -80,13 +89,19 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
         }
         const data = await response.json()
         setPrediction(data)
-        
+
+        // For a non-English-authored forecast, edit the author's ORIGINAL-language text
+        // (claimText/etc. are English-canonical). English is re-derived on save.
+        const inOriginal = data.originalLanguage && data.originalLanguage !== 'en'
+        setEditLang(inOriginal ? data.originalLanguage : null)
+        const src = inOriginal && data.original ? data.original : data
+
         // Initialize form
         const resolveDate = new Date(data.resolveByDatetime)
         setFormData({
-          claimText: data.claimText || '',
-          detailsText: data.detailsText || '',
-          resolutionRules: data.resolutionRules || '',
+          claimText: src.claimText || data.claimText || '',
+          detailsText: src.detailsText ?? data.detailsText ?? '',
+          resolutionRules: src.resolutionRules ?? data.resolutionRules ?? '',
           resolveByDatetime: toLocalDatetimeInput(resolveDate),
           isPublic: data.isPublic !== false,
           options: data.options?.map((o: PredictionOption) => o.text) || [],
@@ -156,16 +171,18 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
       setPrediction(updated)
       setSaveSuccess(true)
 
-      // Update form data with saved values
+      // Update form with saved values. When editing in the original language, the
+      // response carries the (re-derived) ENGLISH text — keep the author's original
+      // wording in the fields instead of flipping them to English.
       const resolveDate = new Date(updated.resolveByDatetime)
-      setFormData({
-        claimText: updated.claimText || '',
-        detailsText: updated.detailsText || '',
-        resolutionRules: updated.resolutionRules || '',
-        resolveByDatetime: resolveDate.toISOString().slice(0, 16),
+      setFormData(prev => ({
+        claimText: editLang ? prev.claimText : (updated.claimText || ''),
+        detailsText: editLang ? prev.detailsText : (updated.detailsText || ''),
+        resolutionRules: editLang ? prev.resolutionRules : (updated.resolutionRules || ''),
+        resolveByDatetime: toLocalDatetimeInput(resolveDate),
         isPublic: updated.isPublic !== false,
         options: updated.options?.map((o: PredictionOption) => o.text) || [],
-      })
+      }))
     } catch (err) {
       log.error({ err }, 'Error saving forecast')
       setSaveError(err instanceof Error ? err.message : t('saveError'))
@@ -200,6 +217,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
 
   const isDraft = prediction.status === 'DRAFT'
   const isMultipleChoice = prediction.outcomeType === 'MULTIPLE_CHOICE'
+  const textDir = editLang && RTL_LANGS.has(editLang) ? 'rtl' : undefined
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -222,6 +240,18 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
         </p>
       </div>
 
+      {/* Original-language edit notice */}
+      {editLang && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl border border-blue-500/30 bg-cobalt/10 px-4 py-3 text-sm text-blue-300">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            {t('editingInOriginal', {
+              language: new Intl.DisplayNames([locale], { type: 'language' }).of(editLang) || editLang,
+            })}
+          </span>
+        </div>
+      )}
+
       {/* Form */}
       <div className="space-y-6">
         {/* Claim Text */}
@@ -231,6 +261,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
           </label>
           <textarea
             id="claimText"
+            dir={textDir}
             value={formData.claimText}
             onChange={(e) => handleChange('claimText', e.target.value)}
             rows={3}
@@ -292,6 +323,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
           </label>
           <textarea
             id="detailsText"
+            dir={textDir}
             value={formData.detailsText}
             onChange={(e) => handleChange('detailsText', e.target.value)}
             rows={5}
@@ -307,6 +339,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
           </label>
           <textarea
             id="resolutionRules"
+            dir={textDir}
             value={formData.resolutionRules}
             onChange={(e) => handleChange('resolutionRules', e.target.value)}
             rows={3}
