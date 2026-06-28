@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleRouteError } from '@/lib/api-error'
 import { getPredictionWithTags, findSimilarForecasts } from '@/lib/services/forecast'
+import { aiFeaturesEnabled } from '@/lib/capabilities'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,12 @@ export const dynamic = 'force-dynamic'
 // GET /api/forecasts/similar?q=<text>&tags=<csv>&limit=3
 export async function GET(request: NextRequest) {
   try {
+    // Similar-forecasts relies on embeddings (an AI feature). When AI is off
+    // (self-host default) return empty, matching the no-embeddings behavior.
+    if (!aiFeaturesEnabled()) {
+      return NextResponse.json({ similar: [] })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id') || undefined
     const q = (searchParams.get('q') || '').slice(0, 200)

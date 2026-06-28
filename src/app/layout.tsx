@@ -13,6 +13,8 @@ import { NextBanner } from '@/components/NextBanner'
 import Sidebar from '@/components/Sidebar'
 import { MainContent } from '@/components/MainContent'
 import SessionWrapper from '@/components/SessionWrapper'
+import { CapabilitiesProvider } from '@/components/CapabilitiesProvider'
+import { getCapabilities } from '@/lib/capabilities'
 import PwaInstaller from '@/components/PwaInstaller'
 import PushPermissionPrompt from '@/components/PushPermissionPrompt'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
@@ -118,6 +120,7 @@ export default async function RootLayout({
       <body className={`${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
         <GoogleAnalytics measurementId={gaMeasurementId} isStaging={isStaging} />
         <NextIntlClientProvider messages={messages}>
+          <CapabilitiesProvider value={getCapabilities()}>
           <SessionWrapper>
             <AnalyticsUserSync />
             <StagingBanner />
@@ -131,6 +134,7 @@ export default async function RootLayout({
             <CookieConsent />
             <Toaster position="bottom-right" />
           </SessionWrapper>
+          </CapabilitiesProvider>
         </NextIntlClientProvider>
       </body>
     </html>

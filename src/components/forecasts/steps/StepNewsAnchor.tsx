@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Link as LinkIcon, X, ExternalLink, Loader2, Wand2, CheckCircle2 } from 'lucide-react'
 import type { PredictionFormData } from '../ForecastWizard'
 import { createClientLogger } from '@/lib/client-logger'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('StepNewsAnchor')
 
@@ -24,6 +25,7 @@ type NewsAnchor = {
 
 export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
   const t = useTranslations('wizard')
+  const { ai, externalMarkets } = useCapabilities()
   const [url, setUrl] = useState(formData.newsAnchorUrl || '')
   const [title, setTitle] = useState(formData.newsAnchorTitle || '')
   const [isSearching, setIsSearching] = useState(false)
@@ -35,7 +37,9 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
 
   const isUrl = /^https?:\/\/[^\s]+$/i.test(url.trim())
   // A pasted Polymarket/Kalshi market URL is imported into the forecast, not treated as a news anchor.
-  const isMarketUrl = /^https?:\/\/(www\.)?(polymarket|kalshi)\.com\//i.test(url.trim())
+  // Only when external-market integrations are enabled (off by default on self-host); otherwise a
+  // market URL is just a normal link and the auto-import effect below stays dormant.
+  const isMarketUrl = externalMarkets && /^https?:\/\/(www\.)?(polymarket|kalshi)\.com\//i.test(url.trim())
 
   const handleSelectAnchor = useCallback((anchor: NewsAnchor) => {
     setSelectedAnchor(anchor)
@@ -329,6 +333,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            {ai && (
             <button
               onClick={handleMagicExtract}
               disabled={!isUrl || isSearching || isExtracting}
@@ -346,6 +351,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 </>
               )}
             </button>
+            )}
 
             <button
               onClick={handleUrlSubmit}
@@ -358,7 +364,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
         </div>
       )}
 
-      {!skipNews && (
+      {!skipNews && ai && (
         <div className="p-4 bg-cobalt/10 border border-cobalt/20 rounded-lg flex items-start gap-3">
           <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
             <Wand2 className="w-5 h-5" />

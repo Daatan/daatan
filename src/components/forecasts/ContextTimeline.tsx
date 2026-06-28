@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
 import { createClientLogger } from '@/lib/client-logger'
 import { toError } from '@/lib/utils/error'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('ContextTimeline')
 
@@ -138,6 +139,7 @@ export default function ContextTimeline({
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [hasFetched, setHasFetched] = useState(hasInitialSnapshots)
   const [isMounted, setIsMounted] = useState(false)
+  const { ai } = useCapabilities()
   const t = useTranslations('context')
 
   const TIMING_KEY = 'daatan:context-timings'
@@ -311,7 +313,7 @@ export default function ContextTimeline({
           {t('title')}
         </h2>
         <div className="flex items-center gap-2">
-          {canAnalyze && (
+          {canAnalyze && ai && (
             <span
               role="button"
               onClick={(e) => { e.stopPropagation(); handleAnalyze() }}

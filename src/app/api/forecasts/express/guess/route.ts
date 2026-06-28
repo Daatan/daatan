@@ -1,8 +1,9 @@
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { getOracleProbability } from '@/lib/services/oracle'
 import { z } from 'zod'
-import { handleRouteError } from '@/lib/api-error'
+import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
+import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 
@@ -19,6 +20,10 @@ const guessSchema = z.object({
 })
 
 export const POST = withAuth(async (request, user) => {
+  if (!aiFeaturesEnabled()) {
+    return apiError('AI features are not enabled on this instance', 404)
+  }
+
   try {
     const body = await request.json()
     const { claimText, detailsText, articles } = guessSchema.parse(body)

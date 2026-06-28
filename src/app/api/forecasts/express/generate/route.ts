@@ -2,6 +2,7 @@ import { generateExpressPrediction, NoArticlesFoundError } from '@/lib/llm/expre
 import { z } from 'zod'
 import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
+import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { ForecastAttemptOutcome, Prisma } from '@prisma/client'
@@ -38,6 +39,10 @@ const generateSchema = z.object({
 })
 
 export const POST = withAuth(async (request, user) => {
+  if (!aiFeaturesEnabled()) {
+    return apiError('AI features are not enabled on this instance', 404)
+  }
+
   const body = await request.json()
   const { userInput, skipSources } = generateSchema.parse(body)
   const isUrl = /^https?:\/\/[^\s]+$/i.test(userInput.trim())

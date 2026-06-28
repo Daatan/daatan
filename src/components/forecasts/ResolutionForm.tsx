@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const RESEARCH_TIMING_KEY = 'daatan:research-timings'
 const RESEARCH_TIMING_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -35,6 +36,7 @@ interface ResolutionFormProps {
 }
 
 export function ResolutionForm({ predictionId, outcomeType, options, onResolved }: ResolutionFormProps) {
+  const { ai } = useCapabilities()
   const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable'>('correct')
   const [correctOptionId, setCorrectOptionId] = useState<string>('')
   const [evidenceLinks, setEvidenceLinks] = useState<string>('')
@@ -157,6 +159,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
     <form onSubmit={handleSubmit} className="bg-navy-700 rounded-lg border border-navy-600 p-6 space-y-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Resolve Forecast</h3>
+        {ai && (
         <Button
           type="button"
           onClick={handleAiResearch}
@@ -171,6 +174,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
             ? researchStep === 'analyzing' ? 'Analyzing outcomes...' : 'Searching articles...'
             : 'AI Assist'}
         </Button>
+        )}
       </div>
 
       {/* Outcome Selection */}

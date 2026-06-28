@@ -5,6 +5,7 @@ import type { PredictionFormData } from '../ForecastWizard'
 import { TagSelector } from '@/components/ui/TagSelector'
 import { SimilarForecastsWarning } from '../SimilarForecastsWarning'
 import { createClientLogger } from '@/lib/client-logger'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('StepPrediction')
 
@@ -15,6 +16,7 @@ type Props = {
 
 export const StepPrediction = ({ formData, updateFormData }: Props) => {
   const t = useTranslations('wizard')
+  const { ai } = useCapabilities()
   const [isSuggesting, setIsSuggesting] = useState(false)
   const lastSuggestedClaim = useRef('')
 
@@ -26,8 +28,9 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
   useEffect(() => {
     const claim = formData.claimText?.trim() || ''
 
-    // Trigger if claim is substantial (e.g. > 20 chars) and has changed since last suggestion
-    if (claim.length >= 20 && claim !== lastSuggestedClaim.current && !isSuggesting) {
+    // Trigger if claim is substantial (e.g. > 20 chars) and has changed since last suggestion.
+    // AI tag-suggestion is off by default on self-host.
+    if (ai && claim.length >= 20 && claim !== lastSuggestedClaim.current && !isSuggesting) {
       const timer = setTimeout(async () => {
         setIsSuggesting(true)
         lastSuggestedClaim.current = claim
@@ -54,7 +57,7 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
 
       return () => clearTimeout(timer)
     }
-  }, [formData.claimText, formData.detailsText, formData.tags, updateFormData, isSuggesting])
+  }, [ai, formData.claimText, formData.detailsText, formData.tags, updateFormData, isSuggesting])
 
   return (
     <div className="space-y-6">

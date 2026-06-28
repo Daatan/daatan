@@ -12,6 +12,7 @@ import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import { aiFeaturesEnabled } from '@/lib/capabilities'
 import {
   getContextTimeline,
   getForecastForContextUpdate,
@@ -55,6 +56,12 @@ export async function GET(request: NextRequest, { params }: RawRouteContext) {
 // POST — protected endpoint (wrapped by withAuth, params already awaited)
 export const POST = withAuth(async (request: NextRequest, user, { params }: RouteContext) => {
     try {
+        // Context analysis is an AI feature (web search + Oracle + LLM) — off by
+        // default on self-host. Read-only GET timeline above stays available.
+        if (!aiFeaturesEnabled()) {
+            return apiError('AI features are not enabled on this instance', 404)
+        }
+
         const { id } = params
         const prediction = await getForecastForContextUpdate(id)
 

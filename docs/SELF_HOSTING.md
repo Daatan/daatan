@@ -133,15 +133,24 @@ A MinIO service is included (commented) in `docker-compose.selfhost.yml` — unc
 
 ---
 
-## 6. AI features (all optional — degrade gracefully)
+## 6. Optional add-on features (OFF by default)
 
-| Var | What happens when unset |
+v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and track per-person calibration/reputation (Brier/Glicko/ELO) — none of which need any external service. The AI/Oracle/search and external-market features are **opt-in and off by default** on self-host, so a fresh install shows no AI buttons and never calls out.
+
+| Flag | Gates | Default (self-host) |
+|------|-------|---------------------|
+| `ENABLE_AI_FEATURES=true` | Oracle co-forecaster, web/news search, LLM estimates — the "Analyze", Express, "Guess Chances", AI extract & tag-suggest, AI-assist-on-resolve surfaces | **off** |
+| `ENABLE_EXTERNAL_MARKETS=true` | Polymarket / Kalshi paste-to-prefill import + suggest-similar | **off** |
+
+When a flag is off, its UI is hidden and its API routes return 404 — there are no broken buttons. To turn AI on, set `ENABLE_AI_FEATURES=true` **and** configure at least one of:
+
+| Var | Role when AI is enabled |
 |-----|--------------------------|
-| `GEMINI_API_KEY` | Falls back to a local Ollama at `OLLAMA_BASE_URL`; if neither, AI estimates are skipped. |
-| `OLLAMA_BASE_URL` | No local LLM fallback. |
-| `ORACLE_URL` / `ORACLE_API_KEY` | The calibrated Oracle co-forecaster is skipped; the LLM path is used instead. |
+| `GEMINI_API_KEY` | Cloud LLM (primary). Falls back to a local Ollama at `OLLAMA_BASE_URL` if unset. |
+| `OLLAMA_BASE_URL` | Local LLM fallback. |
+| `ORACLE_URL` / `ORACLE_API_KEY` | Calibrated Oracle co-forecaster; the LLM path is used when unset. |
 
-The forecasting engine, scoring, Brier/Glicko/ELO, and reputation work with **none** of these set — the AI pieces are additive.
+Within enabled AI, these still degrade gracefully relative to one another (no Oracle → LLM; no LLM → feature skipped).
 
 ---
 
@@ -194,4 +203,5 @@ See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated l
 - **Branding:** `APP_URL`, `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
 - **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
-- **AI:** `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `ORACLE_URL`, `ORACLE_API_KEY`
+- **Add-on toggles (off by default):** `ENABLE_AI_FEATURES`, `ENABLE_EXTERNAL_MARKETS`
+- **AI (only when `ENABLE_AI_FEATURES=true`):** `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, `ORACLE_URL`, `ORACLE_API_KEY`
