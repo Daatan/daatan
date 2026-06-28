@@ -6,6 +6,8 @@ This guide targets a **single organization, one install** (corp / gov / NGO) run
 
 > **SaaS note.** The public daatan.com SaaS is the same codebase with `DAATAN_EDITION=saas` (the default). Everything in this guide is gated behind `DAATAN_EDITION=self_hosted` and is inert for the SaaS deploy.
 
+> **Maintainers:** see [`SELF_HOST_ARCHITECTURE.md`](./SELF_HOST_ARCHITECTURE.md) for the design and [`SELF_HOST_TEST_PLAN.md`](./SELF_HOST_TEST_PLAN.md) for how it's validated.
+
 ---
 
 ## 1. What you need
