@@ -228,4 +228,21 @@ describe('EditForecastClient', () => {
 
     expect(screen.getByText('Save Changes').closest('button')).toBeDisabled()
   })
+
+  it('loads the original-language text (not the English canonical) and shows the notice', async () => {
+    mockFetchLoad({
+      ...BASE_PREDICTION,
+      status: 'DRAFT',
+      claimText: 'At least one party will withdraw from the race',
+      originalLanguage: 'he',
+      original: { claimText: 'לפחות מפלגה אחת תפרוש מהמרוץ', detailsText: 'הקשר', resolutionRules: 'כללי הכרעה' },
+    } as never)
+    renderWithIntl(<EditForecastClient id="pred-1" />)
+
+    // The Hebrew (author's) text is in the form — NOT the English canonical.
+    await waitFor(() => expect(screen.getByDisplayValue('לפחות מפלגה אחת תפרוש מהמרוץ')).toBeInTheDocument())
+    expect(screen.queryByDisplayValue('At least one party will withdraw from the race')).not.toBeInTheDocument()
+    // The "editing in <language>" notice renders.
+    expect(screen.getByText(/public English version updates automatically/)).toBeInTheDocument()
+  })
 })

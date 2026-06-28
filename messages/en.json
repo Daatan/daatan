@@ -169,6 +169,7 @@
   },
   "Forecasts": {
     "title": "Edit Forecast",
+    "editingInOriginal": "Editing in {language} — the public English version updates automatically.",
     "backToForecast": "Back to Forecast",
     "claimLabel": "Claim Text",
     "detailsLabel": "Details / Context",

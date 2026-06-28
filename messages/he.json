@@ -169,6 +169,7 @@
   },
   "Forecasts": {
     "title": "עריכת תחזית",
+    "editingInOriginal": "עריכה ב{language} — הגרסה הציבורית באנגלית מתעדכנת אוטומטית.",
     "backToForecast": "חזרה לתחזית",
     "claimLabel": "טקסט התחזית",
     "detailsLabel": "פרטים / הקשר",
