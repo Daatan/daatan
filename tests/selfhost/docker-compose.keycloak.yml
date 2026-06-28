@@ -1,0 +1,33 @@
+# Keycloak test IdP for self-hosted OIDC validation (Layer 3 of the test plan).
+# Imports the `daatan` realm with a confidential client + two seeded users.
+#
+#   docker compose -f tests/selfhost/docker-compose.keycloak.yml up -d
+#   # Keycloak admin console: http://localhost:8080  (admin / admin)
+#
+# Point the app at it:
+#   OIDC_ISSUER=http://localhost:8080/realms/daatan
+#   OIDC_CLIENT_ID=daatan-selfhost
+#   OIDC_CLIENT_SECRET=daatan-selfhost-secret
+#   OIDC_ADMIN_EMAILS=admin@acme.example
+#   ALLOWED_EMAIL_DOMAINS=acme.example
+#
+# Seeded users (realm `daatan`), password `password`:
+#   admin@acme.example  → becomes ADMIN via OIDC_ADMIN_EMAILS
+#   user@acme.example   → provisioned as USER
+#
+# NOTE: the issuer host must match between the app and the browser. For a local
+# app on the host, http://localhost:8080 works for both. If the app runs inside
+# Docker, expose Keycloak on a shared network and use its service hostname.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: daatan-test-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
