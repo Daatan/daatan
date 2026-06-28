@@ -15,6 +15,7 @@ import { MainContent } from '@/components/MainContent'
 import SessionWrapper from '@/components/SessionWrapper'
 import { CapabilitiesProvider } from '@/components/CapabilitiesProvider'
 import { getCapabilities } from '@/lib/capabilities'
+import { BrandingProvider } from '@/components/BrandingProvider'
 import PwaInstaller from '@/components/PwaInstaller'
 import PushPermissionPrompt from '@/components/PushPermissionPrompt'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
@@ -25,7 +26,7 @@ import { isRtl } from '@/i18n/config'
 import type { Locale } from '@/i18n/config'
 
 import { env } from '@/env'
-import { getAppName, getAppUrl, getVerificationTokens, shouldIndex } from '@/lib/branding'
+import { getAppName, getAppUrl, getVerificationTokens, shouldIndex, getBranding } from '@/lib/branding'
 
 export async function generateMetadata(): Promise<Metadata> {
   // SaaS keeps the literal DAATAN identity (these resolve byte-identically when
@@ -127,6 +128,7 @@ export default async function RootLayout({
         <GoogleAnalytics measurementId={gaMeasurementId} isStaging={isStaging} />
         <NextIntlClientProvider messages={messages}>
           <CapabilitiesProvider value={getCapabilities()}>
+          <BrandingProvider value={getBranding()}>
           <SessionWrapper>
             <AnalyticsUserSync />
             <StagingBanner />
@@ -140,6 +142,7 @@ export default async function RootLayout({
             <CookieConsent />
             <Toaster position="bottom-right" />
           </SessionWrapper>
+          </BrandingProvider>
           </CapabilitiesProvider>
         </NextIntlClientProvider>
       </body>

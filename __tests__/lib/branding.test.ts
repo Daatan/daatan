@@ -32,6 +32,17 @@ describe('branding (SaaS / unset edition — must match the old literals)', () =
     expect(b.getAppUrl()).toBe('https://daatan.com')
   })
 
+  it('getBranding snapshot defaults to DAATAN with no logo override', async () => {
+    const b = await load()
+    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: null })
+  })
+
+  it('getBranding carries the APP_LOGO_URL override', async () => {
+    mockEnv.APP_LOGO_URL = 'https://cdn.example/logo.png'
+    const b = await load()
+    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: 'https://cdn.example/logo.png' })
+  })
+
   it('emits the exact Google + Bing verification tokens', async () => {
     const b = await load()
     expect(b.getVerificationTokens()).toEqual({
