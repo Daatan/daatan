@@ -350,6 +350,23 @@ export async function findSimilarForecasts({
   const vectorStr = `[${embedding.join(',')}]`
   const fetchLimit = limit * 5 // fetch extra to allow tag-boosted re-sorting
 
+  // Tag gate: short-sentence claim embeddings cluster by structure ("<person> will
+  // <do X> by <date>") far more than by topic, so cosine alone surfaces topically
+  // unrelated matches (e.g. a Messi forecast's nearest neighbour being a Putin one).
+  // When the source forecast has tags, require candidates to share at least one — the
+  // topical signal cosine lacks. When it has none (e.g. the create-time duplicate
+  // warning before tags are picked), fall back to pure cosine.
+  const lowerTags = tags.map(t => t.toLowerCase())
+  const tagGate = lowerTags.length
+    ? Prisma.sql`
+        AND EXISTS (
+          SELECT 1
+          FROM "_PredictionToTag" pt2
+          JOIN tags t2 ON t2.id = pt2."B"
+          WHERE pt2."A" = p.id AND lower(t2.name) = ANY(${lowerTags})
+        )`
+    : Prisma.empty
+
   const rows = await prisma.$queryRaw<SimilarRow[]>(
     Prisma.sql`
       SELECT
@@ -368,7 +385,7 @@ export async function findSimilarForecasts({
       LEFT JOIN tags t ON t.id = pt."B"
       WHERE p.status IN ('ACTIVE', 'PENDING_APPROVAL')
         AND p.embedding IS NOT NULL
-        AND p.id != ${excludeId ?? ''}
+        AND p.id != ${excludeId ?? ''}${tagGate}
       GROUP BY p.id, u.name, u.username, p.embedding
       HAVING (1 - (p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)})) >= ${COSINE_THRESHOLD}
       ORDER BY p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)}
