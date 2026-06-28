@@ -61,6 +61,24 @@ Sent by shell scripts **executing on the EC2 server** via SSM from `watchdog.yml
 
 ---
 
+## News-indexer watchdog (`news-indexer-watchdog.yml` — hourly)
+
+Monitors the **news-indexer** (`scrapper.daatan.com`) — free disk + DB / pipeline health — which `watchdog.yml`'s `disk-watchdog` does **not** cover (that targets the `daatan-backend` instances only). Runs from the **GitHub Actions runner** by polling the public `/stats` endpoint (disk usage comes from `.disk.used_percent`, which reflects the EC2 root volume).
+
+ALERT-ONLY each hour → 🚨 to **both** channels (clean + noisy); silent when healthy. Once a day at **09:00 UTC** it also posts a plain digest to the **noisy** channel.
+
+| Event | Icon | Trigger |
+|---|---|---|
+| Disk low | 💾 | `disk.used_percent` > 80%, or a jump > 2 pp vs the previous hour |
+| Worker unhealthy | ⚙️ | `worker.status` ≠ `ok` |
+| Pipeline stalled | 📰 | 0 articles indexed in 24h |
+| Queue backed up | 📮 | DLQ depth > 0, or queue depth > 500 |
+| Stale feed | 🕸️ | an enabled feed stopped producing > 7d |
+| Indexer down | 🚨 | `/stats` unreachable |
+| Daily digest | 📊 | always at 09:00 UTC (disk, DB, articles, worker, matches, stale feeds) |
+
+---
+
 ## Daily summary (`heartbeat.yml` — daily 09:00 UTC)
 
 Sent by the **EC2 app process** via `GET /api/cron/heartbeat` (triggered by `heartbeat.yml`). Because the Telegram message originates from the server — not from GitHub Actions — a silent daily summary means the server itself has a problem, not just that GitHub Actions is down. The message also doubles as the liveness heartbeat (it replaced the old bare "server alive" ping).
