@@ -21,12 +21,23 @@ Everything else (Postgres with pgvector, migrations) is in the bundled compose f
 
 ## 2. Quick start
 
+**Recommended — pull the prebuilt image** (no source checkout, no build):
+
 ```bash
 cp .env.selfhost.example .env      # then edit — see §3
+export DAATAN_VERSION=1.18.25      # a published release (omit → latest)
+docker compose -f docker-compose.selfhost.pull.yml up -d
+```
+
+This pulls the app + migrations images from GHCR (`ghcr.io/daatan/daatan-selfhost`), runs migrations as a one-shot init container, starts Postgres (`pgvector/pgvector:pg16`), and starts the app on `:3000`. Point your ingress at `:3000` and open your domain. Override `DAATAN_IMAGE` if you mirror the image to your own registry.
+
+**Alternative — build from source** (a repo checkout):
+
+```bash
 docker compose -f docker-compose.selfhost.yml up -d --build
 ```
 
-This builds the app image locally, runs database migrations as a one-shot init container, starts Postgres (`pgvector/pgvector:pg16`), and starts the app on `:3000`. Point your ingress at `:3000` and open your domain.
+Either way, migrations run automatically before the app starts.
 
 Health checks:
 - `GET /api/health` — app + DB.
@@ -178,12 +189,17 @@ Schedule the dump (cron / your backup system) and ship the artifact off-host.
 
 Migrations run automatically: the `migrate` one-shot container applies pending Prisma migrations before the app starts, on every `up`.
 
+Pull-based install — bump the version and re-up:
+
 ```bash
-git pull
-docker compose -f docker-compose.selfhost.yml up -d --build
+export DAATAN_VERSION=<new-version>
+docker compose -f docker-compose.selfhost.pull.yml pull
+docker compose -f docker-compose.selfhost.pull.yml up -d
 ```
 
-Take a `pg_dump` (see §7) before upgrading.
+Source build — `git pull` then `up --build`. Take a `pg_dump` (see §7) before upgrading.
+
+> **Publishing (maintainers):** the `Release self-hosted image` GitHub Action (manual dispatch) builds and pushes `ghcr.io/daatan/daatan-selfhost:<version>` (+ `-migrations`). GHCR packages start private — make them public once (org → Packages) so customers can pull without credentials.
 
 ---
 

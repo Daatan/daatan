@@ -1,0 +1,80 @@
+# Daatan — self-hosted edition (PULL a prebuilt image; no local build)
+#
+# The product install path: pulls the published image from GHCR instead of
+# building from source. Use docker-compose.selfhost.yml instead if you want to
+# build locally from a checkout.
+#
+# Quick start:
+#   cp .env.selfhost.example .env          # then edit
+#   export DAATAN_VERSION=1.18.25          # a published release (omit → latest)
+#   docker compose -f docker-compose.selfhost.pull.yml up -d
+#
+# TLS is terminated at your own ingress/load balancer → forward to app :3000.
+# Override the image with DAATAN_IMAGE if you mirror it to your own registry.
+
+services:
+  # One-shot: applies pending Prisma migrations, then exits. App waits for it.
+  migrate:
+    image: ${DAATAN_IMAGE:-ghcr.io/daatan/daatan-selfhost}:${DAATAN_VERSION:-latest}-migrations
+    environment:
+      - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ${DAATAN_IMAGE:-ghcr.io/daatan/daatan-selfhost}:${DAATAN_VERSION:-latest}
+    container_name: daatan-selfhost-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
+      - AUTH_TRUST_HOST=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    # pgvector is required (embeddings / similar-forecasts when AI is enabled).
+    image: pgvector/pgvector:pg16
+    container_name: daatan-selfhost-postgres
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=daatan
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=daatan
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U daatan -d daatan" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
