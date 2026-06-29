@@ -10,6 +10,21 @@ const log = createLogger('startup')
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
+  // Self-hosted edition: warm the admin-editable settings cache (brand name,
+  // OpenRouter key, /about content) from the DB, then rebuild the LLM service
+  // so a key set in a previous session is live without a restart. No-op on
+  // SaaS (loadSettings short-circuits off self_hosted).
+  if (process.env.DAATAN_EDITION === 'self_hosted') {
+    try {
+      const { loadSettings } = await import('@/lib/services/settings')
+      await loadSettings()
+      const { rebuildLlmService } = await import('@/lib/llm')
+      rebuildLlmService()
+    } catch (err) {
+      log.error({ err }, '[startup] Failed to warm settings cache')
+    }
+  }
+
   // Sync bot configurations to database on startup (non-blocking)
   import('@/lib/bots/sync').then(({ syncBotsToDatabase }) => {
     syncBotsToDatabase().catch(error => {

@@ -161,6 +161,20 @@ model Invite {
   @@map("invites")
 }
 
+// Admin-editable runtime configuration for the self-hosted edition (brand name,
+// /about content, OpenRouter key). A row OVERRIDES the matching .env value;
+// when no row exists the env (or a hardcoded default) is used, so SaaS — which
+// never writes rows — is byte-identical to before. Single-tenant key/value;
+// the value is stored as text (the OpenRouter key lives in the operator's own
+// DB and is never echoed back through the API).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
 // ============================================
 // NEWS ANCHORS (Context for predictions)
 // ============================================
