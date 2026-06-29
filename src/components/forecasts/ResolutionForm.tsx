@@ -37,7 +37,7 @@ interface ResolutionFormProps {
 
 export function ResolutionForm({ predictionId, outcomeType, options, onResolved }: ResolutionFormProps) {
   const { aiResearch } = useCapabilities()
-  const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable'>('correct')
+  const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable' | null>(null)
   const [correctOptionId, setCorrectOptionId] = useState<string>('')
   const [evidenceLinks, setEvidenceLinks] = useState<string>('')
   const [resolutionNote, setResolutionNote] = useState('')
@@ -91,9 +91,15 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
+    if (!outcome) {
+      setError('Please select an outcome')
+      return
+    }
+
     setIsSubmitting(true)
     setResolveStep('scoring')
-    setError(null)
 
     const isMultipleChoice = outcomeType === 'MULTIPLE_CHOICE'
     if (isMultipleChoice && (outcome === 'correct' || outcome === 'wrong') && !correctOptionId) {
@@ -306,6 +312,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
       <Button
         type="submit"
         loading={isSubmitting}
+        disabled={!outcome}
         fullWidth
         size="lg"
       >

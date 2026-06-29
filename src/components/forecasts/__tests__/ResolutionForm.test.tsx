@@ -44,12 +44,26 @@ describe('ResolutionForm', () => {
     })
   })
 
+  it('disables submit until an outcome is selected', async () => {
+    render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+    const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+    expect(submitButton).toBeDisabled()
+
+    fireEvent.click(submitButton)
+    expect(mockFetch).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Correct'))
+    expect(submitButton).not.toBeDisabled()
+  })
+
   it('calls onResolved callback when resolution succeeds', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true })
     const onResolved = vi.fn()
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} onResolved={onResolved} />)
 
+    fireEvent.click(screen.getByText('Correct'))
     const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
     fireEvent.click(submitButton)
 
@@ -82,6 +96,7 @@ describe('ResolutionForm', () => {
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
 
+    fireEvent.click(screen.getByText('Correct'))
     const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
     fireEvent.click(submitButton)
 
@@ -95,6 +110,7 @@ describe('ResolutionForm', () => {
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
 
+    fireEvent.click(screen.getByText('Correct'))
     const evidenceTextarea = document.getElementById('evidence') as HTMLTextAreaElement
     fireEvent.change(evidenceTextarea, {
       target: { value: 'https://example.com/1\nhttps://example.com/2' },
@@ -148,6 +164,7 @@ describe('ResolutionForm', () => {
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
 
+    fireEvent.click(screen.getByText('Correct'))
     const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
     fireEvent.click(submitButton)
 
