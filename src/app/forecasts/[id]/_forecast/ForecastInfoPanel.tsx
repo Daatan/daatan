@@ -1,7 +1,9 @@
 'use client'
 import Link from 'next/link'
-import { Calendar, Target, TrendingUp, ExternalLink } from 'lucide-react'
+import { Calendar, Target, TrendingUp, ExternalLink, User } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { UserLink } from '@/components/UserLink'
+import { RoleBadge } from '@/components/RoleBadge'
 import type { Prediction } from './types'
 
 interface Props {
@@ -33,6 +35,32 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
   return (
     <>
       <div className={variant === 'mobile' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
+        {variant === 'desktop' && (
+          <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+              <User className="w-3.5 h-3.5" />
+              {t('author')}
+            </div>
+            <UserLink
+              userId={prediction.author.id}
+              username={prediction.author.username}
+              name={prediction.author.name}
+              image={prediction.author.image}
+              showAvatar={true}
+              avatarSize={28}
+              className="w-full"
+            >
+              <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="font-semibold text-white truncate">{prediction.author.name}</span>
+                {prediction.author.role && (
+                  <RoleBadge role={prediction.author.role} size="sm" />
+                )}
+              </span>
+              <span className="text-xs text-gray-500 shrink-0">{t('reputationShort')} {prediction.author.rs.toFixed(0)}</span>
+            </UserLink>
+          </div>
+        )}
+
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
