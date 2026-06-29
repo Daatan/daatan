@@ -224,12 +224,10 @@ const Sidebar = () => {
         {/* Logo */}
         <Link href="/" className="hidden lg:flex p-6 items-center gap-3 hover:bg-navy-800 transition-colors">
           <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} priority />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-white">{appName}</span>
-              <span className="text-xs text-text-subtle font-mono">v{VERSION}</span>
-            </div>
+          <div className="min-w-0">
+            <span className="block text-lg font-bold text-white leading-tight">{appName}</span>
             <p className="text-sm text-text-secondary">{t('tagline')}</p>
+            <span className="text-[11px] text-text-subtle font-mono">v{VERSION}</span>
           </div>
         </Link>
 
