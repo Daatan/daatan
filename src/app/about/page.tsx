@@ -1,16 +1,80 @@
 import type { Metadata } from 'next'
 import { Info, Target, Users, TrendingUp, Shield, Mail, GitCommit, Zap, Github, Twitter, Lightbulb } from 'lucide-react'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import { VERSION } from '@/lib/version'
 import Link from 'next/link'
+import { env } from '@/env'
+import { getAppName } from '@/lib/branding'
+import { loadSettings, getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 
-export const metadata: Metadata = {
-  title: 'How DAATAN Works — Forecast Tracking & Prediction Market',
-  description: 'Learn how DAATAN works — a forecast tracking platform where you make predictions, stake your reputation, track your Brier score, and build your credibility over time.',
-  alternates: { canonical: '/about' },
-  openGraph: { url: '/about', type: 'website' },
+const SELF_HOSTED = env.DAATAN_EDITION === 'self_hosted'
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (SELF_HOSTED) {
+    await loadSettings()
+    const title = getCachedSetting(SETTING_KEYS.aboutTitle) || `About ${getAppName()}`
+    return { title, alternates: { canonical: '/about' }, openGraph: { url: '/about', type: 'website' } }
+  }
+  // SaaS — byte-identical to the previous static metadata.
+  return {
+    title: 'How DAATAN Works — Forecast Tracking & Prediction Market',
+    description: 'Learn how DAATAN works — a forecast tracking platform where you make predictions, stake your reputation, track your Brier score, and build your credibility over time.',
+    alternates: { canonical: '/about' },
+    openGraph: { url: '/about', type: 'website' },
+  }
 }
 
-export default function AboutPage() {
+// Markdown element styling for the dark theme (the app has no Tailwind
+// typography plugin). `node` is stripped so it never lands on a DOM element.
+const mdComponents: Components = {
+  h1: ({ node, ...p }) => <h1 className="text-2xl font-bold text-white mt-6 mb-3 first:mt-0" {...p} />,
+  h2: ({ node, ...p }) => <h2 className="text-xl font-bold text-white mt-5 mb-2" {...p} />,
+  h3: ({ node, ...p }) => <h3 className="text-lg font-semibold text-white mt-4 mb-2" {...p} />,
+  p: ({ node, ...p }) => <p className="text-text-secondary mb-3 leading-relaxed" {...p} />,
+  ul: ({ node, ...p }) => <ul className="list-disc pl-6 mb-3 text-text-secondary space-y-1" {...p} />,
+  ol: ({ node, ...p }) => <ol className="list-decimal pl-6 mb-3 text-text-secondary space-y-1" {...p} />,
+  a: ({ node, ...p }) => <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...p} />,
+  strong: ({ node, ...p }) => <strong className="font-semibold text-white" {...p} />,
+  em: ({ node, ...p }) => <em className="italic" {...p} />,
+  code: ({ node, ...p }) => <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300" {...p} />,
+  blockquote: ({ node, ...p }) => <blockquote className="border-l-4 border-navy-600 pl-4 italic text-gray-400 my-3" {...p} />,
+  hr: ({ node, ...p }) => <hr className="border-navy-600 my-5" {...p} />,
+}
+
+/**
+ * On the self-hosted edition /about renders the admin-authored title + Markdown
+ * body (Admin → Settings); SaaS keeps the original DAATAN marketing page.
+ */
+export default async function AboutPage() {
+  if (SELF_HOSTED) return <SelfHostAboutPage />
+  return <SaasAboutPage />
+}
+
+async function SelfHostAboutPage() {
+  await loadSettings()
+  const appName = getAppName()
+  const title = getCachedSetting(SETTING_KEYS.aboutTitle) || `About ${appName}`
+  const body = getCachedSetting(SETTING_KEYS.aboutBody)
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-6 lg:mb-8">
+        <Info className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
+        <h1 className="text-2xl sm:text-3xl font-bold text-white">{title}</h1>
+      </div>
+      {body ? (
+        <div className="bg-navy-700 border border-navy-600 rounded-xl p-6">
+          <ReactMarkdown components={mdComponents}>{body}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className="bg-navy-800 border border-cobalt/30 rounded-xl p-6 text-text-secondary">
+          {appName} is an internal forecasting platform. An administrator can customize this page under Admin → Settings.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SaasAboutPage() {
   const gitCommit = process.env.GIT_COMMIT || null
   const commitShort = gitCommit ? gitCommit.substring(0, 7) : null
   return (

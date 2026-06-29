@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 
-export default function AdminNav({ isAdmin }: { isAdmin: boolean }) {
+export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boolean; selfHosted?: boolean }) {
   const t = useTranslations('admin')
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState<number | null>(null)
@@ -18,6 +18,8 @@ export default function AdminNav({ isAdmin }: { isAdmin: boolean }) {
     { id: 'bots', label: t('tabBots'), adminOnly: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
+    // Runtime config (brand, /about, LLM key) — self-hosted edition only.
+    { id: 'settings', label: t('tabSettings'), adminOnly: true, selfHostedOnly: true },
     { id: 'about', label: t('tabAbout'), adminOnly: true },
   ]
 
@@ -30,7 +32,7 @@ export default function AdminNav({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="flex gap-1 sm:gap-4 border-b mb-6 overflow-x-auto whitespace-nowrap pb-1 scrollbar-hide -mx-2 px-2">
-      {TABS.filter(tab => !tab.adminOnly || isAdmin).map(tab => {
+      {TABS.filter(tab => (!tab.adminOnly || isAdmin) && (!tab.selfHostedOnly || selfHosted)).map(tab => {
         const href = `/admin/${tab.id}`
         const active = pathname === href || pathname.startsWith(href + '/')
         const showBadge = tab.id === 'approvals' && pendingCount !== null && pendingCount > 0
