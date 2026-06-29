@@ -85,5 +85,12 @@ jobs:
             echo "- \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}\`"
             echo "- \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}-migrations\`"
             echo ""
-            echo "Customers pull with \`DAATAN_VERSION=${{ steps.meta.outputs.version }}\` via docker-compose.selfhost.pull.yml."
+            echo "The package is **private**. A customer authenticates once, then pulls:"
+            echo '```'
+            echo 'echo "$GHCR_TOKEN" | docker login ghcr.io -u <user> --password-stdin   # token needs read:packages'
+            echo "export DAATAN_VERSION=${{ steps.meta.outputs.version }}"
+            echo "docker compose -f docker-compose.selfhost.pull.yml up -d"
+            echo '```'
+            echo ""
+            echo "See docs/SELF_HOSTING.md §8 for the full publish + pull flow."
           } >> "$GITHUB_STEP_SUMMARY"
