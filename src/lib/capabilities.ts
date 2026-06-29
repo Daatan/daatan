@@ -1,4 +1,5 @@
 import { env } from '@/env'
+import { getOpenRouterKey } from '@/lib/services/settings'
 
 /**
  * Optional add-on capabilities. The SaaS edition has them always on (daatan.com
@@ -10,9 +11,14 @@ import { env } from '@/env'
  * booleans are passed to the client via CapabilitiesProvider.
  */
 
-/** An LLM is configured (OpenRouter / Gemini / local Ollama). */
+/**
+ * An LLM is configured (OpenRouter / Gemini / local Ollama). The OpenRouter key
+ * may come from the admin-editable settings (DB) or env — so a self-host admin
+ * pasting a key turns AI on with no restart. Only reached on self_hosted (SaaS
+ * short-circuits before this), so consulting the settings cache is safe.
+ */
 function hasLLM(): boolean {
-  return !!(env.OPENROUTER_API_KEY || env.GEMINI_API_KEY || env.OLLAMA_BASE_URL)
+  return !!(getOpenRouterKey() || env.GEMINI_API_KEY || env.OLLAMA_BASE_URL)
 }
 
 /** A web/news search backend is configured (the Oracle). */

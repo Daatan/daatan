@@ -79,9 +79,21 @@ describe('branding (self_hosted)', () => {
     expect((await load()).getAppUrl()).toBe('https://forecast.acme.example')
   })
 
-  it('throws when APP_NAME / APP_URL are missing (fail fast, must brand)', async () => {
+  it('falls back to a neutral default name when nothing is set (boots unconfigured)', async () => {
+    // Brand name is admin-editable at runtime, so a missing APP_NAME no longer
+    // fails fast — the app boots as "Forecasting" until the admin sets it.
     const b = await load()
-    expect(() => b.getAppName()).toThrow(/APP_NAME is required/)
+    expect(b.getAppName()).toBe('Forecasting')
+  })
+
+  it('uses APP_NAME env as the seed when no admin setting exists', async () => {
+    mockEnv.APP_NAME = 'Acme'
+    const b = await load()
+    expect(b.getAppName()).toBe('Acme')
+  })
+
+  it('still fails fast when APP_URL is missing (operationally required)', async () => {
+    const b = await load()
     expect(() => b.getAppUrl()).toThrow(/APP_URL/)
   })
 

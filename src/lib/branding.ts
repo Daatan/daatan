@@ -1,16 +1,20 @@
 import { env } from '@/env'
+import { getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 
 /**
  * White-label branding. The SaaS edition keeps the literal DAATAN identity
- * (prod is byte-identical when APP_* are unset). The self_hosted edition MUST
- * brand itself: APP_NAME / APP_URL are required there, so a missing value
- * throws a clear error rather than silently shipping "DAATAN".
+ * (prod is byte-identical when APP_* are unset). The self_hosted edition brands
+ * itself from admin-editable runtime settings (DB) → APP_NAME env → a neutral
+ * default, so a fresh install always boots and the admin sets the real name
+ * live in the UI. APP_URL is still required (operationally needed for canonical
+ * URLs / OIDC redirects), so a missing value there still fails fast.
  *
  * Server-only (reads DAATAN_EDITION). Used by metadata, robots, sitemap.
  */
 
 const SAAS_NAME = 'DAATAN'
 const SAAS_URL = 'https://daatan.com'
+const SELF_HOST_DEFAULT_NAME = 'Forecasting'
 
 function isSelfHosted(): boolean {
   return env.DAATAN_EDITION === 'self_hosted'
@@ -18,9 +22,8 @@ function isSelfHosted(): boolean {
 
 /** Display name for titles / siteName / prompts. */
 export function getAppName(): string {
-  if (env.APP_NAME) return env.APP_NAME
   if (isSelfHosted()) {
-    throw new Error('APP_NAME is required when DAATAN_EDITION=self_hosted — set it in your environment.')
+    return getCachedSetting(SETTING_KEYS.appName) || env.APP_NAME || SELF_HOST_DEFAULT_NAME
   }
   return SAAS_NAME
 }
@@ -37,9 +40,17 @@ export function getAppUrl(): string {
   return SAAS_URL
 }
 
-/** Logo asset for the UI; operators override via APP_LOGO_URL. */
+/** Logo override URL (admin setting → APP_LOGO_URL env), or null for the bundled asset. */
+function getLogoOverride(): string | null {
+  if (isSelfHosted()) {
+    return getCachedSetting(SETTING_KEYS.appLogoUrl) || env.APP_LOGO_URL || null
+  }
+  return env.APP_LOGO_URL ?? null
+}
+
+/** Logo asset for the UI; operators override via the admin setting or APP_LOGO_URL. */
 export function getAppLogoUrl(): string {
-  return env.APP_LOGO_URL || '/logo-icon.svg'
+  return getLogoOverride() || '/logo-icon.svg'
 }
 
 export interface Branding {
@@ -50,7 +61,7 @@ export interface Branding {
 
 /** Snapshot handed to the client BrandingProvider from the root layout. */
 export function getBranding(): Branding {
-  return { appName: getAppName(), logoUrl: env.APP_LOGO_URL ?? null }
+  return { appName: getAppName(), logoUrl: getLogoOverride() }
 }
 
 /**

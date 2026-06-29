@@ -5,58 +5,63 @@ import { ResilientLLMService } from './service'
 import type { LLMProvider } from './types'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
+import { getOpenRouterKey, getOpenRouterModel } from '@/lib/services/settings'
 
 const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
 const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
-const openrouterApiKey = process.env.OPENROUTER_API_KEY || ''
 
-// Initialize providers list in priority order
-const providers: LLMProvider[] = []
+// Build the main service's provider list in priority order. The OpenRouter key
+// is read at build time from the admin settings (DB) → env, so re-running this
+// after the settings cache warms (or after the admin saves a key) picks it up
+// without a restart — see rebuildLlmService().
+function buildProviders(): LLMProvider[] {
+  const providers: LLMProvider[] = []
 
-// Only register Gemini when an API key is available.
-// In CI/test environments we often don't have a real key,
-// so we gracefully skip Gemini and rely on other providers.
-if (geminiApiKey) {
-  providers.push(
-    new GeminiProvider({
-      apiKey: geminiApiKey,
-      modelName: 'gemini-2.5-flash',
-    }),
-  )
-} else {
-  log.warn(
-    'GEMINI_API_KEY is not set; Gemini provider will be disabled. ' +
-    'Only fallback providers (e.g. Ollama) will be used.',
-  )
+  // Only register Gemini when an API key is available. In CI/test environments
+  // we often don't have a real key, so we skip Gemini and rely on fallbacks.
+  if (geminiApiKey) {
+    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: 'gemini-2.5-flash' }))
+  } else {
+    log.warn(
+      'GEMINI_API_KEY is not set; Gemini provider will be disabled. ' +
+      'Only fallback providers (e.g. Ollama) will be used.',
+    )
+  }
+
+  // Self-host edition: register OpenRouter when a key is configured (admin
+  // setting or env), so a single admin key powers the user-facing features
+  // (Express, etc.), not just bots. Scoped to self_hosted so the SaaS main
+  // service stays Gemini+Ollama (SaaS uses OpenRouter only inside the bot
+  // service — unchanged here).
+  const openrouterApiKey = getOpenRouterKey()
+  if (env.DAATAN_EDITION === 'self_hosted' && openrouterApiKey) {
+    providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: getOpenRouterModel() }))
+  }
+
+  // Always register Ollama as a fallback provider (when reachable)
+  providers.push(new OllamaProvider({ baseUrl: ollamaBaseUrl, modelName: 'qwen2.5:7b' }))
+
+  return providers
 }
 
-// Self-host edition: register OpenRouter when the operator supplies a key, so a
-// single admin key powers the user-facing features (Express, etc.), not just
-// bots. Scoped to self_hosted so the SaaS main service stays Gemini+Ollama
-// (SaaS already uses OpenRouter only inside the bot service — unchanged here).
-if (env.DAATAN_EDITION === 'self_hosted' && openrouterApiKey) {
-  providers.push(
-    new OpenRouterProvider({
-      apiKey: openrouterApiKey,
-      modelName: env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
-    }),
-  )
+// Main service with fallback strategy; tries providers in registration order.
+// `let` (not `const`) + a live ES binding so rebuildLlmService() can swap in a
+// service that reflects a newly-configured OpenRouter key without a restart.
+export let llmService = new ResilientLLMService(buildProviders())
+
+/**
+ * Rebuild the main LLM service from current settings. Called after the settings
+ * cache warms at boot and whenever the admin saves the OpenRouter key, so
+ * self-host AI turns on/off live. No-op effect on SaaS (providers are unchanged
+ * there). Importers using `import { llmService }` see the new instance via the
+ * live binding.
+ */
+export function rebuildLlmService(): void {
+  llmService = new ResilientLLMService(buildProviders())
 }
-
-// Always register Ollama as a fallback provider (when reachable)
-providers.push(
-  new OllamaProvider({
-    baseUrl: ollamaBaseUrl,
-    modelName: 'qwen2.5:7b', // Default fallback model
-  }),
-)
-
-// Create service instance with fallback strategy.
-// Tries providers in the order they were registered above.
-export const llmService = new ResilientLLMService(providers)
 
 // OpenRouter model IDs that have been renamed; map old → current.
 const OPENROUTER_MODEL_ALIASES: Record<string, string> = {
