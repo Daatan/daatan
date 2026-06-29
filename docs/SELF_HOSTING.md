@@ -61,11 +61,28 @@ Copy `.env.selfhost.example` and fill it in. The essentials:
 | `NEXTAUTH_SECRET` | 32+ char random secret — `openssl rand -hex 32`. |
 | `DAATAN_EDITION` | Set to `self_hosted`. |
 
-### Branding (required for self-host)
+### Branding
 
-`APP_NAME` and `APP_URL` are **required** when `DAATAN_EDITION=self_hosted` — the app fails fast with a clear error if either is missing, so your instance never ships as "DAATAN". `APP_URL` is the canonical/SEO base (falls back to `NEXTAUTH_URL`); `APP_LOGO_URL` and `EMAIL_FROM` are optional overrides.
+Most branding is editable **at runtime by an admin** under **Admin → Settings** (no restart) — see §3a. The `.env` values below are optional seeds for a zero-touch first boot:
+
+| Var | What |
+|-----|------|
+| `APP_URL` | **Required.** Canonical/SEO base URL (falls back to `NEXTAUTH_URL`). The app fails fast if neither is set. |
+| `APP_NAME` | Optional seed for the brand name. If unset, the app boots as **"Forecasting"** until an admin sets the real name in Settings. |
+| `APP_LOGO_URL` | Optional logo URL seed. |
+| `EMAIL_FROM` | Optional outbound-email sender. |
 
 A self-hosted instance is automatically **`noindex`** (robots + meta) and emits no daatan.com search-verification tags — it won't show up in public search engines.
+
+### 3a. Admin settings (edit in the UI, no restart)
+
+Once an admin is signed in (§4), **Admin → Settings** lets them configure the instance live — values are stored in the database and **override the matching `.env` value**:
+
+- **App name** and **logo URL** — branding shown in the sidebar, page titles, and AI prompts.
+- **About page** — a title + Markdown body rendered to all users at `/about`.
+- **OpenRouter API key + model** — see §6. The key powers Express/AI; pasting it turns those features on with no restart. The key is write-only in the UI (shown as `•••• configured`, never echoed back) and stored in your own database.
+
+Leaving a field blank reverts it to the `.env` value (or the built-in default).
 
 ---
 
@@ -161,8 +178,9 @@ v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and
 | `ENABLE_EXTERNAL_MARKETS=true` | Polymarket / Kalshi paste-to-prefill import |
 
 Notes:
+- **Easiest path:** an admin pastes the OpenRouter key under **Admin → Settings** (§3a) — no `.env` edit, no restart. The `OPENROUTER_API_KEY` env var is just a seed for the same setting.
 - On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracle.
-- `OPENROUTER_MODEL` overrides the default model (`openai/gpt-4o-mini`).
+- `OPENROUTER_MODEL` (or the Model field in Settings) overrides the default model (`openai/gpt-4o-mini`).
 - `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
 - Providers degrade gracefully relative to one another (Gemini → OpenRouter → Ollama).
 
@@ -200,7 +218,28 @@ docker compose -f docker-compose.selfhost.pull.yml up -d
 
 Source build — `git pull` then `up --build`. Take a `pg_dump` (see §7) before upgrading.
 
-> **Publishing (maintainers):** the `Release self-hosted image` GitHub Action (manual dispatch) builds and pushes `ghcr.io/daatan/daatan-selfhost:<version>` (+ `-migrations`). GHCR packages start private — make them public once (org → Packages) so customers can pull without credentials.
+### 8a. Publishing the image (maintainers)
+
+The image is published from a **manual** GitHub Action — it never fires on a normal prod tag and touches nothing in the SaaS pipeline (no ECR/EC2/AWS).
+
+1. Bump `package.json` / `src/lib/version.ts` and merge to `main` as usual.
+2. **Actions → "Release self-hosted image" → Run workflow.** Leave *Version* blank to publish the current `package.json` version (or type an explicit one).
+3. It builds and pushes both tags to GHCR:
+   - `ghcr.io/daatan/daatan-selfhost:<version>` and `:latest`
+   - `ghcr.io/daatan/daatan-selfhost:<version>-migrations` and `:latest-migrations`
+
+### 8b. Letting a customer pull (private image)
+
+The package is **private** (public packages are disabled by org policy), so the customer authenticates once before pulling. Issue them — or have them create — a GitHub token with **`read:packages`** only, then:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
+export DAATAN_VERSION=<version>
+docker compose -f docker-compose.selfhost.pull.yml pull
+docker compose -f docker-compose.selfhost.pull.yml up -d
+```
+
+If a customer can't be granted org access, mirror the image into their own registry and point `DAATAN_IMAGE` at it.
 
 ---
 
@@ -218,8 +257,8 @@ Source build — `git pull` then `up --build`. Take a `pg_dump` (see §7) before
 
 See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated list. Quick map:
 
-- **Required:** `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION`
-- **Branding:** `APP_URL`, `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
+- **Required:** `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION`, `APP_URL`
+- **Branding (optional seeds — editable in Admin → Settings):** `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
 - **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (seeds the first admin via `prisma/seed.ts`)
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
 - **AI (a key enables it):** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`; `ORACLE_URL`/`ORACLE_API_KEY` add "Analyze"; `ENABLE_AI_FEATURES` (override), `ENABLE_EXTERNAL_MARKETS`
