@@ -141,7 +141,7 @@ export default async function RootLayout({
               <MainContent>{children}</MainContent>
             </div>
             {!isSelfHosted() && <PwaInstaller />}
-            <PushPermissionPrompt />
+            {!isSelfHosted() && <PushPermissionPrompt />}
             <CookieConsent />
             <Toaster position="bottom-right" />
           </SessionWrapper>

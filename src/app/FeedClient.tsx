@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl'
 import ForecastCard, { Prediction } from '@/components/forecasts/ForecastCard'
 import { ForecastCardSkeleton } from '@/components/forecasts/ForecastCardSkeleton'
 import EmptyState from '@/components/ui/EmptyState'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { createClientLogger } from '@/lib/client-logger'
 
 const log = createClientLogger('FeedClient')
@@ -30,6 +31,9 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { data: session } = useSession()
+  const { selfHosted } = useCapabilities()
+  // "Needs Review" is the bot-forecast approval queue; bots (and the
+  // PENDING_APPROVAL status) don't exist on self-host, so hide the filter there.
   const isAdminOrApprover = session?.user?.role === 'ADMIN' || session?.user?.role === 'APPROVER'
   const t = useTranslations('feed')
   const tf = useTranslations('forecast')
@@ -224,7 +228,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             >
               {t('filters.awaitingResolution')}
             </button>
-            {isAdminOrApprover && (
+            {isAdminOrApprover && !selfHosted && (
               <button
                 onClick={() => handleSetFilter('NEEDS_REVIEW')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'NEEDS_REVIEW'

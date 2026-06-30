@@ -66,7 +66,7 @@
     "empty_RESOLVED": "Neniu solvita prognozo",
     "emptyDesc_RESOLVED": "Ankoraŭ neniu prognozo estis solvita. Rezultoj aperos ĉi tie post kiam ili estos finpretigitaj.",
     "empty_NEEDS_REVIEW": "Neniu prognozo bezonas kontrolon",
-    "emptyDesc_NEEDS_REVIEW": "Bonege! Ĉiuj bot-generitaj prognozoj estis kontrolitaj.",
+    "emptyDesc_NEEDS_REVIEW": "Bonege! Ĉio atendanta kontrolon estas kontrolita.",
     "empty_ALL": "Neniu prognozo trovita",
     "emptyDesc_ALL": "Ni ne povis trovi prognozojn kiuj respondas al viaj nunaj filtriloj.",
     "createFirst": "Krei la unuan prognozon",
