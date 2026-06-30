@@ -20,7 +20,7 @@ const basePrediction = {
 const wrap = (prediction: Prediction) =>
   render(
     <NextIntlClientProvider locale="en" messages={enMessages}>
-      <ForecastInfoPanel prediction={prediction} isMounted />
+      <ForecastInfoPanel prediction={prediction} />
     </NextIntlClientProvider>,
   )
 
@@ -29,6 +29,15 @@ describe('ForecastInfoPanel — Creation date box', () => {
     wrap(basePrediction)
     expect(screen.getByText('Creation date')).toBeInTheDocument()
     expect(screen.getByText('Resolution date')).toBeInTheDocument()
+  })
+
+  it('renders both dates synchronously (no isMounted gate) in UTC for SSR', () => {
+    wrap(basePrediction)
+    // Both values are present on first render — they must be in the SSR HTML.
+    expect(screen.getByText(/Mar 1, 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/Apr 16, 2026/)).toBeInTheDocument()
+    // UTC-stable formatting (timeZone: 'UTC') so server and client agree.
+    expect(screen.getAllByText(/UTC/).length).toBeGreaterThan(0)
   })
 })
 

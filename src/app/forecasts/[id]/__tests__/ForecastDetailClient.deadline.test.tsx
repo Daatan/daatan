@@ -60,29 +60,25 @@ describe('ForecastDetailClient — Deadline panel', () => {
     expect(labels.length).toBeGreaterThan(0)
   })
 
-  it('shows a non-empty formatted date after mount (isMounted guard)', async () => {
+  it('shows a non-empty formatted date in the SSR render (no mount gate)', async () => {
     await act(async () => {
       render(wrap(<ForecastDetailClient initialData={makePrediction() as any} />))
     })
 
-    // Wait for isMounted useEffect to set state and the date to appear
-    await waitFor(() => {
-      // The year 2026 must appear somewhere in the deadline panel
-      const matches = screen.getAllByText(/2026/)
-      expect(matches.length).toBeGreaterThan(0)
-    })
+    // The date is rendered synchronously (UTC-stable), so it's in the initial
+    // HTML for crawlers — the year 2026 must appear in the deadline panel.
+    const matches = screen.getAllByText(/2026/)
+    expect(matches.length).toBeGreaterThan(0)
   })
 
-  it('deadline text includes a timezone abbreviation (GMT or UTC or named zone)', async () => {
+  it('deadline text includes a UTC timezone token (hydration-stable)', async () => {
     await act(async () => {
       render(wrap(<ForecastDetailClient initialData={makePrediction() as any} />))
     })
 
-    await waitFor(() => {
-      // toLocaleString with timeZoneName: 'short' always appends a tz token
-      // In CI (UTC) this is "UTC"; in local envs it may be "GMT+N" or "EET" etc.
-      const fullText = document.body.textContent ?? ''
-      expect(fullText).toMatch(/UTC|GMT|[A-Z]{2,5}T/)
-    })
+    // formatDisplayDateTime pins timeZone: 'UTC' + timeZoneName: 'short' → "UTC",
+    // identical on server and client (no hydration mismatch).
+    const fullText = document.body.textContent ?? ''
+    expect(fullText).toMatch(/UTC/)
   })
 })

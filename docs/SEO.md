@@ -42,6 +42,38 @@ Private forecasts (where `isPublic = false`) get only the Article + BreadcrumbLi
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 
+## Server-rendered content (Soft 404 prevention)
+
+A forecast page must carry **substantive, unique text in its initial SSR HTML** — not
+just a claim line wrapped in the sitewide nav. When the server pre-render is thin and
+near-identical across thousands of pages, Google's thin-content heuristic files them under
+**"Soft 404"** (HTTP 200 but treated as an error) and drops them from the index, which also
+lowers the whole domain's crawl rate.
+
+Two anti-patterns previously starved the pre-render; both are fixed:
+
+- **`isMounted` date gates** — dates rendered `''` on the server and only filled after
+  hydration. They now render via the hydration-safe `formatDisplayDate` /
+  `formatDisplayDateTime` helpers (`src/lib/utils/date.ts`), which pin a fixed `en-US`
+  locale + `timeZone: 'UTC'` so server and client emit identical text (no mismatch, no gate).
+- **Collapsed-by-default `{open && …}` conditional rendering** — the resolution rules and the
+  whole AI-context card (summary, AI estimate, reasoning, Oracle sources) were *absent from
+  the DOM* until expanded. They now always render into the DOM and collapse via a CSS `hidden`
+  class instead of being removed, so crawlers see them (content inside collapsed/hidden
+  accordions is indexed under mobile-first).
+
+Additionally, `ForecastDetailClient` renders a **server-side facts line** under the `<h1>`
+(English/canonical locale): author · opened/resolves dates · forecaster count · community
+consensus · AI estimate · status. This guarantees unique prose even on one-line claims that
+have no description or sources yet. Regression coverage:
+`src/app/forecasts/[id]/__tests__/ForecastDetailClient.ssr-content.test.tsx` and the
+"collapsed by default" case in `src/components/forecasts/__tests__/ContextTimeline.test.tsx`.
+
+> Verify after deploy: fetch a forecast as Googlebot and strip `<script>` — the claim, the
+> facts line, the resolution rules, and (when present) the AI reasoning/sources must be in the
+> visible HTML. Then in Search Console, URL Inspection → "Test live URL" on a few previously
+> soft-404'd slugs and **Validate Fix** on the Soft 404 issue.
+
 ## Slugs & canonical URLs
 
 Slugs are English (forecasts authored in another language are canonicalized to English at
