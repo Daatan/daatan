@@ -41,7 +41,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - Scoring systems: [`src/lib/services/scoring-systems.ts`](./src/lib/services/scoring-systems.ts) and [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md)
 - Bot system: [`src/lib/services/bots/`](./src/lib/services/bots/) and [`docs/bots.md`](./docs/bots.md), [`docs/BOT_APPROVAL_WORKFLOW.md`](./docs/BOT_APPROVAL_WORKFLOW.md)
 - Embeddings + similar-forecasts: [`docs/EMBEDDINGS.md`](./docs/EMBEDDINGS.md)
-- Search providers: [Daatan/docs: search-providers.md](https://github.com/Daatan/docs/blob/main/search-providers.md)
+- Search providers: [`docs/SEARCH_PROVIDERS.md`](./docs/SEARCH_PROVIDERS.md) (local summary) + canonical [Daatan/docs: search-providers.md](https://github.com/Daatan/docs/blob/main/search-providers.md)
 - API surface: [`docs/API.md`](./docs/API.md)
 - Deployment: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md), [`docs/zero-downtime-version-updates.md`](./docs/zero-downtime-version-updates.md)
 - Telegram notifications: [`docs/TELEGRAM_NOTIFICATIONS.md`](./docs/TELEGRAM_NOTIFICATIONS.md)

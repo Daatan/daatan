@@ -238,6 +238,12 @@ The influence/strength of a specific prediction in scoring/visibility calculatio
 
 ---
 
+## Navigation (UI note)
+
+On mobile, the header search icon opens an inline search field in the top bar — it does **not** open the left navigation drawer. See `src/components/Sidebar.tsx`.
+
+---
+
 ## Related Documentation
 
 - [DAATAN_CORE.md](./DAATAN_CORE.md) — Source of Truth (vision and principles)
