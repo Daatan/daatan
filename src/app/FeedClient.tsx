@@ -177,8 +177,10 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Welcome Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      {/* Welcome Section — sticky so "New Forecast" stays in place while scrolling.
+          Negative margins break out of the page padding so the bar spans full width;
+          px-* re-aligns its content with the cards below. top-16 clears the mobile header. */}
+      <div className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 bg-navy-900/90 backdrop-blur-sm border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-cobalt/10 rounded-lg">
             <Home className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
@@ -386,16 +388,6 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
         </div>
       )}
 
-      {/* Floating New Forecast button — always visible while scrolling the feed.
-          z-40 keeps transient PWA/push prompts (z-50) above it. end-4 is RTL-aware. */}
-      <Button
-        href="/create"
-        size="lg"
-        leftIcon={<Plus className="w-5 h-5" />}
-        className="fixed bottom-4 end-4 z-40 shadow-lg shadow-black/30"
-      >
-        {t('newForecast')}
-      </Button>
     </div>
   )
 }
