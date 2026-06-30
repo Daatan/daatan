@@ -123,6 +123,16 @@ IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL
 
 If the key file is ever lost (e.g., regenerated `public/` directory), re-add `public/{key}.txt` containing only the key string.
 
+**Bulk backlog resubmission.** The per-event ping only covers forecasts changed *after*
+the feature shipped, so the pre-existing backlog was never submitted (Bing Webmaster Tools
+nags about this under "publish all your latest relevant URLs"). `POST /api/admin/indexnow/resubmit`
+(ADMIN-only) pushes **every indexable URL at once**: it reads the live sitemap — the single
+source of truth for what's indexable — and submits those URLs via `notifyIndexNowBulk` (batches
+of 10,000). Safe to re-run after large backfills (e.g. the English-canonicalization re-slug pass).
+No-op without `INDEXNOW_KEY`; the sitemap is empty off-production, so it only does real work on prod.
+Trigger it as an authenticated admin, e.g. from the browser console on daatan.com:
+`fetch('/api/admin/indexnow/resubmit', { method: 'POST' }).then(r => r.json()).then(console.log)`.
+
 ### Google Indexing API
 
 Unlike IndexNow, Google does not accept third-party push pings, so `notifyGoogle` calls Google's
