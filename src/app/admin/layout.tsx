@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import AdminNav from './AdminNav'
 
 export default async function AdminLayout({
@@ -15,7 +15,7 @@ export default async function AdminLayout({
   }
 
   const isAdmin = session.user.role === 'ADMIN'
-  const selfHosted = env.DAATAN_EDITION === 'self_hosted'
+  const selfHosted = isSelfHosted()
 
   return (
     <div className="admin-container p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">

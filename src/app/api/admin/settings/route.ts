@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-middleware'
-import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import {
   SETTING_KEYS,
   loadSettings,
@@ -19,12 +19,8 @@ import { handleRouteError, apiError } from '@/lib/api-error'
  * flag. Non-secret fields revert to the env/default when saved blank.
  */
 
-function selfHostedOnly(): boolean {
-  return env.DAATAN_EDITION === 'self_hosted'
-}
-
 export const GET = withAuth(async () => {
-  if (!selfHostedOnly()) return apiError('Not found', 404)
+  if (!isSelfHosted()) return apiError('Not found', 404)
   await loadSettings()
   return NextResponse.json({
     appName: getCachedSetting(SETTING_KEYS.appName) ?? '',
@@ -37,9 +33,18 @@ export const GET = withAuth(async () => {
   })
 }, { roles: ['ADMIN'] })
 
+// Logo lands in <img src> / og:image / favicon, so constrain it to a relative
+// path or an http(s) URL (empty reverts to the bundled asset).
+const logoUrl = z
+  .string()
+  .max(500)
+  .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), {
+    message: 'Logo URL must be a relative path or an http(s) URL',
+  })
+
 const bodySchema = z.object({
   appName: z.string().max(100).optional(),
-  appLogoUrl: z.string().max(500).optional(),
+  appLogoUrl: logoUrl.optional(),
   aboutTitle: z.string().max(200).optional(),
   aboutBody: z.string().max(20000).optional(),
   openrouterModel: z.string().max(100).optional(),
@@ -50,7 +55,7 @@ const bodySchema = z.object({
 })
 
 export const PUT = withAuth(async (req) => {
-  if (!selfHostedOnly()) return apiError('Not found', 404)
+  if (!isSelfHosted()) return apiError('Not found', 404)
   try {
     const parsed = bodySchema.safeParse(await req.json())
     if (!parsed.success) return apiError('Invalid settings payload', 400)

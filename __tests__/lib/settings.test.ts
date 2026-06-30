@@ -106,4 +106,41 @@ describe('settings — self_hosted', () => {
     await s.setSetting(s.SETTING_KEYS.openrouterModel, 'db/model')
     expect(s.getOpenRouterModel()).toBe('db/model')
   })
+
+  it('re-warming clears keys that no longer exist in the DB', async () => {
+    db.rows = [{ key: 'app_name', value: 'Acme' }]
+    const s = await load()
+    await s.loadSettings()
+    expect(s.getCachedSetting(s.SETTING_KEYS.appName)).toBe('Acme')
+    db.rows = [{ key: 'app_about_title', value: 'About' }] // app_name removed
+    await s.loadSettings()
+    expect(s.getCachedSetting(s.SETTING_KEYS.appName)).toBeUndefined()
+    expect(s.getCachedSetting(s.SETTING_KEYS.aboutTitle)).toBe('About')
+  })
+
+  it('loadSettings swallows a DB error: no throw, stays unwarmed, env fallback', async () => {
+    db.findMany.mockRejectedValueOnce(new Error('DB down'))
+    mockEnv.OPENROUTER_API_KEY = 'env-key'
+    const s = await load()
+    await expect(s.loadSettings()).resolves.toBeUndefined()
+    expect(s.settingsWarmed()).toBe(false)
+    expect(s.getOpenRouterKey()).toBe('env-key') // falls back to env
+  })
+
+  it('ensureSettingsWarmed loads once, then is a no-op', async () => {
+    db.rows = [{ key: 'app_name', value: 'Acme' }]
+    const s = await load()
+    await s.ensureSettingsWarmed()
+    expect(db.findMany).toHaveBeenCalledTimes(1)
+    expect(s.settingsWarmed()).toBe(true)
+    await s.ensureSettingsWarmed() // already warm → no second query
+    expect(db.findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('ensureSettingsWarmed never queries outside self_hosted', async () => {
+    mockEnv.DAATAN_EDITION = 'saas'
+    const s = await load()
+    await s.ensureSettingsWarmed()
+    expect(db.findMany).not.toHaveBeenCalled()
+  })
 })

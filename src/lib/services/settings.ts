@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('settings')
@@ -28,12 +29,8 @@ export const SETTING_KEYS = {
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS]
 
-const cache = new Map<string, string>()
+let cache = new Map<string, string>()
 let warmed = false
-
-function isSelfHosted(): boolean {
-  return env.DAATAN_EDITION === 'self_hosted'
-}
 
 /** Synchronous read of a cached setting, or undefined when unset/unwarmed. */
 export function getCachedSetting(key: SettingKey): string | undefined {
@@ -43,18 +40,33 @@ export function getCachedSetting(key: SettingKey): string | undefined {
 /**
  * Load all settings into the cache. No-op (and never touches the DB) outside
  * the self_hosted edition. Safe to call repeatedly.
+ *
+ * The freshly-loaded map is swapped in atomically (built fully, then assigned)
+ * so a concurrent {@link getCachedSetting} can never observe an empty/partial
+ * cache — readers see either the old map or the new one, never a torn state.
  */
 export async function loadSettings(): Promise<void> {
   if (!isSelfHosted()) return
   try {
     const rows = await prisma.setting.findMany()
-    cache.clear()
-    for (const row of rows) cache.set(row.key, row.value)
+    const next = new Map<string, string>()
+    for (const row of rows) next.set(row.key, row.value)
+    cache = next
     warmed = true
     log.info({ count: rows.length }, 'settings loaded')
   } catch (err) {
     log.error({ err }, 'failed to load settings — using env fallbacks')
   }
+}
+
+/**
+ * Warm the cache from the DB once, lazily — for request paths (e.g. /about)
+ * that can await but shouldn't pay a DB round-trip on every hit. After the boot
+ * warm or the first call this is a no-op; write-through keeps it fresh in-process.
+ */
+export async function ensureSettingsWarmed(): Promise<void> {
+  if (warmed || !isSelfHosted()) return
+  await loadSettings()
 }
 
 /**
@@ -66,17 +78,29 @@ export async function setSetting(key: SettingKey, value: string): Promise<void> 
     throw new Error('Settings are editable only in the self_hosted edition')
   }
   const trimmed = value.trim()
-  if (trimmed === '') {
-    await prisma.setting.deleteMany({ where: { key } })
-    cache.delete(key)
-    return
+  // Write errors are rethrown sanitized: a raw Prisma error can echo the
+  // offending value (here possibly the OpenRouter key) into logs / staging
+  // error bodies — that one value must never leak.
+  try {
+    if (trimmed === '') {
+      await prisma.setting.deleteMany({ where: { key } })
+      const next = new Map(cache)
+      next.delete(key)
+      cache = next
+      return
+    }
+    await prisma.setting.upsert({
+      where: { key },
+      update: { value: trimmed },
+      create: { key, value: trimmed },
+    })
+    // Mutate a copy then swap, mirroring loadSettings' atomic-swap contract.
+    const next = new Map(cache)
+    next.set(key, trimmed)
+    cache = next
+  } catch {
+    throw new Error(`Failed to persist setting "${key}"`)
   }
-  await prisma.setting.upsert({
-    where: { key },
-    update: { value: trimmed },
-    create: { key, value: trimmed },
-  })
-  cache.set(key, trimmed)
 }
 
 /** Whether the cache has been warmed from the DB at least once. */

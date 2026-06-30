@@ -4,7 +4,7 @@ import { OpenRouterProvider } from './providers/openrouter'
 import { ResilientLLMService } from './service'
 import type { LLMProvider } from './types'
 import { createLogger } from '@/lib/logger'
-import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import { getOpenRouterKey, getOpenRouterModel } from '@/lib/services/settings'
 
 const log = createLogger('llm')
@@ -37,7 +37,7 @@ function buildProviders(): LLMProvider[] {
   // service stays Gemini+Ollama (SaaS uses OpenRouter only inside the bot
   // service — unchanged here).
   const openrouterApiKey = getOpenRouterKey()
-  if (env.DAATAN_EDITION === 'self_hosted' && openrouterApiKey) {
+  if (isSelfHosted() && openrouterApiKey) {
     providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: getOpenRouterModel() }))
   }
 
