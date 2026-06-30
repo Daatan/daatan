@@ -66,7 +66,7 @@
     "empty_RESOLVED": "No resolved forecasts",
     "emptyDesc_RESOLVED": "No forecasts have been resolved yet. Results will appear here once they are finalized.",
     "empty_NEEDS_REVIEW": "No forecasts pending review",
-    "emptyDesc_NEEDS_REVIEW": "Excellent! All bot-generated forecasts have been reviewed.",
+    "emptyDesc_NEEDS_REVIEW": "Excellent! Everything pending review has been reviewed.",
     "empty_ALL": "No forecasts found",
     "emptyDesc_ALL": "We couldn't find any forecasts matching your current filters.",
     "createFirst": "Create the first forecast",
