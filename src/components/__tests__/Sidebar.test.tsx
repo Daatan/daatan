@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import Sidebar from '../Sidebar'
 import { useSession } from 'next-auth/react'
 import { vi, describe, it, expect } from 'vitest'
@@ -84,6 +84,26 @@ describe('Sidebar Component', () => {
 
     render(<Sidebar />)
     expect(screen.getByText('Fallback Name')).toBeInTheDocument()
+  })
+
+  it('opens an inline header search (not the nav drawer) when the mobile search icon is tapped', () => {
+    vi.mocked(useSession).mockReturnValue({
+      data: null,
+      status: 'unauthenticated',
+    } as any)
+
+    render(<Sidebar />)
+
+    // No inline search field before tapping the icon.
+    expect(screen.queryByPlaceholderText('searchPlaceholder')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('search'))
+
+    // The header morphs into an inline search field with a back affordance…
+    expect(screen.getByPlaceholderText('searchPlaceholder')).toBeInTheDocument()
+    expect(screen.getByLabelText('back')).toBeInTheDocument()
+    // …and the left nav drawer was NOT opened (no close-menu overlay).
+    expect(screen.queryByLabelText('Close menu')).not.toBeInTheDocument()
   })
 
   it('handles null session data gracefully (Build-time scenario)', () => {

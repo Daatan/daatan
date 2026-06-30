@@ -29,6 +29,7 @@ import {
   BarChart3,
   Mail,
   Search,
+  ArrowLeft,
 } from 'lucide-react'
 
 import { useTranslations, useLocale } from 'next-intl'
@@ -59,17 +60,26 @@ const Sidebar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hasMounted, setHasMounted] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  // Mobile-only: the header search field, opened in place by the magnifier icon.
+  // Kept separate from the nav drawer so tapping search no longer opens the whole panel.
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
 
+  useEffect(() => {
+    if (mobileSearchOpen) mobileSearchInputRef.current?.focus()
+  }, [mobileSearchOpen])
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     const q = searchQuery.trim()
     setSearchOpen(false)
+    setMobileSearchOpen(false)
     setSearchQuery('')
     handleCloseMenu()
     router.push(q ? `/forecasts?q=${encodeURIComponent(q)}` : '/forecasts')
@@ -168,13 +178,47 @@ const Sidebar = () => {
     <>
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-navy-900 border-b border-navy-600 flex items-center justify-between px-4 z-50">
+        {mobileSearchOpen ? (
+          // In-place search: tapping the magnifier morphs the header into a search
+          // field instead of opening the nav drawer.
+          <form onSubmit={handleSearch} className="flex items-center gap-1 w-full">
+            <button
+              type="button"
+              onClick={() => { setMobileSearchOpen(false); setSearchQuery('') }}
+              className="p-2 rounded-lg hover:bg-navy-800 transition-colors shrink-0"
+              aria-label={c('back')}
+            >
+              <ArrowLeft className="w-5 h-5 text-text-secondary" />
+            </button>
+            <input
+              ref={mobileSearchInputRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={ff('searchPlaceholder')}
+              type="search"
+              className="flex-1 min-w-0 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
+              onKeyDown={e => { if (e.key === 'Escape') { setMobileSearchOpen(false); setSearchQuery('') } }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); mobileSearchInputRef.current?.focus() }}
+                className="p-2 rounded-lg hover:bg-navy-800 transition-colors shrink-0"
+                aria-label={c('clear')}
+              >
+                <X className="w-5 h-5 text-text-secondary" />
+              </button>
+            )}
+          </form>
+        ) : (
+        <>
         <Link href="/" className="flex items-center gap-2" onClick={handleCloseMenu}>
           <BrandLogo fallbackSrc="/logo-icon.png" width={40} height={40} priority />
           <span className="text-lg font-bold text-white">{appName}</span>
         </Link>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setSearchOpen(true); setIsMobileMenuOpen(true) }}
+            onClick={() => setMobileSearchOpen(true)}
             className="p-2 rounded-lg hover:bg-navy-800 transition-colors"
             aria-label={c('search')}
           >
@@ -208,6 +252,8 @@ const Sidebar = () => {
             )}
           </button>
         </div>
+        </>
+        )}
       </header>
 
       {/* Mobile Overlay */}
