@@ -23,6 +23,7 @@ async function getInitialContextSnapshots(predictionId: string): Promise<Context
     externalProbability: s.externalProbability,
     externalReasoning: s.externalReasoning,
     oracleSnapshot: (s.oracleSnapshot as ContextSnapshot['oracleSnapshot']) ?? null,
+    insufficientData: s.insufficientData,
   }))
 }
 

@@ -155,6 +155,7 @@
     "filterByTagTooltip": "Foliumi prognozojn kun la etikedo \"{tag}\"",
     "legendYou": "Vi",
     "legendAI": "AI",
+    "aiInsufficientEvidence": "Nesufiĉaj pruvoj",
     "signInToVote": "Ensalutu por voĉdoni",
     "marketDistribution": "Merkata Distribuo",
     "confidencePercent": "Fido: {value}%",

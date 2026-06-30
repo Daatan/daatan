@@ -76,9 +76,12 @@ type OracleSnapshot = {
 }
 
 export type AiEstimate = {
-  probability: number
+  /** Null when the run abstained (see `abstained`). */
+  probability: number | null
   ciLow?: number
   ciHigh?: number
+  /** The Oracle had no evidence bearing on the claim — show "Insufficient evidence". */
+  abstained?: boolean
 }
 
 export type Snapshot = {
@@ -89,6 +92,7 @@ export type Snapshot = {
   externalProbability?: number | null
   externalReasoning?: string | null
   oracleSnapshot?: OracleSnapshot | null
+  insufficientData?: boolean
 }
 
 type NewsAnchor = {
@@ -110,7 +114,10 @@ type Props = {
 
 /** Map a snapshot's persisted probability + Oracle CI (if any) into the callback shape. */
 const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
-  if (!snap || snap.externalProbability == null) return null
+  if (!snap) return null
+  // The latest run abstained — surface "Insufficient evidence", not a stale number.
+  if (snap.insufficientData) return { probability: null, abstained: true }
+  if (snap.externalProbability == null) return null
   const oracle = snap.oracleSnapshot
   return {
     probability: snap.externalProbability,

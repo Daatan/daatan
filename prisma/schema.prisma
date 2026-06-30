@@ -375,6 +375,11 @@ model ContextSnapshot {
   // Null when the LLM-fallback path was taken or Oracle is not configured.
   oracleSnapshot Json? @map("oracle_snapshot")
 
+  // True when this run abstained: the Oracle had no evidence bearing on the claim
+  // (off-topic / all-hedged / too thin), so no probability was produced. The UI
+  // hides the AI estimate and shows "Insufficient evidence" instead of a number.
+  insufficientData Boolean @default(false) @map("insufficient_data")
+
   createdAt DateTime @default(now())
 
   @@index([predictionId, createdAt])

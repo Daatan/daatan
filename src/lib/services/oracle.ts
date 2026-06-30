@@ -75,6 +75,11 @@ export interface OracleForecastResponse {
 export interface OracleForecastResult {
   forecast: OracleForecastResponse | null
   logId: string | null
+  /** True when the Oracle ran but deliberately abstained (insufficient_data): the
+   *  evidence didn't bear on the claim. Distinct from `forecast: null` due to a
+   *  transport error / not-configured. Callers should surface "insufficient
+   *  evidence" rather than substituting an ungrounded estimate. */
+  insufficientData?: boolean
 }
 
 /**
@@ -174,6 +179,15 @@ export const getOracleForecast = async (
 
     const data: OracleForecastResponse = await res.json()
     const searchEngine = data.provider ?? data.provider_chain?.join(', ') ?? null
+
+    // The Oracle deliberately abstained: it ran but the evidence didn't bear on
+    // the claim (off-topic, all-hedged, or too thin). Signal this distinctly so
+    // the caller can show "insufficient evidence" instead of guessing a number.
+    if (data.insufficient_data) {
+      log.debug({ reason: data.reason, articlesUsed: data.articles_used }, 'Oracle abstained — insufficient evidence')
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
+      return { forecast: null, logId, insufficientData: true }
+    }
 
     if (data.placeholder) {
       log.debug('Oracle returned placeholder response — no real forecast available')
