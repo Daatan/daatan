@@ -58,6 +58,8 @@ export interface Capabilities {
   ai: boolean
   aiResearch: boolean
   externalMarkets: boolean
+  /** True on the self-hosted edition — lets client components drop SaaS-only surfaces. */
+  selfHosted: boolean
 }
 
 /** Snapshot of all capability flags — handed to the client provider from the root layout. */
@@ -66,5 +68,6 @@ export function getCapabilities(): Capabilities {
     ai: aiFeaturesEnabled(),
     aiResearch: aiResearchEnabled(),
     externalMarkets: externalMarketsEnabled(),
+    selfHosted: isSelfHosted(),
   }
 }

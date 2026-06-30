@@ -44,7 +44,13 @@ describe('capabilities', () => {
     expect(c.aiFeaturesEnabled()).toBe(false)
     expect(c.aiResearchEnabled()).toBe(false)
     expect(c.externalMarketsEnabled()).toBe(false)
-    expect(c.getCapabilities()).toEqual({ ai: false, aiResearch: false, externalMarkets: false })
+    expect(c.getCapabilities()).toEqual({ ai: false, aiResearch: false, externalMarkets: false, selfHosted: true })
+  })
+
+  it('getCapabilities reports selfHosted=false on SaaS/unset', async () => {
+    expect((await load()).getCapabilities().selfHosted).toBe(false)
+    mockEnv.DAATAN_EDITION = 'saas'
+    expect((await load()).getCapabilities().selfHosted).toBe(false)
   })
 
   it('turns AI on when an LLM key is configured (the key is the opt-in)', async () => {

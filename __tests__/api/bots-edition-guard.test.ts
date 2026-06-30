@@ -48,4 +48,16 @@ describe('bot routes — self-hosted gating', () => {
     const res = await POST(new NextRequest('http://localhost/api/bots/run', { method: 'POST' }))
     expect(res.status).toBe(404) // not 401 — the route is absent, not merely unauthorized
   })
+
+  it('POST /api/forecasts/[id]/approve → 404 on self_hosted (bot-only endpoint)', async () => {
+    const { POST } = await import('@/app/api/forecasts/[id]/approve/route')
+    const res = await POST(new NextRequest('http://localhost/x', { method: 'POST' }), { params: Promise.resolve({ id: 'p1' }) } as never)
+    expect(res.status).toBe(404)
+  })
+
+  it('POST /api/forecasts/[id]/reject → 404 on self_hosted (bot-only endpoint)', async () => {
+    const { POST } = await import('@/app/api/forecasts/[id]/reject/route')
+    const res = await POST(new NextRequest('http://localhost/x', { method: 'POST' }), { params: Promise.resolve({ id: 'p1' }) } as never)
+    expect(res.status).toBe(404)
+  })
 })

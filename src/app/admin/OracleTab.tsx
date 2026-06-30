@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 type Breakdown = {
   key: string
@@ -263,13 +264,13 @@ export function formatProviderChain(chain: string[]): string {
 // Column-header tooltips that make the Oracle vocabulary self-explanatory.
 const HEADER_HINTS = {
   type: 'Oracle call type — FORECAST: AI probability estimate; SEARCH: article retrieval; LEADERBOARD/HEALTH/LLM/FETCH_URL: support calls.',
-  source: 'Daatan workflow that triggered this Oracle call (e.g. context-update, bot-voting, express-creation).',
+  source: 'Daatan workflow that triggered this Oracle call (e.g. context-update, research, express-creation).',
   status: 'OK: usable result · EMPTY: no usable result (see Detail) · ERROR: call failed (see Detail).',
   detail: 'Why a call was EMPTY or ERROR — hover a row for the specific reason.',
   engine: 'Search engine that ultimately served the result. "caller" = articles supplied directly by the caller (no search); "none" = no provider claimed it.',
   provider: 'Provider that served the result; hover a row for the full provider chain attempted.',
   fallback: 'Whether a FORECAST fell back to the LLM (with its probability) instead of an article-grounded estimate.',
-  by: 'User or bot that triggered the call (the caller).',
+  by: 'The caller that triggered the Oracle call.',
 } as const
 
 function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
@@ -363,6 +364,9 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
 }
 
 export default function OracleTab() {
+  const { selfHosted } = useCapabilities()
+  // 'bot-voting' is a SaaS-only Oracle caller — drop it from the filter on self-host.
+  const sourceOptions = selfHosted ? SOURCE_OPTIONS.filter(s => s !== 'bot-voting') : SOURCE_OPTIONS
   const [stats, setStats] = useState<OracleStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [windowDays, setWindowDays] = useState(30)
@@ -407,7 +411,7 @@ export default function OracleTab() {
             title="Filter by source workflow"
           >
             <option value="">All sources</option>
-            {SOURCE_OPTIONS.map(s => (
+            {sourceOptions.map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>

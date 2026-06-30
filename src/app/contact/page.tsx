@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Mail, Github, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { isSelfHosted } from '@/lib/edition'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -10,6 +12,8 @@ export const metadata: Metadata = {
 }
 
 export default function ContactPage() {
+  // SaaS-only support page (DAATAN contact details) — absent on self-host.
+  if (isSelfHosted()) notFound()
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6 lg:mb-8">

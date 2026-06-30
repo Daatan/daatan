@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
+import { isSelfHosted } from '@/lib/edition'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -14,6 +15,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function DisclaimerPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const t = await getTranslations({ locale, namespace: 'footer' })
+  // The self-hosted edition has no bot system, so the bot references are dropped.
+  const selfHosted = isSelfHosted()
 
   return (
     <LegalPage title={t('disclaimer')} Icon={AlertTriangle}>
@@ -30,14 +33,14 @@ export default async function DisclaimerPage({ params }: { params: Promise<{ loc
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">2. AI-Generated Content</h2>
         <p>
-          Some forecasts and probability estimates on DAATAN are generated or informed by AI systems (including the Oracle and bot users). AI-generated content may be inaccurate, incomplete, or outdated. AI models can hallucinate — they may produce confident-sounding statements that are factually wrong. We do not independently verify every AI output before it appears on the platform.
+          Some forecasts and probability estimates on DAATAN are generated or informed by AI systems (including the Oracle{selfHosted ? '' : ' and bot users'}). AI-generated content may be inaccurate, incomplete, or outdated. AI models can hallucinate — they may produce confident-sounding statements that are factually wrong. We do not independently verify every AI output before it appears on the platform.
         </p>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">3. Source Comprehension Not Guaranteed</h2>
         <p>
-          When the Oracle system or bot users cite external articles, news items, or links as supporting evidence for a forecast, we do not claim to have fully or correctly understood those sources. The AI may misread, misrepresent, selectively quote, or misinterpret the linked content. External links are provided as references only — always read the source yourself before drawing conclusions.
+          When the Oracle system {selfHosted ? 'cites' : 'or bot users cite'} external articles, news items, or links as supporting evidence for a forecast, we do not claim to have fully or correctly understood those sources. The AI may misread, misrepresent, selectively quote, or misinterpret the linked content. External links are provided as references only — always read the source yourself before drawing conclusions.
         </p>
       </section>
 

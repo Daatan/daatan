@@ -1,11 +1,17 @@
 'use client'
 
 import React, { useState } from 'react'
+import { notFound } from 'next/navigation'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { analyses } from './data'
 
 export default function RetroanalysisPage() {
+  const { selfHosted } = useCapabilities()
   const [activeAnalysisId, setActiveAnalysisId] = useState(analyses[0].id)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+
+  // SaaS-only marketing archive — not part of the self-hosted edition.
+  if (selfHosted) notFound()
 
   const activeAnalysis = analyses.find(a => a.id === activeAnalysisId) || analyses[0]
 
