@@ -9,6 +9,46 @@ function urlFor(slug: string): string {
   return `${HOST}/forecasts/${slug}`
 }
 
+/** IndexNow accepts at most 10,000 URLs per request. */
+const INDEXNOW_BATCH = 10_000
+
+/**
+ * Submit a batch of already-built URLs to IndexNow in one or more requests
+ * (Bing/Yandex/Seznam — not Google). Unlike the fire-and-forget per-event
+ * `notifyIndexNow`, this awaits each request and reports counts, so an admin
+ * backlog resubmission can surface the result. No-op (returns zeros) without
+ * INDEXNOW_KEY or when given no URLs. The host + keyLocation are derived from
+ * the first URL so it stays correct for any deployment.
+ */
+export async function notifyIndexNowBulk(urls: string[]): Promise<{ submitted: number; batches: number }> {
+  const key = env.INDEXNOW_KEY
+  if (!key || urls.length === 0) return { submitted: 0, batches: 0 }
+  const host = new URL(urls[0]).hostname
+
+  let submitted = 0
+  let batches = 0
+  for (let i = 0; i < urls.length; i += INDEXNOW_BATCH) {
+    const urlList = urls.slice(i, i + INDEXNOW_BATCH)
+    batches += 1
+    try {
+      const res = await fetch('https://api.indexnow.org/indexnow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ host, key, keyLocation: `https://${host}/${key}.txt`, urlList }),
+      })
+      if (res.ok) {
+        submitted += urlList.length
+        log.info({ count: urlList.length, host }, 'IndexNow bulk ping sent')
+      } else {
+        log.warn({ status: res.status, count: urlList.length, host }, 'IndexNow bulk ping failed')
+      }
+    } catch (err) {
+      log.warn({ err, count: urlList.length, host }, 'IndexNow bulk ping error')
+    }
+  }
+  return { submitted, batches }
+}
+
 /** Ping IndexNow (Bing/Yandex/Seznam — not Google) for a forecast URL. No-op without INDEXNOW_KEY. */
 export function notifyIndexNow(slug: string): void {
   const key = env.INDEXNOW_KEY
