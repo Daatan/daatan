@@ -112,7 +112,7 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 
 ### Fallback chain for forecast "AI %"
 
-1.  **Oracle** (`POST /forecast` with 20s timeout) — calibrated multi-source estimate.
+1.  **Oracle** (`POST /forecast` with 12s timeout (bots use 20s)) — calibrated multi-source estimate.
 2.  **LLM `guessChances`** (Gemini → Ollama via the provider chain above) — used if Oracle is not configured, times out, returns a placeholder response, or has zero usable articles.
 
 ### Call sites
