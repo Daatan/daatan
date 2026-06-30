@@ -182,8 +182,17 @@ export async function createCommitment(
   const [prediction, user] = await Promise.all([
     db.prediction.findUnique({
       where: { id: predictionId },
-      include: { options: true },
-      // confidence needed for aiProbabilityAtCommit snapshot
+      include: {
+        options: true,
+        // confidence needed for aiProbabilityAtCommit snapshot; the latest
+        // snapshot's insufficientData tells us whether the Oracle abstained, so we
+        // don't manufacture an LLM estimate to grade an abstained forecast against.
+        contextSnapshots: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { insufficientData: true },
+        },
+      },
     }),
     db.user.findUnique({
       where: { id: userId },
@@ -214,7 +223,14 @@ export async function createCommitment(
     )
     emitCreateCommitmentSideEffects(prediction, commitment, data)
 
-    if (commitment.aiProbabilityAtCommit == null) {
+    const abstained = prediction.contextSnapshots?.[0]?.insufficientData ?? false
+    if (commitment.aiProbabilityAtCommit == null && !abstained) {
+      // confidence was null at commit. That's either "not analysed yet" (ask the
+      // LLM for a base-rate estimate to grade against) or "the Oracle abstained —
+      // insufficient evidence". For the latter (abstained) we must NOT manufacture
+      // a number: the UI honestly shows no AI estimate, so grading the user's
+      // aiScore against an LLM guess would defeat the abstention. Leaving
+      // aiProbabilityAtCommit null makes aiScore simply skipped at resolution.
       void triggerAiProbabilityEstimate(commitment.id, prediction.claimText)
     }
   }
