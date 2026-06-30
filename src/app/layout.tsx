@@ -15,6 +15,7 @@ import { MainContent } from '@/components/MainContent'
 import SessionWrapper from '@/components/SessionWrapper'
 import { CapabilitiesProvider } from '@/components/CapabilitiesProvider'
 import { getCapabilities } from '@/lib/capabilities'
+import { isSelfHosted } from '@/lib/edition'
 import { BrandingProvider } from '@/components/BrandingProvider'
 import PwaInstaller from '@/components/PwaInstaller'
 import PushPermissionPrompt from '@/components/PushPermissionPrompt'
@@ -53,7 +54,9 @@ export async function generateMetadata(): Promise<Metadata> {
       ],
       apple: '/apple-touch-icon.png',
     },
-    manifest: '/manifest.webmanifest',
+    // No PWA on self-host: the manifest is DAATAN-branded and installability
+    // isn't wanted for an internal tool.
+    ...(isSelfHosted() ? {} : { manifest: '/manifest.webmanifest' }),
     ...(tokens && {
       verification: {
         google: tokens.google,
@@ -137,7 +140,7 @@ export default async function RootLayout({
               <Sidebar />
               <MainContent>{children}</MainContent>
             </div>
-            <PwaInstaller />
+            {!isSelfHosted() && <PwaInstaller />}
             <PushPermissionPrompt />
             <CookieConsent />
             <Toaster position="bottom-right" />

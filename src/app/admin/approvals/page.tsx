@@ -202,7 +202,7 @@ export default function ApprovalsPage() {
                 <div>
                     <h2 className="text-xl font-bold text-white">Pending Approvals</h2>
                     <p className="text-sm text-gray-500 mt-1">
-                        Bot-generated forecasts awaiting human review before going live.
+                        Forecasts awaiting human review before going live.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">

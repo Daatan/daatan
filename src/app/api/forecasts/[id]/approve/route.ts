@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { getForecastById, approveForecast } from '@/lib/services/forecast'
 import { createCommitment } from '@/lib/services/commitment'
 import { notifyBotForecastApproved } from '@/lib/services/telegram'
@@ -14,6 +15,8 @@ export const dynamic = 'force-dynamic'
 
 // POST /api/forecasts/[id]/approve - Approve a PENDING_APPROVAL forecast and stake on it
 export const POST = withAuth(async (_request, user, { params }) => {
+  const blocked = blockedOnSelfHost()
+  if (blocked) return blocked
   try {
     const prediction = await getForecastById(params.id)
 

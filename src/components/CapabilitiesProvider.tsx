@@ -6,7 +6,7 @@ import type { Capabilities } from '@/lib/capabilities'
 // SaaS-equivalent default (everything on). The root layout always provides the
 // real server-resolved value; this default only matters for components rendered
 // outside the provider (e.g. isolated tests), keeping their behavior unchanged.
-const DEFAULT: Capabilities = { ai: true, aiResearch: true, externalMarkets: true }
+const DEFAULT: Capabilities = { ai: true, aiResearch: true, externalMarkets: true, selfHosted: false }
 
 const CapabilitiesContext = createContext<Capabilities>(DEFAULT)
 

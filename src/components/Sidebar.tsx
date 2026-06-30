@@ -7,6 +7,7 @@ import { useSession, signOut, signIn } from 'next-auth/react'
 import { VERSION } from '@/lib/version'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useBranding } from '@/components/BrandingProvider'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { Avatar } from './Avatar'
 import { UserLink } from './UserLink'
 import { useUnreadCount } from '@/lib/hooks/useUnreadCount'
@@ -111,6 +112,7 @@ const Sidebar = () => {
 
   const t = useTranslations('nav')
   const { appName } = useBranding()
+  const { selfHosted } = useCapabilities()
   const c = useTranslations('common')
   const ff = useTranslations('forecastsFeed')
 
@@ -119,16 +121,24 @@ const Sidebar = () => {
   // Use "loading" state for SSR and pre-mount to ensure server/client HTML matches
   const effectiveStatus = hasMounted ? status : 'loading'
 
+  // SaaS-only marketing/support pages are removed from the self-hosted edition.
+  // `selfHosted` comes from the server-resolved CapabilitiesProvider value, so
+  // it's stable across SSR + client (no hydration mismatch).
+  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis']
+  const editionNavItems = selfHosted
+    ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
+    : navItems
+
   // Filter nav items based on auth status (only after mount to avoid hydration mismatch)
   const filteredNavItems = hasMounted
-    ? navItems.filter((item) => {
+    ? editionNavItems.filter((item) => {
       const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
       if (authRequiredRoutes.includes(item.href)) {
         return status === 'authenticated'
       }
       return true
     })
-    : navItems.filter((item) => {
+    : editionNavItems.filter((item) => {
       // During SSR/pre-mount, show all non-auth routes
       const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
       return !authRequiredRoutes.includes(item.href)
