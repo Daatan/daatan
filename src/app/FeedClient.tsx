@@ -385,6 +385,17 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
           </div>
         </div>
       )}
+
+      {/* Floating New Forecast button — always visible while scrolling the feed.
+          z-40 keeps transient PWA/push prompts (z-50) above it. end-4 is RTL-aware. */}
+      <Button
+        href="/create"
+        size="lg"
+        leftIcon={<Plus className="w-5 h-5" />}
+        className="fixed bottom-4 end-4 z-40 shadow-lg shadow-black/30"
+      >
+        {t('newForecast')}
+      </Button>
     </div>
   )
 }
