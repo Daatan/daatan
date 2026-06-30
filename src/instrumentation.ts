@@ -25,14 +25,17 @@ export async function register() {
     }
   }
 
-  // Sync bot configurations to database on startup (non-blocking)
-  import('@/lib/bots/sync').then(({ syncBotsToDatabase }) => {
-    syncBotsToDatabase().catch(error => {
-      log.error({ err: error }, '[startup] Failed to sync bots to database')
+  // Sync bot configurations to database on startup (non-blocking). The bot
+  // system is SaaS-only, so skip it entirely in the self-hosted edition.
+  if (process.env.DAATAN_EDITION !== 'self_hosted') {
+    import('@/lib/bots/sync').then(({ syncBotsToDatabase }) => {
+      syncBotsToDatabase().catch(error => {
+        log.error({ err: error }, '[startup] Failed to sync bots to database')
+      })
+    }).catch(err => {
+      log.error({ err }, '[startup] Failed to load bot sync module')
     })
-  }).catch(err => {
-    log.error({ err }, '[startup] Failed to load bot sync module')
-  })
+  }
 
   if (process.env.NODE_ENV !== 'production') return
 

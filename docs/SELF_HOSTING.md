@@ -184,6 +184,8 @@ Notes:
 - `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
 - Providers degrade gracefully relative to one another (Gemini → OpenRouter → Ollama).
 
+> **Not in the self-hosted edition:** the automated **bot system** (LLM personas that scan news and auto-create forecasts) is SaaS-only. Its admin tab, pages, and API routes are disabled on self-host (the routes 404), and no bot sync runs at boot. Forecasts on a self-host are created by your people.
+
 ---
 
 ## 7. Backups

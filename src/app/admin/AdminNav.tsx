@@ -15,7 +15,8 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
     { id: 'comments', label: t('tabComments') },
     { id: 'users', label: t('tabUsers'), adminOnly: true },
     { id: 'invites', label: t('tabInvites'), adminOnly: true },
-    { id: 'bots', label: t('tabBots'), adminOnly: true },
+    // The bot system is SaaS-only — hidden in the self-hosted edition.
+    { id: 'bots', label: t('tabBots'), adminOnly: true, selfHostedHidden: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
     // Runtime config (brand, /about, LLM key) — self-hosted edition only.
@@ -32,7 +33,7 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
 
   return (
     <div className="flex gap-1 sm:gap-4 border-b mb-6 overflow-x-auto whitespace-nowrap pb-1 scrollbar-hide -mx-2 px-2">
-      {TABS.filter(tab => (!tab.adminOnly || isAdmin) && (!tab.selfHostedOnly || selfHosted)).map(tab => {
+      {TABS.filter(tab => (!tab.adminOnly || isAdmin) && (!tab.selfHostedOnly || selfHosted) && (!tab.selfHostedHidden || !selfHosted)).map(tab => {
         const href = `/admin/${tab.id}`
         const active = pathname === href || pathname.startsWith(href + '/')
         const showBadge = tab.id === 'approvals' && pendingCount !== null && pendingCount > 0

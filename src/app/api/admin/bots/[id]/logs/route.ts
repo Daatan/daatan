@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { getBotById, listBotLogs } from '@/lib/services/bot'
 
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic'
 // GET /api/admin/bots/[id]/logs?page=1&limit=20 — paginated run log
 export const GET = withAuth(
   async (request: NextRequest, _user, { params }) => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     try {
       const bot = await getBotById(params.id)
       if (!bot) return apiError('Bot not found', 404)
