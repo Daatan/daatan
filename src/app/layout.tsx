@@ -136,7 +136,7 @@ export default async function RootLayout({
             <AnalyticsUserSync />
             <StagingBanner />
             <NextBanner />
-            <div className="flex min-h-screen overflow-x-hidden">
+            <div className="flex min-h-screen overflow-x-clip">
               <Sidebar />
               <MainContent>{children}</MainContent>
             </div>
