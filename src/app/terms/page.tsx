@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
-  description: 'DAATAN Terms of Service — read our rules and guidelines.',
+  description: "DAATAN's Terms of Service: the rules for using the reputation-based forecasting platform — account responsibilities, acceptable use, and how forecasts and scoring work.",
 }
 
 export default function TermsPage() {

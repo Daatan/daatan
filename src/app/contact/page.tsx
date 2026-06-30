@@ -6,7 +6,7 @@ import { isSelfHosted } from '@/lib/edition'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
-  description: 'Get in touch with the DAATAN team.',
+  description: 'Get in touch with the DAATAN team — questions, feedback, partnership ideas, or support for the reputation-based news-forecasting platform.',
   alternates: { canonical: '/contact' },
   openGraph: { url: '/contact', type: 'website' },
 }

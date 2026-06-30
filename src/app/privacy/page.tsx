@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'DAATAN Privacy Policy — learn how we protect your data.',
+  description: "DAATAN's Privacy Policy: what data we collect, how we use and protect it, your rights, and how cookies and authentication work on the forecasting platform.",
 }
 
 export default function PrivacyPage() {
