@@ -10,6 +10,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockEnv: Record<string, unknown> = {}
 vi.mock('@/env', () => ({ env: mockEnv }))
 
+// Faithful stand-in for the settings resolver: a DB-cached key wins over env,
+// mirroring getOpenRouterKey() so we can exercise the admin-UI (DB) path.
+const settingStore: Record<string, string> = {}
+vi.mock('@/lib/services/settings', () => ({
+  getOpenRouterKey: () => settingStore['openrouter_api_key'] || (mockEnv.OPENROUTER_API_KEY as string) || '',
+}))
+
 async function load() {
   vi.resetModules()
   return import('@/lib/capabilities')
@@ -18,6 +25,7 @@ async function load() {
 describe('capabilities', () => {
   beforeEach(() => {
     for (const k of Object.keys(mockEnv)) delete mockEnv[k]
+    for (const k of Object.keys(settingStore)) delete settingStore[k]
   })
 
   it('treats SaaS (and unset edition) as fully enabled', async () => {
@@ -46,6 +54,14 @@ describe('capabilities', () => {
     expect(c.aiFeaturesEnabled()).toBe(true)
     // ...but Analyze stays off until a search backend exists.
     expect(c.aiResearchEnabled()).toBe(false)
+  })
+
+  it('turns AI on from a DB-set OpenRouter key (admin UI) with no env key', async () => {
+    mockEnv.DAATAN_EDITION = 'self_hosted'
+    settingStore['openrouter_api_key'] = 'db-or-key' // admin pasted it in Settings; no env var
+    const c = await load()
+    expect(c.aiFeaturesEnabled()).toBe(true)
+    expect(c.aiResearchEnabled()).toBe(false) // still no search backend
   })
 
   it('Gemini or Ollama also enable AI', async () => {

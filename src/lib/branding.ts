@@ -1,4 +1,5 @@
 import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import { getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 
 /**
@@ -15,10 +16,6 @@ import { getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 const SAAS_NAME = 'DAATAN'
 const SAAS_URL = 'https://daatan.com'
 const SELF_HOST_DEFAULT_NAME = 'Forecasting'
-
-function isSelfHosted(): boolean {
-  return env.DAATAN_EDITION === 'self_hosted'
-}
 
 /** Display name for titles / siteName / prompts. */
 export function getAppName(): string {

@@ -3,15 +3,15 @@ import { Info, Target, Users, TrendingUp, Shield, Mail, GitCommit, Zap, Github, 
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { VERSION } from '@/lib/version'
 import Link from 'next/link'
-import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import { getAppName } from '@/lib/branding'
-import { loadSettings, getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
+import { ensureSettingsWarmed, getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 
-const SELF_HOSTED = env.DAATAN_EDITION === 'self_hosted'
+const SELF_HOSTED = isSelfHosted()
 
 export async function generateMetadata(): Promise<Metadata> {
   if (SELF_HOSTED) {
-    await loadSettings()
+    await ensureSettingsWarmed()
     const title = getCachedSetting(SETTING_KEYS.aboutTitle) || `About ${getAppName()}`
     return { title, alternates: { canonical: '/about' }, openGraph: { url: '/about', type: 'website' } }
   }
@@ -51,7 +51,7 @@ export default async function AboutPage() {
 }
 
 async function SelfHostAboutPage() {
-  await loadSettings()
+  await ensureSettingsWarmed()
   const appName = getAppName()
   const title = getCachedSetting(SETTING_KEYS.aboutTitle) || `About ${appName}`
   const body = getCachedSetting(SETTING_KEYS.aboutBody)

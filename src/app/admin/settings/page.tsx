@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import SettingsPanel from '../SettingsPanel'
 
 /**
@@ -8,6 +8,6 @@ import SettingsPanel from '../SettingsPanel'
  * route redirects there.
  */
 export default function AdminSettingsPage() {
-  if (env.DAATAN_EDITION !== 'self_hosted') redirect('/admin/forecasts')
+  if (!isSelfHosted()) redirect('/admin/forecasts')
   return <SettingsPanel />
 }

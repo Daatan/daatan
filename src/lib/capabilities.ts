@@ -1,4 +1,5 @@
 import { env } from '@/env'
+import { isSelfHosted } from '@/lib/edition'
 import { getOpenRouterKey } from '@/lib/services/settings'
 
 /**
@@ -33,7 +34,7 @@ function hasSearch(): boolean {
  * stays as an explicit override.
  */
 export function aiFeaturesEnabled(): boolean {
-  if (env.DAATAN_EDITION !== 'self_hosted') return true
+  if (!isSelfHosted()) return true
   return hasLLM() || env.ENABLE_AI_FEATURES === 'true'
 }
 
@@ -43,13 +44,13 @@ export function aiFeaturesEnabled(): boolean {
  * hidden on an LLM-only self-host rather than appearing and failing.
  */
 export function aiResearchEnabled(): boolean {
-  if (env.DAATAN_EDITION !== 'self_hosted') return true
+  if (!isSelfHosted()) return true
   return aiFeaturesEnabled() && hasSearch()
 }
 
 /** External prediction-market integrations (Polymarket / Kalshi import + suggest-similar). */
 export function externalMarketsEnabled(): boolean {
-  if (env.DAATAN_EDITION !== 'self_hosted') return true
+  if (!isSelfHosted()) return true
   return env.ENABLE_EXTERNAL_MARKETS === 'true'
 }
 

@@ -9,6 +9,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockEnv: Record<string, unknown> = {}
 vi.mock('@/env', () => ({ env: mockEnv }))
 
+// Admin-set DB values (the cache) — drives the DB > env > default precedence.
+const settingStore: Record<string, string> = {}
+vi.mock('@/lib/services/settings', () => ({
+  SETTING_KEYS: {
+    appName: 'app_name',
+    appLogoUrl: 'app_logo_url',
+    aboutTitle: 'app_about_title',
+    aboutBody: 'app_about_body',
+    openrouterApiKey: 'openrouter_api_key',
+    openrouterModel: 'openrouter_model',
+  },
+  getCachedSetting: (k: string) => settingStore[k],
+}))
+
 async function load() {
   vi.resetModules()
   return import('@/lib/branding')
@@ -17,6 +31,7 @@ async function load() {
 describe('branding (SaaS / unset edition — must match the old literals)', () => {
   beforeEach(() => {
     for (const k of Object.keys(mockEnv)) delete mockEnv[k]
+    for (const k of Object.keys(settingStore)) delete settingStore[k]
   })
 
   it('defaults to the DAATAN identity', async () => {
@@ -62,6 +77,7 @@ describe('branding (SaaS / unset edition — must match the old literals)', () =
 describe('branding (self_hosted)', () => {
   beforeEach(() => {
     for (const k of Object.keys(mockEnv)) delete mockEnv[k]
+    for (const k of Object.keys(settingStore)) delete settingStore[k]
     mockEnv.DAATAN_EDITION = 'self_hosted'
   })
 
@@ -90,6 +106,27 @@ describe('branding (self_hosted)', () => {
     mockEnv.APP_NAME = 'Acme'
     const b = await load()
     expect(b.getAppName()).toBe('Acme')
+  })
+
+  it('the admin-set DB name overrides the APP_NAME env seed (DB > env > default)', async () => {
+    mockEnv.APP_NAME = 'Acme (env)'
+    settingStore['app_name'] = 'Acme (admin)'
+    const b = await load()
+    expect(b.getAppName()).toBe('Acme (admin)')
+  })
+
+  it('the admin-set DB logo overrides APP_LOGO_URL env; getBranding carries it', async () => {
+    mockEnv.APP_LOGO_URL = 'https://cdn/env.png'
+    settingStore['app_logo_url'] = 'https://cdn/admin.png'
+    const b = await load()
+    expect(b.getAppLogoUrl()).toBe('https://cdn/admin.png')
+    expect(b.getBranding().logoUrl).toBe('https://cdn/admin.png')
+  })
+
+  it('getAppLogoUrl falls back to the bundled asset when nothing is set', async () => {
+    const b = await load()
+    expect(b.getAppLogoUrl()).toBe('/logo-icon.svg')
+    expect(b.getBranding().logoUrl).toBeNull()
   })
 
   it('still fails fast when APP_URL is missing (operationally required)', async () => {
