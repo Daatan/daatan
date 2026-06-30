@@ -49,7 +49,7 @@ describe('ContextTimeline', () => {
     expect(screen.queryByText(enMessages.context.analyze)).not.toBeInTheDocument()
   })
 
-  it('section is collapsed by default', async () => {
+  it('keeps the context body in the DOM while collapsed by default (crawlable, hidden via CSS)', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -63,7 +63,12 @@ describe('ContextTimeline', () => {
       renderWithIntl(<ContextTimeline predictionId="p1" initialContext="Current situation summary" canAnalyze={false} />)
     })
 
-    expect(screen.queryByText('Current situation summary')).not.toBeInTheDocument()
+    // The summary is rendered into the HTML for SEO even though the section is
+    // visually collapsed — its container carries the `hidden` class rather than
+    // being removed from the tree.
+    const body = screen.getByText('Current situation summary')
+    expect(body).toBeInTheDocument()
+    expect(body.parentElement?.className).toContain('hidden')
   })
 
   it('displays initial context after expanding section', async () => {

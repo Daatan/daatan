@@ -4,15 +4,15 @@ import { Calendar, Target, TrendingUp, ExternalLink, User } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { UserLink } from '@/components/UserLink'
 import { RoleBadge } from '@/components/RoleBadge'
+import { formatDisplayDateTime } from '@/lib/utils/date'
 import type { Prediction } from './types'
 
 interface Props {
   prediction: Prediction
   variant?: 'desktop' | 'mobile'
-  isMounted: boolean
 }
 
-export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }: Props) {
+export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
   const t = useTranslations('forecast')
   const market = prediction.externalMarket
   const marketProbability =
@@ -66,15 +66,8 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
             <Calendar className="w-3.5 h-3.5" />
             {t('creationDate')}
           </div>
-          <div className="text-white font-semibold truncate" suppressHydrationWarning>
-            {isMounted && new Date(prediction.createdAt).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZoneName: 'short',
-            })}
+          <div className="text-white font-semibold truncate">
+            {formatDisplayDateTime(prediction.createdAt)}
           </div>
         </div>
 
@@ -83,15 +76,8 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', isMounted }
             <Calendar className="w-3.5 h-3.5" />
             {t('deadline')}
           </div>
-          <div className="text-white font-semibold truncate" suppressHydrationWarning>
-            {isMounted && new Date(prediction.resolveByDatetime).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZoneName: 'short',
-            })}
+          <div className="text-white font-semibold truncate">
+            {formatDisplayDateTime(prediction.resolveByDatetime)}
           </div>
         </div>
 

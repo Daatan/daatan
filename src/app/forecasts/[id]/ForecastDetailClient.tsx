@@ -38,6 +38,7 @@ import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
+import { formatDisplayDate } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
@@ -76,7 +77,6 @@ export default function ForecastDetailClient({
   const [isLoading, setIsLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [isApproving, setIsApproving] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
   const [showRules, setShowRules] = useState(false)
 
   // Confidence state (0 to 100 for display; 50 = neutral for BINARY)
@@ -100,7 +100,6 @@ export default function ForecastDetailClient({
   const canApprove = (session?.user?.role === 'ADMIN' || session?.user?.role === 'APPROVER') && prediction?.status === 'PENDING_APPROVAL'
 
   useEffect(() => {
-    setIsMounted(true)
     if (prediction?.userCommitment) {
       // cuCommitted stores -100..100 for BINARY in DB; convert to 0..100 for display
       const val = prediction.userCommitment.cuCommitted ?? (prediction.userCommitment.binaryChoice ? 70 : -70)
@@ -206,14 +205,9 @@ export default function ForecastDetailClient({
     }
   }
 
-  const formatDate = (date: string | Date) => {
-    if (!isMounted) return ''
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
+  // UTC-stable so the resolved-on date renders in the SSR HTML (crawlable) with
+  // no hydration mismatch — see formatDisplayDate.
+  const formatDate = (date: string | Date) => formatDisplayDate(date)
 
   const handleApproveAction = async (status: 'ACTIVE' | 'VOID') => {
     if (!prediction) return
@@ -309,13 +303,7 @@ export default function ForecastDetailClient({
             {/* Deadline - Moved to top */}
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-gray-400 text-sm font-medium">
               <Calendar className="w-4 h-4" />
-              <span suppressHydrationWarning>
-                {isMounted && new Date(prediction.resolveByDatetime).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </span>
+              <span>{formatDisplayDate(prediction.resolveByDatetime)}</span>
             </div>
 
             {/* Confidence/Probability - Moved to top */}
@@ -400,8 +388,38 @@ export default function ForecastDetailClient({
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
+        {/* Server-rendered one-line summary. Guarantees every forecast page —
+            even a one-sentence claim with no description — carries unique,
+            substantive prose in the initial HTML, which is what stops Google's
+            thin-content "Soft 404" verdict. English only: it's the canonical
+            (indexed) locale; localized routes are hreflang alternates. */}
+        {locale === 'en' && (() => {
+          const created = formatDisplayDate(prediction.createdAt)
+          const resolves = formatDisplayDate(prediction.resolveByDatetime)
+          const forecasters = prediction.commitments.length
+          const consensus = prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null
+          const aiSnap = initialContextSnapshots?.[0]
+          const ai = aiSnap?.insufficientData ? null : (aiSnap?.externalProbability ?? prediction.confidence ?? null)
+          const status =
+            prediction.resolvedAt && prediction.resolutionOutcome
+              ? `resolved ${prediction.resolutionOutcome}`
+              : prediction.status === 'ACTIVE'
+                ? 'open for forecasts'
+                : prediction.status.replace(/_/g, ' ').toLowerCase()
+          const parts = [
+            `Forecast by ${prediction.author.name || prediction.author.username}`,
+            `opened ${created}`,
+            `resolves ${resolves}`,
+            `${forecasters} ${forecasters === 1 ? 'forecaster' : 'forecasters'}`,
+          ]
+          if (consensus != null) parts.push(`community consensus ${consensus}%`)
+          if (ai != null) parts.push(`AI estimate ${ai}%`)
+          parts.push(status)
+          return <p className="text-sm text-gray-400 mb-4 leading-relaxed">{parts.join(' · ')}.</p>
+        })()}
+
         <div className="xl:hidden">
-          <ForecastInfoPanel prediction={prediction} variant="mobile" isMounted={isMounted} />
+          <ForecastInfoPanel prediction={prediction} variant="mobile" />
         </div>
 
         {(showTranslated && translatedFields) && (
@@ -428,11 +446,11 @@ export default function ForecastDetailClient({
           {showRules ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           {t('resolutionRulesTitle')}
         </button>
-        {showRules && (
-          <div className="mt-2 p-3 bg-navy-800 border border-navy-600 rounded-lg text-sm text-text-secondary whitespace-pre-wrap">
-            {prediction.resolutionRules ?? t('noResolutionRules')}
-          </div>
-        )}
+        {/* Always in the DOM (crawlable); collapsed via CSS rather than removed,
+            so the resolution rules are part of the SSR HTML for SEO. */}
+        <div className={`mt-2 p-3 bg-navy-800 border border-navy-600 rounded-lg text-sm text-text-secondary whitespace-pre-wrap ${showRules ? '' : 'hidden'}`}>
+          {prediction.resolutionRules ?? t('noResolutionRules')}
+        </div>
       </div>
 
       {/* Situation Context / Timeline */}
@@ -760,10 +778,7 @@ export default function ForecastDetailClient({
         {/* Right column (desktop). Not sticky: it holds related forecasts and
             the full discussion, which can be taller than the viewport. */}
         <div className="hidden xl:block space-y-4">
-          <ForecastInfoPanel
-            prediction={prediction}
-            isMounted={isMounted}
-          />
+          <ForecastInfoPanel prediction={prediction} />
           <SimilarForecasts predictionId={prediction.id} />
           <CommentThread predictionId={prediction.id} initialComments={initialComments} />
         </div>

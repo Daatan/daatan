@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
 import { createClientLogger } from '@/lib/client-logger'
 import { toError } from '@/lib/utils/error'
+import { formatDisplayDateTime } from '@/lib/utils/date'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('ContextTimeline')
@@ -145,7 +146,6 @@ export default function ContextTimeline({
   const [isContextOpen, setIsContextOpen] = useState(false)
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [hasFetched, setHasFetched] = useState(hasInitialSnapshots)
-  const [isMounted, setIsMounted] = useState(false)
   const { aiResearch } = useCapabilities()
   const t = useTranslations('context')
 
@@ -176,7 +176,6 @@ export default function ContextTimeline({
 
   // Fetch timeline on mount
   useEffect(() => {
-    setIsMounted(true)
     // Server already prefetched the timeline for SEO — propagate the AI estimate but skip the redundant fetch.
     if (hasInitialSnapshots) {
       onAiEstimate?.(toAiEstimate(initialSnapshots?.[0]))
@@ -290,16 +289,9 @@ export default function ContextTimeline({
     }
   }
 
-  const formatDate = (dateStr: string) => {
-    if (!isMounted) return ''
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
+  // UTC-stable so snapshot timestamps render in the SSR HTML without a hydration
+  // mismatch (the timeline is prefetched for SEO).
+  const formatDate = (dateStr: string) => formatDisplayDateTime(dateStr)
 
   const previousSnapshots = snapshots.slice(1)
 
@@ -342,9 +334,11 @@ export default function ContextTimeline({
         </div>
       </button>
 
-      {/* Current context card */}
-      {currentContext && isContextOpen && (
-        <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+      {/* Current context card — always in the DOM (crawlable); collapsed via CSS
+          rather than removed, so the AI summary, estimate, reasoning and Oracle
+          sources are part of the SSR HTML for SEO. */}
+      {currentContext && (
+        <div className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${isContextOpen ? '' : 'hidden'}`}>
           <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">{currentContext}</p>
           {contextUpdatedAt && (
             <p className="text-xs text-gray-400 mt-2" suppressHydrationWarning>

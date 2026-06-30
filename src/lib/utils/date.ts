@@ -31,3 +31,34 @@ export function toLocalDatetimeInput(date: Date): string {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   )
 }
+
+/**
+ * Format a date for display in a **hydration-safe** way: fixed `en-US` locale
+ * and UTC timezone, so the server and the client emit byte-identical text. This
+ * lets date-bearing content render in the initial SSR HTML (so crawlers see it)
+ * without an `isMounted` gate or a hydration mismatch. Returns '' for invalid
+ * input. Use UTC-stable display anywhere the value must appear in the server HTML
+ * (SEO); use the locale-aware `toLocaleString` only for client-only chrome.
+ */
+export function formatDisplayDate(date: string | Date | null | undefined): string {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+
+/** Like {@link formatDisplayDate} but with the time of day; renders an explicit "UTC" suffix. */
+export function formatDisplayDateTime(date: string | Date | null | undefined): string {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  })
+}
