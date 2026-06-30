@@ -527,7 +527,7 @@ Liveness + readiness probe. Returns `200` when the DB is reachable, `503` when i
 ```json
 {
   "status": "ok",         // "ok" | "degraded"
-  "version": "1.18.0",    // app version from src/lib/version.ts
+  "version": "1.22.6",    // app version from src/lib/version.ts
   "commit": "e3a594f",    // short GIT_COMMIT baked at build time
   "timestamp": "2026-04-16T17:31:45.056Z",
   "env": "production",    // APP_ENV

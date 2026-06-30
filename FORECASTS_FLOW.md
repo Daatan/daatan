@@ -133,6 +133,8 @@ Prediction {
 - Only changed fields are sent in the PATCH request
 - Edit buttons on forecast cards and detail pages link directly to the editor
 
+**Author-language editing.** A non-English author edits the forecast in their *own* language; the English canonical text is derived/normalized behind the scenes rather than typed by the author (see `src/lib/services/forecast.ts`, `src/lib/services/translation.ts`, and `EditForecastClient.tsx`). The forecast URL stays stable across edits — editing does not mint a new slug/id. Likewise, the express-create flow shows its preview in the author's original language.
+
 ### Feed Filtering
 The feed supports three types of filters, all persisted in URL query params:
 1. **Status** — Open, Closing Soon, Awaiting Resolution, Resolved, All

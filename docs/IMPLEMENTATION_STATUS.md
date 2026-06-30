@@ -1,5 +1,7 @@
 # Bot Approval Workflow - Implementation Status
 
+> **ARCHIVED / historical.** This document is a frozen snapshot of the bot-approval implementation effort, which has since shipped (100% complete). It is kept for historical reference and is **not** a live planning document. For current behavior see [`docs/BOT_APPROVAL_WORKFLOW.md`](./BOT_APPROVAL_WORKFLOW.md).
+
 **Last Updated**: March 21, 2026
 **Overall Progress**: 15/15 tasks complete (100%) ✅
 
