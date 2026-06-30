@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { z } from 'zod'
 import { getForecastById, updateForecastStatus, deleteForecast } from '@/lib/services/forecast'
-import { notifyIndexNow } from '@/lib/services/indexnow'
+import { notifySearchEngines } from '@/lib/services/indexnow'
 
 const updateStatusSchema = z.object({
   status: z.enum(['DRAFT', 'ACTIVE', 'PENDING', 'PENDING_APPROVAL', 'RESOLVED_CORRECT', 'RESOLVED_WRONG', 'VOID', 'UNRESOLVABLE']),
@@ -30,7 +30,7 @@ export const PATCH = withAuth(async (req, user, { params }) => {
   const prediction = await updateForecastStatus(id, result.data.status)
 
   if (result.data.status === 'VOID' || result.data.status === 'UNRESOLVABLE') {
-    notifyIndexNow(prediction.slug ?? prediction.id)
+    notifySearchEngines(prediction.slug ?? prediction.id)
   }
 
   return NextResponse.json(prediction)

@@ -113,6 +113,12 @@ export const env = createEnv({
     // IndexNow — instant Bing/Yandex indexing on publish
     INDEXNOW_KEY: z.string().min(1).optional(),
 
+    // Google Indexing API — direct ping to Google on publish/re-slug.
+    // Both must be set to enable; no-op otherwise. The service account must be
+    // added as an owner of the property in Google Search Console.
+    GOOGLE_INDEXING_CLIENT_EMAIL: z.string().email().optional(),
+    GOOGLE_INDEXING_PRIVATE_KEY: z.string().min(1).optional(),
+
     // News-indexer integration
     NEWS_INDEXER_SECRET: z.string().min(1).optional(),  // inbound: news-indexer → Daatan
     NEWS_INDEXER_URL: z.string().url().optional(),      // outbound: Daatan → news-indexer
@@ -167,6 +173,8 @@ export const env = createEnv({
     ORACLE_URL: process.env.ORACLE_URL,
     ORACLE_API_KEY: process.env.ORACLE_API_KEY,
     INDEXNOW_KEY: process.env.INDEXNOW_KEY,
+    GOOGLE_INDEXING_CLIENT_EMAIL: process.env.GOOGLE_INDEXING_CLIENT_EMAIL,
+    GOOGLE_INDEXING_PRIVATE_KEY: process.env.GOOGLE_INDEXING_PRIVATE_KEY,
     NEWS_INDEXER_SECRET: process.env.NEWS_INDEXER_SECRET,
     NEWS_INDEXER_URL: process.env.NEWS_INDEXER_URL,
     NEWS_INDEXER_API_KEY: process.env.NEWS_INDEXER_API_KEY,

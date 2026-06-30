@@ -13,7 +13,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 vi.mock('@/lib/services/embedding', () => ({ embedText: vi.fn(), embedAndStoreForecast: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/services/indexnow', () => ({ notifyIndexNow: vi.fn() }))
+vi.mock('@/lib/services/indexnow', () => ({ notifySearchEngines: vi.fn() }))
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
@@ -26,6 +26,7 @@ vi.mock('@/lib/services/translation', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { embedAndStoreForecast } from '@/lib/services/embedding'
+import { notifySearchEngines } from '@/lib/services/indexnow'
 import { normalizeForecastToEnglish, translatePredictionToAllLocales } from '@/lib/services/translation'
 import { canonicalizeForecastToEnglish } from '../forecast'
 
@@ -70,7 +71,7 @@ describe('canonicalizeForecastToEnglish', () => {
   })
 
   it('canonicalizes a Hebrew forecast: alias old slug, re-slug, seed original, fill locales', async () => {
-    mockFindUnique.mockResolvedValue({ id: 'p1', slug: '2026-1', claimText: HEBREW, detailsText: null, resolutionRules: null, originalLanguage: null } as never)
+    mockFindUnique.mockResolvedValue({ id: 'p1', slug: '2026-1', claimText: HEBREW, detailsText: null, resolutionRules: null, originalLanguage: null, isPublic: true } as never)
     mockNormalize.mockResolvedValue({
       language: 'he',
       isEnglish: false,
@@ -97,5 +98,20 @@ describe('canonicalizeForecastToEnglish', () => {
     // English claim re-embedded, other locales filled
     expect(embedAndStoreForecast).toHaveBeenCalledWith('p1', ENGLISH)
     expect(translatePredictionToAllLocales).toHaveBeenCalledWith('p1')
+    // the new canonical URL is announced to search engines (old slug only 308s)
+    expect(notifySearchEngines).toHaveBeenCalledWith(upd.data.slug)
+  })
+
+  it('does not notify search engines for a non-public forecast', async () => {
+    mockFindUnique.mockResolvedValue({ id: 'p1', slug: '2026-1', claimText: HEBREW, detailsText: null, resolutionRules: null, originalLanguage: null, isPublic: false } as never)
+    mockNormalize.mockResolvedValue({
+      language: 'he',
+      isEnglish: false,
+      english: { claimText: ENGLISH, detailsText: null, resolutionRules: null },
+      original: { claimText: HEBREW, detailsText: null, resolutionRules: null },
+    } as never)
+
+    expect(await canonicalizeForecastToEnglish('p1')).toBe('canonicalized')
+    expect(notifySearchEngines).not.toHaveBeenCalled()
   })
 })

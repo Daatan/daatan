@@ -49,23 +49,37 @@ creation — see [TRANSLATIONS.md](./TRANSLATIONS.md)). Reaching a forecast by r
 **retired slug** (kept in `prediction_slug_aliases` after a re-slug), 308-redirects to the
 current canonical `/forecasts/[slug]`, so old links and their SEO are preserved.
 
-## IndexNow
+## Search-engine notification
 
-IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL changes, rather than waiting for their crawlers.
+`src/lib/services/indexnow.ts` exposes `notifySearchEngines(slug)` — a fire-and-forget
+fan-out called on every event that creates, changes, or moves a forecast URL. It pings two
+independent channels, each a no-op until its own env var(s) are set:
 
-**How it works:**
+- **IndexNow** (`notifyIndexNow`) — Bing/Yandex/Seznam. **Does not reach Google.**
+- **Google Indexing API** (`notifyGoogle`) — Google directly (see below).
 
-1. A shared key (`711ada60e0032e070ede0e05de85a79e`) is hosted at `public/711ada60e0032e070ede0e05de85a79e.txt`.
-2. On each triggering event, `src/lib/services/indexnow.ts` fires a fire-and-forget POST to `https://api.indexnow.org/indexnow` with the URL.
-3. The integration is disabled (no-op) when `INDEXNOW_KEY` is not set in the environment.
-
-**Triggering events:**
+**Triggering events** (all route through `notifySearchEngines`):
 
 | Event | Code path |
 |-------|-----------|
 | Forecast published | `publishForecast()` in `src/lib/services/forecast.ts` |
-| Bot forecast approved | `approveForecast()` in `src/lib/services/forecast.ts` |
+| Forecast approved | `approveForecast()` in `src/lib/services/forecast.ts` |
+| **Forecast re-slugged to English** | `canonicalizeForecastToEnglish()` in `src/lib/services/forecast.ts` |
 | Forecast resolved | `resolvePrediction()` in `src/lib/services/prediction-resolution.ts` |
+| Admin status change (VOID/UNRESOLVABLE) | `src/app/api/admin/forecasts/[id]/route.ts` |
+| Forecast rejected | `src/app/api/forecasts/[id]/reject/route.ts` |
+
+> The re-slug trigger matters most for non-English forecasts: canonicalization mints a brand-new
+> English URL and leaves the old slug only 308-redirecting. Without this ping the new URL stays
+> undiscovered until the next sitemap re-crawl. All events are public-gated (`isPublic`).
+
+### IndexNow (Bing/Yandex)
+
+IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL changes.
+
+1. A shared key (`711ada60e0032e070ede0e05de85a79e`) is hosted at `public/711ada60e0032e070ede0e05de85a79e.txt`.
+2. On each event, a POST goes to `https://api.indexnow.org/indexnow` with the URL.
+3. Disabled (no-op) when `INDEXNOW_KEY` is not set.
 
 **Setup checklist (one-time):**
 
@@ -76,3 +90,23 @@ IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL
 **Env var:** `INDEXNOW_KEY` (optional server-side; see `src/env.ts`)
 
 If the key file is ever lost (e.g., regenerated `public/` directory), re-add `public/{key}.txt` containing only the key string.
+
+### Google Indexing API
+
+Unlike IndexNow, Google does not accept third-party push pings, so `notifyGoogle` calls Google's
+[Indexing API](https://developers.google.com/search/apis/indexing-api/v3/quickstart) directly. It
+signs a service-account JWT (via `jose`), exchanges it for an access token, and POSTs
+`{ url, type: 'URL_UPDATED' }` to `urlNotifications:publish`. No-op unless both env vars are set.
+
+**Env vars:** `GOOGLE_INDEXING_CLIENT_EMAIL`, `GOOGLE_INDEXING_PRIVATE_KEY` (service-account creds; see `src/env.ts`).
+
+**Setup (one-time):**
+
+- [ ] Create a Google Cloud service account; enable the **Indexing API** on the project.
+- [ ] In [Search Console](https://search.google.com/search-console) → Settings → Users and permissions, add the service-account email as an **Owner** of the `daatan.com` property.
+- [ ] Set `GOOGLE_INDEXING_CLIENT_EMAIL` and `GOOGLE_INDEXING_PRIVATE_KEY` (the SA key's `client_email` / `private_key`; newlines may be `\n`-escaped) in `daatan-env-prod`.
+
+> **Caveat:** the Indexing API is officially scoped to `JobPosting`/`BroadcastEvent` content. It is
+> used here as a best-effort discovery nudge; Google may ignore or rate-limit other content types.
+> The sitemap remains the authoritative discovery path — resubmit it in Search Console after large
+> backfills (e.g. the English-canonicalization re-slug pass).
