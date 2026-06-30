@@ -155,6 +155,7 @@
     "filterByTagTooltip": "Прогнозы с тегом «{tag}»",
     "legendYou": "Вы",
     "legendAI": "ИИ",
+    "aiInsufficientEvidence": "Недостаточно данных",
     "signInToVote": "Войдите, чтобы голосовать",
     "marketDistribution": "Распределение рынка",
     "confidencePercent": "Уверенность: {value}%",

@@ -455,7 +455,11 @@ export default function ForecastDetailClient({
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
           const marketProb = communityProbability(prediction.commitments) ?? 50
-          const aiVal = aiEstimate?.probability ?? prediction.confidence ?? null
+          // The latest run abstained (no evidence bears on the claim): hide the AI
+          // needle and show "Insufficient evidence" instead of a number. Falls back
+          // to the latest snapshot for SSR / first paint, before onAiEstimate fires.
+          const aiAbstained = aiEstimate ? !!aiEstimate.abstained : !!initialContextSnapshots?.[0]?.insufficientData
+          const aiVal = aiAbstained ? null : (aiEstimate?.probability ?? prediction.confidence ?? null)
 
           return (
             <div className="flex flex-col items-center">
@@ -467,9 +471,9 @@ export default function ForecastDetailClient({
                   percentage={marketProb}
                   userPercentage={userConfidence}
                   centerLabel={t('legendYou')}
-                  aiPercentage={aiEstimate?.probability ?? prediction.confidence ?? undefined}
-                  aiCiLow={aiEstimate?.ciLow ?? prediction.aiCiLow ?? undefined}
-                  aiCiHigh={aiEstimate?.ciHigh ?? prediction.aiCiHigh ?? undefined}
+                  aiPercentage={aiAbstained ? undefined : (aiEstimate?.probability ?? prediction.confidence ?? undefined)}
+                  aiCiLow={aiAbstained ? undefined : (aiEstimate?.ciLow ?? prediction.aiCiLow ?? undefined)}
+                  aiCiHigh={aiAbstained ? undefined : (aiEstimate?.ciHigh ?? prediction.aiCiHigh ?? undefined)}
                   size="xl"
                   onUserPercentageChange={prediction.status === 'ACTIVE'
                     ? (pct) => setUserConfidence(Math.round(pct))
@@ -486,7 +490,12 @@ export default function ForecastDetailClient({
                     <div className="w-3 h-1.5 bg-[#3B82F6] rounded-full" />
                     <span className="text-blue-400">{t('legendYou')} {userConfidence}%</span>
                   </div>
-                  {aiVal != null && (
+                  {aiAbstained ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
+                      <span className="text-amber-400/70">{t('legendAI')} · {t('aiInsufficientEvidence')}</span>
+                    </div>
+                  ) : aiVal != null && (
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-1 bg-[#FBBF24] rounded-full" />
                       <span className="text-amber-400">{t('legendAI')} {aiVal}%</span>

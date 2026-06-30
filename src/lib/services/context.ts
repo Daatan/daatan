@@ -44,6 +44,10 @@ export interface SaveContextUpdateInput {
   confidence: number | null
   aiCiLow: number | null
   aiCiHigh: number | null
+  /** The Oracle abstained — no evidence bears on the claim. Records the snapshot
+   *  as an abstention and CLEARS the prediction's stale AI estimate so the gauge
+   *  shows "Insufficient evidence" rather than the last (now-unsupported) number. */
+  insufficientData?: boolean
   now: Date
 }
 
@@ -58,6 +62,7 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
         externalProbability: input.externalProbability,
         externalReasoning: input.externalReasoning,
         oracleSnapshot: input.oracleSnapshot ?? undefined,
+        insufficientData: input.insufficientData ?? false,
       },
     }),
     prisma.prediction.update({
@@ -65,9 +70,16 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
       data: {
         detailsText: input.summary,
         contextUpdatedAt: input.now,
-        ...(input.confidence !== null && { confidence: input.confidence }),
-        aiCiLow: input.aiCiLow,
-        aiCiHigh: input.aiCiHigh,
+        // On abstention, explicitly null the AI estimate (the latest run says the
+        // evidence is insufficient). Otherwise preserve a prior confidence when
+        // this run produced none (e.g. a timeout) by only writing it when present.
+        ...(input.insufficientData
+          ? { confidence: null, aiCiLow: null, aiCiHigh: null }
+          : {
+              ...(input.confidence !== null && { confidence: input.confidence }),
+              aiCiLow: input.aiCiLow,
+              aiCiHigh: input.aiCiHigh,
+            }),
       },
     }),
     // Invalidate stale detailsText translations: this update overwrites the

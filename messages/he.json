@@ -155,6 +155,7 @@
     "filterByTagTooltip": "עיון בתחזיות עם התגית \"{tag}\"",
     "legendYou": "אתה",
     "legendAI": "בינה מלאכותית",
+    "aiInsufficientEvidence": "אין מספיק ראיות",
     "signInToVote": "התחברו כדי להצביע",
     "marketDistribution": "התפלגות השוק",
     "confidencePercent": "ביטחון: {value}%",

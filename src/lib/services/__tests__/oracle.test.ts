@@ -135,6 +135,21 @@ describe('getOracleForecast', () => {
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'no_search_results' }))
   })
 
+  it('flags insufficientData (and returns null) when the Oracle abstains', async () => {
+    // _empty_response carries insufficient_data:true (and placeholder:true); the
+    // abstention check runs first so the caller can distinguish "no evidence bears
+    // on the claim" from "Oracle unavailable" and avoid an ungrounded LLM guess.
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...fullPayload, mean: 0, articles_used: 0, placeholder: true, insufficient_data: true, reason: 'all_low_certainty' }),
+    })
+    const { forecast, insufficientData } = await getOracleForecast('Q?')
+    expect(forecast).toBeNull()
+    expect(insufficientData).toBe(true)
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_low_certainty' }))
+  })
+
   it('returns null when articles_used is 0, passing through the Oracle reason', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

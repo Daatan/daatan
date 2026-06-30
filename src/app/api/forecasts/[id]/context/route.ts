@@ -168,11 +168,12 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             predictionCiLow: number | null
             predictionCiHigh: number | null
             oracleSnapshotData: Prisma.InputJsonValue | null
+            insufficientData?: boolean
         }
 
         // Oracle estimation starts immediately; LLM runs concurrently below
         const estimationWork: Promise<EstimationResult> = (async () => {
-            const { forecast: oracleForecast, logId: oracleLogId } = await getOracleForecast(prediction.claimText, {
+            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOracleForecast(prediction.claimText, {
                 articles: searchResults.map(r => ({
                     url: r.url,
                     title: r.title,
@@ -181,6 +182,23 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     publishedDate: r.publishedDate,
                 })),
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })
+            // The Oracle abstained — the evidence doesn't bear on the claim. Record
+            // the abstention and do NOT fall back to an LLM guess, which would just
+            // re-introduce an ungrounded number from the same off-topic articles.
+            if (insufficientData) {
+                log.info(
+                    { predictionId: prediction.id, path: 'abstain' },
+                    'context.ai_estimate',
+                )
+                return {
+                    externalProbability: null,
+                    externalReasoning: 'Insufficient evidence — recent coverage does not bear on this claim',
+                    predictionCiLow: null,
+                    predictionCiHigh: null,
+                    oracleSnapshotData: null,
+                    insufficientData: true,
+                }
+            }
             if (oracleForecast !== null) {
                 const toPercent = (v: number) => Math.round(((v + 1) / 2) * 100)
                 const prob = toPercent(oracleForecast.mean)
@@ -294,6 +312,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     let predictionCiLow: number | null = null
                     let predictionCiHigh: number | null = null
                     let oracleSnapshotData: Prisma.InputJsonValue | null = null
+                    let insufficientData = false
 
                     if (estimationResult === null) {
                         log.warn(
@@ -306,6 +325,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         predictionCiLow = estimationResult.predictionCiLow
                         predictionCiHigh = estimationResult.predictionCiHigh
                         oracleSnapshotData = estimationResult.oracleSnapshotData
+                        insufficientData = estimationResult.insufficientData ?? false
                     }
 
                     const totalMs = Date.now() - t0
@@ -327,6 +347,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         confidence: externalProbability,
                         aiCiLow: predictionCiLow,
                         aiCiHigh: predictionCiHigh,
+                        insufficientData,
                         now,
                     })
 

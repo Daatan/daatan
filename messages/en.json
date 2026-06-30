@@ -155,6 +155,7 @@
     "filterByTagTooltip": "Browse forecasts tagged \"{tag}\"",
     "legendYou": "You",
     "legendAI": "AI",
+    "aiInsufficientEvidence": "Insufficient evidence",
     "signInToVote": "Sign in to vote",
     "marketDistribution": "Market Distribution",
     "confidencePercent": "Confidence: {value}%",
