@@ -143,7 +143,22 @@ export default async function RootLayout({
             {!isSelfHosted() && <PwaInstaller />}
             {!isSelfHosted() && <PushPermissionPrompt />}
             <CookieConsent />
-            <Toaster position="bottom-right" />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: 'var(--color-navy-700)',
+                  color: '#fff',
+                  border: '1px solid var(--color-navy-600)',
+                  borderRadius: '0.75rem',
+                  fontSize: '0.875rem',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
+                },
+                success: { iconTheme: { primary: 'var(--color-cobalt)', secondary: '#fff' } },
+                error: { iconTheme: { primary: '#f87171', secondary: '#fff' } },
+                loading: { iconTheme: { primary: 'var(--color-cobalt-light)', secondary: 'var(--color-navy-700)' } },
+              }}
+            />
           </SessionWrapper>
           </BrandingProvider>
           </CapabilitiesProvider>
