@@ -6,7 +6,7 @@ import { getForecastById, rejectForecast } from '@/lib/services/forecast'
 import { notifyBotForecastRejected } from '@/lib/services/telegram'
 import { findUserBasicInfo } from '@/lib/services/user'
 import { rejectForecastSchema } from '@/lib/validations/prediction'
-import { notifyIndexNow } from '@/lib/services/indexnow'
+import { notifySearchEngines } from '@/lib/services/indexnow'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +49,7 @@ export const POST = withAuth(async (request, user, { params }) => {
       notifyBotForecastRejected(updated, updated.author, rejector)
     }
 
-    notifyIndexNow(updated.slug ?? updated.id)
+    notifySearchEngines(updated.slug ?? updated.id)
 
     return NextResponse.json({
       success: true,

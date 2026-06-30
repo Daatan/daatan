@@ -3,7 +3,7 @@ import { createLogger } from '@/lib/logger'
 import { applyGlicko2Update } from '@/lib/services/expertise'
 import { calculateEloUpdates } from '@/lib/services/elo'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
-import { notifyIndexNow } from '@/lib/services/indexnow'
+import { notifySearchEngines } from '@/lib/services/indexnow'
 
 const log = createLogger('prediction-resolution')
 
@@ -204,7 +204,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     'Prediction resolved',
   )
 
-  if (prediction.isPublic) notifyIndexNow(prediction.slug ?? prediction.id)
+  if (prediction.isPublic) notifySearchEngines(prediction.slug ?? prediction.id)
 
   return { result, prediction }
 }

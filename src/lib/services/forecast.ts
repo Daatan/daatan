@@ -6,7 +6,7 @@ import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { createLogger } from '@/lib/logger'
-import { notifyIndexNow } from '@/lib/services/indexnow'
+import { notifySearchEngines } from '@/lib/services/indexnow'
 import { communityProbability } from '@/lib/forecast-math'
 import {
   normalizeForecastToEnglish,
@@ -443,7 +443,7 @@ export type CanonicalizeResult = 'canonicalized' | 'english' | 'failed' | 'skipp
 export async function canonicalizeForecastToEnglish(predictionId: string): Promise<CanonicalizeResult> {
   const p = await prisma.prediction.findUnique({
     where: { id: predictionId },
-    select: { id: true, slug: true, claimText: true, detailsText: true, resolutionRules: true, originalLanguage: true },
+    select: { id: true, slug: true, claimText: true, detailsText: true, resolutionRules: true, originalLanguage: true, isPublic: true },
   })
   if (!p || p.originalLanguage !== null) return 'skipped'
 
@@ -511,6 +511,9 @@ export async function canonicalizeForecastToEnglish(predictionId: string): Promi
   await translatePredictionToAllLocales(p.id).catch((err) =>
     log.error({ err, id: p.id }, 'locale fill failed during canonicalization'),
   )
+  // Re-slug changed the canonical URL (old slug now only 308-redirects), so the
+  // engines must be told about the new one — otherwise it stays undiscovered.
+  if (p.isPublic) notifySearchEngines(newSlug)
   return 'canonicalized'
 }
 
@@ -741,7 +744,7 @@ export async function publishForecast(id: string) {
       options: { orderBy: { displayOrder: 'asc' } },
     },
   })
-  if (result.isPublic) notifyIndexNow(result.slug ?? result.id)
+  if (result.isPublic) notifySearchEngines(result.slug ?? result.id)
   return result
 }
 
@@ -755,7 +758,7 @@ export async function approveForecast(predictionId: string) {
       options: { orderBy: { displayOrder: 'asc' } },
     },
   })
-  if (result.isPublic) notifyIndexNow(result.slug ?? result.id)
+  if (result.isPublic) notifySearchEngines(result.slug ?? result.id)
   return result
 }
 
