@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { z } from 'zod'
 import { createBotLLMService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
@@ -54,6 +55,8 @@ const createBotSchema = z
 // GET /api/admin/bots — list all bots
 export const GET = withAuth(
   async () => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     try {
       const bots = await listBots()
       return NextResponse.json({ bots })
@@ -67,6 +70,8 @@ export const GET = withAuth(
 // POST /api/admin/bots — create a new bot
 export const POST = withAuth(
   async (request: NextRequest) => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     try {
       const body = await request.json()
       const data = createBotSchema.parse(body)

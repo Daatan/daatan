@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { runBotById } from '@/lib/services/bots'
 import { apiError, handleRouteError } from '@/lib/api-error'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { getBotById } from '@/lib/services/bot'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
@@ -14,6 +15,8 @@ const BOT_RUN_WINDOW = 60 * 60_000 // 1 hour
 // POST /api/admin/bots/[id]/run?dry=true — manual trigger (with optional dry run)
 export const POST = withAuth(
   async (request: NextRequest, user, { params }) => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     const rl = checkRateLimit(`bot-run:${user.id}`, BOT_RUN_LIMIT, BOT_RUN_WINDOW)
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 

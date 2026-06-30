@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash, timingSafeEqual } from 'crypto'
 import { runDueBots } from '@/lib/services/bots'
 import { createLogger } from '@/lib/logger'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { env } from '@/env'
 
 const log = createLogger('api/bots/run')
@@ -21,6 +22,9 @@ function secretsMatch(provided: string, expected: string): boolean {
  * Protected by a shared secret in the x-bot-runner-secret header.
  */
 export async function POST(request: NextRequest) {
+  const blocked = blockedOnSelfHost()
+  if (blocked) return blocked
+
   const secret = request.headers.get('x-bot-runner-secret')
   const expected = env.BOT_RUNNER_SECRET
 

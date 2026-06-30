@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError, apiError } from '@/lib/api-error'
+import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { z } from 'zod'
 import { getBotById, updateBot, disableBot } from '@/lib/services/bot'
 
@@ -50,6 +51,8 @@ const updateBotSchema = z
 // PATCH /api/admin/bots/[id] — update bot config
 export const PATCH = withAuth(
   async (request: NextRequest, _user, { params }) => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     try {
       const body = await request.json()
       const data = updateBotSchema.parse(body)
@@ -76,6 +79,8 @@ export const PATCH = withAuth(
 // DELETE /api/admin/bots/[id] — disable (soft delete via isActive = false)
 export const DELETE = withAuth(
   async (_request: NextRequest, _user, { params }) => {
+    const blocked = blockedOnSelfHost()
+    if (blocked) return blocked
     try {
       const bot = await getBotById(params.id)
       if (!bot) return apiError('Bot not found', 404)
