@@ -293,6 +293,10 @@ git tag v1.8.X <commit-sha>
 git push origin v1.8.X
 ```
 
+There are now two additional rollback paths: the GitHub Actions **Rollback**
+workflow (Actions → Rollback → Run workflow) and the Telegram `/rollback` bot for
+one-tap operator-initiated rollbacks. See `docs/ROLLBACK.md` for both.
+
 ### Restarting the app on prod — do NOT force-recreate
 
 ⚠️ **Never run `docker compose up --force-recreate app` directly on production.**
@@ -323,3 +327,6 @@ full health check. See `.claude/commands/` for details.
 | `STAGING_URL`                  | Bot cron + heartbeat target URL (staging) |
 | `OPENROUTER_API_KEY`           | Bot LLM calls (staging only)         |
 | `INDEXNOW_KEY`                 | IndexNow instant indexing (Bing/Yandex) — optional; omit to disable |
+| `TELEGRAM_WEBHOOK_SECRET`      | Shared secret for the Telegram rollback webhook — unset = fail closed |
+| `TELEGRAM_ROLLBACK_CHAT_IDS`   | Comma-separated Telegram chat IDs allowed to issue `/rollback` |
+| `GH_ROLLBACK_TOKEN`            | GitHub PAT with `actions:write` to trigger the Rollback workflow |

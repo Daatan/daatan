@@ -199,6 +199,7 @@ export function notifySearchHealthDigest(report: {
 interface ForecastInfo {
   id: string
   claimText: string
+  slug?: string | null
 }
 
 interface UserInfo {
@@ -216,7 +217,7 @@ function truncate(text: string, max: number): string {
 
 function forecastUrl(prediction: ForecastInfo): string {
   const base = process.env.NEXTAUTH_URL || 'https://daatan.com'
-  return `${base}/forecasts/${prediction.id}`
+  return `${base}/forecasts/${prediction.slug || prediction.id}`
 }
 
 export function notifyForecastPublished(prediction: ForecastInfo, author: UserInfo): void {
