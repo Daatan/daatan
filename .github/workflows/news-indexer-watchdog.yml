@@ -5,10 +5,12 @@ name: News-Indexer Watchdog
 # by watchdog.yml's disk-watchdog (that targets the daatan-backend instances only), so
 # this fills that gap.
 #
-#   • Runs hourly. ALERT-ONLY: posts a 🚨 to BOTH Telegram channels (clean + noisy)
-#     when something looks suspicious, and stays silent otherwise.
-#   • Once a day (DIGEST_HOUR, UTC) it also posts a plain health digest to the noisy
-#     channel so there's a regular "all good" heartbeat.
+#   • Runs every 2 hours, on even UTC hours. ALERT-ONLY: posts a 🚨 to BOTH Telegram
+#     channels (clean + noisy) when something looks suspicious, and stays silent
+#     otherwise.
+#   • Once a day (DIGEST_HOUR, UTC — must be an even hour so an even-hour run hits it)
+#     it also posts a plain health digest to the noisy channel so there's a regular
+#     "all good" heartbeat.
 #
 # Disk usage comes from /stats (.disk.used_percent), added by the news-indexer
 # feat/stats-disk-usage change — the app container's / is backed by the EC2 root
@@ -17,15 +19,15 @@ name: News-Indexer Watchdog
 
 on:
   schedule:
-    - cron: '17 * * * *'   # hourly, at :17 (off the top-of-hour congestion)
+    - cron: '17 */2 * * *'   # every 2h on even UTC hours, at :17 (off the top-of-hour congestion)
   workflow_dispatch:
 
 env:
   STATS_URL: https://scrapper.daatan.com/stats
   DISK_ALERT_PCT: '80'     # absolute disk-usage alert threshold
-  DISK_DELTA_PCT: '2'      # alert if disk% jumps more than this between hourly runs
+  DISK_DELTA_PCT: '2'      # alert if disk% jumps more than this between runs (now 2h apart)
   QUEUE_DEPTH_ALERT: '500' # main-queue depth that looks backed up
-  DIGEST_HOUR: '9'         # UTC hour to post the daily digest
+  DIGEST_HOUR: '8'         # UTC hour to post the daily digest (must be EVEN — see cron)
 
 jobs:
   watch:
