@@ -127,7 +127,7 @@ export async function listAdminUsers({ search, page, limit }: AdminUsersQuery) {
 export async function updateUserRole(id: string, role: string) {
   return prisma.user.update({
     where: { id },
-    data: { role: role as 'USER' | 'RESOLVER' | 'ADMIN' },
+    data: { role: role as 'USER' | 'RESOLVER' | 'APPROVER' | 'ADMIN' },
     select: {
       id: true, name: true, username: true, emailNotifications: true,
       isPublic: true, role: true, rs: true, isBot: true,

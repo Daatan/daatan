@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { updateUserRole } from '@/lib/services/user'
 
 const updateUserSchema = z.object({
-  role: z.enum(['USER', 'RESOLVER', 'ADMIN']),
+  role: z.enum(['USER', 'RESOLVER', 'APPROVER', 'ADMIN']),
 })
 
 export const PATCH = withAuth(async (req, user, { params }) => {

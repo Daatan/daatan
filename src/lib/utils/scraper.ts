@@ -69,57 +69,70 @@ export function isPrivateIP(ip: string): boolean {
   return false
 }
 
+/**
+ * Validate that a URL is https and resolves only to public IPs. Throws on
+ * violation. Called for the initial URL AND every redirect hop.
+ */
+async function assertSafeUrl(rawUrl: string): Promise<void> {
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(rawUrl)
+  } catch {
+    throw new Error('Invalid URL format')
+  }
+
+  // SSRF Protection 1: Enforce HTTPS
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Only HTTPS URLs are allowed')
+  }
+
+  // SSRF Protection 2: reject internal hosts, then resolve and check the IPs.
+  if (isPrivateIP(parsedUrl.hostname) || parsedUrl.hostname === 'localhost') {
+    throw new Error('Fetching internal or private IPs is forbidden')
+  }
+  try {
+    const ips = await resolve4(parsedUrl.hostname)
+    for (const ip of ips) {
+      if (isPrivateIP(ip)) {
+        throw new Error('Resolved domain points to a private/internal IP')
+      }
+    }
+  } catch (dnsErr) {
+    // Our own violation bubbles up; a genuine DNS-resolution failure is left
+    // for fetch() to surface as a network error.
+    if (dnsErr instanceof Error && dnsErr.message.includes('Resolved domain')) {
+      throw dnsErr
+    }
+  }
+}
+
 export async function fetchUrlContent(url: string): Promise<string> {
   try {
-    let parsedUrl: URL
-    try {
-      parsedUrl = new URL(url)
-    } catch {
-      throw new Error('Invalid URL format')
+    // Re-validate the initial URL and every redirect hop: default fetch follows
+    // redirects, so a validated public host could 30x-redirect to an internal
+    // one (e.g. 169.254.169.254). redirect:'manual' + per-hop assertSafeUrl
+    // closes that bypass.
+    let currentUrl = url
+    let response: Response | undefined
+    for (let hop = 0; hop < 5; hop++) {
+      await assertSafeUrl(currentUrl)
+      response = await fetch(currentUrl, {
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+      })
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location')
+        if (!location) break
+        currentUrl = new URL(location, currentUrl).toString()
+        continue
+      }
+      break
     }
 
-    // SSRF Protection 1: Enforce HTTPS
-    if (parsedUrl.protocol !== 'https:') {
-      throw new Error('Only HTTPS URLs are allowed')
-    }
-
-    // SSRF Protection 2: Resolve DNS and check if the IP is private
-    // Note: We resolve it before fetching. In an ideal world we would
-    // pin the fetched IP, but node-fetch / global fetch doesn't expose
-    // the resolved IP. This provides simple protection against basic
-    // DNS rebinding or direct IP passing.
-    try {
-      // First check if the hostname itself is an IP
-      if (isPrivateIP(parsedUrl.hostname) || parsedUrl.hostname === 'localhost') {
-        throw new Error('Fetching internal or private IPs is forbidden')
-      }
-
-      // Then resolve domain to IPs and check them
-      const ips = await resolve4(parsedUrl.hostname)
-      for (const ip of ips) {
-        if (isPrivateIP(ip)) {
-          throw new Error('Resolved domain points to a private/internal IP')
-        }
-      }
-    } catch (dnsErr) {
-      if (dnsErr instanceof Error && dnsErr.message.includes('forbidden')) {
-        throw dnsErr
-      }
-      // If DNS resolution fails, let fetch handle the network error,
-      // but if it's our own error, bubble it up.
-      if (dnsErr instanceof Error && dnsErr.message.includes('Resolved domain')) {
-        throw dnsErr
-      }
-    }
-
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.statusText}`)
+    if (!response || !response.ok) {
+      throw new Error(`Failed to fetch URL: ${response?.statusText ?? 'too many redirects'}`)
     }
 
     const html = await response.text()
