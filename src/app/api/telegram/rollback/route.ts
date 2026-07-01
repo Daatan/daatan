@@ -10,6 +10,10 @@
  * Security: only allowed Telegram chat IDs can use these commands.
  * Required env vars:
  *   TELEGRAM_BOT_TOKEN          — Bot token from BotFather
+ *   TELEGRAM_WEBHOOK_SECRET     — Secret token registered with Telegram's setWebhook
+ *                                 (secret_token). REQUIRED: the endpoint fails closed
+ *                                 without it, since it's the only proof a request is
+ *                                 genuinely from Telegram.
  *   TELEGRAM_ROLLBACK_CHAT_IDS  — Comma-separated allowed chat IDs (e.g. "123456,789012")
  *   GH_ROLLBACK_TOKEN           — PAT with actions:write on this repo
  *   GITHUB_REPOSITORY           — e.g. "Daatan/daatan"
@@ -142,12 +146,17 @@ async function triggerRollback(
 
 export async function POST(request: Request) {
   try {
-    // Validate Telegram webhook secret header
-    if (WEBHOOK_SECRET) {
-      const secretHeader = request.headers.get('x-telegram-bot-api-secret-token') ?? ''
-      if (!secretsMatch(secretHeader, WEBHOOK_SECRET)) {
-        return NextResponse.json({ ok: true }) // Return 200 to avoid Telegram retries
-      }
+    // Fail closed: the webhook secret is the only proof a request actually came
+    // from Telegram. Without it, anyone who can reach this URL and supplies an
+    // allowed chat_id in the body could trigger a production rollback. If the
+    // secret isn't configured, refuse every request rather than trust the body.
+    if (!WEBHOOK_SECRET) {
+      log.error('TELEGRAM_WEBHOOK_SECRET is not configured — rejecting rollback webhook request')
+      return NextResponse.json({ ok: true }) // 200 to avoid Telegram retries
+    }
+    const secretHeader = request.headers.get('x-telegram-bot-api-secret-token') ?? ''
+    if (!secretsMatch(secretHeader, WEBHOOK_SECRET)) {
+      return NextResponse.json({ ok: true }) // 200 to avoid Telegram retries
     }
 
     const body = await request.json()

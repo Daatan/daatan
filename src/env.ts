@@ -96,6 +96,9 @@ export const env = createEnv({
     // Telegram notifications
     TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
     TELEGRAM_CHAT_ID: z.string().min(1).optional(),
+    // Secret token for the /rollback webhook (Telegram setWebhook secret_token).
+    // The rollback route fails closed without it — see api/telegram/rollback.
+    TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
 
     // Web Push (VAPID)
     VAPID_PRIVATE_KEY: z.string().min(1).optional(),
@@ -167,6 +170,7 @@ export const env = createEnv({
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
+    TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
     VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
     BOT_RUNNER_SECRET: process.env.BOT_RUNNER_SECRET,
     MAX_BOTS: process.env.MAX_BOTS,
