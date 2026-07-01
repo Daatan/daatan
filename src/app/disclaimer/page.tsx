@@ -5,7 +5,7 @@ import { isSelfHosted } from '@/lib/edition'
 
 export const metadata: Metadata = {
   title: 'Disclaimer',
-  description: 'DAATAN Disclaimer — understand the limitations and nature of our forecasting platform.',
+  description: 'DAATAN Disclaimer: forecasts and AI estimates are informational only — not financial, legal, or professional advice. Understand the limits before relying on them.',
 }
 
 export default function DisclaimerPage() {
