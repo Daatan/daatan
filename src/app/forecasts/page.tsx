@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { PredictionsPage } from './PredictionsClient'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
+import { JsonLd } from '@/components/JsonLd'
 
 export const metadata: Metadata = {
   title: 'Forecasts — Browse Predictions',
@@ -65,10 +66,7 @@ export default async function ForecastsPage() {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
+      <JsonLd data={itemListJsonLd} />
       <PredictionsPage initialPredictions={initialPredictions} />
     </>
   )

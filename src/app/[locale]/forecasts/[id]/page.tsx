@@ -10,6 +10,7 @@ import { buildForecastDescription } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
+import { JsonLd } from '@/components/JsonLd'
 import { getContextTimeline } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
@@ -260,8 +261,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={articleJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <Suspense fallback={<ForecastLoading />}>
         <ForecastDetailClient
           initialData={localizedPrediction}

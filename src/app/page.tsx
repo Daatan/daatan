@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { Loader2 } from 'lucide-react'
 import type { Metadata } from 'next'
 import FeedClient from './FeedClient'
+import { JsonLd } from '@/components/JsonLd'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
 
 export const dynamic = 'force-dynamic'
@@ -71,10 +72,7 @@ export default async function FeedPage({
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
-      />
+      <JsonLd data={websiteJsonLd} />
       <Suspense fallback={<FeedLoading />}>
         <FeedClient initialPredictions={initialPredictions} />
       </Suspense>

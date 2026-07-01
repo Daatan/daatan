@@ -11,6 +11,7 @@ import { getForecastVoters } from '@/lib/services/forecast-sources'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
+import { JsonLd } from '@/components/JsonLd'
 
 async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
   const data = await getContextTimeline(predictionId)
@@ -370,10 +371,10 @@ export default async function ForecastDetailPage({ params }: Props) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      {eventJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />}
-      {claimReviewJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(claimReviewJsonLd) }} />}
+      <JsonLd data={articleJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
+      {eventJsonLd && <JsonLd data={eventJsonLd} />}
+      {claimReviewJsonLd && <JsonLd data={claimReviewJsonLd} />}
       <ForecastDetailClient
         initialData={prediction}
         initialComments={initialComments}
