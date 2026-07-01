@@ -784,12 +784,6 @@ model BotConfig {
   // TODO(stage2-bot-params): injected in bot-runner.ts runVoting() LLM prompt
   voteBias Int @default(50)
 
-  // DEAD: relics of the removed CU-staking economy (there is no bot balance to
-  // refill). Never read at runtime. Kept only to avoid churning the bot admin
-  // UI/i18n in this migration; slated for removal in the CU-rename follow-up.
-  cuRefillAt     Int @default(0)
-  cuRefillAmount Int @default(50)
-
   // Enabled action flags — disable phases without removing the bot.
   // TODO(stage2-bot-params): guarded at start of each phase in bot-runner.ts
   canCreateForecasts Boolean @default(true)

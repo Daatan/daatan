@@ -26,8 +26,6 @@ const updateBotSchema = z
     activeHoursEnd: z.number().int().min(0).max(23).nullable().optional(),
     tagFilter: z.array(z.string().min(1)).optional(),
     voteBias: z.number().int().min(0).max(100).optional(),
-    cuRefillAt: z.number().int().min(0).optional(),
-    cuRefillAmount: z.number().int().min(1).optional(),
     canCreateForecasts: z.boolean().optional(),
     canVote: z.boolean().optional(),
     requireApprovalForForecasts: z.boolean().optional(),

@@ -37,8 +37,6 @@ const createBotSchema = z
     activeHoursEnd: z.number().int().min(0).max(23).nullable().default(null),
     tagFilter: z.array(z.string().min(1)).default([]),
     voteBias: z.number().int().min(0).max(100).default(50),
-    cuRefillAt: z.number().int().min(0).default(0),
-    cuRefillAmount: z.number().int().min(1).default(50),
     canCreateForecasts: z.boolean().default(true),
     canVote: z.boolean().default(true),
     requireApprovalForForecasts: z.boolean().default(false),

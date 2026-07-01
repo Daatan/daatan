@@ -114,8 +114,6 @@ function makeBot(overrides: Partial<{
   activeHoursEnd: number | null
   tagFilter: string[]
   voteBias: number
-  cuRefillAt: number
-  cuRefillAmount: number
   canCreateForecasts: boolean
   canVote: boolean
   autoApprove: boolean
@@ -143,8 +141,6 @@ function makeBot(overrides: Partial<{
     activeHoursEnd: null,
     tagFilter: [],
     voteBias: 50,
-    cuRefillAt: 0,
-    cuRefillAmount: 50,
     canCreateForecasts: true,
     canVote: true,
     autoApprove: false,
@@ -1475,85 +1471,6 @@ describe('runDueBots — voting', () => {
     expect(summaries[0].votes).toBe(2)
     expect(createCommitment).toHaveBeenCalledTimes(2)
   })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CU auto-refill (ensureBotCU)
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('runDueBots — CU auto-refill (ensureBotCU)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // Reset LLM mock fully to clear any unconsumed mockResolvedValueOnce from previous suites
-    mockGenerateContent.mockReset()
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-02-20T12:00:00Z'))
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('no-ops in dry-run mode (does not refill CU)', async () => {
-    const { prisma } = await import('@/lib/prisma')
-    const { fetchRssFeeds, detectHotTopics } = await import('@/lib/services/bots/rss')
-    const { createCommitment } = await import('@/lib/services/commitment')
-    const { runDueBots } = await import('@/lib/services/bots')
-
-    // Bot with cuRefillAt=10, low balance (5 CU) → would refill in non-dry-run
-    const bot = makeBot({ cuRefillAt: 10, cuRefillAmount: 50, maxVotesPerDay: 0 })
-    vi.mocked(prisma.botConfig.findMany).mockResolvedValue([bot] as any)
-    vi.mocked(prisma.botRunLog.count).mockResolvedValue(0)
-    vi.mocked(fetchRssFeeds).mockResolvedValue([])
-    vi.mocked(detectHotTopics).mockReturnValue([
-      { title: 'Dry-run refill topic', items: [], sourceCount: 3 },
-    ] as any)
-    mockGenerateContent
-      .mockResolvedValueOnce({ text: 'no' })
-      .mockResolvedValueOnce({ text: VALID_FORECAST_JSON })
-      .mockResolvedValueOnce({ text: QUALITY_PASS_JSON })
-    vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
-    vi.mocked(createCommitment).mockResolvedValue({ ok: true } as any)
-    vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
-
-    await runDueBots(true) // dry-run
-
-    // user.findUnique should not be called since ensureBotCU exits early in dry-run
-    expect(prisma.user.findUnique).not.toHaveBeenCalled()
-    expect(prisma.$transaction).not.toHaveBeenCalled()
-  })
-
-  it('no-ops when cuRefillAt=0 (feature disabled)', async () => {
-    const { prisma } = await import('@/lib/prisma')
-    const { fetchRssFeeds, detectHotTopics } = await import('@/lib/services/bots/rss')
-    const { createCommitment } = await import('@/lib/services/commitment')
-    const { runDueBots } = await import('@/lib/services/bots')
-
-    const bot = makeBot({ cuRefillAt: 0, maxVotesPerDay: 0 })
-    vi.mocked(prisma.botConfig.findMany).mockResolvedValue([bot] as any)
-    vi.mocked(prisma.botRunLog.count).mockResolvedValue(0)
-    vi.mocked(fetchRssFeeds).mockResolvedValue([])
-    vi.mocked(detectHotTopics).mockReturnValue([
-      { title: 'No refill needed topic', items: [], sourceCount: 3 },
-    ] as any)
-    mockGenerateContent
-      .mockResolvedValueOnce({ text: 'no' })
-      .mockResolvedValueOnce({ text: VALID_FORECAST_JSON })
-      .mockResolvedValueOnce({ text: QUALITY_PASS_JSON })
-    vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
-    vi.mocked(prisma.prediction.create).mockResolvedValue({ id: 'pred-x' } as any)
-    vi.mocked(prisma.prediction.update).mockResolvedValue({} as any)
-    vi.mocked(createCommitment).mockResolvedValue({ ok: true } as any)
-    vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
-    vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)
-
-    await runDueBots(false)
-
-    expect(prisma.user.findUnique).not.toHaveBeenCalled()
-    // Forecast create + initial stake use a single interactive transaction (CU refill path was removed).
-    expect(prisma.$transaction).toHaveBeenCalled()
-  })
-
 })
 
 // ─── tagFilter sanitization ───────────────────────────────────────────────────

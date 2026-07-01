@@ -19,8 +19,6 @@ const BOT_CONFIG_SELECT = {
   activeHoursEnd: true,
   tagFilter: true,
   voteBias: true,
-  cuRefillAt: true,
-  cuRefillAmount: true,
   canCreateForecasts: true,
   canVote: true,
   autoApprove: true,
@@ -87,8 +85,6 @@ export async function listBots() {
       activeHoursEnd: bot.activeHoursEnd,
       tagFilter: bot.tagFilter,
       voteBias: bot.voteBias,
-      cuRefillAt: bot.cuRefillAt,
-      cuRefillAmount: bot.cuRefillAmount,
       canCreateForecasts: bot.canCreateForecasts,
       canVote: bot.canVote,
       autoApprove: bot.autoApprove,
@@ -142,8 +138,6 @@ export interface CreateBotData {
   activeHoursEnd: number | null
   tagFilter: string[]
   voteBias: number
-  cuRefillAt: number
-  cuRefillAmount: number
   canCreateForecasts: boolean
   canVote: boolean
   requireApprovalForForecasts: boolean
@@ -186,8 +180,6 @@ export async function createBotInDb(data: CreateBotData) {
         activeHoursEnd: data.activeHoursEnd,
         tagFilter: data.tagFilter,
         voteBias: data.voteBias,
-        cuRefillAt: data.cuRefillAt,
-        cuRefillAmount: data.cuRefillAmount,
         canCreateForecasts: data.canCreateForecasts,
         canVote: data.canVote,
         requireApprovalForForecasts: data.requireApprovalForForecasts,
@@ -219,8 +211,6 @@ export interface UpdateBotData {
   activeHoursEnd?: number | null
   tagFilter?: string[]
   voteBias?: number
-  cuRefillAt?: number
-  cuRefillAmount?: number
   canCreateForecasts?: boolean
   canVote?: boolean
   requireApprovalForForecasts?: boolean
