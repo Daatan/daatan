@@ -188,16 +188,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     createUser: async ({ user }) => {
       try {
-        await prisma.cuTransaction.create({
-          data: {
-            userId: user.id!,
-            type: 'INITIAL_GRANT',
-            amount: 100,
-            balanceAfter: 100,
-            note: 'Welcome bonus',
-          },
-        })
-
         // Notify Telegram about new user registration
         notifyNewUserRegistered({
           email: user.email!,
@@ -205,7 +195,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           provider: 'google', // createUser event is usually for OAuth providers
         })
       } catch (error) {
-        log.error({ err: error }, 'Failed to create initial grant or notify registration')
+        log.error({ err: error }, 'Failed to notify new-user registration')
       }
     },
   },

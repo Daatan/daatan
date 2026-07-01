@@ -38,14 +38,14 @@ describe('GET /api/commitments/stats', () => {
     const { prisma } = await import('@/lib/prisma')
 
     const mockCommitments = [
-      // Correct prediction (returned more than committed)
-      { cuCommitted: 10, cuReturned: 15, rsChange: 1.0, prediction: { status: 'RESOLVED_CORRECT' } },
-      // Wrong prediction (returned 0)
-      { cuCommitted: 20, cuReturned: 0, rsChange: -1.0, prediction: { status: 'RESOLVED_WRONG' } },
-      // Pending
-      { cuCommitted: 5, cuReturned: null, rsChange: null, prediction: { status: 'ACTIVE' } },
+      // Correct: brierScore < 0.25
+      { brierScore: 0.05, rsChange: 1.0, prediction: { status: 'RESOLVED_CORRECT' } },
+      // Wrong: brierScore >= 0.25
+      { brierScore: 0.6, rsChange: -1.0, prediction: { status: 'RESOLVED_WRONG' } },
+      // Pending (no brierScore yet)
+      { brierScore: null, rsChange: null, prediction: { status: 'ACTIVE' } },
       // Another correct
-      { cuCommitted: 15, cuReturned: 22, rsChange: 1.5, prediction: { status: 'RESOLVED_CORRECT' } },
+      { brierScore: 0.1, rsChange: 1.5, prediction: { status: 'RESOLVED_CORRECT' } },
     ]
 
     vi.mocked(prisma.commitment.findMany).mockResolvedValue(mockCommitments as any)
@@ -61,9 +61,6 @@ describe('GET /api/commitments/stats', () => {
     expect(data.wrong).toBe(1)
     expect(data.pending).toBe(1)
     expect(data.accuracy).toBe(67) // 2/3 = 66.7 -> Math.round = 67
-    expect(data.totalCuCommitted).toBe(50) // 10+20+5+15
-    expect(data.totalCuReturned).toBe(37) // 15+0+0+22
-    expect(data.netCu).toBe(-13) // 37-50
     expect(data.totalRsChange).toBe(1.5) // 1.0 + (-1.0) + 0 + 1.5
   })
 
@@ -102,6 +99,5 @@ describe('GET /api/commitments/stats', () => {
 
     expect(data.total).toBe(0)
     expect(data.accuracy).toBeNull()
-    expect(data.netCu).toBe(0)
   })
 })

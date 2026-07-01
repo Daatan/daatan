@@ -58,7 +58,6 @@ export type Prediction = {
     binaryChoice?: boolean | null
     rsSnapshot: number
     createdAt: string
-    cuReturned?: number | null
     rsChange?: number | null
     probability?: number | null
     user: {

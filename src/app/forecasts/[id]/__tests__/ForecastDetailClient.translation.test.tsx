@@ -31,7 +31,6 @@ vi.mock('next/navigation', () => ({
 // Mock components to simplify tests
 vi.mock('@/components/comments/CommentThread', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/CommitmentForm', () => ({ default: () => null }))
-vi.mock('@/components/forecasts/CUBalanceIndicator', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/Speedometer', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/ContextTimeline', () => ({ default: () => null }))
 vi.mock('../ModeratorResolutionSection', () => ({ ModeratorResolutionSection: () => null }))

@@ -11,7 +11,6 @@ type AdminUser = {
   email: string
   role: string
   rs: number
-  cuAvailable: number
   createdAt: string
   image: string | null
   isBot: boolean
@@ -96,7 +95,6 @@ export default function UsersTable() {
                   <th className="p-3 border-b text-left">Email</th>
                   <th className="p-3 border-b text-left">Role</th>
                   <th className="p-3 border-b text-right">Reputation</th>
-                  <th className="p-3 border-b text-right">Confidence</th>
                   <th className="p-3 border-b text-right">Created</th>
                 </tr>
               </thead>
@@ -130,7 +128,6 @@ export default function UsersTable() {
                       </select>
                     </td>
                     <td className="p-3 text-right font-mono text-sm">{Math.round(u.rs)}</td>
-                    <td className="p-3 text-right font-mono text-sm">{u.cuAvailable}</td>
                     <td className="p-3 text-right text-xs text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))}

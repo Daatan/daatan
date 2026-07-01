@@ -384,26 +384,25 @@ export async function getCommitmentStats(userId: string) {
   })
 
   const total = commitments.length
-  const totalCuCommitted = commitments.reduce((sum, c) => sum + c.cuCommitted, 0)
-  const totalCuReturned = commitments.reduce((sum, c) => sum + (c.cuReturned ?? 0), 0)
   const totalRsChange = commitments.reduce((sum, c) => sum + (c.rsChange ?? 0), 0)
 
   const resolved = commitments.filter(
     (c) => c.prediction.status === 'RESOLVED_CORRECT' || c.prediction.status === 'RESOLVED_WRONG',
   )
-  const correct = resolved.filter((c) => (c.cuReturned ?? 0) > c.cuCommitted)
-  const wrong = resolved.filter((c) => (c.cuReturned ?? 0) === 0)
+  // "Correct" mirrors the resolution engine's own definition (prediction-resolution.ts):
+  // brierScore < 0.25 means the forecast beat a coin flip toward the true outcome.
+  // Void commitments never get a brierScore, so they drop out of the accuracy base.
+  const scored = resolved.filter((c) => c.brierScore != null)
+  const correct = scored.filter((c) => c.brierScore! < 0.25)
+  const wrong = scored.filter((c) => c.brierScore! >= 0.25)
   const pending = commitments.filter(
     (c) => c.prediction.status === 'ACTIVE' || c.prediction.status === 'PENDING',
   )
 
-  const accuracy = resolved.length > 0 ? Math.round((correct.length / resolved.length) * 100) : null
-  const netCu = totalCuReturned - totalCuCommitted
-
-  const brierScored = commitments.filter((c) => c.brierScore != null)
+  const accuracy = scored.length > 0 ? Math.round((correct.length / scored.length) * 100) : null
   const avgBrierScore =
-    brierScored.length > 0
-      ? Math.round((brierScored.reduce((sum, c) => sum + c.brierScore!, 0) / brierScored.length) * 1000) / 1000
+    scored.length > 0
+      ? Math.round((scored.reduce((sum, c) => sum + c.brierScore!, 0) / scored.length) * 1000) / 1000
       : null
 
   return {
@@ -413,11 +412,8 @@ export async function getCommitmentStats(userId: string) {
     wrong: wrong.length,
     pending: pending.length,
     accuracy,
-    totalCuCommitted,
-    totalCuReturned,
-    netCu,
     totalRsChange: Math.round(totalRsChange * 100) / 100,
     avgBrierScore,
-    brierCount: brierScored.length,
+    brierCount: scored.length,
   }
 }

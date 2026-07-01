@@ -15,19 +15,10 @@ vi.mock('@/lib/prisma', () => ({
     user: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      create: vi.fn(),
     },
-    $transaction: vi.fn((cb) => cb(mockTx)),
   },
 }))
-
-const mockTx = {
-  user: {
-    create: vi.fn(),
-  },
-  cuTransaction: {
-    create: vi.fn(),
-  },
-}
 
 vi.mock('bcryptjs', () => ({
   default: {
@@ -71,12 +62,12 @@ describe('POST /api/auth/signup', () => {
     // 2. No collisions
     vi.mocked(prisma.user.findMany).mockResolvedValue([])
     // 3. User creation result
-    mockTx.user.create.mockResolvedValue({
+    vi.mocked(prisma.user.create).mockResolvedValue({
       id: 'new-user-id',
       name: 'Test User',
       email: 'test@example.com',
       username: 'test_user',
-    })
+    } as never)
 
     const body = {
       name: 'Test User',
@@ -97,13 +88,7 @@ describe('POST /api/auth/signup', () => {
     expect(data.username).toBe('test_user')
     
     expect(bcrypt.hash).toHaveBeenCalledWith('password123', 12)
-    expect(mockTx.user.create).toHaveBeenCalled()
-    expect(mockTx.cuTransaction.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        type: 'INITIAL_GRANT',
-        amount: 100,
-      })
-    }))
+    expect(prisma.user.create).toHaveBeenCalled()
   })
 
   it('returns 400 if user email already exists', async () => {
