@@ -73,6 +73,12 @@ export function handleRouteError(
     )
   }
 
+  // Prisma unique-constraint violation → 409 (e.g. a double-submit racing the
+  // existence check). Duck-typed to avoid importing the Prisma error class.
+  if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P2002') {
+    return NextResponse.json({ error: 'This resource already exists' }, { status: 409 })
+  }
+
   log.error({ err: error }, fallbackMessage)
 
   // Include error details in staging for easier debugging

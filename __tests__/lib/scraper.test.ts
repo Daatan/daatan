@@ -95,7 +95,38 @@ describe('fetchUrlContent SSRF Protection', () => {
         const result = await fetchUrlContent('https://public.example.com/test')
         expect(result).toBe('Test Content')
         expect(mockFetch).toHaveBeenCalledTimes(1)
-        expect(mockFetch).toHaveBeenCalledWith('https://public.example.com/test', expect.any(Object))
+        expect(mockFetch).toHaveBeenCalledWith('https://public.example.com/test', expect.objectContaining({ redirect: 'manual' }))
+    })
+
+    it('rejects a redirect to an internal host (SSRF via 302)', async () => {
+        // Public initial host, but the server 302-redirects to the metadata IP.
+        mockFetch.mockResolvedValueOnce({
+            status: 302,
+            ok: false,
+            headers: { get: (h: string) => (h === 'location' ? 'https://169.254.169.254/latest/meta-data' : null) },
+            text: async () => '',
+        })
+        await expect(fetchUrlContent('https://public.example.com/start'))
+            .rejects.toThrow('Fetching internal or private IPs is forbidden')
+    })
+
+    it('follows a redirect to another public host and re-validates it', async () => {
+        mockFetch
+            .mockResolvedValueOnce({
+                status: 302,
+                ok: false,
+                headers: { get: (h: string) => (h === 'location' ? 'https://public.example.com/final' : null) },
+                text: async () => '',
+            })
+            .mockResolvedValueOnce({
+                status: 200,
+                ok: true,
+                headers: { get: () => null },
+                text: async () => '<html><body>Final Content</body></html>',
+            })
+        const result = await fetchUrlContent('https://public.example.com/start')
+        expect(result).toContain('Final Content')
+        expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 })
 

@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.22.14",
+  "version": "1.22.15",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
