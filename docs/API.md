@@ -580,8 +580,8 @@ Update notification preferences.
 
 ## Telegram
 
-### `POST /api/telegram/rollback` — Internal
-Trigger a manual production rollback notification. Used by CI/CD.
+### `POST /api/telegram/rollback` — Telegram webhook
+Handles interactive Telegram commands (`/status`, `/versions`, `/rollback 1.7.x`) that dispatch the GitHub Actions rollback workflow. **Fails closed:** rejects every request unless `TELEGRAM_WEBHOOK_SECRET` is set and the request carries the matching `x-telegram-bot-api-secret-token` header (plus a chat-ID allow-list). See [ROLLBACK.md](./ROLLBACK.md).
 
 ---
 

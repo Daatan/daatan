@@ -64,6 +64,30 @@ Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the v
 
 Total time: ~5–8 minutes.
 
+### Triggering it from Telegram (`/rollback`)
+
+The same workflow can be started from Telegram with `/rollback 1.7.x` (or
+`/rollback staging 1.7.x`), handled by `POST /api/telegram/rollback`.
+
+**The endpoint fails closed.** It only acts on requests carrying the matching
+`x-telegram-bot-api-secret-token` header, so it is inert unless
+`TELEGRAM_WEBHOOK_SECRET` is set on the app **and** Telegram is configured to send
+that secret. With the var unset, every request is rejected — the secret is the
+only proof a request genuinely came from Telegram; without it a spoofed `chat_id`
+in the body could trigger a production rollback.
+
+One-time setup:
+
+1. Set `TELEGRAM_WEBHOOK_SECRET` to a random value in the app env (prod + staging).
+2. Register the webhook so Telegram sends that secret with every update:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+     -d "url=https://daatan.com/api/telegram/rollback" \
+     -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+   ```
+3. Ensure `TELEGRAM_ROLLBACK_CHAT_IDS` lists the allowed chat IDs and
+   `GH_ROLLBACK_TOKEN` (a PAT with `actions:write`) is set.
+
 ---
 
 ## Option B: Manual SSM rollback (when CI is unavailable)

@@ -66,4 +66,21 @@ describe('POST /api/telegram/rollback — webhook secret gate', () => {
     const calledUrl = fetchMock.mock.calls[0][0] as string
     expect(calledUrl).toContain('/sendMessage')
   })
+
+  // Regression: previously the secret check was `if (WEBHOOK_SECRET) {...}`, so an
+  // unset secret skipped the gate entirely (fail-open) and let any request through.
+  it('fails closed when TELEGRAM_WEBHOOK_SECRET is not configured', async () => {
+    vi.resetModules()
+    vi.stubEnv('TELEGRAM_WEBHOOK_SECRET', '')
+    vi.stubEnv('TELEGRAM_ROLLBACK_CHAT_IDS', '111222')
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'test-token')
+    const { POST } = await import('@/app/api/telegram/rollback/route')
+
+    // Even an allowed chat id is rejected before any processing — with no secret
+    // configured the request cannot be authenticated as coming from Telegram.
+    const res = await POST(postWith('any-secret', { message: { chat: { id: 111222 }, text: '/status' } }))
+
+    expect(res.status).toBe(200)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
