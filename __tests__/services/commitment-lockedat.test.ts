@@ -48,7 +48,7 @@ function makePrediction(overrides: Record<string, unknown> = {}) {
 }
 
 function makeUser() {
-  return { id: 'user-1', rs: 100, cuAvailable: 100, cuLocked: 0, isBot: false }
+  return { id: 'user-1', rs: 100, isBot: false }
 }
 
 function makeCreatedCommitment() {

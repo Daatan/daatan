@@ -42,10 +42,8 @@ model User {
   // Roles
   role UserRole @default(USER)
 
-  // Scoring & Currency
-  rs          Float @default(100) // Reputation Score (starts at 100)
-  cuAvailable Int   @default(100) // Confidence Units available to commit
-  cuLocked    Int   @default(0) // Confidence Units locked in active predictions
+  // Scoring
+  rs Float @default(100) // Reputation Score (starts at 100)
 
   // Glicko-2 expertise rating
   mu                 Float @default(1500) // skill estimate (Glicko-1 scale)
@@ -73,10 +71,8 @@ model User {
 
   // Prediction system relations
   predictions         Prediction[] // Predictions authored by user
-  commitments         Commitment[] // User's CU commitments
-  withdrawals         CommitmentWithdrawal[] // Exited commitments
-  cuTransactions      CuTransaction[] // CU ledger entries
-  resolvedPredictions Prediction[]           @relation("ResolvedBy")
+  commitments         Commitment[] // User's commitments
+  resolvedPredictions Prediction[] @relation("ResolvedBy")
 
   // Bot rejection tracking
   rejectedBotTopics BotRejectedTopic[]
@@ -219,18 +215,18 @@ model Tag {
 }
 
 model UserTagRating {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tagId      String
-  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  elo        Float    @default(1500)
-  mu         Float    @default(1500)
-  sigma      Float    @default(350)
-  volatility Float    @default(0.06)
+  elo        Float @default(1500)
+  mu         Float @default(1500)
+  sigma      Float @default(350)
+  volatility Float @default(0.06)
 
-  updatedAt  DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, tagId])
   @@index([tagId])
@@ -270,10 +266,10 @@ model Prediction {
   newsAnchor   NewsAnchor? @relation(fields: [newsAnchorId], references: [id])
 
   // Prediction content
-  claimText   String  @db.VarChar(500) // The testable statement (canonical = English)
-  slug        String? @unique // URL-friendly identifier (e.g., "bitcoin-100k-2026")
-  detailsText String? @db.Text // Additional conditions/context
-  tags        Tag[]
+  claimText        String  @db.VarChar(500) // The testable statement (canonical = English)
+  slug             String? @unique // URL-friendly identifier (e.g., "bitcoin-100k-2026")
+  detailsText      String? @db.Text // Additional conditions/context
+  tags             Tag[]
   // Detected source language of the author's input, ISO 639-1. Null = legacy /
   // unknown (assumed English). When not English, claimText/detailsText/
   // resolutionRules are canonicalized to English and the original is kept as a
@@ -337,7 +333,6 @@ model Prediction {
   // Relations
   options          PredictionOption[]
   commitments      Commitment[]
-  withdrawals      CommitmentWithdrawal[]
   comments         Comment[]
   contextSnapshots ContextSnapshot[]
   translations     PredictionTranslation[]
@@ -501,7 +496,6 @@ model Commitment {
   probability Float?
 
   // Result (calculated after resolution)
-  cuReturned Int? // CU returned after resolution
   rsChange   Float? // RS delta after resolution
   brierScore Float? // (probability - outcome)² computed at resolution
 
@@ -516,73 +510,7 @@ model Commitment {
   @@unique([userId, predictionId])
   @@index([predictionId])
   @@index([userId])
-  @@index([userId, cuReturned]) // leaderboard aggregation
   @@map("commitments")
-}
-
-// ============================================
-// COMMITMENT WITHDRAWALS (Exit penalty tracking)
-// ============================================
-
-model CommitmentWithdrawal {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  predictionId String
-  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
-
-  cuCommitted Int // Original committed amount at time of exit
-  cuBurned    Int // Amount burned as penalty (goes to winnersPoolBonus)
-  cuRefunded  Int // Amount returned immediately (cuCommitted - cuBurned)
-  burnRate    Int // Burn rate × 100 (e.g., 25 = 25%)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([predictionId])
-  @@map("commitment_withdrawals")
-}
-
-// ============================================
-// CU LEDGER (Transaction history)
-// ============================================
-
-enum CuTransactionType {
-  INITIAL_GRANT // Signup bonus
-  COMMITMENT_LOCK // CU locked for prediction
-  COMMITMENT_UNLOCK // CU returned after resolution
-  REFUND // CU refunded (void/unresolvable)
-  BONUS // Streak/achievement bonus
-  ADMIN_ADJUSTMENT // Manual adjustment by admin
-  WITHDRAWAL_PENALTY // CU burned as exit penalty (negative)
-  WITHDRAWAL_REFUND // CU returned to user on exit after penalty (positive)
-  VOID_BURN_REFUND // Burned CU refunded when prediction ends void/unresolvable
-}
-
-model CuTransaction {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type   CuTransactionType
-  amount Int // Positive = credit, negative = debit
-
-  // Reference to related entity
-  referenceId String? @db.VarChar(100) // e.g., commitment_id, prediction_id
-  note        String? @db.VarChar(500)
-
-  // Balance after this transaction
-  balanceAfter Int
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([type])
-  @@index([createdAt])
-  @@map("cu_transactions")
 }
 
 // ============================================
@@ -856,9 +784,9 @@ model BotConfig {
   // TODO(stage2-bot-params): injected in bot-runner.ts runVoting() LLM prompt
   voteBias Int @default(50)
 
-  // CU auto-refill: when bot's cuAvailable drops to/below cuRefillAt,
-  // grant cuRefillAmount CU. cuRefillAt = 0 disables auto-refill.
-  // TODO(stage2-bot-params): enforced in bot-runner.ts before each stake
+  // DEAD: relics of the removed CU-staking economy (there is no bot balance to
+  // refill). Never read at runtime. Kept only to avoid churning the bot admin
+  // UI/i18n in this migration; slated for removal in the CU-rename follow-up.
   cuRefillAt     Int @default(0)
   cuRefillAmount Int @default(50)
 
@@ -1030,7 +958,7 @@ model OracleCallLog {
   // http_5xx | http_4xx. EMPTY (passed through from the Oracle's `reason`):
   // no_search_results | all_articles_off_topic | all_fetches_failed |
   // extraction_errors | no_usable_predictions | no_result | oracle_timeout. Else unknown.
-  failureReason String?
+  failureReason       String?
   // True when the caller abandoned the Oracle result and used the LLM fallback.
   fellBackToLlm       Boolean @default(false)
   // The 0–100 probability the LLM fallback produced (set with fellBackToLlm).

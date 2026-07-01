@@ -6,7 +6,7 @@ vi.mock('@/lib/api-middleware', () => ({
   withAuth: (handler: (req: Request, user: unknown, ctx: unknown) => unknown, _opts?: unknown) =>
     async (req: Request, ctx: { params: Promise<Record<string, string>> }) => {
       const params = await ctx.params
-      return handler(req, { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN', rs: 0, cuAvailable: 0, cuLocked: 0 }, { ...ctx, params })
+      return handler(req, { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN', rs: 0 }, { ...ctx, params })
     },
 }))
 
@@ -186,7 +186,7 @@ describe('GET /api/admin/users', () => {
     const { GET } = await import('@/app/api/admin/users/route')
 
     vi.mocked(prisma.user.findMany).mockResolvedValue([
-      { id: 'u1', name: 'Alice', email: 'a@e.com', role: 'USER', cuAvailable: 100, rs: 1.0, createdAt: new Date(), _count: { predictions: 2, commitments: 5 } },
+      { id: 'u1', name: 'Alice', email: 'a@e.com', role: 'USER', rs: 1.0, createdAt: new Date(), _count: { predictions: 2, commitments: 5 } },
     ] as any)
     vi.mocked(prisma.user.count).mockResolvedValue(1)
 

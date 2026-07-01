@@ -77,8 +77,6 @@ const ADMIN_SESSION = {
     email: 'admin@daatan.test',
     role: 'ADMIN',
     rs: 100,
-    cuAvailable: 1000,
-    cuLocked: 0,
   },
 }
 
@@ -88,8 +86,6 @@ const USER_SESSION = {
     email: 'user@daatan.test',
     role: 'USER',
     rs: 10,
-    cuAvailable: 100,
-    cuLocked: 0,
   },
 }
 
@@ -121,7 +117,7 @@ function makeBotRecord(overrides: Partial<Record<string, unknown>> = {}) {
     autoApprove: false,
     lastRunAt: null,
     createdAt: new Date('2026-02-20T00:00:00Z'),
-    user: { id: 'user-bot-1', name: 'TestBot', username: 'testbot_b', image: null, cuAvailable: 100, cuLocked: 0 },
+    user: { id: 'user-bot-1', name: 'TestBot', username: 'testbot_b', image: null },
     runLogs: [],
     ...overrides,
   }
@@ -535,7 +531,7 @@ describe('PATCH /api/admin/bots/[id]', () => {
     mockAuth.mockResolvedValue(ADMIN_SESSION)
 
     const existing = makeBotRecord()
-    const updated = { ...existing, isActive: false, user: { id: 'user-bot-1', name: 'TestBot', username: 'testbot_b', cuAvailable: 100 } }
+    const updated = { ...existing, isActive: false, user: { id: 'user-bot-1', name: 'TestBot', username: 'testbot_b' } }
     vi.mocked(prisma.botConfig.findUnique).mockResolvedValue(existing as any)
     vi.mocked(prisma.botConfig.update).mockResolvedValue(updated as any)
 

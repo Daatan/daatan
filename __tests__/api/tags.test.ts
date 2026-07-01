@@ -136,8 +136,6 @@ describe('POST /api/tags', () => {
     name: 'Admin User',
     role: 'ADMIN',
     rs: 100,
-    cuAvailable: 100,
-    cuLocked: 0,
     ...overrides,
   })
 

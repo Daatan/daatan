@@ -111,8 +111,6 @@ describe('POST /api/forecasts/[id]/context', () => {
     name: 'Test User',
     role: 'USER',
     rs: 100,
-    cuAvailable: 100,
-    cuLocked: 0,
   }
 
   // Drains an SSE streaming response and merges all events into one object.

@@ -18,9 +18,6 @@ vi.mock('@/lib/prisma', () => ({
       create: vi.fn(),
       findUnique: vi.fn(),
     },
-    cuTransaction: {
-      create: vi.fn(),
-    },
     $transaction: vi.fn((callback) => callback(prisma)),
   },
 }))
@@ -52,7 +49,6 @@ describe('Race Conditions', () => {
       
       const mockUser = {
         id: 'user-1',
-        cuAvailable: 100,
         rs: 100,
       }
 

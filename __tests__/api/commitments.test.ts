@@ -28,8 +28,6 @@ const mockUser = {
   email: 'user@test.com',
   role: 'USER' as const,
   rs: 0,
-  cuAvailable: 100,
-  cuLocked: 0,
 }
 
 const mockCommitment = {

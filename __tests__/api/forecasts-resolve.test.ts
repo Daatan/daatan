@@ -33,9 +33,6 @@ vi.mock('@/lib/prisma', () => ({
     commitment: {
       update: vi.fn(),
     },
-    cuTransaction: {
-      create: vi.fn(),
-    },
     $transaction: vi.fn((fn: (tx: unknown) => Promise<unknown>) =>
       fn({
         prediction: {
@@ -49,7 +46,6 @@ vi.mock('@/lib/prisma', () => ({
         predictionOption: { update: vi.fn() },
         commitment: { update: vi.fn() },
         user: { update: vi.fn() },
-        cuTransaction: { create: vi.fn() },
       })
     ),
   },
@@ -119,7 +115,6 @@ describe('POST /api/predictions/[id]/resolve', () => {
         predictionOption: { update: vi.fn() },
         commitment: { update: vi.fn() },
         user: { update: vi.fn() },
-        cuTransaction: { create: vi.fn() },
       }
       return fn(tx as never) as never
     })
@@ -159,7 +154,6 @@ describe('POST /api/predictions/[id]/resolve', () => {
         predictionOption: { update: vi.fn() },
         commitment: { update: vi.fn() },
         user: { update: vi.fn() },
-        cuTransaction: { create: vi.fn() },
       }
       return fn(tx as never) as never
     })
