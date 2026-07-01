@@ -6,6 +6,7 @@ import { createLogger } from '@/lib/logger'
 import { UserProfileView } from '@/components/profile/UserProfileView'
 import { loadProfileScores, loadProfileTab } from '@/lib/services/profile'
 import type { ProfileTab } from '@/lib/services/profile'
+import { JsonLd } from '@/components/JsonLd'
 
 export const dynamic = 'force-dynamic'
 
@@ -141,14 +142,8 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
     return (
       <>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-        />
+        <JsonLd data={personJsonLd} />
+        <JsonLd data={breadcrumbJsonLd} />
         <UserProfileView
           user={user}
           userTags={userTags}

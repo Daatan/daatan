@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import { getLeaderboard } from '@/lib/services/leaderboard'
+import { JsonLd } from '@/components/JsonLd'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build. Route stays dynamic; the DB call below is cached.
@@ -45,10 +46,7 @@ export default async function LeaderboardLayout({ children }: { children: React.
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
+      <JsonLd data={itemListJsonLd} />
       {children}
     </>
   )

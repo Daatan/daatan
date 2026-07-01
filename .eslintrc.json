@@ -1,3 +1,12 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Property[key.name='__html'] > CallExpression[callee.object.name='JSON'][callee.property.name='stringify']",
+        "message": "Do not serialize data directly into dangerouslySetInnerHTML — JSON.stringify does not escape </script> (stored XSS). Render structured data through the <JsonLd> component, or use jsonLdSafe() from @/lib/jsonLd."
+      }
+    ]
+  }
 }
