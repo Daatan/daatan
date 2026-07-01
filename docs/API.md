@@ -264,7 +264,7 @@ List commitments for the current user.
 ---
 
 ### `GET /api/commitments/stats` — Auth
-Aggregate stats for the current user's commitments (total, resolved, CU).
+Aggregate stats for the current user's commitments (total, resolved, correct/wrong, accuracy, avg Brier score). Correct/wrong are derived from each commitment's Brier score (`< 0.25` = correct), matching the resolution engine.
 
 ---
 
@@ -431,10 +431,7 @@ List all users.
 Get user details.
 
 ### `PATCH /api/admin/users/[id]`
-Update user (role, cuAvailable, etc.).
-
-### `POST /api/admin/users/grant-cu`
-Grant CU to a user.
+Update user role.
 
 ### `GET /api/admin/comments`
 List all comments.

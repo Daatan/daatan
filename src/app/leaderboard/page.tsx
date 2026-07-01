@@ -18,7 +18,6 @@ type LeaderboardUser = {
   username: string | null
   image: string | null
   rs: number
-  cuAvailable: number
   mu: number
   sigma: number
   glickoRank: number

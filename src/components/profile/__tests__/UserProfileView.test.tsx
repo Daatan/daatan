@@ -88,8 +88,6 @@ describe('UserProfileView Component', () => {
     mu: 1500,
     sigma: 350,
     eloRating: 1500,
-    cuAvailable: 200,
-    cuLocked: 0,
     createdAt: new Date('2025-01-01').toISOString(),
     _count: { predictions: 10, commitments: 5 },
   }

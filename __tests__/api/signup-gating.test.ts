@@ -19,15 +19,9 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    user: { findUnique: vi.fn(), findMany: vi.fn() },
-    $transaction: vi.fn((cb) => cb(mockTx)),
+    user: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   },
 }))
-
-const mockTx = {
-  user: { create: vi.fn() },
-  cuTransaction: { create: vi.fn() },
-}
 
 vi.mock('bcryptjs', () => ({ default: { hash: vi.fn().mockResolvedValue('hashed_password') } }))
 
@@ -55,9 +49,9 @@ describe('POST /api/auth/signup — self-host access gates', () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null)
     vi.mocked(prisma.user.findMany).mockResolvedValue([])
-    mockTx.user.create.mockResolvedValue({
+    vi.mocked(prisma.user.create).mockResolvedValue({
       id: 'id', name: 'Jane Doe', email: 'jane@acme.com', username: 'jane_doe',
-    })
+    } as never)
   })
 
   it('blocks closed signup with 403 (invite-only) when self_hosted and no invite is given', async () => {

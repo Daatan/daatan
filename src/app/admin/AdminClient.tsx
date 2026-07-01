@@ -31,8 +31,6 @@ type AdminUser = {
   image: string | null
   role: 'USER' | 'RESOLVER' | 'APPROVER' | 'ADMIN'
   rs: number
-  cuAvailable: number
-  cuLocked: number
   createdAt: string
   _count: { predictions: number; commitments: number; comments: number }
 }
@@ -529,7 +527,6 @@ function UsersTab() {
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{t('colUser')}</th>
                     <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">{t('colRoles')}</th>
                     <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">{t('colRS')}</th>
-                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">{t('colConfidence')}</th>
                     <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">{t('colActivity')}</th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">{t('colJoined')}</th>
                     <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">{t('colActions')}</th>
@@ -576,9 +573,6 @@ function UsersTab() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-text-secondary">{u.rs.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">
-                        {u.cuAvailable}
-                      </td>
                       <td className="px-4 py-3 text-center">
                         <div className="text-xs text-gray-500">
                           {u._count.predictions}p · {u._count.commitments}c · {u._count.comments}m

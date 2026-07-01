@@ -69,7 +69,6 @@ export async function syncBotsToDatabase() {
                     isBot: true,
                     emailNotifications: false,
                     isPublic: true,
-                    cuAvailable: 100, // Initial seed balance
                     botConfig: {
                         create: {
                             personaPrompt: bot.personaPrompt,

@@ -25,8 +25,6 @@ interface UserProfileViewProps {
     sigma: number
     eloRating: number
     createdAt: Date | string
-    cuAvailable?: number
-    cuLocked?: number
     email?: string | null
     _count: { predictions: number; commitments: number }
   }

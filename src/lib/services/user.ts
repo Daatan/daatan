@@ -79,59 +79,15 @@ export interface RegisterUserData {
 }
 
 export async function registerUser(data: RegisterUserData) {
-  return prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        password: data.hashedPassword,
-        username: data.username,
-        slug: data.slug,
-        cuAvailable: 100,
-      },
-    })
-
-    await tx.cuTransaction.create({
-      data: {
-        userId: user.id,
-        type: 'INITIAL_GRANT',
-        amount: 100,
-        balanceAfter: 100,
-        note: 'Welcome bonus',
-      },
-    })
-
-    return user
+  return prisma.user.create({
+    data: {
+      name: data.name,
+      email: data.email,
+      password: data.hashedPassword,
+      username: data.username,
+      slug: data.slug,
+    },
   })
-}
-
-export async function grantCuToAllUsers(amount: number, note: string) {
-  const users = await prisma.user.findMany({
-    where: { isBot: false },
-    select: { id: true, cuAvailable: true },
-  })
-
-  if (users.length === 0) return 0
-
-  await prisma.$transaction(
-    users.flatMap(u => [
-      prisma.cuTransaction.create({
-        data: {
-          userId: u.id,
-          type: 'ADMIN_ADJUSTMENT',
-          amount,
-          balanceAfter: u.cuAvailable + amount,
-          note,
-        },
-      }),
-      prisma.user.update({
-        where: { id: u.id },
-        data: { cuAvailable: { increment: amount } },
-      }),
-    ]),
-  )
-
-  return users.length
 }
 
 export interface AdminUsersQuery {
@@ -155,7 +111,7 @@ export async function listAdminUsers({ search, page, limit }: AdminUsersQuery) {
       where,
       select: {
         id: true, name: true, username: true, email: true, role: true,
-        cuAvailable: true, rs: true, createdAt: true, isBot: true,
+        rs: true, createdAt: true, isBot: true,
         _count: { select: { predictions: true, commitments: true } },
       },
       skip: (page - 1) * limit,
@@ -174,7 +130,7 @@ export async function updateUserRole(id: string, role: string) {
     data: { role: role as 'USER' | 'RESOLVER' | 'ADMIN' },
     select: {
       id: true, name: true, username: true, emailNotifications: true,
-      isPublic: true, role: true, rs: true, cuAvailable: true, isBot: true,
+      isPublic: true, role: true, rs: true, isBot: true,
     },
   })
 }

@@ -59,8 +59,6 @@ const APPROVER_SESSION = {
     email: 'approver@daatan.test',
     role: 'ADMIN',
     rs: 100,
-    cuAvailable: 1000,
-    cuLocked: 0,
   },
 }
 

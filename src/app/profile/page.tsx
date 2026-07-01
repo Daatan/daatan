@@ -51,8 +51,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         sigma: true,
         eloRating: true,
         createdAt: true,
-        cuAvailable: true,
-        cuLocked: true,
         _count: {
           select: { predictions: true, commitments: true },
         },

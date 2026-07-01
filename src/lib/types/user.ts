@@ -8,6 +8,4 @@ export interface AuthUser {
   image?: string | null
   role: UserRole
   rs: number
-  cuAvailable: number
-  cuLocked: number
 }

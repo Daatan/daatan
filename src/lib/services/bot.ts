@@ -164,7 +164,6 @@ export async function createBotInDb(data: CreateBotData) {
         isBot: true,
         emailNotifications: false,
         isPublic: true,
-        cuAvailable: 100,
       },
     })
 

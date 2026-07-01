@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/api-middleware', () => ({
   withAuth: (handler: (req: Request, user: unknown) => unknown) =>
     (request: Request, _context: Record<string, unknown>) =>
-      handler(request, { id: 'user-1', email: 'a@example.com', role: 'USER', rs: 0, cuAvailable: 0, cuLocked: 0 }),
+      handler(request, { id: 'user-1', email: 'a@example.com', role: 'USER', rs: 0 }),
 }))
 
 // ─── Prisma ────────────────────────────────────────────────────────────────
