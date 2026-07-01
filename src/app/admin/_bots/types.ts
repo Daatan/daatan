@@ -54,8 +54,6 @@ export interface Bot {
   activeHoursEnd: number | null
   tagFilter: string[]
   voteBias: number
-  cuRefillAt: number
-  cuRefillAmount: number
   canCreateForecasts: boolean
   canVote: boolean
   autoApprove: boolean

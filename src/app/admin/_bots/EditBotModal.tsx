@@ -32,8 +32,6 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
     activeHoursEnd: bot.activeHoursEnd,
     tagFilter: bot.tagFilter ?? [],
     voteBias: bot.voteBias ?? 50,
-    cuRefillAt: bot.cuRefillAt ?? 0,
-    cuRefillAmount: bot.cuRefillAmount ?? 50,
     canCreateForecasts: bot.canCreateForecasts ?? true,
     canVote: bot.canVote ?? true,
     autoApprove: bot.autoApprove ?? false,
@@ -71,8 +69,6 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
       activeHoursEnd: form.activeHoursEnd,
       tagFilter: form.tagFilter,
       voteBias: form.voteBias,
-      cuRefillAt: form.cuRefillAt,
-      cuRefillAmount: form.cuRefillAmount,
       canCreateForecasts: form.canCreateForecasts,
       canVote: form.canVote,
       autoApprove: form.autoApprove,
@@ -278,22 +274,6 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                 </p>
               </div>
             )}
-          </div>
-
-          <div className="border rounded-lg p-3 space-y-3 bg-navy-800">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('confidenceRefill')}</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <NumberField label={t('refillThreshold')} value={form.cuRefillAt} min={0}
-                  onChange={(v) => setForm({ ...form, cuRefillAt: v })} />
-                {form.cuRefillAt === 0 && <p className="text-xs text-gray-400 mt-1">{t('refillDisabled')}</p>}
-              </div>
-              <NumberField label={t('refillAmount')} value={form.cuRefillAmount} min={1}
-                onChange={(v) => setForm({ ...form, cuRefillAmount: v })} />
-            </div>
-            <p className="text-xs text-gray-400">
-              {t('refillHint')}
-            </p>
           </div>
 
           <Field label={t('tagFilter')} hint={t('tagFilterHint')}>

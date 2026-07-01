@@ -110,8 +110,6 @@ function makeBotRecord(overrides: Partial<Record<string, unknown>> = {}) {
     activeHoursEnd: null,
     tagFilter: [],
     voteBias: 50,
-    cuRefillAt: 0,
-    cuRefillAmount: 50,
     canCreateForecasts: true,
     canVote: true,
     autoApprove: false,
