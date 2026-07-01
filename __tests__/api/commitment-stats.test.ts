@@ -72,7 +72,7 @@ describe('GET /api/commitments/stats', () => {
     const { prisma } = await import('@/lib/prisma')
 
     vi.mocked(prisma.commitment.findMany).mockResolvedValue([
-      { cuCommitted: 10, cuReturned: null, rsChange: null, prediction: { status: 'ACTIVE' } },
+      { rsChange: null, prediction: { status: 'ACTIVE' } },
     ] as any)
 
     const request = new NextRequest('http://localhost/api/commitments/stats')

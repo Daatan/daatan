@@ -29,9 +29,6 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    cuTransaction: {
-      create: vi.fn(),
-    },
     $transaction: vi.fn(),
   },
 }))
@@ -122,7 +119,7 @@ function makeBot(overrides: Partial<{
   canCreateForecasts: boolean
   canVote: boolean
   autoApprove: boolean
-  user: { id: string; name: string | null; cuAvailable: number }
+  user: { id: string; name: string | null }
 }> = {}) {
   return {
     id: 'bot-1',
@@ -151,7 +148,7 @@ function makeBot(overrides: Partial<{
     canCreateForecasts: true,
     canVote: true,
     autoApprove: false,
-    user: { id: 'user-1', name: 'BotUser', cuAvailable: 1000 },
+    user: { id: 'user-1', name: 'BotUser' },
     ...overrides,
   }
 }
@@ -1602,7 +1599,7 @@ describe('runDueBots — tagFilter sanitization', () => {
     vi.mocked(createCommitment).mockResolvedValue({ ok: true } as any)
     vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
     vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ cuAvailable: 1000 } as any)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user-1' } as any)
 
     await runDueBots(false)
 
@@ -1775,7 +1772,7 @@ describe('LLM response parsing — schema drift guard', () => {
       },
     ]
     vi.mocked(prisma.prediction.findMany).mockResolvedValue(activeForecasts as any)
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: bot.userId, cuAvailable: 100, rs: 1500 } as any)
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: bot.userId, rs: 1500 } as any)
     vi.mocked(createCommitment).mockResolvedValue({ ok: true, data: { id: 'c1' } } as any)
     vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
     vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)

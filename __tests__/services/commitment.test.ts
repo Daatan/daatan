@@ -35,7 +35,6 @@ function makeCommitment(overrides: Record<string, unknown> = {}) {
     cuCommitted: 70,
     rsSnapshot: 1.0,
     createdAt: new Date(),
-    cuReturned: null,
     rsChange: null,
     brierScore: null,
     prediction: {
