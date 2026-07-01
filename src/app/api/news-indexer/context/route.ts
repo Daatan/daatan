@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const prediction = await prisma.prediction.findUnique({
       where: { id: body.predictionId },
-      select: { id: true, claimText: true, status: true },
+      select: { id: true, claimText: true, status: true, slug: true },
     })
 
     if (!prediction) return apiError('Prediction not found', 404)
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     void notifyNewsArticleMatched(
-      { id: prediction.id, claimText: prediction.claimText },
+      { id: prediction.id, claimText: prediction.claimText, slug: prediction.slug },
       { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
       triggerSimilarity,
       probability,
