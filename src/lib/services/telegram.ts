@@ -537,6 +537,37 @@ export function notifyNewsArticleMatched(
   sendChannelNotification(msg)
 }
 
+/**
+ * The AI estimate crossed the high-confidence threshold (≥80%) from below.
+ * Fired by every path that writes a new confidence value (news-indexer pushes,
+ * user-triggered "analyze context", admin backfill) — the crossing check lives
+ * in `context.ts`, so a forecast hovering at 82 doesn't re-alert on each push.
+ * `settled` marks the Oracle's settlement detection: enough sources reported
+ * the outcome as an accomplished fact, so the forecast is a resolution candidate.
+ */
+export function notifyHighConfidence(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  probability: number,
+  previous: number | null,
+  settled = false,
+): void {
+  if (isDevEnv()) return
+
+  const fromLine = previous !== null ? ` (from ${previous}%)` : ''
+  const settledLine = settled
+    ? '\n✅ Oracle reports the outcome as <b>settled</b> — consider resolving'
+    : ''
+
+  const msg = [
+    `📈 <b>High AI confidence</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `AI estimate: <b>${probability}%</b>${fromLine}${settledLine}`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
 export function notifyBackupVerificationFailed(reason: string): void {
   if (isDevEnv()) return
   const msg = [

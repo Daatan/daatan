@@ -58,11 +58,13 @@ export async function refreshOracleSnapshot(prediction: { id: string; claimText:
       ciLow,
       ciHigh,
       articlesUsed: forecast.articles_used,
+      settled: forecast.settled ?? false,
       sources,
     },
     confidence: toPercent(forecast.mean),
     aiCiLow: ciLow,
     aiCiHigh: ciHigh,
+    settled: forecast.settled ?? false,
   })
 
   log.info({ predictionId: prediction.id, sources: sources.length }, 'oracle-backfill.refreshed')

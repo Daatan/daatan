@@ -46,6 +46,8 @@ export interface OracleSource {
   /** Credibility weight from the leaderboard; 1.0 = neutral. */
   credibility_weight: number
   claims: string[]
+  /** True when this source reports the event's outcome as an accomplished fact. */
+  settled?: boolean | null
 }
 
 /** Full response from POST /forecast. */
@@ -68,6 +70,10 @@ export interface OracleForecastResponse {
   provider?: string
   /** Ordered search fallback chain retro tried, in order. */
   provider_chain?: string[]
+  /** True when enough independent sources report the event's outcome as an
+   *  accomplished fact: mean/ci are pinned near the boundary and the forecast
+   *  is a resolution candidate. */
+  settled?: boolean
 }
 
 /** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the

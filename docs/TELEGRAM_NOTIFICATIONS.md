@@ -106,6 +106,7 @@ Sent by API routes and services on business and operational events. The **Channe
 | Bot forecast approved | ✅ | noisy | `POST /api/forecasts/[id]/approve` |
 | Bot forecast rejected | ❌ | noisy | `POST /api/forecasts/[id]/reject` |
 | News article matched | 🗞️ | noisy | news-indexer integration |
+| High AI confidence (≥80%) | 📈 | clean | `src/lib/services/context.ts` — fires when the AI estimate **crosses** 80 from below (any confidence-writing path: news-indexer push, user "analyze context", admin backfill). Crossing-based, so a forecast hovering at 82 doesn't re-alert. Adds a "settled" line when the Oracle reports the outcome as an accomplished fact (resolution candidate). |
 
 ### Operational Alerts
 

@@ -169,6 +169,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             predictionCiHigh: number | null
             oracleSnapshotData: Prisma.InputJsonValue | null
             insufficientData?: boolean
+            settled?: boolean
         }
 
         // Oracle estimation starts immediately; LLM runs concurrently below
@@ -231,8 +232,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         ciLow,
                         ciHigh,
                         articlesUsed: oracleForecast.articles_used,
+                        settled: oracleForecast.settled ?? false,
                         sources: enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl),
                     },
+                    settled: oracleForecast.settled ?? false,
                 }
             }
 
@@ -313,6 +316,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     let predictionCiHigh: number | null = null
                     let oracleSnapshotData: Prisma.InputJsonValue | null = null
                     let insufficientData = false
+                    let settled = false
 
                     if (estimationResult === null) {
                         log.warn(
@@ -326,6 +330,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         predictionCiHigh = estimationResult.predictionCiHigh
                         oracleSnapshotData = estimationResult.oracleSnapshotData
                         insufficientData = estimationResult.insufficientData ?? false
+                        settled = estimationResult.settled ?? false
                     }
 
                     const totalMs = Date.now() - t0
@@ -348,6 +353,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         aiCiLow: predictionCiLow,
                         aiCiHigh: predictionCiHigh,
                         insufficientData,
+                        settled,
                         now,
                     })
 
