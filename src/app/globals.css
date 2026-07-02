@@ -32,7 +32,10 @@
 html {
   touch-action: manipulation;
   -ms-touch-action: manipulation;
-  overflow-x: hidden;
+  /* clip (not hidden) blocks horizontal overflow without turning html/body
+     into scroll containers, so position:sticky descendants keep working.
+     Same reasoning as the overflow-x-clip classes in layout.tsx (PR #983). */
+  overflow-x: clip;
 }
 
 body {
@@ -44,7 +47,7 @@ body {
   text-rendering: optimizeLegibility;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ── COMPONENTS ─────────────────────────────────────────── */
