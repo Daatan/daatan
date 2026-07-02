@@ -226,7 +226,7 @@ Returns `{ similar: [] }` when no embedding is available (Gemini API key not con
 ---
 
 ### `GET /api/forecasts/[id]/translate` — Auth
-Return translated version of the forecast in the user's language preference.
+Return translated version of the forecast in the user's language preference. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
 
 ---
 
@@ -291,7 +291,7 @@ Delete a comment (author or admin).
 Add or remove a reaction.
 
 ### `POST /api/comments/[id]/translate` — Auth
-Translate a comment.
+Translate a comment. Rate-limited to 30 requests/hour per IP (429 on exceed).
 
 ---
 
@@ -304,7 +304,7 @@ List notifications for the current user.
 Mark notification as read.
 
 ### `GET /api/notifications/unread-count` — Auth
-Return `{ count: number }`.
+Return `{ count: number }`. Rate-limited to 120 requests/minute per user (429 on exceed).
 
 ### `GET /api/notifications/preferences` — Auth
 Get notification preferences.
@@ -362,10 +362,10 @@ Delete a tag.
 ## AI
 
 ### `POST /api/ai/extract` — Auth
-Extract structured prediction data from free text.
+Extract structured prediction data from free text. Rate-limited to 20 requests/hour per IP (429 on exceed).
 
 ### `POST /api/ai/suggest-tags` — Auth
-Suggest relevant tags for a forecast.
+Suggest relevant tags for a forecast. Rate-limited to 10 requests/hour per user (429 on exceed).
 
 ---
 
@@ -475,6 +475,8 @@ Fetch and extract text/title/date from a URL. Proxies to Oracle `/fetch-url`.
 **Body** `{ "url": "https://..." }`
 
 **Response** `{ "text": "...", "title": "...", "date": "YYYY-MM-DD" }`
+
+**Safe URL fetching (SSRF).** Any server-side URL fetch goes through `assertSafeUrl` in `src/lib/utils/scraper.ts`: HTTPS-only, and after DNS resolution it rejects private, loopback, link-local, and IMDS (`169.254.0.0/16`) addresses. Redirects are followed manually (`redirect: 'manual'`) with the safety check re-run on every hop, so a public host cannot 30x-redirect into an internal target.
 
 ### `POST /api/ibi/search` — Admin
 Article search via Oracle's provider fallback chain. Proxies to Oracle `/search`.

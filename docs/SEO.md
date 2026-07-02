@@ -32,6 +32,8 @@ A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.t
 
 Private forecasts (where `isPublic = false`) get only the Article + BreadcrumbList scripts.
 
+Every JSON-LD payload is HTML-escaped before being injected into its `<script type="application/ld+json">` tag, so forecast-derived text (claim, description, author name) cannot break out of the script element and inject markup — closing the stored-XSS vector.
+
 ## Sitemap
 
 `src/app/sitemap.ts` — dynamically generates the sitemap from live DB data. Included pages:
