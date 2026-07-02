@@ -34,6 +34,7 @@ import { POST } from '../route'
 import { prisma } from '@/lib/prisma'
 import { getOracleForecast } from '@/lib/services/oracle'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
+import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,6 +136,20 @@ describe('POST /api/news-indexer/context', () => {
       probability: null,
     })
     expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
+  })
+
+  it('notifies Telegram when the Oracle produced an estimate', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+    expect(notifyNewsArticleMatched).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT notify Telegram on a null-Oracle push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+    await POST(post('test-secret'))
+    expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
   })
 
   it('feeds the whole article set to the Oracle and returns per-article sources', async () => {
