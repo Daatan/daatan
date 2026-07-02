@@ -29,7 +29,6 @@ import {
   Loader2,
   PenLine,
 } from 'lucide-react'
-import { RoleBadge } from '@/components/RoleBadge'
 import { UserLink } from '@/components/UserLink'
 import Speedometer from './Speedometer'
 
@@ -259,50 +258,58 @@ export default function ForecastCard({
         return {
           icon: <Clock className="w-3 h-3" />,
           className: 'bg-navy-700 text-text-secondary',
-          label: t('draft')
+          label: t('draft'),
+          hint: t('statusHints.draft')
         }
       case 'ACTIVE':
         return {
           icon: <TrendingUp className="w-3 h-3" />,
           className: 'bg-green-100 text-teal',
-          label: t('active')
+          label: t('active'),
+          hint: t('statusHints.active')
         }
       case 'PENDING':
         return {
           icon: <AlertCircle className="w-3 h-3" />,
           className: 'bg-yellow-100 text-yellow-700',
-          label: t('pending')
+          label: t('pending'),
+          hint: t('statusHints.pending')
         }
       case 'PENDING_APPROVAL':
         return {
           icon: <Clock className="w-3 h-3" />,
           className: 'bg-amber-100 text-amber-400',
-          label: t('pendingApproval')
+          label: t('pendingApproval'),
+          hint: t('statusHints.pendingApproval')
         }
       case 'RESOLVED_CORRECT':
         return {
           icon: <CheckCircle2 className="w-3 h-3" />,
           className: 'bg-blue-100 text-cobalt-light',
-          label: t('correct')
+          label: t('correct'),
+          hint: t('statusHints.correct')
         }
       case 'RESOLVED_WRONG':
         return {
           icon: <XCircle className="w-3 h-3" />,
           className: 'bg-red-100 text-red-400',
-          label: t('wrong')
+          label: t('wrong'),
+          hint: t('statusHints.wrong')
         }
       case 'UNRESOLVABLE':
       case 'VOID':
         return {
           icon: <HelpCircle className="w-3 h-3" />,
           className: 'bg-orange-100 text-orange-700',
-          label: status === 'VOID' ? t('void') : t('unresolvable')
+          label: status === 'VOID' ? t('void') : t('unresolvable'),
+          hint: status === 'VOID' ? t('statusHints.void') : t('statusHints.unresolvable')
         }
       default:
         return {
           icon: <Clock className="w-3 h-3" />,
           className: 'bg-navy-700 text-text-secondary',
-          label: status
+          label: status,
+          hint: status
         }
     }
   }
@@ -325,7 +332,10 @@ export default function ForecastCard({
           {/* Header: Status, Confidence, Deadline */}
           <div className="flex items-center flex-wrap gap-2 mb-4">
             {prediction.status !== 'ACTIVE' && (
-              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider ${badge.className}`}>
+              <span
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider ${badge.className}`}
+                title={badge.hint}
+              >
                 {badge.icon}
                 {badge.label}
               </span>
@@ -338,7 +348,10 @@ export default function ForecastCard({
                 ? daysUntil <= 3 ? 'text-red-500' : daysUntil <= 7 ? 'text-amber-500' : 'text-gray-400'
                 : 'text-gray-400'
               return (
-                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 ${dateClass}`}>
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 ${dateClass}`}
+                  title={t('resolveByTooltip')}
+                >
                   <Calendar className="w-3 h-3" />
                   <span suppressHydrationWarning>{formatDate(prediction.resolveByDatetime)}</span>
                 </div>
@@ -465,18 +478,13 @@ export default function ForecastCard({
           {/* Footer Metadata */}
           <div className="flex items-center justify-between mt-auto pt-4 border-t border-navy-600/50">
             <div className="flex items-center gap-x-4 text-xs text-gray-500">
-              {/* Commitment Count */}
-              {prediction._count.commitments > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="font-medium text-text-secondary">{prediction._count.commitments}</span>
-                  <span className="hidden sm:inline">{t('commitmentsLabel')}</span>
-                </div>
-              )}
-
-              {/* User Committed Indicator */}
+              {/* Voter count lives in the header pill; only the personal
+                  "you committed" indicator remains down here. */}
               {prediction.userHasCommitted && (
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-blue-600 rounded-full text-[10px] font-medium">
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-blue-600 rounded-full text-[10px] font-medium"
+                  title={t('committedTooltip')}
+                >
                   <CheckCircle2 className="w-3 h-3" />
                   <span>{t('committedLabel')}</span>
                 </div>
@@ -498,9 +506,6 @@ export default function ForecastCard({
                 <span className="font-medium text-gray-400 hover:text-text-secondary truncate max-w-[100px]">
                   {prediction.author.name || t('anonymous')}
                 </span>
-                {prediction.author.role && prediction.author.role !== 'USER' && (
-                  <RoleBadge role={prediction.author.role} size="sm" />
-                )}
               </div>
             </UserLink>
           </div>
@@ -577,7 +582,10 @@ export default function ForecastCard({
         )}
 
         <div className="flex-shrink-0 self-center">
-          <div className="w-8 h-8 rounded-full bg-navy-800 flex items-center justify-center group-hover:bg-cobalt/10 transition-colors">
+          <div
+            className="w-8 h-8 rounded-full bg-navy-800 flex items-center justify-center group-hover:bg-cobalt/10 transition-colors"
+            title={t('openForecastTooltip')}
+          >
             <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
           </div>
         </div>
