@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const prediction = await prisma.prediction.findUnique({
       where: { id: body.predictionId },
-      select: { id: true, claimText: true, status: true, slug: true },
+      select: { id: true, claimText: true, status: true, slug: true, confidence: true },
     })
 
     if (!prediction) return apiError('Prediction not found', 404)
@@ -158,13 +158,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    void notifyNewsArticleMatched(
-      { id: prediction.id, claimText: prediction.claimText, slug: prediction.slug },
-      { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
-      triggerSimilarity,
-      probability,
-      items.length,
-    )
+    // Notify only when the push produced an estimate. news-indexer re-pushes the
+    // same article set after its cooldown when the Oracle returned null (that
+    // retry is how the estimate eventually lands), so notifying on null turns
+    // every retry into a duplicate Telegram message for a push that stored
+    // nothing. The successful retry still notifies once.
+    if (probability !== null) {
+      void notifyNewsArticleMatched(
+        { id: prediction.id, claimText: prediction.claimText, slug: prediction.slug },
+        { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
+        triggerSimilarity,
+        probability,
+        items.length,
+        prediction.confidence,
+      )
+    }
 
     // Top-level fields echo the trigger article's enrichment (back-compat with the
     // single-article contract); `sources` carries the whole set for the multi push.

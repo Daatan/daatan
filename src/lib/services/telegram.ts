@@ -517,12 +517,21 @@ export function notifyNewsArticleMatched(
   similarity: number,
   probability: number | null,
   articleCount = 1,
+  previousProbability: number | null = null,
 ): void {
   if (isDevEnv()) return
 
   const sourceLabel = article.source ? ` · ${article.source}` : ''
   const simPct = Math.round(similarity * 100)
-  const probLine = probability !== null ? ` · Oracle: <b>${probability}%</b>` : ''
+  // Distinguish a fresh estimate from an update to an existing one, so repeat
+  // notifications for the same forecast read as new information, not duplicates.
+  const changeLabel =
+    previousProbability === null
+      ? ' (first estimate)'
+      : previousProbability === probability
+        ? ' (unchanged)'
+        : ` (was ${previousProbability}%)`
+  const probLine = probability !== null ? ` · Oracle: <b>${probability}%</b>${changeLabel}` : ''
   // When the estimate aggregates several articles, note how many backed it.
   const evidenceLine = articleCount > 1 ? `\nBased on <b>${articleCount}</b> articles` : ''
 
