@@ -71,7 +71,21 @@
     "empty_ALL": "No forecasts found",
     "emptyDesc_ALL": "We couldn't find any forecasts matching your current filters.",
     "createFirst": "Create the first forecast",
-    "loading": "Loading your feed..."
+    "loading": "Loading your feed...",
+    "filterHints": {
+      "open": "Show forecasts that are open for voting",
+      "closingSoon": "Show open forecasts closest to their deadline",
+      "awaitingResolution": "Show forecasts past their deadline, waiting to be resolved",
+      "resolved": "Show forecasts that have already been resolved",
+      "all": "Show all forecasts regardless of status",
+      "needsReview": "Show forecasts awaiting moderator approval",
+      "tags": "Filter forecasts by tags"
+    },
+    "sortHints": {
+      "newest": "Sort by creation date, newest first",
+      "deadline": "Sort by resolution deadline",
+      "cu": "Sort by total credibility units staked"
+    }
   },
   "forecast": {
     "create": "New Forecast",
@@ -167,7 +181,20 @@
     "submitting": "Submitting...",
     "commitForecastButton": "Commit Forecast",
     "forecasterLabel": "Forecaster",
-    "reputationShort": "Reputation"
+    "reputationShort": "Reputation",
+    "resolveByTooltip": "Deadline — the date by which this forecast will be resolved",
+    "committedTooltip": "You have voted on this forecast",
+    "openForecastTooltip": "Open forecast details",
+    "statusHints": {
+      "draft": "Draft — not published yet",
+      "active": "Active — open for votes",
+      "pending": "Past its deadline — awaiting resolution",
+      "pendingApproval": "Awaiting moderator approval",
+      "correct": "Resolved — the claim came true",
+      "wrong": "Resolved — the claim did not come true",
+      "void": "Void — cancelled without resolution",
+      "unresolvable": "Unresolvable — the outcome could not be determined"
+    }
   },
   "Forecasts": {
     "title": "Edit Forecast",

@@ -71,7 +71,21 @@
     "empty_ALL": "Neniu prognozo trovita",
     "emptyDesc_ALL": "Ni ne povis trovi prognozojn kiuj respondas al viaj nunaj filtriloj.",
     "createFirst": "Krei la unuan prognozon",
-    "loading": "Ŝarĝas vian fluon..."
+    "loading": "Ŝarĝas vian fluon...",
+    "filterHints": {
+      "open": "Montri prognozojn malfermitajn por voĉdonado",
+      "closingSoon": "Montri malfermitajn prognozojn plej proksimajn al sia limdato",
+      "awaitingResolution": "Montri prognozojn post sia limdato, atendantajn solvon",
+      "resolved": "Montri jam solvitajn prognozojn",
+      "all": "Montri ĉiujn prognozojn sendepende de stato",
+      "needsReview": "Montri prognozojn atendantajn aprobon de kontrolanto",
+      "tags": "Filtri prognozojn laŭ etikedoj"
+    },
+    "sortHints": {
+      "newest": "Ordigi laŭ kreodato, plej novaj unue",
+      "deadline": "Ordigi laŭ solvo-limdato",
+      "cu": "Ordigi laŭ la sumo de vetitaj kredindec-unuoj"
+    }
   },
   "forecast": {
     "create": "Nova Antaŭdiro",
@@ -167,7 +181,20 @@
     "submitting": "Sendante...",
     "commitForecastButton": "Engaĝi Prognozon",
     "forecasterLabel": "Prognozanto",
-    "reputationShort": "Reputacio"
+    "reputationShort": "Reputacio",
+    "resolveByTooltip": "Limdato — la dato ĝis kiu ĉi tiu prognozo estos solvita",
+    "committedTooltip": "Vi voĉdonis pri ĉi tiu prognozo",
+    "openForecastTooltip": "Malfermi detalojn de la prognozo",
+    "statusHints": {
+      "draft": "Malneto — ankoraŭ ne publikigita",
+      "active": "Aktiva — malfermita por voĉdonoj",
+      "pending": "Post la limdato — atendas solvon",
+      "pendingApproval": "Atendas aprobon de kontrolanto",
+      "correct": "Solvita — la aserto realiĝis",
+      "wrong": "Solvita — la aserto ne realiĝis",
+      "void": "Nuligita — fermita sen solvo",
+      "unresolvable": "Nesolvebla — la rezulto ne povis esti determinita"
+    }
   },
   "Forecasts": {
     "title": "Redakti Prognozon",

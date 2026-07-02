@@ -205,6 +205,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
             <button
               onClick={() => handleSetFilter('ACTIVE')}
+              title={t('filterHints.open')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'ACTIVE'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-cobalt/10 text-cobalt-light border border-cobalt/30 hover:bg-blue-100'
@@ -214,6 +215,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             </button>
             <button
               onClick={() => handleSetFilter('CLOSING_SOON')}
+              title={t('filterHints.closingSoon')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'CLOSING_SOON'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
@@ -223,6 +225,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             </button>
             <button
               onClick={() => handleSetFilter('PENDING')}
+              title={t('filterHints.awaitingResolution')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'PENDING'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
@@ -233,6 +236,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             {isAdminOrApprover && !selfHosted && (
               <button
                 onClick={() => handleSetFilter('NEEDS_REVIEW')}
+              title={t('filterHints.needsReview')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'NEEDS_REVIEW'
                   ? 'bg-purple-600 text-white shadow-sm'
                   : 'bg-purple-900/20 text-purple-700 hover:bg-purple-100 border border-purple-100'
@@ -243,6 +247,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             )}
             <button
               onClick={() => handleSetFilter('RESOLVED')}
+              title={t('filterHints.resolved')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'RESOLVED'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
@@ -252,6 +257,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             </button>
             <button
               onClick={() => handleSetFilter('ALL')}
+              title={t('filterHints.all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'ALL'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
@@ -282,6 +288,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
                   <button
                     key={value}
                     onClick={() => handleSetSort(value)}
+                    title={t(`sortHints.${value}`)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === value
                       ? 'bg-gray-800 text-white shadow-sm'
                       : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
@@ -297,6 +304,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
             <div className="w-px h-5 bg-navy-600 mx-1 flex-shrink-0" />
             <button
               onClick={() => setTagsVisible(v => !v)}
+              title={t('filterHints.tags')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 tagsVisible
                   ? 'bg-blue-600 text-white shadow-sm'
