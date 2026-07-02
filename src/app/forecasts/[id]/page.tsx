@@ -305,7 +305,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: prediction.claimText,
-    description: prediction.detailsText || undefined,
+    description: prediction.detailsText || prediction.claimText,
     url: `https://daatan.com/forecasts/${slug}`,
     image: `https://daatan.com/forecasts/${slug}/opengraph-image`,
     startDate: prediction.publishedAt ?? prediction.createdAt,
@@ -313,7 +313,15 @@ export default async function ForecastDetailPage({ params }: Props) {
     eventStatus: prediction.status === 'VOID'
       ? 'https://schema.org/EventCancelled'
       : 'https://schema.org/EventScheduled',
+    // Without an online attendance mode Google assumes a physical event and
+    // rejects VirtualLocation ("Invalid object type for field location").
+    eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
     organizer: {
+      '@type': 'Person',
+      name: prediction.author.name || prediction.author.username,
+      url: `https://daatan.com/profile/${prediction.author.username}`,
+    },
+    performer: {
       '@type': 'Person',
       name: prediction.author.name || prediction.author.username,
       url: `https://daatan.com/profile/${prediction.author.username}`,

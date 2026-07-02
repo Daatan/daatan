@@ -22,9 +22,11 @@ A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.t
 2. **BreadcrumbList** — Home → Forecasts → [claim text]
 3. **Event** (`schema.org/Event`, public forecasts only) — maps the forecast to a predictive event:
    - `name`: forecast claim text
+   - `description`: details text, falling back to the claim text (Google warns when absent)
    - `startDate`: `publishedAt` (or `createdAt` as fallback)
    - `endDate`: `resolveByDatetime`
-   - `organizer`: forecast author (Person, with profile URL)
+   - `eventAttendanceMode`: `OnlineEventAttendanceMode` — **required** for the `VirtualLocation` below; without it Google assumes a physical event and fails the rich result with "Invalid object type for field location"
+   - `organizer` + `performer`: forecast author (Person, with profile URL)
    - `location`: VirtualLocation pointing at the forecast URL
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
 
