@@ -16,6 +16,7 @@ const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast
   mockPrisma: {
     prediction: {
       findFirst: vi.fn(),
+      findUnique: vi.fn().mockResolvedValue({ confidence: 50, claimText: 'Test claim', slug: null }),
       update: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },

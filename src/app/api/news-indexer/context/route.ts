@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
           ciLow,
           ciHigh,
           articlesUsed: oracleForecast.articles_used,
+          settled: oracleForecast.settled ?? false,
           sources: oracleForecast.sources.map((s) => ({
             sourceId: s.source_id,
             sourceName: s.source_name,
@@ -140,8 +141,10 @@ export async function POST(request: NextRequest) {
             certainty: s.certainty,
             credibilityWeight: s.credibility_weight,
             claims: s.claims,
+            settled: s.settled ?? null,
           })),
         },
+        settled: oracleForecast.settled ?? false,
       })
 
       log.info(

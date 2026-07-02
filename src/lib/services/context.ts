@@ -1,5 +1,46 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { notifyHighConfidence } from '@/lib/services/telegram'
+
+/** AI-estimate level (0–100) at or above which a crossing fires a Telegram alert. */
+const HIGH_CONFIDENCE_THRESHOLD = 80
+
+interface PreviousConfidence {
+  confidence: number | null
+  claimText: string
+  slug: string | null
+}
+
+/** Snapshot the prediction's confidence (plus notification fields) before a write. */
+async function readPreviousConfidence(predictionId: string): Promise<PreviousConfidence | null> {
+  return prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { confidence: true, claimText: true, slug: true },
+  })
+}
+
+/**
+ * Fire the high-confidence Telegram alert when the new AI estimate crosses
+ * HIGH_CONFIDENCE_THRESHOLD from below (or from no estimate). Crossing-based on
+ * purpose: a forecast hovering above the bar doesn't re-alert on every update;
+ * it re-alerts only after dipping below and climbing back.
+ */
+function notifyIfCrossedHighConfidence(
+  predictionId: string,
+  prev: PreviousConfidence | null,
+  newConfidence: number | null,
+  settled = false,
+): void {
+  if (prev === null || newConfidence === null) return
+  if (newConfidence < HIGH_CONFIDENCE_THRESHOLD) return
+  if (prev.confidence !== null && prev.confidence >= HIGH_CONFIDENCE_THRESHOLD) return
+  notifyHighConfidence(
+    { id: predictionId, claimText: prev.claimText, slug: prev.slug },
+    newConfidence,
+    prev.confidence,
+    settled,
+  )
+}
 
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
 export async function getContextTimeline(idOrSlug: string) {
@@ -48,11 +89,14 @@ export interface SaveContextUpdateInput {
    *  as an abstention and CLEARS the prediction's stale AI estimate so the gauge
    *  shows "Insufficient evidence" rather than the last (now-unsupported) number. */
   insufficientData?: boolean
+  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  settled?: boolean
   now: Date
 }
 
 /** Persist a context snapshot and update the prediction in a single transaction. */
 export async function saveContextUpdate(input: SaveContextUpdateInput) {
+  const prev = await readPreviousConfidence(input.predictionId)
   const [snapshot] = await prisma.$transaction([
     prisma.contextSnapshot.create({
       data: {
@@ -90,6 +134,9 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
       where: { predictionId: input.predictionId, fieldName: 'detailsText' },
     }),
   ])
+  if (!input.insufficientData) {
+    notifyIfCrossedHighConfidence(input.predictionId, prev, input.confidence, input.settled)
+  }
   return snapshot
 }
 
@@ -101,6 +148,8 @@ export interface SaveNewsIndexerMatchInput {
   ciLow: number
   ciHigh: number
   oracleSnapshot: Prisma.InputJsonValue
+  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  settled?: boolean
 }
 
 /**
@@ -110,6 +159,7 @@ export interface SaveNewsIndexerMatchInput {
  * and does not consume the 1-hour user cooldown.
  */
 export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Promise<void> {
+  const prev = await readPreviousConfidence(input.predictionId)
   await prisma.$transaction([
     prisma.contextSnapshot.create({
       data: {
@@ -130,6 +180,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
       },
     }),
   ])
+  notifyIfCrossedHighConfidence(input.predictionId, prev, input.externalProbability, input.settled)
 }
 
 /** Fetch the full context snapshot timeline for a prediction. */
@@ -178,6 +229,8 @@ export interface SaveOracleSnapshotInput {
   confidence: number | null
   aiCiLow: number | null
   aiCiHigh: number | null
+  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  settled?: boolean
 }
 
 /**
@@ -187,6 +240,7 @@ export interface SaveOracleSnapshotInput {
  * clobbers a user-written context summary. Mirrors saveNewsIndexerMatch.
  */
 export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Promise<void> {
+  const prev = await readPreviousConfidence(input.predictionId)
   await prisma.$transaction([
     prisma.contextSnapshot.create({
       data: {
@@ -206,4 +260,5 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
       },
     }),
   ])
+  notifyIfCrossedHighConfidence(input.predictionId, prev, input.confidence, input.settled)
 }
