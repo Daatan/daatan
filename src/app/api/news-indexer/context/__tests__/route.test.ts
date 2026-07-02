@@ -60,7 +60,7 @@ function post(secret: string | null, body: unknown = VALID_BODY) {
   })
 }
 
-const ACTIVE_PREDICTION = { id: 'pred-1', claimText: 'Will X happen?', status: 'ACTIVE' }
+const ACTIVE_PREDICTION = { id: 'pred-1', claimText: 'Will X happen?', status: 'ACTIVE', confidence: 65 }
 
 // One caller article in, so the Oracle returns exactly one source whose url
 // echoes the pushed article (search is skipped — see forecaster.py:506).
@@ -138,11 +138,13 @@ describe('POST /api/news-indexer/context', () => {
     expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
   })
 
-  it('notifies Telegram when the Oracle produced an estimate', async () => {
+  it('notifies Telegram when the Oracle produced an estimate, with the pre-push value for the "(was X%)" label', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).toHaveBeenCalledTimes(1)
+    // last arg = the prediction's confidence BEFORE this push
+    expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][5]).toBe(65)
   })
 
   it('does NOT notify Telegram on a null-Oracle push (news-indexer retries the same set; each retry would duplicate the message)', async () => {

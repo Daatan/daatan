@@ -227,4 +227,30 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     expect(body.text).toMatch(/^\[prod\] /)
     expect(body.text).toContain('News match')
   })
+
+  it('labels a first estimate, an update, and an unchanged value distinctly', async () => {
+    process.env.APP_ENV = 'production'
+
+    const send = (probability: number, previous: number | null) =>
+      notifyNewsArticleMatched(
+        { id: 'p1', claimText: 'x' },
+        { title: 'Headline', url: 'https://e.com/a', source: null },
+        0.5,
+        probability,
+        1,
+        previous,
+      )
+
+    send(72, null)
+    send(72, 65)
+    send(72, 72)
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3))
+    const texts = vi.mocked(fetch).mock.calls.map(
+      (c) => JSON.parse(c[1]!.body as string).text as string,
+    )
+    expect(texts[0]).toContain('72%</b> (first estimate)')
+    expect(texts[1]).toContain('72%</b> (was 65%)')
+    expect(texts[2]).toContain('72%</b> (unchanged)')
+  })
 })
