@@ -8,6 +8,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     contextSnapshot: {
       create: vi.fn(),
+      findFirst: vi.fn(),
     },
     predictionTranslation: {
       deleteMany: vi.fn(),
