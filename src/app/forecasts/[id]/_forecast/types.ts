@@ -76,9 +76,15 @@ export type Prediction = {
     slug: string
     url: string
     question: string
+    /** Outcome labels in price order (Json column), e.g. ["Yes","No"]. */
+    outcomes?: unknown
     resolved: boolean
+    /** Raw provider prices — NOT polarity-adjusted. Display through
+     *  marketDisplayProbability() so externalMarketInverted is honored. */
     snapshots: Array<{ createdAt: string; probability: number }>
   } | null
+  /** The linked market asks the opposite question; display 100 − price. */
+  externalMarketInverted?: boolean
   totalCuCommitted?: number
   userCommitment?: {
     id: string

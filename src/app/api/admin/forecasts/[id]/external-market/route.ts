@@ -11,6 +11,7 @@ const log = createLogger('admin-forecast-external-market')
 export const dynamic = 'force-dynamic'
 
 const linkSchema = z.object({ url: z.string().min(1) })
+const invertSchema = z.object({ inverted: z.boolean() })
 
 /**
  * GET /api/admin/forecasts/[id]/external-market
@@ -59,10 +60,38 @@ export const POST = withAuth(
         externalMarketId: market.id,
         externalMarketLinkedAt: new Date(),
         externalMarketLinkMethod: 'manual',
+        // A fresh link must not inherit a stale polarity from a previous market.
+        externalMarketInverted: false,
       },
     })
     log.info({ predictionId: params.id, marketId: market.id }, 'Linked external market')
     return NextResponse.json({ market })
+  },
+  { roles: ['ADMIN'] },
+)
+
+/**
+ * PATCH /api/admin/forecasts/[id]/external-market  body: { inverted }
+ * Mark the linked market as asking the OPPOSITE question — the UI then shows
+ * 100 − market price so the Market line matches the forecast claim's direction.
+ */
+export const PATCH = withAuth(
+  async (request, _user, { params }) => {
+    const { inverted } = invertSchema.parse(await request.json())
+
+    const prediction = await prisma.prediction.findUnique({
+      where: { id: params.id },
+      select: { externalMarketId: true },
+    })
+    if (!prediction) return apiError('Forecast not found', 404)
+    if (!prediction.externalMarketId) return apiError('No market linked to this forecast', 409)
+
+    await prisma.prediction.update({
+      where: { id: params.id },
+      data: { externalMarketInverted: inverted },
+    })
+    log.info({ predictionId: params.id, inverted }, 'Set external-market polarity')
+    return NextResponse.json({ ok: true, inverted })
   },
   { roles: ['ADMIN'] },
 )
@@ -78,6 +107,7 @@ export const DELETE = withAuth(
         externalMarketId: null,
         externalMarketLinkedAt: null,
         externalMarketLinkMethod: null,
+        externalMarketInverted: false,
       },
     })
     log.info({ predictionId: params.id }, 'Unlinked external market')

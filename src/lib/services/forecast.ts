@@ -542,6 +542,7 @@ export async function getForecastById(idOrSlug: string) {
           slug: true,
           url: true,
           question: true,
+          outcomes: true,
           resolved: true,
           snapshots: {
             orderBy: { createdAt: 'asc' },

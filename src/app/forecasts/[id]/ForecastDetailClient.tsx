@@ -38,6 +38,7 @@ import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
+import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
 
@@ -717,13 +718,23 @@ export default function ForecastDetailClient({
       {/* Admin-only external-market link control (renders nothing for non-admins) */}
       <ExternalMarketLinkAdmin prediction={prediction} />
 
-      {/* Probability chart — shown when ≥3 commitments OR a linked market has history */}
+      {/* Probability chart — shown when ≥3 commitments OR a linked market has history.
+          Market prices are polarity-adjusted here (inverted links plot 100 − price)
+          and the legend says so, so the line always matches the claim's direction. */}
       <ProbabilityChart
         commitments={prediction.commitments}
         snapshots={initialContextSnapshots ?? []}
         outcomeType={prediction.outcomeType}
         options={prediction.options}
-        marketSnapshots={prediction.externalMarket?.snapshots ?? []}
+        marketSnapshots={(prediction.externalMarket?.snapshots ?? []).map(s => ({
+          ...s,
+          probability: marketDisplayProbability(s.probability, prediction.externalMarketInverted ?? false),
+        }))}
+        marketLabel={marketLineName(
+          prediction.externalMarket?.provider === 'KALSHI' ? 'Kalshi' : 'Polymarket',
+          prediction.externalMarketInverted ?? false,
+          trackedOutcomeLabel(prediction.externalMarket?.outcomes),
+        )}
       />
 
       {/* Commitments List */}
