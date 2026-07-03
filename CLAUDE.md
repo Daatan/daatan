@@ -55,7 +55,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - SSH port 22 is closed — server access is via AWS SSM `send-command` (use the `/ssm` slash command in Claude Code)
 - Use `docker compose` (v2 plugin, no hyphen) on prod, not `docker-compose`
 - Production uses containers `daatan-app`, `daatan-nginx`, `daatan-postgres`, `daatan-certbot`
-- Backups: GitHub Actions `backup.yml` runs at 03:00 and 15:00 UTC daily (RPO ≤ 12h); stored in S3 `daatan-db-backups-272007598366`
+- Backups: GitHub Actions `backup.yml` runs at 04:00 and 16:00 UTC daily (RPO ≤ 12h); stored in S3 `daatan-db-backups-272007598366`
 
 ## Before opening a PR
 
