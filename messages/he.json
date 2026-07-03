@@ -171,6 +171,8 @@
     "legendYou": "אתה",
     "legendAI": "בינה מלאכותית",
     "aiInsufficientEvidence": "אין מספיק ראיות",
+    "settledBanner": "התוצאה דווחה — ממתין להכרעה",
+    "settledBannerSub": "לא ניתן עוד להתחייב",
     "signInToVote": "התחברו כדי להצביע",
     "marketDistribution": "התפלגות השוק",
     "confidencePercent": "ביטחון: {value}%",

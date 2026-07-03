@@ -171,6 +171,8 @@
     "legendYou": "Vi",
     "legendAI": "AI",
     "aiInsufficientEvidence": "Nesufiĉaj pruvoj",
+    "settledBanner": "Rezulto raportita — atendas decidon",
+    "settledBannerSub": "Engaĝiĝoj estas fermitaj",
     "signInToVote": "Ensalutu por voĉdoni",
     "marketDistribution": "Merkata Distribuo",
     "confidencePercent": "Fido: {value}%",
