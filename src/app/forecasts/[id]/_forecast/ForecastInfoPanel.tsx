@@ -5,6 +5,11 @@ import { useTranslations } from 'next-intl'
 import { UserLink } from '@/components/UserLink'
 import { RoleBadge } from '@/components/RoleBadge'
 import { formatDisplayDateTime } from '@/lib/utils/date'
+import {
+  INVERTED_HINT,
+  marketDisplayProbability,
+  trackedOutcomeLabel,
+} from '@/lib/market-display'
 import type { Prediction } from './types'
 
 interface Props {
@@ -15,10 +20,16 @@ interface Props {
 export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
   const t = useTranslations('forecast')
   const market = prediction.externalMarket
+  const marketInverted = prediction.externalMarketInverted ?? false
   const marketProbability =
     market && market.snapshots.length > 0
-      ? market.snapshots[market.snapshots.length - 1].probability
+      ? marketDisplayProbability(
+          market.snapshots[market.snapshots.length - 1].probability,
+          marketInverted,
+        )
       : null
+  // Non-Yes/No market: the price tracks the first outcome — say which one.
+  const marketOutcome = market ? trackedOutcomeLabel(market.outcomes) : null
   const providerLabel = market
     ? market.provider === 'KALSHI'
       ? 'Kalshi'
@@ -114,13 +125,34 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
               <TrendingUp className="w-3.5 h-3.5" />
               {providerLabel}
+              {marketInverted && (
+                <span
+                  title={INVERTED_HINT}
+                  className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded border border-amber-500/50 text-amber-400 cursor-help"
+                >
+                  Inverted
+                </span>
+              )}
               <ExternalLink className="w-3 h-3 ml-auto text-gray-500 group-hover:text-pink-400" />
             </div>
             <div className="flex items-baseline gap-2">
               {marketProbability != null ? (
-                <span className="text-white font-semibold text-lg">{marketProbability}%</span>
+                <span
+                  className="text-white font-semibold text-lg"
+                  title={marketInverted ? INVERTED_HINT : `Market: “${market.question}”`}
+                >
+                  {marketProbability}%
+                </span>
               ) : (
                 <span className="text-gray-400 italic text-xs">Awaiting price</span>
+              )}
+              {marketOutcome && (
+                <span
+                  title={`This market isn't a Yes/No question — the price shown tracks the “${marketOutcome}” outcome.`}
+                  className="text-[10px] text-gray-400 cursor-help"
+                >
+                  chance of “{marketOutcome}”
+                </span>
               )}
               {market.resolved && (
                 <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400">

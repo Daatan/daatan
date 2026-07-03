@@ -393,6 +393,18 @@ List all forecasts regardless of status.
 ### `PATCH /api/admin/forecasts/[id]`
 Admin-level forecast update (no status restrictions).
 
+### `GET /api/admin/forecasts/[id]/external-market`
+Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search re-ranked by embedding similarity with a deadline-gap penalty. Suggestion only; an admin confirms via POST.
+
+### `POST /api/admin/forecasts/[id]/external-market`
+Link a market by pasted URL. **Body** `{ url }`. On first link the market's full provider-side price history is backfilled (Polymarket CLOB `prices-history`, best-effort, capped at 400 points) so the chart's Market line starts at the market's birth, then the current price is seeded; the hourly `external-market-sync` cron owns the series from there. Resets `inverted` to false.
+
+### `PATCH /api/admin/forecasts/[id]/external-market`
+Set the link's polarity. **Body** `{ inverted: boolean }` — mark the linked market as asking the *opposite* question (e.g. claim "X will not win" vs market "Will X win?"). Stored per-prediction (`externalMarketInverted`); the UI then displays 100 − market price everywhere and labels the Market line "(inverted)". `409` when no market is linked.
+
+### `DELETE /api/admin/forecasts/[id]/external-market`
+Unlink the market (also clears the inverted flag).
+
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).
 

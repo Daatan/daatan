@@ -44,8 +44,11 @@ type Props = {
   snapshots: ChartSnapshot[]
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE' | 'NUMERIC_THRESHOLD'
   options: ChartOption[]
-  /** Linked external-market YES-price history, oldest first. Drives the "Market" line. */
+  /** Linked external-market price history, oldest first, already polarity-adjusted
+   *  by the caller (see marketDisplayProbability). Drives the "Market" line. */
   marketSnapshots?: ChartMarketPoint[]
+  /** Legend name for the market line, e.g. "Market (Polymarket, inverted)". */
+  marketLabel?: string
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
@@ -103,6 +106,7 @@ export default function ProbabilityChart({
   outcomeType,
   options,
   marketSnapshots = [],
+  marketLabel = 'Market (Polymarket)',
 }: Props) {
   // `picked` is the user's explicit range choice; null → use the data-driven default.
   // `brush` tracks manual brush dragging, so presets and fine control coexist.
@@ -343,7 +347,7 @@ export default function ProbabilityChart({
             <Line
               type="stepAfter"
               dataKey="market"
-              name="Market (Polymarket)"
+              name={marketLabel}
               stroke="#EC4899"
               strokeWidth={2}
               dot={showMarketDots}

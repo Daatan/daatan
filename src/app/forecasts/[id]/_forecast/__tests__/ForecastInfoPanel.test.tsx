@@ -99,4 +99,30 @@ describe('ForecastInfoPanel — linked market card', () => {
     wrap(basePrediction)
     expect(screen.queryByText(/View on/)).toBeNull()
   })
+
+  it('shows 100 − price and an "Inverted" badge when the link is inverted', () => {
+    wrap({
+      ...withMarket('https://polymarket.com/event/will-x-happen'),
+      externalMarketInverted: true,
+    } as unknown as Prediction)
+    expect(screen.getByText('38%')).toBeInTheDocument()
+    expect(screen.queryByText('62%')).toBeNull()
+    const badge = screen.getByText('Inverted')
+    expect(badge).toHaveAttribute('title', expect.stringContaining('opposite question'))
+  })
+
+  it('names the tracked outcome for a non-Yes/No market', () => {
+    const p = withMarket('https://polymarket.com/event/will-x-happen')
+    ;(p.externalMarket as { outcomes?: unknown }).outcomes = ['Knicks', 'Celtics']
+    wrap(p)
+    expect(screen.getByText('chance of “Knicks”')).toBeInTheDocument()
+  })
+
+  it('adds no polarity or outcome labels on a plain Yes/No link', () => {
+    const p = withMarket('https://polymarket.com/event/will-x-happen')
+    ;(p.externalMarket as { outcomes?: unknown }).outcomes = ['Yes', 'No']
+    wrap(p)
+    expect(screen.queryByText('Inverted')).toBeNull()
+    expect(screen.queryByText(/chance of/)).toBeNull()
+  })
 })

@@ -127,6 +127,7 @@ async function getPrediction(idOrSlug: string) {
           slug: prediction.externalMarket.slug,
           url: prediction.externalMarket.url,
           question: prediction.externalMarket.question,
+          outcomes: prediction.externalMarket.outcomes,
           resolved: prediction.externalMarket.resolved,
           snapshots: prediction.externalMarket.snapshots.map(s => ({
             createdAt: s.createdAt.toISOString(),

@@ -100,6 +100,24 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
     }
   }
 
+  async function setInverted(inverted: boolean) {
+    setBusy(true)
+    try {
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inverted }),
+      })
+      if (!res.ok) throw new Error('Update failed')
+      toast.success(inverted ? 'Marked as inverted — showing 100 − price' : 'Inversion removed')
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function suggest() {
     setBusy(true)
     try {
@@ -129,26 +147,42 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
       </div>
 
       {market ? (
-        <div className="flex items-center justify-between gap-3">
-          <a
-            href={market.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-gray-200 hover:text-pink-300 inline-flex items-center gap-1 min-w-0"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 shrink-0">
-              {PROVIDER_LABEL[market.provider] ?? market.provider}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <a
+              href={market.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-gray-200 hover:text-pink-300 inline-flex items-center gap-1 min-w-0"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400 shrink-0">
+                {PROVIDER_LABEL[market.provider] ?? market.provider}
+              </span>
+              <span className="truncate">{market.question}</span>
+              <ExternalLink className="w-3 h-3 shrink-0" />
+            </a>
+            <button
+              onClick={unlink}
+              disabled={busy}
+              className="text-xs text-gray-400 hover:text-red-400 inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
+            >
+              <X className="w-3.5 h-3.5" /> Unlink
+            </button>
+          </div>
+          <label className="flex items-start gap-2 text-xs text-gray-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={prediction.externalMarketInverted ?? false}
+              onChange={e => setInverted(e.target.checked)}
+              disabled={busy}
+              className="mt-0.5 accent-pink-500"
+            />
+            <span>
+              <span className="font-medium text-gray-300">Inverted</span> — the market asks the{' '}
+              <em>opposite</em> of this claim (e.g. claim “X will <em>not</em> win” vs market
+              “Will X win?”). When checked, the site shows 100 − market price everywhere.
             </span>
-            <span className="truncate">{market.question}</span>
-            <ExternalLink className="w-3 h-3 shrink-0" />
-          </a>
-          <button
-            onClick={unlink}
-            disabled={busy}
-            className="text-xs text-gray-400 hover:text-red-400 inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
-          >
-            <X className="w-3.5 h-3.5" /> Unlink
-          </button>
+          </label>
         </div>
       ) : (
         <div className="space-y-3">
@@ -172,6 +206,13 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
           </button>
           {suggestions && suggestions.length === 0 && (
             <p className="text-xs text-gray-500 italic">No candidates found.</p>
+          )}
+          {suggestions && suggestions.length > 0 && (
+            <p className="text-[11px] text-gray-500">
+              Matching is semantic and can miss negation — make sure the market asks the{' '}
+              <em>same direction</em> as the claim. If it asks the opposite, link it and tick
+              “Inverted”.
+            </p>
           )}
           {suggestions && suggestions.length > 0 && (
             <ul className="space-y-1">

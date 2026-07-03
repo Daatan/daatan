@@ -6,7 +6,12 @@ import type { ExternalMarket, MarketProvider as MarketProviderEnum } from '@pris
 const log = createLogger('external-markets')
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com'
+const CLOB_BASE = 'https://clob.polymarket.com'
 const FETCH_TIMEOUT_MS = 8_000
+/** 12-hour candles keep even a multi-year market history to a few hundred points. */
+const HISTORY_FIDELITY_MINUTES = 720
+/** Hard cap on backfilled snapshots per market (stride-sampled down when over). */
+const MAX_BACKFILL_POINTS = 400
 /** Cosine similarity above which a market is treated as "the same question". */
 const MATCH_THRESHOLD = 0.8
 /** How many keyword candidates to embed-and-rank per suggest. */
@@ -99,6 +104,9 @@ export interface NormalizedMarket {
   closed: boolean
   /** Winning outcome label once resolved, else null. */
   resolvedOutcome: string | null
+  /** Provider-specific id for the YES outcome's price-history series (Polymarket
+   *  CLOB token id). Null when the provider exposes none — backfill is skipped. */
+  historyId: string | null
 }
 
 /** Lightweight candidate returned by the suggestion helper. */
@@ -130,27 +138,29 @@ export interface MarketProvider {
 // Polymarket provider (public Gamma API)
 // ---------------------------------------------------------------------------
 
-/** Fetch JSON from Gamma with a timeout; returns null on any failure. */
-async function gammaFetch<T>(path: string): Promise<T | null> {
+/** Fetch JSON from a fixed Polymarket host with a timeout; returns null on any failure. */
+async function apiFetch<T>(base: string, path: string): Promise<T | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(`${GAMMA_BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       signal: controller.signal,
       headers: { accept: 'application/json' },
     })
     if (!res.ok) {
-      log.warn({ path, status: res.status }, 'Gamma request failed')
+      log.warn({ base, path, status: res.status }, 'Market API request failed')
       return null
     }
     return (await res.json()) as T
   } catch (err) {
-    log.warn({ path, err: String(err) }, 'Gamma request errored')
+    log.warn({ base, path, err: String(err) }, 'Market API request errored')
     return null
   } finally {
     clearTimeout(timer)
   }
 }
+
+const gammaFetch = <T,>(path: string) => apiFetch<T>(GAMMA_BASE, path)
 
 /** Gamma encodes `outcomes`/`outcomePrices` as JSON strings; decode defensively. */
 function decodeJsonArray(value: unknown): string[] {
@@ -196,6 +206,10 @@ export function normalizeGammaMarket(raw: Record<string, unknown>): NormalizedMa
   const endDateRaw = typeof raw.endDate === 'string' ? raw.endDate : null
   const endDate = endDateRaw ? new Date(endDateRaw) : null
 
+  // CLOB token ids sit in outcome order, so the YES token shares yesIndex.
+  const clobTokenIds = decodeJsonArray(raw.clobTokenIds)
+  const historyId = clobTokenIds[yesIndex] ?? null
+
   return {
     provider: 'POLYMARKET',
     externalId,
@@ -207,6 +221,83 @@ export function normalizeGammaMarket(raw: Record<string, unknown>): NormalizedMa
     endDate: endDate && !isNaN(endDate.getTime()) ? endDate : null,
     closed,
     resolvedOutcome,
+    historyId,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Price-history backfill (Polymarket CLOB)
+// ---------------------------------------------------------------------------
+
+/** A historical YES-price point ready to insert as a snapshot. */
+export interface HistoryPoint {
+  createdAt: Date
+  probability: number
+}
+
+/** Evenly stride-sample `points` down to at most `max`, always keeping the last
+ *  point (the most recent price) so the series ends where live sync picks up. */
+export function samplePoints<T>(points: T[], max: number): T[] {
+  if (points.length <= max) return points
+  const stride = points.length / max
+  const out: T[] = []
+  for (let i = 0; i < max - 1; i++) out.push(points[Math.floor(i * stride)])
+  out.push(points[points.length - 1])
+  return out
+}
+
+/** Parse a CLOB prices-history payload into snapshot-ready points (asc, capped). */
+export function parseHistoryPayload(payload: unknown): HistoryPoint[] {
+  const history = (payload as { history?: unknown })?.history
+  if (!Array.isArray(history)) return []
+  const points: HistoryPoint[] = []
+  for (const row of history) {
+    const t = (row as { t?: unknown })?.t
+    const p = (row as { p?: unknown })?.p
+    if (typeof t !== 'number' || typeof p !== 'number' || !Number.isFinite(t) || !Number.isFinite(p)) continue
+    points.push({
+      createdAt: new Date(t * 1000),
+      probability: Math.round(Math.min(1, Math.max(0, p)) * 100),
+    })
+  }
+  points.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  return samplePoints(points, MAX_BACKFILL_POINTS)
+}
+
+/** Fetch the market's full-life YES price history. Empty on any failure. */
+async function fetchYesPriceHistory(historyId: string): Promise<HistoryPoint[]> {
+  const payload = await apiFetch<unknown>(
+    CLOB_BASE,
+    `/prices-history?market=${encodeURIComponent(historyId)}&interval=max&fidelity=${HISTORY_FIDELITY_MINUTES}`,
+  )
+  return payload ? parseHistoryPayload(payload) : []
+}
+
+/**
+ * Backfill a market's snapshot series from provider history so the chart's
+ * Market line starts at the market's birth, not at link time. Inserts only
+ * points strictly OLDER than `before` (the earliest existing snapshot, or now),
+ * so it composes with a live series and re-runs are no-ops. Best-effort: any
+ * failure just leaves the series to grow forward from the seed snapshot.
+ */
+async function backfillMarketHistory(
+  marketId: string,
+  historyId: string,
+  before: Date,
+): Promise<number> {
+  try {
+    const points = (await fetchYesPriceHistory(historyId)).filter(
+      p => p.createdAt.getTime() < before.getTime(),
+    )
+    if (points.length === 0) return 0
+    await prisma.externalMarketPriceSnapshot.createMany({
+      data: points.map(p => ({ marketId, probability: p.probability, createdAt: p.createdAt })),
+    })
+    log.info({ marketId, points: points.length }, 'Backfilled market price history')
+    return points.length
+  } catch (err) {
+    log.warn({ marketId, err: String(err) }, 'Market history backfill failed')
+    return 0
   }
 }
 
@@ -364,14 +455,16 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
     },
   })
 
-  // Seed an initial price snapshot so the forecast history chart's "Market" line
-  // shows as soon as a market is linked/imported, instead of staying empty until
-  // the first hourly sync cron happens to run (GitHub schedules are irregular).
-  // Only when none exist yet — the hourly sync owns the ongoing time series.
+  // Seed the price series so the forecast history chart's "Market" line shows as
+  // soon as a market is linked/imported, instead of staying empty until the first
+  // hourly sync cron happens to run (GitHub schedules are irregular). On first
+  // link, backfill the market's full provider-side history (best-effort) and then
+  // seed the current price; the hourly sync owns the ongoing time series.
   const snapshotCount = await prisma.externalMarketPriceSnapshot.count({
     where: { marketId: market.id },
   })
   if (snapshotCount === 0) {
+    if (m.historyId) await backfillMarketHistory(market.id, m.historyId, new Date())
     await prisma.externalMarketPriceSnapshot.create({
       data: { marketId: market.id, probability: m.yesProbability },
     })
@@ -422,6 +515,22 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
       if (!latest) {
         failed++
         continue
+      }
+      // Heal markets linked before backfill existed: a series with ≤1 point has
+      // no provider history yet, so fill everything older than its first point.
+      // Self-disabling — once backfilled the count is >1 and this never re-runs.
+      if (latest.historyId) {
+        const count = await prisma.externalMarketPriceSnapshot.count({
+          where: { marketId: cached.id },
+        })
+        if (count <= 1) {
+          const first = await prisma.externalMarketPriceSnapshot.findFirst({
+            where: { marketId: cached.id },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+          })
+          await backfillMarketHistory(cached.id, latest.historyId, first?.createdAt ?? new Date())
+        }
       }
       await prisma.$transaction([
         prisma.externalMarketPriceSnapshot.create({

@@ -9,7 +9,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     externalMarketPriceSnapshot: {
       create: vi.fn(),
+      createMany: vi.fn(),
       count: vi.fn(),
+      findFirst: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -28,6 +30,8 @@ import {
   suggestMarketMatch,
   buildMarketSearchQuery,
   deadlineWeight,
+  parseHistoryPayload,
+  samplePoints,
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
 import { embedText } from '@/lib/services/embedding'
@@ -53,13 +57,21 @@ function gammaRow(overrides: Record<string, unknown> = {}) {
 
 /**
  * URL-aware fetch mock. `suggest()` hits `/public-search` (events→markets shape),
- * while `fetchMarket()` hits `/markets?slug=` (a flat array). Route each to the
- * right shape; `searchRows` populates the single search event's `markets[]`.
+ * `fetchMarket()` hits `/markets?slug=` (a flat array), and history backfill hits
+ * the CLOB `/prices-history` endpoint. Route each to the right shape; `searchRows`
+ * populates the single search event's `markets[]`.
  */
-function gammaFetchMock(searchRows: Record<string, unknown>[], marketRows = [gammaRow()]) {
+function gammaFetchMock(
+  searchRows: Record<string, unknown>[],
+  marketRows = [gammaRow()],
+  history: { t: number; p: number }[] = [],
+) {
   return vi.fn(async (input: RequestInfo | URL) => {
     if (String(input).includes('/public-search')) {
       return jsonResponse({ events: [{ markets: searchRows }] })
+    }
+    if (String(input).includes('/prices-history')) {
+      return jsonResponse({ history })
     }
     return jsonResponse(marketRows)
   })
@@ -218,6 +230,97 @@ describe('resolveMarketByUrl', () => {
 
     expect(prisma.externalMarketPriceSnapshot.create).not.toHaveBeenCalled()
   })
+
+  it('backfills provider history before seeding when the market has a history id', async () => {
+    const past = Math.floor(Date.now() / 1000) - 86_400 // one day ago
+    global.fetch = gammaFetchMock(
+      [],
+      [gammaRow({ clobTokenIds: '["yes-token", "no-token"]' })],
+      [{ t: past, p: 0.4 }, { t: past + 3600, p: 0.55 }],
+    )
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(0)
+
+    await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(prisma.externalMarketPriceSnapshot.createMany).toHaveBeenCalledWith({
+      data: [
+        { marketId: 'm1', probability: 40, createdAt: new Date(past * 1000) },
+        { marketId: 'm1', probability: 55, createdAt: new Date((past + 3600) * 1000) },
+      ],
+    })
+    // The live seed still lands after the historical points.
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 68 },
+    })
+  })
+
+  it('falls back to the plain seed when the history fetch fails', async () => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes('/prices-history')
+        ? jsonResponse({}, false, 500)
+        : jsonResponse([gammaRow({ clobTokenIds: '["yes-token", "no-token"]' })]),
+    )
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(0)
+
+    await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(prisma.externalMarketPriceSnapshot.createMany).not.toHaveBeenCalled()
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 68 },
+    })
+  })
+})
+
+describe('price-history parsing', () => {
+  it('parses CLOB points into snapshot-ready rows, clamped and sorted ascending', () => {
+    const out = parseHistoryPayload({
+      history: [
+        { t: 200, p: 1.2 },
+        { t: 100, p: 0.335 },
+        { t: 150, p: -0.1 },
+        { t: 'junk', p: 0.5 },
+        { p: 0.5 },
+      ],
+    })
+    expect(out).toEqual([
+      { createdAt: new Date(100_000), probability: 34 },
+      { createdAt: new Date(150_000), probability: 0 },
+      { createdAt: new Date(200_000), probability: 100 },
+    ])
+  })
+
+  it('returns empty for a malformed payload', () => {
+    expect(parseHistoryPayload(null)).toEqual([])
+    expect(parseHistoryPayload({ history: 'nope' })).toEqual([])
+  })
+
+  it('samplePoints keeps everything under the cap and always keeps the last point', () => {
+    const points = Array.from({ length: 10 }, (_, i) => i)
+    expect(samplePoints(points, 20)).toHaveLength(10)
+    const sampled = samplePoints(points, 4)
+    expect(sampled).toHaveLength(4)
+    expect(sampled[0]).toBe(0)
+    expect(sampled[sampled.length - 1]).toBe(9)
+  })
+})
+
+describe('normalizeGammaMarket historyId', () => {
+  it('picks the CLOB token aligned with the YES outcome', () => {
+    const m = normalizeGammaMarket(
+      gammaRow({
+        outcomes: '["No", "Yes"]',
+        outcomePrices: '["0.32", "0.68"]',
+        clobTokenIds: '["no-token", "yes-token"]',
+      }),
+    )
+    expect(m?.historyId).toBe('yes-token')
+  })
+
+  it('is null when the row carries no token ids', () => {
+    expect(normalizeGammaMarket(gammaRow())?.historyId).toBeNull()
+  })
 })
 
 describe('syncLinkedMarkets', () => {
@@ -248,6 +351,44 @@ describe('syncLinkedMarkets', () => {
 
     expect(result).toEqual({ synced: 0, failed: 1 })
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('heals a pre-backfill market: fills history older than its only snapshot', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    const firstSnapshotAt = new Date('2026-07-01T00:00:00Z')
+    const older = Math.floor(firstSnapshotAt.getTime() / 1000) - 86_400
+    const newer = Math.floor(firstSnapshotAt.getTime() / 1000) + 86_400
+    global.fetch = gammaFetchMock(
+      [],
+      [gammaRow({ clobTokenIds: '["yes-token", "no-token"]' })],
+      [{ t: older, p: 0.25 }, { t: newer, p: 0.3 }],
+    )
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(1)
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue({
+      createdAt: firstSnapshotAt,
+    } as never)
+
+    const result = await syncLinkedMarkets()
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    // Only the point OLDER than the existing snapshot is inserted.
+    expect(prisma.externalMarketPriceSnapshot.createMany).toHaveBeenCalledWith({
+      data: [{ marketId: 'm1', probability: 25, createdAt: new Date(older * 1000) }],
+    })
+  })
+
+  it('does not attempt a heal when the series already has history', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    global.fetch = gammaFetchMock([], [gammaRow({ clobTokenIds: '["yes-token", "no-token"]' })])
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(7)
+
+    await syncLinkedMarkets()
+
+    expect(prisma.externalMarketPriceSnapshot.createMany).not.toHaveBeenCalled()
   })
 })
 

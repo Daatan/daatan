@@ -329,6 +329,10 @@ model Prediction {
   externalMarket           ExternalMarket? @relation(fields: [externalMarketId], references: [id], onDelete: SetNull)
   externalMarketLinkedAt   DateTime?       @map("external_market_linked_at")
   externalMarketLinkMethod String?         @map("external_market_link_method") @db.VarChar(20) // 'manual' | 'ai-confirmed' | 'imported'
+  // The linked market asks the OPPOSITE question (e.g. claim "X will not win" vs
+  // market "Will X win?"). Per-prediction, not per-market: two forecasts may link
+  // the same market in opposite directions. UI plots 100 − price when set.
+  externalMarketInverted   Boolean         @default(false) @map("external_market_inverted")
 
   // Relations
   options          PredictionOption[]
