@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 
 interface SpeedometerProps {
   percentage?: number // Market average (default needle)
@@ -31,17 +31,23 @@ export default function Speedometer({
   const safeMarketPct = isNaN(percentage) ? 50 : Math.min(100, Math.max(0, percentage))
 
   const sizes = {
-    xs: { width: 64, height: 40, strokeWidth: 4, fontSize: '10px', needleBase: 3.5, pivotRadius: 2.5, hitRadius: 9 },
-    sm: { width: 120, height: 72, strokeWidth: 5, fontSize: '12px', needleBase: 5, pivotRadius: 3.5, hitRadius: 14 },
-    md: { width: 160, height: 96, strokeWidth: 7, fontSize: '15px', needleBase: 6, pivotRadius: 4.5, hitRadius: 18 },
-    lg: { width: 220, height: 132, strokeWidth: 9, fontSize: '18px', needleBase: 8, pivotRadius: 6, hitRadius: 24 },
-    xl: { width: 280, height: 168, strokeWidth: 11, fontSize: '24px', needleBase: 10, pivotRadius: 7.5, hitRadius: 30 },
+    xs: { width: 64, height: 40, strokeWidth: 4, fontSize: '10px', needleBase: 3.5, pivotRadius: 2.5 },
+    sm: { width: 120, height: 72, strokeWidth: 5, fontSize: '12px', needleBase: 5, pivotRadius: 3.5 },
+    md: { width: 160, height: 96, strokeWidth: 7, fontSize: '15px', needleBase: 6, pivotRadius: 4.5 },
+    lg: { width: 220, height: 132, strokeWidth: 9, fontSize: '18px', needleBase: 8, pivotRadius: 6 },
+    xl: { width: 280, height: 168, strokeWidth: 11, fontSize: '24px', needleBase: 10, pivotRadius: 7.5 },
   }
 
-  const { width, height, strokeWidth, fontSize, needleBase, pivotRadius, hitRadius } = sizes[size]
+  const { width, height, strokeWidth, fontSize, needleBase, pivotRadius } = sizes[size]
 
   const [isDragging, setIsDragging] = useState(false)
+  // A tap "focuses" the gauge before it responds like a normal drag/click
+  // control — the first touch to land on it while scrolling the page just
+  // activates it (no value change); only once focused does it behave like a
+  // plain draggable control. Tapping outside clears focus again.
+  const [isActive, setIsActive] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const bottomPad = strokeWidth + pivotRadius + 4
   const topPad = strokeWidth + 4
@@ -109,9 +115,6 @@ export default function Speedometer({
     }
   }, [size])
 
-  // Reads from svgRef rather than e.currentTarget so the calculation is
-  // correct regardless of which child element (the drag thumb) received
-  // the pointer event.
   const getPctFromPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current
     if (!svg) return 50
@@ -131,54 +134,71 @@ export default function Speedometer({
     return (deg - 180) / 180 * 100
   }, [center.x, center.y, width, height])
 
-  // Pointer handlers live on the small drag thumb (not the whole SVG), so a
-  // touch anywhere else on the gauge — or on the page around it — scrolls
-  // normally. Only grabbing the thumb itself enters drag mode.
-  const handlePointerDown = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+  const isDraggableBase = !!onUserPercentageChange && userPercentage !== undefined
+
+  // First tap on an unfocused gauge only claims focus — it deliberately
+  // doesn't move the needle. It's a `click` handler (not pointerdown), so
+  // a touch that turns into a page scroll never reaches it: browsers only
+  // synthesize `click` for a touch that stayed in place.
+  const handleActivate = useCallback(() => {
+    if (!isDraggableBase) return
+    setIsActive(true)
+  }, [isDraggableBase])
+
+  // Once focused, the gauge behaves like a plain draggable control again:
+  // pointerdown jumps the needle to that point and starts a drag.
+  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!onUserPercentageChange || userPercentage === undefined) return
     e.preventDefault()
-    e.stopPropagation()
-    ;(e.currentTarget as SVGCircleElement).setPointerCapture(e.pointerId)
+    ;(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId)
     setIsDragging(true)
     onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
   }, [onUserPercentageChange, userPercentage, getPctFromPoint])
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!isDragging || !onUserPercentageChange) return
     onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
   }, [isDragging, onUserPercentageChange, getPctFromPoint])
 
-  const handlePointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!isDragging) return
-    ;(e.currentTarget as SVGCircleElement).releasePointerCapture(e.pointerId)
+    ;(e.currentTarget as SVGSVGElement).releasePointerCapture(e.pointerId)
     setIsDragging(false)
   }, [isDragging])
 
-  // Tap-to-jump on the arc itself. Deliberately a `click` handler, not
-  // pointerdown/move: browsers only synthesize `click` for a touch that
-  // stayed in place, and suppress it once the same touch has scrolled the
-  // page past their own pan threshold. That gives free tap-vs-scroll
-  // disambiguation without custom gesture math, and this element keeps the
-  // default touch-action so scrolling over the arc still works.
-  const handleArcClick = useCallback((e: React.MouseEvent<SVGPathElement>) => {
-    if (!onUserPercentageChange || userPercentage === undefined) return
-    onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
-  }, [onUserPercentageChange, userPercentage, getPctFromPoint])
+  // Tapping anywhere outside the gauge clears focus, so the next tap on it
+  // goes back to "activate only" instead of immediately dragging.
+  useEffect(() => {
+    if (!isActive) return
+    const handleOutside = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsActive(false)
+      }
+    }
+    document.addEventListener('pointerdown', handleOutside)
+    return () => document.removeEventListener('pointerdown', handleOutside)
+  }, [isActive])
 
   const backgroundArc = createArcPath(center, radius, 180, 360)
   const redArc = createArcPath(center, radius, 180, 270) // Left half (NO side)
   const greenArc = createArcPath(center, radius, 270, 360) // Right half (YES side)
 
-  const isDraggable = !!onUserPercentageChange && userPercentage !== undefined
+  const isDraggable = isDraggableBase && isActive
 
   return (
-    <div className="flex flex-col items-center">
+    <div ref={containerRef} className="flex flex-col items-center">
       <svg
         ref={svgRef}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        className="overflow-visible"
+        className={`overflow-visible${isDraggable ? ' select-none touch-none' : ''}`}
+        style={isDraggableBase ? { cursor: isDraggable ? (isDragging ? 'grabbing' : 'grab') : 'pointer', WebkitTouchCallout: 'none' } : undefined}
+        onClick={isDraggableBase && !isActive ? handleActivate : undefined}
+        onPointerDown={isDraggable ? handlePointerDown : undefined}
+        onPointerMove={isDraggable ? handlePointerMove : undefined}
+        onPointerUp={isDraggable ? handlePointerUp : undefined}
+        onPointerCancel={isDraggable ? handlePointerUp : undefined}
       >
         <defs>
           <linearGradient id={theme.greenGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -200,21 +220,6 @@ export default function Speedometer({
         {/* Arcs */}
         <path d={greenArc} fill="none" stroke={`url(#${theme.greenGradientId})`} strokeWidth={strokeWidth} strokeLinecap="round" />
         <path d={redArc} fill="none" stroke={`url(#${theme.redGradientId})`} strokeWidth={strokeWidth} strokeLinecap="round" />
-
-        {/* Invisible, generously-wide tap target over the arc: click anywhere
-            on the gauge to jump the needle there. Left at default touch-action
-            (not "none") so a touch that turns into a page scroll never
-            reaches this as a click. */}
-        {isDraggable && (
-          <path
-            d={backgroundArc}
-            fill="none"
-            stroke="transparent"
-            strokeWidth={strokeWidth + 24}
-            style={{ cursor: 'pointer' }}
-            onClick={handleArcClick}
-          />
-        )}
 
         {/* AI Confidence Interval band (rendered under ticks so AI tick sits on top).
             Wider than the arc stroke so it shows as a bright amber halo extending
@@ -306,30 +311,6 @@ export default function Speedometer({
             className="transition-all duration-150 ease-out"
           />
         )}
-
-        {/* Drag thumb (User Needle only): the only element that captures
-            pointer events, so touch anywhere else on the gauge — or on the
-            page around it — scrolls normally instead of moving the needle.
-            touch-none is critical on iOS Safari here: without it the
-            browser can still claim the gesture as a page scroll after a few
-            pixels and stop routing pointermove to this element. */}
-        {isDraggable && userPercentage !== undefined && (() => {
-          const tip = getTipPoint(userPercentage, radius - 4)
-          return (
-            <circle
-              cx={tip.x}
-              cy={tip.y}
-              r={hitRadius}
-              fill="transparent"
-              className="touch-none select-none"
-              style={{ cursor: isDragging ? 'grabbing' : 'grab', WebkitTouchCallout: 'none' }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-            />
-          )
-        })()}
 
         {/* Pivot */}
         <circle cx={center.x} cy={center.y} r={pivotRadius} fill={theme.grayBackground} stroke={theme.needleMarket} strokeWidth="1" />
