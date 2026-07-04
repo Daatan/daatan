@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { Prisma, type ContextSnapshot } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { notifyHighConfidence } from '@/lib/services/telegram'
@@ -49,9 +49,30 @@ function notifyIfCrossedHighConfidence(
  *  public timeline, from anchor selection, and from evidence-push dedup. */
 const NOT_CLOCK: Prisma.ContextSnapshotWhereInput = { kind: { not: 'clock' } }
 
+/** Keep the heavy JSON (`sources[]` + `oracleSnapshot`) only for this many most-recent
+ *  snapshots; older timeline rows are returned light. Bounds a payload that would
+ *  otherwise grow with a forecast's entire update history. */
+const CONTEXT_TIMELINE_HEAVY_LIMIT = 25
+
+/**
+ * Drop the heavy `sources[]` / `oracleSnapshot` blobs from all but the most-recent
+ * `keepHeavy` snapshots (input must be newest-first). The probability chart reads only
+ * `createdAt` + `externalProbability`, so its full history is untouched — only a deep-
+ * scrolled timeline row loses its source chips. This is what keeps the timeline read
+ * from growing unboundedly with a long-lived forecast's snapshot count.
+ */
+function stripHeavyTail(
+  snapshots: ContextSnapshot[],
+  keepHeavy = CONTEXT_TIMELINE_HEAVY_LIMIT,
+): ContextSnapshot[] {
+  return (snapshots ?? []).map((snap, i): ContextSnapshot =>
+    i < keepHeavy ? snap : { ...snap, sources: [], oracleSnapshot: null },
+  )
+}
+
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
 export async function getContextTimeline(idOrSlug: string) {
-  return prisma.prediction.findFirst({
+  const prediction = await prisma.prediction.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
     select: {
       id: true,
@@ -63,6 +84,8 @@ export async function getContextTimeline(idOrSlug: string) {
       },
     },
   })
+  if (!prediction) return prediction
+  return { ...prediction, contextSnapshots: stripHeavyTail(prediction.contextSnapshots) }
 }
 
 /** Fetch prediction with newsAnchor for the POST context-update endpoint. */
@@ -238,12 +261,13 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
   notifyIfCrossedHighConfidence(input.predictionId, prev, input.externalProbability, input.settled)
 }
 
-/** Fetch the full context snapshot timeline for a prediction. */
+/** Fetch the context snapshot timeline for a prediction (heavy tail stripped). */
 export async function listContextSnapshots(predictionId: string) {
-  return prisma.contextSnapshot.findMany({
+  const snapshots = await prisma.contextSnapshot.findMany({
     where: { predictionId, ...NOT_CLOCK },
     orderBy: { createdAt: 'desc' },
   })
+  return stripHeavyTail(snapshots)
 }
 
 /**
