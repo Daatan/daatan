@@ -24,6 +24,8 @@ export type Prediction = {
   confidence?: number | null
   aiCiLow?: number | null
   aiCiHigh?: number | null
+  /** Oracle settlement pin — outcome reported as fact, awaiting human resolution. */
+  settled?: boolean
   extractedEntities?: string[]
   consensusLine?: string | null
   sourceSummary?: string | null

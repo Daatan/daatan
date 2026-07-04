@@ -171,6 +171,8 @@
     "legendYou": "You",
     "legendAI": "AI",
     "aiInsufficientEvidence": "Insufficient evidence",
+    "settledBanner": "Outcome reported — awaiting resolution",
+    "settledBannerSub": "Commitments are closed",
     "signInToVote": "Sign in to vote",
     "marketDistribution": "Market Distribution",
     "confidencePercent": "Confidence: {value}%",

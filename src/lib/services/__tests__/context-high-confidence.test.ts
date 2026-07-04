@@ -26,6 +26,7 @@ import { notifyHighConfidence } from '@/lib/services/telegram'
 import { saveContextUpdate, saveNewsIndexerMatch, saveOracleSnapshotOnly } from '@/lib/services/context'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
+const update = vi.mocked(prisma.prediction.update)
 const notify = vi.mocked(notifyHighConfidence)
 
 function mockPrevious(confidence: number | null) {
@@ -150,5 +151,89 @@ describe('high-confidence crossing alert', () => {
       aiCiHigh: null,
     })
     expect(notify).not.toHaveBeenCalled()
+  })
+})
+
+describe('settled persistence', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-1' }] as never)
+  })
+
+  it('saveNewsIndexerMatch writes settled+settledAt when settled', async () => {
+    mockPrevious(70)
+    await saveNewsIndexerMatch({ ...matchInput(97), settled: true })
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ settled: true, settledAt: expect.any(Date) }),
+      }),
+    )
+  })
+
+  it('saveNewsIndexerMatch does not write settled when not settled', async () => {
+    mockPrevious(70)
+    await saveNewsIndexerMatch(matchInput(75))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).not.toHaveProperty('settled')
+    expect(call.data).not.toHaveProperty('settledAt')
+  })
+
+  it('saveOracleSnapshotOnly writes settled+settledAt when settled', async () => {
+    mockPrevious(null)
+    await saveOracleSnapshotOnly({
+      predictionId: 'pred-1',
+      oracleSnapshot: {},
+      confidence: 97,
+      aiCiLow: 94,
+      aiCiHigh: 99,
+      settled: true,
+    })
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ settled: true, settledAt: expect.any(Date) }),
+      }),
+    )
+  })
+
+  it('saveContextUpdate writes settled+settledAt when settled', async () => {
+    mockPrevious(50)
+    await saveContextUpdate({
+      predictionId: 'pred-1',
+      summary: 'summary',
+      sources: [],
+      externalProbability: 97,
+      externalReasoning: null,
+      oracleSnapshot: null,
+      confidence: 97,
+      aiCiLow: 94,
+      aiCiHigh: 99,
+      settled: true,
+      now: new Date('2026-07-04T00:00:00Z'),
+    })
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ settled: true, settledAt: new Date('2026-07-04T00:00:00Z') }),
+      }),
+    )
+  })
+
+  it('saveContextUpdate does not clear settled on an abstained (insufficientData) run', async () => {
+    mockPrevious(50)
+    await saveContextUpdate({
+      predictionId: 'pred-1',
+      summary: 'summary',
+      sources: [],
+      externalProbability: null,
+      externalReasoning: null,
+      oracleSnapshot: null,
+      confidence: null,
+      aiCiLow: null,
+      aiCiHigh: null,
+      insufficientData: true,
+      now: new Date('2026-07-04T00:00:00Z'),
+    })
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).not.toHaveProperty('settled')
+    expect(call.data).not.toHaveProperty('settledAt')
   })
 })

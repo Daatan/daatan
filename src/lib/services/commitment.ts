@@ -17,6 +17,8 @@ export interface CommitmentPrediction {
   claimText: string
   slug: string | null
   lockedAt: Date | null
+  settled: boolean
+  resolveByDatetime: Date
   options: PredictionOption[]
 }
 
@@ -36,6 +38,28 @@ interface UpdateCommitmentData {
 // Validation helpers
 // ============================================
 
+/** Why new/changed commitments are refused even on an ACTIVE prediction. Null = open. */
+export type CommitmentLockReason = 'settled' | 'deadline-passed' | null
+
+/**
+ * Committing after the outcome is already known (Oracle settlement pin) or after
+ * the resolution deadline is a free-points exploit: rsChange = (0.25 − brier) × 100
+ * has no time discount, so a sure-thing commit yields ~+25 RS risk-free.
+ */
+export function getCommitmentLockReason(
+  prediction: { settled: boolean; resolveByDatetime: Date },
+  now: Date = new Date(),
+): CommitmentLockReason {
+  if (prediction.settled) return 'settled'
+  if (prediction.resolveByDatetime <= now) return 'deadline-passed'
+  return null
+}
+
+const LOCK_ERRORS: Record<NonNullable<CommitmentLockReason>, string> = {
+  settled: 'Commitments are closed — the outcome has been reported and this forecast is awaiting resolution',
+  'deadline-passed': 'Commitments are closed — the resolution deadline has passed',
+}
+
 function validateCommitEligibility(
   prediction: CommitmentPrediction,
   userId: string,
@@ -46,6 +70,8 @@ function validateCommitEligibility(
   if (prediction.status === 'PENDING_APPROVAL' && prediction.authorId !== userId) {
     return { ok: false, error: 'Only the author can stake on a forecast pending approval', status: 403 }
   }
+  const lock = getCommitmentLockReason(prediction)
+  if (lock) return { ok: false, error: LOCK_ERRORS[lock], status: 409 }
   return null
 }
 
@@ -247,13 +273,17 @@ export async function removeCommitment(
 ): Promise<ServiceResult<{ success: true }>> {
   const commitment = await prisma.commitment.findUnique({
     where: { userId_predictionId: { userId, predictionId } },
-    include: { prediction: { select: { status: true } } },
+    include: { prediction: { select: { status: true, settled: true, resolveByDatetime: true } } },
   })
 
   if (!commitment) return { ok: false, error: 'Commitment not found', status: 404 }
   if (commitment.prediction.status !== 'ACTIVE') {
     return { ok: false, error: 'Cannot remove commitment from non-active predictions', status: 400 }
   }
+  // Deleting a losing commitment after the outcome is known dodges the loss —
+  // the same exploit as late committing, in reverse.
+  const removeLock = getCommitmentLockReason(commitment.prediction)
+  if (removeLock) return { ok: false, error: LOCK_ERRORS[removeLock], status: 409 }
 
   await prisma.commitment.delete({ where: { id: commitment.id } })
 
@@ -288,6 +318,8 @@ export async function updateCommitment(
   if (commitment.prediction.status !== 'ACTIVE') {
     return { ok: false, error: 'Can only update commitments on active predictions', status: 400 }
   }
+  const updateLock = getCommitmentLockReason(commitment.prediction)
+  if (updateLock) return { ok: false, error: LOCK_ERRORS[updateLock], status: 409 }
 
   if (data.optionId !== undefined) {
     const optionExists = commitment.prediction.options.some((o) => o.id === data.optionId)

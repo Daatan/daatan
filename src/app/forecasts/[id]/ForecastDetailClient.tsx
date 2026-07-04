@@ -276,6 +276,11 @@ export default function ForecastDetailClient({
     )
   }
 
+  // Mirrors getCommitmentLockReason server-side (client clock is fine — the
+  // server re-validates and returns 409 with the human-readable reason).
+  const commitmentsLocked =
+    !!prediction.settled || new Date(prediction.resolveByDatetime) <= new Date()
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       {/* Back Link */}
@@ -293,6 +298,13 @@ export default function ForecastDetailClient({
 
       {/* Header */}
       <div className="mb-6">
+        {prediction.status === 'ACTIVE' && prediction.settled && (
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-400">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="font-medium">{t('settledBanner')}</span>
+            <span className="text-amber-400/70">· {t('settledBannerSub')}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             {prediction.status !== 'ACTIVE' && (
@@ -494,7 +506,7 @@ export default function ForecastDetailClient({
                   aiCiLow={aiAbstained ? undefined : (aiEstimate?.ciLow ?? prediction.aiCiLow ?? undefined)}
                   aiCiHigh={aiAbstained ? undefined : (aiEstimate?.ciHigh ?? prediction.aiCiHigh ?? undefined)}
                   size="xl"
-                  onUserPercentageChange={prediction.status === 'ACTIVE'
+                  onUserPercentageChange={prediction.status === 'ACTIVE' && !commitmentsLocked
                     ? (pct) => setUserConfidence(Math.round(pct))
                     : undefined}
                 />
@@ -530,7 +542,7 @@ export default function ForecastDetailClient({
                       onChange={setUserConfidence}
                       onCommit={handleCommitConfidence}
                       isSubmitting={isSubmitting}
-                      disabled={prediction.status !== 'ACTIVE'}
+                      disabled={prediction.status !== 'ACTIVE' || commitmentsLocked}
                       canCommit={userConfidence !== initialUserConfidence}
                       isCommitted={!!prediction.userCommitment}
                     />
@@ -596,7 +608,7 @@ export default function ForecastDetailClient({
                 <div className="space-y-4 mb-10">
                   {optionsWithStats.map((option) => {
                     const isSelected = selectedOptionId === option.id
-                    const isActive = prediction.status === 'ACTIVE'
+                    const isActive = prediction.status === 'ACTIVE' && !commitmentsLocked
                     return (
                       <div key={option.id} className={`relative rounded-2xl border transition-all duration-200 ${
                         isSelected
@@ -679,9 +691,9 @@ export default function ForecastDetailClient({
                 ) : (
                   <button
                     onClick={handleCommitMultipleChoice}
-                    disabled={!selectedOptionId || prediction.status !== 'ACTIVE' || isSubmitting}
+                    disabled={!selectedOptionId || prediction.status !== 'ACTIVE' || commitmentsLocked || isSubmitting}
                     className={`w-full py-4 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-200 ${
-                      !selectedOptionId || prediction.status !== 'ACTIVE' || isSubmitting
+                      !selectedOptionId || prediction.status !== 'ACTIVE' || commitmentsLocked || isSubmitting
                         ? 'bg-navy-800 text-gray-400 cursor-not-allowed border border-navy-600'
                         : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20 active:scale-[0.98] border border-blue-400/30'
                     }`}
@@ -742,7 +754,7 @@ export default function ForecastDetailClient({
         prediction={prediction}
         currentUserId={session?.user?.id}
         authorId={prediction.author.id}
-        onRemove={prediction.status === 'ACTIVE'
+        onRemove={prediction.status === 'ACTIVE' && !commitmentsLocked
           ? () => fetch(`/api/forecasts/${prediction.id}`).then(r => r.json()).then(setPrediction)
           : undefined}
       />

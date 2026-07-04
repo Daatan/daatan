@@ -323,6 +323,13 @@ model Prediction {
   evidenceLinks     Json? // Array of evidence URLs
   resolutionNote    String?   @db.Text
 
+  // Oracle settlement detection: >=2 independent sources reported the outcome as
+  // an accomplished fact (retro settlement pin). Sticky — only ever set true by
+  // the snapshot writers; human resolution supersedes it. While ACTIVE it blocks
+  // new commitments (free-points window between pin and resolution).
+  settled   Boolean   @default(false)
+  settledAt DateTime? @map("settled_at")
+
   // External prediction-market link (opt-in — only some forecasts are linked).
   // Linking is admin-authoritative or via URL import; AI only suggests candidates.
   externalMarketId         String?         @map("external_market_id")

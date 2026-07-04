@@ -127,6 +127,8 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
               aiCiLow: input.aiCiLow,
               aiCiHigh: input.aiCiHigh,
             }),
+        // Sticky: a later thin/abstained run must not clear a detected settlement.
+        ...(input.settled && { settled: true, settledAt: input.now }),
       },
     }),
     // Invalidate stale detailsText translations: this update overwrites the
@@ -220,6 +222,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
         confidence: input.externalProbability,
         aiCiLow: input.ciLow,
         aiCiHigh: input.ciHigh,
+        ...(input.settled && { settled: true, settledAt: new Date() }),
       },
     }),
   ])
@@ -300,6 +303,7 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
         ...(input.confidence !== null && { confidence: input.confidence }),
         aiCiLow: input.aiCiLow,
         aiCiHigh: input.aiCiHigh,
+        ...(input.settled && { settled: true, settledAt: new Date() }),
       },
     }),
   ])

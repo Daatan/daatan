@@ -171,6 +171,8 @@
     "legendYou": "Вы",
     "legendAI": "ИИ",
     "aiInsufficientEvidence": "Недостаточно данных",
+    "settledBanner": "Исход уже сообщён — ожидает разрешения",
+    "settledBannerSub": "Ставки закрыты",
     "signInToVote": "Войдите, чтобы голосовать",
     "marketDistribution": "Распределение рынка",
     "confidencePercent": "Уверенность: {value}%",
