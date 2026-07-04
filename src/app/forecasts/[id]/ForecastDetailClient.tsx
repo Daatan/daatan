@@ -278,8 +278,15 @@ export default function ForecastDetailClient({
 
   // Mirrors getCommitmentLockReason server-side (client clock is fine — the
   // server re-validates and returns 409 with the human-readable reason).
-  const commitmentsLocked =
-    !!prediction.settled || new Date(prediction.resolveByDatetime) <= new Date()
+  const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
+  const nowMs = Date.now()
+  const claimDeadlineMs = prediction.claimDeadline ? new Date(prediction.claimDeadline).getTime() : null
+  const resolveByMs = new Date(prediction.resolveByDatetime).getTime()
+  const impossibilityPinned =
+    claimDeadlineMs !== null &&
+    claimDeadlineMs <= nowMs &&
+    Math.abs(claimDeadlineMs - resolveByMs) <= DEADLINE_AGREEMENT_TOLERANCE_MS
+  const commitmentsLocked = !!prediction.settled || resolveByMs <= nowMs || impossibilityPinned
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
@@ -533,6 +540,17 @@ export default function ForecastDetailClient({
                     </div>
                   )}
                 </div>
+
+                {/* Temporal-clock annotation: only for diffuse-deadline claims the
+                    daily glide actually prices (retro docs/TEMPORAL_MODEL_PLAN.md). */}
+                {!aiAbstained && prediction.claimArchetype === 'DIFFUSE' && prediction.claimDeadline && !commitmentsLocked && (() => {
+                  const daysLeft = Math.ceil((new Date(prediction.claimDeadline).getTime() - Date.now()) / 86_400_000)
+                  return daysLeft > 0 ? (
+                    <p className="mt-3 text-center text-[11px] text-gray-500">
+                      {t('temporalClockAnnotation', { days: daysLeft })}
+                    </p>
+                  ) : null
+                })()}
 
                 {/* Confidence Slider Integration (Desktop & Mobile) */}
                 <div className="w-full mt-10">

@@ -19,6 +19,7 @@ export interface CommitmentPrediction {
   lockedAt: Date | null
   settled: boolean
   resolveByDatetime: Date
+  claimDeadline: Date | null
   options: PredictionOption[]
 }
 
@@ -39,25 +40,46 @@ interface UpdateCommitmentData {
 // ============================================
 
 /** Why new/changed commitments are refused even on an ACTIVE prediction. Null = open. */
-export type CommitmentLockReason = 'settled' | 'deadline-passed' | null
+export type CommitmentLockReason = 'settled' | 'deadline-passed' | 'impossibility-pinned' | null
+
+/** claimDeadline (LLM-parsed) and resolveByDatetime (platform-authoritative) must
+ *  agree within this window to trust an impossibility auto-lock — mirrors
+ *  DEADLINE_AGREEMENT_TOLERANCE_MS in temporal-clock.ts (duplicated, not
+ *  imported, to keep this module's own dependency surface minimal). */
+const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
 
 /**
  * Committing after the outcome is already known (Oracle settlement pin) or after
  * the resolution deadline is a free-points exploit: rsChange = (0.25 − brier) × 100
  * has no time discount, so a sure-thing commit yields ~+25 RS risk-free.
+ *
+ * The third arm — claimDeadline itself has literally passed — auto-locks ONLY
+ * when it agrees with resolveByDatetime within tolerance: that's pure calendar
+ * arithmetic, no LLM judgment call in the loop. A tau_lead-derived early
+ * impossibility (tEff passed but the literal claimDeadline hasn't) does NOT
+ * auto-lock — that's an LLM inference about statutory timing, not a fact, and
+ * only sends the provisional Telegram note (temporal-clock.ts).
  */
 export function getCommitmentLockReason(
-  prediction: { settled: boolean; resolveByDatetime: Date },
+  prediction: { settled: boolean; resolveByDatetime: Date; claimDeadline?: Date | null },
   now: Date = new Date(),
 ): CommitmentLockReason {
   if (prediction.settled) return 'settled'
   if (prediction.resolveByDatetime <= now) return 'deadline-passed'
+  if (
+    prediction.claimDeadline &&
+    prediction.claimDeadline.getTime() <= now.getTime() &&
+    Math.abs(prediction.claimDeadline.getTime() - prediction.resolveByDatetime.getTime()) <= DEADLINE_AGREEMENT_TOLERANCE_MS
+  ) {
+    return 'impossibility-pinned'
+  }
   return null
 }
 
 const LOCK_ERRORS: Record<NonNullable<CommitmentLockReason>, string> = {
   settled: 'Commitments are closed — the outcome has been reported and this forecast is awaiting resolution',
   'deadline-passed': 'Commitments are closed — the resolution deadline has passed',
+  'impossibility-pinned': 'Commitments are closed — the claim deadline has passed',
 }
 
 function validateCommitEligibility(
@@ -213,7 +235,10 @@ export async function createCommitment(
         // confidence needed for aiProbabilityAtCommit snapshot; the latest
         // snapshot's insufficientData tells us whether the Oracle abstained, so we
         // don't manufacture an LLM estimate to grade an abstained forecast against.
+        // Excludes kind='clock' rows — a clock tick carries no insufficientData
+        // signal of its own and would mask the real latest abstention state.
         contextSnapshots: {
+          where: { kind: { not: 'clock' } },
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: { insufficientData: true },
@@ -273,7 +298,7 @@ export async function removeCommitment(
 ): Promise<ServiceResult<{ success: true }>> {
   const commitment = await prisma.commitment.findUnique({
     where: { userId_predictionId: { userId, predictionId } },
-    include: { prediction: { select: { status: true, settled: true, resolveByDatetime: true } } },
+    include: { prediction: { select: { status: true, settled: true, resolveByDatetime: true, claimDeadline: true } } },
   })
 
   if (!commitment) return { ok: false, error: 'Commitment not found', status: 404 }

@@ -33,4 +33,49 @@ describe('getCommitmentLockReason', () => {
       getCommitmentLockReason({ settled: true, resolveByDatetime: new Date('2020-01-01') }, now),
     ).toBe('settled')
   })
+
+  describe('impossibility-pinned third arm', () => {
+    it('locks when claimDeadline has passed and agrees with resolveByDatetime (still future)', () => {
+      // claimDeadline passed 1h ago; resolveByDatetime is 11h later — within the
+      // 72h tolerance and still in the future, so 'deadline-passed' hasn't fired.
+      const claimDeadline = new Date(now.getTime() - 3600_000)
+      const resolveByDatetime = new Date(now.getTime() + 11 * 3600_000)
+      expect(
+        getCommitmentLockReason({ settled: false, resolveByDatetime, claimDeadline }, now),
+      ).toBe('impossibility-pinned')
+    })
+
+    it('does NOT lock when claimDeadline has NOT passed yet', () => {
+      const claimDeadline = new Date(now.getTime() + 3600_000)
+      const resolveByDatetime = new Date(now.getTime() + 3600_000)
+      expect(
+        getCommitmentLockReason({ settled: false, resolveByDatetime, claimDeadline }, now),
+      ).toBeNull()
+    })
+
+    it('does NOT lock when claimDeadline passed but diverges from resolveByDatetime beyond tolerance', () => {
+      const claimDeadline = new Date(now.getTime() - 3600_000)
+      const resolveByDatetime = new Date(now.getTime() + 100 * 3600_000) // >72h out
+      expect(
+        getCommitmentLockReason({ settled: false, resolveByDatetime, claimDeadline }, now),
+      ).toBeNull()
+    })
+
+    it('does NOT lock when claimDeadline is absent (unclassified forecast)', () => {
+      expect(
+        getCommitmentLockReason(
+          { settled: false, resolveByDatetime: new Date(now.getTime() + 3600_000), claimDeadline: null },
+          now,
+        ),
+      ).toBeNull()
+    })
+
+    it('"deadline-passed" takes precedence once resolveByDatetime itself has passed', () => {
+      const claimDeadline = new Date(now.getTime() - 3600_000)
+      const resolveByDatetime = new Date(now.getTime() - 1800_000)
+      expect(
+        getCommitmentLockReason({ settled: false, resolveByDatetime, claimDeadline }, now),
+      ).toBe('deadline-passed')
+    })
+  })
 })

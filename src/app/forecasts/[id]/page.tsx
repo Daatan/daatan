@@ -110,6 +110,7 @@ async function getPrediction(idOrSlug: string) {
     publishedAt: prediction.publishedAt?.toISOString(),
     resolvedAt: prediction.resolvedAt?.toISOString(),
     lockedAt: prediction.lockedAt?.toISOString(),
+    claimDeadline: prediction.claimDeadline?.toISOString() ?? null,
     outcomePayload:
       outcomePayload && typeof outcomePayload === 'object' && !Array.isArray(outcomePayload)
         ? outcomePayload

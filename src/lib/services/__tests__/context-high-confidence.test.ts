@@ -23,7 +23,7 @@ vi.mock('@/lib/services/telegram', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { notifyHighConfidence } from '@/lib/services/telegram'
-import { saveContextUpdate, saveNewsIndexerMatch, saveOracleSnapshotOnly } from '@/lib/services/context'
+import { saveContextUpdate, saveNewsIndexerMatch, saveOracleSnapshotOnly, saveClockSnapshot } from '@/lib/services/context'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const update = vi.mocked(prisma.prediction.update)
@@ -235,5 +235,44 @@ describe('settled persistence', () => {
     const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
     expect(call.data).not.toHaveProperty('settled')
     expect(call.data).not.toHaveProperty('settledAt')
+  })
+})
+
+describe('saveClockSnapshot — cause-aware alerts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-clock' }] as never)
+  })
+
+  it('never calls notifyHighConfidence, even when the written value crosses 80', async () => {
+    await saveClockSnapshot({
+      predictionId: 'pred-1',
+      probability: 92,
+      aiCiLow: 85,
+      aiCiHigh: 97,
+      meta: { engineVersion: 'glide-v1', cause: 'glide' },
+    })
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('writes the snapshot with kind=clock and updates prediction.confidence, without touching detailsText', async () => {
+    await saveClockSnapshot({
+      predictionId: 'pred-1',
+      probability: 42,
+      aiCiLow: 30,
+      aiCiHigh: 55,
+      meta: { engineVersion: 'glide-v1', cause: 'glide' },
+    })
+
+    const createCall = vi.mocked(prisma.contextSnapshot.create).mock.calls[0][0] as {
+      data: Record<string, unknown>
+    }
+    expect(createCall.data.kind).toBe('clock')
+    expect(createCall.data.externalProbability).toBe(42)
+
+    const updateCall = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(updateCall.data.confidence).toBe(42)
+    expect(updateCall.data).not.toHaveProperty('detailsText')
+    expect(updateCall.data).not.toHaveProperty('settled')
   })
 })

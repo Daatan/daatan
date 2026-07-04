@@ -173,6 +173,7 @@
     "aiInsufficientEvidence": "Insufficient evidence",
     "settledBanner": "Outcome reported — awaiting resolution",
     "settledBannerSub": "Commitments are closed",
+    "temporalClockAnnotation": "includes time-remaining adjustment — deadline in {days} days",
     "signInToVote": "Sign in to vote",
     "marketDistribution": "Market Distribution",
     "confidencePercent": "Confidence: {value}%",
