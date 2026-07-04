@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
 
 interface SpeedometerProps {
   percentage?: number // Market average (default needle)
@@ -29,18 +29,19 @@ export default function Speedometer({
   onUserPercentageChange,
 }: SpeedometerProps) {
   const safeMarketPct = isNaN(percentage) ? 50 : Math.min(100, Math.max(0, percentage))
-  
+
   const sizes = {
-    xs: { width: 64, height: 40, strokeWidth: 4, fontSize: '10px', needleBase: 3.5, pivotRadius: 2.5 },
-    sm: { width: 120, height: 72, strokeWidth: 5, fontSize: '12px', needleBase: 5, pivotRadius: 3.5 },
-    md: { width: 160, height: 96, strokeWidth: 7, fontSize: '15px', needleBase: 6, pivotRadius: 4.5 },
-    lg: { width: 220, height: 132, strokeWidth: 9, fontSize: '18px', needleBase: 8, pivotRadius: 6 },
-    xl: { width: 280, height: 168, strokeWidth: 11, fontSize: '24px', needleBase: 10, pivotRadius: 7.5 },
+    xs: { width: 64, height: 40, strokeWidth: 4, fontSize: '10px', needleBase: 3.5, pivotRadius: 2.5, hitRadius: 9 },
+    sm: { width: 120, height: 72, strokeWidth: 5, fontSize: '12px', needleBase: 5, pivotRadius: 3.5, hitRadius: 14 },
+    md: { width: 160, height: 96, strokeWidth: 7, fontSize: '15px', needleBase: 6, pivotRadius: 4.5, hitRadius: 18 },
+    lg: { width: 220, height: 132, strokeWidth: 9, fontSize: '18px', needleBase: 8, pivotRadius: 6, hitRadius: 24 },
+    xl: { width: 280, height: 168, strokeWidth: 11, fontSize: '24px', needleBase: 10, pivotRadius: 7.5, hitRadius: 30 },
   }
 
-  const { width, height, strokeWidth, fontSize, needleBase, pivotRadius } = sizes[size]
+  const { width, height, strokeWidth, fontSize, needleBase, pivotRadius, hitRadius } = sizes[size]
 
   const [isDragging, setIsDragging] = useState(false)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const bottomPad = strokeWidth + pivotRadius + 4
   const topPad = strokeWidth + 4
@@ -59,11 +60,19 @@ export default function Speedometer({
     }
   }
 
-  const getNeedlePath = (pct: number, baseWidth: number, isThick: boolean = false) => {
+  const getTipPoint = (pct: number, length: number) => {
     const angleDeg = 180 + (pct / 100) * 180
     const angleRad = (angleDeg * Math.PI) / 180
+    return {
+      x: center.x + length * Math.cos(angleRad),
+      y: center.y + length * Math.sin(angleRad),
+    }
+  }
+
+  const getNeedlePath = (pct: number, baseWidth: number, isThick: boolean = false) => {
+    const angleDeg = 180 + (pct / 100) * 180
     const length = isThick ? radius - 4 : radius - 2
-    
+
     const perpAngleLeft = ((angleDeg + 90) * Math.PI) / 180
     const perpAngleRight = ((angleDeg - 90) * Math.PI) / 180
 
@@ -75,10 +84,7 @@ export default function Speedometer({
       x: center.x + (baseWidth / 2) * Math.cos(perpAngleRight),
       y: center.y + (baseWidth / 2) * Math.sin(perpAngleRight),
     }
-    const tip = {
-      x: center.x + length * Math.cos(angleRad),
-      y: center.y + length * Math.sin(angleRad),
-    }
+    const tip = getTipPoint(pct, length)
 
     return `M ${bLeft.x} ${bLeft.y} L ${tip.x} ${tip.y} L ${bRight.x} ${bRight.y} Z`
   }
@@ -103,12 +109,17 @@ export default function Speedometer({
     }
   }, [size])
 
-  const getPctFromPointer = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
+  // Reads from svgRef rather than e.currentTarget so the calculation is
+  // correct regardless of which child element (the drag thumb) received
+  // the pointer event.
+  const getPctFromPoint = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current
+    if (!svg) return 50
+    const rect = svg.getBoundingClientRect()
     const scaleX = width / rect.width
     const scaleY = height / rect.height
-    const mx = (e.clientX - rect.left) * scaleX
-    const my = (e.clientY - rect.top) * scaleY
+    const mx = (clientX - rect.left) * scaleX
+    const my = (clientY - rect.top) * scaleY
     const dx = mx - center.x
     const dy = my - center.y
     let deg = Math.atan2(dy, dx) * 180 / Math.PI
@@ -120,24 +131,39 @@ export default function Speedometer({
     return (deg - 180) / 180 * 100
   }, [center.x, center.y, width, height])
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+  // Pointer handlers live on the small drag thumb (not the whole SVG), so a
+  // touch anywhere else on the gauge — or on the page around it — scrolls
+  // normally. Only grabbing the thumb itself enters drag mode.
+  const handlePointerDown = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
     if (!onUserPercentageChange || userPercentage === undefined) return
     e.preventDefault()
-    ;(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId)
+    e.stopPropagation()
+    ;(e.currentTarget as SVGCircleElement).setPointerCapture(e.pointerId)
     setIsDragging(true)
-    onUserPercentageChange(getPctFromPointer(e))
-  }, [onUserPercentageChange, userPercentage, getPctFromPointer])
+    onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
+  }, [onUserPercentageChange, userPercentage, getPctFromPoint])
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
     if (!isDragging || !onUserPercentageChange) return
-    onUserPercentageChange(getPctFromPointer(e))
-  }, [isDragging, onUserPercentageChange, getPctFromPointer])
+    onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
+  }, [isDragging, onUserPercentageChange, getPctFromPoint])
 
-  const handlePointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
     if (!isDragging) return
-    ;(e.currentTarget as SVGSVGElement).releasePointerCapture(e.pointerId)
+    ;(e.currentTarget as SVGCircleElement).releasePointerCapture(e.pointerId)
     setIsDragging(false)
   }, [isDragging])
+
+  // Tap-to-jump on the arc itself. Deliberately a `click` handler, not
+  // pointerdown/move: browsers only synthesize `click` for a touch that
+  // stayed in place, and suppress it once the same touch has scrolled the
+  // page past their own pan threshold. That gives free tap-vs-scroll
+  // disambiguation without custom gesture math, and this element keeps the
+  // default touch-action so scrolling over the arc still works.
+  const handleArcClick = useCallback((e: React.MouseEvent<SVGPathElement>) => {
+    if (!onUserPercentageChange || userPercentage === undefined) return
+    onUserPercentageChange(getPctFromPoint(e.clientX, e.clientY))
+  }, [onUserPercentageChange, userPercentage, getPctFromPoint])
 
   const backgroundArc = createArcPath(center, radius, 180, 360)
   const redArc = createArcPath(center, radius, 180, 270) // Left half (NO side)
@@ -148,19 +174,11 @@ export default function Speedometer({
   return (
     <div className="flex flex-col items-center">
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        // touch-none is critical on iOS Safari: without touchAction:none the
-        // browser claims the drag as a page scroll after a few pixels and
-        // stops routing pointermove to the SVG, so the needle freezes.
-        // setPointerCapture alone cannot override Safari's scroll decision.
-        className={`overflow-visible${isDraggable ? ' select-none touch-none' : ''}`}
-        style={isDraggable ? { cursor: isDragging ? 'grabbing' : 'grab', WebkitTouchCallout: 'none' } : undefined}
-        onPointerDown={isDraggable ? handlePointerDown : undefined}
-        onPointerMove={isDraggable ? handlePointerMove : undefined}
-        onPointerUp={isDraggable ? handlePointerUp : undefined}
-        onPointerCancel={isDraggable ? handlePointerUp : undefined}
+        className="overflow-visible"
       >
         <defs>
           <linearGradient id={theme.greenGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -182,6 +200,21 @@ export default function Speedometer({
         {/* Arcs */}
         <path d={greenArc} fill="none" stroke={`url(#${theme.greenGradientId})`} strokeWidth={strokeWidth} strokeLinecap="round" />
         <path d={redArc} fill="none" stroke={`url(#${theme.redGradientId})`} strokeWidth={strokeWidth} strokeLinecap="round" />
+
+        {/* Invisible, generously-wide tap target over the arc: click anywhere
+            on the gauge to jump the needle there. Left at default touch-action
+            (not "none") so a touch that turns into a page scroll never
+            reaches this as a click. */}
+        {isDraggable && (
+          <path
+            d={backgroundArc}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={strokeWidth + 24}
+            style={{ cursor: 'pointer' }}
+            onClick={handleArcClick}
+          />
+        )}
 
         {/* AI Confidence Interval band (rendered under ticks so AI tick sits on top).
             Wider than the arc stroke so it shows as a bright amber halo extending
@@ -273,6 +306,30 @@ export default function Speedometer({
             className="transition-all duration-150 ease-out"
           />
         )}
+
+        {/* Drag thumb (User Needle only): the only element that captures
+            pointer events, so touch anywhere else on the gauge — or on the
+            page around it — scrolls normally instead of moving the needle.
+            touch-none is critical on iOS Safari here: without it the
+            browser can still claim the gesture as a page scroll after a few
+            pixels and stop routing pointermove to this element. */}
+        {isDraggable && userPercentage !== undefined && (() => {
+          const tip = getTipPoint(userPercentage, radius - 4)
+          return (
+            <circle
+              cx={tip.x}
+              cy={tip.y}
+              r={hitRadius}
+              fill="transparent"
+              className="touch-none select-none"
+              style={{ cursor: isDragging ? 'grabbing' : 'grab', WebkitTouchCallout: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            />
+          )
+        })()}
 
         {/* Pivot */}
         <circle cx={center.x} cy={center.y} r={pivotRadius} fill={theme.grayBackground} stroke={theme.needleMarket} strokeWidth="1" />
