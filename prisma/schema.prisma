@@ -356,6 +356,15 @@ model Prediction {
   settled   Boolean   @default(false)
   settledAt DateTime? @map("settled_at")
 
+  // Single-shot alert dedup for the requote cron (retro
+  // docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0). temporal-clock.ts re-fires when
+  // this timestamp predates the CURRENT claimDeadline rather than on a plain
+  // NULL check, so reclassifying a forecast to a later deadline doesn't
+  // permanently silence its alert once that new deadline also passes.
+  deadlinePassedAlertAt  DateTime? @map("deadline_passed_alert_at")
+  teffProvisionalAlertAt DateTime? @map("teff_provisional_alert_at")
+  divergenceAlertAt      DateTime? @map("divergence_alert_at")
+
   // External prediction-market link (opt-in — only some forecasts are linked).
   // Linking is admin-authoritative or via URL import; AI only suggests candidates.
   externalMarketId         String?         @map("external_market_id")
@@ -411,6 +420,15 @@ model ContextSnapshot {
   // (off-topic / all-hedged / too thin), so no probability was produced. The UI
   // hides the AI estimate and shows "Insufficient evidence" instead of a number.
   insufficientData Boolean @default(false) @map("insufficient_data")
+
+  // 'evidence' (default; article/analyze/settlement writers) | 'clock' (the
+  // requote cron's daily arithmetic-only glide). Clock snapshots are excluded
+  // from the visible timeline, from anchor selection, and from the
+  // article-dedup check (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0).
+  // String, not an enum — Stage D adds more kinds later.
+  kind String @default("evidence") @db.VarChar(32)
+  // Provenance for kind='clock': { engineVersion, cause, pLast, tLast, tEff, c, direction }.
+  meta Json?
 
   createdAt DateTime @default(now())
 

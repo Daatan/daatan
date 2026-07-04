@@ -45,6 +45,10 @@ function notifyIfCrossedHighConfidence(
   )
 }
 
+/** Clock-driven requote snapshots are arithmetic, not events — excluded from the
+ *  public timeline, from anchor selection, and from evidence-push dedup. */
+const NOT_CLOCK: Prisma.ContextSnapshotWhereInput = { kind: { not: 'clock' } }
+
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
 export async function getContextTimeline(idOrSlug: string) {
   return prisma.prediction.findFirst({
@@ -54,6 +58,7 @@ export async function getContextTimeline(idOrSlug: string) {
       detailsText: true,
       contextUpdatedAt: true,
       contextSnapshots: {
+        where: NOT_CLOCK,
         orderBy: { createdAt: 'desc' },
       },
     },
@@ -188,8 +193,12 @@ function oracleMean(snapshot: unknown): number | null {
  * is the same measurement re-delivered — skip the write entirely.
  */
 export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Promise<void> {
+  // Skip clock rows when finding "the latest push": a daily requote sitting
+  // between two identical article pushes must not defeat this dedup check
+  // (the reasoning-marker comparison would never match a clock row anyway,
+  // silently re-admitting the exact duplicate #1006 fixed).
   const latest = await prisma.contextSnapshot.findFirst({
-    where: { predictionId: input.predictionId },
+    where: { predictionId: input.predictionId, ...NOT_CLOCK },
     orderBy: { createdAt: 'desc' },
     select: { externalReasoning: true, externalProbability: true, sources: true, oracleSnapshot: true },
   })
@@ -232,7 +241,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
 /** Fetch the full context snapshot timeline for a prediction. */
 export async function listContextSnapshots(predictionId: string) {
   return prisma.contextSnapshot.findMany({
-    where: { predictionId },
+    where: { predictionId, ...NOT_CLOCK },
     orderBy: { createdAt: 'desc' },
   })
 }
@@ -244,10 +253,26 @@ export async function listContextSnapshots(predictionId: string) {
  */
 export async function getLatestOracleSnapshot(predictionId: string) {
   return prisma.contextSnapshot.findFirst({
-    where: { predictionId, oracleSnapshot: { not: Prisma.DbNull } },
+    where: { predictionId, oracleSnapshot: { not: Prisma.DbNull }, ...NOT_CLOCK },
     orderBy: { createdAt: 'desc' },
     select: { oracleSnapshot: true, createdAt: true },
   })
+}
+
+/**
+ * The anchor for the requote cron's glide: the most recent evidence-driven
+ * (non-clock) snapshot that actually carries a probability and wasn't an
+ * abstention. Deliberately NOT Prediction.confidence — the clock overwrites
+ * that daily, so anchoring on it would compound the glide against itself.
+ */
+export async function getLatestEvidenceEstimate(
+  predictionId: string,
+): Promise<{ externalProbability: number; createdAt: Date } | null> {
+  return prisma.contextSnapshot.findFirst({
+    where: { predictionId, externalProbability: { not: null }, insufficientData: false, ...NOT_CLOCK },
+    orderBy: { createdAt: 'desc' },
+    select: { externalProbability: true, createdAt: true },
+  }) as Promise<{ externalProbability: number; createdAt: Date } | null>
 }
 
 /**
@@ -308,4 +333,43 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     }),
   ])
   notifyIfCrossedHighConfidence(input.predictionId, prev, input.confidence, input.settled)
+}
+
+export interface SaveClockSnapshotInput {
+  predictionId: string
+  probability: number
+  aiCiLow: number | null
+  aiCiHigh: number | null
+  /** Clock provenance: { engineVersion, cause, pLast, tLast, tEff, c, direction }. */
+  meta: Prisma.InputJsonValue
+}
+
+/**
+ * The requote cron's writer (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0):
+ * a kind='clock' snapshot + confidence/CI update, in one transaction. Never
+ * calls notifyIfCrossedHighConfidence — cause-aware alerts mean a pure clock
+ * crossing must not fire the "consider resolving" alert built for
+ * settlement-grade news; never touches detailsText/translations/settled.
+ */
+export async function saveClockSnapshot(input: SaveClockSnapshotInput): Promise<void> {
+  await prisma.$transaction([
+    prisma.contextSnapshot.create({
+      data: {
+        predictionId: input.predictionId,
+        kind: 'clock',
+        summary: '',
+        sources: [],
+        externalProbability: input.probability,
+        meta: input.meta,
+      },
+    }),
+    prisma.prediction.update({
+      where: { id: input.predictionId },
+      data: {
+        confidence: input.probability,
+        aiCiLow: input.aiCiLow,
+        aiCiHigh: input.aiCiHigh,
+      },
+    }),
+  ])
 }

@@ -106,6 +106,12 @@ export const env = createEnv({
     // Bot runner / cron shared secret
     BOT_RUNNER_SECRET: z.string().min(1).optional(),
 
+    // Temporal-clock requote cron hard kill switch. The archetype allowlist
+    // that actually gates behavior is sent per-request by the GitHub Actions
+    // workflow (a repo variable, flippable without a deploy); this env var is
+    // the server-side backstop that overrides whatever the request says.
+    TEMPORAL_CLOCK_DISABLED: z.enum(['true', 'false']).optional(),
+
     // Bot system limits
     MAX_BOTS: z.coerce.number().default(50),
 
@@ -173,6 +179,7 @@ export const env = createEnv({
     TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
     VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
     BOT_RUNNER_SECRET: process.env.BOT_RUNNER_SECRET,
+    TEMPORAL_CLOCK_DISABLED: process.env.TEMPORAL_CLOCK_DISABLED,
     MAX_BOTS: process.env.MAX_BOTS,
     ORACLE_URL: process.env.ORACLE_URL,
     ORACLE_API_KEY: process.env.ORACLE_API_KEY,

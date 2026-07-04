@@ -1,0 +1,91 @@
+name: Temporal Requote
+
+# Daily trigger for /api/cron/requote, the temporal-model daily driver (retro
+# docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0): pure arithmetic per open forecast
+# (the zero-parameter constant-hazard glide + impossibility pin), no
+# Oracle/search/LLM call except a bounded self-heal classification pass.
+#
+# WHERE THIS RUNS:
+#   A GitHub Actions runner makes the HTTP request; the EC2 app process does
+#   the work. Same mechanism as external-market-sync.yml / heartbeat.yml —
+#   not an EC2 crontab.
+#
+# ARCHETYPE ALLOWLIST (the feature's on/off + per-class kill switch):
+#   vars.TEMPORAL_CLOCK_ARCHETYPES — comma-separated (e.g. "diffuse"), empty
+#   or unset = fully off. Flip it in the repo's Settings > Variables — no
+#   redeploy, no restart, takes effect on the next run (or dispatch one now).
+#   A server-side env var (TEMPORAL_CLOCK_DISABLED) is the hard backstop.
+
+on:
+  schedule:
+    - cron: '31 5 * * *'   # daily 05:31 UTC (off the hour)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute and log only — write nothing, send no alerts'
+        type: boolean
+        default: false
+
+jobs:
+  requote:
+    name: Requote ${{ matrix.env.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - name: production
+            url: https://daatan.com
+          - name: staging
+
+    steps:
+      - name: Trigger requote
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          ARCHETYPES: ${{ vars.TEMPORAL_CLOCK_ARCHETYPES }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          ENV="${{ matrix.env.name }}"
+          if [ "$ENV" = "staging" ]; then
+            BASE="$STAGING_URL"
+          else
+            BASE="${{ matrix.env.url }}"
+          fi
+
+          if [ -z "$BASE" ]; then
+            echo "⚠️ No URL configured for $ENV — skipping"
+            exit 0
+          fi
+
+          # Empty/unset var -> empty JSON array -> server-side no-op (see
+          # src/app/api/cron/requote/route.ts: an empty allowlist runs nothing).
+          ARCHS_JSON=$(printf '%s' "$ARCHETYPES" | jq -R 'split(",") | map(select(length > 0))')
+          DRY_RUN_JSON="false"
+          if [ "$DRY_RUN" = "true" ]; then DRY_RUN_JSON="true"; fi
+
+          BODY_JSON=$(jq -n --argjson archetypes "$ARCHS_JSON" --argjson dryRun "$DRY_RUN_JSON" \
+            '{archetypes: $archetypes, dryRun: $dryRun}')
+
+          # Self-heal classifies up to 5 forecasts (15s LLM timeout each) —
+          # generous ceiling under this so slow LLM calls don't fail the run.
+          HTTP=$(curl -s -o /tmp/requote_body.txt -w "%{http_code}" \
+            --max-time 120 \
+            -X POST \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            -H "content-type: application/json" \
+            -d "$BODY_JSON" \
+            "$BASE/api/cron/requote")
+
+          BODY=$(cat /tmp/requote_body.txt)
+          echo "HTTP $HTTP — $BODY"
+
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Requote OK for $ENV"
+          elif [ "$HTTP" = "404" ]; then
+            # The route ships with this PR; until the env is deployed it 404s — not an error.
+            echo "ℹ️ Route not deployed yet on $ENV (HTTP 404) — skipping"
+          else
+            echo "❌ Requote failed for $ENV (HTTP $HTTP)"
+            exit 1
+          fi

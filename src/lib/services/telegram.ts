@@ -577,6 +577,94 @@ export function notifyHighConfidence(
   sendChannelNotification(msg, 'clean')
 }
 
+/**
+ * The requote cron's daily glide moved the literal claim deadline into the
+ * past with no settlement detected. Fired at the LITERAL claimDeadline, never
+ * at the tau_lead-adjusted effective horizon — that horizon is a pricing
+ * concept, and prompting a human to resolve early on the strength of an LLM
+ * lead-time inference would be wrong. Single-shot (deduped in temporal-clock.ts).
+ */
+export function notifyDeadlinePassedQuietly(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  direction: 'arrival' | 'survival',
+  deadline: Date,
+): void {
+  if (isDevEnv()) return
+
+  const verb = direction === 'arrival' ? 'NO' : 'YES'
+  const msg = [
+    `⏰ <b>Deadline passed quietly</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Claim deadline ${deadline.toISOString().slice(0, 10)} has passed with no settlement reported — consider resolving <b>${verb}</b>.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
+/**
+ * The glide reached its tau_lead-adjusted horizon before the literal claim
+ * deadline (a statutory/lead-time inference from the classifier LLM, not a
+ * plain calendar fact) — a lower-key note, NOT the resolve-now alert above.
+ */
+export function notifyProvisionalImpossibility(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  effectiveHorizon: Date,
+  claimDeadline: Date,
+  tauLeadDays: number,
+): void {
+  if (isDevEnv()) return
+
+  const msg = [
+    `🕰 <b>Provisional impossibility</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Impossible per lead-time analysis (τ_lead=${tauLeadDays}d, effective horizon ${effectiveHorizon.toISOString().slice(0, 10)}, claim deadline ${claimDeadline.toISOString().slice(0, 10)}). Verify the reasoning; early resolution optional.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
+/**
+ * claimDeadline (LLM-parsed from claim text) and resolveByDatetime (platform-
+ * authoritative) disagree beyond tolerance — the glide is still running
+ * (toward the later, safer date) but the hard pin is suppressed pending review.
+ */
+export function notifyDeadlineDivergence(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  claimDeadline: Date,
+  resolveByDatetime: Date,
+): void {
+  if (isDevEnv()) return
+
+  const days = Math.round(Math.abs(claimDeadline.getTime() - resolveByDatetime.getTime()) / 86_400_000)
+  const msg = [
+    `⚠️ <b>Deadline disagreement</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Classifier deadline ${claimDeadline.toISOString().slice(0, 10)} vs resolveBy ${resolveByDatetime.toISOString().slice(0, 10)} (${days}d apart). Gliding toward the later date; hard pin suppressed. Review the classification.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
+/** Daily fleet digest for the requote cron — only sent when something moved. */
+export function notifyRequoteSummary(s: {
+  glided: number
+  pinned: number
+  maxDeltaPts: number
+  divergences: number
+}): void {
+  if (isDevEnv()) return
+
+  const msg = [
+    `🕐 <b>Requote summary</b>`,
+    `Glided: ${s.glided} · Pinned: ${s.pinned} · Max Δ: ${s.maxDeltaPts}pt${s.divergences ? ` · Divergences: ${s.divergences}` : ''}`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
 export function notifyBackupVerificationFailed(reason: string): void {
   if (isDevEnv()) return
   const msg = [

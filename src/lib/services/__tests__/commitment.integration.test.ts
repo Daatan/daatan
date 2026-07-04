@@ -233,4 +233,47 @@ describe('Commitment Service Integration', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.status).toBe(409)
   })
+
+  it('blocks a new commitment when claimDeadline has passed and agrees with resolveByDatetime', async () => {
+    const user = await prisma.user.create({
+      data: { email: 'impossibility-block@example.com', rs: 100 },
+    })
+    const now = Date.now()
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Impossibility Pinned Prediction',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date(now + 11 * 3600_000), // still in the future
+        claimDeadline: new Date(now - 3600_000), // passed 1h ago, within 72h tolerance
+        shareToken: 'test-token-impossibility-' + Date.now(),
+      },
+    })
+
+    const result = await createCommitment(user.id, prediction.id, { confidence: 60 })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.status).toBe(409)
+  })
+
+  it('does NOT block a commitment when claimDeadline has passed but diverges from resolveByDatetime', async () => {
+    const user = await prisma.user.create({
+      data: { email: 'divergent-no-block@example.com', rs: 100 },
+    })
+    const now = Date.now()
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Divergent Deadline Prediction',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date(now + 100 * 3600_000), // well beyond tolerance
+        claimDeadline: new Date(now - 3600_000),
+        shareToken: 'test-token-divergent-' + Date.now(),
+      },
+    })
+
+    const result = await createCommitment(user.id, prediction.id, { confidence: 60 })
+    expect(result.ok).toBe(true)
+  })
 })
