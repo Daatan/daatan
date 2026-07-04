@@ -90,7 +90,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
     status = "Enabled"
 
     filter {
-      prefix = "daily/"
+      prefix = "backups/"
     }
 
     expiration {
@@ -112,7 +112,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups_staging" {
     status = "Enabled"
 
     filter {
-      prefix = "daily/"
+      prefix = "backups/"
     }
 
     expiration {

@@ -568,16 +568,14 @@ The staging and production databases are **fully independent**. They share no da
 
 ### Automated Backups
 
-- **Script:** `/home/ubuntu/backup-db.sh`
-- **Cron:** `/etc/cron.d/daatan-backup` — daily at **03:00 UTC**
-- **Backs up both DBs:**
-  - Prod (`daatan-postgres` → `daatan`) → `s3://daatan-db-backups-272007598366/daily/`
-  - Staging (`daatan-postgres-staging` → `daatan_staging`) → `s3://daatan-db-backups-staging-272007598366/daily/`
-- **S3 filename format:** `daatan_YYYYMMDD_HHMMSS.sql.gz` / `daatan_staging_YYYYMMDD_HHMMSS.sql.gz`
-- **Local retention:** last 7 files in `/home/ubuntu/backups/`
-- **Size guard:** files under 1 KB are rejected (catches empty-DB dumps)
-- **Failure alerting:** sends Telegram message to "Daatan Updates" channel on any failure
-- **Watchdog:** `/home/ubuntu/backup-watchdog.sh` — cron at **07:00 UTC** (`/etc/cron.d/daatan-backup-watchdog`), alerts if no backup uploaded to S3 today
+- **Workflow:** `.github/workflows/backup.yml` — scheduled at **04:00 and 16:00 UTC** daily (RPO ≤ 12h), plus manual `workflow_dispatch`
+- **Mechanism:** GitHub Actions pushes `scripts/backup-db.sh` to the prod EC2 instance (tag `Environment=prod`) via AWS SSM `send-command` and runs it there — no cron on the box
+- **Backs up:** prod only (`daatan-postgres` → `daatan`) → `s3://daatan-db-backups-272007598366/backups/`
+- **S3 filename format:** `<UTC timestamp>.sql.gz` (e.g. `20260703T172550Z.sql.gz`)
+- **Retention:** the script itself trims the `backups/` prefix to the newest 60 objects (30 days at 2/day) after every upload; an S3 lifecycle rule on the same prefix (`terraform/s3.tf`) expires objects after 30 days as a backstop in case the script's trim ever fails
+- **Post-backup verification:** workflow triggers `scripts/verify-backup.sh` via SSM to confirm the dump restores cleanly
+- **Failure alerting:** Telegram message to the clean/prod channel on any step failure
+- **Staging bucket:** `daatan-db-backups-staging-*` and its 14-day lifecycle rule exist in Terraform but nothing currently populates it — staging has no automated DB backup today
 
 ---
 
