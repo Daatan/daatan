@@ -26,7 +26,7 @@ if [[ -z "$ENV" || -z "$PROMPT" || -z "$ACTION" ]]; then
 fi
 
 VALID_ENVS=("staging" "prod")
-VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "translate" "topic-extraction" "content-moderation" "guess-chances")
+VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "translate" "topic-extraction" "content-moderation" "guess-chances" "temporal-classifier")
 
 if [[ ! " ${VALID_ENVS[*]} " =~ " ${ENV} " ]]; then
   echo "Error: env must be one of: ${VALID_ENVS[*]}"

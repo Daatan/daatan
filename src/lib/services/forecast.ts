@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
+import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { createLogger } from '@/lib/logger'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { communityProbability } from '@/lib/forecast-math'
@@ -279,6 +280,16 @@ export async function createForecast(input: CreateForecastInput) {
   embedAndStoreForecast(prediction.id, claimText).catch((err) =>
     log.error({ err, id: prediction.id }, 'embed failed')
   )
+
+  // Fire-and-forget: classify temporal structure (deadline/direction/archetype)
+  // for the requote cron. Bot-created forecasts bypass createForecast
+  // (bots/stake.ts creates rows directly) — the cron's self-heal pass covers them.
+  classifyAndStoreTemporal({
+    id: prediction.id,
+    claimText,
+    resolveByDatetime: new Date(input.resolveByDatetime),
+    outcomeType: input.outcomeType,
+  }).catch((err) => log.error({ err, id: prediction.id }, 'temporal classification failed'))
 
   if (input.outcomeType === 'MULTIPLE_CHOICE') {
     const payload = input.outcomePayload as { options?: string[] } | undefined

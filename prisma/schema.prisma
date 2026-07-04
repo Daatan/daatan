@@ -254,6 +254,21 @@ enum PredictionStatus {
   UNRESOLVABLE // Cannot determine outcome (conflicting sources)
 }
 
+// Temporal-model metadata (retro/docs/TEMPORAL_MODEL_PLAN.md). Classified once
+// at forecast creation (LLM) + one-shot backfill for pre-existing forecasts.
+enum ClaimDirection {
+  ARRIVAL // true only if the event HAPPENS by the deadline
+  SURVIVAL // true if the event does NOT happen / a state persists
+  NONE // no temporal direction
+}
+
+enum ClaimArchetype {
+  DIFFUSE // event can occur any day in the window — the only archetype v1 prices
+  SCHEDULED // outcome determined at a known moment (election, ruling date)
+  THRESHOLD // a measurable quantity crossing a stated bar
+  NONE // anything else / unclassified
+}
+
 model Prediction {
   id String @id @default(cuid())
 
@@ -298,6 +313,17 @@ model Prediction {
   // so list endpoints can render the range on cards without a join.
   aiCiLow  Int? @map("ai_ci_low")
   aiCiHigh Int? @map("ai_ci_high")
+
+  // Temporal-model metadata (retro/docs/TEMPORAL_MODEL_PLAN.md #3.4). NULL
+  // classifierVersion = never classified (pre-existing forecast awaiting
+  // backfill, or classification failed — fail-open, no glide until retried).
+  claimDeadline     DateTime?       @map("claim_deadline") // parsed from claim TEXT, not resolveByDatetime — they diverge
+  claimDirection    ClaimDirection? @map("claim_direction")
+  claimArchetype    ClaimArchetype? @map("claim_archetype")
+  tauLeadDays       Int?            @map("tau_lead_days")
+  classifierVersion String?         @map("classifier_version") @db.VarChar(40)
+  classifiedAt      DateTime?       @map("classified_at")
+  classifierOutput  Json?           @map("classifier_output") // raw {confidence, notes, ...} for audit
 
   // Semantic embedding for similar-forecast search (pgvector, text-embedding-004, 768-dim)
   embedding Unsupported("vector(768)")?
