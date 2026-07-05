@@ -47,6 +47,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - Telegram notifications: [`docs/TELEGRAM_NOTIFICATIONS.md`](./docs/TELEGRAM_NOTIFICATIONS.md)
 - Analytics (GA4 + consent mode): [`docs/ANALYTICS.md`](./docs/ANALYTICS.md)
 - SEO (IndexNow, JSON-LD, metadata): [`docs/SEO.md`](./docs/SEO.md)
+- GEO — AI answer engine visibility/citation (ChatGPT, Perplexity, AI Overviews): [`docs/GEO.md`](./docs/GEO.md)
 
 ## Infra cheat-sheet
 
