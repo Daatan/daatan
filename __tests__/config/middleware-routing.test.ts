@@ -198,3 +198,48 @@ describe('Middleware matcher safety', () => {
     expect(!(hasStandaloneSlash && hasCatchAll)).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Test group 4: OG-image noindex header
+//
+// og:image generator routes (/opengraph-image, /*/opengraph-image) return
+// 200 image/png, never HTML. Googlebot still crawls them as page candidates
+// (every forecast/profile page links one via <meta property="og:image">),
+// then rejects them — this was piling up as "Crawled - currently not
+// indexed / Failed" in Search Console. Middleware sets X-Robots-Tag: noindex
+// on these responses so they're cleanly excluded instead. Blocking via
+// robots.txt was deliberately avoided: a Googlebot-specific user-agent block
+// would need every other Disallow rule duplicated into it (RFC 9309 UA
+// groups don't merge with the wildcard group).
+// ---------------------------------------------------------------------------
+
+describe('OG-image noindex header', () => {
+  it('middleware sets X-Robots-Tag: noindex for paths ending in /opengraph-image', () => {
+    const src = readMiddleware()
+
+    expect(
+      /pathname\.endsWith\(['"]\/opengraph-image['"]\)/.test(src),
+      'middleware.ts no longer checks pathname.endsWith("/opengraph-image"). ' +
+      'og:image routes need X-Robots-Tag: noindex to avoid piling up as ' +
+      '"Crawled - currently not indexed" in Search Console — see src/app/robots.ts ' +
+      'for why this is done in middleware rather than robots.txt.'
+    ).toBe(true)
+
+    expect(
+      /X-Robots-Tag['"]\s*,\s*['"]noindex/.test(src),
+      'middleware.ts no longer sets the X-Robots-Tag: noindex header.'
+    ).toBe(true)
+  })
+
+  it('the matcher does not exclude opengraph-image paths from running middleware', () => {
+    const src = readMiddleware()
+    const matcherMatch = src.match(/matcher\s*:\s*\[([\s\S]*?)\]/)
+    if (!matcherMatch) return
+
+    expect(
+      /opengraph-image/.test(matcherMatch[1]),
+      'the middleware matcher now excludes opengraph-image paths, so the ' +
+      'X-Robots-Tag: noindex header will never be set on them.'
+    ).toBe(false)
+  })
+})
