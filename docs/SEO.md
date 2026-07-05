@@ -28,6 +28,7 @@ A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.t
    - `eventAttendanceMode`: `OnlineEventAttendanceMode` — **required** for the `VirtualLocation` below; without it Google assumes a physical event and fails the rich result with "Invalid object type for field location"
    - `organizer` + `performer`: forecast author (Person, with profile URL)
    - `location`: VirtualLocation pointing at the forecast URL
+   - `offers`: free Offer (`price: "0"`, `InStock`) pointing at the forecast URL — Google warns "Missing field 'offers'" without it
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
 
 > **`creator` on the CreativeWork types** (Article, ClaimReview, the nested Claim): added alongside `author` because Google Search Console flags `creator` as a recommended field on CreativeWork-derived items ("Missing field 'creator'"). `creator` mirrors the corresponding `author`.
