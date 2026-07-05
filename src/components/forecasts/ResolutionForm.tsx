@@ -185,8 +185,8 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
 
       {/* Outcome Selection */}
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-text-secondary">Outcome</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div id="outcome-label" className="block text-sm font-medium text-text-secondary">Outcome</div>
+        <div role="group" aria-labelledby="outcome-label" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => setOutcome('correct')}
@@ -252,8 +252,8 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
       {/* Multiple Choice Option Selector */}
       {isMultipleChoice && (outcome === 'correct' || outcome === 'wrong') && (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-text-secondary">Which option was correct?</label>
-          <div className="grid grid-cols-1 gap-2">
+          <div id="correct-option-label" className="block text-sm font-medium text-text-secondary">Which option was correct?</div>
+          <div role="group" aria-labelledby="correct-option-label" className="grid grid-cols-1 gap-2">
             {options.map((option) => (
               <button
                 key={option.id}

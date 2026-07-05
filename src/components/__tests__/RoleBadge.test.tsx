@@ -1,4 +1,6 @@
+/* eslint-disable jsx-a11y/aria-role -- `role` here is RoleBadge's own prop (a UserRole), not an ARIA role attribute */
 import { render, screen } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import { describe, it, expect } from 'vitest'
 import { RoleBadge } from '../RoleBadge'
 
@@ -41,6 +43,11 @@ describe('RoleBadge', () => {
     const medium = screen.getByText('A')
     expect(medium.className).toContain('w-5')
     expect(medium.className).toContain('text-[11px]')
+  })
+
+  it('has no automatically detectable a11y violations', async () => {
+    const { container } = render(<RoleBadge role="ADMIN" />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 

@@ -302,10 +302,20 @@ export default function ContextTimeline({
 
   return (
     <div className="mb-8">
-      {/* Header — clicking toggles the context body */}
-      <button
+      {/* Header — clicking toggles the context body. A <div role="button">, not a
+          <button>, because it contains the nested "analyze" action button below —
+          buttons can't nest inside buttons per HTML spec. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsContextOpen((o) => !o)}
-        className="w-full flex items-center justify-between mb-3 group"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setIsContextOpen((o) => !o)
+          }
+        }}
+        className="w-full flex items-center justify-between mb-3 group cursor-pointer"
       >
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
           <FileText className="w-5 h-5" />
@@ -313,9 +323,10 @@ export default function ContextTimeline({
         </h2>
         <div className="flex items-center gap-2">
           {canAnalyze && aiResearch && (
-            <span
-              role="button"
+            <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); handleAnalyze() }}
+              disabled={isAnalyzing}
               aria-disabled={isAnalyzing}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-cobalt/10 hover:bg-blue-100 rounded-md transition-colors aria-disabled:opacity-50 aria-disabled:pointer-events-none"
             >
@@ -324,7 +335,7 @@ export default function ContextTimeline({
               {isAnalyzing && analyzeStep
                 ? t(`step${analyzeStep.charAt(0).toUpperCase()}${analyzeStep.slice(1)}` as 'stepSearching' | 'stepAnalyzing' | 'stepEstimating')
                 : t('analyze')}
-            </span>
+            </button>
           )}
           {isContextOpen ? (
             <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" />
@@ -332,7 +343,7 @@ export default function ContextTimeline({
             <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" />
           )}
         </div>
-      </button>
+      </div>
 
       {/* Current context card — always in the DOM (crawlable); collapsed via CSS
           rather than removed, so the AI summary, estimate, reasoning and Oracle
