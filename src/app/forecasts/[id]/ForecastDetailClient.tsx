@@ -410,36 +410,6 @@ export default function ForecastDetailClient({
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
-        {/* Server-rendered one-line summary. Guarantees every forecast page —
-            even a one-sentence claim with no description — carries unique,
-            substantive prose in the initial HTML, which is what stops Google's
-            thin-content "Soft 404" verdict. English only: it's the canonical
-            (indexed) locale; localized routes are hreflang alternates. */}
-        {locale === 'en' && (() => {
-          const created = formatDisplayDate(prediction.createdAt)
-          const resolves = formatDisplayDate(prediction.resolveByDatetime)
-          const forecasters = prediction.commitments.length
-          const consensus = prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null
-          const aiSnap = initialContextSnapshots?.[0]
-          const ai = aiSnap?.insufficientData ? null : (aiSnap?.externalProbability ?? prediction.confidence ?? null)
-          const status =
-            prediction.resolvedAt && prediction.resolutionOutcome
-              ? `resolved ${prediction.resolutionOutcome}`
-              : prediction.status === 'ACTIVE'
-                ? 'open for forecasts'
-                : prediction.status.replace(/_/g, ' ').toLowerCase()
-          const parts = [
-            `Forecast by ${prediction.author.name || prediction.author.username}`,
-            `opened ${created}`,
-            `resolves ${resolves}`,
-            `${forecasters} ${forecasters === 1 ? 'forecaster' : 'forecasters'}`,
-          ]
-          if (consensus != null) parts.push(`community consensus ${consensus}%`)
-          if (ai != null) parts.push(`AI estimate ${ai}%`)
-          parts.push(status)
-          return <p className="text-sm text-gray-400 mb-4 leading-relaxed">{parts.join(' · ')}.</p>
-        })()}
-
         <div className="xl:hidden">
           <ForecastInfoPanel prediction={prediction} variant="mobile" />
         </div>
@@ -817,6 +787,42 @@ export default function ForecastDetailClient({
       <div className="xl:hidden border-t border-navy-600 mt-12 pt-8">
         <CommentThread predictionId={prediction.id} initialComments={initialComments} />
       </div>
+
+      {/* Server-rendered summary line, placed last so it reads as a quiet
+          metadata footer rather than competing with the claim for attention.
+          Guarantees every forecast page — even a one-sentence claim with no
+          description — carries unique, substantive prose in the initial
+          HTML, which is what stops Google's thin-content "Soft 404" verdict.
+          English only: it's the canonical (indexed) locale; localized routes
+          are hreflang alternates. */}
+      {locale === 'en' && (() => {
+        const created = formatDisplayDate(prediction.createdAt)
+        const resolves = formatDisplayDate(prediction.resolveByDatetime)
+        const forecasters = prediction.commitments.length
+        const consensus = prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null
+        const aiSnap = initialContextSnapshots?.[0]
+        const ai = aiSnap?.insufficientData ? null : (aiSnap?.externalProbability ?? prediction.confidence ?? null)
+        const status =
+          prediction.resolvedAt && prediction.resolutionOutcome
+            ? `resolved ${prediction.resolutionOutcome}`
+            : prediction.status === 'ACTIVE'
+              ? 'open for forecasts'
+              : prediction.status.replace(/_/g, ' ').toLowerCase()
+        const parts = [
+          `Forecast by ${prediction.author.name || prediction.author.username}`,
+          `opened ${created}`,
+          `resolves ${resolves}`,
+          `${forecasters} ${forecasters === 1 ? 'forecaster' : 'forecasters'}`,
+        ]
+        if (consensus != null) parts.push(`community consensus ${consensus}%`)
+        if (ai != null) parts.push(`AI estimate ${ai}%`)
+        parts.push(status)
+        return (
+          <p className="text-xs text-gray-500 mt-8 pt-6 border-t border-navy-600 leading-relaxed">
+            {parts.join(' · ')}.
+          </p>
+        )
+      })()}
 
         </div>{/* end left column */}
 
