@@ -56,7 +56,7 @@ export type Prediction = {
   } | null
   isPublic?: boolean
   source?: string | null
-  tags?: { name: string }[]
+  tags?: { name: string; slug?: string }[]
   options?: Array<{
     id: string
     text: string
@@ -424,7 +424,8 @@ export default function ForecastCard({
                 {prediction.tags.slice(0, 2).map((tag) => (
                   <Link
                     key={tag.name}
-                    href={`/?tags=${encodeURIComponent(tag.name)}`}
+                    href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
+                    prefetch={false}
                     title={t('filterByTagTooltip', { tag: tag.name })}
                     className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-blue-600 hover:bg-cobalt/20 hover:text-blue-400 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20 transition-colors"
                   >

@@ -23,6 +23,22 @@ export const listTags = async () => {
   }))
 }
 
+export const getTagBySlug = async (slug: string) => {
+  const tag = await prisma.tag.findUnique({
+    where: { slug },
+    select: { id: true, name: true, slug: true, _count: { select: { predictions: true } } },
+  })
+  if (!tag) return null
+  return { id: tag.id, name: tag.name, slug: tag.slug, count: tag._count.predictions }
+}
+
+/** Count of a tag's predictions currently visible on the tag page (public + active). */
+export const getVisibleTagPredictionCount = async (tagId: string) => {
+  return prisma.prediction.count({
+    where: { status: 'ACTIVE', isPublic: true, tags: { some: { id: tagId } } },
+  })
+}
+
 export const createTag = async (name: string) => {
   const slug = slugify(name)
 

@@ -67,7 +67,7 @@ export async function listForecasts(query: ListForecastsQuery) {
       include: {
         author: { select: PREDICTION_AUTHOR_SELECT },
         newsAnchor: { select: NEWS_ANCHOR_SELECT },
-        tags: { select: { name: true } },
+        tags: { select: { name: true, slug: true } },
         options: { orderBy: { displayOrder: 'asc' } },
         _count: { select: { commitments: true } },
         commitments: {
