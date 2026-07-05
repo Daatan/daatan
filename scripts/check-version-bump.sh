@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Check version consistency between package.json and src/lib/version.ts.
-# Versions must match when both files are touched — but bumping on feature
-# branches is not required. Version is bumped once in a release commit on main.
+# CLAUDE.md's hard rule requires bumping both on every non-main commit; this
+# hook only checks that the two files agree when both are staged — it does
+# not itself enforce that a bump happened.
 
 PKG_VERSION=$(node -p "require('./package.json').version")
 TS_VERSION=$(grep -oP '// v\K[0-9]+\.[0-9]+\.[0-9]+' src/lib/version.ts)
