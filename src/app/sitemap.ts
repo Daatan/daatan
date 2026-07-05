@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 // that broke v1.10.76); only the data layer is cached.
 const fetchSitemapData = unstable_cache(
   async () => {
-    const [predictions, translatedPredictionIds, users] = await Promise.all([
+    const [predictions, translatedPredictionIds, users, tags] = await Promise.all([
       prisma.prediction.findMany({
         where: {
           isPublic: true,
@@ -30,8 +30,22 @@ const fetchSitemapData = unstable_cache(
         where: { isPublic: true, username: { not: null } },
         select: { username: true, updatedAt: true },
       }),
+      prisma.tag.findMany({
+        where: {
+          predictions: {
+            some: {
+              isPublic: true,
+              status: { in: ['ACTIVE', 'PENDING', 'RESOLVED_CORRECT', 'RESOLVED_WRONG'] },
+            },
+          },
+        },
+        select: {
+          slug: true,
+          predictions: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+        },
+      }),
     ])
-    return { predictions, translatedPredictionIds, users }
+    return { predictions, translatedPredictionIds, users, tags }
   },
   ['sitemap-data'],
   { revalidate: 3600, tags: ['sitemap'] },
@@ -120,7 +134,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ])
 
-  const { predictions, translatedPredictionIds, users } = await fetchSitemapData()
+  const { predictions, translatedPredictionIds, users, tags } = await fetchSitemapData()
 
   const translatedSet = new Set(
     translatedPredictionIds.map((t) => `${t.predictionId}:${t.language}`),
@@ -182,11 +196,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }))
 
+  // 6. Tag routes (no locale variants — English-only launch, matching profile routes)
+  const tagRoutes: MetadataRoute.Sitemap = tags.map((t) => ({
+    url: `${BASE_URL}/tags/${t.slug}`,
+    lastModified: t.predictions[0]?.updatedAt ?? new Date(),
+    changeFrequency: 'daily' as const,
+    priority: 0.5,
+  }))
+
   return [
     ...staticRoutes,
     ...localeStaticRoutes,
     ...forecastRoutes,
     ...localeForecastRoutes,
     ...profileRoutes,
+    ...tagRoutes,
   ]
 }

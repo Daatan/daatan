@@ -71,7 +71,7 @@ const authorSelect = {
 
 const predictionInclude = {
   author: { select: authorSelect },
-  tags: { select: { name: true } },
+  tags: { select: { name: true, slug: true } },
   _count: { select: { commitments: true } },
 } as const
 
