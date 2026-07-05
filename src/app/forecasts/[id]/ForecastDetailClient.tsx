@@ -486,11 +486,6 @@ export default function ForecastDetailClient({
         onAiEstimate={setAiEstimate}
       />
 
-      {/* Related forecasts: inline on mobile/tablet, in the right column on desktop */}
-      <div className="xl:hidden">
-        <SimilarForecasts predictionId={prediction.id} />
-      </div>
-
       {/* Probability Display (Interactive Gauge) */}
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
@@ -725,6 +720,13 @@ export default function ForecastDetailClient({
             </div>
           )
         })()}
+      </div>
+
+      {/* Related forecasts: inline on mobile/tablet (after the gauge, so users
+          commit their own confidence before seeing others' forecasts), in the
+          right column on desktop */}
+      <div className="xl:hidden">
+        <SimilarForecasts predictionId={prediction.id} />
       </div>
 
       {/* Resolution Info (if resolved) */}
