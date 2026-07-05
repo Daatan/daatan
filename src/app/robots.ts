@@ -36,10 +36,14 @@ export default function robots(): MetadataRoute.Robots {
         // noindex meta tag) — not indexable content.
         '/docs/',
         // NOTE: the OG image routes (/opengraph-image, /*/opengraph-image) are
-        // intentionally NOT disallowed. They return 200 image/png, so Google treats
-        // them as image resources (not soft-404 pages); blocking them only filled
-        // Search Console's "Blocked by robots.txt" report with ~one entry per
-        // forecast×locale (every page's og:image points at one) for no benefit.
+        // intentionally NOT disallowed here. Blocking them via robots.txt would
+        // require duplicating every other Disallow rule into a Googlebot-specific
+        // user-agent block (RFC 9309: UA groups don't merge with the wildcard
+        // group), and social-preview crawlers fetching the raw image bytes would
+        // still be fine either way. Instead, src/middleware.ts sets
+        // `X-Robots-Tag: noindex` on every /opengraph-image response — that
+        // excludes them from the index cleanly ("Excluded by noindex tag") without
+        // touching robots.txt at all, and works regardless of content-type.
       ],
     },
     sitemap: `${baseUrl}/sitemap.xml`,

@@ -79,6 +79,27 @@ have no description or sources yet. Regression coverage:
 > visible HTML. Then in Search Console, URL Inspection → "Test live URL" on a few previously
 > soft-404'd slugs and **Validate Fix** on the Soft 404 issue.
 
+## OG-image routes are excluded from the index
+
+`opengraph-image.tsx` route handlers (`src/app/opengraph-image.tsx`,
+`src/app/forecasts/[id]/opengraph-image.tsx`, `src/app/profile/[id]/opengraph-image.tsx`, …)
+return `200 image/png` — never HTML. They exist only so `<meta property="og:image">` on every
+forecast/profile page has something to point at for social-preview cards. Googlebot still
+crawls them as page candidates (one per page that links them) and rejects them, which piled up
+as **"Crawled - currently not indexed / Failed"** in Search Console (49% of that bucket as of
+2026-07).
+
+Fix: `src/middleware.ts` sets `X-Robots-Tag: noindex` on any response whose path ends in
+`/opengraph-image`. This moves them to the clean "Excluded by noindex tag" bucket instead.
+Deliberately **not** done via a `robots.txt` `Disallow`: blocking only Googlebot from a path
+requires a `User-agent: Googlebot`-specific block, and per RFC 9309 user-agent groups don't
+merge with the wildcard `User-agent: *` group — every other `Disallow` rule would need
+duplicating into it or Googlebot would crawl `/admin/`, `/api/`, etc. unrestricted.
+`X-Robots-Tag` works on any content type and needs no robots.txt change. Social-preview
+crawlers (Twitterbot, facebookexternalhit, Slackbot, …) fetch the raw image bytes and ignore
+the header, so link previews are unaffected. Regression coverage:
+`__tests__/config/middleware-routing.test.ts` ("OG-image noindex header").
+
 ## Slugs & canonical URLs
 
 Slugs are English (forecasts authored in another language are canonicalized to English at
