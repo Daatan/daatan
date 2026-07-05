@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import { NextIntlClientProvider } from 'next-intl'
 import ContextTimeline, { groupSources } from '../ContextTimeline'
 import enMessages from '../../../../messages/en.json'
@@ -47,6 +48,14 @@ describe('ContextTimeline', () => {
       renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
     })
     expect(screen.queryByText(enMessages.context.analyze)).not.toBeInTheDocument()
+  })
+
+  it('has no automatically detectable a11y violations, with the analyze button visible', async () => {
+    let container: HTMLElement
+    await act(async () => {
+      ;({ container } = renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />))
+    })
+    expect(await axe(container!)).toHaveNoViolations()
   })
 
   it('keeps the context body in the DOM while collapsed by default (crawlable, hidden via CSS)', async () => {

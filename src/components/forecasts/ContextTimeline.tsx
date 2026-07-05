@@ -302,54 +302,50 @@ export default function ContextTimeline({
 
   return (
     <div className="mb-8">
-      {/* Header — clicking toggles the context body. A <div role="button">, not a
-          <button>, because it contains the nested "analyze" action button below —
-          buttons can't nest inside buttons per HTML spec. */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setIsContextOpen((o) => !o)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            setIsContextOpen((o) => !o)
-          }
-        }}
-        className="w-full flex items-center justify-between mb-3 group cursor-pointer"
-      >
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          {t('title')}
-        </h2>
-        <div className="flex items-center gap-2">
-          {canAnalyze && aiResearch && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleAnalyze() }}
-              disabled={isAnalyzing}
-              aria-disabled={isAnalyzing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-cobalt/10 hover:bg-blue-100 rounded-md transition-colors aria-disabled:opacity-50 aria-disabled:pointer-events-none"
-            >
-              <Loader2 className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : 'hidden'}`} />
-              {!isAnalyzing && <RefreshCw className="w-4 h-4" />}
-              {isAnalyzing && analyzeStep
-                ? t(`step${analyzeStep.charAt(0).toUpperCase()}${analyzeStep.slice(1)}` as 'stepSearching' | 'stepAnalyzing' | 'stepEstimating')
-                : t('analyze')}
-            </button>
-          )}
+      {/* Header. The toggle target and the "analyze" action are siblings, not
+          nested — a focusable control inside a role="button"/<button> container
+          is an accessibility violation (double tab stop, screen readers treat
+          role="button" as a leaf and can hide the nested control). */}
+      <div className="w-full flex items-center justify-between mb-3 group">
+        <button
+          type="button"
+          onClick={() => setIsContextOpen((o) => !o)}
+          aria-expanded={isContextOpen}
+          aria-controls={`context-panel-${predictionId}`}
+          className="flex items-center gap-2 text-left"
+        >
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            {t('title')}
+          </h2>
           {isContextOpen ? (
-            <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" />
+            <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" />
+            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" aria-hidden="true" />
           )}
-        </div>
+        </button>
+        {canAnalyze && aiResearch && (
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={isAnalyzing}
+            aria-disabled={isAnalyzing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-cobalt/10 hover:bg-blue-100 rounded-md transition-colors aria-disabled:opacity-50 aria-disabled:pointer-events-none"
+          >
+            <Loader2 className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : 'hidden'}`} aria-hidden="true" />
+            {!isAnalyzing && <RefreshCw className="w-4 h-4" aria-hidden="true" />}
+            {isAnalyzing && analyzeStep
+              ? t(`step${analyzeStep.charAt(0).toUpperCase()}${analyzeStep.slice(1)}` as 'stepSearching' | 'stepAnalyzing' | 'stepEstimating')
+              : t('analyze')}
+          </button>
+        )}
       </div>
 
       {/* Current context card — always in the DOM (crawlable); collapsed via CSS
           rather than removed, so the AI summary, estimate, reasoning and Oracle
           sources are part of the SSR HTML for SEO. */}
       {currentContext && (
-        <div className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${isContextOpen ? '' : 'hidden'}`}>
+        <div id={`context-panel-${predictionId}`} className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${isContextOpen ? '' : 'hidden'}`}>
           <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">{currentContext}</p>
           {contextUpdatedAt && (
             <p className="text-xs text-gray-400 mt-2" suppressHydrationWarning>
