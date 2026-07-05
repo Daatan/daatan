@@ -83,6 +83,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '',          lastModified: new Date(),              frequency: 'daily'   as const, priority: 1.0, localized: true  },
     { route: '/forecasts',lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: true  },
     { route: '/about',    lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.8, localized: false },
+    { route: '/methodology', lastModified: new Date('2026-07-05'), frequency: 'monthly' as const, priority: 0.6, localized: false },
     { route: '/leaderboard', lastModified: new Date(),           frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/activity', lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/privacy',     lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: true  },

@@ -373,6 +373,7 @@ function SaasAboutPage() {
               )}
             </div>
             <div className="flex items-center gap-4 text-sm text-text-subtle">
+              <Link href="/methodology" className="hover:text-white hover:underline">Scoring Methodology</Link>
               <Link href="/privacy" className="hover:text-white hover:underline">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-white hover:underline">Terms of Service</Link>
               <Link href="/disclaimer" className="hover:text-white hover:underline">Disclaimer</Link>
