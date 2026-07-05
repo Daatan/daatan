@@ -40,7 +40,7 @@ interface UpdateCommitmentData {
 // ============================================
 
 /** Why new/changed commitments are refused even on an ACTIVE prediction. Null = open. */
-export type CommitmentLockReason = 'settled' | 'deadline-passed' | 'impossibility-pinned' | null
+export type CommitmentLockReason = 'deadline-passed' | 'impossibility-pinned' | null
 
 /** claimDeadline (LLM-parsed) and resolveByDatetime (platform-authoritative) must
  *  agree within this window to trust an impossibility auto-lock — mirrors
@@ -49,11 +49,13 @@ export type CommitmentLockReason = 'settled' | 'deadline-passed' | 'impossibilit
 const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
 
 /**
- * Committing after the outcome is already known (Oracle settlement pin) or after
- * the resolution deadline is a free-points exploit: rsChange = (0.25 − brier) × 100
- * has no time discount, so a sure-thing commit yields ~+25 RS risk-free.
+ * Committing after the resolution deadline is a free-points exploit: rsChange =
+ * (0.25 − brier) × 100 has no time discount, so a sure-thing commit yields ~+25
+ * RS risk-free. An Oracle settlement pin (prediction.settled) does NOT lock
+ * commitments — it's classifier-derived and can misfire on contradictory source
+ * evidence, so it's surfaced only as a notification/banner, never a hard block.
  *
- * The third arm — claimDeadline itself has literally passed — auto-locks ONLY
+ * The second arm — claimDeadline itself has literally passed — auto-locks ONLY
  * when it agrees with resolveByDatetime within tolerance: that's pure calendar
  * arithmetic, no LLM judgment call in the loop. A tau_lead-derived early
  * impossibility (tEff passed but the literal claimDeadline hasn't) does NOT
@@ -64,7 +66,6 @@ export function getCommitmentLockReason(
   prediction: { settled: boolean; resolveByDatetime: Date; claimDeadline?: Date | null },
   now: Date = new Date(),
 ): CommitmentLockReason {
-  if (prediction.settled) return 'settled'
   if (prediction.resolveByDatetime <= now) return 'deadline-passed'
   if (
     prediction.claimDeadline &&
@@ -77,7 +78,6 @@ export function getCommitmentLockReason(
 }
 
 const LOCK_ERRORS: Record<NonNullable<CommitmentLockReason>, string> = {
-  settled: 'Commitments are closed — the outcome has been reported and this forecast is awaiting resolution',
   'deadline-passed': 'Commitments are closed — the resolution deadline has passed',
   'impossibility-pinned': 'Commitments are closed — the claim deadline has passed',
 }

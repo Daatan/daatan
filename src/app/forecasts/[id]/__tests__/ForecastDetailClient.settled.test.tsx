@@ -51,7 +51,7 @@ const wrap = (ui: React.ReactElement) => (
 const globalFetch = global.fetch
 afterEach(() => { global.fetch = globalFetch })
 
-describe('ForecastDetailClient — settled lock', () => {
+describe('ForecastDetailClient — settled notification', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useSession).mockReturnValue({
@@ -59,7 +59,7 @@ describe('ForecastDetailClient — settled lock', () => {
     } as never)
   })
 
-  it('shows the settled banner and disables the slider when settled', async () => {
+  it('shows the settled banner but keeps the slider enabled — settlement is notification-only', async () => {
     const prediction = makePrediction({ settled: true })
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => prediction })
 
@@ -69,7 +69,7 @@ describe('ForecastDetailClient — settled lock', () => {
 
     expect(await screen.findByText(/outcome reported/i)).toBeInTheDocument()
     expect(confidenceSliderProps).toHaveBeenCalledWith(
-      expect.objectContaining({ disabled: true }),
+      expect.objectContaining({ disabled: false }),
     )
   })
 
