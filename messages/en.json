@@ -14,7 +14,8 @@
     "search": "Search",
     "signIn": "Sign In",
     "signOut": "Sign Out",
-    "noResults": "No results found"
+    "noResults": "No results found",
+    "skipToContent": "Skip to content"
   },
   "nav": {
     "feed": "Forecasts",

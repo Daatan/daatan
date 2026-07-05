@@ -119,6 +119,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                   value={option}
                   onChange={(e) => handleOptionChange(index, e.target.value)}
                   placeholder={t('optionPlaceholder', { n: index + 1 })}
+                  aria-label={t('optionPlaceholder', { n: index + 1 })}
                   className="flex-1 px-4 py-2 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
                   maxLength={500}
                 />

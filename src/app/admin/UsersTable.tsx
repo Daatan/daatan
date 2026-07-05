@@ -72,6 +72,7 @@ export default function UsersTable() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, email, or username..."
+              aria-label="Search by name, email, or username..."
               className="pl-10 pr-4 py-2 border border-navy-600 rounded-lg w-full bg-navy-700 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -117,6 +118,7 @@ export default function UsersTable() {
                       <select
                         value={u.role}
                         onChange={(e) => updateRole(u.id, e.target.value)}
+                        aria-label="Change user role"
                         className={`border rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${u.role === 'ADMIN' ? 'bg-purple-900/20 text-purple-800 border-purple-200' :
                           u.role === 'RESOLVER' ? 'bg-cobalt/10 text-cobalt-light border-cobalt/30' :
                             'bg-navy-700 text-white border-navy-600'

@@ -71,6 +71,7 @@ export default function CommentForm({
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={placeholder ?? t('shareThoughts')}
+        aria-label={placeholder ?? t('shareThoughts')}
         rows={parentId ? 2 : 3}
         maxLength={2000}
         className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cobalt resize-none"

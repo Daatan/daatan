@@ -288,6 +288,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
                     value={option}
                     onChange={(e) => handleOptionChange(index, e.target.value)}
                     placeholder={`Option ${index + 1}`}
+                    aria-label={`Option ${index + 1}`}
                     className="flex-1 px-4 py-2 bg-navy-800 text-white border border-navy-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     maxLength={500}
                   />

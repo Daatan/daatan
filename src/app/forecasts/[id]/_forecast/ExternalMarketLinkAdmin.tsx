@@ -191,6 +191,7 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://polymarket.com/event/… or kalshi.com/…"
+              aria-label="https://polymarket.com/event/… or kalshi.com/…"
               className="flex-1 px-3 py-2 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
             />
             <button

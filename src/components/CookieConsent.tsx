@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 
 const STORAGE_KEY = 'daatan_analytics_consent'
@@ -43,6 +43,8 @@ function applyConsent(value: ConsentValue) {
  */
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false)
+  const declineRef = useRef<HTMLButtonElement & HTMLAnchorElement>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     const stored = getStoredConsent()
@@ -51,32 +53,59 @@ export default function CookieConsent() {
       applyConsent(stored)
       return
     }
+    previouslyFocused.current = document.activeElement as HTMLElement | null
     setVisible(true)
   }, [])
+
+  useEffect(() => {
+    // Move focus into the banner so keyboard/screen-reader users notice it
+    // immediately. Not a focus trap — the banner has no backdrop and doesn't
+    // block the rest of the page, so trapping Tab here would hold keyboard
+    // users hostage to a decision that mouse users can freely ignore.
+    if (visible) declineRef.current?.focus()
+  }, [visible])
+
+  const dismiss = () => {
+    setVisible(false)
+    // Return focus to wherever the user was, but only if that element is
+    // still attached — a route change while the banner was up could have
+    // unmounted it.
+    if (previouslyFocused.current && document.body.contains(previouslyFocused.current)) {
+      previouslyFocused.current.focus()
+    }
+  }
 
   const handleAccept = () => {
     try { localStorage.setItem(STORAGE_KEY, 'granted') } catch { /* ignore */ }
     applyConsent('granted')
-    setVisible(false)
+    dismiss()
   }
 
   const handleDecline = () => {
     try { localStorage.setItem(STORAGE_KEY, 'denied') } catch { /* ignore */ }
     // consent stays 'denied' (default already set in GoogleAnalytics)
-    setVisible(false)
+    dismiss()
   }
 
   if (!visible) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-navy-700 border-t border-navy-600 shadow-lg">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-dismiss listener on the region, catching bubbled keydowns from its content; the region itself isn't made interactive
+    <div
+      role="region"
+      aria-label="Cookie consent"
+      aria-describedby="cookie-consent-description"
+      onKeyDown={(e) => { if (e.key === 'Escape') handleDecline() }}
+      className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-navy-700 border-t border-navy-600 shadow-lg"
+    >
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <p className="flex-1 text-sm text-gray-200">
+        <p id="cookie-consent-description" className="flex-1 text-sm text-gray-200">
           We use analytics cookies to understand how the app is used and improve it.
           No ads. No cross-site tracking.{' '}
         </p>
         <div className="flex gap-2 shrink-0">
           <Button
+            ref={declineRef}
             onClick={handleDecline}
             variant="outline"
             size="sm"

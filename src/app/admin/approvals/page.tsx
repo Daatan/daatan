@@ -306,6 +306,7 @@ export default function ApprovalsPage() {
                                         type="checkbox"
                                         checked={isSelected}
                                         onChange={() => toggleSelect(p.id)}
+                                        aria-label="Select forecast"
                                         className="mt-1 w-4 h-4 accent-blue-500 cursor-pointer shrink-0"
                                     />
                                 )}

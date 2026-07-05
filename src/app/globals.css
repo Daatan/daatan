@@ -50,6 +50,15 @@ body {
   overflow-x: clip;
 }
 
+/* ── ACCESSIBILITY ──────────────────────────────────────── */
+/* Keyboard-only focus ring (`:focus-visible` skips mouse/touch clicks) so every
+   interactive element gets a visible indicator even where a component doesn't
+   define its own — existing `focus:ring-*` utility classes still layer on top. */
+:focus-visible {
+  outline: 2px solid var(--color-cobalt-light);
+  outline-offset: 2px;
+}
+
 /* ── COMPONENTS ─────────────────────────────────────────── */
 @layer components {
   .input-dark {

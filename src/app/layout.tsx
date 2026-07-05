@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
 import { Inter, Heebo } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
-import { getLocale, getMessages } from 'next-intl/server'
+import { getLocale, getMessages, getTranslations } from 'next-intl/server'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
@@ -122,6 +122,7 @@ export default async function RootLayout({
   const cookieLocale = (await getLocale()) as Locale
   const locale: Locale = urlLocale ?? cookieLocale
   const messages = await getMessages()
+  const t = await getTranslations('common')
   // APP_ENV, not NEXT_PUBLIC_ENV: staging runs the same promoted Docker image
   // as production, so this must read the runtime instance var — see src/env.ts.
   const isStaging = env.APP_ENV === 'staging'
@@ -130,6 +131,12 @@ export default async function RootLayout({
   return (
     <html lang={locale} dir={isRtl(locale) ? 'rtl' : 'ltr'} suppressHydrationWarning>
       <body className={`${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-lg focus:bg-navy-900 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
+        >
+          {t('skipToContent')}
+        </a>
         <GoogleAnalytics measurementId={gaMeasurementId} isStaging={isStaging} />
         <NextIntlClientProvider messages={messages}>
           <CapabilitiesProvider value={getCapabilities()}>

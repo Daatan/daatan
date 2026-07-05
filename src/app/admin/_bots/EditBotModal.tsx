@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { Loader2, Check, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { STANDARD_TAGS } from '@/lib/constants'
@@ -15,6 +15,7 @@ interface Props {
 
 export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
   const t = useTranslations('admin')
+  const voteBiasId = useId()
   const [form, setForm] = useState({
     personaPrompt: bot.personaPrompt,
     forecastPrompt: bot.forecastPrompt,
@@ -108,7 +109,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
       <div className="bg-navy-700 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-navy-700 z-10">
           <h3 className="font-semibold text-white">{t('editBotTitle', { name: bot.user.name ?? '' })}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -234,13 +235,13 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               </label>
             </div>
             <div className="max-w-xs">
-              <label className="block text-xs font-medium text-gray-400 mb-1">
+              <label htmlFor={voteBiasId} className="block text-xs font-medium text-gray-400 mb-1">
                 {t('voteBias', { bias: form.voteBias })}
                 <span className="ml-2 text-gray-400 font-normal">
                   ({form.voteBias < 40 ? t('leansNo') : form.voteBias > 60 ? t('leansYes') : t('neutral')})
                 </span>
               </label>
-              <input type="range" min={0} max={100} value={form.voteBias}
+              <input id={voteBiasId} type="range" min={0} max={100} value={form.voteBias}
                 onChange={(e) => setForm({ ...form, voteBias: parseInt(e.target.value) })}
                 className="w-full accent-blue-600" />
               <div className="flex justify-between text-xs text-gray-400 mt-0.5">
@@ -282,7 +283,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                 {form.tagFilter.map(slug => (
                   <span key={slug} className="inline-flex items-center gap-1 bg-blue-100 text-cobalt-light px-2 py-0.5 rounded text-xs font-medium">
                     {allTags.find(t => t.slug === slug)?.name ?? slug}
-                    <button type="button" onClick={() => toggleTag(slug)} className="hover:text-blue-900">
+                    <button type="button" onClick={() => toggleTag(slug)} aria-label={`Remove ${allTags.find(t => t.slug === slug)?.name ?? slug}`} className="hover:text-blue-900">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -294,6 +295,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                   onChange={(e) => { setTagInput(e.target.value); setShowTagSuggestions(true) }}
                   onFocus={() => setShowTagSuggestions(true)}
                   placeholder={t('searchTags')}
+                  aria-label={t('searchTags')}
                   className="w-full border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -344,9 +346,13 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  // A plain-text group label, not <label>, because children isn't always a
+  // single labelable control (e.g. the tag-filter field wraps chips + an
+  // input) — role="group" + aria-labelledby works for either shape.
+  const labelId = useId()
   return (
-    <div>
-      <label className="block text-sm font-medium text-text-secondary mb-1">{label}</label>
+    <div role="group" aria-labelledby={labelId}>
+      <div id={labelId} className="block text-sm font-medium text-text-secondary mb-1">{label}</div>
       {hint && <p className="text-xs text-gray-400 mb-1">{hint}</p>}
       {children}
     </div>
@@ -356,10 +362,11 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function NumberField({ label, value, min, max, onChange }: {
   label: string; value: number; min: number; max?: number; onChange: (v: number) => void
 }) {
+  const id = useId()
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-400 mb-1">{label}</label>
-      <input type="number" value={value} min={min} max={max}
+      <label htmlFor={id} className="block text-xs font-medium text-gray-400 mb-1">{label}</label>
+      <input id={id} type="number" value={value} min={min} max={max}
         onChange={(e) => onChange(parseInt(e.target.value) || min)}
         className="w-full border rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
     </div>

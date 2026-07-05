@@ -60,7 +60,7 @@ export function CreateBotForm({ onCreated, onCancel }: Props) {
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             {t('create')}
           </button>
-          <button type="button" onClick={onCancel} className="p-1.5 text-gray-500 hover:text-text-secondary">
+          <button type="button" onClick={onCancel} aria-label="Cancel" className="p-1.5 text-gray-500 hover:text-text-secondary">
             <X className="w-4 h-4" />
           </button>
         </div>

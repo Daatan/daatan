@@ -195,6 +195,7 @@ function ForecastsTab() {
           <input
             type="text"
             placeholder={t('searchForecasts')}
+            aria-label={t('searchForecasts')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -350,6 +351,7 @@ function CommentsTab() {
           <input
             type="text"
             placeholder={t('searchComments')}
+            aria-label={t('searchComments')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -505,6 +507,7 @@ function UsersTab() {
         <input
           type="text"
           placeholder={t('searchUsers')}
+          aria-label={t('searchUsers')}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -586,6 +589,7 @@ function UsersTab() {
                           value={u.role}
                           onChange={(e) => updateRole(u.id, e.target.value as AdminUser['role'])}
                           disabled={updatingId === u.id}
+                          aria-label="Change user role"
                           className="text-xs border border-navy-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                         >
                           <option value="USER">{t('roleUser')}</option>
@@ -627,6 +631,7 @@ function Pagination({ page, totalPages, total, onPageChange }: {
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
+          aria-label="Previous page"
           className="p-1.5 rounded-lg border border-navy-600 text-gray-500 hover:bg-navy-800 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -637,6 +642,7 @@ function Pagination({ page, totalPages, total, onPageChange }: {
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
+          aria-label="Next page"
           className="p-1.5 rounded-lg border border-navy-600 text-gray-500 hover:bg-navy-800 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />

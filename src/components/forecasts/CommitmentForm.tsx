@@ -84,6 +84,7 @@ function ConfidenceInput({
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value))}
           disabled={disabled}
+          aria-label="Confidence"
           className="w-full h-3 bg-navy-800 rounded-lg appearance-none cursor-pointer accent-blue-500 border border-navy-600"
         />
         {min === -100 && (
