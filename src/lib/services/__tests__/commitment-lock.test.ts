@@ -10,10 +10,10 @@ describe('getCommitmentLockReason', () => {
     ).toBeNull()
   })
 
-  it('returns "settled" when the outcome has been pinned', () => {
+  it('does NOT lock when settled — settlement is notification-only', () => {
     expect(
       getCommitmentLockReason({ settled: true, resolveByDatetime: new Date('2030-01-01') }, now),
-    ).toBe('settled')
+    ).toBeNull()
   })
 
   it('returns "deadline-passed" when resolveByDatetime has passed', () => {
@@ -28,10 +28,10 @@ describe('getCommitmentLockReason', () => {
     ).toBe('deadline-passed')
   })
 
-  it('prefers "settled" when both conditions hold', () => {
+  it('"deadline-passed" fires regardless of settled when the deadline has passed', () => {
     expect(
       getCommitmentLockReason({ settled: true, resolveByDatetime: new Date('2020-01-01') }, now),
-    ).toBe('settled')
+    ).toBe('deadline-passed')
   })
 
   describe('impossibility-pinned third arm', () => {

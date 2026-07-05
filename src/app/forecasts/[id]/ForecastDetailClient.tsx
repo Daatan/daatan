@@ -278,6 +278,8 @@ export default function ForecastDetailClient({
 
   // Mirrors getCommitmentLockReason server-side (client clock is fine — the
   // server re-validates and returns 409 with the human-readable reason).
+  // Note: an Oracle settlement pin (prediction.settled) is notification-only —
+  // it does not lock commitments, only the deadline arms below do.
   const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
   const nowMs = Date.now()
   const claimDeadlineMs = prediction.claimDeadline ? new Date(prediction.claimDeadline).getTime() : null
@@ -286,7 +288,7 @@ export default function ForecastDetailClient({
     claimDeadlineMs !== null &&
     claimDeadlineMs <= nowMs &&
     Math.abs(claimDeadlineMs - resolveByMs) <= DEADLINE_AGREEMENT_TOLERANCE_MS
-  const commitmentsLocked = !!prediction.settled || resolveByMs <= nowMs || impossibilityPinned
+  const commitmentsLocked = resolveByMs <= nowMs || impossibilityPinned
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
