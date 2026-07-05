@@ -26,7 +26,7 @@ Required env: `GEMINI_API_KEY`.
 
 ## Schema
 
-`prisma/schema.prisma:240` (Prediction model):
+`prisma/schema.prisma:329` (Prediction model):
 
 ```prisma
 embedding Unsupported("vector(768)")?
@@ -51,7 +51,7 @@ Prereq: the postgres image must include pgvector. Production now uses `pgvector/
 
 `GET /api/forecasts/similar?id=<id>&limit=3` (or `?q=<text>&tags=<csv>&limit=3`).
 
-The route delegates to `findSimilarForecasts()` in `src/lib/services/forecast.ts:261`. Core SQL:
+The route delegates to `findSimilarForecasts()` in `src/lib/services/forecast.ts:344`. Core SQL:
 
 ```sql
 SELECT p.id, p.claim_text, ...,
@@ -65,7 +65,7 @@ ORDER BY p.embedding <=> $vector::vector
 LIMIT $limit
 ```
 
-`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing the constant in `forecast.ts:237`.
+`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing the constant in `forecast.ts:320`.
 
 > **Known limitation / planned redesign:** this matches on `claimText` alone, so the
 > deadline is embedded as text while the structured `resolveByDatetime` is unused —

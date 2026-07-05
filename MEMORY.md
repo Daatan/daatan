@@ -2,9 +2,9 @@
 
 ## Architecture Decisions
 - PostgreSQL 16 for strict data integrity (not NoSQL)
-- Next.js 14 App Router (not Pages Router)
+- Next.js 15 App Router (not Pages Router)
 - Tailwind CSS with mobile-first approach
-- NextAuth.js for authentication (Google OAuth)
+- NextAuth.js for authentication (Google OAuth, plus a generic OIDC provider for self-hosted SSO)
 - Prisma as ORM
 
 ## Environment
@@ -16,7 +16,7 @@
 
 ## Key Files
 - Database schema: `prisma/schema.prisma`
-- Auth config: `src/lib/auth.ts`
+- Auth config: `src/auth.ts`
 - API routes: `src/app/api/`
 - Version: `src/lib/version.ts`
 - Deployment: `docker-compose.prod.yml`, `.github/workflows/deploy.yml`
