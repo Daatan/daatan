@@ -13,11 +13,17 @@ vi.mock('@/lib/prisma', () => ({
       count: vi.fn(),
       findFirst: vi.fn(),
     },
+    prediction: {
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))
 
 vi.mock('@/lib/services/embedding', () => ({ embedText: vi.fn() }))
+vi.mock('@/lib/services/context', () => ({ getLatestEvidenceEstimate: vi.fn() }))
+vi.mock('@/lib/services/telegram', () => ({ notifyMarketDivergence: vi.fn() }))
 
 import {
   normalizeGammaMarket,
@@ -35,6 +41,8 @@ import {
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
 import { embedText } from '@/lib/services/embedding'
+import { getLatestEvidenceEstimate } from '@/lib/services/context'
+import { notifyMarketDivergence } from '@/lib/services/telegram'
 
 /** Build a minimal fetch Response stand-in. */
 function jsonResponse(data: unknown, ok = true, status = 200) {
@@ -389,6 +397,133 @@ describe('syncLinkedMarkets', () => {
     await syncLinkedMarkets()
 
     expect(prisma.externalMarketPriceSnapshot.createMany).not.toHaveBeenCalled()
+  })
+
+  describe('market vs Oracle divergence', () => {
+    // gammaRow()'s default outcomePrices ["0.68", "0.32"] → market YES probability 68.
+    const prediction = (overrides: Record<string, unknown> = {}) => ({
+      id: 'p1',
+      claimText: 'Will X happen?',
+      slug: 'will-x-happen',
+      externalMarketInverted: false,
+      marketDivergenceAlertAt: null,
+      ...overrides,
+    })
+
+    beforeEach(() => {
+      global.fetch = gammaFetchMock([])
+    })
+
+    it('notifies and stamps the alert when the gap first crosses the threshold', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction()] },
+      ] as never)
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 40, createdAt: new Date() } as never)
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 } as never)
+
+      await syncLinkedMarkets()
+
+      // market 68 vs oracle 40 → 28pt gap, above the 20pt threshold.
+      expect(prisma.prediction.updateMany).toHaveBeenCalledWith({
+        where: { id: 'p1', marketDivergenceAlertAt: null },
+        data: { marketDivergenceAlertAt: expect.any(Date) },
+      })
+      expect(notifyMarketDivergence).toHaveBeenCalledWith(
+        { id: 'p1', claimText: 'Will X happen?', slug: 'will-x-happen' },
+        68,
+        40,
+        28,
+      )
+    })
+
+    it('does not notify when a concurrent run already claimed the crossing', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction()] },
+      ] as never)
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 40, createdAt: new Date() } as never)
+      // Another runner already flipped null → set between our read and our claim attempt.
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 0 } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+    })
+
+    it('does not re-notify while already alerted and still divergent', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        {
+          id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET',
+          predictions: [prediction({ marketDivergenceAlertAt: new Date('2026-07-01') })],
+        },
+      ] as never)
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 40, createdAt: new Date() } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.update).not.toHaveBeenCalled()
+    })
+
+    it('re-arms (clears the alert) once the gap closes', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        {
+          id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET',
+          predictions: [prediction({ marketDivergenceAlertAt: new Date('2026-07-01') })],
+        },
+      ] as never)
+      // market 68 vs oracle 60 → 8pt gap, back under the threshold.
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 60, createdAt: new Date() } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.update).toHaveBeenCalledWith({
+        where: { id: 'p1' },
+        data: { marketDivergenceAlertAt: null },
+      })
+    })
+
+    it('stays alerted in the hysteresis band (below the alert threshold but above the rearm bar)', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        {
+          id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET',
+          predictions: [prediction({ marketDivergenceAlertAt: new Date('2026-07-01') })],
+        },
+      ] as never)
+      // market 68 vs oracle 50 → 18pt gap: under the 20pt alert bar but above
+      // the 15pt rearm bar, so it must neither re-notify nor clear the alert.
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 50, createdAt: new Date() } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.update).not.toHaveBeenCalled()
+      expect(prisma.prediction.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('inverts the market probability for a prediction linked in the opposite direction', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction({ externalMarketInverted: true })] },
+      ] as never)
+      // Inverted: 100 - 68 = 32 vs oracle 40 → 8pt gap, under the threshold.
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 40, createdAt: new Date() } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+    })
+
+    it('skips a prediction with no Oracle estimate yet', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction()] },
+      ] as never)
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue(null)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.update).not.toHaveBeenCalled()
+    })
   })
 })
 
