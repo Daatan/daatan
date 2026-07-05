@@ -234,3 +234,5 @@ ELO and Glicko-2 per-tag ratings start all users at default values within each t
 | `src/components/profile/ScoresGrid.tsx` | Profile page scores grid — renders all metrics for a single user |
 
 See also: [`docs/PROFILE_PAGE.md`](./PROFILE_PAGE.md) for the profile page architecture and per-user score display.
+
+The public-facing `/methodology` page (`src/app/methodology/page.tsx`, `he` variant at `src/app/[locale]/methodology/page.tsx`) is a plain-language, worked-example version of this reference — linked from the `/about` page footer.
