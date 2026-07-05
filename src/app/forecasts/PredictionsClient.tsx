@@ -130,10 +130,11 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               placeholder={t('searchPlaceholder')}
+              aria-label={t('searchPlaceholder')}
               className="w-full bg-navy-700 text-white text-sm pl-9 pr-8 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
             />
             {searchInput && (
-              <button type="button" onClick={clearSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+              <button type="button" onClick={clearSearch} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -184,7 +185,7 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-full text-xs font-medium">
                   <Search className="w-3 h-3" />
                   {activeQuery}
-                  <button onClick={clearSearch} className="hover:text-white ml-0.5">
+                  <button onClick={clearSearch} aria-label="Clear search" className="hover:text-white ml-0.5">
                     <X className="w-3 h-3" />
                   </button>
                 </span>

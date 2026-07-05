@@ -646,6 +646,7 @@ export default function ForecastDetailClient({
                               value={mcConfidence}
                               onChange={(e) => setMcConfidence(parseInt(e.target.value))}
                               disabled={isSubmitting}
+                              aria-label="Confidence"
                               className="w-full h-3 bg-navy-900 rounded-lg appearance-none cursor-pointer accent-blue-500 border border-blue-500/30"
                             />
                           </div>

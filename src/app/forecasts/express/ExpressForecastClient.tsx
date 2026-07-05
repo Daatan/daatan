@@ -665,6 +665,7 @@ export default function ExpressForecastClient({
               {isEditing ? (
                 <textarea
                   dir="auto"
+                  aria-label="Claim text"
                   value={editForm?.claimText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, claimText: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -685,6 +686,7 @@ export default function ExpressForecastClient({
               {isEditing ? (
                 <input
                   type="datetime-local"
+                  aria-label="Resolve by date"
                   value={editForm?.resolveByDatetime?.slice(0, 16)} // Format for input
                   min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -708,7 +710,7 @@ export default function ExpressForecastClient({
                   <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-navy-700 text-text-secondary rounded-full text-sm">
                     {tag}
                     {isEditing && (
-                      <button onClick={() => removeTag(tag)} className="hover:text-red-500">
+                      <button onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`} className="hover:text-red-500">
                         <X className="w-3 h-3" />
                       </button>
                     )}
@@ -722,9 +724,10 @@ export default function ExpressForecastClient({
                       onChange={e => setNewTag(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addTag()}
                       placeholder={t('addTagPlaceholder')}
+                      aria-label={t('addTagPlaceholder')}
                       className="px-3 py-1 rounded-full text-sm w-32 border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <button onClick={addTag} className="p-1 text-blue-600 hover:bg-cobalt/10 rounded-full">
+                    <button onClick={addTag} aria-label="Add tag" className="p-1 text-blue-600 hover:bg-cobalt/10 rounded-full">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
@@ -762,6 +765,7 @@ export default function ExpressForecastClient({
                             value={option}
                             onChange={(e) => handleOptionChange(index, e.target.value)}
                             placeholder={t('optionPlaceholder', { n: index + 1 })}
+                            aria-label={t('optionPlaceholder', { n: index + 1 })}
                             className="flex-1 px-3 py-2 rounded-lg text-sm border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             maxLength={500}
                           />
@@ -810,6 +814,7 @@ export default function ExpressForecastClient({
               {isEditing ? (
                 <textarea
                   dir="auto"
+                  aria-label="Context"
                   value={editForm?.detailsText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, detailsText: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -826,6 +831,7 @@ export default function ExpressForecastClient({
               {isEditing ? (
                 <textarea
                   dir="auto"
+                  aria-label="Resolution rules"
                   value={editForm?.resolutionRules}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, resolutionRules: e.target.value }) : null)}
                   className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"

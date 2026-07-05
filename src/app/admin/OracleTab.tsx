@@ -398,6 +398,7 @@ export default function OracleTab() {
           <select
             value={windowDays}
             onChange={e => setWindowDays(Number(e.target.value))}
+            aria-label="Filter by time window"
             className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
           >
             {WINDOW_OPTIONS.map(d => (
@@ -409,6 +410,7 @@ export default function OracleTab() {
             onChange={e => setSource(e.target.value)}
             className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             title="Filter by source workflow"
+            aria-label="Filter by source workflow"
           >
             <option value="">All sources</option>
             {sourceOptions.map(s => (
@@ -420,6 +422,7 @@ export default function OracleTab() {
             onChange={e => setCallType(e.target.value)}
             className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             title="Filter by call type"
+            aria-label="Filter by call type"
           >
             <option value="">All types</option>
             {CALLTYPE_OPTIONS.map(t => (
@@ -431,6 +434,7 @@ export default function OracleTab() {
             onChange={e => setStatus(e.target.value)}
             className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             title="Filter by call status"
+            aria-label="Filter by call status"
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map(s => (

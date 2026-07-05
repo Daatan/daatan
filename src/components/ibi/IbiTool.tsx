@@ -294,12 +294,14 @@ export default function IbiTool() {
             value={state.articleUrl}
             onChange={e => setState(s => ({ ...s, articleUrl: e.target.value }))}
             placeholder="Article URL"
+            aria-label="Article URL"
           />
           <input
             className="w-36 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
             type="date"
             value={state.articleDate}
             onChange={e => setState(s => ({ ...s, articleDate: e.target.value }))}
+            aria-label="Article date"
           />
           <button
             onClick={fetchArticle}
@@ -325,6 +327,7 @@ export default function IbiTool() {
           className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs focus:outline-none focus:border-blue-500 h-40 resize-y"
           value={s1Prompt}
           onChange={e => setS1Prompt(e.target.value)}
+          aria-label="Extraction prompt"
         />
         <button
           onClick={runStage1}
@@ -340,6 +343,7 @@ export default function IbiTool() {
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs h-40 resize-y focus:outline-none focus:border-blue-500"
               value={s1Output}
               onChange={e => setS1Output(e.target.value)}
+              aria-label="Extraction output"
             />
             <button
               onClick={proceedToStage2}
@@ -360,6 +364,7 @@ export default function IbiTool() {
             value={s2Query}
             onChange={e => setS2Query(e.target.value)}
             placeholder="Search query"
+            aria-label="Search query"
           />
           <input
             className="w-36 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
@@ -367,6 +372,7 @@ export default function IbiTool() {
             value={s2DateTo}
             onChange={e => setS2DateTo(e.target.value)}
             placeholder="Date to"
+            aria-label="Date to"
           />
           <button
             onClick={runSearch}
@@ -409,6 +415,7 @@ export default function IbiTool() {
           className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs focus:outline-none focus:border-blue-500 h-40 resize-y"
           value={s2ConsensusPrompt}
           onChange={e => setS2ConsensusPrompt(e.target.value)}
+          aria-label="Consensus prompt"
         />
         <button
           onClick={runConsensus}
@@ -503,6 +510,7 @@ function ModelSelect({
         className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
         value={model}
         onChange={e => onModel(e.target.value)}
+        aria-label="Model"
       >
         {MODELS.map(m => (
           <option key={m.value} value={m.value}>{m.label}</option>
@@ -514,6 +522,7 @@ function ModelSelect({
           value={custom}
           onChange={e => onCustom(e.target.value)}
           placeholder="provider/model-name"
+          aria-label="Custom model name"
         />
       )}
     </div>

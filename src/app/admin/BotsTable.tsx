@@ -179,7 +179,7 @@ export default function BotsTable() {
         <div className="mb-6 border-2 border-cobalt/30 bg-cobalt/10 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-blue-600 px-4 py-2 flex justify-between items-center">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">{t('runSummary', { name: runResult.botName })}</h3>
-            <button onClick={() => setRunResult(null)} className="text-blue-100 hover:text-white">
+            <button onClick={() => setRunResult(null)} aria-label="Dismiss" className="text-blue-100 hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>

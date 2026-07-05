@@ -195,6 +195,7 @@ const Sidebar = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={ff('searchPlaceholder')}
+              aria-label={ff('searchPlaceholder')}
               type="search"
               className="flex-1 min-w-0 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
               onKeyDown={e => { if (e.key === 'Escape') { setMobileSearchOpen(false); setSearchQuery('') } }}
@@ -302,10 +303,11 @@ const Sidebar = () => {
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder={ff('searchPlaceholder')}
+                    aria-label={ff('searchPlaceholder')}
                     className="flex-1 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
                     onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
                   />
-                  <button type="button" onClick={() => setSearchOpen(false)} className="p-1 text-gray-400 hover:text-white">
+                  <button type="button" onClick={() => setSearchOpen(false)} aria-label={c('close')} className="p-1 text-gray-400 hover:text-white">
                     <X className="w-4 h-4" />
                   </button>
                 </form>

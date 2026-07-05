@@ -192,6 +192,7 @@ export default function NotificationPreferences() {
                     } disabled:opacity-50`}
                     role="switch"
                     aria-checked={pref.inApp}
+                    aria-label={`${t('inApp')}: ${t(TYPE_LABEL_KEYS[pref.type])}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-navy-700 shadow ring-0 transition duration-200 ease-in-out ${
@@ -210,6 +211,7 @@ export default function NotificationPreferences() {
                       } disabled:opacity-50`}
                       role="switch"
                       aria-checked={pref.browserPush}
+                      aria-label={`${t('push')}: ${t(TYPE_LABEL_KEYS[pref.type])}`}
                     >
                       <span
                         className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-navy-700 shadow ring-0 transition duration-200 ease-in-out ${

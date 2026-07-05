@@ -62,6 +62,7 @@ export default function ConfidenceSlider({
             value={value}
             onChange={(e) => onChange(Math.round(parseFloat(e.target.value)))}
             disabled={disabled || isSubmitting}
+            aria-label="Confidence"
             className="w-full h-3 bg-navy-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all border border-navy-600 shadow-inner"
           />
           {/* Midpoint mark at 50 */}
