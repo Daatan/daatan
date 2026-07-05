@@ -149,6 +149,7 @@ export default function SettingsPanel() {
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
                 placeholder="sk-or-…"
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional: moves focus to the input this click just revealed
                 autoFocus
               />
               <button type="button" onClick={() => { setEditingKey(false); setKeyInput('') }} className="text-sm text-gray-400 hover:text-white">

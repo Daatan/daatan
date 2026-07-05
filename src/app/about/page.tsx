@@ -26,6 +26,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Markdown element styling for the dark theme (the app has no Tailwind
 // typography plugin). `node` is stripped so it never lands on a DOM element.
+// jsx-a11y can't see that `{...p}` always carries markdown-parsed children,
+// so heading/anchor content checks false-positive here — disabled below.
+/* eslint-disable jsx-a11y/heading-has-content, jsx-a11y/anchor-has-content */
 const mdComponents: Components = {
   h1: ({ node, ...p }) => <h1 className="text-2xl font-bold text-white mt-6 mb-3 first:mt-0" {...p} />,
   h2: ({ node, ...p }) => <h2 className="text-xl font-bold text-white mt-5 mb-2" {...p} />,

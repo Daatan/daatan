@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
+import { axe } from 'jest-axe'
 import Sidebar from '../Sidebar'
 import { useSession } from 'next-auth/react'
 import { vi, describe, it, expect } from 'vitest'
@@ -113,5 +114,15 @@ describe('Sidebar Component', () => {
     // Component should not throw error even if session hook fails
     const { container } = render(<Sidebar />)
     expect(container).toBeInTheDocument()
+  })
+
+  it('has no automatically detectable a11y violations', async () => {
+    vi.mocked(useSession).mockReturnValue({
+      data: null,
+      status: 'unauthenticated',
+    } as any)
+
+    const { container } = render(<Sidebar />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

@@ -380,6 +380,7 @@ export default function IbiTool() {
         {state.searchResults.length > 0 && (
           <div className="space-y-2">
             {state.searchResults.map(r => (
+              // eslint-disable-next-line jsx-a11y/label-has-associated-control -- text comes from r.title/r.snippet expressions, which the static rule can't see
               <label key={r.url} className="flex gap-2 items-start cursor-pointer">
                 <input
                   type="checkbox"

@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { vi, expect } from 'vitest'
+import { toHaveNoViolations } from 'jest-axe'
+
+expect.extend(toHaveNoViolations)
 
 // Ensure env validation is skipped in tests; set dummies so @t3-oss/env-nextjs has values if any test imports env
 process.env.SKIP_ENV_VALIDATION = '1'

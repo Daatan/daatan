@@ -213,7 +213,7 @@ const Sidebar = () => {
         ) : (
         <>
         <Link href="/" className="flex items-center gap-2" onClick={handleCloseMenu}>
-          <BrandLogo fallbackSrc="/logo-icon.png" width={40} height={40} priority />
+          <BrandLogo fallbackSrc="/logo-icon.png" width={40} height={40} priority alt="" />
           <span className="text-lg font-bold text-white">{appName}</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ const Sidebar = () => {
       >
         {/* Logo */}
         <Link href="/" className="hidden lg:flex p-6 items-center gap-3 hover:bg-navy-800 transition-colors">
-          <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} priority />
+          <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} priority alt="" />
           <div className="min-w-0">
             <span className="block text-lg font-bold text-white leading-tight">{appName}</span>
             <p className="text-sm text-text-secondary">{t('tagline')}</p>
