@@ -81,8 +81,10 @@ export function handleRouteError(
 
   log.error({ err: error }, fallbackMessage)
 
-  // Include error details in staging for easier debugging
-  const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
+  // Include error details in staging for easier debugging. APP_ENV, not
+  // NEXT_PUBLIC_ENV: staging runs the same promoted Docker image as
+  // production, so this must read the runtime instance var — see src/env.ts.
+  const isStaging = process.env.APP_ENV === 'staging'
   const body: ApiErrorBody = { error: fallbackMessage }
   if (isStaging && error instanceof Error) {
     body.details = [{ path: [], message: error.message }]

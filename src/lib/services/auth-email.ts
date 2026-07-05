@@ -15,7 +15,9 @@ const log = createLogger('auth-email')
 
 const APP_URL    = process.env.NEXTAUTH_URL ?? 'https://daatan.com'
 const FROM       = process.env.EMAIL_FROM   ?? 'Daatan <noreply@daatan.com>'
-const isStaging  = process.env.NEXT_PUBLIC_ENV === 'staging'
+// APP_ENV, not NEXT_PUBLIC_ENV: staging runs the same promoted Docker image as
+// production, so this must read the runtime instance var — see src/env.ts.
+const isStaging  = process.env.APP_ENV === 'staging'
 
 let _resend: Resend | null = null
 function getResend(): Resend | null {

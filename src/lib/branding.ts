@@ -67,7 +67,11 @@ export function getBranding(): Branding {
  */
 export function shouldIndex(): boolean {
   if (isSelfHosted()) return false
-  return env.NEXT_PUBLIC_ENV === 'production'
+  // APP_ENV (not NEXT_PUBLIC_ENV): staging and production run the same
+  // promoted Docker image, so a build-time-inlined var reads the build's
+  // origin, not which instance this actually is. APP_ENV is set per-instance
+  // at container runtime — see src/env.ts.
+  return env.APP_ENV === 'production'
 }
 
 /** Site-verification tokens — only meaningful for the SaaS daatan.com property. */

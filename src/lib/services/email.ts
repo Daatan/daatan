@@ -11,7 +11,9 @@ function getResend(): Resend | null {
 }
 
 const APP_URL = process.env.NEXTAUTH_URL ?? 'https://daatan.com'
-const isStaging = process.env.NEXT_PUBLIC_ENV === 'staging'
+// APP_ENV, not NEXT_PUBLIC_ENV: staging runs the same promoted Docker image as
+// production, so this must read the runtime instance var — see src/env.ts.
+const isStaging = process.env.APP_ENV === 'staging'
 
 /**
  * Dispatch a transactional email to a user.

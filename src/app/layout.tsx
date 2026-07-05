@@ -122,7 +122,9 @@ export default async function RootLayout({
   const cookieLocale = (await getLocale()) as Locale
   const locale: Locale = urlLocale ?? cookieLocale
   const messages = await getMessages()
-  const isStaging = env.NEXT_PUBLIC_ENV === 'staging'
+  // APP_ENV, not NEXT_PUBLIC_ENV: staging runs the same promoted Docker image
+  // as production, so this must read the runtime instance var — see src/env.ts.
+  const isStaging = env.APP_ENV === 'staging'
   const gaMeasurementId = isStaging ? 'G-Z4XXM7GYHW' : (process.env.GA_MEASUREMENT_ID ?? '')
 
   return (

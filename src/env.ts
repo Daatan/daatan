@@ -82,6 +82,15 @@ export const env = createEnv({
     // Optional / Other
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     NEXTAUTH_DEBUG: z.enum(['true', 'false']).optional(),
+
+    // Which deployed instance this is — set at container RUNTIME (docker-compose
+    // `environment:` / blue-green-deploy.sh -e APP_ENV=..., not a build arg), so
+    // it reads correctly even though staging and production run the same
+    // promoted Docker image. Unlike NEXT_PUBLIC_ENV (inlined at build time and
+    // therefore frozen to whatever the single shared image was built with),
+    // this is the one to use for any staging-vs-production runtime behavior
+    // (indexability, GA property, email redirect gating, debug logging, etc).
+    APP_ENV: z.enum(['development', 'staging', 'next', 'production']).default('development'),
     
     // AI / Analytics
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -169,6 +178,7 @@ export const env = createEnv({
     ENABLE_EXTERNAL_MARKETS: process.env.ENABLE_EXTERNAL_MARKETS,
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
+    APP_ENV: process.env.APP_ENV,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,

@@ -67,9 +67,9 @@ describe('branding (SaaS / unset edition — must match the old literals)', () =
   })
 
   it('indexes only in production', async () => {
-    mockEnv.NEXT_PUBLIC_ENV = 'production'
+    mockEnv.APP_ENV = 'production'
     expect((await load()).shouldIndex()).toBe(true)
-    mockEnv.NEXT_PUBLIC_ENV = 'staging'
+    mockEnv.APP_ENV = 'staging'
     expect((await load()).shouldIndex()).toBe(false)
   })
 })
@@ -137,7 +137,7 @@ describe('branding (self_hosted)', () => {
   it('never indexes and never emits Daatan verification tokens', async () => {
     mockEnv.APP_NAME = 'Acme'
     mockEnv.APP_URL = 'https://forecast.acme.example'
-    mockEnv.NEXT_PUBLIC_ENV = 'production'
+    mockEnv.APP_ENV = 'production'
     const b = await load()
     expect(b.shouldIndex()).toBe(false)
     expect(b.getVerificationTokens()).toBeNull()
