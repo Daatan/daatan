@@ -333,6 +333,13 @@ export default async function ForecastDetailPage({ params }: Props) {
       name: 'DAATAN',
       url: `https://daatan.com/forecasts/${slug}`,
     },
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+      url: `https://daatan.com/forecasts/${slug}`,
+    },
   } : null
 
   const claimReviewJsonLd =
