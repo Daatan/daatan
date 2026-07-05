@@ -4,7 +4,7 @@ async function main() {
   console.log('--- Telegram Notification Test ---')
   console.log('Bot Token:', process.env.TELEGRAM_BOT_TOKEN ? 'Set' : 'MISSING')
   console.log('Chat ID:', process.env.TELEGRAM_CHAT_ID ? 'Set' : 'MISSING')
-  console.log('Env:', process.env.NEXT_PUBLIC_ENV)
+  console.log('Env:', process.env.APP_ENV)
 
   const mockPrediction = {
     id: 'test-123',

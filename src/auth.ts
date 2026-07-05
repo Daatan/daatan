@@ -17,8 +17,10 @@ import { isEmailDomainAllowed, parseAllowedDomains } from "@/lib/auth/access"
 const log = createLogger('auth')
 
 const isTest = process.env.PLAYWRIGHT_TEST === 'true'
-const isStaging = env.NEXT_PUBLIC_ENV === 'staging'
-const isHosted = env.NEXT_PUBLIC_ENV === 'staging' || env.NEXT_PUBLIC_ENV === 'production'
+// APP_ENV, not NEXT_PUBLIC_ENV: staging and production run the same promoted
+// Docker image, so this must read the runtime instance var — see src/env.ts.
+const isStaging = env.APP_ENV === 'staging'
+const isHosted = env.APP_ENV === 'staging' || env.APP_ENV === 'production'
 
 // Merge Edge-compatible config (`authConfig`, used by middleware) with Node-only
 // features: Prisma adapter, bcrypt-backed Credentials provider, and the

@@ -6,7 +6,9 @@ import { env } from "@/env"
 // runtime. It MUST NOT import Prisma, bcrypt, or any other Node-only module.
 // The Credentials provider (and the Playwright test provider) both need DB
 // access and therefore live in `src/auth.ts`, which runs on Node.
-const isHosted = env.NEXT_PUBLIC_ENV === 'staging' || env.NEXT_PUBLIC_ENV === 'production'
+// APP_ENV, not NEXT_PUBLIC_ENV: staging and production run the same promoted
+// Docker image, so this must read the runtime instance var — see src/env.ts.
+const isHosted = env.APP_ENV === 'staging' || env.APP_ENV === 'production'
 
 // Register Google only when credentials are present. The SaaS edition always
 // sets these; a self-hosted install authenticates via OIDC/SAML (Phase 1) or

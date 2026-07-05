@@ -67,7 +67,10 @@ function localizedAlternates(path: string) {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const isProd = env.NEXT_PUBLIC_ENV === 'production'
+  // APP_ENV, not NEXT_PUBLIC_ENV: staging and production run the same
+  // promoted Docker image (build-time vars are frozen to whichever env built
+  // it), so this must read the runtime-set instance var instead — see src/env.ts.
+  const isProd = env.APP_ENV === 'production'
 
   // If not production, return empty sitemap to avoid indexing staging
   if (!isProd) {

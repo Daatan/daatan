@@ -10,7 +10,7 @@ type ProviderLike = { id?: string; type?: string; name?: string }
 function mockEnv(overrides: Record<string, unknown>) {
   vi.doMock('@/env', () => ({
     env: {
-      NEXT_PUBLIC_ENV: 'development',
+      APP_ENV: 'development',
       NEXTAUTH_SECRET: 'x'.repeat(32),
       GOOGLE_CLIENT_ID: undefined,
       GOOGLE_CLIENT_SECRET: undefined,
