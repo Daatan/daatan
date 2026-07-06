@@ -648,6 +648,29 @@ export function notifyDeadlineDivergence(
   sendChannelNotification(msg, 'noisy')
 }
 
+/**
+ * A linked prediction market's implied probability and our Oracle estimate
+ * disagree by more than the divergence threshold — worth a human look
+ * (mispriced market, stale Oracle estimate, or a real edge).
+ */
+export function notifyMarketDivergence(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  marketProbability: number,
+  oracleProbability: number,
+  gapPts: number,
+): void {
+  if (isDevEnv()) return
+
+  const msg = [
+    `📊 <b>Market ⇄ Oracle divergence</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Market ${marketProbability}% vs Oracle ${oracleProbability}% (Δ ${gapPts}pt).`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
 /** Daily fleet digest for the requote cron — only sent when something moved. */
 export function notifyRequoteSummary(s: {
   glided: number

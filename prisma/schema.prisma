@@ -365,6 +365,11 @@ model Prediction {
   teffProvisionalAlertAt DateTime? @map("teff_provisional_alert_at")
   divergenceAlertAt      DateTime? @map("divergence_alert_at")
 
+  // Single-shot alert dedup for the market-vs-Oracle divergence check (external-
+  // market-sync cron). Set when the gap first crosses the threshold; cleared
+  // once it closes so a later re-crossing fires again (see checkMarketDivergence).
+  marketDivergenceAlertAt DateTime? @map("market_divergence_alert_at")
+
   // External prediction-market link (opt-in — only some forecasts are linked).
   // Linking is admin-authoritative or via URL import; AI only suggests candidates.
   externalMarketId         String?         @map("external_market_id")

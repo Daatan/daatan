@@ -1,9 +1,20 @@
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { embedText } from '@/lib/services/embedding'
+import { getLatestEvidenceEstimate } from '@/lib/services/context'
+import { notifyMarketDivergence } from '@/lib/services/telegram'
 import type { ExternalMarket, MarketProvider as MarketProviderEnum } from '@prisma/client'
 
 const log = createLogger('external-markets')
+
+/** Percentage-point gap between a linked market's implied YES probability and
+ *  our Oracle estimate above which we alert — the two disagreeing enough to be
+ *  worth a human look (mispriced market, stale Oracle read, or a real edge). */
+const MARKET_DIVERGENCE_THRESHOLD_PTS = 20
+/** Re-arm only once the gap falls back to this (lower) bar, not merely below
+ *  MARKET_DIVERGENCE_THRESHOLD_PTS — the buffer stops a gap oscillating right
+ *  at the line (20.1 → 19.9 → 20.2 ...) from re-notifying every hourly sync. */
+const MARKET_DIVERGENCE_REARM_PTS = 15
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com'
 const CLOB_BASE = 'https://clob.polymarket.com'
@@ -503,7 +514,15 @@ export async function resolveMarketByUrl(url: string): Promise<ExternalMarket | 
 export async function syncLinkedMarkets(): Promise<{ synced: number; failed: number }> {
   const markets = await prisma.externalMarket.findMany({
     where: { predictions: { some: {} } },
-    select: { id: true, slug: true, externalId: true, provider: true },
+    select: {
+      id: true,
+      slug: true,
+      externalId: true,
+      provider: true,
+      predictions: {
+        select: { id: true, claimText: true, slug: true, externalMarketInverted: true, marketDivergenceAlertAt: true },
+      },
+    },
   })
 
   let synced = 0
@@ -547,6 +566,7 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
         }),
       ])
       synced++
+      await checkMarketDivergence(cached.predictions ?? [], latest.yesProbability)
     } catch (err) {
       log.error({ marketId: cached.id, err: String(err) }, 'Failed to sync market')
       failed++
@@ -555,6 +575,53 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
 
   log.info({ total: markets.length, synced, failed }, 'External-market sync complete')
   return { synced, failed }
+}
+
+type DivergenceCandidate = {
+  id: string
+  claimText: string
+  slug: string | null
+  externalMarketInverted: boolean
+  marketDivergenceAlertAt: Date | null
+}
+
+/**
+ * For every prediction linked to a just-synced market, compare the market's
+ * implied probability (inverted per-prediction if the link asks the opposite
+ * question) against our latest Oracle estimate. Alerts once when the gap first
+ * crosses MARKET_DIVERGENCE_THRESHOLD_PTS, then stays quiet until the gap
+ * closes — re-arming for a later re-crossing. Best-effort, never throws.
+ */
+async function checkMarketDivergence(
+  predictions: DivergenceCandidate[],
+  marketYesProbability: number,
+): Promise<void> {
+  for (const p of predictions) {
+    try {
+      const marketProbability = p.externalMarketInverted ? 100 - marketYesProbability : marketYesProbability
+      const anchor = await getLatestEvidenceEstimate(p.id)
+      if (!anchor) continue
+
+      const gapPts = Math.abs(marketProbability - anchor.externalProbability)
+
+      if (gapPts > MARKET_DIVERGENCE_THRESHOLD_PTS && p.marketDivergenceAlertAt === null) {
+        // Atomic claim-then-notify: only the runner that actually flips this
+        // row from null → set sends the alert, so an overlapping cron run
+        // (retry, manual trigger) can't double-fire for the same crossing.
+        const claimed = await prisma.prediction.updateMany({
+          where: { id: p.id, marketDivergenceAlertAt: null },
+          data: { marketDivergenceAlertAt: new Date() },
+        })
+        if (claimed.count > 0) {
+          notifyMarketDivergence({ id: p.id, claimText: p.claimText, slug: p.slug }, marketProbability, anchor.externalProbability, gapPts)
+        }
+      } else if (gapPts <= MARKET_DIVERGENCE_REARM_PTS && p.marketDivergenceAlertAt !== null) {
+        await prisma.prediction.update({ where: { id: p.id }, data: { marketDivergenceAlertAt: null } })
+      }
+    } catch (err) {
+      log.error({ predictionId: p.id, err: String(err) }, 'Failed to check market divergence')
+    }
+  }
 }
 
 /**
