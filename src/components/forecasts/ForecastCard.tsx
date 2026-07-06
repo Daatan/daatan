@@ -427,7 +427,7 @@ export default function ForecastCard({
                     href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
                     prefetch={false}
                     title={t('filterByTagTooltip', { tag: tag.name })}
-                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-blue-600 hover:bg-cobalt/20 hover:text-blue-400 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20 transition-colors"
+                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
                     {tag.name}
                   </Link>
@@ -483,7 +483,7 @@ export default function ForecastCard({
                   "you committed" indicator remains down here. */}
               {prediction.userHasCommitted && (
                 <div
-                  className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-blue-600 rounded-full text-[10px] font-medium"
+                  className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-[10px] font-medium"
                   title={t('committedTooltip')}
                 >
                   <CheckCircle2 className="w-3 h-3" />
