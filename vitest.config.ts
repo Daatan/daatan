@@ -11,6 +11,12 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/**', '**/*.integration.test.ts'],
     coverage: {
       provider: 'v8',
+      // `all: true` was removed in vitest v4's coverage options; `include`
+      // is the supported replacement — it makes every matching source file
+      // show up in the report (0% included) instead of only files touched
+      // by a test, which is how api-middleware.ts, auth.ts, cron-auth.ts,
+      // and api-edition-guard.ts were invisible in coverage before.
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
       reporter: ['text', 'json', 'html'],
       exclude: [
         '**/node_modules/**',
