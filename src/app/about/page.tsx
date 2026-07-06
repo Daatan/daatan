@@ -377,6 +377,7 @@ function SaasAboutPage() {
               <Link href="/privacy" className="hover:text-white hover:underline">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-white hover:underline">Terms of Service</Link>
               <Link href="/disclaimer" className="hover:text-white hover:underline">Disclaimer</Link>
+              <Link href="/accessibility" className="hover:text-white hover:underline">Accessibility</Link>
               <span>&copy; {new Date().getFullYear()} DAATAN</span>
             </div>
           </div>

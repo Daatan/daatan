@@ -89,6 +89,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/privacy',     lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
     { route: '/terms',       lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
     { route: '/disclaimer',  lastModified: new Date('2026-06-12'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
+    { route: '/accessibility', lastModified: new Date('2026-07-06'), frequency: 'monthly' as const, priority: 0.3, localized: false },
   ]
 
   const staticRoutes: MetadataRoute.Sitemap = staticRouteDefs.map(({ route, lastModified, frequency, priority, localized }) => ({

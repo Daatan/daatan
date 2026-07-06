@@ -63,10 +63,10 @@ Sources: [BOIA overview](https://www.boia.org/blog/israels-digital-accessibility
 - **Known, accepted trade-off — not touched**: axe flags `meta-viewport` (`maximumScale: 1, userScalable: false` in `layout.tsx`) as disabling pinch-zoom, a WCAG 1.4.4 violation. This was a deliberate mobile-UX decision made across two prior PRs (enabled, then re-disabled to stop accidental double-tap zoom on interactive elements) — flagging for a product decision rather than unilaterally reverting it again.
 - Manual keyboard-only walkthrough of the primary flows (forecast creation, resolution, commenting) — not yet done; automated tools don't catch everything (e.g. logical tab order, meaningful focus order in modals).
 
-**Phase 3 — Legal disclosures (can run in parallel with Phase 1/2, no code dependency)**
-- Draft and publish an accessibility statement page (`/accessibility` route) — WCAG level claimed, date of last review, known limitations, contact channel.
-- Designate an accessibility coordinator and publish their contact info on that same page.
-- Confirm with counsel: which revenue band applies, and whether a third-party certified audit is required/recommended for the accessibility statement's claims.
+**Phase 3 — Legal disclosures (can run in parallel with Phase 1/2, no code dependency)** ✅ statement page done
+- Published `/accessibility` (`src/app/accessibility/page.tsx`) — conformance status (partially conformant, WCAG 2.0 AA / IS 5568), last-reviewed date, known limitations (linking back to what Phase 2 tracked as not-yet-covered), and a feedback/contact section. Linked from `/about`'s "Contact & Info" section alongside Privacy/Terms/Disclaimer, and added to `sitemap.ts`.
+- Accessibility coordinator contact: reusing the existing `office@daatan.com` support inbox (a deliberate choice — see open question 2 below on whether a named individual is needed instead).
+- Still open: confirm with counsel which revenue band applies, and whether a third-party certified audit is required/recommended for the accessibility statement's claims.
 
 ## 5. Sequencing note
 
@@ -76,4 +76,4 @@ Phase 0 and Phase 3 have no dependency on each other or on Phase 1/2 — they ca
 
 1. Which revenue band does daatan.com fall into (exempt / NIS 100k–300k / ≥300k)? Determines urgency, not whether the work is worth doing.
 2. Do we need a third-party certified accessibility audit, or is an internal audit + statement sufficient for the initial disclosure?
-3. Who is designated as the accessibility coordinator (a real contact, not a generic inbox)?
+3. Who is designated as the accessibility coordinator (a real contact, not a generic inbox)? Currently using `office@daatan.com` on the statement page pending this decision.
