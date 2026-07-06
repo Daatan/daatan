@@ -17,7 +17,7 @@ GitHub → CI/CD (GitHub Actions) → ECR → EC2 via SSM → Blue-green swap �
 | Environment | URL                        | Trigger              | Image tag         | EC2 Instance            |
 |-------------|----------------------------|----------------------|-------------------|-------------------------|
 | Staging     | https://staging.daatan.com | Push to `main`       | `staging-latest`  | `i-0406d237ca5d92cdf`   |
-| Production  | https://daatan.com         | Git tag `v*`         | `1.8.X`           | `i-04ea44d4243d35624`   |
+| Production  | https://daatan.com         | Git tag `v*`         | `1.30.X`          | `i-04ea44d4243d35624`   |
 
 Each environment has its own EC2 instance, Postgres container, nginx, and SSL certificate.
 
@@ -49,8 +49,8 @@ When staging looks good, push a version tag:
 
 ```bash
 git checkout main && git pull
-git tag v1.8.X
-git push origin v1.8.X
+git tag v1.30.X
+git push origin v1.30.X
 ```
 
 This triggers the `deploy-production` job which:
@@ -73,9 +73,9 @@ This triggers the `deploy-production` job which:
 ### Bump commands
 
 ```bash
-npm version patch   # 1.8.5 → 1.8.6  (bug fixes, small changes)
-npm version minor   # 1.8.6 → 1.9.0  (new features)
-npm version major   # 1.9.0 → 2.0.0  (breaking changes)
+npm version patch   # 1.30.8 → 1.30.9  (bug fixes, small changes)
+npm version minor   # 1.30.9 → 1.31.0  (new features)
+npm version major   # 1.31.0 → 2.0.0   (breaking changes)
 ```
 
 ---
@@ -120,8 +120,8 @@ build ──┬──► deploy-staging    (on push to main)
 3. Verify staging version ≥ production target (safety gate)
 4. Check EC2 SSM health (`Environment=prod` instance)
 5. SSM command:
-   - Pull versioned app image (`1.8.X`) from ECR
-   - Pull versioned migrations image (`1.8.X-migrations`) from ECR
+   - Pull versioned app image (`1.30.X`) from ECR
+   - Pull versioned migrations image (`1.30.X-migrations`) from ECR
    - Run `blue-green-deploy.sh production`
 6. Poll + verify (via `.github/actions/ssm-deploy`)
 7. Send Telegram notification
@@ -192,8 +192,8 @@ See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` for full background.
 |---|---|---|
 | `staging-latest` | Latest staging app image | `runner` stage |
 | `staging-latest-migrations` | Latest staging migrations image | `migrations` stage |
-| `1.8.X` | Versioned production app image | `runner` stage |
-| `1.8.X-migrations` | Versioned production migrations image | `migrations` stage |
+| `1.30.X` | Versioned production app image | `runner` stage |
+| `1.30.X-migrations` | Versioned production migrations image | `migrations` stage |
 | `sha-<commit>` | Per-commit reference | `runner` stage |
 | `buildcache` | BuildKit layer cache | — |
 
@@ -282,15 +282,15 @@ Go to **Actions → CI/CD Pipeline → Run workflow**, select `staging`.
 ### Manual production deploy (workflow dispatch)
 
 Go to **Actions → CI/CD Pipeline → Run workflow**, select `production`, enter the
-version tag (e.g. `v1.8.32`).
+version tag (e.g. `v1.30.9`).
 
 ### Rollback production
 
 Tag the previous known-good commit and push:
 
 ```bash
-git tag v1.8.X <commit-sha>
-git push origin v1.8.X
+git tag v1.30.X <commit-sha>
+git push origin v1.30.X
 ```
 
 There are now two additional rollback paths: the GitHub Actions **Rollback**
