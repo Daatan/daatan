@@ -408,7 +408,7 @@ const Sidebar = () => {
           ) : (
             <button
               onClick={handleSignIn}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-cobalt hover:bg-navy-700 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-cobalt-light hover:bg-navy-700 transition-colors"
             >
               <LogIn className="w-5 h-5" />
               <span className="font-medium">{c('signIn')}</span>

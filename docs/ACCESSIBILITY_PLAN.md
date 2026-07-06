@@ -53,10 +53,15 @@ Sources: [BOIA overview](https://www.boia.org/blog/israels-digital-accessibility
 - Audit the 14 `<form>`-containing files and ensure every input has an associated `<label htmlFor>` or `aria-label`.
 - Add focus handling to `CookieConsent.tsx` (move focus to the banner on mount, trap tab order while visible, return focus on dismiss).
 
-**Phase 2 — Verification**
-- Run an automated contrast check (axe or Lighthouse) against the Tailwind color system; fix any AA failures (targeted CSS variable adjustments, not a redesign).
-- Run Lighthouse/axe CI against the main user flows (home, forecast detail, sign-in, sign-up, admin) and fix what surfaces.
-- Manual keyboard-only walkthrough of the primary flows (forecast creation, resolution, commenting) — automated tools don't catch everything (e.g. logical tab order, meaningful focus order in modals).
+**Phase 2 — Verification** ✅ initial pass done
+- Ran a real-browser axe-core sweep (jest-axe/jsdom can't compute actual color contrast) against the live staging deploy of Phase 1 (home, forecasts feed, leaderboard, sign-in, about) and against `tests/e2e/a11y.spec.ts` (new — `@axe-core/playwright`, runs under `npm run test:e2e` against a local build).
+- Fixed 3 confirmed AA contrast failures, verified by direct WCAG contrast-ratio calculation:
+  - Sidebar "Sign In" button (`text-cobalt` → `text-cobalt-light`, 3.71:1 → 5.28:1 on navy-900) — appears on every page for unauthenticated users.
+  - Forecast-card tag pills and the "committed" badge (`text-blue-600` → `text-cobalt-light`, 2.75:1 → ~4.5:1 on `bg-cobalt/10`) — the single largest failure by node count (42 occurrences across list pages).
+  - `StagingBanner.tsx` (`bg-amber-400/80` → `bg-amber-400`, 3.68:1 → 5.43:1) — staging-only, but real.
+- **Not yet swept**: `text-blue-600` on a `bg-cobalt/10`-style dark surface appears in at least 8 more files not covered by the 4 audited pages — `ContextTimeline.tsx`, `ResolutionForm.tsx`, `StepPrediction.tsx`, `ForecastWizard.tsx`, `NotificationList.tsx`, `ExpressForecastClient.tsx`, `ForecastDetailClient.tsx`, `CommentItem.tsx`. Same root cause (Tailwind's light-mode `blue-600` retrofitted onto this dark theme), same fix (`text-cobalt-light`) — each needs the actual background context checked before swapping, since `text-blue-600` is also used correctly in some light-surface contexts (e.g. `hover:bg-blue-100`) elsewhere. Tracked here, not silently skipped.
+- **Known, accepted trade-off — not touched**: axe flags `meta-viewport` (`maximumScale: 1, userScalable: false` in `layout.tsx`) as disabling pinch-zoom, a WCAG 1.4.4 violation. This was a deliberate mobile-UX decision made across two prior PRs (enabled, then re-disabled to stop accidental double-tap zoom on interactive elements) — flagging for a product decision rather than unilaterally reverting it again.
+- Manual keyboard-only walkthrough of the primary flows (forecast creation, resolution, commenting) — not yet done; automated tools don't catch everything (e.g. logical tab order, meaningful focus order in modals).
 
 **Phase 3 — Legal disclosures (can run in parallel with Phase 1/2, no code dependency)**
 - Draft and publish an accessibility statement page (`/accessibility` route) — WCAG level claimed, date of last review, known limitations, contact channel.
