@@ -123,7 +123,10 @@ Prediction {
 - Prediction text + details
 - Outcome definition (Binary/MC/Numeric)
 - Resolve-by deadline
-- Commitment details (CU, RS snapshot, weight)
+- Commitment details (confidence %, RS snapshot, weight) — `cuCommitted` is the underlying
+  DB field name (a holdover from the original CU-staking design, see
+  `.kiro/specs/prediction-commitment/`), but no "CU" label is ever shown to users; the UI
+  always converts it to a confidence percentage
 - Tags (displayed as colored pills on forecast cards)
 
 ### Editing Forecasts

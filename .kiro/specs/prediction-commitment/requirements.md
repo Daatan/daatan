@@ -1,5 +1,9 @@
 # Requirements Document: Prediction Commitment
 
+> **Historical record, not current design.** The CU economy (balances, returns) specified
+> below was subsequently abandoned; only the Brier/RS/Glicko-2/ELO scoring path is live
+> today. See `design.md`'s banner for details.
+
 ## Introduction
 
 This document specifies the requirements for the prediction commitment functionality in DAATAN, a reputation-based prediction platform. The commitment system allows users to stake Confidence Units (CU) on predictions, demonstrating their confidence in specific outcomes. When predictions resolve, users receive CU returns and Reputation Score (RS) adjustments based on the accuracy of their commitments.

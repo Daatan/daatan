@@ -1,5 +1,8 @@
 # Implementation Plan: Prediction Commitment
 
+> **Historical record, not a live plan.** This is the original implementation plan for the
+> CU-staking economy, later abandoned. See `design.md`'s banner for details.
+
 ## Overview
 
 This implementation plan builds upon existing commitment infrastructure (database models, basic create/delete endpoints) to complete the prediction commitment feature. The approach is incremental: first enhance API endpoints, then build UI components, then add property-based tests for correctness validation.

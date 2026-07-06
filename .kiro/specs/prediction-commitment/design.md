@@ -1,5 +1,13 @@
 # Design Document: Prediction Commitment
 
+> **Historical record, not current design.** This spec describes the original CU-staking
+> economy (balances, returns, transaction ledger) as it was built. That economy was
+> subsequently abandoned — `cuReturned` is never written in the live resolution path, so
+> there are no balances or payouts today. Scoring is Brier score / RS / Glicko-2 / ELO only;
+> `cuCommitted` survives purely as the DB field name for a confidence magnitude. See
+> `PRODUCT.md`'s resolution-effects table and `docs/SCORING_SYSTEMS.md` for the current
+> mechanism. Kept here as a record of the original implementation, not a guide to it.
+
 ## Overview
 
 The prediction commitment system enables users to stake Confidence Units (CU) on prediction outcomes, creating a reputation-based forecasting mechanism. This design extends the existing commitment infrastructure (database models, basic API endpoints) with a complete user-facing feature including UI components, enhanced API endpoints, and proper transaction handling.
