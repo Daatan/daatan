@@ -298,7 +298,9 @@ CREATE INDEX "bot_rejected_topics_rejectedAt_idx" ON "bot_rejected_topics"("reje
 
 ## Bot Runner Implementation
 
-### Approval Workflow in bot-runner.ts
+The original monolithic `bot-runner.ts` was split into `src/lib/services/bots/{runner,stake,voting,shared}.ts`; the snippets below reflect current file locations.
+
+### Approval Workflow in stake.ts
 
 ```typescript
 // Immediately stake if approval NOT required
@@ -503,7 +505,7 @@ BotRejectedTopic
 
 **Solution:**
 1. Verify `maxForecastsPerHour > 0` on BotConfig
-2. Check bot-runner.ts: `countThisHourActions()` call
+2. Check `src/lib/services/bots/runner.ts`: `countThisHourActions()` call
 3. Set limit > 0 and re-run bot
 
 ---

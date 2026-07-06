@@ -127,12 +127,16 @@ The influence/strength of a specific prediction in scoring/visibility calculatio
 
 ### Resolution Outcomes
 
-| Outcome | Description | CU Effect | RS Effect |
-|---------|-------------|-----------|-----------|
-| Correct | Prediction happened | Unlock | Changes (calculated) |
-| Wrong | Prediction did not happen | Unlock | Changes (calculated) |
-| Void | Canceled/invalidated | Refund | No change |
-| Unresolvable | Cannot be determined | Unlock | No change |
+There is no lockable CU balance to unlock/refund — confidence is a Brier-scored
+input, not staked currency. See [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md)
+for the full formulas.
+
+| Outcome | Description | Scoring Effect |
+|---------|-------------|-----------|
+| Correct | Prediction happened | Brier score vs. confidence; RS, Glicko-2, and ELO all update (can be + or −) |
+| Wrong | Prediction did not happen | Same pipeline as Correct, scored against the opposite outcome |
+| Void | Canceled/invalidated | No scoring effect — RS, Glicko-2, ELO all untouched |
+| Unresolvable | Cannot be determined | No scoring effect — RS, Glicko-2, ELO all untouched |
 
 ---
 
