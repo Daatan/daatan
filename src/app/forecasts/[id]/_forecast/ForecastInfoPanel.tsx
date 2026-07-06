@@ -20,7 +20,8 @@ interface Props {
 export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
   const t = useTranslations('forecast')
   // Mobile shows the two date cards side by side; below sm the half-width card
-  // can't fit the full timestamp, so drop the time there (full format from sm up).
+  // can't fit the full timestamp or label, so use the date-only format and the
+  // short label there (full versions from sm up).
   const dateCell = (date: string) =>
     variant === 'mobile' ? (
       <>
@@ -29,6 +30,15 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
       </>
     ) : (
       formatDisplayDateTime(date)
+    )
+  const dateLabel = (shortKey: string, fullKey: string) =>
+    variant === 'mobile' ? (
+      <>
+        <span className="sm:hidden">{t(shortKey)}</span>
+        <span className="hidden sm:inline">{t(fullKey)}</span>
+      </>
+    ) : (
+      t(fullKey)
     )
   const market = prediction.externalMarket
   const marketInverted = prediction.externalMarketInverted ?? false
@@ -86,7 +96,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
-            {t('creationDate')}
+            {dateLabel('creationDateShort', 'creationDate')}
           </div>
           <div className="text-white font-semibold truncate">
             {dateCell(prediction.createdAt)}
@@ -96,7 +106,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
-            {t('deadline')}
+            {dateLabel('deadlineShort', 'deadline')}
           </div>
           <div className="text-white font-semibold truncate">
             {dateCell(prediction.resolveByDatetime)}
