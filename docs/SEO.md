@@ -143,9 +143,17 @@ IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL
 
 - [x] `INDEXNOW_KEY` added to `daatan-env-prod` Secrets Manager
 - [x] Key file deployed at `/711ada60e0032e070ede0e05de85a79e.txt`
+- [x] `INDEXNOW_KEY` / `GOOGLE_INDEXING_*` passed through in `docker-compose.prod.yml` / `docker-compose.staging.yml`
 - [ ] Register key in [Bing Webmaster Tools](https://www.bing.com/webmasters) → IndexNow tab
 
 **Env var:** `INDEXNOW_KEY` (optional server-side; see `src/env.ts`)
+
+> Being in Secrets Manager / `.env` is not enough on its own: `docker-compose.prod.yml` and
+> `docker-compose.staging.yml` only pass through vars explicitly listed under each `app`
+> service's `environment:` block. A var missing from that list is silently absent inside the
+> container even though `.env` has it — this bit `INDEXNOW_KEY` and both `GOOGLE_INDEXING_*`
+> vars for a stretch (fixed here), so add any new server env var to both compose files' `app`
+> service(s), not just to Secrets Manager.
 
 If the key file is ever lost (e.g., regenerated `public/` directory), re-add `public/{key}.txt` containing only the key string.
 

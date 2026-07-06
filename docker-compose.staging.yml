@@ -76,6 +76,9 @@ services:
       - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
       - ORACLE_URL=${ORACLE_URL}
       - ORACLE_API_KEY=${ORACLE_API_KEY}
+      - INDEXNOW_KEY=${INDEXNOW_KEY}
+      - GOOGLE_INDEXING_CLIENT_EMAIL=${GOOGLE_INDEXING_CLIENT_EMAIL}
+      - GOOGLE_INDEXING_PRIVATE_KEY=${GOOGLE_INDEXING_PRIVATE_KEY}
     depends_on:
       postgres-staging:
         condition: service_healthy
@@ -137,6 +140,9 @@ services:
       - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
       - ORACLE_URL=${ORACLE_URL}
       - ORACLE_API_KEY=${ORACLE_API_KEY}
+      - INDEXNOW_KEY=${INDEXNOW_KEY}
+      - GOOGLE_INDEXING_CLIENT_EMAIL=${GOOGLE_INDEXING_CLIENT_EMAIL}
+      - GOOGLE_INDEXING_PRIVATE_KEY=${GOOGLE_INDEXING_PRIVATE_KEY}
     depends_on:
       postgres-staging:
         condition: service_healthy
