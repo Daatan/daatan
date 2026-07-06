@@ -31,7 +31,7 @@ aws ssm start-session --target i-0406d237ca5d92cdf   # staging
 aws ssm send-command \
   --instance-ids i-04ea44d4243d35624 \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd ~/app && ./scripts/update-version.sh production 1.7.X"]'
+  --parameters 'commands=["cd ~/app && ./scripts/update-version.sh production 1.30.X"]'
 ```
 
 ### Update Version (Staging)
@@ -40,7 +40,7 @@ aws ssm send-command \
 aws ssm send-command \
   --instance-ids i-0406d237ca5d92cdf \
   --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd ~/app && ./scripts/update-version.sh staging 1.7.X"]'
+  --parameters 'commands=["cd ~/app && ./scripts/update-version.sh staging 1.30.X"]'
 ```
 
 ## What Happens
