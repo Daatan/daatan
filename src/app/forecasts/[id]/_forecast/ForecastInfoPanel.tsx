@@ -4,7 +4,7 @@ import { Calendar, Target, TrendingUp, ExternalLink, User } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { UserLink } from '@/components/UserLink'
 import { RoleBadge } from '@/components/RoleBadge'
-import { formatDisplayDateTime } from '@/lib/utils/date'
+import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 import {
   INVERTED_HINT,
   marketDisplayProbability,
@@ -19,6 +19,27 @@ interface Props {
 
 export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
   const t = useTranslations('forecast')
+  // Mobile shows the two date cards side by side; below sm the half-width card
+  // can't fit the full timestamp or label, so use the date-only format and the
+  // short label there (full versions from sm up).
+  const dateCell = (date: string) =>
+    variant === 'mobile' ? (
+      <>
+        <span className="sm:hidden">{formatDisplayDate(date)}</span>
+        <span className="hidden sm:inline">{formatDisplayDateTime(date)}</span>
+      </>
+    ) : (
+      formatDisplayDateTime(date)
+    )
+  const dateLabel = (shortKey: string, fullKey: string) =>
+    variant === 'mobile' ? (
+      <>
+        <span className="sm:hidden">{t(shortKey)}</span>
+        <span className="hidden sm:inline">{t(fullKey)}</span>
+      </>
+    ) : (
+      t(fullKey)
+    )
   const market = prediction.externalMarket
   const marketInverted = prediction.externalMarketInverted ?? false
   const marketProbability =
@@ -45,7 +66,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
     : ''
   return (
     <>
-      <div className={variant === 'mobile' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
+      <div className={variant === 'mobile' ? 'grid grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
         {variant === 'desktop' && (
           <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
@@ -75,24 +96,24 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
-            {t('creationDate')}
+            {dateLabel('creationDateShort', 'creationDate')}
           </div>
           <div className="text-white font-semibold truncate">
-            {formatDisplayDateTime(prediction.createdAt)}
+            {dateCell(prediction.createdAt)}
           </div>
         </div>
 
         <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Calendar className="w-3.5 h-3.5" />
-            {t('deadline')}
+            {dateLabel('deadlineShort', 'deadline')}
           </div>
           <div className="text-white font-semibold truncate">
-            {formatDisplayDateTime(prediction.resolveByDatetime)}
+            {dateCell(prediction.resolveByDatetime)}
           </div>
         </div>
 
-        <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+        <div className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
             <Target className="w-3.5 h-3.5" />
             Tags
@@ -120,7 +141,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
             href={marketUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm hover:border-pink-500/60 transition-colors group"
+            className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm hover:border-pink-500/60 transition-colors group ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}
           >
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
               <TrendingUp className="w-3.5 h-3.5" />
