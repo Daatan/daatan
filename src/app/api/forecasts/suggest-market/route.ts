@@ -9,10 +9,15 @@ const log = createLogger('forecasts-suggest-market')
 
 export const dynamic = 'force-dynamic'
 
-const suggestSchema = z.object({ claimText: z.string().min(1) })
+const suggestSchema = z.object({
+  claimText: z.string().min(1),
+  // Optional — the wizard only knows the deadline once the user has filled the
+  // date step. When present it penalizes candidates resolving far from it.
+  deadline: z.string().datetime().optional(),
+})
 
 /**
- * POST /api/forecasts/suggest-market  body: { claimText }
+ * POST /api/forecasts/suggest-market  body: { claimText, deadline? }
  *
  * Called from the create wizard after the claim step. Keyword-prefilters
  * candidate markets, embeds the claim + candidates, and returns the single
@@ -25,9 +30,9 @@ export const POST = withAuth(async (request) => {
     return NextResponse.json({ match: null })
   }
 
-  const { claimText } = suggestSchema.parse(await request.json())
+  const { claimText, deadline } = suggestSchema.parse(await request.json())
 
-  const match = await suggestMarketMatch(claimText)
+  const match = await suggestMarketMatch(claimText, deadline ? new Date(deadline) : null)
   if (match) {
     log.info({ marketId: match.externalMarketId, score: match.score }, 'Market match suggested')
   }

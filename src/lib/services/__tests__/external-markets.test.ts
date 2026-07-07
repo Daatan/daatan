@@ -578,6 +578,18 @@ describe('suggestMarkets', () => {
     expect(await suggestMarkets('  ')).toEqual([])
     expect(global.fetch).not.toHaveBeenCalled()
   })
+
+  it('keeps at most two markets per event, most-traded first', async () => {
+    // All three sit in a single search event; the cap + volume ranking keep the
+    // two highest-volume ones and drop the rest so one event can't flood recall.
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xa', slug: 'a', volume: '10' }),
+      gammaRow({ conditionId: '0xb', slug: 'b', volume: '100' }),
+      gammaRow({ conditionId: '0xc', slug: 'c', volume: '50' }),
+    ])
+    const out = await suggestMarkets('will x happen')
+    expect(out.map(m => m.externalId)).toEqual(['0xb', '0xc'])
+  })
 })
 
 describe('buildMarketSearchQuery', () => {
@@ -633,14 +645,36 @@ describe('suggestMarketsForClaim', () => {
     expect(out[0].externalId).toBe('0xnear')
   })
 
-  it('falls back to search order when embeddings are unavailable', async () => {
+  it('returns [] when embeddings are unavailable (no unscored fallback)', async () => {
     global.fetch = gammaFetchMock([
       gammaRow({ conditionId: '0x1', slug: 's1' }),
       gammaRow({ conditionId: '0x2', slug: 's2' }),
     ])
     vi.mocked(embedText).mockResolvedValue(null)
     const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
-    expect(out.map(m => m.externalId)).toEqual(['0x1', '0x2'])
+    expect(out).toEqual([])
+  })
+
+  it('drops candidates below the similarity floor, returning [] when none clear it', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xfar', slug: 'far', question: 'Totally unrelated question?' }),
+    ])
+    // Claim and candidate embed orthogonally → cosine 0, under PANEL_MATCH_FLOOR.
+    vi.mocked(embedText).mockImplementation(async (t: string) =>
+      t.includes('Iran') ? [1, 0, 0] : [0, 1, 0],
+    )
+    const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
+    expect(out).toEqual([])
+  })
+
+  it('attaches a 0–100 match score to each returned candidate', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ conditionId: '0xnear', slug: 'near', question: 'Iran peace deal signed?' }),
+    ])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // claim == candidate → cosine 1
+    const out = await suggestMarketsForClaim('Will Iran sign a peace deal?', ['Iran'])
+    expect(out).toHaveLength(1)
+    expect(out[0].score).toBe(100)
   })
 
   it('down-ranks an equally-similar market whose resolution date is far from the deadline', async () => {

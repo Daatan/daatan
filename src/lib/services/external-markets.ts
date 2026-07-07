@@ -25,8 +25,19 @@ const HISTORY_FIDELITY_MINUTES = 720
 const MAX_BACKFILL_POINTS = 400
 /** Cosine similarity above which a market is treated as "the same question". */
 const MATCH_THRESHOLD = 0.8
+/** Cosine-similarity floor for the admin "Suggest matches" panel. Candidates
+ *  below it are dropped rather than shown — the panel returning the 5 least-bad
+ *  markets for a claim with no real equivalent was the main source of the
+ *  "unrelated markets" complaint. Below MATCH_THRESHOLD (these are suggestions a
+ *  human confirms, not auto-links) but high enough to exclude topical noise. */
+const PANEL_MATCH_FLOOR = 0.6
 /** How many keyword candidates to embed-and-rank per suggest. */
 const MATCH_CANDIDATES = 8
+/** Cap on markets kept from a single Polymarket event. `/public-search` returns
+ *  whole events, and a grouped one (elections, "who will win X") bundles dozens
+ *  of sibling markets that share a topic but not the question — collecting them
+ *  all floods the candidate pool and buries the real match. */
+const MAX_MARKETS_PER_EVENT = 2
 /** Deadline-gap tuning. A candidate whose market resolves within GRACE days of
  *  the forecast deadline gets no penalty; beyond that its similarity score
  *  decays smoothly (DECAY = the gap, in days past grace, that halves the score).
@@ -130,6 +141,9 @@ export interface MarketSuggestion {
   url: string
   /** Market resolution date, used to penalize deadline-mismatched candidates. */
   endDate: Date | null
+  /** Semantic match to the claim as an integer 0–100 (raw cosine × 100), set by
+   *  the ranking callers. Absent on unscored candidates straight from search. */
+  score?: number
 }
 
 /** Each provider knows its URLs and how to fetch/normalize/suggest markets. */
@@ -185,6 +199,15 @@ function decodeJsonArray(value: unknown): string[] {
     }
   }
   return []
+}
+
+/** Best-effort numeric trade volume from a raw Gamma market row, used to rank the
+ *  markets within one event. Gamma exposes it under a few keys (sometimes as a
+ *  string); anything missing/unparseable is 0, which sorts to the back. */
+function marketVolume(raw: Record<string, unknown>): number {
+  const v = raw.volumeNum ?? raw.volume ?? raw.volume24hr ?? raw.liquidityNum ?? raw.liquidity
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN
+  return Number.isFinite(n) ? n : 0
 }
 
 /** Map a raw Gamma market row into the normalized shape. Returns null if unusable. */
@@ -358,10 +381,16 @@ export const polymarketProvider: MarketProvider = {
       const out: MarketSuggestion[] = []
       const seen = new Set<string>()
       for (const ev of data?.events ?? []) {
-        for (const raw of ev.markets ?? []) {
+        // Keep only the most-traded markets of each event, so one grouped event
+        // can't crowd out other events' matches before the embedding re-rank.
+        const ranked = [...(ev.markets ?? [])].sort((a, b) => marketVolume(b) - marketVolume(a))
+        let kept = 0
+        for (const raw of ranked) {
+          if (kept >= MAX_MARKETS_PER_EVENT) break
           const m = normalizeGammaMarket(raw)
           if (!m || m.closed || seen.has(m.externalId)) continue
           seen.add(m.externalId)
+          kept++
           out.push({
             provider: m.provider,
             externalId: m.externalId,
@@ -638,9 +667,12 @@ export async function suggestMarkets(query: string, limit = 5): Promise<MarketSu
 /**
  * Ranked suggestions for a forecast's claim (the admin "Suggest matches" panel):
  * build a keyword-reduced query from the claim + extracted entities, search each
- * provider, then — when embeddings are available — re-rank candidates by cosine
- * similarity to the full claim so the closest question floats to the top. Falls
- * back to raw search order if embeddings are unavailable. Best-effort.
+ * provider, then re-rank candidates by cosine similarity to the full claim
+ * (deadline-weighted) so the closest question floats to the top. Only candidates
+ * whose raw cosine clears PANEL_MATCH_FLOOR are returned — a claim with no real
+ * market equivalent yields [] rather than the 5 least-bad markets. Each returned
+ * candidate carries its 0–100 match score. Suppressed entirely when embeddings
+ * are unavailable (an unscored keyword hit can't be trusted). Best-effort.
  */
 export async function suggestMarketsForClaim(
   claimText: string,
@@ -652,20 +684,28 @@ export async function suggestMarketsForClaim(
   if (!query) return []
 
   const candidates = await suggestMarkets(query, 15)
-  if (candidates.length <= 1) return candidates.slice(0, limit)
+  if (candidates.length === 0) return []
 
+  // Without embeddings we can't judge relevance; showing unscored keyword hits is
+  // exactly what surfaced unrelated markets, so suppress rather than guess.
   const claimVec = await embedText(claimText.trim())
-  if (!claimVec) return candidates.slice(0, limit)
+  if (!claimVec) return []
 
   const vecs = await Promise.all(candidates.map(c => embedText(c.question)))
   return candidates
-    .map((c, i) => ({
-      c,
-      score: (vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : -1) * deadlineWeight(c.endDate, deadline),
-    }))
-    .sort((a, b) => b.score - a.score)
+    .map((c, i) => {
+      const cosine = vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : 0
+      return {
+        // Show the semantic match (raw cosine); deadline only re-ranks below.
+        candidate: { ...c, score: Math.round(cosine * 100) },
+        cosine,
+        rank: cosine * deadlineWeight(c.endDate, deadline),
+      }
+    })
+    .filter(s => s.cosine >= PANEL_MATCH_FLOOR)
+    .sort((a, b) => b.rank - a.rank)
     .slice(0, limit)
-    .map(s => s.c)
+    .map(s => s.candidate)
 }
 
 /** A keyword candidate that cleared the embedding-similarity bar, plus its cached id. */
