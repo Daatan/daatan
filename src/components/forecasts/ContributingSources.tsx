@@ -16,13 +16,6 @@ function getSide(stance: number | null): Side {
   return 'neutral'
 }
 
-/** An outlet's aggregate side, from the mean implied P(will) of its articles. */
-function sideFromMean(m: number): Side {
-  if (m > 0.52) return 'yes'
-  if (m < 0.48) return 'no'
-  return 'neutral'
-}
-
 const dotColor: Record<Side, string> = {
   yes: 'bg-emerald-500',
   no: 'bg-rose-500',
@@ -64,21 +57,41 @@ function articleProbYes(s: ContributingSource): number {
   return side === 'yes' ? 0.5 + mag : 0.5 - mag
 }
 
+/**
+ * How much this article's stance actually moves the needle: |stance| × certainty.
+ * Used to pick an outlet's lead article — certainty alone isn't a safe proxy for
+ * relevance, since the Oracle can be highly certain about an off-topic article's
+ * stance on ITS OWN subject while being less certain, but far more decisive, about
+ * the one article that's actually on-topic. Magnitude × certainty favours the
+ * article that actually says something about the claim.
+ */
+function signalStrength(s: ContributingSource): number {
+  return Math.abs(s.stance ?? 0) * (s.certainty ?? 0.5)
+}
+
 type OutletGroup = {
   domain: string
   name: string
+  /** Sorted by signal strength, most decisive first; the first entry (not an outlet-wide average) drives side/pct. */
   articles: ContributingSource[]
-  meanYes: number
   side: Side
+  pct: number | null
 }
 
 /**
  * The publications that fed the Oracle's estimate, grouped by outlet and shown as
  * "voters" in the same "will happen / won't happen" language readers use to vote.
  * A tug-of-war lean bar summarises where the press sits; below it, outlets split
- * into will / won't / neutral columns by their aggregate stance. An outlet with
- * several articles is an expandable card listing each; a single-article outlet is
- * a plain link. Sits below the human forecasters and never affects the community number.
+ * into will / won't / neutral columns by their single most-decisive article's
+ * stance (highest |stance| × certainty) — not an outlet-wide average, which could
+ * cancel a strong signal against an unrelated article from the same domain and
+ * mislabel the whole outlet "neutral"; not raw certainty either, since the Oracle
+ * can be very certain about an off-topic article's stance on its own subject.
+ * An outlet with several articles is an expandable card listing each; a
+ * single-article outlet is a plain link. Articles news-indexer matched but the
+ * Oracle gate-rejected as off-topic (no stance) don't get voter cards — just a
+ * passing count, so they're visible without being treated as evidence.
+ * Sits below the human forecasters and never affects the community number.
  */
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
   const t = useTranslations('sources')
@@ -95,37 +108,64 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
 
   if (unique.length === 0) return null
 
-  // Press lean is article-granular (it's about the coverage), independent of grouping.
-  const pressMeanYes = unique.reduce((sum, s) => sum + articleProbYes(s), 0) / unique.length
+  // Only stance-scored articles were actually incorporated into the Oracle's estimate;
+  // a null stance means news-indexer matched it but the Oracle gate-rejected it as not
+  // bearing on the claim. Those are counted, not turned into voter cards.
+  const used = unique.filter((s) => s.stance != null)
+  const notUsedCount = unique.length - used.length
+  const notUsedText = notUsedCount > 0
+    ? t(notUsedCount === 1 ? 'notUsed' : 'notUsedPlural', { count: notUsedCount })
+    : null
+
+  if (used.length === 0) {
+    return (
+      <div className="mt-12" data-testid="contributing-sources">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-1">
+          <Newspaper className="w-5 h-5" />
+          {t('title')}
+        </h2>
+        {notUsedText && <p className="text-sm text-gray-500">{notUsedText}</p>}
+      </div>
+    )
+  }
+
+  // Press lean is article-granular (it's about the coverage that fed the Oracle),
+  // independent of grouping, and only over articles the Oracle actually used.
+  const pressMeanYes = used.reduce((sum, s) => sum + articleProbYes(s), 0) / used.length
   const leanPct = Math.round(pressMeanYes * 100)
   const summary =
     leanPct > 50 ? t('pressLeanYes', { pct: leanPct })
     : leanPct < 50 ? t('pressLeanNo', { pct: 100 - leanPct })
     : t('pressSplit')
-  const countText = unique.length === 1 ? t('count', { count: 1 }) : t('countPlural', { count: unique.length })
+  const countText = used.length === 1 ? t('count', { count: 1 }) : t('countPlural', { count: used.length })
 
-  // Group articles by outlet, derive each outlet's aggregate side, bucket into columns.
+  // Group used articles by outlet; each card's side/badge come from its single
+  // most-decisive article (see doc comment above), not an outlet-wide average.
   const byDomain = new Map<string, ContributingSource[]>()
-  for (const s of unique) {
+  for (const s of used) {
     const d = outletDomain(s)
     const arr = byDomain.get(d) ?? []
     arr.push(s)
     byDomain.set(d, arr)
   }
   const outletGroups: OutletGroup[] = [...byDomain.entries()].map(([domain, articles]) => {
-    const meanYes = articles.reduce((sum, a) => sum + articleProbYes(a), 0) / articles.length
+    const sorted = [...articles].sort((a, b) => signalStrength(b) - signalStrength(a))
+    const lead = sorted[0]
+    const side = getSide(lead.stance)
+    const leadProbYes = articleProbYes(lead)
+    const pct = side === 'yes' ? Math.round(leadProbYes * 100) : side === 'no' ? Math.round((1 - leadProbYes) * 100) : null
     return {
       domain,
       name: articles.find(a => a.source)?.source || domain,
-      articles: [...articles].sort((a, b) => (b.certainty ?? 0) - (a.certainty ?? 0)),
-      meanYes,
-      side: sideFromMean(meanYes),
+      articles: sorted,
+      side,
+      pct,
     }
   })
   const byCol: Record<Side, OutletGroup[]> = { yes: [], no: [], neutral: [] }
   for (const g of outletGroups) byCol[g.side].push(g)
   for (const side of ['yes', 'no', 'neutral'] as Side[]) {
-    byCol[side].sort((a, b) => b.articles.length - a.articles.length || b.meanYes - a.meanYes)
+    byCol[side].sort((a, b) => b.articles.length - a.articles.length || (b.pct ?? 0) - (a.pct ?? 0))
   }
 
   const sideMeta: Record<Side, { label: string; short: string; head: string; badge: string }> = {
@@ -180,8 +220,6 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
   }
 
   const OutletCard = ({ g }: { g: OutletGroup }) => {
-    const aggPct = g.side === 'yes' ? Math.round(g.meanYes * 100) : g.side === 'no' ? Math.round((1 - g.meanYes) * 100) : null
-
     // Single-article outlet → a plain link showing the headline inline (no expand).
     if (g.articles.length === 1) {
       const s = g.articles[0]
@@ -201,7 +239,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
             <span className="block font-medium text-white truncate">{g.name}</span>
             {s.title && <span className="block text-xs text-gray-400 truncate group-hover/card:text-gray-300">{s.title}</span>}
           </span>
-          <Badge side={g.side} pct={aggPct} />
+          <Badge side={g.side} pct={g.pct} />
           <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover/card:text-gray-300" />
         </a>
       )
@@ -214,7 +252,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           <Avatar src={null} name={g.name} size={20} className="shrink-0" />
           <span className="font-medium text-white truncate flex-1 min-w-0">{g.name}</span>
           <span className="shrink-0 text-[10px] text-gray-500">{g.articles.length}</span>
-          <Badge side={g.side} pct={aggPct} />
+          <Badge side={g.side} pct={g.pct} />
           <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open/card:rotate-180" />
         </summary>
         <div className="px-2 pb-2 pt-0.5 space-y-0.5 border-t border-navy-600">
@@ -269,6 +307,8 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           <Column side="neutral" />
         </div>
       )}
+
+      {notUsedText && <p className="mt-4 text-xs text-gray-500">{notUsedText}</p>}
     </div>
   )
 }
