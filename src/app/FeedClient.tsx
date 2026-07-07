@@ -17,7 +17,7 @@ import { createClientLogger } from '@/lib/client-logger'
 const log = createClientLogger('FeedClient')
 
 type FilterStatus = 'ACTIVE' | 'PENDING' | 'RESOLVED' | 'CLOSING_SOON' | 'NEEDS_REVIEW' | 'ALL'
-type SortBy = 'newest' | 'deadline' | 'cu'
+type SortBy = 'newest' | 'deadline' | 'cu' | 'updated'
 
 const VALID_STATUSES: FilterStatus[] = ['ACTIVE', 'PENDING', 'RESOLVED', 'CLOSING_SOON', 'NEEDS_REVIEW', 'ALL']
 
@@ -284,6 +284,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
                   { value: 'newest', label: t('sort.newest') },
                   { value: 'deadline', label: t('sort.byDeadline') },
                   { value: 'cu', label: t('sort.mostStaked') },
+                  { value: 'updated', label: t('sort.updated') },
                 ] as { value: SortBy; label: string }[]).map(({ value, label }) => (
                   <button
                     key={value}

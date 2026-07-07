@@ -47,7 +47,8 @@
     "sort": {
       "newest": "Newest",
       "byDeadline": "By Deadline",
-      "mostStaked": "Most Staked"
+      "mostStaked": "Most Staked",
+      "updated": "Last Updated"
     },
     "tags": "Tags",
     "openForecasts": "Open Forecasts",
@@ -85,7 +86,8 @@
     "sortHints": {
       "newest": "Sort by creation date, newest first",
       "deadline": "Sort by resolution deadline",
-      "cu": "Sort by total credibility units staked"
+      "cu": "Sort by total credibility units staked",
+      "updated": "Sort by when the forecast was last updated"
     }
   },
   "forecast": {
