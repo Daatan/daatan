@@ -95,7 +95,9 @@ export async function GET(request: NextRequest) {
     const isCuSort = query.sortBy === 'cu'
     const orderBy: Record<string, 'asc' | 'desc'> = closingSoon || query.sortBy === 'deadline'
       ? { resolveByDatetime: query.sortOrder as 'asc' | 'desc' }
-      : { createdAt: query.sortOrder as 'asc' | 'desc' }
+      : query.sortBy === 'updated'
+        ? { updatedAt: query.sortOrder as 'asc' | 'desc' }
+        : { createdAt: query.sortOrder as 'asc' | 'desc' }
 
     const { predictions, total } = await listForecasts({
       where, orderBy, page: query.page, limit: query.limit,

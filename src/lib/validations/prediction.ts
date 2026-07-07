@@ -164,7 +164,7 @@ export const listPredictionsQuerySchema = z.object({
   q: z.string().max(200).optional(), // Full-text search on claimText and tags
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  sortBy: z.enum(['newest', 'deadline', 'cu']).default('newest'),
+  sortBy: z.enum(['newest', 'deadline', 'cu', 'updated']).default('newest'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })
 

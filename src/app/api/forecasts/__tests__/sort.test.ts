@@ -71,6 +71,30 @@ describe('/api/forecasts sort parameters', () => {
             expect(findManyCall.orderBy).toEqual({ resolveByDatetime: 'desc' })
         })
 
+        it('uses updatedAt for updated sort (desc default)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            const request = new NextRequest('http://localhost/api/forecasts?sortBy=updated')
+            await GET(request)
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.orderBy).toEqual({ updatedAt: 'desc' })
+        })
+
+        it('uses explicit sortOrder for updated sort', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            const request = new NextRequest('http://localhost/api/forecasts?sortBy=updated&sortOrder=asc')
+            await GET(request)
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.orderBy).toEqual({ updatedAt: 'asc' })
+        })
+
         it('sorts by CU in memory (desc default)', async () => {
             const { prisma } = await import('@/lib/prisma')
             

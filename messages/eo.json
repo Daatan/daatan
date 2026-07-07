@@ -47,7 +47,8 @@
     "sort": {
       "newest": "Plej Nova",
       "byDeadline": "Laŭ Limdato",
-      "mostStaked": "Plej Stakita"
+      "mostStaked": "Plej Stakita",
+      "updated": "Laste Ĝisdatigita"
     },
     "tags": "Etikedoj",
     "openForecasts": "Malfermitaj Prognozoj",
@@ -85,7 +86,8 @@
     "sortHints": {
       "newest": "Ordigi laŭ kreodato, plej novaj unue",
       "deadline": "Ordigi laŭ solvo-limdato",
-      "cu": "Ordigi laŭ la sumo de vetitaj kredindec-unuoj"
+      "cu": "Ordigi laŭ la sumo de vetitaj kredindec-unuoj",
+      "updated": "Ordigi laŭ la lasta ĝisdatigo-dato"
     }
   },
   "forecast": {
