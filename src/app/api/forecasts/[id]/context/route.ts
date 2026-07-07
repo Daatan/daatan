@@ -9,7 +9,7 @@ import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
-import { enrichOracleSources } from '@/lib/services/oracle-snapshot'
+import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { aiResearchEnabled } from '@/lib/capabilities'
@@ -201,10 +201,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 }
             }
             if (oracleForecast !== null) {
-                const toPercent = (v: number) => Math.round(((v + 1) / 2) * 100)
-                const prob = toPercent(oracleForecast.mean)
-                const ciLow = toPercent(oracleForecast.ci_low)
-                const ciHigh = toPercent(oracleForecast.ci_high)
+                const prob = stanceToPercent(oracleForecast.mean)
+                const ciLow = stanceToPercent(oracleForecast.ci_low)
+                const ciHigh = stanceToPercent(oracleForecast.ci_high)
                 // Attach authors to the Oracle's sources (it omits them); best-effort,
                 // never blocks the estimate. Title/date come from the input articles below.
                 const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map(s => s.url))
@@ -227,8 +226,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     predictionCiLow: ciLow,
                     predictionCiHigh: ciHigh,
                     oracleSnapshotData: {
-                        mean: oracleForecast.mean,
-                        std: oracleForecast.std,
+                        mean: prob,
+                        std: stanceStdToPercent(oracleForecast.std),
                         ciLow,
                         ciHigh,
                         articlesUsed: oracleForecast.articles_used,

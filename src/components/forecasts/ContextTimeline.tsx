@@ -68,7 +68,9 @@ type OracleSnapshotSource = {
 
 /** Full Oracle payload persisted alongside a context snapshot when the Oracle path is taken. */
 type OracleSnapshot = {
+  /** Probability percent [0, 100] — converted from the Oracle's raw stance mean. */
   mean: number
+  /** Spread, on the same percent scale as `mean`/`ciLow`/`ciHigh`. */
   std: number
   ciLow: number
   ciHigh: number
