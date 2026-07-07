@@ -3,6 +3,24 @@ import type { SearchResult } from '@/lib/services/oracleSearch'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 
 /**
+ * Map an aggregated Oracle stance/CI bound in [-1, 1] to a probability percent
+ * in [0, 100]. Shared by every call site that builds a `ContextSnapshot.oracleSnapshot`
+ * (news-indexer push, user-triggered analyze, backfill) so `mean`/`ciLow`/`ciHigh`
+ * always land on the same scale inside that JSON blob — a prior split where only
+ * ciLow/ciHigh went through this conversion and `mean` was stored raw made the
+ * snapshot look self-contradictory (e.g. mean=0.60 next to ciLow=54/ciHigh=99).
+ */
+export function stanceToPercent(v: number): number {
+  return Math.round(((v + 1) / 2) * 100)
+}
+
+/** Scale a stance-space standard deviation onto the same percent scale as {@link stanceToPercent}
+ *  (that map's slope is 50, so a spread scales by 50 with no offset). */
+export function stanceStdToPercent(v: number): number {
+  return Math.round(v * 50)
+}
+
+/**
  * One Oracle-analysed source as persisted in `ContextSnapshot.oracleSnapshot.sources`.
  * The Oracle returns stance/certainty/credibility/claims but no title/date/author;
  * those are joined on at capture time — title/date from the input articles, author

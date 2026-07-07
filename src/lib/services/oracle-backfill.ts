@@ -2,7 +2,7 @@ import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
-import { enrichOracleSources } from '@/lib/services/oracle-snapshot'
+import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
 import { createLogger } from '@/lib/logger'
 
@@ -46,22 +46,22 @@ export async function refreshOracleSnapshot(prediction: { id: string; claimText:
   const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
   const sources = enrichOracleSources(forecast.sources, searchResults, authorByUrl)
 
-  const toPercent = (v: number) => Math.round(((v + 1) / 2) * 100)
-  const ciLow = toPercent(forecast.ci_low)
-  const ciHigh = toPercent(forecast.ci_high)
+  const ciLow = stanceToPercent(forecast.ci_low)
+  const ciHigh = stanceToPercent(forecast.ci_high)
+  const probability = stanceToPercent(forecast.mean)
 
   await saveOracleSnapshotOnly({
     predictionId: prediction.id,
     oracleSnapshot: {
-      mean: forecast.mean,
-      std: forecast.std,
+      mean: probability,
+      std: stanceStdToPercent(forecast.std),
       ciLow,
       ciHigh,
       articlesUsed: forecast.articles_used,
       settled: forecast.settled ?? false,
       sources,
     },
-    confidence: toPercent(forecast.mean),
+    confidence: probability,
     aiCiLow: ciLow,
     aiCiHigh: ciHigh,
     settled: forecast.settled ?? false,

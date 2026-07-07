@@ -4,6 +4,7 @@ import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
+import { stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
@@ -110,10 +111,9 @@ export async function POST(request: NextRequest) {
     }))
 
     if (oracleForecast) {
-      const toPercent = (v: number) => Math.round(((v + 1) / 2) * 100)
-      probability = toPercent(oracleForecast.mean)
-      const ciLow = toPercent(oracleForecast.ci_low)
-      const ciHigh = toPercent(oracleForecast.ci_high)
+      probability = stanceToPercent(oracleForecast.mean)
+      const ciLow = stanceToPercent(oracleForecast.ci_low)
+      const ciHigh = stanceToPercent(oracleForecast.ci_high)
 
       await saveNewsIndexerMatch({
         predictionId: prediction.id,
@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
         ciLow,
         ciHigh,
         oracleSnapshot: {
-          mean: oracleForecast.mean,
-          std: oracleForecast.std,
+          mean: probability,
+          std: stanceStdToPercent(oracleForecast.std),
           ciLow,
           ciHigh,
           articlesUsed: oracleForecast.articles_used,

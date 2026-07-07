@@ -418,6 +418,9 @@ model ContextSnapshot {
   // Shape: { mean, std, ciLow, ciHigh, articlesUsed,
   //          sources: [{ sourceId, sourceName, url, stance, certainty,
   //                      credibilityWeight, claims }] }
+  // mean/std/ciLow/ciHigh are all probability percent (0-100) — the Oracle's raw
+  // [-1,1] stance scale is converted before storage (see stanceToPercent). Only the
+  // per-source `stance`/`certainty` inside `sources[]` stay on the raw Oracle scale.
   // Null when the LLM-fallback path was taken or Oracle is not configured.
   oracleSnapshot Json? @map("oracle_snapshot")
 
