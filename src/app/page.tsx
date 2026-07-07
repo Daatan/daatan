@@ -66,6 +66,7 @@ export default async function FeedPage({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'DAATAN',
+    alternateName: 'דעתן',
     url: 'https://daatan.com',
     description: 'Prove you were right — without shouting into the void.',
   }

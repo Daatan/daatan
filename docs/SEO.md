@@ -37,6 +37,12 @@ Private forecasts (where `isPublic = false`) get only the Article + BreadcrumbLi
 
 Every JSON-LD payload is HTML-escaped before being injected into its `<script type="application/ld+json">` tag, so forecast-derived text (claim, description, author name) cannot break out of the script element and inject markup — closing the stored-XSS vector.
 
+> **`alternateName: 'דעתן'`** on the homepage `WebSite` schema (`src/app/page.tsx`) and every
+> forecast page's `Organization` nodes (`publisher` on Article, `author`/`creator` on
+> ClaimReview): the Hebrew spelling of the brand name, so Google's entity graph can associate
+> it with "DAATAN" even though the visible logo/title text is Latin-script everywhere. Added
+> after investigating why searching "דעתן" surfaced nothing — see the sitemap note below.
+
 ## Sitemap
 
 `src/app/sitemap.ts` — dynamically generates the sitemap from live DB data. Included pages:
@@ -46,6 +52,17 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 - Static pages (about, contact, pricing, …) — monthly
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
+
+Static routes are listed once in `staticRouteDefs` with a `localized` flag: `true` means
+Google is told (via `alternates.languages`) that `/he/<route>` and `/ru/<route>` exist, but
+that alone does **not** put those locale URLs in the sitemap — they only get their own `<loc>`
+entries if also added to `localeStaticRoutes`. `/about` and `/methodology` were `localized:
+false` and absent from `localeStaticRoutes`, so `/he/about` and `/he/methodology` were never
+listed anywhere Google could discover them — confirmed via the URL Inspection API returning
+"URL is unknown to Google" for both. This mattered specifically because those two pages are
+the only ones with the Hebrew brand name "דעתן" as visible body text (everywhere else uses the
+Latin "DAATAN"), so a search for "דעתן" had zero indexed pages to ever match. Fixed by setting
+`localized: true` for both and adding matching entries to `localeStaticRoutes`.
 
 ## Server-rendered content (Soft 404 prevention)
 
