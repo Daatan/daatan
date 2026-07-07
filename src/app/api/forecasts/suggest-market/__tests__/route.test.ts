@@ -55,4 +55,19 @@ describe('POST /api/forecasts/suggest-market', () => {
     const res = await POST(req({ claimText: 'Will X happen?' }), ctx as never)
     expect(res.status).toBe(401)
   })
+
+  it('forwards a provided deadline to the matcher as a Date', async () => {
+    vi.mocked(suggestMarketMatch).mockResolvedValue(null)
+    await POST(req({ claimText: 'Will X happen this year?', deadline: '2026-12-31T00:00:00.000Z' }), ctx as never)
+    expect(suggestMarketMatch).toHaveBeenCalledWith(
+      'Will X happen this year?',
+      new Date('2026-12-31T00:00:00.000Z'),
+    )
+  })
+
+  it('passes null when no deadline is provided', async () => {
+    vi.mocked(suggestMarketMatch).mockResolvedValue(null)
+    await POST(req({ claimText: 'Will X happen this year?' }), ctx as never)
+    expect(suggestMarketMatch).toHaveBeenCalledWith('Will X happen this year?', null)
+  })
 })

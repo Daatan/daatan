@@ -225,6 +225,11 @@ Returns `{ similar: [] }` when no embedding is available (Gemini API key not con
 
 ---
 
+### `POST /api/forecasts/suggest-market` — Auth
+Called by the create wizard after the claim step to offer linking a "same question" external market. **Body** `{ claimText, deadline? }` — `deadline` is an optional ISO 8601 datetime the wizard sends only once the resolution date is known (prefilled express / AI-extract / market-import flows), penalizing candidates that resolve far from it. Keyword-prefilters candidates, embeds the claim + each candidate, and returns `{ match }` with the single best market only when its deadline-adjusted cosine similarity clears the auto-link threshold, else `{ match: null }`. Best-effort; returns `{ match: null }` when external markets are disabled or embeddings are unavailable.
+
+---
+
 ### `GET /api/forecasts/[id]/translate` — Auth
 Return translated version of the forecast in the user's language preference. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
 
@@ -394,7 +399,7 @@ List all forecasts regardless of status.
 Admin-level forecast update (no status restrictions).
 
 ### `GET /api/admin/forecasts/[id]/external-market`
-Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search re-ranked by embedding similarity with a deadline-gap penalty. Suggestion only; an admin confirms via POST.
+Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search (at most 2 markets kept per source event) re-ranked by embedding similarity with a deadline-gap penalty. Only candidates whose similarity clears a relevance floor are returned, each with a `score` (0–100 match); a claim with no real equivalent returns `[]` rather than the least-bad markets, and suggestions are suppressed entirely when embeddings are unavailable. Suggestion only; an admin confirms via POST.
 
 ### `POST /api/admin/forecasts/[id]/external-market`
 Link a market by pasted URL. **Body** `{ url }`. On first link the market's full provider-side price history is backfilled (Polymarket CLOB `prices-history`, best-effort, capped at 400 points) so the chart's Market line starts at the market's birth, then the current price is seeded; the hourly `external-market-sync` cron owns the series from there. Resets `inverted` to false.

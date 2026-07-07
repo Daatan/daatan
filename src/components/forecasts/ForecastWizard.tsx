@@ -177,10 +177,18 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
   // Non-blocking: we advance immediately and surface the prompt when it returns.
   const checkMarketMatch = async (claimText: string) => {
     try {
+      // Forward the deadline when it's already known (express / AI-extract /
+      // market-import flows prefill it) so a same-question market resolving far
+      // off can't be offered. Usually unset at this step in the manual flow.
+      let deadline: string | undefined
+      if (formData.resolveByDatetime) {
+        const d = localEndOfDay(formData.resolveByDatetime)
+        if (!Number.isNaN(d.getTime())) deadline = d.toISOString()
+      }
       const res = await fetch('/api/forecasts/suggest-market', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimText }),
+        body: JSON.stringify({ claimText, ...(deadline ? { deadline } : {}) }),
       })
       if (!res.ok) return
       const data = await res.json()

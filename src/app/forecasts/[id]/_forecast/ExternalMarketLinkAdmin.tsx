@@ -13,6 +13,8 @@ type Suggestion = {
   question: string
   yesProbability: number
   url: string
+  /** Semantic match to the claim, 0–100 (raw cosine ×100). */
+  score?: number
 }
 
 interface Props {
@@ -230,7 +232,12 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
                       </span>
                       <span className="truncate">{s.question}</span>
                     </span>
-                    <span className="text-pink-400 font-semibold shrink-0">{s.yesProbability}%</span>
+                    <span className="inline-flex items-center gap-2 shrink-0">
+                      {typeof s.score === 'number' && (
+                        <span className="text-[10px] font-medium text-gray-500">{s.score}% match</span>
+                      )}
+                      <span className="text-pink-400 font-semibold">{s.yesProbability}%</span>
+                    </span>
                   </button>
                 </li>
               ))}
