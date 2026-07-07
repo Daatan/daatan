@@ -30,6 +30,7 @@ import {
   Mail,
   Search,
   ArrowLeft,
+  Vote,
 } from 'lucide-react'
 
 import { useTranslations, useLocale } from 'next-intl'
@@ -38,6 +39,9 @@ type NavItem = {
   href: string
   labelKey: string
   icon: React.ComponentType<{ className?: string }>
+  // External links (e.g. the separate elections.daatan.com app) render as a plain
+  // <a target="_blank"> instead of a client-side next/link route.
+  external?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -49,6 +53,7 @@ const navItems: NavItem[] = [
   { href: '/leaderboard', labelKey: 'leaderboard', icon: Trophy },
   { href: '/profile', labelKey: 'profile', icon: User },
   { href: '/settings', labelKey: 'settings', icon: Settings },
+  { href: 'https://elections.daatan.com', labelKey: 'elections', icon: Vote, external: true },
   { href: '/about', labelKey: 'about', icon: Info },
   { href: '/contact', labelKey: 'contact', icon: Mail },
   { href: '/retroanalysis', labelKey: 'retroanalysis', icon: History },
@@ -134,7 +139,7 @@ const Sidebar = () => {
   // SaaS-only marketing/support pages are removed from the self-hosted edition.
   // `selfHosted` comes from the server-resolved CapabilitiesProvider value, so
   // it's stable across SSR + client (no hydration mismatch).
-  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis']
+  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', 'https://elections.daatan.com']
   const editionNavItems = selfHosted
     ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
     : navItems
@@ -325,31 +330,49 @@ const Sidebar = () => {
             {navLinks.map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
+              const linkClass = `
+                flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
+                ${isActive
+                  ? 'bg-navy-700 text-cobalt-light'
+                  : 'text-text-secondary hover:bg-navy-800 hover:text-white'
+                }
+              `
+              const linkBody = (
+                <>
+                  <span className="relative">
+                    <Icon className="w-5 h-5" />
+                    {item.href === '/notifications' && hasMounted && unreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-medium">{item.label}</span>
+                </>
+              )
 
               return (
                 <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={item.labelKey === 'signIn' ? handleSignIn : handleCloseMenu}
-                    className={`
-                      flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                      ${isActive
-                        ? 'bg-navy-700 text-cobalt-light'
-                        : 'text-text-secondary hover:bg-navy-800 hover:text-white'
-                      }
-                    `}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <span className="relative">
-                      <Icon className="w-5 h-5" />
-                      {item.href === '/notifications' && hasMounted && unreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
+                  {item.external ? (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={handleCloseMenu}
+                      className={linkClass}
+                    >
+                      {linkBody}
+                    </a>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      onClick={item.labelKey === 'signIn' ? handleSignIn : handleCloseMenu}
+                      className={linkClass}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      {linkBody}
+                    </Link>
+                  )}
                 </li>
               )
             })}
