@@ -37,7 +37,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 
 - Schema: [`prisma/schema.prisma`](./prisma/schema.prisma)
 - Auth flow: [`src/auth.ts`](./src/auth.ts)
-- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — Gemini primary, Ollama fallback, OpenRouter for bots
+- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — main chain Gemini → Oracle (Bedrock/Nova) → OpenRouter → Ollama (each leg registers only when configured); OpenRouter also powers bots. See [`docs/LLM_ARCHITECTURE.md`](./docs/LLM_ARCHITECTURE.md)
 - Scoring systems: [`src/lib/services/scoring-systems.ts`](./src/lib/services/scoring-systems.ts) and [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md)
 - Bot system: [`src/lib/services/bots/`](./src/lib/services/bots/) and [`docs/bots.md`](./docs/bots.md), [`docs/BOT_APPROVAL_WORKFLOW.md`](./docs/BOT_APPROVAL_WORKFLOW.md)
 - Embeddings + similar-forecasts: [`docs/EMBEDDINGS.md`](./docs/EMBEDDINGS.md)

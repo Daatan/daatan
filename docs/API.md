@@ -170,7 +170,7 @@ Refresh the AI context for a forecast: fetches web articles for the claim, asks 
 **Probability source (tried in order):**
 
 1. **TruthMachine Oracle API** (`POST ${ORACLE_URL}/forecast`) — calibrated multi-source estimate. Used when `ORACLE_URL` and `ORACLE_API_KEY` are set and the Oracle returns a non-placeholder response with at least one usable article. See [docs/LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md#oracle-api-integration). When this path is taken, the full Oracle payload (mean, std, 95% CI, per-source stance/certainty/credibility) is persisted on the snapshot in the `oracleSnapshot` field and surfaced in the UI.
-2. **LLM `guessChances`** (Gemini → Ollama fallback) — used when the Oracle is unconfigured, times out, returns `placeholder: true`, or the API version is incompatible. Snapshots from this path have `oracleSnapshot = null`.
+2. **LLM `guessChances`** (Gemini → Oracle → OpenRouter → Ollama fallback) — used when the forecast Oracle path is unconfigured, times out, returns `placeholder: true`, or the API version is incompatible. Snapshots from this path have `oracleSnapshot = null`.
 
 The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMachine Oracle (calibrated multi-source estimate)"` vs the LLM-generated justification).
 
@@ -503,9 +503,9 @@ Article search via Oracle's provider fallback chain. Proxies to Oracle `/search`
 **Response** `{ "results": [{ "title", "url", "snippet", "source", "published_date" }] }`
 
 ### `POST /api/ibi/llm` — Admin
-LLM call via Oracle's OpenRouter proxy. Proxies to Oracle `/llm`.
+LLM call proxied to the Oracle `/llm` endpoint (AWS Bedrock / Amazon Nova via litellm). `model` is a litellm ID and defaults to the Oracle's configured Bedrock model when omitted.
 
-**Body** `{ "model": "google/gemini-2.5-flash", "messages": [{ "role": "user", "content": "..." }], "temperature": 0.1 }`
+**Body** `{ "model": "bedrock/amazon.nova-pro-v1:0", "messages": [{ "role": "user", "content": "..." }], "temperature": 0.1 }`
 
 **Response** `{ "content": "..." }`
 

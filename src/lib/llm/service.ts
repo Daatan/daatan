@@ -25,16 +25,18 @@ export class ResilientLLMService {
         )
         return response
       } catch (error) {
+        // A single provider failing is expected — a later one in the chain may
+        // still succeed, so this is logged but NOT paged. Only a full-chain
+        // failure (below) pages Telegram; a fallback that rescues the call is silent.
         log.error({ err: error, provider: provider.name, durationMs: Date.now() - t0 }, 'Provider failed')
         lastError = error as Error
-
-        // Notify Telegram about LLM provider error
-        notifyLlmError(provider.name, lastError.message)
-
         continue // Try next provider
       }
     }
 
+    // Every provider failed (or none were configured) — now it's a real outage.
+    const providerChain = this.providers.map((p) => p.name).join(' → ') || 'none'
+    notifyLlmError(providerChain, lastError?.message ?? 'no LLM providers configured')
     throw new Error(`All LLM providers failed. Last error: ${lastError?.message}`)
   }
 }
