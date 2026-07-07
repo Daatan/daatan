@@ -6,28 +6,38 @@ The application uses a **Resilient LLM Service** that abstracts the underlying A
 
 ## Provider Chain
 
+The main `llmService` tries providers in this order; each leg is **registered only when it's configured**, so a call is never single-provider in practice. The fallbacks are deliberately cross-vendor — a Google/Gemini outage takes down neither the Oracle (AWS Bedrock) nor the OpenRouter free Llama leg.
+
 1.  **Primary**: **Google Gemini** (`gemini-2.5-flash`)
-    *   Fast, cost-effective, high quality.
-    *   Used for all standard requests via `llmService`.
-    *   Requires `GEMINI_API_KEY`.
+    *   Fast, cost-effective, high quality. Requires `GEMINI_API_KEY` (skipped in CI/test where it's unset).
 
-2.  **Secondary (Fallback)**: **Ollama** (hosting `qwen2.5:7b`)
-    *   Self-hosted, private, no per-token cost.
-    *   Used automatically if Gemini returns an error (timeout, rate limit, 5xx).
-    *   Requires `OLLAMA_BASE_URL` (default: `http://localhost:11434`).
+2.  **Fallback 1**: **Oracle `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
+    *   Calls the retro Oracle's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.
+    *   Registered whenever the Oracle is configured (`ORACLE_URL` + `ORACLE_API_KEY`) — a no-op otherwise (e.g. self-host installs that don't reach Daatan's Oracle).
+    *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON).
 
-3.  **Bots**: **OpenRouter**
-    *   Used by autonomous bot users via `createBotLLMService(modelPreference)`.
-    *   Allows per-bot model selection (e.g., `mistralai/mixtral-8x7b`).
-    *   Requires `OPENROUTER_API_KEY`.
+3.  **Fallback 2**: **OpenRouter**
+    *   Registered whenever a key is configured (admin setting → env), for **both** editions.
+    *   **SaaS**: added only as a last-resort backstop, so it uses the free **non-Google** model `meta-llama/llama-3.3-70b-instruct:free` (an OpenRouter *Gemini* model would still hit Google's backend and die in the same outage).
+    *   **Self-host**: runs as a primary user-facing provider on the admin-chosen `getOpenRouterModel()`.
+
+4.  **Fallback 3**: **Ollama** (hosting `qwen2.5:7b`)
+    *   Self-hosted, private, no per-token cost. **Registered only when `OLLAMA_BASE_URL` is explicitly set** — the old implicit `localhost:11434` default was dropped so hosts that don't run Ollama (e.g. prod) don't carry a dead provider slot that fails on every fallback.
+
+**Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above.
+
+### Failure notifications
+
+A single provider failing is **logged but not paged** — a later leg may still succeed, and a fallback that rescues the call is silent. Telegram is paged (via `notifyLlmError`) **only when the whole chain fails**, with the attempted provider chain (e.g. `Gemini → Oracle → OpenRouter`) and the last error. See `docs/TELEGRAM_NOTIFICATIONS.md`.
 
 ## Code Structure
 
 *   **`src/lib/llm/types.ts`**: Interfaces for `LLMProvider`, `LLMRequest`, `LLMResponse`.
 *   **`src/lib/llm/providers/`**: Implementations for specific services.
     *   `gemini.ts`: Wrapper for Google Generative AI SDK.
+    *   `oracle.ts`: HTTP client for the Oracle `/llm` endpoint (Bedrock/Nova) — main-chain fallback.
     *   `ollama.ts`: HTTP client for Ollama API.
-    *   `openrouter.ts`: HTTP client for OpenRouter API (used by bots).
+    *   `openrouter.ts`: HTTP client for OpenRouter API (main-chain fallback + bots).
 *   **`src/lib/llm/service.ts`**: `ResilientLLMService` class that handles the retry/fallback logic.
 *   **`src/lib/llm/bedrock-prompts.ts`**: AWS Bedrock Prompt Management client (5-minute TTL cache).
 *   **`src/lib/llm/index.ts`**: Instantiates and exports `llmService` and `createBotLLMService`.
@@ -65,7 +75,7 @@ Requires `AWS_REGION` and an IAM role/profile with `bedrock:GetPrompt` and `ssm:
 
 ## Usage
 
-### Standard requests (Gemini → Ollama fallback)
+### Standard requests (Gemini → Oracle → OpenRouter → Ollama fallback)
 
 Instead of importing `GoogleGenerativeAI` directly, use the service:
 
@@ -113,7 +123,7 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 ### Fallback chain for forecast "AI %"
 
 1.  **Oracle** (`POST /forecast` with 12s timeout (bots use 20s)) — calibrated multi-source estimate.
-2.  **LLM `guessChances`** (Gemini → Ollama via the provider chain above) — used if Oracle is not configured, times out, returns a placeholder response, or has zero usable articles.
+2.  **LLM `guessChances`** (Gemini → Oracle → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracle path is not configured, times out, returns a placeholder response, or has zero usable articles.
 
 ### Call sites
 

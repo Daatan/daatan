@@ -117,7 +117,7 @@ Sent by API routes and services on business and operational events. The **Channe
 | Search provider health digest | ⚠️/🚨 | noisy / **clean when critical** | 5 min (global, one key) | `GET /api/cron/search-health` (hourly) + `GET /api/health/search` |
 | Server error | 🚨 | noisy | 5 min per `route:ErrorType` | `src/lib/api-middleware.ts` |
 | Dead link / 404 | 🔗 | noisy | 5 min per `pathname` | API routes on not-found |
-| LLM provider error | 🤖 | noisy | 5 min per `provider` | `src/lib/llm/index.ts` |
+| LLM chain failure | 🤖 | noisy | 5 min per provider-chain | `src/lib/llm/service.ts` — fires **only when the whole fallback chain fails**; a single provider failing that a fallback then rescues is logged, not paged |
 | Oracle search unavailable | ⚠️ | noisy | 5 min (global) | `src/lib/services/oracleSearch.ts` |
 | Market ⇄ Oracle divergence | 📊 | noisy | single-shot per crossing; hysteresis re-arms only once the gap falls to ≤15pt (not merely <20pt), and an atomic claim (`updateMany` gated on the alert column being null) prevents double-fires across overlapping cron runs | `GET /api/cron/external-market-sync` (hourly) → `checkMarketDivergence()` in `src/lib/services/external-markets.ts` — fires when a linked Polymarket/Kalshi market's implied probability and our Oracle estimate differ by more than 20pt |
 

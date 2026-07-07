@@ -1,48 +1,77 @@
 import { GeminiProvider } from './providers/gemini'
 import { OllamaProvider } from './providers/ollama'
 import { OpenRouterProvider } from './providers/openrouter'
+import { OracleProvider } from './providers/oracle'
 import { ResilientLLMService } from './service'
 import type { LLMProvider } from './types'
 import { createLogger } from '@/lib/logger'
 import { isSelfHosted } from '@/lib/edition'
 import { getOpenRouterKey, getOpenRouterModel } from '@/lib/services/settings'
+import { getOracleConfig } from '@/lib/services/oracleClient'
 
 const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
-const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 
-// Build the main service's provider list in priority order. The OpenRouter key
-// is read at build time from the admin settings (DB) → env, so re-running this
-// after the settings cache warms (or after the admin saves a key) picks it up
-// without a restart — see rebuildLlmService().
+// The Oracle fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
+// from Google), so it can serve precisely when Gemini/Google is unavailable. We
+// pin an explicit model rather than inherit the Oracle's pipeline default.
+const ORACLE_FALLBACK_MODEL = 'bedrock/amazon.nova-pro-v1:0'
+
+// OpenRouter no longer offers a free Gemini model (the :free Gemini slugs now
+// 404). Both the SaaS main-chain fallback and the Gemini-preference bot leg use
+// this free NON-Google model — it's only reached when direct Gemini is down, so
+// it must not route back to Google, and it can actually serve during a Google outage.
+const OPENROUTER_FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
+
+// Build the main service's provider list in priority order:
+//   Gemini → Oracle (Bedrock/Nova) → OpenRouter → Ollama
+// Each leg registers only when it's configured, so a call is never Gemini-only in
+// practice. The OpenRouter/Oracle keys are read at build time from admin settings
+// (DB) → env, so re-running this after the settings cache warms (or after the admin
+// saves a key) picks it up without a restart — see rebuildLlmService().
 function buildProviders(): LLMProvider[] {
   const providers: LLMProvider[] = []
 
-  // Only register Gemini when an API key is available. In CI/test environments
-  // we often don't have a real key, so we skip Gemini and rely on fallbacks.
+  // Primary: direct Gemini. In CI/test we often have no key, so skip it and rely
+  // on the fallbacks below.
   if (geminiApiKey) {
     providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: 'gemini-2.5-flash' }))
   } else {
     log.warn(
       'GEMINI_API_KEY is not set; Gemini provider will be disabled. ' +
-      'Only fallback providers (e.g. Ollama) will be used.',
+      'Only fallback providers will be used.',
     )
   }
 
-  // Self-host edition: register OpenRouter when a key is configured (admin
-  // setting or env), so a single admin key powers the user-facing features
-  // (Express, etc.), not just bots. Scoped to self_hosted so the SaaS main
-  // service stays Gemini+Ollama (SaaS uses OpenRouter only inside the bot
-  // service — unchanged here).
-  const openrouterApiKey = getOpenRouterKey()
-  if (isSelfHosted() && openrouterApiKey) {
-    providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: getOpenRouterModel() }))
+  // Fallback 1: the Oracle's /llm (AWS Bedrock / Amazon Nova) — a different vendor
+  // from Google, so it survives a Gemini/Google outage. Registered whenever the
+  // Oracle is configured (ORACLE_URL + ORACLE_API_KEY); a no-op otherwise, e.g. on
+  // self-host installs that don't reach Daatan's Oracle.
+  const oracleConfig = getOracleConfig()
+  if (oracleConfig) {
+    providers.push(new OracleProvider(oracleConfig, ORACLE_FALLBACK_MODEL))
   }
 
-  // Always register Ollama as a fallback provider (when reachable)
-  providers.push(new OllamaProvider({ baseUrl: ollamaBaseUrl, modelName: 'qwen2.5:7b' }))
+  // Fallback 2: OpenRouter. Registered whenever a key is configured (admin setting
+  // → env), for BOTH editions. Self-host runs it as a primary user-facing provider
+  // on the admin-chosen model; SaaS adds it only as a last-resort backstop, so it
+  // defaults to the free NON-Google model (an OpenRouter *Gemini* model would still
+  // hit Google's backend and die in the same outage).
+  const openrouterApiKey = getOpenRouterKey()
+  if (openrouterApiKey) {
+    const openrouterModel = isSelfHosted() ? getOpenRouterModel() : OPENROUTER_FREE_FALLBACK_MODEL
+    providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: openrouterModel }))
+  }
+
+  // Fallback 3: local Ollama — only when explicitly configured. Skipping the
+  // localhost:11434 default avoids a dead provider slot (and its false "provider
+  // failed" pages) on hosts that don't run Ollama, e.g. prod.
+  const ollamaBaseUrl = process.env.OLLAMA_BASE_URL
+  if (ollamaBaseUrl) {
+    providers.push(new OllamaProvider({ baseUrl: ollamaBaseUrl, modelName: 'qwen2.5:7b' }))
+  }
 
   return providers
 }
@@ -70,12 +99,6 @@ const OPENROUTER_MODEL_ALIASES: Record<string, string> = {
   'google/gemini-2.0-flash-exp:free':     'google/gemini-2.0-flash:free',
   'google/gemini-2.0-flash-exp':          'google/gemini-2.0-flash',
 }
-
-// OpenRouter no longer offers a free Gemini model (the :free Gemini slugs now
-// 404). For Gemini-preference bots the OpenRouter leg is only a *fallback* —
-// reached when direct Gemini is down — so it uses this free non-Google model,
-// which can actually serve precisely during a Gemini/Google outage.
-const OPENROUTER_FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
 
 /**
  * Creates an LLM service backed by OpenRouter for a specific model.
