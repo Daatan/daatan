@@ -135,15 +135,17 @@ describe('generateExpressPrediction', () => {
         .rejects.toThrow('NO_ARTICLES_FOUND')
     })
 
-    it('does not treat text with URL-like substrings as URL input', async () => {
+    it('detects and anchors on a URL pasted alongside free text', async () => {
+      // Regression: "link + text" must honor the link as the source (Andrej's case),
+      // not fall back to a keyword search that anchors on a different article.
+      mockFetchUrlContent.mockResolvedValue('CNN Bitcoin Rally. Full body text here.')
       mockOracleSearch.mockResolvedValue(mockArticles)
       setupLlmMock()
 
-      await generateExpressPrediction('check https://cnn.com for news about bitcoin')
+      const result = await generateExpressPrediction('check https://cnn.com for news about bitcoin')
 
-      // Should use text search, not URL fetch (input has spaces, not a pure URL)
-      expect(mockFetchUrlContent).not.toHaveBeenCalled()
-      expect(mockOracleSearch).toHaveBeenCalledWith(MOCK_EXTRACTED_QUERY, 15, undefined, { source: 'express-creation' })
+      expect(mockFetchUrlContent).toHaveBeenCalledWith('https://cnn.com')
+      expect(result.newsAnchor!.url).toBe('https://cnn.com')
     })
 
     it('anchors on the model-selected relevant article, not the first result', async () => {
@@ -242,19 +244,21 @@ describe('generateExpressPrediction', () => {
       expect(uniqueUrls.size).toBe(allUrls.length)
     })
 
-    it('falls back to search when URL fetch fails', async () => {
+    it('keeps the user URL as the anchor when the fetch fails (no search-result substitution)', async () => {
+      // Bot-blocked/paywalled pages (e.g. Walla) fail to scrape; the user's link must
+      // still anchor the forecast rather than being replaced by the first Oracle hit.
       mockFetchUrlContent.mockRejectedValue(new Error('Network error'))
       mockOracleSearch.mockResolvedValue(mockArticles)
-      
+
       mockGenerateContent
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       const result = await generateExpressPrediction(testUrl)
 
-      // Should fall back to using URL as search query
+      // Related-article search still runs (best effort), but the anchor stays the user's URL.
       expect(mockOracleSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
       expect(mockGenerateContent).toHaveBeenCalledTimes(1)
-      expect(result.newsAnchor!.url).toBe('https://cnn.com/btc')
+      expect(result.newsAnchor!.url).toBe(testUrl)
     })
 
     it('falls back to URL as search topic when topic extraction fails', async () => {

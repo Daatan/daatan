@@ -1,4 +1,4 @@
-import { generateExpressPrediction, NoArticlesFoundError } from '@/lib/llm/expressPrediction'
+import { generateExpressPrediction, NoArticlesFoundError, extractFirstUrl } from '@/lib/llm/expressPrediction'
 import { z } from 'zod'
 import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
@@ -45,7 +45,9 @@ export const POST = withAuth(async (request, user) => {
 
   const body = await request.json()
   const { userInput, skipSources } = generateSchema.parse(body)
-  const isUrl = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
+  // Records whether the input carried a source link (anywhere, not only as a bare
+  // URL) — matches how generateExpressPrediction now anchors on a pasted link.
+  const isUrl = extractFirstUrl(userInput) !== null
 
   // Without a search backend (the LLM-only self-host case) skip the article
   // search and generate from the user's text alone. The LLM provider itself
