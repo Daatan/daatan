@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart, { communityProbability, tsWindowToIndices } from '../ProbabilityChart'
+import ProbabilityChart, { communityProbability, tsWindowToIndices, buildMarketSeries } from '../ProbabilityChart'
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -147,6 +147,36 @@ describe('communityProbability (mean of committers\' implied estimates)', () => 
   it('three moderate YES stakes do not pin to 100%', () => {
     // mean of (0.75, 0.75, 0.75) = 0.75 → 75% (was 100% under the share formula)
     expect(communityProbability([{ cuCommitted: 50 }, { cuCommitted: 50 }, { cuCommitted: 50 }])).toBe(75)
+  })
+})
+
+describe('buildMarketSeries (carry-forward + real-change flagging)', () => {
+  it('flags the first appearance of a price as a change', () => {
+    const out = buildMarketSeries([{ createdAt: '2026-07-01', probability: 20 }], [new Date('2026-07-01').getTime()])
+    expect(out).toEqual([{ market: 20, marketChanged: true }])
+  })
+
+  it('does not re-flag a re-synced price that repeats the prior value', () => {
+    const market = [
+      { createdAt: '2026-07-01', probability: 20 },
+      { createdAt: '2026-07-02', probability: 20 },
+      { createdAt: '2026-07-03', probability: 20 },
+      { createdAt: '2026-07-04', probability: 15 },
+    ]
+    const ts = market.map(m => new Date(m.createdAt).getTime())
+    const out = buildMarketSeries(market, ts)
+    expect(out.map(o => o.marketChanged)).toEqual([true, false, false, true])
+    expect(out.map(o => o.market)).toEqual([20, 20, 20, 15])
+  })
+
+  it('carries the last value forward through ts points with no market snapshot at all', () => {
+    const market = [{ createdAt: '2026-07-01', probability: 20 }]
+    const ts = [new Date('2026-07-01').getTime(), new Date('2026-07-02').getTime()]
+    const out = buildMarketSeries(market, ts)
+    expect(out).toEqual([
+      { market: 20, marketChanged: true },
+      { market: 20, marketChanged: false },
+    ])
   })
 })
 

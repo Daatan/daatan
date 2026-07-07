@@ -304,6 +304,22 @@ describe('price-history parsing', () => {
     expect(parseHistoryPayload({ history: 'nope' })).toEqual([])
   })
 
+  it('drops consecutive candles at the same price — a flat run is one measurement', () => {
+    const out = parseHistoryPayload({
+      history: [
+        { t: 100, p: 0.2 },
+        { t: 200, p: 0.2 },
+        { t: 300, p: 0.2 },
+        { t: 400, p: 0.5 },
+        { t: 500, p: 0.5 },
+      ],
+    })
+    expect(out).toEqual([
+      { createdAt: new Date(100_000), probability: 20 },
+      { createdAt: new Date(400_000), probability: 50 },
+    ])
+  })
+
   it('samplePoints keeps everything under the cap and always keeps the last point', () => {
     const points = Array.from({ length: 10 }, (_, i) => i)
     expect(samplePoints(points, 20)).toHaveLength(10)
@@ -397,6 +413,50 @@ describe('syncLinkedMarkets', () => {
     await syncLinkedMarkets()
 
     expect(prisma.externalMarketPriceSnapshot.createMany).not.toHaveBeenCalled()
+  })
+
+  it('skips writing a new snapshot when the price has not changed since the last sync', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    // gammaRow()'s default outcomePrices ["0.68", "0.32"] → market YES probability 68.
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue({ probability: 68 } as never)
+
+    const result = await syncLinkedMarkets()
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    expect(prisma.externalMarketPriceSnapshot.create).not.toHaveBeenCalled()
+    expect(prisma.externalMarket.update).toHaveBeenCalledOnce()
+  })
+
+  it('writes a new snapshot when the price has changed since the last sync', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue({ probability: 50 } as never)
+
+    const result = await syncLinkedMarkets()
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 68 },
+    })
+  })
+
+  it('writes a snapshot on a market\'s first-ever sync (no prior snapshot to compare)', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue(null)
+
+    await syncLinkedMarkets()
+
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 68 },
+    })
   })
 
   describe('market vs Oracle divergence', () => {

@@ -280,7 +280,14 @@ export function samplePoints<T>(points: T[], max: number): T[] {
   return out
 }
 
-/** Parse a CLOB prices-history payload into snapshot-ready points (asc, capped). */
+/** Drop points whose probability repeats the previous point's — a plateau of
+ *  identical candles is one real price, not one measurement per candle. Always
+ *  keeps the first point so an all-flat series still yields its starting price. */
+function dedupeConsecutive(points: HistoryPoint[]): HistoryPoint[] {
+  return points.filter((p, i) => i === 0 || p.probability !== points[i - 1].probability)
+}
+
+/** Parse a CLOB prices-history payload into snapshot-ready points (asc, deduped, capped). */
 export function parseHistoryPayload(payload: unknown): HistoryPoint[] {
   const history = (payload as { history?: unknown })?.history
   if (!Array.isArray(history)) return []
@@ -295,7 +302,7 @@ export function parseHistoryPayload(payload: unknown): HistoryPoint[] {
     })
   }
   points.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-  return samplePoints(points, MAX_BACKFILL_POINTS)
+  return samplePoints(dedupeConsecutive(points), MAX_BACKFILL_POINTS)
 }
 
 /** Fetch the market's full-life YES price history. Empty on any failure. */
@@ -580,10 +587,23 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
           await backfillMarketHistory(cached.id, latest.historyId, first?.createdAt ?? new Date())
         }
       }
+      // Only record a new snapshot when the price actually moved — an unconditional
+      // create-every-run turned a flat market into a dot-per-cron-tick plateau on
+      // the probability chart. lastSyncedAt/resolution still update every run.
+      const lastSnapshot = await prisma.externalMarketPriceSnapshot.findFirst({
+        where: { marketId: cached.id },
+        orderBy: { createdAt: 'desc' },
+        select: { probability: true },
+      })
+      const priceChanged = lastSnapshot?.probability !== latest.yesProbability
       await prisma.$transaction([
-        prisma.externalMarketPriceSnapshot.create({
-          data: { marketId: cached.id, probability: latest.yesProbability },
-        }),
+        ...(priceChanged
+          ? [
+              prisma.externalMarketPriceSnapshot.create({
+                data: { marketId: cached.id, probability: latest.yesProbability },
+              }),
+            ]
+          : []),
         prisma.externalMarket.update({
           where: { id: cached.id },
           data: {
