@@ -27,6 +27,18 @@ resource "aws_route53_record" "api" {
   records = [aws_eip.production.public_ip]
 }
 
+# Elections subdomain (elections.daatan.com) → production instance. Served by the
+# same app; src/middleware.ts host-routes it to the /elections section. TLS is the
+# daatan.com cert expanded to include this SAN (certbot --expand); nginx server
+# block in infra/nginx/nginx-prod-ssl.conf.
+resource "aws_route53_record" "elections" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "elections.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.production.public_ip]
+}
+
 # WWW CNAME pointing to root
 resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.main.zone_id
