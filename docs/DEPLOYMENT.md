@@ -96,6 +96,9 @@ build ──┬──► deploy-staging    (on push to main)
 3. Build Next.js app (with dummy DB URL)
 4. Security audit
 5. Check env var parity between `blue-green-deploy.sh` and `docker-compose.prod.yml`
+   (`scripts/check-env-parity.sh` — extracts `-e KEY` tokens from `blue-green-deploy.sh`'s
+   `ENV_ARGS` bash array and compares against the compose file's `environment:` block per
+   service; doesn't catch a var missing from *both*, only drift between them)
 6. Build and push **app image** (`staging-latest`) to ECR
 7. Build and push **migrations image** (`staging-latest-migrations`) to ECR
    - Reuses all cached layers from step 6 — adds ~30–60s to CI time
