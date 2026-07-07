@@ -523,7 +523,9 @@
     "countPlural": "{count} публикаций",
     "originOracle": "Проанализировано ИИ",
     "originIndexer": "В индексе",
-    "originBoth": "Оба"
+    "originBoth": "Оба",
+    "notUsed": "+{count} статья найдена, но не использована ИИ",
+    "notUsedPlural": "+{count} статей найдено, но не использовано ИИ"
   },
   "footer": {
     "privacy": "Политика конфиденциальности",

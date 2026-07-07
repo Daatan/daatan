@@ -112,4 +112,66 @@ describe('ContributingSources', () => {
     )
     expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
   })
+
+  it("uses the outlet's most decisive article for the badge, not a diluted average or bare certainty", () => {
+    // Mirrors a real case: a clearly on-topic YES article (stance .724, certainty
+    // .725) shares a domain with an unrelated article that has HIGHER raw certainty
+    // but a much weaker stance magnitude (stance -.208, certainty .78). Averaging
+    // would cancel the strong signal down to "neutral"; picking by certainty alone
+    // would pick the wrong (irrelevant) article. Signal strength (|stance| ×
+    // certainty) correctly picks the on-topic one.
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://jpost.com/a', source: 'jpost.com', title: 'Decisive on-topic story', stance: 0.724, certainty: 0.725 }),
+          src({ url: 'https://jpost.com/b', source: 'jpost.com', title: 'Unrelated off-topic story', stance: -0.208, certainty: 0.78 }),
+        ]}
+      />,
+    )
+    expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
+    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
+  })
+
+  it('mentions gate-rejected articles by count instead of giving them a voter card', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://a.com/1', stance: 0.6 }),
+          src({ url: 'https://b.com/2', stance: null, certainty: null }),
+          src({ url: 'https://c.com/3', stance: null, certainty: null }),
+        ]}
+      />,
+    )
+    // Only the stance-scored article gets a voter card...
+    expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
+    // ...the two gate-rejected ones are a passing count, not their own column entries.
+    expect(screen.getByText('+2 articles matched but not used by the AI')).toBeInTheDocument()
+    expect(screen.queryByText(/^Neutral \/ unclear/)).toBeNull()
+  })
+
+  it('uses the singular form for exactly one not-used article', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://a.com/1', stance: 0.6 }),
+          src({ url: 'https://b.com/2', stance: null }),
+        ]}
+      />,
+    )
+    expect(screen.getByText('+1 article matched but not used by the AI')).toBeInTheDocument()
+  })
+
+  it('shows only a not-used count when every matched article was gate-rejected', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://a.com/1', stance: null }),
+          src({ url: 'https://b.com/2', stance: null }),
+        ]}
+      />,
+    )
+    expect(screen.getByText(enMessages.sources.title)).toBeInTheDocument()
+    expect(screen.getByText('+2 articles matched but not used by the AI')).toBeInTheDocument()
+    expect(screen.queryByText(/^Will happen/)).toBeNull()
+  })
 })

@@ -523,7 +523,9 @@
     "countPlural": "{count} פרסומים",
     "originOracle": "נותח ב-AI",
     "originIndexer": "באינדקס",
-    "originBoth": "שניהם"
+    "originBoth": "שניהם",
+    "notUsed": "+כתבה אחת נמצאה אך לא נעשה בה שימוש ע\"י ה-AI",
+    "notUsedPlural": "+{count} כתבות נמצאו אך לא נעשה בהן שימוש ע\"י ה-AI"
   },
   "footer": {
     "privacy": "מדיניות פרטיות",
