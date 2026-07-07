@@ -288,6 +288,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
+      alternateName: 'דעתן',
       url: 'https://daatan.com',
       logo: { '@type': 'ImageObject', url: 'https://daatan.com/logo-icon.png' },
     },
@@ -355,11 +356,13 @@ export default async function ForecastDetailPage({ params }: Props) {
           author: {
             '@type': 'Organization',
             name: 'DAATAN',
+            alternateName: 'דעתן',
             url: 'https://daatan.com',
           },
           creator: {
             '@type': 'Organization',
             name: 'DAATAN',
+            alternateName: 'דעתן',
             url: 'https://daatan.com',
           },
           reviewRating: {

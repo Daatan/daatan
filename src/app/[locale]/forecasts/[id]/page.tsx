@@ -245,6 +245,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
+      alternateName: 'דעתן',
       url: 'https://daatan.com',
       logo: { '@type': 'ImageObject', url: 'https://daatan.com/logo-icon.png' },
     },
