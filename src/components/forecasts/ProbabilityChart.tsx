@@ -53,6 +53,14 @@ type Props = {
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
 
+/** Renders a dot only at a real market-price change (see `marketChanged`), so a
+ *  re-synced-but-unchanged price doesn't draw a redundant marker on the flat
+ *  stretch between changes. */
+function MarketDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { marketChanged?: boolean } }) {
+  if (cx == null || cy == null || !payload?.marketChanged) return null
+  return <circle className="market-price-dot" cx={cx} cy={cy} r={3} fill="#EC4899" stroke="none" />
+}
+
 // Axis ticks show the date; the tooltip header adds the time so events on the
 // same day (which previously collapsed to one ambiguous label) are distinct.
 const fmtDate = (ts: number) =>
@@ -98,6 +106,27 @@ export function tsWindowToIndices(
   }
   if (e < 0) e = tsList.length - 1
   return e - s >= 1 ? { s, e } : null
+}
+
+/**
+ * Carry a market's price forward across a merged timeline as a step function
+ * (one entry per `ts`), flagging only the points where the price is a genuine
+ * change from the prior point. A market re-synced every cron tick re-confirms
+ * the same price far more often than it actually moves, so without this flag
+ * every tick would draw its own chart dot.
+ */
+export function buildMarketSeries(
+  sortedMarket: { createdAt: string; probability: number }[],
+  tsList: number[],
+): { market: number | null; marketChanged: boolean }[] {
+  let prev: number | null = null
+  return tsList.map(ts => {
+    const upTo = sortedMarket.filter(m => new Date(m.createdAt).getTime() <= ts)
+    const latest = upTo.length > 0 ? upTo[upTo.length - 1].probability : null
+    const marketChanged = latest != null && latest !== prev
+    prev = latest ?? prev
+    return { market: latest, marketChanged }
+  })
 }
 
 export default function ProbabilityChart({
@@ -149,20 +178,21 @@ export default function ProbabilityChart({
     ...sortedMarket.map(m => new Date(m.createdAt).getTime()),
   ].sort((a, b) => a - b)
   const uniqueTs = [...new Set(allTs)]
+  const marketSeries = buildMarketSeries(sortedMarket, uniqueTs)
 
-  const data = uniqueTs.map(ts => {
+  const data = uniqueTs.map((ts, i) => {
     const upToCommits = sortedCommits.filter(c => new Date(c.createdAt).getTime() <= ts)
     const upToSnaps = sortedSnaps.filter(s => new Date(s.createdAt).getTime() <= ts)
     // Carry AI estimate forward as a step function
     const latestAi = upToSnaps.length > 0 ? upToSnaps[upToSnaps.length - 1].externalProbability : null
 
-    const upToMarket = sortedMarket.filter(m => new Date(m.createdAt).getTime() <= ts)
-    const latestMarket = upToMarket.length > 0 ? upToMarket[upToMarket.length - 1].probability : null
+    const { market: latestMarket, marketChanged } = marketSeries[i]
 
-    const point: Record<string, number | string | null> = {
+    const point: Record<string, number | string | boolean | null> = {
       ts,
       ai: latestAi ?? null,
       market: latestMarket,
+      marketChanged,
     }
 
     if (outcomeType === 'BINARY') {
@@ -184,13 +214,12 @@ export default function ProbabilityChart({
   // snapshot — would read as an empty chart. Render point markers while the series
   // is sparse so each value is legible; drop them once the trend is dense.
   const showDots = data.length <= 5
-  // The AI and market series carry their last value forward as a step function, so a
-  // single Oracle estimate (or market snapshot) dated AFTER all commitments yields one
-  // non-null point at the right edge — with no segment to draw and dots off (because the
-  // commitments made `data` dense), it's invisible. Decide dots per series by how many
-  // real points each has, so a lone estimate always shows as a marker.
+  // The AI series carries its last value forward as a step function, so a single
+  // Oracle estimate dated AFTER all commitments yields one non-null point at the
+  // right edge — with no segment to draw and dots off (because the commitments
+  // made `data` dense), it's invisible. Decide dots by how many real points the
+  // series has, so a lone estimate always shows as a marker.
   const showAiDots = aiPointCount <= 5
-  const showMarketDots = sortedMarket.length <= 5
 
   // Range presets drive the brush window (which zooms the chart). Default to the
   // tightest preset that still shows ≥2 points, so the chart opens on recent
@@ -350,7 +379,7 @@ export default function ProbabilityChart({
               name={marketLabel}
               stroke="#EC4899"
               strokeWidth={2}
-              dot={showMarketDots}
+              dot={<MarketDot />}
               connectNulls
             />
           )}
