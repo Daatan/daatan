@@ -59,7 +59,7 @@ const FALLBACK_PROMPTS: Partial<Record<PromptName, string>> = {
 Rules:
 1. Create clear, unambiguous claims that can be objectively verified
 2. Infer resolution dates from context (e.g., "this year" = end of current year)
-3. If no timeframe mentioned, default to end of current year ({{endOfYearHuman}})
+3. Choose the resolution date to match the topic's natural resolution point — e.g. the election date, referendum date, earnings report date, court ruling, treaty deadline, or product-launch window. Only if the topic has no natural resolution point, default to end of current year ({{endOfYearHuman}})
 3a. For relative-timing predictions ("will A happen before B", "will X do Y before Z does W"), default to 5 years from today ({{fiveYearsFromNowHuman}}) — use {{fiveYearsFromNow}} as the resolveByDatetime
 4. Summarize current situation based on provided articles (2-3 sentences, factual)
 5. Focus on factual, verifiable outcomes
@@ -95,7 +95,7 @@ Based on these recent articles/context:
 
 Generate a structured prediction with:
 1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO)
-2. Resolution date as ISO 8601 datetime (infer from user input or default to {{endOfYear}})
+2. Resolution date as ISO 8601 datetime — match the topic's natural resolution point (election date, earnings date, ruling, deadline, etc.); only if none exists, default to {{endOfYear}}
 3. Context summary (2-3 sentences about current situation from articles)
 4. Tags (array of strings, e.g. ["Geopolitics", "Iran"])
 5. Resolution rules (specific criteria for resolution)

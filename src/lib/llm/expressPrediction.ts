@@ -241,32 +241,35 @@ export async function generateExpressPrediction(
     return { ...prediction, newsAnchor: null, additionalLinks: [], localized }
   }
 
-  const isUrl = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
+  // Honor a source URL pasted anywhere in the input, not only when the entire
+  // input is a bare URL. When the user supplies a link (even alongside their own
+  // framing text), that link IS the forecast's news anchor by definition — we
+  // never let a search-engine result silently replace it.
+  const detectedUrl = extractFirstUrl(userInput)
 
   let searchResults: SearchResult[]
   let primaryArticle: SearchResult | null = null
 
-  if (isUrl) {
-    // URL flow: fetch article, extract topic, search for related articles
-    const url = userInput.trim()
+  if (detectedUrl) {
+    const url = detectedUrl
+    // Whatever the user typed besides the URL is their own claim/framing text.
+    const contextText = userInput.replace(url, '').trim()
+    const domain = extractDomainFromUrl(url)
     onProgress?.('searching', { message: 'Fetching article content...' })
 
     let articleContent: string
     try {
       articleContent = await fetchUrlContent(url)
     } catch {
-      log.warn({ url }, 'Failed to fetch URL content, falling back to search')
+      log.warn({ url }, 'Failed to fetch URL content; keeping it as the anchor and searching for related articles')
       articleContent = ''
     }
 
-    if (!articleContent) {
-      // Fallback: use the URL as a search query
-      onProgress?.('searching', { message: 'Searching for relevant articles...' })
-      searchResults = (await oracleSearch(url, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
-      if (searchResults.length === 0) {
-        throw new NoArticlesFoundError({ searchedFor: url, isUrl: true, isNonLatin: false })
-      }
-    } else {
+    // Query used to find *related* articles (extra links/context) — never to pick
+    // the anchor, which is always the user's URL.
+    let relatedQuery: string
+
+    if (articleContent) {
       // Extract topic from article content using LLM
       onProgress?.('searching', { message: 'Reading article and extracting topic...' })
 
@@ -281,13 +284,12 @@ export async function generateExpressPrediction(
         topic = extractResult.text.trim().replace(/^["']|["']$/g, '')
       } catch (error) {
         log.warn({ err: error }, 'Failed to extract topic from article, using URL as search')
-        topic = url
+        topic = contextText || url
       }
 
       log.info({ url, topic }, 'Extracted topic from URL')
 
-      // Build primary article from fetched content
-      const domain = extractDomainFromUrl(url)
+      // Build primary article from fetched content.
       // Extract title: first meaningful line from content (before any long text)
       const titleMatch = articleContent.match(/^(.{10,120}?)(?:\s{2,}|\.\s)/)
       primaryArticle = {
@@ -296,22 +298,35 @@ export async function generateExpressPrediction(
         snippet: articleContent.substring(0, 500),
         source: domain,
       }
-
-      // Search for related articles using the extracted topic
-      onProgress?.('searching', { message: `Finding related articles for: "${topic}"` })
-
-      try {
-        searchResults = (await oracleSearch(topic, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
-      } catch {
-        searchResults = []
+      relatedQuery = topic
+    } else {
+      // Scrape failed (paywall, bot-protection, non-HTTPS, JS-only page). Still
+      // honor the user's URL as the anchor — build it from the domain plus the
+      // user's own text — so the link is never dropped for a search result.
+      primaryArticle = {
+        title: domain,
+        url,
+        snippet: contextText,
+        source: domain,
       }
-
-      // Remove the original URL from search results if it appeared
-      searchResults = searchResults.filter(r => r.url !== url)
-
-      // Prepend the primary article
-      searchResults = [primaryArticle, ...searchResults.slice(0, 4)]
+      relatedQuery = contextText ? await buildSearchQuery(contextText) : url
     }
+
+    // Best-effort related articles for additional links / LLM context. Empty is
+    // fine — the user's own article already anchors the forecast, so unlike the
+    // text-only flow below we never throw NoArticlesFoundError here.
+    onProgress?.('searching', { message: `Finding related articles for: "${relatedQuery}"` })
+    let related: SearchResult[]
+    try {
+      related = (await oracleSearch(relatedQuery, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
+    } catch {
+      related = []
+    }
+
+    // Remove the original URL from related results if it appeared, then prepend
+    // the primary article so it is always index 0 / the anchor.
+    related = related.filter(r => r.url !== url)
+    searchResults = [primaryArticle, ...related.slice(0, 4)]
   } else {
     // Normal text flow: extract a focused query from the claim, then search.
     // Sentence-style claims retrieve poorly; key entities/topic do much better.
@@ -535,6 +550,18 @@ Snippet: ${article.snippet}
     log.error({ err: error }, 'Failed to guess chances')
     throw error
   }
+}
+
+/**
+ * Extract the first http(s) URL appearing anywhere in a string, or null.
+ * Lets a source link pasted alongside free text ("<claim> https://site/article")
+ * still be honored as the forecast's news anchor. Trailing sentence punctuation
+ * and closing brackets/quotes that commonly abut a URL in prose are trimmed.
+ */
+export function extractFirstUrl(input: string): string | null {
+  const match = input.match(/https?:\/\/[^\s<>"'`)\]}]+/i)
+  if (!match) return null
+  return match[0].replace(/[.,;:!?]+$/, '')
 }
 
 export function extractDomainFromUrl(url: string): string {

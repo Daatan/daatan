@@ -133,8 +133,9 @@ export default function ExpressForecastClient({
       return
     }
 
-    // URL detection for UI feedback
-    const isUrl = /^(https?:\/\/[^\s]+)$/i.test(userInput.trim())
+    // URL detection for UI feedback — a link pasted anywhere (even alongside
+    // text) is honored as the news anchor server-side, so flag it here too.
+    const isUrl = /https?:\/\/[^\s]+/i.test(userInput)
 
     setError('')
     setStep('checking')
@@ -453,7 +454,7 @@ export default function ExpressForecastClient({
           />
           <div className="flex justify-between items-center mt-2">
             <span className="text-xs text-gray-500">{t('charCount', { count: userInput.length })}</span>
-            {/^(https?:\/\/[^\s]+)$/i.test(userInput.trim()) && (
+            {/https?:\/\/[^\s]+/i.test(userInput) && (
               <span className="text-xs text-blue-600 font-medium">{t('urlDetected')}</span>
             )}
           </div>
