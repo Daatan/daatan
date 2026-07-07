@@ -14,23 +14,26 @@ COMPOSE_PROD="$ROOT/docker-compose.prod.yml"
 COMPOSE_STAGING="$ROOT/docker-compose.staging.yml"
 
 # Extract env keys from blue-green-deploy.sh for a given environment branch.
-# Matches lines of the form: ENV_ARGS="$ENV_ARGS -e KEY=..."
+# Matches lines of the form: ENV_ARGS+=(-e "KEY=...") or ENV_ARGS+=(-e KEY)
+# (ENV_ARGS is a bash array — see the word-splitting bug this fixed, 2026-07-07:
+# a plain string ENV_ARGS with unquoted expansion broke on any value containing
+# a space, e.g. a PEM key's "-----BEGIN PRIVATE KEY-----" header.)
 blue_green_keys_common() {
   # Keys set unconditionally (before the if/else branch)
-  awk '/ENV_ARGS=.*-e /,/if \[ "\$ENVIRONMENT"/' "$BLUE_GREEN" \
-    | grep -oP '(?<=-e )[A-Z_]+(?==|[ "\\])' | sort -u
+  awk '/ENV_ARGS\+=\(-e /,/if \[ "\$ENVIRONMENT"/' "$BLUE_GREEN" \
+    | grep -oP '(?<=-e )"?[A-Z_]+' | tr -d '"' | sort -u
 }
 
 blue_green_keys_prod() {
   # Keys set in the production (else) branch
   awk '/else$/,/^fi$/' "$BLUE_GREEN" \
-    | grep -oP '(?<=-e )[A-Z_]+(?==|[ "\\])' | sort -u
+    | grep -oP '(?<=-e )"?[A-Z_]+' | tr -d '"' | sort -u
 }
 
 blue_green_keys_staging() {
   # Keys set in the staging branch
   awk '/if \[ "\$ENVIRONMENT" = "staging" \]/,/else$/' "$BLUE_GREEN" \
-    | grep -oP '(?<=-e )[A-Z_]+(?==|[ "\\])' | sort -u
+    | grep -oP '(?<=-e )"?[A-Z_]+' | tr -d '"' | sort -u
 }
 
 # Extract env keys from a compose file's named service block.
