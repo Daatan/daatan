@@ -6,7 +6,7 @@ import { buildForecastDescription } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
-import { getContextTimeline } from '@/lib/services/context'
+import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getForecastVoters } from '@/lib/services/forecast-sources'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
@@ -260,11 +260,20 @@ export default async function ForecastDetailPage({ params }: Props) {
     permanentRedirect(`/forecasts/${prediction.slug}`)
   }
 
-  const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
+  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
     getForecastVoters(prediction.id),
+    getProbabilityHistory(prediction.id),
   ])
+  // Chart series: includes kind='clock' glide requotes (unlike the event
+  // timeline above) so the daily time-decay adjustment shows as movement.
+  const initialProbabilityHistory = probabilityHistory.map((s) => ({
+    id: s.id,
+    createdAt: s.createdAt.toISOString(),
+    externalProbability: s.externalProbability,
+    kind: s.kind,
+  }))
   const slug = prediction.slug || prediction.id
   const articleJsonLd = {
     '@context': 'https://schema.org',
@@ -399,6 +408,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         initialData={prediction}
         initialComments={initialComments}
         initialContextSnapshots={initialContextSnapshots}
+        initialProbabilityHistory={initialProbabilityHistory}
         initialContributingSources={initialContributingSources}
       />
     </>

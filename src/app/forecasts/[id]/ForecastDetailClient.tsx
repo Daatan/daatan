@@ -49,12 +49,15 @@ export default function ForecastDetailClient({
   isLocalized,
   initialComments,
   initialContextSnapshots,
+  initialProbabilityHistory,
   initialContributingSources,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
   initialComments?: Comment[]
   initialContextSnapshots?: ContextSnapshot[]
+  /** Chart series incl. kind='clock' glide requotes (the event timeline above excludes them). */
+  initialProbabilityHistory?: { id: string; createdAt: string; externalProbability: number | null; kind: string }[]
   initialContributingSources?: ContributingSource[]
 }) {
   const { id } = useParams() as { id: string }
@@ -453,9 +456,11 @@ export default function ForecastDetailClient({
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
           const marketProb = communityProbability(prediction.commitments) ?? 50
-          // The latest run abstained (no evidence bears on the claim): hide the AI
-          // needle and show "Insufficient evidence" instead of a number. Falls back
-          // to the latest snapshot for SSR / first paint, before onAiEstimate fires.
+          // The AI needle/band read the prediction's funnel-maintained cache
+          // (confidence/aiCiLow/aiCiHigh — includes the daily glide requote);
+          // `aiEstimate` overrides only after an in-page analyze run produces a
+          // fresher value. Abstention: latest run had no bearing evidence —
+          // hide the needle and show "Insufficient evidence".
           const aiAbstained = aiEstimate ? !!aiEstimate.abstained : !!initialContextSnapshots?.[0]?.insufficientData
           const aiVal = aiAbstained ? null : (aiEstimate?.probability ?? prediction.confidence ?? null)
 
@@ -721,7 +726,7 @@ export default function ForecastDetailClient({
           and the legend says so, so the line always matches the claim's direction. */}
       <ProbabilityChart
         commitments={prediction.commitments}
-        snapshots={initialContextSnapshots ?? []}
+        snapshots={initialProbabilityHistory ?? initialContextSnapshots ?? []}
         outcomeType={prediction.outcomeType}
         options={prediction.options}
         marketSnapshots={(prediction.externalMarket?.snapshots ?? []).map(s => ({
@@ -795,7 +800,8 @@ export default function ForecastDetailClient({
         const forecasters = prediction.commitments.length
         const consensus = prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null
         const aiSnap = initialContextSnapshots?.[0]
-        const ai = aiSnap?.insufficientData ? null : (aiSnap?.externalProbability ?? prediction.confidence ?? null)
+        // prediction.confidence is the funnel-maintained cache (incl. glide) — authoritative over the last evidence snapshot.
+        const ai = aiSnap?.insufficientData ? null : (prediction.confidence ?? aiSnap?.externalProbability ?? null)
         const status =
           prediction.resolvedAt && prediction.resolutionOutcome
             ? `resolved ${prediction.resolutionOutcome}`

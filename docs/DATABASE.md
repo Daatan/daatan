@@ -181,8 +181,10 @@ anchor time).
    `mean/std` are stance-scale) — never trust the schema comment alone when
    reading old rows.
 4. **`kind='clock'` rows are invisible on purpose** in timeline/anchor/dedup
-   queries — new query paths over `context_snapshots` must decide explicitly
-   whether clock rows belong.
+   queries; the probability chart's `getProbabilityHistory` is the one reader
+   that deliberately includes them (glide movement must be visible). New query
+   paths over `context_snapshots` must decide explicitly whether clock rows
+   belong.
 5. **Text indexes depend on glibc collation** — after any base-image/OS
    upgrade, run the collation check before trusting slug lookups
    ([DATABASE_COLLATION.md](./DATABASE_COLLATION.md)).

@@ -16,6 +16,7 @@ import {
   listContextSnapshots,
   getLatestOracleSnapshot,
   getLatestEvidenceEstimate,
+  getProbabilityHistory,
   saveNewsIndexerMatch,
 } from '@/lib/services/context'
 
@@ -83,5 +84,27 @@ describe('news-indexer dedup (#1006) is not defeated by a clock row in between',
 
     const call = findFirstSnapshot.mock.calls[0][0] as { where: Record<string, unknown> }
     expect(call.where).toMatchObject({ predictionId: 'pred-1', kind: { not: 'clock' } })
+  })
+})
+
+describe('getProbabilityHistory — the one reader that INCLUDES clock rows', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('does not filter by kind, so glide requotes appear in the chart series', async () => {
+    findManySnapshots.mockResolvedValue([])
+    await getProbabilityHistory('pred-1')
+    const call = findManySnapshots.mock.calls[0][0] as {
+      where: Record<string, unknown>
+      orderBy: Record<string, unknown>
+      select: Record<string, unknown>
+    }
+    expect(call.where).not.toHaveProperty('kind')
+    expect(call.where).toMatchObject({
+      predictionId: 'pred-1',
+      externalProbability: { not: null },
+      insufficientData: false,
+    })
+    expect(call.orderBy).toEqual({ createdAt: 'asc' })
+    expect(call.select).toMatchObject({ kind: true, externalProbability: true, createdAt: true })
   })
 })

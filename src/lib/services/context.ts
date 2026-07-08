@@ -395,6 +395,21 @@ export async function getLatestEvidenceEstimate(
 }
 
 /**
+ * The full AI-probability series for the history chart: every snapshot that
+ * carries an estimate, INCLUDING kind='clock' glide requotes. This is the one
+ * reader that deliberately crosses the NOT_CLOCK line — the timeline hides
+ * clock rows as events, but the chart must show the glide as movement
+ * (retro docs/ORACLE_VARIABLES.md §4.2 / §6). Ascending, light columns only.
+ */
+export async function getProbabilityHistory(predictionId: string) {
+  return prisma.contextSnapshot.findMany({
+    where: { predictionId, externalProbability: { not: null }, insufficientData: false },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, createdAt: true, externalProbability: true, kind: true },
+  })
+}
+
+/**
  * Mark a forecast as Oracle-attempted when the Oracle produced no usable sources
  * (no articles / no estimate). Writes an empty oracleSnapshot marker so the backfill
  * stops re-selecting it (it now HAS a non-null oracleSnapshot) and the loop converges.
