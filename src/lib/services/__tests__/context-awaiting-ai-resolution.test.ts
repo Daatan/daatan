@@ -146,7 +146,7 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
       expect(updatedData().awaitingAiResolution).toBe(true)
     })
 
-    it('leaves the flag untouched when confidence is null', async () => {
+    it('does not touch the prediction at all when confidence is null', async () => {
       await saveOracleSnapshotOnly({
         predictionId: 'pred-1',
         oracleSnapshot: {},
@@ -154,7 +154,9 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
         aiCiLow: null,
         aiCiHigh: null,
       })
-      expect(updatedData()).not.toHaveProperty('awaitingAiResolution')
+      // recordEstimate: no probability ⇒ no prediction.update op — flag, needle
+      // and band are all preserved (previously the band was blanked anyway).
+      expect(update).not.toHaveBeenCalled()
     })
   })
 

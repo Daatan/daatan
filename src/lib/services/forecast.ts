@@ -8,6 +8,7 @@ import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { createLogger } from '@/lib/logger'
 import { notifySearchEngines } from '@/lib/services/indexnow'
+import { recordEstimate } from '@/lib/services/context'
 import { communityProbability } from '@/lib/forecast-math'
 import {
   normalizeForecastToEnglish,
@@ -226,7 +227,6 @@ export async function createForecast(input: CreateForecastInput) {
           status: 'DRAFT',
           isPublic: input.isPublic ?? true,
           source: input.source ?? null,
-          confidence: input.confidence ?? null,
           externalMarketId: input.externalMarketId,
           externalMarketLinkedAt: input.externalMarketId ? new Date() : undefined,
           externalMarketLinkMethod: input.externalMarketId ? 'imported' : undefined,
@@ -259,6 +259,19 @@ export async function createForecast(input: CreateForecastInput) {
   }
 
   if (!prediction) throw new Error('Failed to generate a unique URL slug after multiple attempts')
+
+  // The creation draft goes through the estimate funnel like every other AI
+  // number (retro docs/ORACLE_VARIABLES.md §6): it lands as an origin='creation'
+  // snapshot instead of an unprovenanced bare confidence on the row. Bots bypass
+  // createForecast entirely (bots/stake.ts) — known funnel gap, out of scope here.
+  if (input.confidence != null) {
+    await recordEstimate({
+      predictionId: prediction.id,
+      origin: 'creation',
+      probability: input.confidence,
+      externalReasoning: 'Initial estimate at forecast creation',
+    })
+  }
 
   // Preserve the author's original-language wording as a translation, so the
   // source-language UI shows exactly what they wrote and the background job never

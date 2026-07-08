@@ -61,6 +61,129 @@ function notifyIfCrossedHighConfidence(
  *  public timeline, from anchor selection, and from evidence-push dedup. */
 const NOT_CLOCK: Prisma.ContextSnapshotWhereInput = { kind: { not: 'clock' } }
 
+// ─── recordEstimate: the single estimate writer (retro docs/ORACLE_VARIABLES.md §6) ───
+
+export type EstimateOrigin = 'creation' | 'analyze' | 'news-indexer' | 'backfill' | 'clock'
+
+/** Per-origin behavior. Reproduces the pre-funnel writers exactly; the point is
+ *  that the differences are now declared in one table instead of five functions. */
+interface OriginPolicy {
+  kind: 'evidence' | 'clock'
+  /** Fire the high-confidence crossing alert on this origin's writes. */
+  notifyOnCrossing: boolean
+  /** May latch Prediction.settled (sticky). Clock/creation never carry settlement. */
+  canSettle: boolean
+  /** Owns the user-facing context: detailsText + contextUpdatedAt + translation
+   *  invalidation. Only the user-triggered analyze path does. */
+  touchesUserContext: boolean
+}
+
+const ORIGIN_POLICY: Record<EstimateOrigin, OriginPolicy> = {
+  creation: { kind: 'evidence', notifyOnCrossing: false, canSettle: false, touchesUserContext: false },
+  analyze: { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: true },
+  'news-indexer': { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: false },
+  backfill: { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: false },
+  clock: { kind: 'clock', notifyOnCrossing: false, canSettle: false, touchesUserContext: false },
+}
+
+export interface RecordEstimateInput {
+  predictionId: string
+  origin: EstimateOrigin
+  /** AI probability 0–100, or null when this run produced no number (e.g. a
+   *  timeout) — in which case the prediction's needle AND band are both left
+   *  untouched (never one without the other). */
+  probability: number | null
+  ciLow?: number | null
+  ciHigh?: number | null
+  /** The run abstained: records the snapshot as an abstention and clears the
+   *  prediction's stale estimate (needle + band together). */
+  insufficientData?: boolean
+  /** Oracle settlement detection; honored only where the origin policy allows. */
+  settled?: boolean
+  summary?: string
+  sources?: Prisma.InputJsonValue
+  externalReasoning?: string | null
+  oracleSnapshot?: Prisma.InputJsonValue | null
+  /** Clock provenance JSON (origin='clock' only). */
+  meta?: Prisma.InputJsonValue
+  now?: Date
+}
+
+/** Oracle articles_used out of the snapshot payload, else null (LLM fallback, clock). */
+function articlesUsedOf(oracleSnapshot: unknown): number | null {
+  const n = (oracleSnapshot as { articlesUsed?: unknown } | null | undefined)?.articlesUsed
+  return typeof n === 'number' ? n : null
+}
+
+/**
+ * Persist one AI-estimate write — any origin — as a ContextSnapshot plus a
+ * consistent Prediction update, in a single transaction.
+ *
+ * Invariants (uniform across origins, unlike the five pre-funnel writers):
+ * - the snapshot always carries `origin`, `articlesUsed`, and its probability;
+ * - `confidence` and `aiCiLow/aiCiHigh` move atomically — both written (with
+ *   `awaitingAiResolution` recomputed), both cleared on abstention, or both
+ *   left alone when the run produced no number;
+ * - the settled latch and all notifications are decided here, per origin policy.
+ */
+export async function recordEstimate(input: RecordEstimateInput) {
+  const policy = ORIGIN_POLICY[input.origin]
+  const now = input.now ?? new Date()
+
+  const willNotify = policy.notifyOnCrossing && !input.insufficientData && input.probability !== null
+  const prev = willNotify ? await readPreviousConfidence(input.predictionId) : null
+
+  const estimateFields: Prisma.PredictionUpdateInput = input.insufficientData
+    ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
+    : input.probability !== null
+      ? {
+          confidence: input.probability,
+          awaitingAiResolution: isAwaitingAiResolution(input.probability),
+          aiCiLow: input.ciLow ?? null,
+          aiCiHigh: input.ciHigh ?? null,
+        }
+      : {}
+  const predictionData: Prisma.PredictionUpdateInput = {
+    ...estimateFields,
+    ...(policy.canSettle && input.settled ? { settled: true, settledAt: now } : {}),
+    ...(policy.touchesUserContext ? { detailsText: input.summary ?? '', contextUpdatedAt: now } : {}),
+  }
+
+  const ops: Prisma.PrismaPromise<unknown>[] = [
+    prisma.contextSnapshot.create({
+      data: {
+        predictionId: input.predictionId,
+        kind: policy.kind,
+        origin: input.origin,
+        summary: input.summary ?? '',
+        sources: input.sources ?? [],
+        externalProbability: input.probability,
+        externalReasoning: input.externalReasoning ?? null,
+        oracleSnapshot: input.oracleSnapshot ?? undefined,
+        insufficientData: input.insufficientData ?? false,
+        meta: input.meta ?? undefined,
+        articlesUsed: articlesUsedOf(input.oracleSnapshot),
+      },
+    }),
+  ]
+  if (Object.keys(predictionData).length > 0) {
+    ops.push(prisma.prediction.update({ where: { id: input.predictionId }, data: predictionData }))
+  }
+  if (policy.touchesUserContext) {
+    // This write overwrites the English summary — cached he/ru/eo translations
+    // are now stale; dropping them makes SSR fall back until re-translation.
+    ops.push(prisma.predictionTranslation.deleteMany({
+      where: { predictionId: input.predictionId, fieldName: 'detailsText' },
+    }))
+  }
+
+  const [snapshot] = await prisma.$transaction(ops)
+  if (willNotify) {
+    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, input.settled)
+  }
+  return snapshot as ContextSnapshot
+}
+
 /** Keep the heavy JSON (`sources[]` + `oracleSnapshot`) only for this many most-recent
  *  snapshots; older timeline rows are returned light. Bounds a payload that would
  *  otherwise grow with a forecast's entire update history. */
@@ -137,55 +260,23 @@ export interface SaveContextUpdateInput {
   now: Date
 }
 
-/** Persist a context snapshot and update the prediction in a single transaction. */
+/** Persist a user-triggered analyze run. Adapter over recordEstimate — the route's
+ *  `confidence` always equals `externalProbability`, unified as `probability`. */
 export async function saveContextUpdate(input: SaveContextUpdateInput) {
-  const prev = await readPreviousConfidence(input.predictionId)
-  const [snapshot] = await prisma.$transaction([
-    prisma.contextSnapshot.create({
-      data: {
-        predictionId: input.predictionId,
-        summary: input.summary,
-        sources: input.sources,
-        externalProbability: input.externalProbability,
-        externalReasoning: input.externalReasoning,
-        oracleSnapshot: input.oracleSnapshot ?? undefined,
-        insufficientData: input.insufficientData ?? false,
-      },
-    }),
-    prisma.prediction.update({
-      where: { id: input.predictionId },
-      data: {
-        detailsText: input.summary,
-        contextUpdatedAt: input.now,
-        // On abstention, explicitly null the AI estimate (the latest run says the
-        // evidence is insufficient). Otherwise preserve a prior confidence when
-        // this run produced none (e.g. a timeout) by only writing it when present.
-        ...(input.insufficientData
-          ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
-          : {
-              ...(input.confidence !== null && {
-                confidence: input.confidence,
-                awaitingAiResolution: isAwaitingAiResolution(input.confidence),
-              }),
-              aiCiLow: input.aiCiLow,
-              aiCiHigh: input.aiCiHigh,
-            }),
-        // Sticky: a later thin/abstained run must not clear a detected settlement.
-        ...(input.settled && { settled: true, settledAt: input.now }),
-      },
-    }),
-    // Invalidate stale detailsText translations: this update overwrites the
-    // English summary, so any cached he/ru/eo translation is now out of date.
-    // Dropping the rows makes SSR fall back to the source until the next
-    // on-demand re-translation (which the content-aware cache also enforces).
-    prisma.predictionTranslation.deleteMany({
-      where: { predictionId: input.predictionId, fieldName: 'detailsText' },
-    }),
-  ])
-  if (!input.insufficientData) {
-    notifyIfCrossedHighConfidence(input.predictionId, prev, input.confidence, input.settled)
-  }
-  return snapshot
+  return recordEstimate({
+    predictionId: input.predictionId,
+    origin: 'analyze',
+    probability: input.externalProbability,
+    ciLow: input.aiCiLow,
+    ciHigh: input.aiCiHigh,
+    insufficientData: input.insufficientData,
+    settled: input.settled,
+    summary: input.summary,
+    sources: input.sources,
+    externalReasoning: input.externalReasoning,
+    oracleSnapshot: input.oracleSnapshot,
+    now: input.now,
+  })
 }
 
 export interface SaveNewsIndexerMatchInput {
@@ -233,16 +324,17 @@ function oracleMean(snapshot: unknown): number | null {
 export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Promise<void> {
   // Skip clock rows when finding "the latest push": a daily requote sitting
   // between two identical article pushes must not defeat this dedup check
-  // (the reasoning-marker comparison would never match a clock row anyway,
+  // (the origin/reasoning comparison would never match a clock row anyway,
   // silently re-admitting the exact duplicate #1006 fixed).
   const latest = await prisma.contextSnapshot.findFirst({
     where: { predictionId: input.predictionId, ...NOT_CLOCK },
     orderBy: { createdAt: 'desc' },
-    select: { externalReasoning: true, externalProbability: true, sources: true, oracleSnapshot: true },
+    select: { origin: true, externalReasoning: true, externalProbability: true, sources: true, oracleSnapshot: true },
   })
   if (
     latest &&
-    latest.externalReasoning === NEWS_INDEXER_REASONING &&
+    // Reasoning-marker fallback: rows written before the origin column existed.
+    (latest.origin === 'news-indexer' || latest.externalReasoning === NEWS_INDEXER_REASONING) &&
     latest.externalProbability === input.externalProbability &&
     oracleMean(latest.oracleSnapshot) === oracleMean(input.oracleSnapshot) &&
     sourceUrlKey(latest.sources) === sourceUrlKey(input.sources)
@@ -251,30 +343,17 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
     return
   }
 
-  const prev = await readPreviousConfidence(input.predictionId)
-  await prisma.$transaction([
-    prisma.contextSnapshot.create({
-      data: {
-        predictionId: input.predictionId,
-        summary: '',
-        sources: input.sources,
-        externalProbability: input.externalProbability,
-        externalReasoning: NEWS_INDEXER_REASONING,
-        oracleSnapshot: input.oracleSnapshot,
-      },
-    }),
-    prisma.prediction.update({
-      where: { id: input.predictionId },
-      data: {
-        confidence: input.externalProbability,
-        awaitingAiResolution: isAwaitingAiResolution(input.externalProbability),
-        aiCiLow: input.ciLow,
-        aiCiHigh: input.ciHigh,
-        ...(input.settled && { settled: true, settledAt: new Date() }),
-      },
-    }),
-  ])
-  notifyIfCrossedHighConfidence(input.predictionId, prev, input.externalProbability, input.settled)
+  await recordEstimate({
+    predictionId: input.predictionId,
+    origin: 'news-indexer',
+    probability: input.externalProbability,
+    ciLow: input.ciLow,
+    ciHigh: input.ciHigh,
+    settled: input.settled,
+    sources: input.sources,
+    externalReasoning: NEWS_INDEXER_REASONING,
+    oracleSnapshot: input.oracleSnapshot,
+  })
 }
 
 /** Fetch the context snapshot timeline for a prediction (heavy tail stripped). */
@@ -322,14 +401,12 @@ export async function getLatestEvidenceEstimate(
  * Touches nothing on the prediction — no estimate, no CI, no detailsText.
  */
 export async function markOracleAttempted(predictionId: string, reason: string): Promise<void> {
-  await prisma.contextSnapshot.create({
-    data: {
-      predictionId,
-      summary: '',
-      sources: [],
-      externalReasoning: `TruthMachine Oracle (backfill: ${reason})`,
-      oracleSnapshot: { sources: [], empty: true, reason },
-    },
+  await recordEstimate({
+    predictionId,
+    origin: 'backfill',
+    probability: null,
+    externalReasoning: `TruthMachine Oracle (backfill: ${reason})`,
+    oracleSnapshot: { sources: [], empty: true, reason },
   })
 }
 
@@ -351,31 +428,18 @@ export interface SaveOracleSnapshotInput {
  * clobbers a user-written context summary. Mirrors saveNewsIndexerMatch.
  */
 export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Promise<void> {
-  const prev = await readPreviousConfidence(input.predictionId)
-  await prisma.$transaction([
-    prisma.contextSnapshot.create({
-      data: {
-        predictionId: input.predictionId,
-        summary: '',
-        sources: [],
-        externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
-        oracleSnapshot: input.oracleSnapshot,
-      },
-    }),
-    prisma.prediction.update({
-      where: { id: input.predictionId },
-      data: {
-        ...(input.confidence !== null && {
-          confidence: input.confidence,
-          awaitingAiResolution: isAwaitingAiResolution(input.confidence),
-        }),
-        aiCiLow: input.aiCiLow,
-        aiCiHigh: input.aiCiHigh,
-        ...(input.settled && { settled: true, settledAt: new Date() }),
-      },
-    }),
-  ])
-  notifyIfCrossedHighConfidence(input.predictionId, prev, input.confidence, input.settled)
+  await recordEstimate({
+    predictionId: input.predictionId,
+    origin: 'backfill',
+    // Funnel fix (ORACLE_VARIABLES.md §4.3 asymmetry 4): the backfill estimate now
+    // lands on the snapshot too, so the chart and the glide anchor can see it.
+    probability: input.confidence,
+    ciLow: input.aiCiLow,
+    ciHigh: input.aiCiHigh,
+    settled: input.settled,
+    externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
+    oracleSnapshot: input.oracleSnapshot,
+  })
 }
 
 export interface SaveClockSnapshotInput {
@@ -395,25 +459,12 @@ export interface SaveClockSnapshotInput {
  * settlement-grade news; never touches detailsText/translations/settled.
  */
 export async function saveClockSnapshot(input: SaveClockSnapshotInput): Promise<void> {
-  await prisma.$transaction([
-    prisma.contextSnapshot.create({
-      data: {
-        predictionId: input.predictionId,
-        kind: 'clock',
-        summary: '',
-        sources: [],
-        externalProbability: input.probability,
-        meta: input.meta,
-      },
-    }),
-    prisma.prediction.update({
-      where: { id: input.predictionId },
-      data: {
-        confidence: input.probability,
-        awaitingAiResolution: isAwaitingAiResolution(input.probability),
-        aiCiLow: input.aiCiLow,
-        aiCiHigh: input.aiCiHigh,
-      },
-    }),
-  ])
+  await recordEstimate({
+    predictionId: input.predictionId,
+    origin: 'clock',
+    probability: input.probability,
+    ciLow: input.aiCiLow,
+    ciHigh: input.aiCiHigh,
+    meta: input.meta,
+  })
 }
