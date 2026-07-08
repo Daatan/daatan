@@ -47,12 +47,28 @@ export async function GET(request: NextRequest) {
     const closingSoon = searchParams.get('closingSoon') === 'true'
 
     const where: Record<string, unknown> = {}
+    // Sub-filters that must combine with AND but can't each own top-level `where.OR`
+    // (the "Awaiting Resolution" status clause and the free-text search clause both
+    // need their own OR — collected here and joined via where.AND at the end).
+    const andConditions: Record<string, unknown>[] = []
 
     if (resolvedOnly) {
       where.status = { in: ['RESOLVED_CORRECT', 'RESOLVED_WRONG', 'VOID', 'UNRESOLVABLE'] }
     } else if (query.status) {
       if (['DRAFT', 'PENDING_APPROVAL'].includes(query.status) && !isAdminOrApprover) {
         where.status = 'ACTIVE'
+      } else if (query.status === 'PENDING') {
+        // "Awaiting Resolution": deadline-passed forecasts (real PENDING) plus
+        // still-ACTIVE forecasts the AI is confident about (>=90% or <=10%) —
+        // see awaitingAiResolution in context.ts. Kept as a separate ACTIVE
+        // forecast (not reusing PENDING for it) so staking stays open and the
+        // news-indexer keeps re-evaluating it, letting the flag clear itself.
+        andConditions.push({
+          OR: [
+            { status: 'PENDING' },
+            { status: 'ACTIVE', awaitingAiResolution: true },
+          ],
+        })
       } else {
         where.status = query.status
       }
@@ -68,11 +84,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (query.q) {
-      where.OR = [
-        { claimText: { contains: query.q, mode: 'insensitive' } },
-        { tags: { some: { name: { contains: query.q, mode: 'insensitive' } } } },
-      ]
+      andConditions.push({
+        OR: [
+          { claimText: { contains: query.q, mode: 'insensitive' } },
+          { tags: { some: { name: { contains: query.q, mode: 'insensitive' } } } },
+        ],
+      })
     }
+
+    if (andConditions.length > 0) where.AND = andConditions
 
     if (!query.authorId && !query.status && !resolvedOnly) {
       where.status = { notIn: ['DRAFT', 'PENDING_APPROVAL'] }

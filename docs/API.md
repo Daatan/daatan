@@ -24,7 +24,7 @@ List predictions. Public; optional session for user-context fields.
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
-| `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE` |
+| `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE`. `PENDING` ("Awaiting Resolution") also matches still-`ACTIVE` forecasts where `awaitingAiResolution` is true (AI estimate >=90% or <=10%, see `context.ts`) — status itself doesn't change, so staking stays open until the real deadline |
 | `authorId` | cuid | — | Filter by author |
 | `tags` | string | — | Comma-separated tag names |
 | `page` | number | 1 | |

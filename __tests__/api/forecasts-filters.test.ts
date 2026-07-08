@@ -56,14 +56,21 @@ describe('GET /api/forecasts - Status Filters', () => {
     )
   })
 
-  it('filters PENDING (Awaiting Resolution) predictions correctly', async () => {
+  it('filters PENDING (Awaiting Resolution): deadline-passed OR AI-flagged-ACTIVE', async () => {
     const request = new NextRequest('http://localhost/api/forecasts?status=PENDING')
     await GET(request)
 
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          status: 'PENDING',
+          AND: [
+            {
+              OR: [
+                { status: 'PENDING' },
+                { status: 'ACTIVE', awaitingAiResolution: true },
+              ],
+            },
+          ],
         }),
       })
     )

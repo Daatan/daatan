@@ -59,7 +59,7 @@ describe('ForecastDetailClient — settled notification', () => {
     } as never)
   })
 
-  it('shows the settled banner but keeps the slider enabled — settlement is notification-only', async () => {
+  it('renders no banner when settled — settlement is notification-only (Telegram), not a UI element', async () => {
     const prediction = makePrediction({ settled: true })
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => prediction })
 
@@ -67,7 +67,7 @@ describe('ForecastDetailClient — settled notification', () => {
       render(wrap(<ForecastDetailClient initialData={prediction as never} />))
     })
 
-    expect(await screen.findByText(/outcome reported/i)).toBeInTheDocument()
+    expect(screen.queryByText(/outcome reported/i)).not.toBeInTheDocument()
     expect(confidenceSliderProps).toHaveBeenCalledWith(
       expect.objectContaining({ disabled: false }),
     )
