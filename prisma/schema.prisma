@@ -444,6 +444,14 @@ model ContextSnapshot {
   // article-dedup check (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0).
   // String, not an enum — Stage D adds more kinds later.
   kind String @default("evidence") @db.VarChar(32)
+  // Which path wrote this snapshot: 'creation' | 'analyze' | 'news-indexer' |
+  // 'backfill' | 'clock' (the recordEstimate funnel — retro docs/ORACLE_VARIABLES.md
+  // §6). Pure provenance; `kind` keeps the pricing semantics (evidence vs clock).
+  // Null = row written before the funnel existed.
+  origin String? @db.VarChar(32)
+  // Oracle articles_used behind this estimate — evidence volume for a future
+  // overwrite policy. Null when unknown (legacy, LLM-fallback, clock rows).
+  articlesUsed Int? @map("articles_used")
   // Provenance for kind='clock': { engineVersion, cause, pLast, tLast, tEff, c, direction }.
   meta Json?
 

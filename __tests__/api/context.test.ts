@@ -321,7 +321,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     expect(ops).toHaveLength(3)
   })
 
-  it('clears aiCiLow/aiCiHigh on LLM-fallback path (no Oracle CI available)', async () => {
+  it('leaves needle and band untouched when the run produced no number (atomic needle+band)', async () => {
     mockAuth.mockResolvedValue({ user: authenticatedUser })
     mockPrisma.prediction.findFirst.mockResolvedValue({
       id: 'pred1',
@@ -343,9 +343,12 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     const res = await POST(makeRequest('pred1', 'POST'), routeParams('pred1'))
     await parseSSE(res)
 
+    // recordEstimate invariant: confidence and aiCiLow/aiCiHigh move together —
+    // a run with no probability must not blank the band around a stale needle.
     const predictionUpdateCall = mockPrisma.prediction.update.mock.calls[0][0]
-    expect(predictionUpdateCall.data.aiCiLow).toBeNull()
-    expect(predictionUpdateCall.data.aiCiHigh).toBeNull()
+    expect(predictionUpdateCall.data).not.toHaveProperty('confidence')
+    expect(predictionUpdateCall.data).not.toHaveProperty('aiCiLow')
+    expect(predictionUpdateCall.data).not.toHaveProperty('aiCiHigh')
   })
 
   it('passes previousContext to LLM prompt when detailsText exists', async () => {

@@ -140,6 +140,8 @@ Return the public context timeline for a forecast (list of dated context snapsho
   "sources": [{ "title": "...", "url": "...", "source": "...", "publishedDate": "..." }],
   "externalProbability": 64,                          // 0–100, or null
   "externalReasoning": "TruthMachine Oracle (...)",   // or null
+  "origin": "analyze",                                // which path wrote it: creation | analyze | news-indexer | backfill | clock; null on pre-funnel rows
+  "articlesUsed": 3,                                  // Oracle evidence volume, or null (legacy / LLM fallback / clock)
   "oracleSnapshot": {                                 // null when LLM-fallback path was used
     "mean": 0.28,                                     // aggregated stance in [-1, 1]
     "std": 0.12,
