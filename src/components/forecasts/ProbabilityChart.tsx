@@ -20,6 +20,9 @@ import { communityProbability } from '@/lib/forecast-math'
 type ChartSnapshot = {
   createdAt: string
   externalProbability?: number | null
+  /** 'evidence' (default) | 'clock' — clock rows are the daily glide requote;
+   *  they draw the AI line's movement but get a hollow dot, not a filled one. */
+  kind?: string
 }
 
 type ChartCommitment = {
@@ -59,6 +62,17 @@ const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#
 function MarketDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { marketChanged?: boolean } }) {
   if (cx == null || cy == null || !payload?.marketChanged) return null
   return <circle className="market-price-dot" cx={cx} cy={cy} r={3} fill="#EC4899" stroke="none" />
+}
+
+/** Marks only real AI snapshot events (not carried step values): evidence runs
+ *  get a filled dot, clock (glide) requotes a hollow one — arithmetic movement
+ *  is visible on the line but doesn't masquerade as a news event. */
+export function AiDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { aiEvent?: string | null } }) {
+  if (cx == null || cy == null || !payload?.aiEvent) return null
+  if (payload.aiEvent === 'clock') {
+    return <circle className="ai-clock-dot" cx={cx} cy={cy} r={2.5} fill="#1A202C" stroke="#FBBF24" strokeWidth={1.5} />
+  }
+  return <circle className="ai-evidence-dot" cx={cx} cy={cy} r={3} fill="#FBBF24" stroke="none" />
 }
 
 // Axis ticks show the date; the tooltip header adds the time so events on the
@@ -188,9 +202,14 @@ export default function ProbabilityChart({
 
     const { market: latestMarket, marketChanged } = marketSeries[i]
 
+    // The snapshot exactly at this timestamp (if any) — drives the AiDot so
+    // markers appear at real AI events only, styled by evidence vs clock.
+    const snapAt = sortedSnaps.filter(s => new Date(s.createdAt).getTime() === ts).pop()
+
     const point: Record<string, number | string | boolean | null> = {
       ts,
       ai: latestAi ?? null,
+      aiEvent: snapAt ? (snapAt.kind === 'clock' ? 'clock' : 'evidence') : null,
       market: latestMarket,
       marketChanged,
     }
@@ -367,7 +386,7 @@ export default function ProbabilityChart({
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
-              dot={showAiDots}
+              dot={showAiDots ? <AiDot /> : false}
               connectNulls
             />
           )}

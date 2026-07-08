@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart, { communityProbability, tsWindowToIndices, buildMarketSeries } from '../ProbabilityChart'
+import ProbabilityChart, { AiDot, communityProbability, tsWindowToIndices, buildMarketSeries } from '../ProbabilityChart'
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -198,5 +198,54 @@ describe('tsWindowToIndices (drag-to-zoom span → brush indices)', () => {
   it('returns null for a window too narrow to span two points (a stray click)', () => {
     expect(tsWindowToIndices(ts, 11, 12)).toBeNull()
     expect(tsWindowToIndices(ts, 20, 20)).toBeNull()
+  })
+})
+
+describe('AiDot (evidence vs clock markers)', () => {
+  const renderDot = (payload?: { aiEvent?: string | null }) => {
+    const { container } = render(
+      <svg>
+        <AiDot cx={10} cy={20} payload={payload} />
+      </svg>,
+    )
+    return container
+  }
+
+  it('renders a filled dot at an evidence snapshot', () => {
+    const container = renderDot({ aiEvent: 'evidence' })
+    const dot = container.querySelector('circle.ai-evidence-dot')
+    expect(dot).not.toBeNull()
+    expect(dot!.getAttribute('fill')).toBe('#FBBF24')
+  })
+
+  it('renders a hollow dot at a clock (glide) requote', () => {
+    const container = renderDot({ aiEvent: 'clock' })
+    const dot = container.querySelector('circle.ai-clock-dot')
+    expect(dot).not.toBeNull()
+    expect(dot!.getAttribute('stroke')).toBe('#FBBF24')
+    expect(dot!.getAttribute('fill')).not.toBe('#FBBF24')
+  })
+
+  it('renders nothing at carried step values (no snapshot at this timestamp)', () => {
+    expect(renderDot({ aiEvent: null }).querySelector('circle')).toBeNull()
+    expect(renderDot(undefined).querySelector('circle')).toBeNull()
+  })
+})
+
+describe('clock snapshots in the chart series', () => {
+  it('counts clock rows toward the ≥2-AI-updates gating (glide alone can draw the line)', () => {
+    render(
+      <ProbabilityChart
+        commitments={[]}
+        snapshots={[
+          { createdAt: '2026-07-01T00:00:00Z', externalProbability: 60, kind: 'evidence' },
+          { createdAt: '2026-07-02T00:00:00Z', externalProbability: 59, kind: 'clock' },
+          { createdAt: '2026-07-03T00:00:00Z', externalProbability: 58, kind: 'clock' },
+        ]}
+        outcomeType="BINARY"
+        options={[]}
+      />,
+    )
+    expect(screen.getByText(HEADING)).toBeTruthy()
   })
 })

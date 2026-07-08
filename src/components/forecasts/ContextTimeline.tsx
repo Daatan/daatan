@@ -176,13 +176,14 @@ export default function ContextTimeline({
     } catch { /* storage full or private mode */ }
   }
 
-  // Fetch timeline on mount
+  // Fetch timeline on mount. Deliberately does NOT call onAiEstimate: on first
+  // paint the gauge reads the prediction's funnel-maintained cache
+  // (confidence/aiCiLow/aiCiHigh — includes the daily clock requote), which the
+  // latest *evidence* snapshot here would shadow with a staler value. The
+  // callback fires only from a fresh in-page analyze run (below).
   useEffect(() => {
-    // Server already prefetched the timeline for SEO — propagate the AI estimate but skip the redundant fetch.
-    if (hasInitialSnapshots) {
-      onAiEstimate?.(toAiEstimate(initialSnapshots?.[0]))
-      return
-    }
+    // Server already prefetched the timeline for SEO — skip the redundant fetch.
+    if (hasInitialSnapshots) return
     const fetchTimeline = async () => {
       try {
         const res = await fetch(`/api/forecasts/${predictionId}/context`)
@@ -190,9 +191,7 @@ export default function ContextTimeline({
           const data = await res.json()
           setCurrentContext(data.currentContext)
           setContextUpdatedAt(data.contextUpdatedAt)
-          const snaps: Snapshot[] = data.snapshots || []
-          setSnapshots(snaps)
-          onAiEstimate?.(toAiEstimate(snaps[0]))
+          setSnapshots(data.snapshots || [])
         }
       } catch (err) {
         log.error({ err }, 'Failed to fetch context timeline')
@@ -201,7 +200,7 @@ export default function ContextTimeline({
       }
     }
     fetchTimeline()
-  }, [predictionId, onAiEstimate, hasInitialSnapshots, initialSnapshots])
+  }, [predictionId, hasInitialSnapshots])
 
   // Seed localStorage from server averages when data is absent or stale
   useEffect(() => {
