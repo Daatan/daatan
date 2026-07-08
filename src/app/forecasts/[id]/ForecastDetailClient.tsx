@@ -307,13 +307,6 @@ export default function ForecastDetailClient({
 
       {/* Header */}
       <div className="mb-6">
-        {prediction.status === 'ACTIVE' && prediction.settled && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-400">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="font-medium">{t('settledBanner')}</span>
-            <span className="text-amber-400/70">· {t('settledBannerSub')}</span>
-          </div>
-        )}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             {prediction.status !== 'ACTIVE' && (

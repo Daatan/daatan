@@ -133,6 +133,53 @@ describe('/api/forecasts', () => {
             expect(findManyCall.where.tags).toBeUndefined()
         })
 
+        it('status=PENDING matches deadline-passed OR AI-flagged-ACTIVE forecasts', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            const request = new NextRequest('http://localhost/api/forecasts?status=PENDING')
+            await GET(request)
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.where.status).toBeUndefined()
+            expect(findManyCall.where.AND).toEqual([
+                {
+                    OR: [
+                        { status: 'PENDING' },
+                        { status: 'ACTIVE', awaitingAiResolution: true },
+                    ],
+                },
+            ])
+        })
+
+        it('combines the PENDING OR-clause with a search query without clobbering either', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            const request = new NextRequest('http://localhost/api/forecasts?status=PENDING&q=turkey')
+            await GET(request)
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.where.AND).toEqual([
+                {
+                    OR: [
+                        { status: 'PENDING' },
+                        { status: 'ACTIVE', awaitingAiResolution: true },
+                    ],
+                },
+                {
+                    OR: [
+                        { claimText: { contains: 'turkey', mode: 'insensitive' } },
+                        { tags: { some: { name: { contains: 'turkey', mode: 'insensitive' } } } },
+                    ],
+                },
+            ])
+        })
+
         it('includes tags in response payload', async () => {
             const { prisma } = await import('@/lib/prisma')
 

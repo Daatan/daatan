@@ -177,8 +177,6 @@
     "legendYou": "Вы",
     "legendAI": "ИИ",
     "aiInsufficientEvidence": "Недостаточно данных",
-    "settledBanner": "Исход уже сообщён — ожидает разрешения",
-    "settledBannerSub": "Ставки закрыты",
     "temporalClockAnnotation": "с учётом оставшегося времени — срок через {days} дн.",
     "signInToVote": "Войдите, чтобы голосовать",
     "marketDistribution": "Распределение рынка",

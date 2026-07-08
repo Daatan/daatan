@@ -8,6 +8,18 @@ const log = createLogger('context-service')
 /** AI-estimate level (0–100) at or above which a crossing fires a Telegram alert. */
 const HIGH_CONFIDENCE_THRESHOLD = 80
 
+/** Symmetric band outside which a forecast is added to the "Awaiting Resolution"
+ *  tab (alongside deadline-passed PENDING ones) without touching `status` — an
+ *  ACTIVE forecast stays ACTIVE, so staking stays open and the news-indexer keeps
+ *  re-evaluating it. Level-based, not sticky: recomputed on every confidence
+ *  write, so it clears the moment a later read lands back inside the band. */
+const AWAITING_AI_RESOLUTION_LOW = 10
+const AWAITING_AI_RESOLUTION_HIGH = 90
+
+function isAwaitingAiResolution(confidence: number | null): boolean {
+  return confidence !== null && (confidence >= AWAITING_AI_RESOLUTION_HIGH || confidence <= AWAITING_AI_RESOLUTION_LOW)
+}
+
 interface PreviousConfidence {
   confidence: number | null
   claimText: string
@@ -149,9 +161,12 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
         // evidence is insufficient). Otherwise preserve a prior confidence when
         // this run produced none (e.g. a timeout) by only writing it when present.
         ...(input.insufficientData
-          ? { confidence: null, aiCiLow: null, aiCiHigh: null }
+          ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
           : {
-              ...(input.confidence !== null && { confidence: input.confidence }),
+              ...(input.confidence !== null && {
+                confidence: input.confidence,
+                awaitingAiResolution: isAwaitingAiResolution(input.confidence),
+              }),
               aiCiLow: input.aiCiLow,
               aiCiHigh: input.aiCiHigh,
             }),
@@ -252,6 +267,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
       where: { id: input.predictionId },
       data: {
         confidence: input.externalProbability,
+        awaitingAiResolution: isAwaitingAiResolution(input.externalProbability),
         aiCiLow: input.ciLow,
         aiCiHigh: input.ciHigh,
         ...(input.settled && { settled: true, settledAt: new Date() }),
@@ -349,7 +365,10 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     prisma.prediction.update({
       where: { id: input.predictionId },
       data: {
-        ...(input.confidence !== null && { confidence: input.confidence }),
+        ...(input.confidence !== null && {
+          confidence: input.confidence,
+          awaitingAiResolution: isAwaitingAiResolution(input.confidence),
+        }),
         aiCiLow: input.aiCiLow,
         aiCiHigh: input.aiCiHigh,
         ...(input.settled && { settled: true, settledAt: new Date() }),
@@ -391,6 +410,7 @@ export async function saveClockSnapshot(input: SaveClockSnapshotInput): Promise<
       where: { id: input.predictionId },
       data: {
         confidence: input.probability,
+        awaitingAiResolution: isAwaitingAiResolution(input.probability),
         aiCiLow: input.aiCiLow,
         aiCiHigh: input.aiCiHigh,
       },
