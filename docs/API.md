@@ -143,8 +143,8 @@ Return the public context timeline for a forecast (list of dated context snapsho
   "origin": "analyze",                                // which path wrote it: creation | analyze | news-indexer | backfill | clock; null on pre-funnel rows
   "articlesUsed": 3,                                  // Oracle evidence volume, or null (legacy / LLM fallback / clock)
   "oracleSnapshot": {                                 // null when LLM-fallback path was used
-    "mean": 0.28,                                     // aggregated stance in [-1, 1]
-    "std": 0.12,
+    "mean": 64,                                       // 0–100 percent (rows written before v1.31.2 carry raw [-1,1] stance here — see docs/DATABASE.md)
+    "std": 6,                                         // 0–100 percent spread
     "ciLow": 52,                                      // 0–100, pre-scaled 95% CI
     "ciHigh": 76,
     "articlesUsed": 3,

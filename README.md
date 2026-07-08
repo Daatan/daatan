@@ -133,6 +133,7 @@ git push origin v1.1.1
 | [docs/BOT_APPROVAL_WORKFLOW.md](./docs/BOT_APPROVAL_WORKFLOW.md) | Bot approval workflow (v1.7.31+) |
 | [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) | LLM provider chain, Bedrock prompts, Oracle integration |
 | [docs/API.md](./docs/API.md) | HTTP API reference |
+| [docs/DATABASE.md](./docs/DATABASE.md) | Database map: tables by domain, probability scales, estimate stream, gotchas |
 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Deployment pipeline (canonical) |
 | [docs/ROLLBACK.md](./docs/ROLLBACK.md) | Rollback procedures |
 | [INFRASTRUCTURE_SPLIT.md](./INFRASTRUCTURE_SPLIT.md) | Prod / staging EC2 split |
