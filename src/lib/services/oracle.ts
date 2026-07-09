@@ -65,6 +65,9 @@ export interface OracleSource {
   claims: string[]
   /** True when this source reports the event's outcome as an accomplished fact. */
   settled?: boolean | null
+  /** Explicit modeled/poll/market probability this source cited for the event
+   *  itself (retro's quantitative_anchor_multiplier input), if any. */
+  quantitative_estimate?: number | null
 }
 
 /** Full response from POST /forecast. */

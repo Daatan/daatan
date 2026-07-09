@@ -122,6 +122,22 @@ Supporting tables: `context_timings` (per-analyze phase latencies),
 chain, failure reason, LLM-fallback flag — the observability layer for the
 search/forecast chain).
 
+## Evidence pool (foundation layer) — `evidence_pool_articles`
+
+Per-forecast, keyed by `(predictionId, urlHash)` — `urlHash` is `hashUrl()`
+(same normalization as `NewsAnchor`), so http/https and trailing-slash variants
+of the same URL collapse to one row. **Foundation layer only (2026-07-09,
+retro `docs/ORACLE_VARIABLES.md` §6 part 2): nothing reads this table to
+compute an estimate yet.** `analyze`/`news-indexer`/`backfill` shadow-write
+their per-source signal here (`addArticlesToPool` in
+`src/lib/services/evidence-pool.ts`) in *addition to*, not instead of, their
+existing `ContextSnapshot`/`Prediction` writes — fire-and-forget, so a
+failure there never blocks or alters the estimate. The row IS the extraction
+cache: re-discovering an already-pooled article updates its stored signal in
+place. `excluded` is reserved for the not-yet-built per-article admin
+exclusion feature (an ORACLE_VARIABLES.md §6 precondition) — shadow-writes
+never touch it, so an admin's exclusion decision survives re-discovery.
+
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
 Cached Polymarket/Kalshi markets that forecasts link to (many-to-one).

@@ -5,6 +5,7 @@ import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
+import { addArticlesToPool } from '@/lib/services/evidence-pool'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('oracle-backfill')
@@ -48,6 +49,12 @@ export async function refreshOracleSnapshot(
   const articleMeta = await getArticleMetaByUrl(forecast.sources.map(s => s.url))
   const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
   const sources = enrichOracleSources(forecast.sources, searchResults, authorByUrl)
+
+  // Evidence pool shadow-write (foundation layer, retro docs/ORACLE_VARIABLES.md
+  // §6 part 2) — additive only, never blocks or alters the estimate below.
+  addArticlesToPool(prediction.id, sources, 'backfill').catch((err) =>
+    log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
+  )
 
   const ciLow = stanceToPercent(forecast.ci_low)
   const ciHigh = stanceToPercent(forecast.ci_high)

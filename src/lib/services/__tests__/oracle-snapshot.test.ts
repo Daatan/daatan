@@ -14,6 +14,8 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   certainty: 0.8,
   credibility_weight: 1,
   claims: ['it will happen'],
+  settled: true,
+  quantitative_estimate: 0.62,
   ...over,
 })
 
@@ -41,12 +43,23 @@ describe('enrichOracleSources', () => {
       title: 'Headline',
       publishedAt: '2026-06-18',
       author: 'Jane Doe',
+      settled: true,
+      quantitativeEstimate: 0.62,
     })
   })
 
   it('leaves title/date/author null when not joinable', () => {
     const out = enrichOracleSources([oracleSource({ url: 'https://x.com/y' })], [], new Map())
     expect(out[0]).toMatchObject({ title: null, publishedAt: null, author: null })
+  })
+
+  it('defaults settled/quantitativeEstimate to null when the Oracle omits them', () => {
+    const out = enrichOracleSources(
+      [oracleSource({ settled: undefined, quantitative_estimate: undefined })],
+      [searchResult()],
+      new Map(),
+    )
+    expect(out[0]).toMatchObject({ settled: null, quantitativeEstimate: null })
   })
 })
 

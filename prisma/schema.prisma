@@ -396,6 +396,7 @@ model Prediction {
   commitments      Commitment[]
   comments         Comment[]
   contextSnapshots ContextSnapshot[]
+  evidencePool     EvidencePoolArticle[]
   translations     PredictionTranslation[]
   slugAliases      PredictionSlugAlias[]
   oracleCallLogs   OracleCallLog[]
@@ -460,6 +461,51 @@ model ContextSnapshot {
 
   @@index([predictionId, createdAt])
   @@map("context_snapshots")
+}
+
+/// Per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2, foundation
+/// layer only — 2026-07-09). analyze/news-indexer/backfill shadow-write their
+/// per-source signals here in ADDITION to (not instead of) their existing
+/// ContextSnapshot/Prediction writes; nothing reads this table to compute an
+/// estimate yet — that's a separate follow-up. One row per (predictionId,
+/// urlHash): the row IS the extraction cache, so re-discovering an already-pooled
+/// article on a later run updates its signal in place.
+model EvidencePoolArticle {
+  id           String     @id @default(cuid())
+  predictionId String
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  url     String @db.VarChar(2000)
+  urlHash String @map("url_hash") @db.VarChar(64) // hashUrl() — same normalization as NewsAnchor
+  title   String? @db.VarChar(500)
+  source  String? @db.VarChar(200) // outlet/domain, e.g. "reuters.com"
+  publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
+
+  // Extracted signal, same shape as EnrichedOracleSource — stance/certainty stay on
+  // the Oracle's raw [-1,1]/[0,1] scale (see oracle-snapshot.ts), not converted here.
+  stance               Float?
+  certainty            Float?
+  credibilityWeight    Float?  @map("credibility_weight")
+  claims               Json    @default("[]")
+  settled              Boolean?
+  quantitativeEstimate Float?  @map("quantitative_estimate")
+
+  // Which path most recently (re-)extracted this article: 'analyze' |
+  // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
+  // latest signal, not a history of every path that ever cited this article.
+  origin String @db.VarChar(32)
+
+  // Admin override — unused until the exclusion feature (ORACLE_VARIABLES.md §6
+  // precondition) is built; reserved now so that feature doesn't also need a
+  // migration. Shadow-writes never touch this field once an admin has set it.
+  excluded Boolean @default(false)
+
+  addedAt   DateTime @default(now()) @map("added_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([predictionId, urlHash])
+  @@index([predictionId])
+  @@map("evidence_pool_articles")
 }
 
 // ============================================

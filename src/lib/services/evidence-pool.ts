@@ -1,0 +1,63 @@
+import { prisma } from '@/lib/prisma'
+import { hashUrl } from '@/lib/utils/hash'
+import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
+
+/**
+ * Foundation layer for the per-forecast evidence pool (retro
+ * docs/ORACLE_VARIABLES.md §6 part 2). Nothing reads this table to compute an
+ * estimate yet — analyze/news-indexer/backfill only shadow-write their
+ * per-source signals here, in addition to their existing writes, so real
+ * data accumulates ahead of the future recompute-over-pool cutover.
+ */
+export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill'
+
+/**
+ * Upsert one batch of extracted sources into a forecast's evidence pool, keyed
+ * by (predictionId, urlHash) — same URL-normalization as NewsAnchor, so
+ * http/https and trailing-slash variants of the same story collapse to one
+ * row. The row IS the extraction cache: re-discovering an already-pooled
+ * article updates its signal in place rather than accumulating duplicates.
+ * Never touches `excluded` — an admin's exclusion decision on an article
+ * survives every later re-discovery.
+ */
+export async function addArticlesToPool(
+  predictionId: string,
+  sources: EnrichedOracleSource[],
+  origin: PoolOrigin,
+): Promise<void> {
+  await Promise.all(
+    sources.map((s) =>
+      prisma.evidencePoolArticle.upsert({
+        where: { predictionId_urlHash: { predictionId, urlHash: hashUrl(s.url) } },
+        create: {
+          predictionId,
+          url: s.url,
+          urlHash: hashUrl(s.url),
+          title: s.title,
+          source: s.sourceName,
+          publishedDate: s.publishedAt,
+          stance: s.stance,
+          certainty: s.certainty,
+          credibilityWeight: s.credibilityWeight,
+          claims: s.claims,
+          settled: s.settled,
+          quantitativeEstimate: s.quantitativeEstimate,
+          origin,
+        },
+        update: {
+          url: s.url,
+          title: s.title,
+          source: s.sourceName,
+          publishedDate: s.publishedAt,
+          stance: s.stance,
+          certainty: s.certainty,
+          credibilityWeight: s.credibilityWeight,
+          claims: s.claims,
+          settled: s.settled,
+          quantitativeEstimate: s.quantitativeEstimate,
+          origin,
+        },
+      }),
+    ),
+  )
+}
