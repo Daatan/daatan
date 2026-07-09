@@ -32,6 +32,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
   }
 })
 
+import { ClaimDirection } from '@prisma/client'
 import { getOracleForecast, getOracleProbability, BOT_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
@@ -192,6 +193,60 @@ describe('getOracleForecast', () => {
     await getOracleForecast('Q?')
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'network' }))
   })
+
+  describe('claim direction/deadline (retro #244 direction guard)', () => {
+    it('sends claim_direction: "arrival" for ClaimDirection.ARRIVAL', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDirection: ClaimDirection.ARRIVAL })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.claim_direction).toBe('arrival')
+    })
+
+    it('sends claim_direction: "survival" for ClaimDirection.SURVIVAL', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDirection: ClaimDirection.SURVIVAL })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.claim_direction).toBe('survival')
+    })
+
+    it('omits claim_direction for ClaimDirection.NONE (retro 422s on the literal string "none")', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDirection: ClaimDirection.NONE })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.claim_direction).toBeUndefined()
+      expect('claim_direction' in body).toBe(false)
+    })
+
+    it('omits claim_direction when null/undefined', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDirection: null })
+      const [, init] = fetchMock.mock.calls[0]
+      expect('claim_direction' in JSON.parse(init.body as string)).toBe(false)
+
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?')
+      const [, init2] = fetchMock.mock.calls[1]
+      expect('claim_direction' in JSON.parse(init2.body as string)).toBe(false)
+    })
+
+    it('sends claim_deadline as an ISO string when present', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDeadline: new Date('2026-12-31T00:00:00.000Z') })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.claim_deadline).toBe('2026-12-31T00:00:00.000Z')
+    })
+
+    it('omits claim_deadline when null/undefined', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { claimDeadline: null })
+      const [, init] = fetchMock.mock.calls[0]
+      expect('claim_deadline' in JSON.parse(init.body as string)).toBe(false)
+    })
+  })
 })
 
 describe('getOracleProbability', () => {
@@ -252,5 +307,17 @@ describe('forecast request timeout', () => {
   it('getOracleProbability forwards its timeout option to the request', async () => {
     await getOracleProbability('Q?', { source: 'bot-voting' }, { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(BOT_FORECAST_TIMEOUT_MS)
+  })
+
+  it('getOracleProbability forwards claimDirection/claimDeadline to the request', async () => {
+    await getOracleProbability(
+      'Q?',
+      { source: 'bot-voting' },
+      { claimDirection: ClaimDirection.SURVIVAL, claimDeadline: new Date('2026-06-01T00:00:00.000Z') },
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.claim_direction).toBe('survival')
+    expect(body.claim_deadline).toBe('2026-06-01T00:00:00.000Z')
   })
 })

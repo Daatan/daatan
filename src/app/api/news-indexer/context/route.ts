@@ -58,7 +58,15 @@ export async function POST(request: NextRequest) {
 
     const prediction = await prisma.prediction.findUnique({
       where: { id: body.predictionId },
-      select: { id: true, claimText: true, status: true, slug: true, confidence: true },
+      select: {
+        id: true,
+        claimText: true,
+        status: true,
+        slug: true,
+        confidence: true,
+        claimDirection: true,
+        claimDeadline: true,
+      },
     })
 
     if (!prediction) return apiError('Prediction not found', 404)
@@ -95,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     const { forecast: oracleForecast } = await getOracleForecast(
       prediction.claimText,
-      { articles },
+      { articles, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
       { source: 'news-indexer', predictionId: prediction.id },
     )
 

@@ -40,7 +40,7 @@ export async function runVoting(
         tags: { some: { slug: { in: tagFilter } } },
       }),
     },
-    select: { id: true, claimText: true, detailsText: true, outcomeType: true },
+    select: { id: true, claimText: true, detailsText: true, outcomeType: true, claimDirection: true, claimDeadline: true },
     orderBy: { createdAt: 'desc' },
     take: 20,
   })
@@ -83,7 +83,7 @@ export async function runVoting(
         const oracleProbability = await getOracleProbability(
           oracleQuestion,
           { source: 'bot-voting', userId: bot.userId, predictionId: forecast.id },
-          { timeoutMs: BOT_FORECAST_TIMEOUT_MS },
+          { timeoutMs: BOT_FORECAST_TIMEOUT_MS, claimDirection: forecast.claimDirection, claimDeadline: forecast.claimDeadline },
         )
         if (oracleProbability !== null) {
           const pct = Math.round(oracleProbability * 100)

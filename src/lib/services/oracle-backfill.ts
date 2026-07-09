@@ -1,3 +1,4 @@
+import type { ClaimDirection } from '@prisma/client'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
@@ -21,7 +22,9 @@ export type RefreshResult =
  * created before per-source capture existed. Reuses the same search → Oracle →
  * enrich path as the user-triggered analyze route.
  */
-export async function refreshOracleSnapshot(prediction: { id: string; claimText: string }): Promise<RefreshResult> {
+export async function refreshOracleSnapshot(
+  prediction: { id: string; claimText: string; claimDirection?: ClaimDirection | null; claimDeadline?: Date | null },
+): Promise<RefreshResult> {
   const query = await buildSearchQuery(prediction.claimText)
   const searchResults = await oracleSearch(query, DEFAULT_MAX_ARTICLES, undefined, {
     source: 'context-update',
@@ -34,7 +37,7 @@ export async function refreshOracleSnapshot(prediction: { id: string; claimText:
 
   const { forecast } = await getOracleForecast(
     prediction.claimText,
-    { articles: searchResults },
+    { articles: searchResults, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
     { source: 'context-update', predictionId: prediction.id },
   )
   if (forecast === null) {
