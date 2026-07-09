@@ -11,7 +11,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { JsonLd } from '@/components/JsonLd'
-import { getContextTimeline } from '@/lib/services/context'
+import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
@@ -206,11 +206,20 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [initialComments, initialContextSnapshots, initialContributingSources] = await Promise.all([
+  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
     getContributingSources(prediction.id),
+    getProbabilityHistory(prediction.id),
   ])
+  // Chart series: includes kind='clock' glide requotes (unlike the event
+  // timeline above) so the daily time-decay adjustment shows as movement.
+  const initialProbabilityHistory = probabilityHistory.map((s) => ({
+    id: s.id,
+    createdAt: s.createdAt.toISOString(),
+    externalProbability: s.externalProbability,
+    kind: s.kind,
+  }))
 
   // Apply cached translations — never triggers Gemini, read-only
   const translations = await getCachedPredictionTranslation(prediction.id, locale)
@@ -271,6 +280,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           isLocalized={isLocalized}
           initialComments={initialComments}
           initialContextSnapshots={initialContextSnapshots}
+          initialProbabilityHistory={initialProbabilityHistory}
           initialContributingSources={initialContributingSources}
         />
       </Suspense>
