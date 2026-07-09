@@ -6,6 +6,7 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
 import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
+import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { addArticlesToPool } from '@/lib/services/evidence-pool'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
@@ -124,14 +125,17 @@ export async function POST(request: NextRequest) {
       const ciLow = stanceToPercent(oracleForecast.ci_low)
       const ciHigh = stanceToPercent(oracleForecast.ci_high)
 
+      // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
+      // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
+      // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
+      // elections.daatan.com's tracked commentators — can never match a person.
+      const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map((s) => s.url))
+      const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
+      const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl)
+
       // Evidence pool shadow-write (foundation layer, retro docs/ORACLE_VARIABLES.md
       // §6 part 2) — additive only, never blocks or alters the estimate below.
-      const poolSources = enrichOracleSources(
-        oracleForecast.sources,
-        items.map((a) => ({ url: a.url, title: a.title, snippet: a.snippet, source: a.source ?? undefined, publishedDate: a.publishedAt ?? undefined })),
-        new Map(),
-      )
-      addArticlesToPool(prediction.id, poolSources, 'news-indexer').catch((err) =>
+      addArticlesToPool(prediction.id, oracleSources, 'news-indexer').catch((err) =>
         log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
       )
 
@@ -153,22 +157,22 @@ export async function POST(request: NextRequest) {
           ciHigh,
           articlesUsed: oracleForecast.articles_used,
           settled: oracleForecast.settled ?? false,
-          sources: oracleForecast.sources.map((s) => ({
-            sourceId: s.source_id,
-            sourceName: s.source_name,
-            url: s.url,
-            stance: s.stance,
-            certainty: s.certainty,
-            credibilityWeight: s.credibility_weight,
-            claims: s.claims,
-            settled: s.settled ?? null,
-          })),
+          sources: oracleSources,
         },
         settled: oracleForecast.settled ?? false,
       })
 
       log.info(
-        { predictionId: prediction.id, probability, articles: items.length, similarity: triggerSimilarity },
+        {
+          predictionId: prediction.id,
+          probability,
+          articles: items.length,
+          similarity: triggerSimilarity,
+          // How many of the Oracle's sources carried a byline — the signal that makes
+          // per-commentator attribution possible downstream. 0 means the lookup found none.
+          bylines: oracleSources.filter((s) => s.author != null).length,
+          oracleSources: oracleSources.length,
+        },
         'news-indexer: oracle updated',
       )
     } else {
