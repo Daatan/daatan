@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { ExternalLink } from 'lucide-react'
 
 export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boolean; selfHosted?: boolean }) {
   const t = useTranslations('admin')
@@ -20,10 +19,10 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
     { id: 'bots', label: t('tabBots'), adminOnly: true, selfHostedHidden: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
-    // Links out to news-indexer's own author-identity admin panel (separate
-    // service/deploy, own API-key auth) — SaaS-only, no scrapper.daatan.com
+    // Edits news-indexer's author-identity tables through an ADMIN-gated proxy
+    // (/api/admin/news-indexer/authors) — SaaS-only, no scrapper.daatan.com
     // instance exists for self-hosted deployments.
-    { id: 'authors', label: t('tabAuthors'), adminOnly: true, selfHostedHidden: true, external: 'https://scrapper.daatan.com/admin' },
+    { id: 'authors', label: t('tabAuthors'), adminOnly: true, selfHostedHidden: true },
     // Runtime config (brand, /about, LLM key) — self-hosted edition only.
     { id: 'settings', label: t('tabSettings'), adminOnly: true, selfHostedOnly: true },
     { id: 'about', label: t('tabAbout'), adminOnly: true },
@@ -46,21 +45,6 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
           ? 'border-b-2 border-blue-500 font-bold text-blue-600'
           : 'text-gray-500 hover:text-text-secondary'
           }`
-
-        if (tab.external) {
-          return (
-            <a
-              key={tab.id}
-              href={tab.external}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${tabClassName} inline-flex items-center gap-1`}
-            >
-              {tab.label}
-              <ExternalLink className="w-3 h-3" aria-hidden="true" />
-            </a>
-          )
-        }
 
         return (
           <Link

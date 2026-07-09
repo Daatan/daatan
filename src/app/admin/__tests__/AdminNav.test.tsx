@@ -16,13 +16,14 @@ const renderWithIntl = (ui: React.ReactElement) =>
   )
 
 describe('AdminNav', () => {
-  it('renders the Authors tab as an external link to the news-indexer admin panel', () => {
+  it('renders the Authors tab as an in-app link, not an external hand-off', () => {
     renderWithIntl(<AdminNav isAdmin={true} />)
 
     const link = screen.getByRole('link', { name: /Authors/ })
-    expect(link).toHaveAttribute('href', 'https://scrapper.daatan.com/admin')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    // The panel is served from Daatan behind the ADMIN gate; sending the operator
+    // to scrapper.daatan.com would make them paste NEWS_INDEXER_SECRET into a browser.
+    expect(link).toHaveAttribute('href', '/admin/authors')
+    expect(link).not.toHaveAttribute('target')
   })
 
   it('hides the Authors tab in the self-hosted edition', () => {
