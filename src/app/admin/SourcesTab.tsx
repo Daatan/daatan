@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Loader2, RefreshCw, ExternalLink, ArrowUpDown, ArrowDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -144,7 +145,13 @@ export default function SourcesTab() {
                         const dim = measurable && !shared && imp.forecastsAffected === 0
                         return (
                           <tr key={`${s.name}-${i}`} className={`border-t border-navy-700 ${dim ? 'opacity-50' : ''}`}>
-                            <td className="px-3 py-2 font-medium text-white">{s.name}</td>
+                            <td className="px-3 py-2 font-medium text-white">
+                              {s.name ? (
+                                <Link href={`/admin/sources/${encodeURIComponent(s.name)}`} className="hover:text-blue-400 hover:underline transition-colors">
+                                  {s.name}
+                                </Link>
+                              ) : '—'}
+                            </td>
                             <td className="px-3 py-2 text-gray-400 uppercase">{s.language || '—'}</td>
                             <td className="px-3 py-2 max-w-[18rem]">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
