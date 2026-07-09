@@ -121,6 +121,22 @@ describe('POST /api/news-indexer/context', () => {
     })
   })
 
+  it('forwards the prediction\'s claimDirection/claimDeadline to getOracleForecast (arms retro #244)', async () => {
+    const deadline = new Date('2026-12-31T00:00:00.000Z')
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
+      ...ACTIVE_PREDICTION,
+      claimDirection: 'ARRIVAL',
+      claimDeadline: deadline,
+    } as never)
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+
+    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    expect(opts?.claimDirection).toBe('ARRIVAL')
+    expect(opts?.claimDeadline).toBe(deadline)
+  })
+
   it('returns null enrichment when the Oracle has no usable forecast', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 

@@ -71,4 +71,14 @@ describe('refreshOracleSnapshot', () => {
     expect(saved.predictionId).toBe('p1')
     expect(saved.oracleSnapshot.sources[0]).toMatchObject({ sourceName: 'BBC', stance: 0.2 })
   })
+
+  it('forwards claimDirection/claimDeadline to getOracleForecast when present on the prediction', async () => {
+    const deadline = new Date('2026-12-31T00:00:00.000Z')
+    mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+    mockForecast.mockResolvedValue({ forecast: null })
+    await refreshOracleSnapshot({ ...prediction, claimDirection: 'SURVIVAL', claimDeadline: deadline })
+    const [, opts] = mockForecast.mock.calls[0]
+    expect(opts.claimDirection).toBe('SURVIVAL')
+    expect(opts.claimDeadline).toBe(deadline)
+  })
 })

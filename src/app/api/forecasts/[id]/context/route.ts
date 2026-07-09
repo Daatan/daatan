@@ -182,6 +182,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     source: r.source,
                     publishedDate: r.publishedDate,
                 })),
+                claimDirection: prediction.claimDirection,
+                claimDeadline: prediction.claimDeadline,
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })
             // The Oracle abstained — the evidence doesn't bear on the claim. Record
             // the abstention and do NOT fall back to an LLM guess, which would just

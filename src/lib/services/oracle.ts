@@ -1,3 +1,4 @@
+import { ClaimDirection } from '@prisma/client'
 import { createLogger } from '@/lib/logger'
 import {
   getOracleBaseUrl,
@@ -32,6 +33,22 @@ export interface ArticleInput {
   snippet: string
   source?: string
   publishedDate?: string
+}
+
+/** Stored claim temporal metadata, as read off `Prediction`. Optional on every
+ *  Oracle call site — retro's direction guard (#244) is fail-open without it. */
+export interface ClaimMeta {
+  claimDirection?: ClaimDirection | null
+  claimDeadline?: Date | null
+}
+
+/** Map to retro's `ForecastRequest.claim_direction` — a strict
+ *  `Literal["arrival", "survival"]`. NONE/null must be omitted entirely, not
+ *  sent as the literal string "none": retro 422s on any other value. */
+function claimDirectionParam(direction: ClaimDirection | null | undefined): 'arrival' | 'survival' | undefined {
+  if (direction === ClaimDirection.ARRIVAL) return 'arrival'
+  if (direction === ClaimDirection.SURVIVAL) return 'survival'
+  return undefined
 }
 
 /** Per-source signal returned by the Oracle's /forecast endpoint. */
@@ -141,7 +158,7 @@ export interface OracleLeaderboardResponse {
  */
 export const getOracleForecast = async (
   question: string,
-  options?: { articles?: ArticleInput[]; timeoutMs?: number },
+  options?: { articles?: ArticleInput[]; timeoutMs?: number } & ClaimMeta,
   meta: OracleCallMeta = { source: 'other' },
 ): Promise<OracleForecastResult> => {
   const cfg = getOracleConfig()
@@ -158,6 +175,13 @@ export const getOracleForecast = async (
       body: JSON.stringify({
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
+        // Arms retro #244's direction guard. Both fail-open on retro's side
+        // when absent — omit rather than send a value it would 422 on (NONE
+        // is not a valid claim_direction).
+        ...(claimDirectionParam(options?.claimDirection)
+          ? { claim_direction: claimDirectionParam(options?.claimDirection) }
+          : {}),
+        ...(options?.claimDeadline ? { claim_deadline: options.claimDeadline.toISOString() } : {}),
         // Oracle's ArticleInput uses snake_case `published_date`; map from our
         // camelCase `publishedDate` so recency weighting on the Oracle side
         // actually receives the date (otherwise it's dropped and treated as now).
@@ -234,9 +258,13 @@ export const getOracleForecast = async (
 export const getOracleProbability = async (
   question: string,
   meta: OracleCallMeta = { source: 'other' },
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number } & ClaimMeta,
 ): Promise<number | null> => {
-  const { forecast } = await getOracleForecast(question, { timeoutMs: options?.timeoutMs }, meta)
+  const { forecast } = await getOracleForecast(
+    question,
+    { timeoutMs: options?.timeoutMs, claimDirection: options?.claimDirection, claimDeadline: options?.claimDeadline },
+    meta,
+  )
   if (!forecast) return null
   return (forecast.mean + 1) / 2
 }
