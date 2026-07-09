@@ -44,6 +44,9 @@ describe('SourcesTab', () => {
     expect(screen.getByText('Disabled')).toBeInTheDocument()
     // RSS locator renders as a link; youtube channel id as plain text.
     expect(screen.getByRole('link', { name: /phys\.org\/rss-feed/ })).toBeInTheDocument()
+    // The outlet name itself links to its admin detail page.
+    expect(screen.getByRole('link', { name: 'Phys.org' })).toHaveAttribute('href', '/admin/sources/Phys.org')
+    expect(screen.getByRole('link', { name: 'BBC News' })).toHaveAttribute('href', '/admin/sources/BBC%20News')
     // Impact: Phys.org shows its forecast count + 30d badge; the un-measurable youtube row shows n/a.
     expect(screen.getByText('5')).toBeInTheDocument()
     expect(screen.getByText('2 in 30d')).toBeInTheDocument()

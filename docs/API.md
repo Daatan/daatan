@@ -479,6 +479,15 @@ Fetch recent bot run logs.
 ### `GET /api/admin/news-indexer/sources` — Admin
 Proxy to the news-indexer `/sources` list (the configured `sources.yaml` joined to per-source forecast-match impact). Backs the admin **Sources** tab. Returns the news-indexer payload verbatim with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
 
+### `GET /api/admin/news-indexer/sources/[name]` — Admin
+Proxy to news-indexer's `GET /outlets/{name}` — one outlet's identity enrichment (Wikipedia URL, Telegram channel, links, notes — null/empty until an admin fills them in) merged with its `sources.yaml` config and forecast-match-derived impact + up to 50 recent publications. Backs the admin Sources detail page (`/admin/sources/[name]`, linked from each row in the Sources tab). Same `503` behavior as above.
+
+### `PUT /api/admin/news-indexer/sources/[name]` — Admin
+Proxy to news-indexer's `PUT /outlets/{name}` — upsert the enrichment fields. Body: `{ wikipedia_url?, telegram_channel?, links?: [{label,url}], notes? }`; only fields sent as non-null are changed. Returns the updated identity object with its status.
+
+### `DELETE /api/admin/news-indexer/sources/[name]` — Admin
+Proxy to news-indexer's `DELETE /outlets/{name}` — clears an outlet's enrichment row entirely (not exposed in the current UI; available for future use).
+
 ### `POST /api/admin/news-indexer/match` — Admin
 Proxy to the news-indexer `/match` endpoint — re-match a single article URL against active forecasts on demand. Body: `{ articleUrl: string }` (must be a valid URL). Returns the news-indexer response (`{ matches, queued }`) with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
 
