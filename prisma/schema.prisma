@@ -489,15 +489,23 @@ model EvidencePoolArticle {
   claims               Json    @default("[]")
   settled              Boolean?
   quantitativeEstimate Float?  @map("quantitative_estimate")
+  // Retro's resolved evidence_class weight (S2 cutover, retro PR #249/#251) —
+  // the `class_weight[evidence_class]`/certainty-fallback value already
+  // computed server-side, NOT the evidence_class taxonomy itself (retro keeps
+  // that internal). Nothing reads this yet; without it a future
+  // recompute-over-pool cutover would silently fall back to certainty for
+  // every already-pooled article.
+  evidenceWeight Float? @map("evidence_weight")
 
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
   // latest signal, not a history of every path that ever cited this article.
   origin String @db.VarChar(32)
 
-  // Admin override — unused until the exclusion feature (ORACLE_VARIABLES.md §6
-  // precondition) is built; reserved now so that feature doesn't also need a
-  // migration. Shadow-writes never touch this field once an admin has set it.
+  // Admin override (daatan #1068, "Evidence pool" panel on the forecast page).
+  // Not yet enforced by any computation — the recompute-over-pool cutover is
+  // still open — so this only records the decision ahead of that cutover.
+  // Shadow-writes never touch this field once an admin has set it.
   excluded Boolean @default(false)
 
   addedAt   DateTime @default(now()) @map("added_at")

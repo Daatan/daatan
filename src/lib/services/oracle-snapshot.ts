@@ -39,6 +39,7 @@ export type EnrichedOracleSource = {
   author: string | null
   settled: boolean | null
   quantitativeEstimate: number | null
+  evidenceWeight: number | null
 }
 
 /**
@@ -67,6 +68,7 @@ export function enrichOracleSources(
       author: authorByUrl.get(s.url) ?? null,
       settled: s.settled ?? null,
       quantitativeEstimate: s.quantitative_estimate ?? null,
+      evidenceWeight: s.evidence_weight ?? null,
     }
   })
 }

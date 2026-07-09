@@ -137,8 +137,12 @@ cache: re-discovering an already-pooled article updates its stored signal in
 place. `excluded` is settable via the forecast page's admin-only "Evidence
 pool" panel (`EvidencePoolAdmin.tsx`, `PATCH
 /api/admin/forecasts/[id]/evidence-pool/[articleId]`) — shadow-writes never
-touch it, so an admin's exclusion decision survives re-discovery. **Not yet
-enforced by any computation** — the recompute-over-pool cutover (the
+touch it, so an admin's exclusion decision survives re-discovery.
+`evidenceWeight` is retro's resolved evidence_class weight (S2 cutover, retro
+`/forecast`'s `SourceSignal.evidence_weight`, PR #251) — the
+`class_weight[evidence_class]`/certainty-fallback value already computed
+server-side, not the evidence_class taxonomy itself (retro keeps that
+internal). **Not yet enforced by any computation** — the recompute-over-pool cutover (the
 ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
 excluding an article here has no effect on the live estimate today.
 
