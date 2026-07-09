@@ -23,7 +23,7 @@ vi.mock('@/lib/services/telegram', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { notifyHighConfidence } from '@/lib/services/telegram'
-import { recordEstimate, saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
+import { recordEstimate, saveOracleSnapshotOnly, markOracleAttempted, clearSettledLatch } from '@/lib/services/context'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const snapshotCreate = vi.mocked(prisma.contextSnapshot.create)
@@ -121,6 +121,20 @@ describe('recordEstimate — the single estimate writer', () => {
     deleteTranslations.mockClear()
     await recordEstimate({ predictionId: 'pred-2', origin: 'news-indexer', probability: 60 })
     expect(deleteTranslations).not.toHaveBeenCalled()
+  })
+})
+
+describe('clearSettledLatch — the only way back from a settled=true latch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('clears settled and settledAt directly (not via recordEstimate, which can only set true)', async () => {
+    await clearSettledLatch('pred-1', 'admin-user-1')
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'pred-1' },
+      data: { settled: false, settledAt: null },
+    })
   })
 })
 

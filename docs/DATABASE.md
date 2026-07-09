@@ -183,8 +183,12 @@ anchor time).
 1. **Never write `Prediction.confidence`/`aiCiLow`/`aiCiHigh` directly** — go
    through `recordEstimate` so the snapshot stream, the cache, the settled
    latch and notifications stay consistent. (Bots are the one legacy exception.)
-2. **`settled` is a one-way latch** (see above) — clearing it is a manual
-   admin/data operation today.
+2. **`settled` is a one-way latch** (see above) — `recordEstimate` can only
+   set it true, never clear it. An admin can clear a false settlement via
+   `DELETE /api/admin/forecasts/[id]/settled` (`clearSettledLatch` in
+   `context.ts`), surfaced as a "Clear settlement" button on the forecast
+   page when `settled=true`. Clearing re-admits the forecast to the
+   temporal clock's glide candidates on its next daily run.
 3. **Pre-v1.31.2 `oracleSnapshot` rows were stance-scale** until the one-time
    normalization to percent on 2026-07-08. Live data is uniform now; only
    backups predating the fix still mix scales (see "Probability scales" above).
