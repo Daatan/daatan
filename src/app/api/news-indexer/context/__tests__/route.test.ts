@@ -16,6 +16,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
+vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
 
 vi.mock('@/lib/api-error', () => ({
   apiError: (msg: string, status: number) =>
@@ -35,6 +36,7 @@ import { prisma } from '@/lib/prisma'
 import { getOracleForecast } from '@/lib/services/oracle'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
+import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,6 +92,7 @@ describe('POST /api/news-indexer/context', () => {
     vi.clearAllMocks()
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(ACTIVE_PREDICTION as never)
     vi.mocked(saveNewsIndexerMatch).mockResolvedValue(undefined as never)
+    vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
   })
 
   it('rejects a wrong secret with 401 before doing any work', async () => {
@@ -214,5 +217,51 @@ describe('POST /api/news-indexer/context', () => {
     // The snapshot persists the full evidence set as sources.
     const [{ sources }] = vi.mocked(saveNewsIndexerMatch).mock.calls[0]
     expect(sources).toHaveLength(2)
+  })
+
+  describe('author passthrough', () => {
+    // Downstream (elections.daatan.com) matches tracked commentators on
+    // `oracleSnapshot.sources[].author`; the Oracle response never carries one.
+    beforeEach(() => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    })
+
+    const snapshotSources = (): Record<string, unknown>[] =>
+      (vi.mocked(saveNewsIndexerMatch).mock.calls[0][0].oracleSnapshot as unknown as { sources: Record<string, unknown>[] })
+        .sources
+
+    it('writes the byline news-indexer holds for the article', async () => {
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(
+        new Map([['https://bbc.com/news/x', { requestedUrl: 'https://bbc.com/news/x', author: 'נדב איל', publishedAt: null, title: null, source: null }]]) as never,
+      )
+
+      await POST(post('test-secret'))
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith(['https://bbc.com/news/x'])
+      expect(snapshotSources()[0]).toMatchObject({ url: 'https://bbc.com/news/x', sourceName: 'BBC', author: 'נדב איל' })
+    })
+
+    it('records a null author rather than dropping the source when no byline is indexed', async () => {
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
+
+      await POST(post('test-secret'))
+
+      expect(snapshotSources()).toHaveLength(1)
+      expect(snapshotSources()[0]).toMatchObject({ url: 'https://bbc.com/news/x', author: null })
+    })
+
+    it('still keeps the stance/claims the snapshot carried before', async () => {
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
+
+      await POST(post('test-secret'))
+
+      expect(snapshotSources()[0]).toMatchObject({
+        sourceId: 'bbc',
+        stance: 0.42,
+        certainty: 0.77,
+        credibilityWeight: 1.0,
+        claims: ['First extracted claim', 'Second claim'],
+      })
+    })
   })
 })
