@@ -170,10 +170,15 @@ async function callMembers(
  */
 export async function runPanelForPrediction(
   prediction: PanelPrediction,
-  opts: { now?: Date; dryRun?: boolean; apiKey: string } ,
+  opts: { now?: Date; dryRun?: boolean; apiKey: string; template?: string },
 ): Promise<PanelRunResult> {
   const now = opts.now ?? new Date()
-  const template = await getPromptTemplate('panel-estimate')
+  // The sweep resolves the template once and threads it through. Fetching per
+  // forecast would (a) hit SSM once per forecast — and when the parameter is absent,
+  // `getPromptTemplate` returns the fallback WITHOUT caching, so nothing absorbs the
+  // repeat — and (b) let a mid-sweep Bedrock prompt edit give forecasts in the same
+  // sweep different promptVersions, which silently splits one member into two.
+  const template = opts.template ?? (await getPromptTemplate('panel-estimate'))
   const promptVersion = promptVersionOf(template)
   const inputHash = computeInputHash(prediction, now, promptVersion)
 
@@ -285,6 +290,9 @@ export async function runPanelSweep(opts?: {
 
   const now = opts?.now ?? new Date()
 
+  // Resolved once, so every forecast in this sweep shares one promptVersion.
+  const template = await getPromptTemplate('panel-estimate')
+
   const predictions = await prisma.prediction.findMany({
     where: {
       status: 'ACTIVE',
@@ -309,6 +317,7 @@ export async function runPanelSweep(opts?: {
         now,
         dryRun: opts?.dryRun,
         apiKey,
+        template,
       })
       if (result.status === 'written' || result.status === 'dry-run') summary.written += 1
       else if (result.status === 'failed') summary.failed += 1

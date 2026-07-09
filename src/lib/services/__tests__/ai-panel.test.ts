@@ -265,6 +265,20 @@ describe('runPanelSweep', () => {
     expect(JSON.stringify(findManyPredictions.mock.calls[0][0]?.where)).not.toContain('commitments')
   })
 
+  it('resolves the prompt template once per sweep, not once per forecast', async () => {
+    findManyPredictions.mockResolvedValue([
+      prediction,
+      { ...prediction, id: 'pred-2' },
+      { ...prediction, id: 'pred-3' },
+    ] as never)
+
+    await runPanelSweep({ now: NOW })
+
+    // Per-forecast fetches would hammer SSM (the fallback path does not cache), and a
+    // mid-sweep prompt edit would split one member across two promptVersions.
+    expect(getTemplate).toHaveBeenCalledTimes(1)
+  })
+
   it('one failing forecast does not abort the sweep', async () => {
     findManyPredictions.mockResolvedValue([prediction, { ...prediction, id: 'pred-2' }] as never)
     findFirst.mockRejectedValueOnce(new Error('db blip'))
