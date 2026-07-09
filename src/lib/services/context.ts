@@ -184,6 +184,22 @@ export async function recordEstimate(input: RecordEstimateInput) {
   return snapshot as ContextSnapshot
 }
 
+/**
+ * The only way to clear the settled latch (see `recordEstimate` above — it
+ * can only ever set `settled: true`, never false). A human override for a
+ * false settlement (e.g. the 2026-07-08 F-35 incident, fixed by hand via a
+ * prod DB UPDATE at the time). Re-admits the forecast to the temporal
+ * clock's glide candidates (`CANDIDATE_WHERE: settled: false`) on its next
+ * daily run; does not itself trigger a re-estimate.
+ */
+export async function clearSettledLatch(predictionId: string, clearedBy: string): Promise<void> {
+  await prisma.prediction.update({
+    where: { id: predictionId },
+    data: { settled: false, settledAt: null },
+  })
+  log.info({ predictionId, clearedBy }, 'settled latch cleared')
+}
+
 /** Keep the heavy JSON (`sources[]` + `oracleSnapshot`) only for this many most-recent
  *  snapshots; older timeline rows are returned light. Bounds a payload that would
  *  otherwise grow with a forecast's entire update history. */

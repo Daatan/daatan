@@ -37,6 +37,7 @@ import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
 import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
+import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate } from '@/lib/utils/date'
@@ -717,6 +718,9 @@ export default function ForecastDetailClient({
         outcomeType={prediction.outcomeType}
         options={prediction.options}
       />
+
+      {/* Admin-only false-settlement override (renders nothing unless settled) */}
+      <SettledLatchAdmin prediction={prediction} />
 
       {/* Admin-only external-market link control (renders nothing for non-admins) */}
       <ExternalMarketLinkAdmin prediction={prediction} />
