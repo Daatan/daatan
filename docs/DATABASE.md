@@ -44,8 +44,10 @@ Conversion happens once, at the Oracle boundary (`stanceToPercent` in
 carried `mean`/`std` on the raw stance scale; a one-time prod data fix
 (2026-07-08) normalized them all to percent (`mean → (m+1)/2·100`, `std → ·50`),
 so every stored row is now percent and readers need no scale detection. The
-caveat survives only in backups taken before 2026-07-08 — re-run the
-normalization after restoring one.
+caveat survives only in backups taken before 2026-07-08 — re-run
+[`scripts/normalize-oracle-snapshot-scale.sql`](../scripts/normalize-oracle-snapshot-scale.sql)
+after restoring one (executable dry-run/apply/verify steps + the exact
+code-verified per-environment cutoff timestamps, not just this prose).
 
 ## Forecasts — `predictions`
 
