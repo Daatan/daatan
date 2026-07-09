@@ -66,8 +66,12 @@ export interface OracleSource {
   /** True when this source reports the event's outcome as an accomplished fact. */
   settled?: boolean | null
   /** Explicit modeled/poll/market probability this source cited for the event
-   *  itself (retro's quantitative_anchor_multiplier input), if any. */
+   *  itself, if any (retro's cited_probability evidence class). */
   quantitative_estimate?: number | null
+  /** This source's resolved evidence_class weight (retro S2 cutover) — the
+   *  `class_weight[evidence_class]`/certainty-fallback value, NOT the
+   *  evidence_class taxonomy itself (retro keeps that internal). */
+  evidence_weight?: number | null
 }
 
 /** Full response from POST /forecast. */

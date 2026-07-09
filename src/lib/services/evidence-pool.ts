@@ -46,6 +46,7 @@ export async function addArticlesToPool(
           claims: s.claims,
           settled: s.settled,
           quantitativeEstimate: s.quantitativeEstimate,
+          evidenceWeight: s.evidenceWeight,
           origin,
         },
         update: {
@@ -59,6 +60,7 @@ export async function addArticlesToPool(
           claims: s.claims,
           settled: s.settled,
           quantitativeEstimate: s.quantitativeEstimate,
+          evidenceWeight: s.evidenceWeight,
           origin,
         },
       }),
