@@ -17,6 +17,8 @@ vi.mock('@/lib/prisma', () => {
       update: vi.fn(),
     },
     user: { findUnique: vi.fn() },
+    // AI panel: the commit path snapshots the run current at commit time.
+    aiEstimateRun: { findFirst: vi.fn() },
   }
   return {
     prisma: {

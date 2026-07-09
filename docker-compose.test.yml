@@ -2,7 +2,11 @@ version: '3.8'
 
 services:
   postgres-test:
-    image: postgres:16-alpine
+    # pgvector, not plain postgres: the schema declares `Unsupported("vector(768)")`
+    # (Prediction.embedding, ExternalMarket.embedding) and an early migration runs
+    # `CREATE EXTENSION vector`. On postgres:16-alpine `prisma migrate deploy` fails
+    # before a single integration test runs.
+    image: pgvector/pgvector:pg16
     container_name: daatan-postgres-test
     ports:
       - "5433:5432"

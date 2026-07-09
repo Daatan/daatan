@@ -55,6 +55,118 @@ describe('Commitment Service Integration', () => {
     expect(unchangedUser?.rs).toBe(100)
   })
 
+  // Matched-time Brier for the AI panel (docs/AI_PANEL.md §7). This FK is the one
+  // value that cannot be reconstructed after the fact: it records which panel run was
+  // current at the instant the user staked. If it is not captured on write, the
+  // commitment is permanently unscoreable against the panel.
+  it('pins the latest AI-panel run at commit time', async () => {
+    const user = await prisma.user.create({
+      data: { email: `panel-${Date.now()}@example.com`, name: 'Panel User', rs: 100 },
+    })
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Panel run is pinned at commit',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date('2030-01-01'),
+        shareToken: 'panel-token-' + Date.now(),
+      },
+    })
+
+    const stale = await prisma.aiEstimateRun.create({
+      data: {
+        predictionId: prediction.id,
+        inputHash: 'a'.repeat(64),
+        createdAt: new Date('2026-07-01T00:00:00Z'),
+        estimates: {
+          create: [
+            {
+              model: 'qwen/qwen3-235b-a22b-2507',
+              mode: 'ungrounded',
+              promptVersion: 'v1',
+              probability: 30,
+            },
+          ],
+        },
+      },
+    })
+    const current = await prisma.aiEstimateRun.create({
+      data: {
+        predictionId: prediction.id,
+        inputHash: 'b'.repeat(64),
+        createdAt: new Date('2026-07-08T00:00:00Z'),
+        estimates: {
+          create: [
+            {
+              model: 'qwen/qwen3-235b-a22b-2507',
+              mode: 'ungrounded',
+              promptVersion: 'v1',
+              probability: 55,
+            },
+            // An abstaining member still occupies a row: null, not a fabricated number.
+            {
+              model: 'x-ai/grok-4.3',
+              mode: 'ungrounded',
+              promptVersion: 'v1',
+              probability: null,
+              insufficientData: true,
+            },
+          ],
+        },
+      },
+    })
+
+    const result = await createCommitment(user.id, prediction.id, { confidence: 70 })
+    expect(result.ok).toBe(true)
+
+    const commitment = await prisma.commitment.findFirst({
+      where: { userId: user.id, predictionId: prediction.id },
+      include: { aiRunAtCommit: { include: { estimates: true } } },
+    })
+
+    expect(commitment?.aiRunIdAtCommit).toBe(current.id)
+    expect(commitment?.aiRunIdAtCommit).not.toBe(stale.id)
+
+    // A run FK, not a scalar: every member's number at commit time is still recoverable,
+    // which is what makes per-model Brier possible.
+    const estimates = commitment?.aiRunAtCommit?.estimates ?? []
+    expect(estimates).toHaveLength(2)
+    expect(estimates.find((e) => e.model === 'x-ai/grok-4.3')?.probability).toBeNull()
+    expect(estimates.find((e) => e.model.startsWith('qwen/'))?.probability).toBe(55)
+
+    // The panel must never touch the needle.
+    const untouched = await prisma.prediction.findUnique({ where: { id: prediction.id } })
+    expect(untouched?.confidence).toBeNull()
+    expect(untouched?.aiCiLow).toBeNull()
+    expect(untouched?.aiCiHigh).toBeNull()
+  })
+
+  it('leaves aiRunIdAtCommit null when the panel has never run', async () => {
+    const user = await prisma.user.create({
+      data: { email: `norun-${Date.now()}@example.com`, name: 'No Run', rs: 100 },
+    })
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'No panel run yet',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date('2030-01-01'),
+        shareToken: 'norun-token-' + Date.now(),
+      },
+    })
+
+    const result = await createCommitment(user.id, prediction.id, { confidence: 40 })
+    expect(result.ok).toBe(true)
+
+    const commitment = await prisma.commitment.findFirst({
+      where: { userId: user.id, predictionId: prediction.id },
+    })
+    // Drops out of the aggregates, exactly as a null brierScore already does.
+    expect(commitment?.aiRunIdAtCommit).toBeNull()
+  })
+
   it('should derive binaryChoice false from negative confidence', async () => {
     const user = await prisma.user.create({
       data: {

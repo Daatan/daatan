@@ -165,6 +165,21 @@ const writeCommitmentInTx = async (
   const aiProbabilityAtCommit: number | null =
     prediction.confidence != null ? prediction.confidence / 100 : null
 
+  // Matched-time Brier for the AI panel (docs/AI_PANEL.md §7). A human stakes once
+  // while the panel updates daily, so scoring the panel on all its estimates would
+  // flatter it enormously — an estimate made the day before resolution is nearly
+  // free. Instead we pin the run that was current at this instant, exactly as
+  // `communityProbabilityAtCommit` above pins the crowd.
+  //
+  // A run FK, not a scalar: a scalar would collapse the panel to one number at the
+  // very moment we capture it, destroying per-model scoring. Null when no run exists
+  // yet — those commitments drop out of the aggregates, as a null brierScore does.
+  const latestAiRun = await tx.aiEstimateRun.findFirst({
+    where: { predictionId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+
   const created = await tx.commitment.create({
     data: {
       userId,
@@ -175,6 +190,7 @@ const writeCommitmentInTx = async (
       rsSnapshot: user.rs,
       communityProbabilityAtCommit,
       aiProbabilityAtCommit,
+      aiRunIdAtCommit: latestAiRun?.id ?? null,
     },
     include: commitmentInclude,
   })
