@@ -72,7 +72,11 @@ The central table (`Prediction`). Field groups:
 - **Settlement latch**: `settled`/`settledAt` — set when the Oracle reports the
   outcome as an accomplished fact (≥2 independent sources). **One-way**: only
   ever set true by the funnel; a later unsettled run does not clear it; human
-  resolution supersedes. While ACTIVE it blocks new commitments.
+  resolution supersedes. As of PR #1020, `settled` no longer locks commitments
+  by itself — only a passed `resolveByDatetime` or an impossibility pin (a
+  `claimDeadline` that has passed and agrees with `resolveByDatetime` within
+  `DEADLINE_AGREEMENT_TOLERANCE_MS`) blocks new commitments (see
+  `getCommitmentLockReason` in `commitment.ts`).
 - **Temporal-model metadata** (glide; retro `TEMPORAL_MODEL_PLAN.md`):
   `claimDeadline` (parsed from claim *text* — deliberately distinct from
   `resolveByDatetime`; the two diverging triggers the divergence rule),

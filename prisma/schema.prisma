@@ -360,8 +360,9 @@ model Prediction {
 
   // Oracle settlement detection: >=2 independent sources reported the outcome as
   // an accomplished fact (retro settlement pin). Sticky — only ever set true by
-  // the snapshot writers; human resolution supersedes it. While ACTIVE it blocks
-  // new commitments (free-points window between pin and resolution).
+  // the snapshot writers; human resolution supersedes it. As of PR #1020, does
+  // NOT block new commitments by itself — see getCommitmentLockReason in
+  // src/lib/services/commitment.ts.
   settled   Boolean   @default(false)
   settledAt DateTime? @map("settled_at")
 
