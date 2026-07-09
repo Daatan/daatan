@@ -10,6 +10,7 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
+import { addArticlesToPool } from '@/lib/services/evidence-pool'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { aiResearchEnabled } from '@/lib/capabilities'
@@ -222,6 +223,13 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     },
                     'context.ai_estimate',
                 )
+                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl)
+                // Evidence pool shadow-write (foundation layer, retro
+                // docs/ORACLE_VARIABLES.md §6 part 2) — additive only, never
+                // blocks or alters the estimate below.
+                addArticlesToPool(prediction.id, enrichedSources, 'analyze').catch((err) =>
+                    log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
+                )
                 return {
                     externalProbability: prob,
                     externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
@@ -234,7 +242,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         ciHigh,
                         articlesUsed: oracleForecast.articles_used,
                         settled: oracleForecast.settled ?? false,
-                        sources: enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl),
+                        sources: enrichedSources,
                     },
                     settled: oracleForecast.settled ?? false,
                 }

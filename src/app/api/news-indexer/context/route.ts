@@ -4,8 +4,9 @@ import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
-import { stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
+import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
+import { addArticlesToPool } from '@/lib/services/evidence-pool'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 
@@ -122,6 +123,17 @@ export async function POST(request: NextRequest) {
       probability = stanceToPercent(oracleForecast.mean)
       const ciLow = stanceToPercent(oracleForecast.ci_low)
       const ciHigh = stanceToPercent(oracleForecast.ci_high)
+
+      // Evidence pool shadow-write (foundation layer, retro docs/ORACLE_VARIABLES.md
+      // §6 part 2) — additive only, never blocks or alters the estimate below.
+      const poolSources = enrichOracleSources(
+        oracleForecast.sources,
+        items.map((a) => ({ url: a.url, title: a.title, snippet: a.snippet, source: a.source ?? undefined, publishedDate: a.publishedAt ?? undefined })),
+        new Map(),
+      )
+      addArticlesToPool(prediction.id, poolSources, 'news-indexer').catch((err) =>
+        log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
+      )
 
       await saveNewsIndexerMatch({
         predictionId: prediction.id,
