@@ -8,10 +8,14 @@ export const ELECTION_TAG_SLUG = 'israeli-elections-2026'
 
 type OracleSnapshotShape = { mean?: number | null; sources?: EnrichedOracleSource[] } | null
 
-/** Aggregate Oracle mean stance in [-1,1] → probability of YES in [0,100]. */
-function meanToProbability(mean: number | null | undefined): number | null {
+/**
+ * `oracleSnapshot.mean` is probability percent 0–100 on every stored row
+ * (uniform since the 2026-07-08 normalization — see docs/DATABASE.md). The
+ * clamp only guards data restored from a pre-normalization backup.
+ */
+export function meanToProbability(mean: number | null | undefined): number | null {
   if (typeof mean !== 'number' || !Number.isFinite(mean)) return null
-  return Math.round(((mean + 1) / 2) * 100)
+  return Math.min(100, Math.max(0, Math.round(mean)))
 }
 
 /**
