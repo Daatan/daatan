@@ -1,0 +1,325 @@
+import { createHash } from 'crypto'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { createLogger } from '@/lib/logger'
+import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
+import { getOpenRouterKey } from '@/lib/services/settings'
+import { callPanelMember, logMemberFailure } from '@/lib/llm/panel/client'
+import { PANEL_MEMBERS, rosterSignature, type PanelMember } from '@/lib/llm/panel/roster'
+
+const log = createLogger('ai-panel')
+
+/** How many members to call at once. Small: five members × a few hundred forecasts is
+ *  not latency-critical, and OpenRouter would rather we didn't burst. */
+const MEMBER_CONCURRENCY = 3
+
+export type PanelRunStatus =
+  /** input hash unchanged since the last run — nothing to do, previous run stays current */
+  | 'skipped-unchanged'
+  /** another process wrote this exact run first (unique index on predictionId+inputHash) */
+  | 'skipped-duplicate'
+  /** every member's call threw; nothing written, so the next tick retries */
+  | 'failed'
+  | 'written'
+  | 'dry-run'
+
+export interface PanelRunResult {
+  predictionId: string
+  status: PanelRunStatus
+  /** Members that returned a number. */
+  estimated: number
+  /** Members that abstained: returned null, or their call failed. */
+  abstained: number
+}
+
+export interface PanelPrediction {
+  id: string
+  claimText: string
+  resolutionRules: string | null
+  resolveByDatetime: Date
+}
+
+/** Fingerprint of the prompt template. Part of member identity — a prompt change
+ *  makes prior Brier scores incomparable, so it is stored on every estimate.
+ *  Derived from the template text rather than a Bedrock version id so it stays
+ *  correct when the hardcoded fallback prompt is in use. */
+export function promptVersionOf(template: string): string {
+  return createHash('sha256').update(template).digest('hex').slice(0, 12)
+}
+
+/** UTC calendar day. Day granularity, not timestamp: the prompt only ever shows the
+ *  model a date, so a finer clock would force sweeps that cannot change the answer. */
+export function utcDay(now: Date): string {
+  return now.toISOString().slice(0, 10)
+}
+
+export function daysRemaining(resolveBy: Date, now: Date): number {
+  return Math.max(0, Math.ceil((resolveBy.getTime() - now.getTime()) / 86_400_000))
+}
+
+/**
+ * The date-gate. The panel prompt carries no article text, so the only input that
+ * changes over a forecast's life is the date — a "new source arrived" trigger could
+ * not move the output, and re-running on an unchanged hash would just resample a
+ * constant at temperature 0.
+ *
+ * The roster signature is folded in so that adding or dropping a member forces a
+ * fresh sweep, rather than producing runs with different member sets under one hash.
+ */
+export function computeInputHash(
+  prediction: PanelPrediction,
+  now: Date,
+  promptVersion: string,
+  roster: readonly PanelMember[] = PANEL_MEMBERS,
+): string {
+  return createHash('sha256')
+    .update(
+      // JSON.stringify, not join(sep): with any plain separator, a claim ending in
+      // "x" plus rules "y" hashes identically to claim "x y" plus empty rules. Such a
+      // collision would make the sweep silently skip a forecast whose text changed.
+      // Field boundaries must not be forgeable from user-authored claim text.
+      JSON.stringify([
+        prediction.claimText,
+        prediction.resolutionRules ?? '',
+        prediction.resolveByDatetime.toISOString(),
+        utcDay(now),
+        promptVersion,
+        rosterSignature(roster),
+      ]),
+    )
+    .digest('hex')
+}
+
+export function buildPanelPrompt(
+  template: string,
+  prediction: PanelPrediction,
+  now: Date,
+): string {
+  return fillPrompt(template, {
+    claimText: prediction.claimText,
+    resolutionRules: prediction.resolutionRules ?? '(none specified)',
+    resolveByDate: prediction.resolveByDatetime.toISOString().slice(0, 10),
+    todayDate: utcDay(now),
+    daysRemaining: daysRemaining(prediction.resolveByDatetime, now),
+  })
+}
+
+interface MemberOutcome {
+  member: PanelMember
+  probability: number | null
+  insufficientData: boolean
+  promptTokens: number | null
+  completionTokens: number | null
+  latencyMs: number | null
+  /** True when the call threw, as opposed to the model deliberately returning null. */
+  failed: boolean
+}
+
+async function callMembers(
+  members: readonly PanelMember[],
+  prompt: string,
+  apiKey: string,
+  predictionId: string,
+): Promise<MemberOutcome[]> {
+  const outcomes: MemberOutcome[] = []
+  const queue = [...members]
+
+  const worker = async (): Promise<void> => {
+    for (let member = queue.shift(); member; member = queue.shift()) {
+      try {
+        const result = await callPanelMember(member, prompt, apiKey)
+        outcomes.push({
+          member,
+          probability: result.probability,
+          // A null probability is the model abstaining: the claim is too vague.
+          insufficientData: result.probability === null,
+          promptTokens: result.promptTokens,
+          completionTokens: result.completionTokens,
+          latencyMs: result.latencyMs,
+          failed: false,
+        })
+      } catch (err) {
+        logMemberFailure(member.model, predictionId, err)
+        // A failure is an ABSTENTION, never a substitution. We do not retry with a
+        // different model: an `AiEstimate` row must always contain output from the
+        // model it names, or per-member Brier is meaningless.
+        outcomes.push({
+          member,
+          probability: null,
+          insufficientData: true,
+          promptTokens: null,
+          completionTokens: null,
+          latencyMs: null,
+          failed: true,
+        })
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(MEMBER_CONCURRENCY, members.length) }, worker),
+  )
+  return outcomes
+}
+
+/**
+ * Run one panel sweep over one forecast, unless the date-gate says nothing changed.
+ *
+ * Never writes `Prediction.confidence` / `aiCiLow` / `aiCiHigh`, and never calls
+ * `recordEstimate()`. See docs/AI_PANEL.md §1 — that isolation is the feature.
+ */
+export async function runPanelForPrediction(
+  prediction: PanelPrediction,
+  opts: { now?: Date; dryRun?: boolean; apiKey: string } ,
+): Promise<PanelRunResult> {
+  const now = opts.now ?? new Date()
+  const template = await getPromptTemplate('panel-estimate')
+  const promptVersion = promptVersionOf(template)
+  const inputHash = computeInputHash(prediction, now, promptVersion)
+
+  const latestRun = await prisma.aiEstimateRun.findFirst({
+    where: { predictionId: prediction.id },
+    orderBy: { createdAt: 'desc' },
+    select: { inputHash: true },
+  })
+
+  if (latestRun?.inputHash === inputHash) {
+    return { predictionId: prediction.id, status: 'skipped-unchanged', estimated: 0, abstained: 0 }
+  }
+
+  const prompt = buildPanelPrompt(template, prediction, now)
+
+  if (opts.dryRun) {
+    log.info({ predictionId: prediction.id, promptVersion, prompt }, 'Panel dry run')
+    return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
+  }
+
+  const outcomes = await callMembers(PANEL_MEMBERS, prompt, opts.apiKey, prediction.id)
+
+  // If every member's call THREW, this is our problem, not the models' — a bad key, a
+  // dead network. Writing a run of all-abstentions would let the date-gate suppress
+  // any retry until tomorrow. Write nothing and let the next tick try again.
+  // (A run where members deliberately returned null IS written: that is real signal.)
+  if (outcomes.every((o) => o.failed)) {
+    log.error({ predictionId: prediction.id }, 'Every panel member failed — writing nothing')
+    return {
+      predictionId: prediction.id,
+      status: 'failed',
+      estimated: 0,
+      abstained: outcomes.length,
+    }
+  }
+
+  const estimated = outcomes.filter((o) => o.probability !== null).length
+
+  try {
+    await prisma.aiEstimateRun.create({
+      data: {
+        predictionId: prediction.id,
+        inputHash,
+        estimates: {
+          create: outcomes.map((o) => ({
+            model: o.member.model,
+            mode: o.member.mode,
+            promptVersion,
+            probability: o.probability,
+            insufficientData: o.insufficientData,
+            promptTokens: o.promptTokens,
+            completionTokens: o.completionTokens,
+            latencyMs: o.latencyMs,
+          })),
+        },
+      },
+    })
+  } catch (err) {
+    // Unique (predictionId, inputHash): a concurrent sweep beat us to it. Idempotent
+    // by construction, so this is a no-op rather than an error.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return {
+        predictionId: prediction.id,
+        status: 'skipped-duplicate',
+        estimated: 0,
+        abstained: 0,
+      }
+    }
+    throw err
+  }
+
+  return {
+    predictionId: prediction.id,
+    status: 'written',
+    estimated,
+    abstained: outcomes.length - estimated,
+  }
+}
+
+export interface PanelSweepSummary {
+  considered: number
+  written: number
+  skipped: number
+  failed: number
+  /** True when no OpenRouter key is configured — the panel is dormant, not broken. */
+  dormant?: boolean
+}
+
+/**
+ * Sweep every open forecast the panel can estimate.
+ *
+ * BINARY only: a single 0–100 is meaningless for MULTIPLE_CHOICE / NUMERIC_THRESHOLD.
+ *
+ * Deliberately NOT gated on "has at least one commitment". That gate would save a few
+ * dollars, but matched-time Brier snapshots the run current at commit time — so a
+ * forecast whose first commit arrives before its first run yields a null
+ * `aiRunIdAtCommit` and is permanently unscoreable. The runs must lead the commits.
+ */
+export async function runPanelSweep(opts?: {
+  now?: Date
+  dryRun?: boolean
+  limit?: number
+}): Promise<PanelSweepSummary> {
+  const apiKey = getOpenRouterKey()
+  if (!apiKey) {
+    log.warn('No OpenRouter key configured — AI panel is dormant')
+    return { considered: 0, written: 0, skipped: 0, failed: 0, dormant: true }
+  }
+
+  const now = opts?.now ?? new Date()
+
+  const predictions = await prisma.prediction.findMany({
+    where: {
+      status: 'ACTIVE',
+      outcomeType: 'BINARY',
+      resolveByDatetime: { gt: now },
+    },
+    select: { id: true, claimText: true, resolutionRules: true, resolveByDatetime: true },
+    orderBy: { createdAt: 'desc' },
+    ...(opts?.limit ? { take: opts.limit } : {}),
+  })
+
+  const summary: PanelSweepSummary = {
+    considered: predictions.length,
+    written: 0,
+    skipped: 0,
+    failed: 0,
+  }
+
+  for (const prediction of predictions) {
+    try {
+      const result = await runPanelForPrediction(prediction, {
+        now,
+        dryRun: opts?.dryRun,
+        apiKey,
+      })
+      if (result.status === 'written' || result.status === 'dry-run') summary.written += 1
+      else if (result.status === 'failed') summary.failed += 1
+      else summary.skipped += 1
+    } catch (err) {
+      // One bad forecast must not abort the sweep.
+      log.error({ err, predictionId: prediction.id }, 'Panel run threw')
+      summary.failed += 1
+    }
+  }
+
+  log.info(summary, 'AI panel sweep complete')
+  return summary
+}

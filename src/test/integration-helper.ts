@@ -32,7 +32,10 @@ export async function setupTestDatabase() {
   console.log('🗄️ Applying migrations to test database...')
   // We use a different DB URL for migration
   const testDbUrl = 'postgresql://daatan_test:daatan_test@localhost:5433/daatan_test'
-  execSync(`DATABASE_URL="${testDbUrl}" npx prisma migrate reset --force --skip-seed`, { stdio: 'inherit' })
+  // No --skip-seed: Prisma v7 removed the flag (seeding moved to prisma.config.ts,
+  // which declares no seed here). Passing it makes `migrate reset` print usage and
+  // exit non-zero, which took the whole integration suite down with it.
+  execSync(`DATABASE_URL="${testDbUrl}" npx prisma migrate reset --force`, { stdio: 'inherit' })
   
   console.log('✅ Test database ready')
 }
@@ -46,6 +49,9 @@ const TRUNCATABLE_TABLES = [
   'notifications', 'notification_preferences', 'push_subscriptions',
   'tags', 'bot_config', 'bot_run_logs', 'bot_rejected_topics',
   'news_anchors', 'leaderboard_cache', 'resolution_contexts',
+  // AI panel (docs/AI_PANEL.md). ai_estimates cascades from ai_estimate_runs, but
+  // list both: TRUNCATE is explicit here, not inferred from FKs.
+  'ai_estimate_runs', 'ai_estimates',
 ] as const
 
 /**

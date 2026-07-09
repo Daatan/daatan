@@ -12,6 +12,9 @@ vi.mock('@/lib/prisma', () => {
     commitment: { findMany: vi.fn(), create: vi.fn(), findUnique: vi.fn() },
     prediction: { findUnique: vi.fn(), update: vi.fn() },
     user: { findUnique: vi.fn() },
+    // AI panel: the commit path snapshots the run current at commit time.
+    // Unstubbed it resolves undefined, which the service maps to null.
+    aiEstimateRun: { findFirst: vi.fn() },
   }
   return {
     prisma: {

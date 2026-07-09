@@ -39,6 +39,10 @@ type PromptName =
     | 'guess-chances'
     | 'content-moderation'
     | 'temporal-classifier'
+    // Deliberately NOT 'guess-chances': that prompt is context-fed ({{articlesText}})
+    // and live on /api/forecasts/express/guess, so tuning the panel through it would
+    // silently perturb forecast creation. See docs/AI_PANEL.md §3.
+    | 'panel-estimate'
 
 interface CacheEntry {
     template: string
@@ -298,6 +302,28 @@ Instructions:
 4. Be objective and neutral.
 
 Respond ONLY with a JSON object: { "probability": number, "reasoning": "one or two sentences explaining the number" }`,
+
+    // AI panel (docs/AI_PANEL.md §3). UNGROUNDED by construction: no article text,
+    // no search results. The only input that changes over a forecast's life is the
+    // date, which is what makes the run's date-hash gate correct — and what makes
+    // this member's line a *learned* glide, comparable against the arithmetic
+    // constant-hazard glide the requote cron computes.
+    'panel-estimate': `You are a calibrated forecaster. Estimate the probability that the following
+claim resolves TRUE.
+
+Claim: {{claimText}}
+Resolution rules: {{resolutionRules}}
+Resolves by: {{resolveByDate}}
+Today: {{todayDate}}
+Days remaining: {{daysRemaining}}
+
+You have no access to news, search, or events after your training cutoff.
+Base your estimate on base rates, the historical frequency of similar events,
+and the time remaining before the deadline.
+
+If the claim is too vague or underspecified to estimate, return null.
+
+Respond with JSON only: {"probability": <integer 0-100, or null>}`,
 
     'bot-sourceless-forecast-generation': `{{personaPrompt}}
 

@@ -400,6 +400,7 @@ model Prediction {
   translations     PredictionTranslation[]
   slugAliases      PredictionSlugAlias[]
   oracleCallLogs   OracleCallLog[]
+  aiEstimateRuns   AiEstimateRun[]
 
   @@index([status])
   @@index([authorId])
@@ -565,6 +566,77 @@ model ExternalMarketPriceSnapshot {
 }
 
 // ============================================
+// AI PANEL (multi-model estimates — docs/AI_PANEL.md)
+// ============================================
+
+/// One sweep of the AI panel over one forecast: every member's estimate, taken at
+/// the same instant. Commitments reference the RUN (not a scalar probability), so
+/// each member's number at commit time stays recoverable — that is what makes
+/// per-model Brier possible, and what lets a member added later be backfilled
+/// without migrating `commitments`.
+///
+/// `inputHash` is the date-gate. The panel prompt carries no article text, so the
+/// only input that changes over a forecast's life is the date; when the hash is
+/// unchanged we skip the whole sweep and the previous run stays current. The
+/// unique index on (predictionId, inputHash) makes the cron idempotent.
+model AiEstimateRun {
+  id           String     @id @default(cuid())
+  predictionId String     @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  /// sha256 of claim + rules + resolveBy + UTC day + promptVersion + roster signature.
+  inputHash String @map("input_hash") @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+
+  estimates   AiEstimate[]
+  commitments Commitment[]
+
+  @@unique([predictionId, inputHash])
+  @@index([predictionId, createdAt])
+  @@map("ai_estimate_runs")
+}
+
+/// One member's probability within one run.
+///
+/// This table NEVER feeds `Prediction.confidence` / `aiCiLow` / `aiCiHigh`, and the
+/// panel never calls `recordEstimate()`. That isolation is structural: the gauge
+/// (`Speedometer.tsx`) reads only those columns, so no panel value can reach the
+/// needle, the high-confidence Telegram alert, `awaitingAiResolution`, or any
+/// ELO/Glicko/leaderboard path. See docs/AI_PANEL.md §1.
+model AiEstimate {
+  id    String        @id @default(cuid())
+  runId String        @map("run_id")
+  run   AiEstimateRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  /// OpenRouter slug, e.g. "x-ai/grok-4.3". String, not enum — adding a member
+  /// must never require a migration.
+  model String @db.VarChar(64)
+  /// 'ungrounded' today; 'grounded' once vendor-native search lands.
+  mode  String @db.VarChar(16)
+  /// Fingerprint of the prompt template behind this estimate. Member identity is
+  /// (model, mode, promptVersion): change the prompt and prior Brier scores stop
+  /// being comparable, so this must be stored rather than inferred.
+  promptVersion String @map("prompt_version") @db.VarChar(32)
+
+  /// 0–100. Null iff `insufficientData` — the member abstained (claim too vague)
+  /// or its call failed. A failure is recorded as an abstention, never as a
+  /// substituted answer from another model.
+  probability      Int?
+  insufficientData Boolean @default(false) @map("insufficient_data")
+
+  promptTokens     Int? @map("prompt_tokens")
+  completionTokens Int? @map("completion_tokens")
+  latencyMs        Int? @map("latency_ms")
+
+  createdAt DateTime @default(now())
+
+  @@unique([runId, model, mode])
+  @@index([runId])
+  @@map("ai_estimates")
+}
+
+// ============================================
 // PREDICTION OPTIONS (for MC/Numeric)
 // ============================================
 
@@ -633,10 +705,20 @@ model Commitment {
   aiScore                      Float? @map("ai_score")
   eloChange                    Int?   @map("elo_change")
 
+  // The AI-panel run current at commit time — matched-time Brier (docs/AI_PANEL.md §7).
+  // A run FK, NOT a scalar: `aiProbabilityAtCommit` above collapses the Oracle to one
+  // number, which is fine because the Oracle IS one number. The panel is many, and a
+  // scalar here would destroy per-model scoring at the exact instant we capture it.
+  // Null for commits placed before the panel's first run — those drop out of the
+  // aggregates the same way a null `brierScore` already does.
+  aiRunIdAtCommit String?        @map("ai_run_id_at_commit")
+  aiRunAtCommit   AiEstimateRun? @relation(fields: [aiRunIdAtCommit], references: [id], onDelete: SetNull)
+
   // Each user can only commit once per prediction
   @@unique([userId, predictionId])
   @@index([predictionId])
   @@index([userId])
+  @@index([aiRunIdAtCommit])
   @@map("commitments")
 }
 
