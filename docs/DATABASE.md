@@ -34,16 +34,18 @@ S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h).
 
 | where | scale | type |
 |---|---|---|
-| `Prediction.confidence`, `aiCiLow/High`, `ContextSnapshot.externalProbability`, `oracleSnapshot.mean/std/ciLow/ciHigh` (current rows), `ExternalMarketPriceSnapshot.probability`, `OracleCallLog.fallbackProbability` | **0–100** | Int (oracleSnapshot values Float) |
+| `Prediction.confidence`, `aiCiLow/High`, `ContextSnapshot.externalProbability`, `oracleSnapshot.mean/std/ciLow/ciHigh`, `ExternalMarketPriceSnapshot.probability`, `OracleCallLog.fallbackProbability` | **0–100** | Int (oracleSnapshot values Float) |
 | Oracle wire format (`/forecast` response `mean/std/ci_low/ci_high`, and `oracleSnapshot.sources[].stance`) | **stance −1..1** (`p = (stance+1)/2`) | Float |
 | `oracleSnapshot.sources[].certainty` | 0..1 | Float |
 | `Commitment.probability`, `communityProbabilityAtCommit`, `aiProbabilityAtCommit` | **0.0–1.0** | Float |
 
 Conversion happens once, at the Oracle boundary (`stanceToPercent` in
-`src/lib/services/oracle-snapshot.ts`). **Historical caveat**: `oracleSnapshot`
-rows written before v1.31.2 carry `mean`/`std` on the raw stance scale next to
-percent `ciLow/ciHigh`; there is no version marker — any reader of historical
-`oracleSnapshot.mean` must handle both.
+`src/lib/services/oracle-snapshot.ts`). Rows written before v1.31.2 originally
+carried `mean`/`std` on the raw stance scale; a one-time prod data fix
+(2026-07-08) normalized them all to percent (`mean → (m+1)/2·100`, `std → ·50`),
+so every stored row is now percent and readers need no scale detection. The
+caveat survives only in backups taken before 2026-07-08 — re-run the
+normalization after restoring one.
 
 ## Forecasts — `predictions`
 
@@ -177,9 +179,9 @@ anchor time).
    latch and notifications stay consistent. (Bots are the one legacy exception.)
 2. **`settled` is a one-way latch** (see above) — clearing it is a manual
    admin/data operation today.
-3. **Two scales coexist in historical `oracleSnapshot` JSON** (pre-v1.31.2
-   `mean/std` are stance-scale) — never trust the schema comment alone when
-   reading old rows.
+3. **Pre-v1.31.2 `oracleSnapshot` rows were stance-scale** until the one-time
+   normalization to percent on 2026-07-08. Live data is uniform now; only
+   backups predating the fix still mix scales (see "Probability scales" above).
 4. **`kind='clock'` rows are invisible on purpose** in timeline/anchor/dedup
    queries; the probability chart's `getProbabilityHistory` is the one reader
    that deliberately includes them (glide movement must be visible). New query
