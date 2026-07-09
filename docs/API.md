@@ -412,6 +412,12 @@ Set the link's polarity. **Body** `{ inverted: boolean }` — mark the linked ma
 ### `DELETE /api/admin/forecasts/[id]/external-market`
 Unlink the market (also clears the inverted flag).
 
+### `GET /api/admin/forecasts/[id]/evidence-pool`
+List the forecast's evidence pool (`evidence_pool_articles`) — every article `analyze`/`news-indexer`/`backfill` have extracted a signal from. See `docs/DATABASE.md` "Evidence pool" — nothing yet computes from this table.
+
+### `PATCH /api/admin/forecasts/[id]/evidence-pool/[articleId]`
+Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Has no effect on the live estimate yet (recompute-over-pool cutover still open).
+
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).
 

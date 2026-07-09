@@ -4,16 +4,22 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     evidencePoolArticle: {
       upsert: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
   },
 }))
 
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
-import { addArticlesToPool } from '../evidence-pool'
+import { addArticlesToPool, getPoolArticles, setArticleExcluded } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 
 const upsert = vi.mocked(prisma.evidencePoolArticle.upsert)
+const findMany = vi.mocked(prisma.evidencePoolArticle.findMany)
+const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
+const update = vi.mocked(prisma.evidencePoolArticle.update)
 
 const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource => ({
   sourceId: 's1',
@@ -79,5 +85,42 @@ describe('addArticlesToPool', () => {
     await addArticlesToPool('pred-1', [source({ settled: true, quantitativeEstimate: 0.22 })], 'analyze')
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown> }
     expect(call.create).toMatchObject({ settled: true, quantitativeEstimate: 0.22 })
+  })
+})
+
+describe('getPoolArticles', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('lists a forecast\'s pool, most recently added first', async () => {
+    findMany.mockResolvedValue([] as never)
+    await getPoolArticles('pred-1')
+    expect(findMany).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1' },
+      orderBy: { addedAt: 'desc' },
+    })
+  })
+})
+
+describe('setArticleExcluded', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('excludes an article that belongs to the given forecast', async () => {
+    findFirst.mockResolvedValue({ id: 'art-1', predictionId: 'pred-1' } as never)
+    update.mockResolvedValue({ id: 'art-1', excluded: true } as never)
+
+    const result = await setArticleExcluded('pred-1', 'art-1', true)
+
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: 'art-1', predictionId: 'pred-1' } })
+    expect(update).toHaveBeenCalledWith({ where: { id: 'art-1' }, data: { excluded: true } })
+    expect(result).toMatchObject({ excluded: true })
+  })
+
+  it('returns null without updating when the article does not belong to the forecast', async () => {
+    findFirst.mockResolvedValue(null)
+
+    const result = await setArticleExcluded('pred-1', 'someone-elses-article', true)
+
+    expect(update).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 })
