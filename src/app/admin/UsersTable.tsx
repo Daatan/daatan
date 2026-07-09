@@ -22,6 +22,7 @@ export default function UsersTable() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalUsers, setTotalUsers] = useState<number | null>(null)
   const fetchUsers = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -30,6 +31,7 @@ export default function UsersTable() {
         const data = await res.json()
         setUsers(data.users)
         setTotalPages(data.pages)
+        setTotalUsers(data.total)
       }
     } finally {
       setIsLoading(false)
@@ -63,6 +65,11 @@ export default function UsersTable() {
 
   return (
     <div>
+      <div className="mb-3 text-sm text-gray-400">
+        {totalUsers !== null && (
+          <span>{totalUsers.toLocaleString()} {totalUsers === 1 ? 'user' : 'users'}</span>
+        )}
+      </div>
       <div className="mb-6 flex gap-2">
         <form onSubmit={handleSearch} className="flex gap-2 flex-1">
           <div className="relative flex-1 max-w-md">
