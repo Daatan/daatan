@@ -134,9 +134,13 @@ their per-source signal here (`addArticlesToPool` in
 existing `ContextSnapshot`/`Prediction` writes — fire-and-forget, so a
 failure there never blocks or alters the estimate. The row IS the extraction
 cache: re-discovering an already-pooled article updates its stored signal in
-place. `excluded` is reserved for the not-yet-built per-article admin
-exclusion feature (an ORACLE_VARIABLES.md §6 precondition) — shadow-writes
-never touch it, so an admin's exclusion decision survives re-discovery.
+place. `excluded` is settable via the forecast page's admin-only "Evidence
+pool" panel (`EvidencePoolAdmin.tsx`, `PATCH
+/api/admin/forecasts/[id]/evidence-pool/[articleId]`) — shadow-writes never
+touch it, so an admin's exclusion decision survives re-discovery. **Not yet
+enforced by any computation** — the recompute-over-pool cutover (the
+ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
+excluding an article here has no effect on the live estimate today.
 
 ## External markets — `external_markets`, `external_market_price_snapshots`
 

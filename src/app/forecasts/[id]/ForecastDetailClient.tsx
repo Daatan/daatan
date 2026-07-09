@@ -38,6 +38,7 @@ import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
+import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate } from '@/lib/utils/date'
@@ -724,6 +725,9 @@ export default function ForecastDetailClient({
 
       {/* Admin-only external-market link control (renders nothing for non-admins) */}
       <ExternalMarketLinkAdmin prediction={prediction} />
+
+      {/* Admin-only evidence pool viewer + per-article exclusion (renders nothing for non-admins) */}
+      <EvidencePoolAdmin predictionId={prediction.id} />
 
       {/* Probability chart — shown when ≥3 commitments OR a linked market has history.
           Market prices are polarity-adjusted here (inverted links plot 100 − price)
