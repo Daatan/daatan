@@ -497,6 +497,22 @@ Proxy to news-indexer's `DELETE /outlets/{name}` — clears an outlet's enrichme
 ### `POST /api/admin/news-indexer/match` — Admin
 Proxy to the news-indexer `/match` endpoint — re-match a single article URL against active forecasts on demand. Body: `{ articleUrl: string }` (must be a valid URL). Returns the news-indexer response (`{ matches, queued }`) with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
 
+### `GET|POST /api/admin/news-indexer/authors` — Admin
+`GET` proxies news-indexer's `/authors/admin/people` — every curated person with their raw alias rows. `POST` proxies `/authors` to create one; body `{ canonical_name, notes? }`. Backs the admin **Authors** tab (`/admin/authors`).
+
+### `PATCH|DELETE /api/admin/news-indexer/authors/[id]` — Admin
+Rename a person or edit their notes (`PATCH`, body `{ canonical_name?, notes? }`), or delete them and cascade their aliases (`DELETE`).
+
+### `POST /api/admin/news-indexer/authors/[id]/aliases` — Admin
+Add a byline / channel-name alias to a person. Body: `{ alias: string }`.
+
+### `DELETE /api/admin/news-indexer/authors/[id]/aliases/[aliasId]` — Admin
+Remove one alias.
+
+All four reject an `[id]` / `[aliasId]` that is not a UUID with `400` before building the upstream URL, and share the `503 News-indexer not configured` behavior above. Upstream is FastAPI and reports failures as `{detail}`; the proxy rewrites that to Daatan's `{error}` shape and forwards the status.
+
+> **Why these are proxied rather than linked.** news-indexer's own `/admin` page asks the operator to paste an API key into the browser. That key is `NEWS_INDEXER_SECRET`, which also gates `/search`, `/enqueue` and `/ledger` and authenticates news-indexer back to Daatan — so it must not reach a browser. Routing through Daatan keeps the key server-side and replaces the single shared credential with a per-user `ADMIN` check, which also gives the mutations a real audit trail (upstream can only log that *someone* with the key made a change).
+
 ---
 
 ## IBI Analysis (Admin only)
