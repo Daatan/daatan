@@ -35,6 +35,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   settled: null,
   quantitativeEstimate: null,
   evidenceWeight: null,
+  relevanceScore: null,
   ...over,
 })
 
@@ -93,6 +94,13 @@ describe('addArticlesToPool', () => {
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
     expect(call.create).toMatchObject({ evidenceWeight: 4.0 })
     expect(call.update).toMatchObject({ evidenceWeight: 4.0 })
+  })
+
+  it('passes relevanceScore straight through, in both create and update', async () => {
+    await addArticlesToPool('pred-1', [source({ relevanceScore: 0.85 })], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    expect(call.create).toMatchObject({ relevanceScore: 0.85 })
+    expect(call.update).toMatchObject({ relevanceScore: 0.85 })
   })
 })
 

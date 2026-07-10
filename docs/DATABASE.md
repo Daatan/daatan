@@ -142,7 +142,11 @@ touch it, so an admin's exclusion decision survives re-discovery.
 `/forecast`'s `SourceSignal.evidence_weight`, PR #251) — the
 `class_weight[evidence_class]`/certainty-fallback value already computed
 server-side, not the evidence_class taxonomy itself (retro keeps that
-internal). **Not yet enforced by any computation** — the recompute-over-pool cutover (the
+internal). `relevanceScore` is the gatekeeper's graded topic relevance
+(`SourceSignal.relevance_score`) — its square is Layer C of retro's weight
+formula; never captured anywhere in daatan's pipeline before this, so a naive
+recompute would have treated every pooled article as fully on-topic.
+**Not yet enforced by any computation** — the recompute-over-pool cutover (the
 ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
 excluding an article here has no effect on the live estimate today.
 

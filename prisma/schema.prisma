@@ -497,6 +497,11 @@ model EvidencePoolArticle {
   // recompute-over-pool cutover would silently fall back to certainty for
   // every already-pooled article.
   evidenceWeight Float? @map("evidence_weight")
+  // Graded topic relevance [0,1] the gatekeeper assigned (retro
+  // SourceSignal.relevance_score) — its square multiplies aggregation weight
+  // (Layer C). Never previously captured anywhere in daatan's pipeline; without
+  // it a recompute would treat every pooled article as fully on-topic.
+  relevanceScore Float? @map("relevance_score")
 
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the

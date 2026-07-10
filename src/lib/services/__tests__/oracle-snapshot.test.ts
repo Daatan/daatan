@@ -17,6 +17,7 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   settled: true,
   quantitative_estimate: 0.62,
   evidence_weight: 0.6,
+  relevance_score: 0.85,
   ...over,
 })
 
@@ -47,6 +48,7 @@ describe('enrichOracleSources', () => {
       settled: true,
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
+      relevanceScore: 0.85,
     })
   })
 
@@ -55,13 +57,23 @@ describe('enrichOracleSources', () => {
     expect(out[0]).toMatchObject({ title: null, publishedAt: null, author: null })
   })
 
-  it('defaults settled/quantitativeEstimate/evidenceWeight to null when the Oracle omits them', () => {
+  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore to null when the Oracle omits them', () => {
     const out = enrichOracleSources(
-      [oracleSource({ settled: undefined, quantitative_estimate: undefined, evidence_weight: undefined })],
+      [oracleSource({
+        settled: undefined,
+        quantitative_estimate: undefined,
+        evidence_weight: undefined,
+        relevance_score: undefined,
+      })],
       [searchResult()],
       new Map(),
     )
-    expect(out[0]).toMatchObject({ settled: null, quantitativeEstimate: null, evidenceWeight: null })
+    expect(out[0]).toMatchObject({
+      settled: null,
+      quantitativeEstimate: null,
+      evidenceWeight: null,
+      relevanceScore: null,
+    })
   })
 })
 
