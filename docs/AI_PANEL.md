@@ -133,12 +133,14 @@ array entry and no migration.
 
 ### Cost
 
-At ~250 input / ~30 output tokens, one call per member per day, N=300 open forecasts:
+At ~250 input / ~30 output tokens, one call per member per day. Staging reports
+**N = 57** open BINARY forecasts (measured 2026-07-09 via a `?dryRun=1` sweep), i.e.
+57 × 5 members × 30 days = 8,550 calls/month:
 
-| Scenario | Total |
-|---|---|
-| Reasoning off | **~$6/mo** |
-| Reasoning on (~800 hidden tokens) | ~$57/mo |
+| Scenario | N=57 (measured) | N=300 (hypothetical) |
+|---|---|---|
+| Reasoning off | **~$1.20/mo** | ~$6/mo |
+| Reasoning on (~800 hidden tokens) | ~$11/mo | ~$57/mo |
 
 We send `reasoning: { enabled: false }` and cap `max_tokens` at 64. Gemini prices
 `internal_reasoning` at the output rate, so a model that ignores the flag would cost
@@ -254,6 +256,9 @@ cheap LLMs with no search at all. (PR 3.)
   *is* written: that is real signal.)
 - One bad forecast never aborts the sweep.
 - Query params: `?dryRun=1` (build and log prompts, call nothing), `?limit=N`.
+  A dry run reports `{written: 0, dryRun: N}` — **never** `written: N`. A dry run that
+  claims writes is precisely the output that makes someone trust a dry run they
+  shouldn't.
 - Does **not** proxy through the Oracle's `/llm`: that endpoint is capped at
   `30/minute` and shares the budget with the user-facing LLM fallback chain.
 
@@ -269,8 +274,8 @@ cheap LLMs with no search at all. (PR 3.)
 
 ## 11. Open questions
 
-- **N is unknown.** Every cost figure assumes N=300 open forecasts. Confirm with
-  `SELECT status, count(*) FROM predictions GROUP BY status;`
+- **N = 57 on staging** (measured 2026-07-09). Prod is unmeasured; confirm with
+  `SELECT count(*) FROM predictions WHERE status='ACTIVE' AND "outcomeType"='BINARY';`
 - Can `reasoning` actually be disabled on `x-ai/grok-4.3`? Measure `completion_tokens`
   on the first real sweep — `max_tokens: 64` bounds the damage either way.
 - OpenRouter prices verified live 2026-07-09. They move.

@@ -289,4 +289,40 @@ describe('runPanelSweep', () => {
     expect(summary.failed).toBe(1)
     expect(summary.written).toBe(1)
   })
+
+  it('a dry run reports zero written and counts dryRun instead', async () => {
+    findManyPredictions.mockResolvedValue([
+      prediction,
+      { ...prediction, id: 'pred-2' },
+    ] as never)
+
+    const summary = await runPanelSweep({ now: NOW, dryRun: true })
+
+    // The bug this replaces reported "written: 2" for a run that persisted nothing.
+    expect(summary.written).toBe(0)
+    expect(summary.dryRun).toBe(2)
+    expect(summary.considered).toBe(2)
+    expect(createRun).not.toHaveBeenCalled()
+    expect(callMember).not.toHaveBeenCalled()
+  })
+
+  it('a real sweep reports writes, and no dry runs', async () => {
+    findManyPredictions.mockResolvedValue([
+      prediction,
+      { ...prediction, id: 'pred-2' },
+    ] as never)
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(summary.written).toBe(2)
+    expect(summary.dryRun).toBe(0)
+  })
+
+  it('reports dryRun: 0 when dormant, so the shape never varies', async () => {
+    getKey.mockReturnValue('')
+
+    const summary = await runPanelSweep({ now: NOW, dryRun: true })
+
+    expect(summary).toMatchObject({ dormant: true, written: 0, dryRun: 0 })
+  })
 })
