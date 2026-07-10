@@ -8,9 +8,14 @@ name: News-Indexer Watchdog
 #   • Runs every 2 hours, on even UTC hours. ALERT-ONLY: posts a 🚨 to BOTH Telegram
 #     channels (clean + noisy) when something looks suspicious, and stays silent
 #     otherwise.
+#   • Only *acute* conditions alert — disk, worker down, no articles in 24h, DLQ,
+#     queue backlog. Each one starts, gets fixed, and stops. Chronic conditions must
+#     not alert here: a stale feed stays true until someone edits sources.yaml, so a
+#     2-hourly alert becomes 12 identical messages a day on the high-signal channel
+#     forever. Stale feeds are reported once a day in the digest instead.
 #   • Once a day (DIGEST_HOUR, UTC — must be an even hour so an even-hour run hits it)
 #     it also posts a plain health digest to the noisy channel so there's a regular
-#     "all good" heartbeat.
+#     "all good" heartbeat, including the current stale-feed list.
 #
 # Disk usage comes from /stats (.disk.used_percent), added by the news-indexer
 # feat/stats-disk-usage change — the app container's / is backed by the EC2 root
@@ -93,7 +98,14 @@ jobs:
           [ "$ART_24" -eq 0 ] 2>/dev/null && PROBLEMS+=("📰 No articles indexed in 24h")
           [ "$DLQ" -gt 0 ] 2>/dev/null && PROBLEMS+=("📮 DLQ depth ${DLQ}")
           [ "$QDEPTH" -gt "$QUEUE_DEPTH_ALERT" ] 2>/dev/null && PROBLEMS+=("📮 Queue depth ${QDEPTH} (backed up)")
-          [ -n "$STALE" ] && PROBLEMS+=("🕸️ Stale feed(s): ${STALE}")
+
+          # Stale feeds are deliberately NOT a PROBLEM. Every condition above is acute —
+          # it starts, you fix it, it stops. A stale feed is chronic: it stays true until
+          # someone edits sources.yaml, so alerting on it every 2h posts the same message
+          # 12×/day to the *clean* channel, indefinitely. CSIS and Chessdom did exactly
+          # that for 8 days. Staleness is already reported once a day in the digest below
+          # (`🕸️ Stale feeds:`), which is the right cadence for a condition that cannot
+          # change on its own.
 
           # --- persist state for next run's delta ---
           echo "{\"disk_pct\": ${DISK_PCT:-null}, \"db_mb\": ${DB_MB:-0}}" > /tmp/niwd-prev.json
@@ -134,14 +146,18 @@ jobs:
           MSG="🚨 <b>news-indexer: something looks off</b>%0A%0A${PROBLEMS}%0A<a href='${STATS_URL}'>open /stats</a>"
           # both channels; clean falls back to noisy if unset
           CLEAN="${CLEAN:-$NOISY}"
-          for CHAT in "$CLEAN" "$NOISY"; do
+          # De-dupe *before* sending. Iterating "$CLEAN" "$NOISY" when the two are equal
+          # (which is exactly what the fallback above produces when TELEGRAM_CLEAN_CHAT_ID
+          # is unset) posted the alert twice to the same chat; the old trailing `echo`
+          # announced "sent once" after having already sent it twice.
+          CHATS="$CLEAN"
+          [ "$NOISY" != "$CLEAN" ] && CHATS="$CHATS $NOISY"
+          for CHAT in $CHATS; do
             [ -z "$CHAT" ] && continue
             curl -s -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
               -d "chat_id=${CHAT}" -d "text=${MSG}" \
               -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
           done
-          # de-dupe when both IDs are the same
-          if [ "$CLEAN" = "$NOISY" ]; then echo "clean==noisy: sent once"; fi
 
       - name: 📊 Daily digest (noisy channel)
         env:
