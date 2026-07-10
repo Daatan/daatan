@@ -61,16 +61,18 @@ describe('saveNewsIndexerMatch dedup', () => {
     } as never)
   })
 
-  it('skips the write when the latest snapshot is the same measurement', async () => {
+  it('skips the write when the latest snapshot is the same measurement, and reports stored: false', async () => {
     findFirst.mockResolvedValue(storedMatch() as never)
-    await saveNewsIndexerMatch(input())
+    const result = await saveNewsIndexerMatch(input())
     expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(result).toEqual({ stored: false })
   })
 
-  it('writes when the probability changed', async () => {
+  it('writes when the probability changed, and reports stored: true', async () => {
     findFirst.mockResolvedValue(storedMatch({ externalProbability: 65 }) as never)
-    await saveNewsIndexerMatch(input())
+    const result = await saveNewsIndexerMatch(input())
     expect(prisma.$transaction).toHaveBeenCalledOnce()
+    expect(result).toEqual({ stored: true })
   })
 
   it('writes when the Oracle mean changed even at the same rounded probability', async () => {
