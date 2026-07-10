@@ -260,9 +260,14 @@ export async function runPanelForPrediction(
 
 export interface PanelSweepSummary {
   considered: number
+  /** Runs actually persisted. Always 0 on a dry run — see `dryRun` below. */
   written: number
   skipped: number
   failed: number
+  /** Forecasts whose prompt was built and logged but NOT persisted (`?dryRun=1`).
+   *  Counted separately from `written`: a dry run reporting "written: 57" is exactly
+   *  the output that makes someone trust a dry run they shouldn't. */
+  dryRun: number
   /** True when no OpenRouter key is configured — the panel is dormant, not broken. */
   dormant?: boolean
 }
@@ -285,7 +290,7 @@ export async function runPanelSweep(opts?: {
   const apiKey = getOpenRouterKey()
   if (!apiKey) {
     log.warn('No OpenRouter key configured — AI panel is dormant')
-    return { considered: 0, written: 0, skipped: 0, failed: 0, dormant: true }
+    return { considered: 0, written: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
   }
 
   const now = opts?.now ?? new Date()
@@ -309,6 +314,7 @@ export async function runPanelSweep(opts?: {
     written: 0,
     skipped: 0,
     failed: 0,
+    dryRun: 0,
   }
 
   for (const prediction of predictions) {
@@ -319,7 +325,8 @@ export async function runPanelSweep(opts?: {
         apiKey,
         template,
       })
-      if (result.status === 'written' || result.status === 'dry-run') summary.written += 1
+      if (result.status === 'written') summary.written += 1
+      else if (result.status === 'dry-run') summary.dryRun += 1
       else if (result.status === 'failed') summary.failed += 1
       else summary.skipped += 1
     } catch (err) {
