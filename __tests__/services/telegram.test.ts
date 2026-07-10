@@ -16,6 +16,7 @@ import {
   notifyForecastResolved,
   notifyNewsArticleMatched,
   notifyBackupVerificationFailed,
+  notifySecurityError,
 } from '@/lib/services/telegram'
 
 describe('Telegram notification service', () => {
@@ -327,5 +328,116 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     expect(texts[0]).not.toContain('articles ·')
     expect(texts[1]).not.toContain('articles ·')
     expect(texts[2]).toContain('3 articles · match 72%')
+  })
+})
+
+/**
+ * Every message is sent with `parse_mode: 'HTML'`, so any dynamic value that
+ * reaches the message must have `<`, `>`, `&`, `"` escaped — otherwise a
+ * headline like "AT&T settles" or a `?a=1&b=2` tracking URL breaks Telegram's
+ * parser and the message silently fails to send (confirmed live against the
+ * real Telegram API before this fix).
+ */
+describe('HTML escaping', () => {
+  const originalEnv = process.env
+
+  beforeEach(() => {
+    process.env = { ...originalEnv }
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+    process.env.TELEGRAM_CHAT_ID = '-100123'
+    process.env.APP_ENV = 'production'
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response)
+  })
+
+  afterEach(() => {
+    process.env = originalEnv
+    vi.restoreAllMocks()
+  })
+
+  async function sentText(): Promise<string> {
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    return JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).text
+  }
+
+  it('escapes an "&" in the claim text so it cannot break the surrounding quotes', async () => {
+    notifyForecastPublished(
+      { id: 'p1', claimText: 'Will AT&T settle by 2027?' },
+      { name: 'Mark', username: 'mark' },
+    )
+    const text = await sentText()
+    expect(text).toContain('Will AT&amp;T settle by 2027?')
+    expect(text).not.toContain('AT&T settle') // the raw, unescaped form must not appear
+  })
+
+  it('escapes a display name containing HTML metacharacters', async () => {
+    notifyForecastPublished(
+      { id: 'p1', claimText: 'x' },
+      { name: 'Mark <admin>', username: null },
+    )
+    const text = await sentText()
+    expect(text).toContain('by Mark &lt;admin&gt;')
+  })
+
+  it('escapes a free-text commitment choice label', async () => {
+    notifyNewCommitment(
+      { id: 'p1', claimText: 'x' },
+      { name: 'M', username: null },
+      10,
+      'Team A & Team B',
+    )
+    const text = await sentText()
+    expect(text).toContain('Team A &amp; Team B')
+  })
+
+  it('escapes comment text', async () => {
+    notifyNewComment(
+      { id: 'p1', claimText: 'x' },
+      { name: 'M', username: null },
+      'I <3 this & disagree',
+    )
+    const text = await sentText()
+    expect(text).toContain('I &lt;3 this &amp; disagree')
+  })
+
+  it('escapes the article URL used as an href attribute value — the reported live bug', async () => {
+    notifyNewsArticleMatched(
+      { id: 'p1', claimText: 'x' },
+      { title: 'Headline', url: 'https://example.com/a?utm_source=x&utm_medium=y', source: null },
+      { similarity: 0.5 },
+      { probability: 58, previous: null, ciLow: null, ciHigh: null },
+    )
+    const text = await sentText()
+    expect(text).toContain('href="https://example.com/a?utm_source=x&amp;utm_medium=y"')
+    expect(text).not.toContain('utm_source=x&utm_medium=y') // raw "&" must not reach Telegram
+  })
+
+  it('escapes the article title and source name', async () => {
+    notifyNewsArticleMatched(
+      { id: 'p1', claimText: 'x' },
+      { title: 'Israel & Hezbollah agree terms', url: 'https://e.com/a', source: 'AT&T News' },
+      { similarity: 0.5 },
+      { probability: 58, previous: null, ciLow: null, ciHigh: null },
+    )
+    const text = await sentText()
+    expect(text).toContain('Israel &amp; Hezbollah agree terms')
+    expect(text).toContain('AT&amp;T News')
+  })
+
+  it('escapes an attacker-controlled request path', async () => {
+    notifySecurityError('/api/x?q=<script>alert(1)</script>', 403, 'blocked')
+    const text = await sentText()
+    expect(text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(text).not.toContain('<script>')
+  })
+
+  it('truncates the raw text first, then escapes — so the length limit applies to real characters, not entity-expanded ones', async () => {
+    // 120-char limit; padding puts the "&" exactly at the cut point. If escaping
+    // ran before truncating, the entity-expanded "&amp;" (5 chars) would shift
+    // where the cut lands and could split an entity in half.
+    const claimText = 'A'.repeat(119) + '&' + 'B'.repeat(20)
+    notifyForecastPublished({ id: 'p1', claimText }, { name: 'M', username: null })
+    const text = await sentText()
+    expect(text).toContain('A'.repeat(119) + '&amp;...')
+    expect(text).not.toContain('B') // everything past the raw 120-char cut is gone
   })
 })
