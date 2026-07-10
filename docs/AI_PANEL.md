@@ -255,6 +255,18 @@ cheap LLMs with no search at all. (PR 3.)
   API key into a silent 24h outage. (A run where members deliberately returned `null`
   *is* written: that is real signal.)
 - One bad forecast never aborts the sweep.
+- **A rejected key (401/403) aborts it immediately.** Auth failure is a property of the
+  key, not the member: if one member 401s they all will, so retrying is guaranteed to
+  fail. `PanelAuthError` short-circuits the remaining members and the remaining
+  forecasts, nothing is persisted (abstentions caused by *our* bad credential are not
+  evidence about the claim), and the route answers **502** so `ai-panel.yml` goes red.
+
+  This is the failure that actually happened on staging 2026-07-10: a dead key produced
+  57 × 5 = 285 identical `401 "User not found."` warnings, and the cron still answered
+  `200 {"ok":true,...,"failed":57}` — the workflow printed "✅ Panel sweep OK". A dead
+  credential must not look like a healthy no-op.
+
+  `dormant` (no key configured at all) stays a **200**: that is a deliberate state.
 - Query params: `?dryRun=1` (build and log prompts, call nothing), `?limit=N`.
   A dry run reports `{written: 0, dryRun: N}` — **never** `written: N`. A dry run that
   claims writes is precisely the output that makes someone trust a dry run they

@@ -16,7 +16,10 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
 
 vi.mock('@/lib/services/settings', () => ({ getOpenRouterKey: vi.fn() }))
 
-vi.mock('@/lib/llm/panel/client', () => ({
+// Keep the real PanelAuthError: ai-panel.ts branches on `instanceof`, and a stubbed
+// class would make that check silently never match.
+vi.mock('@/lib/llm/panel/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/llm/panel/client')>()),
   callPanelMember: vi.fn(),
   logMemberFailure: vi.fn(),
 }))
@@ -24,7 +27,7 @@ vi.mock('@/lib/llm/panel/client', () => ({
 import { prisma } from '@/lib/prisma'
 import { getPromptTemplate } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
-import { callPanelMember } from '@/lib/llm/panel/client'
+import { callPanelMember, PanelAuthError } from '@/lib/llm/panel/client'
 import {
   buildPanelPrompt,
   computeInputHash,
@@ -277,6 +280,46 @@ describe('runPanelSweep', () => {
     // Per-forecast fetches would hammer SSM (the fallback path does not cache), and a
     // mid-sweep prompt edit would split one member across two promptVersions.
     expect(getTemplate).toHaveBeenCalledTimes(1)
+  })
+
+  // Regression: a dead OpenRouter key produced 57 forecasts × 5 members = 285
+  // identical 401s, and the cron still answered 200 with "✅ Panel sweep OK".
+  it('aborts the whole sweep on a rejected key instead of retrying it 285 times', async () => {
+    findManyPredictions.mockResolvedValue([
+      prediction,
+      { ...prediction, id: 'pred-2' },
+      { ...prediction, id: 'pred-3' },
+    ] as never)
+    callMember.mockRejectedValue(new PanelAuthError(401, 'User not found.'))
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(summary.unauthorized).toBe(true)
+    expect(summary.considered).toBe(3)
+    // Stopped at the first forecast — the other two were never attempted.
+    expect(summary.written + summary.failed + summary.skipped).toBeLessThan(3)
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('stops calling the remaining members once one reports a bad key', async () => {
+    findManyPredictions.mockResolvedValue([prediction] as never)
+    callMember.mockRejectedValue(new PanelAuthError(401, 'User not found.'))
+
+    await runPanelSweep({ now: NOW })
+
+    // MEMBER_CONCURRENCY workers may each have one call in flight; none should retry.
+    expect(callMember.mock.calls.length).toBeLessThanOrEqual(3)
+    expect(callMember.mock.calls.length).toBeLessThan(PANEL_MEMBERS.length)
+  })
+
+  it('a non-auth failure is still per-forecast, not fatal to the sweep', async () => {
+    findManyPredictions.mockResolvedValue([prediction, { ...prediction, id: 'pred-2' }] as never)
+    callMember.mockRejectedValue(new Error('upstream 500'))
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(summary.unauthorized).toBeUndefined()
+    expect(summary.failed).toBe(2) // both attempted
   })
 
   it('one failing forecast does not abort the sweep', async () => {

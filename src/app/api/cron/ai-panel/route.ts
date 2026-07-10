@@ -49,5 +49,15 @@ export async function GET(request: NextRequest) {
   const result = await runPanelSweep({ dryRun, limit })
   log.info(result, 'AI panel cron complete')
 
+  // A rejected key is an operational failure, not a quiet no-op. Returning 200 here
+  // made the scheduled workflow print "✅ Panel sweep OK" while every single call had
+  // 401'd — the failure was visible only as `failed: 57` inside the JSON body. 502 is
+  // what makes ai-panel.yml go red (it treats any non-200, non-404 as a failure).
+  //
+  // `dormant` stays a 200: no key configured is a deliberate state, not a breakage.
+  if (result.unauthorized) {
+    return NextResponse.json({ ok: false, ...result }, { status: 502 })
+  }
+
   return NextResponse.json({ ok: true, ...result })
 }
