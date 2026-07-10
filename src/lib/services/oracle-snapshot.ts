@@ -41,6 +41,7 @@ export type EnrichedOracleSource = {
   quantitativeEstimate: number | null
   evidenceWeight: number | null
   relevanceScore: number | null
+  evidenceClass: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
 }
 
 /**
@@ -71,6 +72,7 @@ export function enrichOracleSources(
       quantitativeEstimate: s.quantitative_estimate ?? null,
       evidenceWeight: s.evidence_weight ?? null,
       relevanceScore: s.relevance_score ?? null,
+      evidenceClass: s.evidence_class ?? null,
     }
   })
 }

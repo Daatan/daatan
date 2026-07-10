@@ -492,8 +492,7 @@ model EvidencePoolArticle {
   quantitativeEstimate Float?  @map("quantitative_estimate")
   // Retro's resolved evidence_class weight (S2 cutover, retro PR #249/#251) —
   // the `class_weight[evidence_class]`/certainty-fallback value already
-  // computed server-side, NOT the evidence_class taxonomy itself (retro keeps
-  // that internal). Nothing reads this yet; without it a future
+  // computed server-side. Nothing reads this yet; without it a future
   // recompute-over-pool cutover would silently fall back to certainty for
   // every already-pooled article.
   evidenceWeight Float? @map("evidence_weight")
@@ -502,6 +501,14 @@ model EvidencePoolArticle {
   // (Layer C). Never previously captured anywhere in daatan's pipeline; without
   // it a recompute would treat every pooled article as fully on-topic.
   relevanceScore Float? @map("relevance_score")
+  // The article's most common evidence_class among its extracted claims
+  // (retro PR #255) — reported_fact | cited_probability | cited_share |
+  // reporting | opinion, or null if unclassified. Needed by the credibility
+  // feedback loop to exclude opinion-class articles from the
+  // resolution-outcome signal (evidence_weight alone can't distinguish
+  // opinion from a low-certainty unclassified article). Plain string, not a
+  // Prisma enum — matches `origin`'s convention for this model.
+  evidenceClass String? @map("evidence_class") @db.VarChar(32)
 
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
