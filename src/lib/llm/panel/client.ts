@@ -39,6 +39,24 @@ const RESPONSE_FORMAT = {
   },
 } as const
 
+/**
+ * The credential is bad (401) or forbidden (403).
+ *
+ * Distinct from every other failure because it is a property of the *key*, not of the
+ * member: if one member gets a 401 they all will. Retrying the other members, or the
+ * other 56 forecasts, cannot succeed — it just burns 285 requests to rediscover the
+ * same fact. The sweep aborts on this and reports it, rather than logging 285
+ * indistinguishable warnings and exiting green.
+ */
+export class PanelAuthError extends Error {
+  readonly status: number
+  constructor(status: number, detail: string) {
+    super(`OpenRouter rejected the API key (HTTP ${status}): ${detail}`)
+    this.name = 'PanelAuthError'
+    this.status = status
+  }
+}
+
 export interface PanelCallResult {
   /** 0–100, or null when the member abstained. */
   probability: number | null
@@ -94,6 +112,11 @@ export async function callPanelMember(
 
     if (!response.ok) {
       const body = await response.text()
+      // An auth failure is global, not per-member — surface it as its own type so the
+      // sweep can stop instead of retrying it once per member per forecast.
+      if (response.status === 401 || response.status === 403) {
+        throw new PanelAuthError(response.status, body.slice(0, 200))
+      }
       throw new Error(`OpenRouter ${response.status} for ${member.model}: ${body.slice(0, 200)}`)
     }
 

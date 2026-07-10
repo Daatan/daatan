@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
-import { callPanelMember, logMemberFailure } from '@/lib/llm/panel/client'
+import { callPanelMember, logMemberFailure, PanelAuthError } from '@/lib/llm/panel/client'
 import { PANEL_MEMBERS, rosterSignature, type PanelMember } from '@/lib/llm/panel/roster'
 
 const log = createLogger('ai-panel')
@@ -123,9 +123,13 @@ async function callMembers(
 ): Promise<MemberOutcome[]> {
   const outcomes: MemberOutcome[] = []
   const queue = [...members]
+  /** Set by whichever worker first sees a 401/403. Stops the remaining members from
+   *  re-proving that the same key is still bad. */
+  let authError: PanelAuthError | null = null
 
   const worker = async (): Promise<void> => {
     for (let member = queue.shift(); member; member = queue.shift()) {
+      if (authError) return
       try {
         const result = await callPanelMember(member, prompt, apiKey)
         outcomes.push({
@@ -139,6 +143,10 @@ async function callMembers(
           failed: false,
         })
       } catch (err) {
+        if (err instanceof PanelAuthError) {
+          authError = err
+          return
+        }
         logMemberFailure(member.model, predictionId, err)
         // A failure is an ABSTENTION, never a substitution. We do not retry with a
         // different model: an `AiEstimate` row must always contain output from the
@@ -159,6 +167,11 @@ async function callMembers(
   await Promise.all(
     Array.from({ length: Math.min(MEMBER_CONCURRENCY, members.length) }, worker),
   )
+
+  // Propagated, not swallowed into abstentions: abstentions caused by OUR bad
+  // credential are not evidence about the claim, and must never be persisted.
+  if (authError) throw authError
+
   return outcomes
 }
 
@@ -268,6 +281,11 @@ export interface PanelSweepSummary {
    *  Counted separately from `written`: a dry run reporting "written: 57" is exactly
    *  the output that makes someone trust a dry run they shouldn't. */
   dryRun: number
+  /** The OpenRouter key was rejected (401/403). The sweep aborted at the first
+   *  occurrence rather than re-proving it for every remaining member and forecast.
+   *  The cron surfaces this as a non-2xx so the scheduled workflow goes red — a dead
+   *  key must not report "✅ Panel sweep OK" with the failures buried in JSON. */
+  unauthorized?: boolean
   /** True when no OpenRouter key is configured — the panel is dormant, not broken. */
   dormant?: boolean
 }
@@ -330,6 +348,14 @@ export async function runPanelSweep(opts?: {
       else if (result.status === 'failed') summary.failed += 1
       else summary.skipped += 1
     } catch (err) {
+      // A rejected key is global: every remaining member and forecast would fail the
+      // same way. Abort instead of making N × members doomed requests, and mark the
+      // sweep so the caller can fail loudly rather than report a green no-op.
+      if (err instanceof PanelAuthError) {
+        log.error({ err }, 'OpenRouter rejected the API key — aborting sweep')
+        summary.unauthorized = true
+        break
+      }
       // One bad forecast must not abort the sweep.
       log.error({ err, predictionId: prediction.id }, 'Panel run threw')
       summary.failed += 1
