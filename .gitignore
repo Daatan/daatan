@@ -1,5 +1,8 @@
 # Dependencies
-node_modules/
+# No trailing slash: that form only matches a directory, so a node_modules
+# *symlink* (as agents create when sharing installs across worktrees) slips
+# past `git add -A` and gets committed.
+node_modules
 
 # Compiled seed (generated during Docker build)
 prisma/seed.js
