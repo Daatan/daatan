@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
-import type { EvidencePoolArticle } from '@prisma/client'
+import type { EvidencePoolArticle, ClaimDirection } from '@prisma/client'
+import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
+import { claimDirectionParam } from '@/lib/services/oracle'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('evidence-pool')
 
 /**
  * Foundation layer for the per-forecast evidence pool (retro
@@ -98,4 +103,110 @@ export async function setArticleExcluded(
     where: { id: articleId },
     data: { excluded },
   })
+}
+
+interface PoolAggregateApiResponse {
+  mean: number
+  ci_low: number
+  ci_high: number
+  articles_used: number
+  settled: boolean
+  insufficient_data: boolean
+  reason: string | null
+}
+
+/** The subset of a live /forecast result needed to log a shadow comparison. */
+export interface LiveForecastForComparison {
+  mean: number
+  ciLow: number
+  ciHigh: number
+  settled: boolean
+}
+
+/**
+ * Shadow-compare retro's `/pool/aggregate` recompute against a live
+ * `/forecast` result — log only, never affects the persisted estimate (retro
+ * docs/ORACLE_VARIABLES.md, recompute-over-pool step 4). Proves the recompute
+ * pipeline produces sane, comparable numbers before any path is cut over to
+ * trust it.
+ *
+ * Fire-and-forget: never throws, callers should chain this *after*
+ * `addArticlesToPool` resolves (not run in parallel with it) so the current
+ * run's article is already in the pool the recompute reads — and must
+ * `.catch()` the returned promise themselves, matching `addArticlesToPool`'s
+ * own convention.
+ */
+export async function shadowCompareRecompute(
+  predictionId: string,
+  live: LiveForecastForComparison,
+  claimDirection: ClaimDirection | null,
+  claimDeadline: Date | null,
+): Promise<void> {
+  const cfg = getOracleConfig()
+  if (!cfg) return
+
+  const pool = await getPoolArticles(predictionId)
+  const excludedCount = pool.filter((a) => a.excluded).length
+  const usable = pool.filter(
+    (a) =>
+      !a.excluded &&
+      a.stance !== null &&
+      a.certainty !== null &&
+      a.credibilityWeight !== null &&
+      a.relevanceScore !== null,
+  )
+  const incompleteCount = pool.length - excludedCount - usable.length
+  if (usable.length === 0) return
+
+  let res: Response
+  try {
+    res = await oracleFetch(cfg, '/pool/aggregate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sources: usable.map((a) => ({
+          stance: a.stance,
+          certainty: a.certainty,
+          credibility_weight: a.credibilityWeight,
+          relevance_score: a.relevanceScore,
+          evidence_weight: a.evidenceWeight,
+          published_date: a.publishedDate,
+          settled: a.settled ?? false,
+        })),
+        ...(claimDirectionParam(claimDirection) ? { claim_direction: claimDirectionParam(claimDirection) } : {}),
+        ...(claimDeadline ? { claim_deadline: claimDeadline.toISOString() } : {}),
+      }),
+      timeoutMs: 10_000,
+    })
+  } catch (err) {
+    log.warn({ predictionId, err }, 'event=pool_recompute_shadow_failed')
+    return
+  }
+  if (!res.ok) {
+    log.warn({ predictionId, status: res.status }, 'event=pool_recompute_shadow_failed')
+    return
+  }
+
+  const agg: PoolAggregateApiResponse = await res.json()
+  log.info(
+    {
+      predictionId,
+      poolSize: pool.length,
+      usableSize: usable.length,
+      excludedCount,
+      incompleteCount,
+      liveMean: live.mean,
+      recomputeMean: agg.mean,
+      meanDelta: Math.abs(live.mean - agg.mean),
+      liveCiLow: live.ciLow,
+      liveCiHigh: live.ciHigh,
+      recomputeCiLow: agg.ci_low,
+      recomputeCiHigh: agg.ci_high,
+      liveSettled: live.settled,
+      recomputeSettled: agg.settled,
+      recomputeInsufficient: agg.insufficient_data,
+      recomputeReason: agg.reason,
+    },
+    'event=pool_recompute_shadow',
+  )
 }
