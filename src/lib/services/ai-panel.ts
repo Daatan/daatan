@@ -115,21 +115,45 @@ interface MemberOutcome {
   failed: boolean
 }
 
+/**
+ * Mutable state threaded through one sweep.
+ *
+ * `openRouterDisabled` latches on the first 401/403 and is honoured for every later
+ * forecast, so a dead key costs exactly one rejected request per sweep instead of one
+ * per member per forecast (285, on 2026-07-10). Bedrock members authenticate with the
+ * app's IAM role and keep running regardless — that is the point of having one.
+ */
+export interface SweepContext {
+  openRouterDisabled: boolean
+  sawOpenRouterAuthError: boolean
+}
+
+/**
+ * The panel can ask nobody: no OpenRouter key AND no member on a route that
+ * authenticates some other way. A missing OpenRouter key alone is no longer dormancy —
+ * Bedrock members use the app's IAM role.
+ */
+export function isDormant(apiKey: string, members: readonly PanelMember[]): boolean {
+  if (apiKey) return false
+  return !members.some((m) => m.route !== 'openrouter')
+}
+
 async function callMembers(
   members: readonly PanelMember[],
   prompt: string,
   apiKey: string,
   predictionId: string,
+  ctx: SweepContext,
 ): Promise<MemberOutcome[]> {
   const outcomes: MemberOutcome[] = []
-  const queue = [...members]
-  /** Set by whichever worker first sees a 401/403. Stops the remaining members from
-   *  re-proving that the same key is still bad. */
-  let authError: PanelAuthError | null = null
+  // Members we cannot authenticate are not asked at all. We deliberately do NOT record
+  // them as abstentions: an abstention means "the model saw the claim and declined",
+  // and writing one for a member we never consulted would be a lie in the data.
+  const queue = members.filter((m) => !(m.route === 'openrouter' && ctx.openRouterDisabled))
 
   const worker = async (): Promise<void> => {
     for (let member = queue.shift(); member; member = queue.shift()) {
-      if (authError) return
+      if (member.route === 'openrouter' && ctx.openRouterDisabled) continue
       try {
         const result = await callPanelMember(member, prompt, apiKey)
         outcomes.push({
@@ -144,8 +168,12 @@ async function callMembers(
         })
       } catch (err) {
         if (err instanceof PanelAuthError) {
-          authError = err
-          return
+          // Latches for the rest of the sweep. Only OpenRouter members are affected;
+          // Bedrock members keep going on the app's IAM role.
+          ctx.openRouterDisabled = true
+          ctx.sawOpenRouterAuthError = true
+          log.error({ err }, 'OpenRouter rejected the API key — disabling those members')
+          continue
         }
         logMemberFailure(member.model, predictionId, err)
         // A failure is an ABSTENTION, never a substitution. We do not retry with a
@@ -165,12 +193,8 @@ async function callMembers(
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(MEMBER_CONCURRENCY, members.length) }, worker),
+    Array.from({ length: Math.min(MEMBER_CONCURRENCY, Math.max(queue.length, 1)) }, worker),
   )
-
-  // Propagated, not swallowed into abstentions: abstentions caused by OUR bad
-  // credential are not evidence about the claim, and must never be persisted.
-  if (authError) throw authError
 
   return outcomes
 }
@@ -183,7 +207,14 @@ async function callMembers(
  */
 export async function runPanelForPrediction(
   prediction: PanelPrediction,
-  opts: { now?: Date; dryRun?: boolean; apiKey: string; template?: string },
+  opts: {
+    now?: Date
+    dryRun?: boolean
+    apiKey: string
+    template?: string
+    /** Shared across the sweep so a rejected OpenRouter key latches once, not per forecast. */
+    ctx?: SweepContext
+  },
 ): Promise<PanelRunResult> {
   const now = opts.now ?? new Date()
   // The sweep resolves the template once and threads it through. Fetching per
@@ -212,14 +243,18 @@ export async function runPanelForPrediction(
     return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
   }
 
-  const outcomes = await callMembers(PANEL_MEMBERS, prompt, opts.apiKey, prediction.id)
+  const ctx = opts.ctx ?? { openRouterDisabled: !opts.apiKey, sawOpenRouterAuthError: false }
+  const outcomes = await callMembers(PANEL_MEMBERS, prompt, opts.apiKey, prediction.id, ctx)
 
-  // If every member's call THREW, this is our problem, not the models' — a bad key, a
-  // dead network. Writing a run of all-abstentions would let the date-gate suppress
-  // any retry until tomorrow. Write nothing and let the next tick try again.
-  // (A run where members deliberately returned null IS written: that is real signal.)
-  if (outcomes.every((o) => o.failed)) {
-    log.error({ predictionId: prediction.id }, 'Every panel member failed — writing nothing')
+  // No outcomes at all means every member was unauthenticated (no key, no IAM) — we
+  // asked nobody. Same treatment as everybody failing: write nothing, retry next tick.
+  //
+  // And if every member's call THREW, that is our problem, not the models' — a dead
+  // network, a bad credential. Writing a run of all-abstentions would let the date-gate
+  // suppress any retry until tomorrow. (A run where members deliberately returned null
+  // IS written: that is real signal about a vague claim.)
+  if (outcomes.length === 0 || outcomes.every((o) => o.failed)) {
+    log.error({ predictionId: prediction.id }, 'No panel member produced a result — writing nothing')
     return {
       predictionId: prediction.id,
       status: 'failed',
@@ -281,12 +316,14 @@ export interface PanelSweepSummary {
    *  Counted separately from `written`: a dry run reporting "written: 57" is exactly
    *  the output that makes someone trust a dry run they shouldn't. */
   dryRun: number
-  /** The OpenRouter key was rejected (401/403). The sweep aborted at the first
-   *  occurrence rather than re-proving it for every remaining member and forecast.
-   *  The cron surfaces this as a non-2xx so the scheduled workflow goes red — a dead
-   *  key must not report "✅ Panel sweep OK" with the failures buried in JSON. */
+  /** The OpenRouter key was rejected (401/403). Those members were disabled for the
+   *  rest of the sweep after the first rejection, rather than re-proving it once per
+   *  member per forecast. Bedrock members carried on. The cron still surfaces this as a
+   *  non-2xx so the scheduled workflow goes red — a dead key must not report
+   *  "✅ Panel sweep OK" with the failures buried in JSON, even if other routes worked. */
   unauthorized?: boolean
-  /** True when no OpenRouter key is configured — the panel is dormant, not broken. */
+  /** No member could be authenticated at all: no OpenRouter key AND no Bedrock member.
+   *  A deliberate state, not a breakage — the cron answers 200. */
   dormant?: boolean
 }
 
@@ -306,9 +343,18 @@ export async function runPanelSweep(opts?: {
   limit?: number
 }): Promise<PanelSweepSummary> {
   const apiKey = getOpenRouterKey()
-  if (!apiKey) {
-    log.warn('No OpenRouter key configured — AI panel is dormant')
+
+  if (isDormant(apiKey, PANEL_MEMBERS)) {
+    log.warn('No OpenRouter key and no Bedrock member — AI panel is dormant')
     return { considered: 0, written: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
+  }
+  if (!apiKey) {
+    log.warn('No OpenRouter key configured — running Bedrock members only')
+  }
+
+  const ctx: SweepContext = {
+    openRouterDisabled: !apiKey,
+    sawOpenRouterAuthError: false,
   }
 
   const now = opts?.now ?? new Date()
@@ -342,25 +388,23 @@ export async function runPanelSweep(opts?: {
         dryRun: opts?.dryRun,
         apiKey,
         template,
+        ctx,
       })
       if (result.status === 'written') summary.written += 1
       else if (result.status === 'dry-run') summary.dryRun += 1
       else if (result.status === 'failed') summary.failed += 1
       else summary.skipped += 1
     } catch (err) {
-      // A rejected key is global: every remaining member and forecast would fail the
-      // same way. Abort instead of making N × members doomed requests, and mark the
-      // sweep so the caller can fail loudly rather than report a green no-op.
-      if (err instanceof PanelAuthError) {
-        log.error({ err }, 'OpenRouter rejected the API key — aborting sweep')
-        summary.unauthorized = true
-        break
-      }
       // One bad forecast must not abort the sweep.
       log.error({ err, predictionId: prediction.id }, 'Panel run threw')
       summary.failed += 1
     }
   }
+
+  // Reported even when Bedrock members carried the sweep: a dead OpenRouter key is an
+  // incident to fix, not a state to tolerate, and the route turns this into a 502 so
+  // the scheduled workflow goes red.
+  if (ctx.sawOpenRouterAuthError) summary.unauthorized = true
 
   log.info(summary, 'AI panel sweep complete')
   return summary

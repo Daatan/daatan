@@ -32,6 +32,7 @@ import {
   buildPanelPrompt,
   computeInputHash,
   daysRemaining,
+  isDormant,
   promptVersionOf,
   runPanelForPrediction,
   runPanelSweep,
@@ -237,14 +238,28 @@ describe('runPanelForPrediction', () => {
 })
 
 describe('runPanelSweep', () => {
-  it('is dormant, not broken, without an OpenRouter key', async () => {
+  // The whole reason the Bedrock member exists: no OpenRouter key must NOT stop the panel.
+  it('runs Bedrock members only when no OpenRouter key is configured', async () => {
     getKey.mockReturnValue('')
+    findManyPredictions.mockResolvedValue([prediction] as never)
 
     const summary = await runPanelSweep({ now: NOW })
 
-    expect(summary.dormant).toBe(true)
-    expect(findManyPredictions).not.toHaveBeenCalled()
-    expect(callMember).not.toHaveBeenCalled()
+    expect(summary.dormant).toBeUndefined()
+    expect(summary.written).toBe(1)
+
+    const called = callMember.mock.calls.map(([m]) => m.route)
+    expect(called).toEqual(['bedrock'])
+    expect(called).not.toContain('openrouter')
+  })
+
+  it('is dormant only when nothing at all can authenticate', () => {
+    const openRouterOnly = [{ model: 'a', mode: 'ungrounded', route: 'openrouter' }] as const
+    const withBedrock = [{ model: 'b', mode: 'ungrounded', route: 'bedrock' }] as const
+
+    expect(isDormant('', openRouterOnly)).toBe(true)
+    expect(isDormant('', withBedrock)).toBe(false) // IAM role, no key needed
+    expect(isDormant('sk-test', openRouterOnly)).toBe(false)
   })
 
   it('selects only open BINARY forecasts that have not passed their deadline', async () => {
@@ -282,34 +297,69 @@ describe('runPanelSweep', () => {
     expect(getTemplate).toHaveBeenCalledTimes(1)
   })
 
-  // Regression: a dead OpenRouter key produced 57 forecasts × 5 members = 285
-  // identical 401s, and the cron still answered 200 with "✅ Panel sweep OK".
-  it('aborts the whole sweep on a rejected key instead of retrying it 285 times', async () => {
+  // Regression: a dead OpenRouter key produced 57 forecasts × 5 members = 285 identical
+  // 401s, and the cron still answered 200 with "✅ Panel sweep OK". It now latches after
+  // the first rejection — but only for the OpenRouter members.
+  it('a rejected key disables OpenRouter members without silencing Bedrock ones', async () => {
     findManyPredictions.mockResolvedValue([
       prediction,
       { ...prediction, id: 'pred-2' },
       { ...prediction, id: 'pred-3' },
     ] as never)
-    callMember.mockRejectedValue(new PanelAuthError(401, 'User not found.'))
+    callMember.mockImplementation(async (m) => {
+      if (m.route === 'openrouter') throw new PanelAuthError(401, 'User not found.')
+      return ok(44)
+    })
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    // Reported as an incident even though the sweep produced data.
+    expect(summary.unauthorized).toBe(true)
+    // The Bedrock member carried all three forecasts.
+    expect(summary.written).toBe(3)
+
+    const openRouterCalls = callMember.mock.calls.filter(([m]) => m.route === 'openrouter')
+    const bedrockCalls = callMember.mock.calls.filter(([m]) => m.route === 'bedrock')
+    // Latched: at most one 401 per concurrent worker, not 4 members × 3 forecasts = 12.
+    expect(openRouterCalls.length).toBeLessThanOrEqual(3)
+    expect(bedrockCalls.length).toBe(3)
+  })
+
+  it('writes nothing when every route is unauthenticated', async () => {
+    findManyPredictions.mockResolvedValue([prediction] as never)
+    callMember.mockImplementation(async (m) => {
+      if (m.route === 'openrouter') throw new PanelAuthError(401, 'User not found.')
+      throw new Error('AccessDeniedException: bedrock:InvokeModel') // terraform not applied
+    })
 
     const summary = await runPanelSweep({ now: NOW })
 
     expect(summary.unauthorized).toBe(true)
-    expect(summary.considered).toBe(3)
-    // Stopped at the first forecast — the other two were never attempted.
-    expect(summary.written + summary.failed + summary.skipped).toBeLessThan(3)
+    expect(summary.written).toBe(0)
+    expect(summary.failed).toBe(1)
     expect(createRun).not.toHaveBeenCalled()
   })
 
-  it('stops calling the remaining members once one reports a bad key', async () => {
+  // An unapplied IAM grant must not take the OpenRouter members down with it.
+  it('a Bedrock AccessDenied is a per-member abstention, not a sweep-wide failure', async () => {
     findManyPredictions.mockResolvedValue([prediction] as never)
-    callMember.mockRejectedValue(new PanelAuthError(401, 'User not found.'))
+    callMember.mockImplementation(async (m) => {
+      if (m.route === 'bedrock') throw new Error('AccessDeniedException')
+      return ok(55)
+    })
 
-    await runPanelSweep({ now: NOW })
+    const summary = await runPanelSweep({ now: NOW })
 
-    // MEMBER_CONCURRENCY workers may each have one call in flight; none should retry.
-    expect(callMember.mock.calls.length).toBeLessThanOrEqual(3)
-    expect(callMember.mock.calls.length).toBeLessThan(PANEL_MEMBERS.length)
+    expect(summary.unauthorized).toBeUndefined()
+    expect(summary.written).toBe(1)
+
+    const written = createRun.mock.calls[0][0].data as {
+      estimates: { create: { model: string; probability: number | null }[] }
+    }
+    // The Bedrock member still occupies a row — as an abstention, with no number.
+    const bedrockRow = written.estimates.create.find((e) => e.model.startsWith('qwen.'))
+    expect(bedrockRow?.probability).toBeNull()
+    expect(written.estimates.create).toHaveLength(PANEL_MEMBERS.length)
   })
 
   it('a non-auth failure is still per-forecast, not fatal to the sweep', async () => {
@@ -361,11 +411,15 @@ describe('runPanelSweep', () => {
     expect(summary.dryRun).toBe(0)
   })
 
-  it('reports dryRun: 0 when dormant, so the shape never varies', async () => {
+  it('a dry run without a key still calls no model and writes nothing', async () => {
     getKey.mockReturnValue('')
+    findManyPredictions.mockResolvedValue([prediction] as never)
 
     const summary = await runPanelSweep({ now: NOW, dryRun: true })
 
-    expect(summary).toMatchObject({ dormant: true, written: 0, dryRun: 0 })
+    // Not dormant (a Bedrock member exists), but dryRun short-circuits before any call.
+    expect(summary).toMatchObject({ written: 0, dryRun: 1 })
+    expect(callMember).not.toHaveBeenCalled()
+    expect(createRun).not.toHaveBeenCalled()
   })
 })
