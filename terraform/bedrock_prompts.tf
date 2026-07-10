@@ -1,4 +1,14 @@
 locals {
+  # WARNING — adding a name here CREATES the SSM parameter with value "PLACEHOLDER".
+  # `ignore_changes = [value]` only protects a parameter AFTER Terraform owns it, so
+  # adding a name for a parameter that already exists out-of-band would overwrite its
+  # live Bedrock ARN with PLACEHOLDER. Import it first (import → no-op plan), then add.
+  #
+  # Known unmanaged parameters that exist in SSM but are deliberately NOT listed here
+  # for exactly that reason: content-moderation, temporal-classifier. They currently
+  # resolve only because of the hand-made `daatan-bedrock-prompts-fix` inline policy
+  # (a wildcard grant that is not in Terraform). Importing them, then dropping that
+  # wildcard, is a separate change.
   prompt_names = [
     "express-prediction",
     "extract-prediction",
@@ -12,7 +22,11 @@ locals {
     "research-query-generation",
     "resolution-research",
     "translate",
-    "topic-extraction"
+    "topic-extraction",
+    # AI panel (docs/AI_PANEL.md). Exists nowhere yet, so creating it at PLACEHOLDER
+    # is safe: getPromptTemplate() treats PLACEHOLDER as "serve the hardcoded fallback",
+    # which is exactly today's behaviour minus the per-sweep ParameterNotFound error.
+    "panel-estimate"
   ]
   prompt_envs = ["staging", "prod"]
 }
