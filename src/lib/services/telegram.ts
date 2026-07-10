@@ -103,7 +103,7 @@ export function notifyServerError(route: string, error: Error): void {
 
   const msg = [
     `🚨 <b>Server Error</b>`,
-    `Route: <code>${route}</code>`,
+    `Route: <code>${escapeHtml(route)}</code>`,
     `Error: <code>${truncate(error.message, 200)}</code>`,
   ].join('\n')
 
@@ -141,7 +141,7 @@ export function notifySearchCreditsLow(provider: string, remaining: number): voi
   if (!canNotify(`search-credits-low:${provider}`)) return
 
   const msg = [
-    `⚠️ <b>Search credits low: ${provider}</b>`,
+    `⚠️ <b>Search credits low: ${escapeHtml(provider)}</b>`,
     `Remaining: <b>${remaining}</b>`,
     `Top up to avoid express forecast generation degradation`,
   ].join('\n')
@@ -176,8 +176,8 @@ export function notifySearchHealthDigest(report: {
 
   const lines = report.issues.map((i) =>
     i.kind === 'exhausted'
-      ? `• <b>${i.provider}</b>: exhausted`
-      : `• <b>${i.provider}</b>: ${i.credits ?? '?'} credits left`,
+      ? `• <b>${escapeHtml(i.provider)}</b>: exhausted`
+      : `• <b>${escapeHtml(i.provider)}</b>: ${i.credits ?? '?'} credits left`,
   )
 
   const msg = [
@@ -207,17 +207,40 @@ interface UserInfo {
   username: string | null
 }
 
-function userName(user: UserInfo): string {
-  return user.name || user.username || 'Someone'
+/**
+ * Escape the characters Telegram's `parse_mode: 'HTML'` treats specially.
+ * Every message this file sends goes through this mode, so any dynamic value
+ * reaching the message — a claim, a comment, a headline, a URL, an error
+ * string — needs this or a stray `<`, `>`, or `&` (an "AT&T" headline, a
+ * `?a=1&b=2` tracking URL, a user typing "<3") breaks Telegram's parser and
+ * the whole message silently fails to send. `&` must be replaced first, or
+ * escaping `<`/`>`/`"` afterward would double-escape the `&` those introduce.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
+function userName(user: UserInfo): string {
+  return escapeHtml(user.name || user.username || 'Someone')
+}
+
+/**
+ * Truncate raw text to `max` chars, then escape — in that order. Escaping
+ * first would count entity-expanded characters (`&` → `&amp;`, 5 chars)
+ * against the truncation limit and could cut an entity in half.
+ */
 function truncate(text: string, max: number): string {
-  return text.length > max ? text.substring(0, max) + '...' : text
+  const t = text.length > max ? text.substring(0, max) + '...' : text
+  return escapeHtml(t)
 }
 
 function forecastUrl(prediction: ForecastInfo): string {
   const base = process.env.NEXTAUTH_URL || 'https://daatan.com'
-  return `${base}/forecasts/${prediction.slug || prediction.id}`
+  return escapeHtml(`${base}/forecasts/${prediction.slug || prediction.id}`)
 }
 
 export function notifyForecastPublished(prediction: ForecastInfo, author: UserInfo): void {
@@ -239,7 +262,7 @@ export function notifyNewCommitment(
 ): void {
   const msg = [
     `🎯 <b>New commitment</b>`,
-    `${userName(user)} committed ${cuCommitted} CU (${choice}) on:`,
+    `${userName(user)} committed ${cuCommitted} CU (${escapeHtml(choice)}) on:`,
     `"${truncate(prediction.claimText, 120)}"`,
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
@@ -315,9 +338,9 @@ export function notifyNewUserRegistered(user: {
 }): void {
   const msg = [
     `🆕 <b>New user registered</b>`,
-    `Email: <code>${user.email}</code>`,
-    user.name ? `Name: <b>${user.name}</b>` : '',
-    `Provider: <code>${user.provider || 'credentials'}</code>`,
+    `Email: <code>${escapeHtml(user.email)}</code>`,
+    user.name ? `Name: <b>${escapeHtml(user.name)}</b>` : '',
+    `Provider: <code>${escapeHtml(user.provider || 'credentials')}</code>`,
   ].filter(Boolean).join('\n')
 
   sendChannelNotification(msg, 'clean')
@@ -337,9 +360,9 @@ export function notifySecurityError(
   const msg = [
     `🛡️ <b>Security Event</b>`,
     `Status: <b>${status}</b>`,
-    `Route: <code>${pathname}</code>`,
-    `Message: <code>${message}</code>`,
-    user ? `User: <code>${user.email || user.id}</code>` : 'User: <i>Anonymous</i>',
+    `Route: <code>${escapeHtml(pathname)}</code>`,
+    `Message: <code>${escapeHtml(message)}</code>`,
+    user ? `User: <code>${escapeHtml(user.email || user.id)}</code>` : 'User: <i>Anonymous</i>',
   ].join('\n')
 
   sendChannelNotification(msg, 'clean')
@@ -352,7 +375,7 @@ export function notifyResourceNotFound(pathname: string, details?: string): void
 
   const msg = [
     `🔗 <b>Dead Link / Not Found</b>`,
-    `Route: <code>${pathname}</code>`,
+    `Route: <code>${escapeHtml(pathname)}</code>`,
     details ? `Details: <code>${truncate(details, 100)}</code>` : '',
   ].filter(Boolean).join('\n')
 
@@ -370,8 +393,8 @@ export function notifyLlmError(
 
   const msg = [
     `🤖 <b>LLM Provider Error</b>`,
-    `Provider: <b>${provider}</b>`,
-    model ? `Model: <code>${model}</code>` : '',
+    `Provider: <b>${escapeHtml(provider)}</b>`,
+    model ? `Model: <code>${escapeHtml(model)}</code>` : '',
     `Error: <code>${truncate(error, 200)}</code>`,
   ].filter(Boolean).join('\n')
 
@@ -391,8 +414,8 @@ export function notifyTranslationFailed(
   const errMsg = error instanceof Error ? error.message : String(error)
   const msg = [
     `🌐 <b>Translation failed</b>`,
-    `Prediction: <code>${predictionId}</code>`,
-    `Language: <b>${language}</b> · Field: <code>${field}</code>`,
+    `Prediction: <code>${escapeHtml(predictionId)}</code>`,
+    `Language: <b>${escapeHtml(language)}</b> · Field: <code>${escapeHtml(field)}</code>`,
     `Error: <code>${truncate(errMsg, 200)}</code>`,
   ].join('\n')
 
@@ -410,8 +433,8 @@ export function notifyDiskSpaceLow(
 
   const msg = [
     `💾 <b>Critical: Disk Space Low</b>`,
-    `Instance: <code>${instanceId}</code>`,
-    `Usage: <b style="color: red">${usage}</b> (Threshold: ${threshold})`,
+    `Instance: <code>${escapeHtml(instanceId)}</code>`,
+    `Usage: <b style="color: red">${escapeHtml(usage)}</b> (Threshold: ${escapeHtml(threshold)})`,
     `Immediate action required to avoid deployment failures.`,
   ].join('\n')
 
@@ -430,7 +453,7 @@ export function notifyMemoryPressure(
 
   const msg = [
     `🧠 <b>Critical: Memory Pressure</b>`,
-    `Instance: <code>${instanceId}</code>`,
+    `Instance: <code>${escapeHtml(instanceId)}</code>`,
     `Memory: <b>${usedMb} MB / ${totalMb} MB (${usagePct}%)</b>`,
     `High memory usage may cause OOM kills or severe slowdowns.`,
   ].join('\n')
@@ -450,8 +473,8 @@ export function notifyHighLoad(
 
   const msg = [
     `🔥 <b>Critical: High CPU Load</b>`,
-    `Instance: <code>${instanceId}</code>`,
-    `Load avg: <b>${load1} (1m) / ${load5} (5m)</b>`,
+    `Instance: <code>${escapeHtml(instanceId)}</code>`,
+    `Load avg: <b>${escapeHtml(load1)} (1m) / ${escapeHtml(load5)} (5m)</b>`,
     `CPU cores: ${cpuCores} — sustained load above ${cpuCores * 2}x normal.`,
   ].join('\n')
 
@@ -499,7 +522,7 @@ export function notifyDailySummary(stats: {
     : `🔎 Search providers: <i>unknown</i>`
 
   const msg = [
-    `📊 <b>Daily summary</b> — v${stats.version}`,
+    `📊 <b>Daily summary</b> — v${escapeHtml(stats.version)}`,
     `🆕 New users: <b>${stats.newUsers}</b>`,
     `📢 Forecasts published: <b>${stats.published}</b>`,
     `🎯 New commitments: <b>${stats.commitments}</b>`,
@@ -541,7 +564,7 @@ export function notifyNewsArticleMatched(
   const rangeLine =
     ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? `\n     range ${ciLow}–${ciHigh}%` : ''
 
-  const sourceLabel = article.source ? ` — ${article.source}` : ''
+  const sourceLabel = article.source ? ` — ${escapeHtml(article.source)}` : ''
   const articleCount = match.articleCount ?? 1
   const countLabel = articleCount > 1 ? `${articleCount} articles · ` : ''
   const simPct = Math.round(match.similarity * 100)
@@ -550,7 +573,7 @@ export function notifyNewsArticleMatched(
     `${headerLine}${rangeLine}`,
     `"${truncate(prediction.claimText, 120)}"`,
     '',
-    `📰 <a href="${article.url}">${truncate(article.title, 100)}</a>${sourceLabel}`,
+    `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
     `     ${countLabel}match ${simPct}%`,
     '',
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
@@ -706,7 +729,7 @@ export function notifyBackupVerificationFailed(reason: string): void {
   const msg = [
     `🚨 <b>Backup Verification FAILED</b>`,
     `The latest backup was uploaded but could not be restored successfully.`,
-    `Reason: <code>${reason}</code>`,
+    `Reason: <code>${escapeHtml(reason)}</code>`,
     `<b>Manual investigation required — backup may be corrupt.</b>`,
   ].join('\n')
   sendChannelNotification(msg, 'clean')
