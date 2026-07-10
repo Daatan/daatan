@@ -26,7 +26,10 @@ export type CuratedAuthor = {
 }
 
 export const CURATED_ELECTION_AUTHORS: CuratedAuthor[] = [
-  { key: 'amit-segal', name: 'Amit Segal', nameHe: 'אמית סגל', handle: 'amitsegal', lang: 'he', aliases: ['amit segal', 'אמית סגל', 'amitsegal'] },
+  // nameHe is the correct spelling (עמית, with an ayin); 'אמית' below is a known
+  // Oracle-side misspelling kept only as a match alias — see elections' sources.ts,
+  // which carries the same correction and both aliases.
+  { key: 'amit-segal', name: 'Amit Segal', nameHe: 'עמית סגל', handle: 'amitsegal', lang: 'he', aliases: ['amit segal', 'עמית סגל', 'אמית סגל', 'amitsegal'] },
   { key: 'ben-caspit', name: 'Ben Caspit', nameHe: 'בן כספית', handle: 'Ben_Caspit', lang: 'he', aliases: ['ben caspit', 'בן כספית', 'ben_caspit'] },
   { key: 'edy-cohen', name: 'Edy Cohen', nameHe: 'אדי כהן', handle: 'edycohendr', lang: 'he', aliases: ['edy cohen', 'אדי כהן', 'edycohendr'] },
   { key: 'guy-bechor', name: 'Guy Bechor', nameHe: 'גיא בכור', handle: 'MyGPLANET', lang: 'he', aliases: ['guy bechor', 'גיא בכור', 'mygplanet'] },
