@@ -17,6 +17,10 @@ vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
+vi.mock('@/lib/services/evidence-pool', () => ({
+  addArticlesToPool: vi.fn(),
+  shadowCompareRecompute: vi.fn(),
+}))
 
 vi.mock('@/lib/api-error', () => ({
   apiError: (msg: string, status: number) =>
@@ -37,6 +41,7 @@ import { getOracleForecast } from '@/lib/services/oracle'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
+import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -93,6 +98,8 @@ describe('POST /api/news-indexer/context', () => {
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(ACTIVE_PREDICTION as never)
     vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true })
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
+    vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
+    vi.mocked(shadowCompareRecompute).mockResolvedValue(undefined)
   })
 
   it('rejects a wrong secret with 401 before doing any work', async () => {
@@ -271,6 +278,57 @@ describe('POST /api/news-indexer/context', () => {
         credibilityWeight: 1.0,
         claims: ['First extracted claim', 'Second claim'],
       })
+    })
+  })
+
+  describe('evidence pool shadow-write + recompute shadow-compare (retro ORACLE_VARIABLES.md §6 step 6)', () => {
+    it('shadow-writes the pool and shadow-compares the recompute after the Oracle produces an estimate', async () => {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
+        ...ACTIVE_PREDICTION,
+        claimDirection: null,
+        claimDeadline: null,
+      } as never)
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      await vi.waitFor(() => expect(shadowCompareRecompute).toHaveBeenCalledTimes(1))
+      expect(addArticlesToPool).toHaveBeenCalledWith('pred-1', expect.any(Array), 'news-indexer')
+      expect(shadowCompareRecompute).toHaveBeenCalledWith(
+        'pred-1',
+        { mean: 0.5, ciLow: 0.2, ciHigh: 0.8, settled: false },
+        null,
+        null,
+      )
+    })
+
+    it('forwards a set claimDirection/claimDeadline to the shadow-compare', async () => {
+      const deadline = new Date('2026-12-31T00:00:00.000Z')
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
+        ...ACTIVE_PREDICTION,
+        claimDirection: 'ARRIVAL',
+        claimDeadline: deadline,
+      } as never)
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      await vi.waitFor(() => expect(shadowCompareRecompute).toHaveBeenCalledTimes(1))
+      expect(shadowCompareRecompute).toHaveBeenCalledWith(
+        'pred-1',
+        expect.objectContaining({ mean: 0.5 }),
+        'ARRIVAL',
+        deadline,
+      )
+    })
+
+    it('does not shadow-compare when the Oracle returns no usable forecast', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      expect(addArticlesToPool).not.toHaveBeenCalled()
+      expect(shadowCompareRecompute).not.toHaveBeenCalled()
     })
   })
 })

@@ -153,12 +153,12 @@ distinguish opinion from a low-certainty unclassified article.
 **Not yet enforced by any computation** — the recompute-over-pool cutover (the
 ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
 excluding an article here has no effect on the live estimate today. As of
-`shadowCompareRecompute()` in `evidence-pool.ts`, every `analyze` run
-does call retro's `POST /pool/aggregate` with the current non-excluded pool
-and logs a comparison against the live estimate (`event=pool_recompute_shadow`)
-— log-only, proving the recompute pipeline produces sane numbers before any
-path is cut over to trust it; the persisted estimate is still always the
-live `/forecast` result.
+`shadowCompareRecompute()` in `evidence-pool.ts`, every `analyze`,
+`news-indexer`, and `backfill` run calls retro's `POST /pool/aggregate` with
+the current non-excluded pool and logs a comparison against the live estimate
+(`event=pool_recompute_shadow`) — log-only, proving the recompute pipeline
+produces sane numbers before any path is cut over to trust it; the persisted
+estimate is still always the live `/forecast` result.
 
 ### Credibility feedback loop (retro `docs/ORACLE_VARIABLES.md` §9)
 
