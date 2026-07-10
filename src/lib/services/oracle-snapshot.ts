@@ -40,6 +40,7 @@ export type EnrichedOracleSource = {
   settled: boolean | null
   quantitativeEstimate: number | null
   evidenceWeight: number | null
+  relevanceScore: number | null
 }
 
 /**
@@ -69,6 +70,7 @@ export function enrichOracleSources(
       settled: s.settled ?? null,
       quantitativeEstimate: s.quantitative_estimate ?? null,
       evidenceWeight: s.evidence_weight ?? null,
+      relevanceScore: s.relevance_score ?? null,
     }
   })
 }

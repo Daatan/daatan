@@ -72,6 +72,9 @@ export interface OracleSource {
    *  `class_weight[evidence_class]`/certainty-fallback value, NOT the
    *  evidence_class taxonomy itself (retro keeps that internal). */
   evidence_weight?: number | null
+  /** Graded topic relevance [0,1] from the gatekeeper; its square multiplies
+   *  this source's aggregation weight (Layer C of retro's weight formula). */
+  relevance_score?: number | null
 }
 
 /** Full response from POST /forecast. */
