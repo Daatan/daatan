@@ -19,6 +19,7 @@ import { auth } from '@/auth'
 import { proxyAuthorsAdmin } from '@/lib/services/news-indexer-authors'
 import { GET, POST } from '../route'
 import { PATCH, DELETE } from '../[id]/route'
+import { POST as POST_ALIAS } from '../[id]/aliases/route'
 import { DELETE as DELETE_ALIAS } from '../[id]/aliases/[aliasId]/route'
 
 const UUID = 'd1a8046c-b8a1-4a41-b12e-7ddd89ef275c'
@@ -95,6 +96,47 @@ describe('authors proxy — id validation', () => {
   it('forwards a well-formed alias delete', async () => {
     await DELETE_ALIAS(req('DELETE'), ctx({ id: UUID, aliasId: ALIAS_UUID }))
     expect(mockProxy).toHaveBeenCalledWith(`/authors/${UUID}/aliases/${ALIAS_UUID}`, { method: 'DELETE' })
+  })
+
+  it.each(['..', 'admin/people', 'not-a-uuid'])(
+    'rejects an alias create on person id %j with 400',
+    async (id) => {
+      const res = await POST_ALIAS(req('POST', { alias: 'בן כספית' }), ctx({ id }))
+      expect(res.status).toBe(400)
+      expect(mockProxy).not.toHaveBeenCalled()
+    },
+  )
+})
+
+describe('authors proxy — alias create', () => {
+  beforeEach(() => asRole('ADMIN'))
+
+  it('rejects an unauthenticated caller with 401 and never calls upstream', async () => {
+    mockAuth.mockResolvedValue(null)
+    const res = await POST_ALIAS(req('POST', { alias: 'x' }), ctx({ id: UUID }))
+    expect(res.status).toBe(401)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-admin caller with 403 and never calls upstream', async () => {
+    asRole('USER')
+    const res = await POST_ALIAS(req('POST', { alias: 'x' }), ctx({ id: UUID }))
+    expect(res.status).toBe(403)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-object body with 400', async () => {
+    const res = await POST_ALIAS(req('POST', 'oops'), ctx({ id: UUID }))
+    expect(res.status).toBe(400)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('forwards a well-formed alias create', async () => {
+    await POST_ALIAS(req('POST', { alias: 'בן כספית' }), ctx({ id: UUID }))
+    expect(mockProxy).toHaveBeenCalledWith(`/authors/${UUID}/aliases`, {
+      method: 'POST',
+      body: { alias: 'בן כספית' },
+    })
   })
 })
 
