@@ -114,15 +114,22 @@ say which is better. This comparison is free.
 
 ## 5. Roster
 
-`src/lib/llm/panel/roster.ts`. All on OpenRouter — one API key, one client.
+`src/lib/llm/panel/roster.ts`. Four on OpenRouter, one on Bedrock.
 
-| Member | $/M in | $/M out | Reasoning | Role |
-|---|---|---|---|---|
-| `qwen/qwen3-235b-a22b-2507` | 0.09 | 0.10 | **no** | deterministic baseline |
-| `openai/gpt-5-mini` | 0.25 | 2.00 | yes | |
-| `google/gemini-2.5-flash` | 0.30 | 2.50 | yes | |
-| `x-ai/grok-4.3` | 1.25 | 2.50 | yes | |
-| `openai/gpt-5-nano` | 0.05 | 0.40 | yes | **control** |
+| Member | Route | $/M in | $/M out | Reasoning | Role |
+|---|---|---|---|---|---|
+| `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | — (credits) | — | **no** | deterministic baseline, outage-proof |
+| `openai/gpt-5-mini` | openrouter | 0.25 | 2.00 | yes | |
+| `google/gemini-2.5-flash` | openrouter | 0.30 | 2.50 | yes | |
+| `x-ai/grok-4.3` | openrouter | 1.25 | 2.50 | yes | |
+| `openai/gpt-5-nano` | openrouter | 0.05 | 0.40 | yes | **control** |
+
+The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
+one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in
+the panel's first real sweep returned 401 and nothing was produced. A member on the
+app's own IAM role keeps the panel producing estimates through an OpenRouter outage or a
+stale key. Its Bedrock model id differs from the OpenRouter slug, so Brier treats it as a
+distinct member — correct, since the weights are the same but the quantization may not be.
 
 The **control member** is a falsification check: if a deliberately weak model scores
 the same Brier as Grok, the instrument is not measuring anything and a flat
@@ -159,8 +166,10 @@ breaks determinism at `temperature: 0`.
   would write an `AiEstimate` row labelled `google/gemini-2.5-flash` containing Llama's
   output. `src/lib/llm/panel/client.ts` calls OpenRouter directly, and a failure is
   recorded as an **abstention**, never as a substitution.
-- **Dormant without a key.** With no OpenRouter key configured (admin Settings → env),
-  the sweep returns `{dormant: true}` and does nothing. That is a 200, not a failure.
+- **Dormant only when nothing can authenticate.** A missing OpenRouter key no longer
+  stops the panel: the Bedrock member runs on the app's IAM role, so the sweep proceeds
+  with that member alone. `{dormant: true}` (a 200, not a failure) now requires *both*
+  no OpenRouter key *and* no non-OpenRouter member. See `isDormant()`.
 
 ### AWS credits: not about cost — about not having a single point of failure
 
@@ -266,18 +275,31 @@ cheap LLMs with no search at all. (PR 3.)
   API key into a silent 24h outage. (A run where members deliberately returned `null`
   *is* written: that is real signal.)
 - One bad forecast never aborts the sweep.
-- **A rejected key (401/403) aborts it immediately.** Auth failure is a property of the
-  key, not the member: if one member 401s they all will, so retrying is guaranteed to
-  fail. `PanelAuthError` short-circuits the remaining members and the remaining
-  forecasts, nothing is persisted (abstentions caused by *our* bad credential are not
-  evidence about the claim), and the route answers **502** so `ai-panel.yml` goes red.
+- **A rejected OpenRouter key (401/403) disables those members for the rest of the
+  sweep.** Auth failure is a property of the *shared key*, not of the member: if one
+  OpenRouter member 401s they all will, so retrying is guaranteed to fail.
+  `PanelAuthError` latches on the first rejection, so a dead key costs one rejected
+  request per sweep, not one per member per forecast.
+
+  It is **scoped to the OpenRouter route.** Bedrock members authenticate with the app's
+  IAM role and keep producing — that is the entire reason one exists. Conversely a
+  Bedrock `AccessDeniedException` (e.g. `terraform/bedrock_invoke.tf` not yet applied)
+  is a plain per-member abstention and must never disable the OpenRouter members.
+
+  Members we cannot authenticate are **not asked, and not recorded as abstentions**: an
+  abstention means "the model saw the claim and declined", so writing one for a member
+  we never consulted would be a lie in the data.
+
+  The route still answers **502** whenever the key was rejected — even if Bedrock
+  members carried the sweep. A dead credential is an incident to fix, not a state to
+  tolerate, and `ai-panel.yml` must go red.
 
   This is the failure that actually happened on staging 2026-07-10: a dead key produced
   57 × 5 = 285 identical `401 "User not found."` warnings, and the cron still answered
   `200 {"ok":true,...,"failed":57}` — the workflow printed "✅ Panel sweep OK". A dead
   credential must not look like a healthy no-op.
 
-  `dormant` (no key configured at all) stays a **200**: that is a deliberate state.
+  `dormant` (nothing can authenticate at all) stays a **200**: a deliberate state.
 - Query params: `?dryRun=1` (build and log prompts, call nothing), `?limit=N`.
   A dry run reports `{written: 0, dryRun: N}` — **never** `written: N`. A dry run that
   claims writes is precisely the output that makes someone trust a dry run they

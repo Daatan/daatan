@@ -1,3 +1,4 @@
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
 import { createLogger } from '@/lib/logger'
 import type { PanelMember } from './roster'
 
@@ -5,6 +6,15 @@ const log = createLogger('ai-panel-client')
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const TIMEOUT_MS = 30_000
+const REGION = process.env.AWS_REGION || 'eu-central-1'
+
+/** Lazily constructed so importing this module never needs AWS credentials — unit
+ *  tests and the OpenRouter-only path must not pay for an SDK client. */
+let bedrockClient: BedrockRuntimeClient | null = null
+function getBedrockClient(): BedrockRuntimeClient {
+  bedrockClient ??= new BedrockRuntimeClient({ region: REGION })
+  return bedrockClient
+}
 
 /**
  * Hard ceiling on output tokens. The answer is one integer; anything larger means a
@@ -40,13 +50,20 @@ const RESPONSE_FORMAT = {
 } as const
 
 /**
- * The credential is bad (401) or forbidden (403).
+ * The **OpenRouter** credential is bad (401) or forbidden (403).
  *
- * Distinct from every other failure because it is a property of the *key*, not of the
- * member: if one member gets a 401 they all will. Retrying the other members, or the
- * other 56 forecasts, cannot succeed — it just burns 285 requests to rediscover the
- * same fact. The sweep aborts on this and reports it, rather than logging 285
- * indistinguishable warnings and exiting green.
+ * Distinct from every other failure because it is a property of the shared key, not of
+ * the member: if one OpenRouter member gets a 401 they all will. Retrying the other
+ * OpenRouter members, or the other 56 forecasts, cannot succeed — it just burns 285
+ * requests to rediscover the same fact.
+ *
+ * SCOPED TO THE OPENROUTER ROUTE, DELIBERATELY. Bedrock members authenticate with the
+ * app's IAM role, an entirely separate credential. A Bedrock `AccessDeniedException`
+ * is therefore a plain per-member failure (→ abstention), never this error: aborting
+ * the sweep because one route's credential is missing would silence the members that
+ * do work. Conversely, a dead OpenRouter key now disables only the OpenRouter members
+ * and lets the Bedrock member keep producing estimates — which is the whole reason
+ * that member exists.
  */
 export class PanelAuthError extends Error {
   readonly status: number
@@ -79,6 +96,55 @@ export async function callPanelMember(
   prompt: string,
   apiKey: string,
 ): Promise<PanelCallResult> {
+  return member.route === 'bedrock'
+    ? callBedrockMember(member, prompt)
+    : callOpenRouterMember(member, prompt, apiKey)
+}
+
+/**
+ * Invoke a Bedrock-hosted member with the app's IAM role.
+ *
+ * Uses Converse rather than raw InvokeModel so the request shape is model-agnostic —
+ * adding a second Bedrock member should not mean learning another vendor's body
+ * format. Converse is authorised by `bedrock:InvokeModel`, which is what
+ * terraform/bedrock_invoke.tf grants.
+ *
+ * Without that policy applied, this throws `AccessDeniedException` — a plain Error, so
+ * the member abstains and the other four are unaffected. That is the correct
+ * degradation, and it means this code can ship before the Terraform lands.
+ */
+async function callBedrockMember(member: PanelMember, prompt: string): Promise<PanelCallResult> {
+  const startedAt = Date.now()
+
+  const response = await getBedrockClient().send(
+    new ConverseCommand({
+      modelId: member.model,
+      messages: [{ role: 'user', content: [{ text: prompt }] }],
+      // Same ceiling and determinism as the OpenRouter path. Bedrock has no
+      // `reasoning: {enabled:false}` switch, but this member is the non-reasoning one,
+      // so there is nothing to disable — and maxTokens still bounds a surprise.
+      inferenceConfig: { maxTokens: MAX_TOKENS, temperature: 0 },
+    }),
+  )
+
+  const text = response.output?.message?.content?.[0]?.text
+  if (typeof text !== 'string' || text.trim() === '') {
+    throw new Error(`Empty response from ${member.model}`)
+  }
+
+  return {
+    probability: parseProbability(text, member.model),
+    promptTokens: response.usage?.inputTokens ?? null,
+    completionTokens: response.usage?.outputTokens ?? null,
+    latencyMs: Date.now() - startedAt,
+  }
+}
+
+async function callOpenRouterMember(
+  member: PanelMember,
+  prompt: string,
+  apiKey: string,
+): Promise<PanelCallResult> {
   const startedAt = Date.now()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -106,7 +172,7 @@ export async function callPanelMember(
         // member's line moved (it isn't stored), and breaks determinism at temp 0.
         // A 250-token base-rate question is not a reasoning task.
         reasoning: { enabled: false },
-        provider: { order: member.providerOrder, allow_fallbacks: false },
+        provider: { order: member.providerOrder ?? [], allow_fallbacks: false },
       }),
     })
 
@@ -145,7 +211,7 @@ export async function callPanelMember(
 function parseProbability(content: string, model: string): number | null {
   let parsed: unknown
   try {
-    parsed = JSON.parse(content)
+    parsed = JSON.parse(extractJsonObject(content))
   } catch {
     throw new Error(`${model} returned non-JSON: ${content.slice(0, 120)}`)
   }
@@ -157,6 +223,26 @@ function parseProbability(content: string, model: string): number | null {
     throw new Error(`${model} returned an out-of-range probability: ${String(value)}`)
   }
   return value
+}
+
+/**
+ * Pull the JSON object out of a model reply.
+ *
+ * The OpenRouter path enforces a strict `response_format` schema, so its content is
+ * already bare JSON and this is a no-op. Bedrock's Converse API has no equivalent, so a
+ * member there may wrap the object in a ```json fence or a sentence. Extracting the
+ * outermost braces is enough; the VALUE is still validated strictly afterwards, so a
+ * model that emits prose and no object still fails (→ abstention) rather than being
+ * coerced into a number we invented.
+ */
+function extractJsonObject(content: string): string {
+  const text = content.trim()
+  if (text.startsWith('{')) return text
+
+  const first = text.indexOf('{')
+  const last = text.lastIndexOf('}')
+  if (first === -1 || last <= first) return text // let JSON.parse throw
+  return text.slice(first, last + 1)
 }
 
 /** Log a member failure at a level that won't page anyone — an abstention is expected. */

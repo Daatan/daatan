@@ -1,11 +1,30 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+
+const bedrockSend = vi.fn()
+vi.mock('@aws-sdk/client-bedrock-runtime', () => ({
+  // Classes, not vi.fn(() => ...): the client constructs these with `new`.
+  BedrockRuntimeClient: class {
+    send = bedrockSend
+  },
+  ConverseCommand: class {
+    constructor(public input: unknown) {}
+  },
+}))
+
 import { callPanelMember, PanelAuthError } from '../client'
 import type { PanelMember } from '../roster'
 
 const MEMBER: PanelMember = {
   model: 'qwen/qwen3-235b-a22b-2507',
   mode: 'ungrounded',
+  route: 'openrouter',
   providerOrder: ['deepinfra/fp8'],
+}
+
+const BEDROCK_MEMBER: PanelMember = {
+  model: 'qwen.qwen3-235b-a22b-2507-v1:0',
+  mode: 'ungrounded',
+  route: 'bedrock',
 }
 
 function respond(status: number, body: unknown, ok = status < 400) {
@@ -26,8 +45,13 @@ const fetchMock = vi.fn()
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockReset()
+  bedrockSend.mockReset()
 })
 afterEach(() => vi.unstubAllGlobals())
+
+function converse(text: string, usage?: { inputTokens: number; outputTokens: number }) {
+  return { output: { message: { content: [{ text }] } }, usage }
+}
 
 describe('callPanelMember request shape', () => {
   it('disables reasoning, caps output, pins the provider, and pins temperature 0', async () => {
@@ -112,5 +136,67 @@ describe('auth failures are their own type', () => {
     const err = await callPanelMember(MEMBER, 'p', 'sk-or-v1-supersecret').catch((e) => e)
 
     expect(err.message).not.toContain('supersecret')
+  })
+})
+
+describe('bedrock route', () => {
+  it('invokes Converse with maxTokens and temperature 0, never touching fetch', async () => {
+    bedrockSend.mockResolvedValue(
+      converse('{"probability": 37}', { inputTokens: 210, outputTokens: 9 }),
+    )
+
+    const r = await callPanelMember(BEDROCK_MEMBER, 'prompt', '')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    const { input } = bedrockSend.mock.calls[0][0]
+    expect(input.modelId).toBe('qwen.qwen3-235b-a22b-2507-v1:0')
+    expect(input.inferenceConfig).toEqual({ maxTokens: 64, temperature: 0 })
+    expect(r).toMatchObject({ probability: 37, promptTokens: 210, completionTokens: 9 })
+  })
+
+  it('needs no OpenRouter key — that is the entire point of this route', async () => {
+    bedrockSend.mockResolvedValue(converse('{"probability": 50}'))
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({
+      probability: 50,
+    })
+  })
+
+  // Bedrock's Converse has no `response_format`, so the model may wrap its object.
+  it('tolerates a ```json fence, since Converse cannot enforce a schema', async () => {
+    bedrockSend.mockResolvedValue(converse('```json\n{"probability": 12}\n```'))
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({
+      probability: 12,
+    })
+  })
+
+  it('tolerates a leading sentence', async () => {
+    bedrockSend.mockResolvedValue(converse('Here is my estimate: {"probability": 88}'))
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({
+      probability: 88,
+    })
+  })
+
+  it('still rejects prose with no object — never invents a number', async () => {
+    bedrockSend.mockResolvedValue(converse('I would say roughly forty percent.'))
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).rejects.toThrow(/non-JSON/)
+  })
+
+  it('still validates the value strictly after extraction', async () => {
+    bedrockSend.mockResolvedValue(converse('```json\n{"probability": 999}\n```'))
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).rejects.toThrow(/out-of-range/)
+  })
+
+  // The IAM grant may not be applied yet. That must degrade to an abstention for THIS
+  // member, never to a PanelAuthError — which would disable the OpenRouter members too.
+  it('an AccessDeniedException is a plain Error, not a PanelAuthError', async () => {
+    const denied = Object.assign(new Error('User is not authorized to perform bedrock:InvokeModel'), {
+      name: 'AccessDeniedException',
+    })
+    bedrockSend.mockRejectedValue(denied)
+
+    const err = await callPanelMember(BEDROCK_MEMBER, 'p', '').catch((e) => e)
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err).not.toBeInstanceOf(PanelAuthError)
   })
 })
