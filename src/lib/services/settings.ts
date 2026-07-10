@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
 import { isSelfHosted } from '@/lib/edition'
 import { createLogger } from '@/lib/logger'
+import { getAwsSecret } from '@/lib/aws/secrets'
 
 const log = createLogger('settings')
 
@@ -108,9 +109,26 @@ export function settingsWarmed(): boolean {
   return warmed
 }
 
-/** The effective OpenRouter API key: admin-set (DB) → env. */
+/**
+ * The effective OpenRouter API key: admin-set (DB) → SSM SecureString → env.
+ *
+ * The DB setting stays first so a self-host operator's admin panel keeps working. SSM
+ * comes next because it is the SaaS source of truth: rotating there is one
+ * `put-parameter --overwrite` and takes effect within the secret cache's 5-minute TTL,
+ * with no redeploy and without touching the `daatan-env-*` blob that also holds the
+ * database password. `env` remains the last resort for local dev, CI, and self-host.
+ *
+ * Still synchronous: {@link warmAwsSecrets} populates the cache at boot and before each
+ * panel sweep. An unwarmed cache reads as '' and we fall through to env, which is the
+ * behaviour this function had before SSM existed.
+ */
 export function getOpenRouterKey(): string {
-  return getCachedSetting(SETTING_KEYS.openrouterApiKey) || env.OPENROUTER_API_KEY || ''
+  return (
+    getCachedSetting(SETTING_KEYS.openrouterApiKey) ||
+    getAwsSecret('OPENROUTER_API_KEY') ||
+    env.OPENROUTER_API_KEY ||
+    ''
+  )
 }
 
 /** The effective OpenRouter model: admin-set (DB) → env → default. */

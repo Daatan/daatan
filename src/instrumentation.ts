@@ -10,6 +10,21 @@ const log = createLogger('startup')
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
+  // Warm the SSM SecureString secrets (docs/SECRETS.md) before the LLM service is built,
+  // so a key rotated since the last deploy is live immediately. Never throws: no SSM, no
+  // parameter, or no kms:Decrypt all degrade to the env-var fallback.
+  try {
+    const { warmAwsSecrets } = await import('@/lib/aws/secrets')
+    await warmAwsSecrets()
+    // The provider chain is built at module load from whatever getOpenRouterKey() saw
+    // then. Rebuild now that SSM has answered, so the OpenRouter fallback leg registers
+    // on a fresh boot instead of only after an admin saves a key.
+    const { rebuildLlmService } = await import('@/lib/llm')
+    rebuildLlmService()
+  } catch (err) {
+    log.error({ err }, '[startup] Failed to warm AWS secrets')
+  }
+
   // Self-hosted edition: warm the admin-editable settings cache (brand name,
   // OpenRouter key, /about content) from the DB, then rebuild the LLM service
   // so a key set in a previous session is live without a restart. No-op on

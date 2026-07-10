@@ -16,6 +16,9 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
 
 vi.mock('@/lib/services/settings', () => ({ getOpenRouterKey: vi.fn() }))
 
+// The sweep refreshes the SSM secret cache before reading the key; never hit AWS in unit tests.
+vi.mock('@/lib/aws/secrets', () => ({ warmAwsSecrets: vi.fn().mockResolvedValue(undefined) }))
+
 // Keep the real PanelAuthError: ai-panel.ts branches on `instanceof`, and a stubbed
 // class would make that check silently never match.
 vi.mock('@/lib/llm/panel/client', async (importOriginal) => ({
