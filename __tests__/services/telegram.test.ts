@@ -205,52 +205,127 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     notifyNewsArticleMatched(
       { id: 'p1', claimText: 'x' },
       { title: 'Headline', url: 'https://e.com/a', source: 'Reuters' },
-      0.9,
-      72,
+      { similarity: 0.9 },
+      { probability: 72, previous: null, ciLow: null, ciHigh: null },
     )
 
     expect(await lastChatId()).toBe(NOISY)
   })
 
-  it('news-article match now flows through the shared helper (gets the env prefix)', async () => {
+  it('news-article match flows through the shared helper (gets the env prefix)', async () => {
     process.env.APP_ENV = 'production'
 
     notifyNewsArticleMatched(
       { id: 'p1', claimText: 'x' },
       { title: 'Headline', url: 'https://e.com/a', source: null },
-      0.5,
-      null,
+      { similarity: 0.5 },
+      { probability: 58, previous: null, ciLow: null, ciHigh: null },
     )
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
     expect(body.text).toMatch(/^\[prod\] /)
-    expect(body.text).toContain('News match')
+    expect(body.text).toContain('Oracle')
   })
 
-  it('labels a first estimate, an update, and an unchanged value distinctly', async () => {
+  it('labels a first estimate, a move, and an unchanged value distinctly', async () => {
     process.env.APP_ENV = 'production'
 
     const send = (probability: number, previous: number | null) =>
       notifyNewsArticleMatched(
         { id: 'p1', claimText: 'x' },
         { title: 'Headline', url: 'https://e.com/a', source: null },
-        0.5,
-        probability,
-        1,
-        previous,
+        { similarity: 0.5 },
+        { probability, previous, ciLow: null, ciHigh: null },
       )
 
-    send(72, null)
-    send(72, 65)
-    send(72, 72)
+    send(58, null)
+    send(58, 45)
+    send(58, 58)
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3))
     const texts = vi.mocked(fetch).mock.calls.map(
       (c) => JSON.parse(c[1]!.body as string).text as string,
     )
-    expect(texts[0]).toContain('72%</b> (first estimate)')
-    expect(texts[1]).toContain('72%</b> (was 65%)')
-    expect(texts[2]).toContain('72%</b> (unchanged)')
+    expect(texts[0]).toContain('Oracle 58%</b> · first estimate')
+    expect(texts[1]).toContain('Oracle 45% → 58%</b>  (+13)')
+    expect(texts[2]).toContain('Oracle 58%</b> · unchanged')
+  })
+
+  it('signs a downward move with a bare minus, not a double sign', async () => {
+    process.env.APP_ENV = 'production'
+
+    notifyNewsArticleMatched(
+      { id: 'p1', claimText: 'x' },
+      { title: 'Headline', url: 'https://e.com/a', source: null },
+      { similarity: 0.5 },
+      { probability: 40, previous: 58, ciLow: null, ciHigh: null },
+    )
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.text).toContain('Oracle 58% → 40%</b>  (-18)')
+  })
+
+  it('renders the confidence range when it is wide enough to be informative', async () => {
+    process.env.APP_ENV = 'production'
+
+    notifyNewsArticleMatched(
+      { id: 'p1', claimText: 'x' },
+      { title: 'Headline', url: 'https://e.com/a', source: null },
+      { similarity: 0.5 },
+      { probability: 58, previous: 45, ciLow: 44, ciHigh: 72 },
+    )
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.text).toContain('range 44–72%')
+  })
+
+  it('omits the range line for a missing or degenerate confidence interval', async () => {
+    process.env.APP_ENV = 'production'
+
+    const send = (ciLow: number | null, ciHigh: number | null) =>
+      notifyNewsArticleMatched(
+        { id: 'p1', claimText: 'x' },
+        { title: 'Headline', url: 'https://e.com/a', source: null },
+        { similarity: 0.5 },
+        { probability: 58, previous: 45, ciLow, ciHigh },
+      )
+
+    send(null, null)
+    send(58, 58) // zero-width band
+    send(57, 58) // 1-point band, still noise
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3))
+    const texts = vi.mocked(fetch).mock.calls.map(
+      (c) => JSON.parse(c[1]!.body as string).text as string,
+    )
+    texts.forEach((t) => expect(t).not.toContain('range'))
+  })
+
+  it('shows the article count only when more than one article backs the estimate', async () => {
+    process.env.APP_ENV = 'production'
+
+    const send = (articleCount?: number) =>
+      notifyNewsArticleMatched(
+        { id: 'p1', claimText: 'x' },
+        { title: 'Headline', url: 'https://e.com/a', source: 'Haaretz' },
+        { similarity: 0.72, articleCount },
+        { probability: 58, previous: 45, ciLow: null, ciHigh: null },
+      )
+
+    send(undefined)
+    send(1)
+    send(3)
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(3))
+    const texts = vi.mocked(fetch).mock.calls.map(
+      (c) => JSON.parse(c[1]!.body as string).text as string,
+    )
+    expect(texts[0]).toContain('match 72%')
+    expect(texts[0]).not.toContain('articles ·')
+    expect(texts[1]).not.toContain('articles ·')
+    expect(texts[2]).toContain('3 articles · match 72%')
   })
 })

@@ -110,6 +110,13 @@ export async function POST(request: NextRequest) {
     )
 
     let probability: number | null = null
+    // Only set alongside probability, in the same block below — kept in this
+    // outer scope so the Telegram notify call (after the block) can read them.
+    let ciLow: number | null = null
+    let ciHigh: number | null = null
+    // False for a re-delivered push saveNewsIndexerMatch recognized as a dedup
+    // (see context.ts) — nothing changed, so nothing should notify either.
+    let wasStored = false
 
     // Per-article enrichment from the Oracle, keyed by url, so news-indexer can map
     // each article in the set back to its own forecast_match row.
@@ -122,8 +129,8 @@ export async function POST(request: NextRequest) {
 
     if (oracleForecast) {
       probability = stanceToPercent(oracleForecast.mean)
-      const ciLow = stanceToPercent(oracleForecast.ci_low)
-      const ciHigh = stanceToPercent(oracleForecast.ci_high)
+      ciLow = stanceToPercent(oracleForecast.ci_low)
+      ciHigh = stanceToPercent(oracleForecast.ci_high)
 
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
@@ -139,7 +146,7 @@ export async function POST(request: NextRequest) {
         log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
       )
 
-      await saveNewsIndexerMatch({
+      const { stored } = await saveNewsIndexerMatch({
         predictionId: prediction.id,
         sources: items.map((a) => ({
           url: a.url,
@@ -161,11 +168,13 @@ export async function POST(request: NextRequest) {
         },
         settled: oracleForecast.settled ?? false,
       })
+      wasStored = stored
 
       log.info(
         {
           predictionId: prediction.id,
           probability,
+          stored,
           articles: items.length,
           similarity: triggerSimilarity,
           // How many of the Oracle's sources carried a byline — the signal that makes
@@ -182,19 +191,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Notify only when the push produced an estimate. news-indexer re-pushes the
-    // same article set after its cooldown when the Oracle returned null (that
-    // retry is how the estimate eventually lands), so notifying on null turns
-    // every retry into a duplicate Telegram message for a push that stored
-    // nothing. The successful retry still notifies once.
-    if (probability !== null) {
+    // Notify only when the push produced an estimate AND it was actually stored.
+    // news-indexer re-pushes the same article set on every poll cycle while its
+    // cooldown rolls — the Oracle-null case is one such retry (no estimate to
+    // report yet), and a repeat push that lands on an identical measurement is
+    // another (saveNewsIndexerMatch's dedup catches that one, hence `wasStored`).
+    // Skipping both means every notification reflects a real change.
+    if (probability !== null && wasStored) {
       void notifyNewsArticleMatched(
         { id: prediction.id, claimText: prediction.claimText, slug: prediction.slug },
         { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
-        triggerSimilarity,
-        probability,
-        items.length,
-        prediction.confidence,
+        { similarity: triggerSimilarity, articleCount: items.length },
+        { probability, previous: prediction.confidence, ciLow, ciHigh },
       )
     }
 
