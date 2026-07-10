@@ -17,11 +17,14 @@ resource "aws_iam_role_policy" "secrets_access" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
+        # This environment's secrets only. A hardcoded `daatan-env-staging` ARN used to
+        # sit here, which let the PROD role read staging's env blob — no caller needs it
+        # (fetch-secrets.sh reads `daatan-env-${ENVIRONMENT}`), and it widened prod's
+        # blast radius for nothing. Removed 2026-07-10.
         Resource = [
           aws_secretsmanager_secret.env_vars.arn,
           aws_secretsmanager_secret.deploy_key.arn,
           aws_secretsmanager_secret.github_token.arn,
-          "arn:aws:secretsmanager:eu-central-1:272007598366:secret:daatan-env-staging-LqU9t5"
         ]
       }
     ]

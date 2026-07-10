@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
+import { warmAwsSecrets } from '@/lib/aws/secrets'
 import { callPanelMember, logMemberFailure, PanelAuthError } from '@/lib/llm/panel/client'
 import { PANEL_MEMBERS, rosterSignature, type PanelMember } from '@/lib/llm/panel/roster'
 
@@ -342,6 +343,9 @@ export async function runPanelSweep(opts?: {
   dryRun?: boolean
   limit?: number
 }): Promise<PanelSweepSummary> {
+  // Refresh (cached 5 min) so a key rotated with `put-parameter --overwrite` is picked up
+  // by the next sweep without a redeploy — the whole point of moving it out of the blob.
+  await warmAwsSecrets()
   const apiKey = getOpenRouterKey()
 
   if (isDormant(apiKey, PANEL_MEMBERS)) {
