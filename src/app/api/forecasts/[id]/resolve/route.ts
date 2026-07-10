@@ -7,6 +7,10 @@ import { notifyForecastResolved } from '@/lib/services/telegram'
 import { notifyNewsIndexerResolution } from '@/lib/services/news-indexer'
 import { createNotification } from '@/lib/services/notification'
 import { resolvePrediction } from '@/lib/services/prediction-resolution'
+import { pushCredibilityFeedback } from '@/lib/services/evidence-pool'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('forecast-resolve')
 
 export const POST = withAuth(async (request, user, { params }) => {
   const body = await request.json()
@@ -47,6 +51,15 @@ export const POST = withAuth(async (request, user, { params }) => {
     }
   }
   notifyNewsIndexerResolution(prediction.id, outcome, communityProbability, aiProbability)
+
+  // Credibility feedback loop (retro docs/ORACLE_VARIABLES.md §9) — BINARY
+  // only, stance has no clean meaning for a MULTIPLE_CHOICE option's
+  // correctness; void/unresolvable have no outcome to score sources against.
+  if (prediction.outcomeType === 'BINARY' && (outcome === 'correct' || outcome === 'wrong')) {
+    pushCredibilityFeedback(prediction.id, outcome === 'correct', result.resolvedAt ?? new Date()).catch((err) =>
+      log.warn({ predictionId: prediction.id, err }, 'credibility feedback push failed'),
+    )
+  }
 
   const forecastLink = `/forecasts/${prediction.slug || prediction.id}`
   for (const commitment of prediction.commitments) {

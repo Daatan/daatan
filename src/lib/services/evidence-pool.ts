@@ -53,6 +53,7 @@ export async function addArticlesToPool(
           quantitativeEstimate: s.quantitativeEstimate,
           evidenceWeight: s.evidenceWeight,
           relevanceScore: s.relevanceScore,
+          evidenceClass: s.evidenceClass,
           origin,
         },
         update: {
@@ -68,6 +69,7 @@ export async function addArticlesToPool(
           quantitativeEstimate: s.quantitativeEstimate,
           evidenceWeight: s.evidenceWeight,
           relevanceScore: s.relevanceScore,
+          evidenceClass: s.evidenceClass,
           origin,
         },
       }),
@@ -208,5 +210,91 @@ export async function shadowCompareRecompute(
       recomputeReason: agg.reason,
     },
     'event=pool_recompute_shadow',
+  )
+}
+
+interface IngestResolutionApiResponse {
+  accepted: boolean
+  already_ingested: boolean
+  sources_recorded: number
+}
+
+/**
+ * Credibility feedback loop, step 2 (retro docs/ORACLE_VARIABLES.md §9):
+ * push one resolved forecast's per-source stances to retro's
+ * `POST /leaderboard/ingest` so real outcomes can eventually score source
+ * credibility, instead of only the frozen, hand-curated vault. Storage-only
+ * on retro's side for now — does not affect live `credibility_weight`.
+ *
+ * BINARY predictions only: stance is a [-1,1] YES-probability signal, which
+ * has no clean meaning for a MULTIPLE_CHOICE prediction's per-option
+ * correctness. Callers must gate on `outcomeType === 'BINARY'` before
+ * calling this (see the resolve route).
+ *
+ * Excludes `excluded` (admin-excluded) and `opinion`-class articles from the
+ * signal (Q7 of the credibility feedback loop interview: an op-ed
+ * disagreeing with how a claim resolved isn't the same kind of credibility
+ * failure as a reported fact being wrong) and anything missing the fields
+ * retro's `ResolutionSourceInput` requires. Skips the call entirely when
+ * nothing usable remains — an empty-sources ingest would just be noise in
+ * retro's accumulating store.
+ *
+ * Fire-and-forget: callers must `.catch()` the returned promise themselves,
+ * matching `addArticlesToPool`/`shadowCompareRecompute`'s own convention —
+ * this never blocks or alters the resolution response.
+ */
+export async function pushCredibilityFeedback(
+  predictionId: string,
+  outcome: boolean,
+  resolvedAt: Date,
+): Promise<void> {
+  const cfg = getOracleConfig()
+  if (!cfg) return
+
+  const pool = await getPoolArticles(predictionId)
+  const usable = pool.filter(
+    (a) => !a.excluded && a.evidenceClass !== 'opinion' && a.source !== null && a.stance !== null,
+  )
+  if (usable.length === 0) return
+
+  let res: Response
+  try {
+    res = await oracleFetch(cfg, '/leaderboard/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prediction_id: predictionId,
+        outcome,
+        resolved_at: resolvedAt.toISOString(),
+        sources: usable.map((a) => ({
+          source: a.source,
+          stance: a.stance,
+          evidence_class: a.evidenceClass,
+          credibility_weight: a.credibilityWeight,
+          evidence_weight: a.evidenceWeight,
+        })),
+      }),
+      timeoutMs: 10_000,
+    })
+  } catch (err) {
+    log.warn({ predictionId, err }, 'event=credibility_feedback_ingest_failed')
+    return
+  }
+  if (!res.ok) {
+    log.warn({ predictionId, status: res.status }, 'event=credibility_feedback_ingest_failed')
+    return
+  }
+
+  const body: IngestResolutionApiResponse = await res.json()
+  log.info(
+    {
+      predictionId,
+      outcome,
+      poolSize: pool.length,
+      usableSize: usable.length,
+      alreadyIngested: body.already_ingested,
+      sourcesRecorded: body.sources_recorded,
+    },
+    'event=credibility_feedback_ingest',
   )
 }

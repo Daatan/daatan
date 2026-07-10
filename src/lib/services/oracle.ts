@@ -70,12 +70,15 @@ export interface OracleSource {
    *  itself, if any (retro's cited_probability evidence class). */
   quantitative_estimate?: number | null
   /** This source's resolved evidence_class weight (retro S2 cutover) — the
-   *  `class_weight[evidence_class]`/certainty-fallback value, NOT the
-   *  evidence_class taxonomy itself (retro keeps that internal). */
+   *  `class_weight[evidence_class]`/certainty-fallback value. */
   evidence_weight?: number | null
   /** Graded topic relevance [0,1] from the gatekeeper; its square multiplies
    *  this source's aggregation weight (Layer C of retro's weight formula). */
   relevance_score?: number | null
+  /** This article's most common evidence_class among its extracted claims
+   *  (retro #255) — used by the credibility feedback loop to exclude
+   *  opinion-class articles from the resolution-outcome signal. */
+  evidence_class?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
 }
 
 /** Full response from POST /forecast. */

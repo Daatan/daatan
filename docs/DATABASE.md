@@ -141,11 +141,15 @@ touch it, so an admin's exclusion decision survives re-discovery.
 `evidenceWeight` is retro's resolved evidence_class weight (S2 cutover, retro
 `/forecast`'s `SourceSignal.evidence_weight`, PR #251) — the
 `class_weight[evidence_class]`/certainty-fallback value already computed
-server-side, not the evidence_class taxonomy itself (retro keeps that
-internal). `relevanceScore` is the gatekeeper's graded topic relevance
+server-side. `relevanceScore` is the gatekeeper's graded topic relevance
 (`SourceSignal.relevance_score`) — its square is Layer C of retro's weight
 formula; never captured anywhere in daatan's pipeline before this, so a naive
 recompute would have treated every pooled article as fully on-topic.
+`evidenceClass` is the article's most common evidence_class among its
+extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
+the credibility feedback loop (see below) to exclude opinion-class articles
+from the resolution-outcome signal, since `evidenceWeight` alone can't
+distinguish opinion from a low-certainty unclassified article.
 **Not yet enforced by any computation** — the recompute-over-pool cutover (the
 ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
 excluding an article here has no effect on the live estimate today. As of
@@ -155,6 +159,18 @@ and logs a comparison against the live estimate (`event=pool_recompute_shadow`)
 — log-only, proving the recompute pipeline produces sane numbers before any
 path is cut over to trust it; the persisted estimate is still always the
 live `/forecast` result.
+
+### Credibility feedback loop (retro `docs/ORACLE_VARIABLES.md` §9)
+
+When a `Prediction` resolves (`resolvePrediction()` in
+`prediction-resolution.ts`) and `outcomeType === 'BINARY'` with a definite
+outcome (not VOID/UNRESOLVABLE), the resolve route fire-and-forget calls
+`pushCredibilityFeedback()` in `evidence-pool.ts`, which posts the
+forecast's non-excluded, non-`opinion`-class pool articles' stances to
+retro's `POST /leaderboard/ingest` (source, stance, evidence_class,
+credibility_weight, evidence_weight, plus the boolean outcome). Storage-only
+on retro's side today — accumulates real resolution data ahead of a future
+scoring step; does not affect any live `credibility_weight`.
 
 ## External markets — `external_markets`, `external_market_price_snapshots`
 

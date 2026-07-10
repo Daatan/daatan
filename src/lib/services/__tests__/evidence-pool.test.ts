@@ -23,7 +23,7 @@ import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { ClaimDirection } from '@prisma/client'
-import { addArticlesToPool, getPoolArticles, setArticleExcluded, shadowCompareRecompute } from '../evidence-pool'
+import { addArticlesToPool, getPoolArticles, setArticleExcluded, shadowCompareRecompute, pushCredibilityFeedback } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 
 const upsert = vi.mocked(prisma.evidencePoolArticle.upsert)
@@ -48,6 +48,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   quantitativeEstimate: null,
   evidenceWeight: null,
   relevanceScore: null,
+  evidenceClass: null,
   ...over,
 })
 
@@ -169,6 +170,7 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
   quantitativeEstimate: null,
   evidenceWeight: 0.6,
   relevanceScore: 0.9,
+  evidenceClass: 'reported_fact',
   origin: 'analyze',
   excluded: false,
   addedAt: new Date('2026-07-01'),
@@ -270,6 +272,103 @@ describe('shadowCompareRecompute', () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOracleFetch.mockRejectedValue(new Error('network down'))
     await expect(shadowCompareRecompute('pred-1', live, null, null)).resolves.toBeUndefined()
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+})
+
+describe('pushCredibilityFeedback', () => {
+  const resolvedAt = new Date('2026-07-17T00:00:00.000Z')
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
+  })
+
+  it('does nothing when the Oracle is not configured', async () => {
+    mockGetOracleConfig.mockReturnValue(null)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(findMany).not.toHaveBeenCalled()
+    expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the pool is empty', async () => {
+    findMany.mockResolvedValue([] as never)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('excludes admin-excluded, opinion-class, and sourceless/stanceless articles', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'art-excluded', excluded: true }),
+      poolArticle({ id: 'art-opinion', evidenceClass: 'opinion' }),
+      poolArticle({ id: 'art-no-source', source: null }),
+      poolArticle({ id: 'art-no-stance', stance: null }),
+    ] as never)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('posts usable sources to /leaderboard/ingest, mapped to the wire shape', async () => {
+    findMany.mockResolvedValue([
+      poolArticle(),
+      poolArticle({ id: 'art-2', excluded: true }),
+      poolArticle({ id: 'art-3', evidenceClass: 'opinion' }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
+    const [, path, init] = mockOracleFetch.mock.calls[0]
+    expect(path).toBe('/leaderboard/ingest')
+    const body = JSON.parse((init as { body: string }).body)
+    expect(body.prediction_id).toBe('pred-1')
+    expect(body.outcome).toBe(true)
+    expect(body.resolved_at).toBe(resolvedAt.toISOString())
+    expect(body.sources).toHaveLength(1)
+    expect(body.sources[0]).toMatchObject({
+      source: 'reuters.com',
+      stance: 0.5,
+      evidence_class: 'reported_fact',
+      credibility_weight: 1.0,
+      evidence_weight: 0.6,
+    })
+  })
+
+  it('logs the ingest result on success', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', false, resolvedAt)
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        predictionId: 'pred-1',
+        outcome: false,
+        sourcesRecorded: 1,
+        alreadyIngested: false,
+      }),
+      'event=credibility_feedback_ingest',
+    )
+  })
+
+  it('never throws when the Oracle returns a non-OK status', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({ ok: false, status: 500 } as never)
+    await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+
+  it('never throws when the fetch itself rejects', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockRejectedValue(new Error('network down'))
+    await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 })
