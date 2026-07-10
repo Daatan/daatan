@@ -511,35 +511,48 @@ export function notifyDailySummary(stats: {
   sendChannelNotification(msg)
 }
 
+/**
+ * A news-indexer push landed a new Oracle read. Leads with the probability
+ * move — that's the news; the level and its confidence band are supporting
+ * detail, and similarity/article-count drop to a footer. Only called for a
+ * push that actually changed something: a re-delivered push that dedups to
+ * nothing (see context.ts's `saveNewsIndexerMatch`) is the caller's job to
+ * skip, not this function's — see news-indexer/context/route.ts's `wasStored`.
+ */
 export function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
   article: { title: string; url: string; source: string | null },
-  similarity: number,
-  probability: number | null,
-  articleCount = 1,
-  previousProbability: number | null = null,
+  match: { similarity: number; articleCount?: number },
+  estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
 ): void {
   if (isDevEnv()) return
 
-  const sourceLabel = article.source ? ` · ${article.source}` : ''
-  const simPct = Math.round(similarity * 100)
-  // Distinguish a fresh estimate from an update to an existing one, so repeat
-  // notifications for the same forecast read as new information, not duplicates.
-  const changeLabel =
-    previousProbability === null
-      ? ' (first estimate)'
-      : previousProbability === probability
-        ? ' (unchanged)'
-        : ` (was ${previousProbability}%)`
-  const probLine = probability !== null ? ` · Oracle: <b>${probability}%</b>${changeLabel}` : ''
-  // When the estimate aggregates several articles, note how many backed it.
-  const evidenceLine = articleCount > 1 ? `\nBased on <b>${articleCount}</b> articles` : ''
+  const { probability, previous, ciLow, ciHigh } = estimate
+  const headerLine =
+    previous === null
+      ? `🗞️ <b>Oracle ${probability}%</b> · first estimate`
+      : previous === probability
+        ? `🗞️ <b>Oracle ${probability}%</b> · unchanged`
+        : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})`
+
+  // A confidence band under 2 points wide is display noise, not signal — and a
+  // missing bound (older snapshots predate ciLow/ciHigh) omits the line entirely
+  // rather than rendering a broken range.
+  const rangeLine =
+    ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? `\n     range ${ciLow}–${ciHigh}%` : ''
+
+  const sourceLabel = article.source ? ` — ${article.source}` : ''
+  const articleCount = match.articleCount ?? 1
+  const countLabel = articleCount > 1 ? `${articleCount} articles · ` : ''
+  const simPct = Math.round(match.similarity * 100)
 
   const msg = [
-    `🗞️ <b>News match</b>`,
+    `${headerLine}${rangeLine}`,
     `"${truncate(prediction.claimText, 120)}"`,
-    `<a href="${article.url}">${truncate(article.title, 100)}</a>`,
-    `Similarity: <b>${simPct}%</b>${sourceLabel}${probLine}${evidenceLine}`,
+    '',
+    `📰 <a href="${article.url}">${truncate(article.title, 100)}</a>${sourceLabel}`,
+    `     ${countLabel}match ${simPct}%`,
+    '',
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
 

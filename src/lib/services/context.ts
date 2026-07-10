@@ -336,8 +336,13 @@ function oracleMean(snapshot: unknown): number | null {
  * entries minutes apart. If the latest snapshot is a news-indexer match with the
  * same probability, the same Oracle mean, and the same source-URL set, this push
  * is the same measurement re-delivered — skip the write entirely.
+ *
+ * `stored` tells the caller whether anything actually changed, so a re-delivered
+ * push can skip its Telegram notification too, not just the database write.
  */
-export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Promise<void> {
+export async function saveNewsIndexerMatch(
+  input: SaveNewsIndexerMatchInput,
+): Promise<{ stored: boolean }> {
   // Skip clock rows when finding "the latest push": a daily requote sitting
   // between two identical article pushes must not defeat this dedup check
   // (the origin/reasoning comparison would never match a clock row anyway,
@@ -356,7 +361,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
     sourceUrlKey(latest.sources) === sourceUrlKey(input.sources)
   ) {
     log.info({ predictionId: input.predictionId }, 'Skipped duplicate news-indexer snapshot')
-    return
+    return { stored: false }
   }
 
   await recordEstimate({
@@ -370,6 +375,7 @@ export async function saveNewsIndexerMatch(input: SaveNewsIndexerMatchInput): Pr
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
   })
+  return { stored: true }
 }
 
 /** Fetch the context snapshot timeline for a prediction (heavy tail stripped). */

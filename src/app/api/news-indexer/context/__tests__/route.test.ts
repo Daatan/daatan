@@ -91,7 +91,7 @@ describe('POST /api/news-indexer/context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(ACTIVE_PREDICTION as never)
-    vi.mocked(saveNewsIndexerMatch).mockResolvedValue(undefined as never)
+    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true })
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
   })
 
@@ -157,17 +157,26 @@ describe('POST /api/news-indexer/context', () => {
     expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
   })
 
-  it('notifies Telegram when the Oracle produced an estimate, with the pre-push value for the "(was X%)" label', async () => {
+  it('notifies Telegram when the Oracle produced an estimate, with the pre-push value as "previous"', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).toHaveBeenCalledTimes(1)
-    // last arg = the prediction's confidence BEFORE this push
-    expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][5]).toBe(65)
+    const [, , , estimate] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
+    // previous = the prediction's confidence BEFORE this push
+    expect(estimate).toMatchObject({ probability: 75, previous: 65, ciLow: 60, ciHigh: 90 })
   })
 
   it('does NOT notify Telegram on a null-Oracle push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+    await POST(post('test-secret'))
+    expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
+  })
+
+  it('does NOT notify Telegram when the push dedups to nothing stored (a re-delivered measurement)', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false })
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
