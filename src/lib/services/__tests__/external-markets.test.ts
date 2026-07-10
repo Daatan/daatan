@@ -67,16 +67,18 @@ function gammaRow(overrides: Record<string, unknown> = {}) {
  * URL-aware fetch mock. `suggest()` hits `/public-search` (events→markets shape),
  * `fetchMarket()` hits `/markets?slug=` (a flat array), and history backfill hits
  * the CLOB `/prices-history` endpoint. Route each to the right shape; `searchRows`
- * populates the single search event's `markets[]`.
+ * populates the single search event's `markets[]`, and `eventSlug` is that event's
+ * own slug (absent from the real payload's market rows — see normalizeGammaMarket).
  */
 function gammaFetchMock(
   searchRows: Record<string, unknown>[],
   marketRows = [gammaRow()],
   history: { t: number; p: number }[] = [],
+  eventSlug?: string,
 ) {
   return vi.fn(async (input: RequestInfo | URL) => {
     if (String(input).includes('/public-search')) {
-      return jsonResponse({ events: [{ markets: searchRows }] })
+      return jsonResponse({ events: [{ slug: eventSlug, markets: searchRows }] })
     }
     if (String(input).includes('/prices-history')) {
       return jsonResponse({ history })
@@ -160,6 +162,35 @@ describe('normalizeGammaMarket', () => {
   })
 })
 
+/**
+ * `/event/{slug}` addresses an event, not a market. A grouped event (one question,
+ * many deadlines) gives each market its own slug, so a URL built from the market
+ * slug alone 404s — the bug these cover.
+ */
+describe('normalizeGammaMarket event-slug URLs', () => {
+  it("builds /event/{event}/{market} from the row's nested parent event", () => {
+    const m = normalizeGammaMarket(gammaRow({ events: [{ slug: 'the-event' }] }))
+    expect(m!.url).toBe('https://polymarket.com/event/the-event/will-x-happen')
+  })
+
+  it('prefers an explicitly passed event slug over the nested one', () => {
+    const m = normalizeGammaMarket(gammaRow({ events: [{ slug: 'nested' }] }), 'explicit')
+    expect(m!.url).toBe('https://polymarket.com/event/explicit/will-x-happen')
+  })
+
+  it('falls back to the bare market slug when no event is known', () => {
+    expect(normalizeGammaMarket(gammaRow())!.url).toBe('https://polymarket.com/event/will-x-happen')
+    expect(normalizeGammaMarket(gammaRow({ events: [] }))!.url).toBe(
+      'https://polymarket.com/event/will-x-happen',
+    )
+  })
+
+  it('ignores a malformed nested event rather than emitting "undefined" in the path', () => {
+    const m = normalizeGammaMarket(gammaRow({ events: [{ title: 'no slug here' }] }))
+    expect(m!.url).toBe('https://polymarket.com/event/will-x-happen')
+  })
+})
+
 describe('polymarketProvider.fetchMarket', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -186,6 +217,43 @@ describe('polymarketProvider.fetchMarket', () => {
   it('returns null when fetch throws', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('network'))
     expect(await polymarketProvider.fetchMarket('boom')).toBeNull()
+  })
+
+  /** Polymarket links a grouped event as `/event/{event}` with no market segment,
+   *  so parseId hands us an event slug that `/markets?slug=` can never match. */
+  describe('event-slug fallback', () => {
+    /** `/markets?slug=` misses; `/events?slug=` returns one event with `markets`. */
+    function eventFallbackMock(markets: Record<string, unknown>[]) {
+      return vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/markets?slug=')) return jsonResponse([])
+        if (url.includes('/events?slug=')) return jsonResponse([{ slug: 'the-event', markets }])
+        return jsonResponse(null, false, 404)
+      })
+    }
+
+    it('resolves an event slug to its most-traded open market', async () => {
+      global.fetch = eventFallbackMock([
+        gammaRow({ conditionId: '0xquiet', slug: 'by-july-31', volumeNum: 10 }),
+        gammaRow({ conditionId: '0xbusy', slug: 'by-december-31', volumeNum: 9000 }),
+      ])
+      const m = await polymarketProvider.fetchMarket('the-event')
+      expect(m!.externalId).toBe('0xbusy')
+      expect(m!.url).toBe('https://polymarket.com/event/the-event/by-december-31')
+    })
+
+    it('skips closed markets when picking', async () => {
+      global.fetch = eventFallbackMock([
+        gammaRow({ conditionId: '0xdone', slug: 'by-june-30', volumeNum: 9000, closed: true }),
+        gammaRow({ conditionId: '0xlive', slug: 'by-december-31', volumeNum: 10 }),
+      ])
+      expect((await polymarketProvider.fetchMarket('the-event'))!.externalId).toBe('0xlive')
+    })
+
+    it('returns null when the event has no open market', async () => {
+      global.fetch = eventFallbackMock([gammaRow({ closed: true })])
+      expect(await polymarketProvider.fetchMarket('the-event')).toBeNull()
+    })
   })
 })
 
@@ -363,6 +431,26 @@ describe('syncLinkedMarkets', () => {
 
     expect(result).toEqual({ synced: 1, failed: 0 })
     expect(prisma.$transaction).toHaveBeenCalledOnce()
+  })
+
+  it('rewrites the stored URL so rows saved with the old market-slug path self-heal', async () => {
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET' },
+    ] as never)
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse([gammaRow({ events: [{ slug: 'the-event' }] })]))
+
+    await syncLinkedMarkets()
+
+    expect(prisma.externalMarket.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'm1' },
+        data: expect.objectContaining({
+          url: 'https://polymarket.com/event/the-event/will-x-happen',
+        }),
+      }),
+    )
   })
 
   it('counts a market as failed when its fetch returns nothing', async () => {
@@ -604,6 +692,15 @@ describe('suggestMarkets', () => {
       expect.stringContaining('/public-search?q='),
       expect.any(Object),
     )
+  })
+
+  it("builds suggestion URLs from the enclosing event's slug, not the market slug", async () => {
+    // public-search market rows carry no `events[]` of their own, so the parent
+    // slug can only come from the enclosing event. Without it, every suggestion
+    // for a grouped event links to a 404.
+    global.fetch = gammaFetchMock([gammaRow()], [gammaRow()], [], 'the-event')
+    const out = await suggestMarkets('will x happen')
+    expect(out[0].url).toBe('https://polymarket.com/event/the-event/will-x-happen')
   })
 
   it('skips closed markets and dedupes by externalId', async () => {
