@@ -3,14 +3,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockSearch, mockForecast, mockMeta, mockSave, mockMark, mockBuildQuery } = vi.hoisted(() => ({
-  mockSearch: vi.fn(),
-  mockForecast: vi.fn(),
-  mockMeta: vi.fn(),
-  mockSave: vi.fn(),
-  mockMark: vi.fn(),
-  mockBuildQuery: vi.fn(),
-}))
+const { mockSearch, mockForecast, mockMeta, mockSave, mockMark, mockBuildQuery, mockAddToPool, mockShadowCompare } =
+  vi.hoisted(() => ({
+    mockSearch: vi.fn(),
+    mockForecast: vi.fn(),
+    mockMeta: vi.fn(),
+    mockSave: vi.fn(),
+    mockMark: vi.fn(),
+    mockBuildQuery: vi.fn(),
+    mockAddToPool: vi.fn(),
+    mockShadowCompare: vi.fn(),
+  }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({ oracleSearch: (...a: unknown[]) => mockSearch(...a) }))
 vi.mock('@/lib/llm/searchQuery', () => ({ buildSearchQuery: (...a: unknown[]) => mockBuildQuery(...a) }))
@@ -22,6 +25,10 @@ vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: (...a: 
 vi.mock('@/lib/services/context', () => ({
   saveOracleSnapshotOnly: (...a: unknown[]) => mockSave(...a),
   markOracleAttempted: (...a: unknown[]) => mockMark(...a),
+}))
+vi.mock('@/lib/services/evidence-pool', () => ({
+  addArticlesToPool: (...a: unknown[]) => mockAddToPool(...a),
+  shadowCompareRecompute: (...a: unknown[]) => mockShadowCompare(...a),
 }))
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -35,6 +42,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockBuildQuery.mockResolvedValue('x query')
   mockMeta.mockResolvedValue(new Map())
+  mockAddToPool.mockResolvedValue(undefined)
+  mockShadowCompare.mockResolvedValue(undefined)
 })
 
 describe('refreshOracleSnapshot', () => {
@@ -80,5 +89,68 @@ describe('refreshOracleSnapshot', () => {
     const [, opts] = mockForecast.mock.calls[0]
     expect(opts.claimDirection).toBe('SURVIVAL')
     expect(opts.claimDeadline).toBe(deadline)
+  })
+
+  describe('evidence pool shadow-write + recompute shadow-compare (retro ORACLE_VARIABLES.md §6 step 6)', () => {
+    const forecast = {
+      mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
+      sources: [{ source_id: 's1', source_name: 'BBC', url: 'https://a.com/1', stance: 0.2, certainty: 0.6, credibility_weight: 1, claims: ['c'] }],
+    }
+
+    it('shadow-writes the pool and shadow-compares the recompute on success', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast })
+
+      await refreshOracleSnapshot(prediction)
+
+      await vi.waitFor(() => expect(mockShadowCompare).toHaveBeenCalledTimes(1))
+      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.any(Array), 'backfill')
+      expect(mockShadowCompare).toHaveBeenCalledWith(
+        'p1',
+        { mean: 0.2, ciLow: 0.0, ciHigh: 0.4, settled: false },
+        null,
+        null,
+      )
+    })
+
+    it('normalizes a prediction with no claimDirection/claimDeadline fields to null (not undefined) for the shadow-compare', async () => {
+      // `prediction` fixture has neither key at all, matching a real Prisma row's
+      // nullable columns coming back as `null`, not TS-optional `undefined`.
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast })
+
+      await refreshOracleSnapshot(prediction)
+
+      await vi.waitFor(() => expect(mockShadowCompare).toHaveBeenCalledTimes(1))
+      const [, , claimDirection, claimDeadline] = mockShadowCompare.mock.calls[0]
+      expect(claimDirection).toBeNull()
+      expect(claimDeadline).toBeNull()
+    })
+
+    it('forwards a set claimDirection/claimDeadline to the shadow-compare', async () => {
+      const deadline = new Date('2026-12-31T00:00:00.000Z')
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast })
+
+      await refreshOracleSnapshot({ ...prediction, claimDirection: 'SURVIVAL', claimDeadline: deadline })
+
+      await vi.waitFor(() => expect(mockShadowCompare).toHaveBeenCalledTimes(1))
+      expect(mockShadowCompare).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({ mean: 0.2 }),
+        'SURVIVAL',
+        deadline,
+      )
+    })
+
+    it('does not shadow-compare when the Oracle returns no usable forecast', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast: null })
+
+      await refreshOracleSnapshot(prediction)
+
+      expect(mockAddToPool).not.toHaveBeenCalled()
+      expect(mockShadowCompare).not.toHaveBeenCalled()
+    })
   })
 })

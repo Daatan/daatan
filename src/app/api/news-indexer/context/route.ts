@@ -7,7 +7,7 @@ import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
 import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
-import { addArticlesToPool } from '@/lib/services/evidence-pool'
+import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 
@@ -140,11 +140,27 @@ export async function POST(request: NextRequest) {
       const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
       const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl)
 
-      // Evidence pool shadow-write (foundation layer, retro docs/ORACLE_VARIABLES.md
-      // §6 part 2) — additive only, never blocks or alters the estimate below.
-      addArticlesToPool(prediction.id, oracleSources, 'news-indexer').catch((err) =>
-        log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
-      )
+      // Evidence pool shadow-write + recompute shadow-compare (retro
+      // docs/ORACLE_VARIABLES.md §6 part 2, step 6) — additive only, never
+      // blocks or alters the estimate below. Chained (not parallel) so the
+      // recompute reads a pool that already includes this run's articles.
+      addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
+        .then(() =>
+          shadowCompareRecompute(
+            prediction.id,
+            {
+              mean: oracleForecast.mean,
+              ciLow: oracleForecast.ci_low,
+              ciHigh: oracleForecast.ci_high,
+              settled: oracleForecast.settled ?? false,
+            },
+            prediction.claimDirection,
+            prediction.claimDeadline,
+          ),
+        )
+        .catch((err) =>
+          log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write/recompute-compare failed'),
+        )
 
       const { stored } = await saveNewsIndexerMatch({
         predictionId: prediction.id,
