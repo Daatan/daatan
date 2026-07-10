@@ -162,13 +162,24 @@ breaks determinism at `temperature: 0`.
 - **Dormant without a key.** With no OpenRouter key configured (admin Settings → env),
   the sweep returns `{dormant: true}` and does nothing. That is a 200, not a failure.
 
-### AWS credits: not applicable
+### AWS credits: not about cost — about not having a single point of failure
 
 Of the five, only `qwen3-235b-a22b-2507` exists on Bedrock
-(`qwen.qwen3-235b-a22b-2507-v1:0`, eu-central-1) — and it is the cheapest member at
-$0.23/mo. Bedrock carries OpenAI's and Google's *open-weights* lines (`gpt-oss-*`,
-`gemma-3-*`), not their flagship API models; xAI is absent entirely. Substituting
-open-weights cousins under the same member label would poison the comparison.
+(`qwen.qwen3-235b-a22b-2507-v1:0`, eu-central-1). Bedrock carries OpenAI's and Google's
+*open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models; xAI is
+absent entirely. Substituting open-weights cousins under the same member label would
+poison the per-member comparison, so the other four stay on OpenRouter.
+
+Running Qwen on Bedrock saves $0.23/mo, which is nothing. The reason to do it is that
+**every member currently depends on one third-party credential** — and on 2026-07-10
+that credential was dead, so all 285 calls in the first real sweep returned 401 and the
+panel produced nothing. A Bedrock member runs on the account's own IAM role and keeps
+the panel producing data through an OpenRouter outage or a bad key. It is also the only
+non-reasoning member, so it carries none of the hidden-token cost risk.
+
+`terraform/bedrock_invoke.tf` grants the app role `bedrock:InvokeModel`, scoped to the
+model ids the roster names. `AiEstimate.model` records the Bedrock model id, so a member
+that moves between routes is correctly treated as a *different* member for Brier.
 
 ---
 
