@@ -116,13 +116,26 @@ say which is better. This comparison is free.
 
 `src/lib/llm/panel/roster.ts`. Four on OpenRouter, one on Bedrock.
 
-| Member | Route | $/M in | $/M out | Reasoning | Role |
-|---|---|---|---|---|---|
-| `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | — (credits) | — | **no** | deterministic baseline, outage-proof |
-| `openai/gpt-5-mini` | openrouter | 0.25 | 2.00 | yes | |
-| `google/gemini-2.5-flash` | openrouter | 0.30 | 2.50 | yes | |
-| `x-ai/grok-4.3` | openrouter | 1.25 | 2.50 | yes | |
-| `openai/gpt-5-nano` | openrouter | 0.05 | 0.40 | yes | **control** |
+| Member | Route | Lineage | Role |
+|---|---|---|---|
+| `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | Alibaba | deterministic baseline, outage-proof |
+| `deepseek/deepseek-chat` | openrouter (`deepinfra/fp4`) | DeepSeek | |
+| `google/gemini-2.5-flash` | openrouter (`google-vertex/eu`) | Google | |
+| `x-ai/grok-4.3` | openrouter (`xai`) | xAI | |
+| `google/gemma-3-4b-it` | openrouter (`deepinfra/bf16`) | Google (4B) | **control** |
+
+> **No OpenAI member.** The gpt-5 lineup on OpenRouter is *reasoning-mandatory* —
+> `reasoning: {enabled: false}` returns `HTTP 400 "Reasoning is mandatory for this
+> endpoint and cannot be disabled"`, so `gpt-5-mini`/`gpt-5-nano` abstained on 100% of
+> calls (confirmed 2026-07-11: all 56 staging rows null). Reasoning models are
+> incompatible with this panel by construction — temperature 0, no hidden thinking, one
+> cheap integer, a deterministic step-function chart. DeepSeek replaces the OpenAI slot
+> as a genuinely independent lineage; a 4B Gemma is a cleaner control than a mini
+> frontier model. Every member verified against the live API (`finish=stop`, ~7–8
+> completion tokens) before landing. Revisit if OpenAI ships a non-reasoning tier.
+>
+> **Grok honors `reasoning: {enabled: false}`** (5–6 tokens observed), so the
+> `max_tokens: 64` cap never trips on it — the concern that drove that cap is resolved.
 
 The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
 one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in

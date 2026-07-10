@@ -75,7 +75,20 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     route: 'bedrock',
   },
 
-  { model: 'openai/gpt-5-mini', mode: 'ungrounded', route: 'openrouter', providerOrder: ['openai'] },
+  // Was openai/gpt-5-mini. OpenAI's entire gpt-5 lineup on OpenRouter is reasoning-
+  // MANDATORY: `reasoning: {enabled: false}` returns HTTP 400 "Reasoning is mandatory
+  // for this endpoint and cannot be disabled", so every call 401-style failed and the
+  // member abstained 100% of the time (confirmed on staging 2026-07-11, all 56 rows
+  // null). Reasoning models are incompatible with this panel by design — temperature 0,
+  // no hidden thinking, one cheap integer, a deterministic step-function chart. DeepSeek
+  // is a strong independent lineage (distinct from Alibaba/Google/xAI) and answers in
+  // ~7 tokens with reasoning off. Verified against the live API before landing.
+  {
+    model: 'deepseek/deepseek-chat',
+    mode: 'ungrounded',
+    route: 'openrouter',
+    providerOrder: ['deepinfra/fp4'],
+  },
 
   // google-vertex/eu keeps claim text in the EU, matching where the rest of the
   // stack runs (eu-central-1).
@@ -88,11 +101,15 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
 
   { model: 'x-ai/grok-4.3', mode: 'ungrounded', route: 'openrouter', providerOrder: ['xai'] },
 
+  // Was openai/gpt-5-nano (same reasoning-mandatory 400 as gpt-5-mini). The control is
+  // deliberately WEAK — if it ties the strong members on Brier, the instrument is not
+  // measuring anything. A 4B open-weights model is a cleaner control than a mini
+  // frontier model ever was. Verified: ~8 tokens, reasoning off.
   {
-    model: 'openai/gpt-5-nano',
+    model: 'google/gemma-3-4b-it',
     mode: 'ungrounded',
     route: 'openrouter',
-    providerOrder: ['openai'],
+    providerOrder: ['deepinfra/bf16'],
     control: true,
   },
 ] as const
