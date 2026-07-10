@@ -210,8 +210,39 @@ function marketVolume(raw: Record<string, unknown>): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** Map a raw Gamma market row into the normalized shape. Returns null if unusable. */
-export function normalizeGammaMarket(raw: Record<string, unknown>): NormalizedMarket | null {
+/** The parent event's slug for a raw Gamma market row, when the row carries it.
+ *  `/markets?slug=` nests the event under `events[]`; `/public-search` does not,
+ *  so that path passes the slug in explicitly. */
+function eventSlugOf(raw: Record<string, unknown>): string | null {
+  const events = Array.isArray(raw.events) ? raw.events : []
+  const first = events[0] as Record<string, unknown> | undefined
+  return typeof first?.slug === 'string' ? first.slug : null
+}
+
+/** Canonical web URL for a Polymarket market.
+ *
+ *  `/event/…` addresses an **event**, not a market. A grouped event (one question,
+ *  many deadlines) has its own slug, distinct from each market's — so building the
+ *  path from the market slug alone 404s for every such market. Only single-market
+ *  events happen to work, because Polymarket then reuses one slug for both, which
+ *  is why the breakage looked intermittent.
+ *
+ *  `/event/{event}/{market}` resolves for grouped and single-market events alike,
+ *  and pins the exact market. Fall back to the bare market slug when the event is
+ *  unknown: no worse than what we emitted before. */
+function polymarketUrl(eventSlug: string | null, marketSlug: string): string {
+  return eventSlug
+    ? `https://polymarket.com/event/${eventSlug}/${marketSlug}`
+    : `https://polymarket.com/event/${marketSlug}`
+}
+
+/** Map a raw Gamma market row into the normalized shape. Returns null if unusable.
+ *  `eventSlug` overrides the row's own nested event — pass it from `/public-search`,
+ *  whose market rows omit `events[]`. */
+export function normalizeGammaMarket(
+  raw: Record<string, unknown>,
+  eventSlug?: string | null,
+): NormalizedMarket | null {
   const externalId = typeof raw.conditionId === 'string' ? raw.conditionId : null
   const slug = typeof raw.slug === 'string' ? raw.slug : null
   const question = typeof raw.question === 'string' ? raw.question : null
@@ -248,7 +279,7 @@ export function normalizeGammaMarket(raw: Record<string, unknown>): NormalizedMa
     provider: 'POLYMARKET',
     externalId,
     slug,
-    url: `https://polymarket.com/event/${slug}`,
+    url: polymarketUrl(eventSlug ?? eventSlugOf(raw), slug),
     question,
     outcomes,
     yesProbability,
@@ -372,8 +403,23 @@ export const polymarketProvider: MarketProvider = {
     const rows = await gammaFetch<Record<string, unknown>[]>(
       `/markets?slug=${encodeURIComponent(slug)}`,
     )
-    if (!rows || rows.length === 0) return null
-    return normalizeGammaMarket(rows[0])
+    if (rows && rows.length > 0) return normalizeGammaMarket(rows[0])
+
+    // No market by that slug. Polymarket shows grouped events at `/event/{event}`
+    // with no market segment, so a pasted URL often yields the *event* slug —
+    // which `/markets?slug=` can never match. Resolve it as an event and take its
+    // most-traded open market, the one the event page opens on.
+    const events = await gammaFetch<{ slug?: string; markets?: Record<string, unknown>[] }[]>(
+      `/events?slug=${encodeURIComponent(slug)}`,
+    )
+    const event = events?.[0]
+    if (!event) return null
+    const candidates = [...(event.markets ?? [])].sort((a, b) => marketVolume(b) - marketVolume(a))
+    for (const raw of candidates) {
+      const m = normalizeGammaMarket(raw, event.slug ?? slug)
+      if (m && !m.closed) return m
+    }
+    return null
   },
 
   async suggest(query: string, limit: number): Promise<MarketSuggestion[]> {
@@ -382,9 +428,9 @@ export const polymarketProvider: MarketProvider = {
     // carries a `markets[]` whose rows are shaped like Gamma market rows, so we
     // reuse normalizeGammaMarket. Open markets only — closed ones can't be linked.
     const collect = async (q: string): Promise<MarketSuggestion[]> => {
-      const data = await gammaFetch<{ events?: { markets?: Record<string, unknown>[] }[] }>(
-        `/public-search?q=${encodeURIComponent(q)}`,
-      )
+      const data = await gammaFetch<
+        { events?: { slug?: string; markets?: Record<string, unknown>[] }[] }
+      >(`/public-search?q=${encodeURIComponent(q)}`)
       const out: MarketSuggestion[] = []
       const seen = new Set<string>()
       for (const ev of data?.events ?? []) {
@@ -394,7 +440,9 @@ export const polymarketProvider: MarketProvider = {
         let kept = 0
         for (const raw of ranked) {
           if (kept >= MAX_MARKETS_PER_EVENT) break
-          const m = normalizeGammaMarket(raw)
+          // These rows carry no `events[]` of their own, so the parent slug has to
+          // come from the enclosing event or the suggestion's URL would 404.
+          const m = normalizeGammaMarket(raw, ev.slug ?? null)
           if (!m || m.closed || seen.has(m.externalId)) continue
           seen.add(m.externalId)
           kept++
@@ -607,6 +655,10 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
         prisma.externalMarket.update({
           where: { id: cached.id },
           data: {
+            // Rewrite the stored URL every sync so rows persisted with the old
+            // market-slug-only path heal themselves on the next cron tick; no
+            // separate backfill. Cheap: it's the same row we already touch.
+            url: latest.url,
             resolved: latest.closed,
             resolvedOutcome: latest.resolvedOutcome,
             endDate: latest.endDate,
