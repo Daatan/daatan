@@ -67,15 +67,17 @@ Monitors the **news-indexer** (`scrapper.daatan.com`) — free disk + DB / pipel
 
 ALERT-ONLY every 2 hours (even UTC hours, at :17) → 🚨 to **both** channels (clean + noisy); silent when healthy. Once a day at **08:00 UTC** it also posts a plain digest to the **noisy** channel (the digest hour must be even so an even-hour run lands on it).
 
-| Event | Icon | Trigger |
-|---|---|---|
-| Disk low | 💾 | `disk.used_percent` > 80%, or a jump > 2 pp vs the previous hour |
-| Worker unhealthy | ⚙️ | `worker.status` ≠ `ok` |
-| Pipeline stalled | 📰 | 0 articles indexed in 24h |
-| Queue backed up | 📮 | DLQ depth > 0, or queue depth > 500 |
-| Stale feed | 🕸️ | an enabled feed stopped producing > 7d |
-| Indexer down | 🚨 | `/stats` unreachable |
-| Daily digest | 📊 | always at 08:00 UTC (disk, DB, articles, worker, matches, stale feeds) |
+Only **acute** conditions alert. Each one starts, gets fixed, and stops, so a repeating message means it is still broken. A **chronic** condition — one that stays true until a human edits config — must never alert on a 2-hourly schedule, or it posts the same text 12×/day to the high-signal channel forever. Stale feeds are chronic (they need a `sources.yaml` edit), so they appear in the daily digest only.
+
+| Event | Icon | Trigger | Alerts |
+|---|---|---|---|
+| Disk low | 💾 | `disk.used_percent` > 80%, or a jump > 2 pp vs the previous hour | 🚨 both channels |
+| Worker unhealthy | ⚙️ | `worker.status` ≠ `ok` | 🚨 both channels |
+| Pipeline stalled | 📰 | 0 articles indexed in 24h | 🚨 both channels |
+| Queue backed up | 📮 | DLQ depth > 0, or queue depth > 500 | 🚨 both channels |
+| Indexer down | 🚨 | `/stats` unreachable | 🚨 both channels |
+| Stale feed | 🕸️ | an enabled feed stopped producing > 7d | digest only (chronic) |
+| Daily digest | 📊 | always at 08:00 UTC (disk, DB, articles, worker, matches, stale feeds) | noisy |
 
 ---
 

@@ -10,7 +10,7 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
-import { addArticlesToPool } from '@/lib/services/evidence-pool'
+import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { aiResearchEnabled } from '@/lib/capabilities'
@@ -226,10 +226,26 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl)
                 // Evidence pool shadow-write (foundation layer, retro
                 // docs/ORACLE_VARIABLES.md §6 part 2) — additive only, never
-                // blocks or alters the estimate below.
-                addArticlesToPool(prediction.id, enrichedSources, 'analyze').catch((err) =>
-                    log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write failed'),
-                )
+                // blocks or alters the estimate below. Chained (not run in
+                // parallel) so the recompute-shadow-compare below reads a pool
+                // that already includes this run's articles.
+                addArticlesToPool(prediction.id, enrichedSources, 'analyze')
+                    .then(() =>
+                        shadowCompareRecompute(
+                            prediction.id,
+                            {
+                                mean: oracleForecast.mean,
+                                ciLow: oracleForecast.ci_low,
+                                ciHigh: oracleForecast.ci_high,
+                                settled: oracleForecast.settled ?? false,
+                            },
+                            prediction.claimDirection,
+                            prediction.claimDeadline,
+                        ),
+                    )
+                    .catch((err) =>
+                        log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write/recompute-compare failed'),
+                    )
                 return {
                     externalProbability: prob,
                     externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',

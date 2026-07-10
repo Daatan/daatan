@@ -148,7 +148,13 @@ formula; never captured anywhere in daatan's pipeline before this, so a naive
 recompute would have treated every pooled article as fully on-topic.
 **Not yet enforced by any computation** — the recompute-over-pool cutover (the
 ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
-excluding an article here has no effect on the live estimate today.
+excluding an article here has no effect on the live estimate today. As of
+`shadowCompareRecompute()` in `evidence-pool.ts`, every `analyze` run
+does call retro's `POST /pool/aggregate` with the current non-excluded pool
+and logs a comparison against the live estimate (`event=pool_recompute_shadow`)
+— log-only, proving the recompute pipeline produces sane numbers before any
+path is cut over to trust it; the persisted estimate is still always the
+live `/forecast` result.
 
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
