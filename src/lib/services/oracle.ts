@@ -44,8 +44,9 @@ export interface ClaimMeta {
 
 /** Map to retro's `ForecastRequest.claim_direction` — a strict
  *  `Literal["arrival", "survival"]`. NONE/null must be omitted entirely, not
- *  sent as the literal string "none": retro 422s on any other value. */
-function claimDirectionParam(direction: ClaimDirection | null | undefined): 'arrival' | 'survival' | undefined {
+ *  sent as the literal string "none": retro 422s on any other value. Same
+ *  mapping `PoolAggregateRequest.claim_direction` expects (see evidence-pool.ts). */
+export function claimDirectionParam(direction: ClaimDirection | null | undefined): 'arrival' | 'survival' | undefined {
   if (direction === ClaimDirection.ARRIVAL) return 'arrival'
   if (direction === ClaimDirection.SURVIVAL) return 'survival'
   return undefined
