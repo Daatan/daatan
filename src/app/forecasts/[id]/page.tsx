@@ -7,6 +7,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
+import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { getForecastVoters } from '@/lib/services/forecast-sources'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
@@ -260,12 +261,22 @@ export default async function ForecastDetailPage({ params }: Props) {
     permanentRedirect(`/forecasts/${prediction.slug}`)
   }
 
-  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory] = await Promise.all([
-    getInitialComments(prediction.id),
-    getInitialContextSnapshots(prediction.id),
-    getForecastVoters(prediction.id),
-    getProbabilityHistory(prediction.id),
-  ])
+  // The AI panel is a hidden, opt-in source (docs/AI_PANEL.md §8): only load and pass its
+  // series when THIS viewer enabled it in Settings. Read here rather than from the session
+  // token so the toggle takes effect without re-login. Anonymous viewers never see it.
+  const showAiPanel = session?.user?.id
+    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { showAiPanel: true } }))
+        ?.showAiPanel ?? false
+    : false
+
+  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory, panelSeries] =
+    await Promise.all([
+      getInitialComments(prediction.id),
+      getInitialContextSnapshots(prediction.id),
+      getForecastVoters(prediction.id),
+      getProbabilityHistory(prediction.id),
+      showAiPanel ? getPanelSeries(prediction.id) : Promise.resolve([]),
+    ])
   // Chart series: includes kind='clock' glide requotes (unlike the event
   // timeline above) so the daily time-decay adjustment shows as movement.
   const initialProbabilityHistory = probabilityHistory.map((s) => ({
@@ -410,6 +421,8 @@ export default async function ForecastDetailPage({ params }: Props) {
         initialContextSnapshots={initialContextSnapshots}
         initialProbabilityHistory={initialProbabilityHistory}
         initialContributingSources={initialContributingSources}
+        aiPanelSeries={panelSeries}
+        showAiPanel={showAiPanel}
       />
     </>
   )

@@ -346,6 +346,8 @@
     "title": "הגדרות",
     "preferences": "העדפות",
     "preferencesDescription": "נהל את הגדרות התצוגה והשפה שלך.",
+    "aiPanel": "פאנל AI",
+    "aiPanelDescription": "הצג קווי הערכת AI ניסיוניים לפי מודל בתרשימי התחזיות. כבוי כברירת מחדל; נפרד מהאורקל ולעולם אינו משפיע על הניקוד שלך.",
     "language": "שפה",
     "languageDescription": "בחר את שפת התצוגה המועדפת עליך",
     "notifications": "התראות",

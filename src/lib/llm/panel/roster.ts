@@ -125,3 +125,31 @@ export function rosterSignature(members: readonly PanelMember[] = PANEL_MEMBERS)
     .sort()
     .join(',')
 }
+
+/**
+ * Short human label for a member on the chart legend. Keyed by prefix so a version
+ * bump (grok-4.3 → grok-4.4, or the Bedrock qwen id) keeps its label without an edit.
+ * Falls back to the raw slug so a new member is never unlabelled.
+ */
+export function panelMemberLabel(model: string): string {
+  if (model.startsWith('qwen')) return 'Qwen'
+  if (model.startsWith('deepseek')) return 'DeepSeek'
+  if (model.startsWith('google/gemini')) return 'Gemini'
+  if (model.startsWith('google/gemma')) return 'Gemma'
+  if (model.startsWith('x-ai/grok')) return 'Grok'
+  if (model.startsWith('openai/')) return 'GPT'
+  return model
+}
+
+/**
+ * A distinct, stable colour per member for the dashed panel lines. Deliberately not
+ * the Oracle's amber (#FBBF24), the community blue, or the market pink — the panel is
+ * its own source. Indexed by roster position so colours don't shuffle when a member
+ * abstains on a given run.
+ */
+export const PANEL_MEMBER_COLORS = ['#22D3EE', '#A78BFA', '#F472B6', '#4ADE80', '#FB923C'] as const
+
+export function panelMemberColor(model: string, members: readonly PanelMember[] = PANEL_MEMBERS): string {
+  const i = members.findIndex((m) => m.model === model)
+  return PANEL_MEMBER_COLORS[(i < 0 ? 0 : i) % PANEL_MEMBER_COLORS.length]
+}

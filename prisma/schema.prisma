@@ -38,6 +38,10 @@ model User {
   emailNotifications Boolean @default(true)
   preferredLanguage  String  @default("en") @db.VarChar(10) // ISO 639-1 code (en, he, etc.)
   isPublic           Boolean @default(true)
+  // Show the experimental AI-panel member lines on forecast charts (docs/AI_PANEL.md §8).
+  // Off by default: the panel is a hidden source, opt-in per user via Settings. Read
+  // server-side in the forecast page loader, so it takes effect without re-login.
+  showAiPanel        Boolean @default(false) @map("show_ai_panel")
 
   // Roles
   role UserRole @default(USER)
