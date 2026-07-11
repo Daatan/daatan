@@ -1067,6 +1067,7 @@
     "scores": "Poentoj",
     "oracleBadge": "Orakolo",
     "controlBadge": "kontrolo",
+    "marketBadge": "merkato",
     "emptyTitle": "Ankoraŭ neniuj poentoj",
     "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
     "footnote": "Samtempa Brier: la takso de ĉiu modelo en la momento de vetado, poentita kontraŭ la rezulto. Membroj kun malpli ol 5 poentoj estas kaŝitaj. La Orakolo estas inkluzivita por komparo; “kontrolo” estas intence malforta modelo."
