@@ -276,6 +276,7 @@
   "leaderboard": {
     "title": "Leaderboard",
     "subtitle": "Top predictors ranked by performance. Prove your accuracy and climb the ranks.",
+    "aiPanelLink": "AI panel leaderboard",
     "rank": "Rank",
     "predictor": "Predictor",
     "correct": "Correct",
@@ -1053,5 +1054,21 @@
     "loading": "Loading...",
     "hideReplies": "Hide replies",
     "showReplies": "{count, plural, one {Show # reply} other {Show # replies}}"
+  },
+  "aiLeaderboard": {
+    "title": "AI Panel Leaderboard",
+    "experimental": "Experimental",
+    "backToLeaderboard": "Back to leaderboard",
+    "explainer": "Each AI model is scored the moment a user stakes, against the outcome — the same matched-time Brier used for humans. Lower is better; 0.25 is a coin flip.",
+    "humanBaseline": "Human forecasters (same commitments)",
+    "nScores": "{n} scores",
+    "model": "Model",
+    "avgBrier": "Avg Brier",
+    "scores": "Scores",
+    "oracleBadge": "Oracle",
+    "controlBadge": "control",
+    "emptyTitle": "No scores yet",
+    "emptyDesc": "AI-panel Brier scores appear once forecasts that were staked on resolve.",
+    "footnote": "Matched-time Brier: each model’s estimate at the instant a user staked, scored against the outcome. Members with fewer than 5 scores are hidden. The Oracle is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet."
   }
 }

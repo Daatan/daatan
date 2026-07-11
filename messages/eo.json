@@ -276,6 +276,7 @@
   "leaderboard": {
     "title": "Rangolisto",
     "subtitle": "Plej bonaj prognozantoj ordigitaj laŭ rendimento. Pruvu vian precizecon kaj grimpu la rangojn.",
+    "aiPanelLink": "Poentotabelo de AI-panelo",
     "rank": "Rango",
     "predictor": "Prognozanto",
     "correct": "Ĝusta",
@@ -1053,5 +1054,21 @@
     "loading": "Ŝargante...",
     "hideReplies": "Kaŝi respondojn",
     "showReplies": "{count, plural, one {Montri # respondon} other {Montri # respondojn}}"
+  },
+  "aiLeaderboard": {
+    "title": "Poentotabelo de AI-panelo",
+    "experimental": "Eksperimenta",
+    "backToLeaderboard": "Reen al poentotabelo",
+    "explainer": "Ĉiu AI-modelo estas poentita en la momento kiam uzanto vetas, kontraŭ la rezulto — la sama samtempa Brier uzata por homoj. Malpli estas pli bone; 0,25 estas monero-ĵeto.",
+    "humanBaseline": "Homaj prognozistoj (samaj vetoj)",
+    "nScores": "{n} poentoj",
+    "model": "Modelo",
+    "avgBrier": "Meza Brier",
+    "scores": "Poentoj",
+    "oracleBadge": "Orakolo",
+    "controlBadge": "kontrolo",
+    "emptyTitle": "Ankoraŭ neniuj poentoj",
+    "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
+    "footnote": "Samtempa Brier: la takso de ĉiu modelo en la momento de vetado, poentita kontraŭ la rezulto. Membroj kun malpli ol 5 poentoj estas kaŝitaj. La Orakolo estas inkluzivita por komparo; “kontrolo” estas intence malforta modelo."
   }
 }
