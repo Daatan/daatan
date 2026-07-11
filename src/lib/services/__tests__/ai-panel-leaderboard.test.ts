@@ -56,7 +56,7 @@ describe('getAiLeaderboard', () => {
     expect(lb.humanAvgBrier).toBe(0.2)
     expect(lb.humanCount).toBe(3)
     // Humans were aggregated over exactly the AI-scored commitment ids.
-    expect(commitAgg.mock.calls[0][0].where.id).toEqual({ in: ['c1'] })
+    expect(commitAgg.mock.calls[0]?.[0]?.where?.id).toEqual({ in: ['c1'] })
   })
 
   it('has no human baseline until a scored commitment exists', async () => {
