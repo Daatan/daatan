@@ -52,6 +52,8 @@ jobs:
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
           BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
         run: |
           ENV="${{ matrix.env.name }}"
           if [ "$ENV" = "staging" ]; then
@@ -60,23 +62,31 @@ jobs:
             BASE="${{ matrix.env.url }}"
           fi
 
+          # A missing URL is a broken secret, not a reason to skip: a deleted
+          # STAGING_URL must turn the job red, not silently switch off coverage.
           if [ -z "$BASE" ]; then
-            echo "⚠️ No URL configured for $ENV — skipping"
-            exit 0
+            echo "❌ No URL configured for $ENV"
+            exit 1
           fi
 
           QS=""
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             QS="?dryRun=1"
           fi
-          if [ -n "${{ inputs.limit }}" ]; then
-            if [ -z "$QS" ]; then QS="?limit=${{ inputs.limit }}"; else QS="$QS&limit=${{ inputs.limit }}"; fi
+          if [ -n "$LIMIT" ]; then
+            if [ -z "$QS" ]; then QS="?limit=$LIMIT"; else QS="$QS&limit=$LIMIT"; fi
           fi
 
           # The endpoint validates x-cron-secret against env.BOT_RUNNER_SECRET on the
           # server (src/app/api/cron/ai-panel/route.ts).
+          #
+          # --max-time is a transport guard, NOT the sweep budget: route.ts's
+          # maxDuration is inert on the self-hosted deployment, and a healthy
+          # first-of-day sweep (sequential forecasts, 30s per-call timeout) can
+          # legitimately run several minutes. 600s buys headroom without letting a
+          # dead server hang the job.
           HTTP=$(curl -s -o /tmp/panel_body.txt -w "%{http_code}" \
-            --max-time 300 \
+            --max-time 600 \
             -H "x-cron-secret: $BOT_RUNNER_SECRET" \
             "$BASE/api/cron/ai-panel$QS")
 
@@ -85,10 +95,10 @@ jobs:
 
           if [ "$HTTP" = "200" ]; then
             echo "✅ Panel sweep OK for $ENV"
-          elif [ "$HTTP" = "404" ]; then
-            # The route ships with v1.38.0+; until an env is deployed it 404s — not an error.
-            echo "ℹ️ Route not deployed yet on $ENV (HTTP 404) — skipping"
           else
+            # 404 is a failure too: the route has been live on both envs since
+            # v1.50.0 (2026-07-11), so "not found" now means a rename or proxy
+            # regression, not "not deployed yet".
             echo "❌ Panel sweep failed for $ENV (HTTP $HTTP)"
             exit 1
           fi
