@@ -4,6 +4,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     prediction: { findMany: vi.fn() },
     aiEstimateRun: { findFirst: vi.fn(), create: vi.fn() },
+    aiEstimate: { createMany: vi.fn() },
   },
 }))
 
@@ -45,6 +46,7 @@ import { PANEL_MEMBERS } from '@/lib/llm/panel/roster'
 
 const findFirst = vi.mocked(prisma.aiEstimateRun.findFirst)
 const createRun = vi.mocked(prisma.aiEstimateRun.create)
+const appendEstimates = vi.mocked(prisma.aiEstimate.createMany)
 const findManyPredictions = vi.mocked(prisma.prediction.findMany)
 const getTemplate = vi.mocked(getPromptTemplate)
 const getKey = vi.mocked(getOpenRouterKey)
@@ -62,6 +64,15 @@ const prediction = {
 
 function ok(probability: number | null) {
   return { probability, promptTokens: 250, completionTokens: 12, latencyMs: 400 }
+}
+
+/** Today's run as the date-gate would find it, covering the given members. */
+function todaysRun(members: readonly (typeof PANEL_MEMBERS)[number][] = PANEL_MEMBERS) {
+  return {
+    id: 'run-1',
+    inputHash: computeInputHash(prediction, NOW, promptVersionOf(TEMPLATE)),
+    estimates: members.map((m) => ({ model: m.model, mode: m.mode })),
+  }
 }
 
 beforeEach(() => {
@@ -155,15 +166,77 @@ describe('runPanelForPrediction', () => {
     )
   })
 
-  it('skips entirely when the input hash is unchanged', async () => {
-    const version = promptVersionOf(TEMPLATE)
-    findFirst.mockResolvedValue({ inputHash: computeInputHash(prediction, NOW, version) } as never)
+  it('skips entirely when the input hash is unchanged and every member is recorded', async () => {
+    findFirst.mockResolvedValue(todaysRun() as never)
 
     const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
 
     expect(result.status).toBe('skipped-unchanged')
     expect(callMember).not.toHaveBeenCalled()
     expect(createRun).not.toHaveBeenCalled()
+    expect(appendEstimates).not.toHaveBeenCalled()
+  })
+
+  // The 2026-07-10 shape: a dead key latched mid-sweep, so the day's run holds only the
+  // Bedrock member. Once the key works again, the same-day sweep must fill the hole —
+  // temperature 0 + a date-only prompt make the appended number exactly what it would
+  // have been at the run's original instant.
+  it('completes a partial run: asks only the missing members and appends to the day\'s run', async () => {
+    const bedrock = PANEL_MEMBERS.filter((m) => m.route === 'bedrock')
+    const openrouter = PANEL_MEMBERS.filter((m) => m.route === 'openrouter')
+    findFirst.mockResolvedValue(todaysRun(bedrock) as never)
+
+    const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
+
+    expect(result.status).toBe('completed-partial')
+    expect(result.estimated).toBe(openrouter.length)
+
+    // Recorded members are never re-asked: one call per member per forecast per day stands.
+    const asked = callMember.mock.calls.map(([m]) => m.model).sort()
+    expect(asked).toEqual(openrouter.map((m) => m.model).sort())
+
+    expect(createRun).not.toHaveBeenCalled()
+    const append = appendEstimates.mock.calls[0][0] as {
+      data: { runId: string; model: string; promptVersion: string }[]
+      skipDuplicates: boolean
+    }
+    expect(append.skipDuplicates).toBe(true)
+    expect(append.data).toHaveLength(openrouter.length)
+    for (const row of append.data) {
+      expect(row.runId).toBe('run-1')
+      expect(row.promptVersion).toBe(promptVersionOf(TEMPLATE))
+    }
+  })
+
+  it('stays quietly skipped when the missing members still cannot be authenticated', async () => {
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+
+    // No key: deliberate Bedrock-only mode. The second tick must not report failures.
+    const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: '' })
+
+    expect(result.status).toBe('skipped-unchanged')
+    expect(callMember).not.toHaveBeenCalled()
+    expect(appendEstimates).not.toHaveBeenCalled()
+  })
+
+  it('appends nothing when every missing member\'s call fails, so the next tick retries', async () => {
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+    callMember.mockRejectedValue(new Error('upstream 500'))
+
+    const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
+
+    expect(result.status).toBe('failed')
+    expect(appendEstimates).not.toHaveBeenCalled()
+  })
+
+  it('a dry run over a partial run calls nothing and appends nothing', async () => {
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+
+    const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test', dryRun: true })
+
+    expect(result.status).toBe('dry-run')
+    expect(callMember).not.toHaveBeenCalled()
+    expect(appendEstimates).not.toHaveBeenCalled()
   })
 
   it('records a null probability as an abstention, not a number', async () => {
@@ -412,6 +485,17 @@ describe('runPanelSweep', () => {
 
     expect(summary.written).toBe(2)
     expect(summary.dryRun).toBe(0)
+  })
+
+  it('counts a completed partial run separately from fresh writes', async () => {
+    findManyPredictions.mockResolvedValue([prediction] as never)
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(summary.completedPartial).toBe(1)
+    expect(summary.written).toBe(0)
+    expect(summary.failed).toBe(0)
   })
 
   it('a dry run without a key still calls no model and writes nothing', async () => {

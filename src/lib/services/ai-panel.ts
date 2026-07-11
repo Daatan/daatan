@@ -22,6 +22,10 @@ export type PanelRunStatus =
   /** every member's call threw; nothing written, so the next tick retries */
   | 'failed'
   | 'written'
+  /** today's run existed but was missing members (they couldn't be authenticated when it
+   *  was written); their estimates were appended in place. See the completion pass in
+   *  `runPanelForPrediction`. */
+  | 'completed-partial'
   | 'dry-run'
 
 export interface PanelRunResult {
@@ -226,15 +230,85 @@ export async function runPanelForPrediction(
   const template = opts.template ?? (await getPromptTemplate('panel-estimate'))
   const promptVersion = promptVersionOf(template)
   const inputHash = computeInputHash(prediction, now, promptVersion)
+  const ctx = opts.ctx ?? { openRouterDisabled: !opts.apiKey, sawOpenRouterAuthError: false }
 
   const latestRun = await prisma.aiEstimateRun.findFirst({
     where: { predictionId: prediction.id },
     orderBy: { createdAt: 'desc' },
-    select: { inputHash: true },
+    select: { id: true, inputHash: true, estimates: { select: { model: true, mode: true } } },
   })
 
   if (latestRun?.inputHash === inputHash) {
-    return { predictionId: prediction.id, status: 'skipped-unchanged', estimated: 0, abstained: 0 }
+    // Completion pass. A run written while some members couldn't be authenticated (a
+    // dead OpenRouter key latching mid-sweep) carries the day's hash but not the full
+    // roster — those members were never asked, so no row exists for them. Skipping
+    // outright would leave that hole unfillable until the next UTC day even after the
+    // key is fixed, and every commitment pinning the run permanently unscoreable for
+    // the missing members. Instead, ask ONLY the members that are missing AND askable
+    // now, and append their estimates to the day's run.
+    //
+    // Appending is sound because the estimate is deterministic for the day: temperature
+    // 0 and a date-only prompt mean the number is exactly what it would have been at the
+    // run's original instant — the same premise the chart's step-function carry-forward
+    // rests on. Members that already have a row (including failure-abstentions) are
+    // never re-asked: one call per member per forecast per day stands.
+    const recorded = new Set(latestRun.estimates.map((e) => `${e.model}:${e.mode}`))
+    const missing = PANEL_MEMBERS.filter((m) => !recorded.has(`${m.model}:${m.mode}`))
+    // Members we still cannot authenticate stay quiet: a deliberate Bedrock-only mode
+    // (no OpenRouter key) must keep reporting skipped, not failed, on the second tick.
+    const askable = missing.filter((m) => !(m.route === 'openrouter' && ctx.openRouterDisabled))
+
+    if (askable.length === 0) {
+      return { predictionId: prediction.id, status: 'skipped-unchanged', estimated: 0, abstained: 0 }
+    }
+
+    const prompt = buildPanelPrompt(template, prediction, now)
+
+    if (opts.dryRun) {
+      log.info(
+        { predictionId: prediction.id, promptVersion, missing: askable.map((m) => m.model), prompt },
+        'Panel dry run (would complete a partial run)',
+      )
+      return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
+    }
+
+    const outcomes = await callMembers(askable, prompt, opts.apiKey, prediction.id, ctx)
+
+    // Same rule as a fresh run: if nobody was reachable, write nothing so the next
+    // tick (or the next key fix) can still retry today.
+    if (outcomes.length === 0 || outcomes.every((o) => o.failed)) {
+      log.error({ predictionId: prediction.id }, 'No missing panel member produced a result — appending nothing')
+      return { predictionId: prediction.id, status: 'failed', estimated: 0, abstained: outcomes.length }
+    }
+
+    // skipDuplicates: a concurrent completion pass appending the same members is a
+    // no-op, mirroring the P2002 handling on run creation.
+    await prisma.aiEstimate.createMany({
+      data: outcomes.map((o) => ({
+        runId: latestRun.id,
+        model: o.member.model,
+        mode: o.member.mode,
+        promptVersion,
+        probability: o.probability,
+        insufficientData: o.insufficientData,
+        promptTokens: o.promptTokens,
+        completionTokens: o.completionTokens,
+        latencyMs: o.latencyMs,
+      })),
+      skipDuplicates: true,
+    })
+
+    const estimated = outcomes.filter((o) => o.probability !== null).length
+    log.info(
+      { predictionId: prediction.id, appended: outcomes.length, estimated },
+      'Completed a partial panel run',
+    )
+    return {
+      predictionId: prediction.id,
+      status: 'completed-partial',
+      estimated,
+      abstained: outcomes.length - estimated,
+    }
   }
 
   const prompt = buildPanelPrompt(template, prediction, now)
@@ -244,7 +318,6 @@ export async function runPanelForPrediction(
     return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
   }
 
-  const ctx = opts.ctx ?? { openRouterDisabled: !opts.apiKey, sawOpenRouterAuthError: false }
   const outcomes = await callMembers(PANEL_MEMBERS, prompt, opts.apiKey, prediction.id, ctx)
 
   // No outcomes at all means every member was unauthenticated (no key, no IAM) — we
@@ -311,6 +384,9 @@ export interface PanelSweepSummary {
   considered: number
   /** Runs actually persisted. Always 0 on a dry run — see `dryRun` below. */
   written: number
+  /** Partial runs (members missing because they couldn't be authenticated at write
+   *  time) whose missing members' estimates were appended in place this sweep. */
+  completedPartial: number
   skipped: number
   failed: number
   /** Forecasts whose prompt was built and logged but NOT persisted (`?dryRun=1`).
@@ -350,7 +426,7 @@ export async function runPanelSweep(opts?: {
 
   if (isDormant(apiKey, PANEL_MEMBERS)) {
     log.warn('No OpenRouter key and no Bedrock member — AI panel is dormant')
-    return { considered: 0, written: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
+    return { considered: 0, written: 0, completedPartial: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
   }
   if (!apiKey) {
     log.warn('No OpenRouter key configured — running Bedrock members only')
@@ -380,6 +456,7 @@ export async function runPanelSweep(opts?: {
   const summary: PanelSweepSummary = {
     considered: predictions.length,
     written: 0,
+    completedPartial: 0,
     skipped: 0,
     failed: 0,
     dryRun: 0,
@@ -395,6 +472,7 @@ export async function runPanelSweep(opts?: {
         ctx,
       })
       if (result.status === 'written') summary.written += 1
+      else if (result.status === 'completed-partial') summary.completedPartial += 1
       else if (result.status === 'dry-run') summary.dryRun += 1
       else if (result.status === 'failed') summary.failed += 1
       else summary.skipped += 1
