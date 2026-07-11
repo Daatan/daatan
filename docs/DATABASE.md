@@ -193,7 +193,10 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 - `ai_estimate_runs` — one panel sweep over one forecast. `inputHash` is the
   date-gate (sha256 of claim + rules + resolveBy + UTC day + promptVersion +
   roster signature); UNIQUE `(predictionId, inputHash)` makes the cron
-  idempotent. In practice one run per open BINARY forecast per day.
+  idempotent. In practice one run per open BINARY forecast per day. A run
+  written while some members couldn't be authenticated is *completed in place*
+  by a later same-day sweep (estimates appended, LASSO.md §4), so a run's
+  estimates may carry a later `createdAt` than the run itself.
 - `ai_estimates` — one member's answer within a run. Member identity is
   `(model, mode, promptVersion)` — all plain strings, never enums, so adding
   a member needs no migration. `probability` is **0–100 Int, null =

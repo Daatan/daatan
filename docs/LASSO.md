@@ -131,10 +131,15 @@ The second tick is a free no-op — no LLM calls, no writes — whenever the fir
 succeeded, because the hash is unchanged. It exists purely so a failed tick self-heals
 within 12h instead of 24h.
 
-Self-healing only covers **total** failure (nothing written, so the gate doesn't
-engage). A *partial* run — e.g. the OpenRouter key 401s and only the Bedrock member
-answers — is still a written run with the day's hash, so the missing members cannot be
-filled in until the next UTC day, even after the key is fixed. See §11.
+A *partial* run — e.g. the OpenRouter key 401s and only the Bedrock member answers —
+carries the day's hash but not the full roster (unauthenticated members are never asked,
+so no row exists for them). Since v1.53.0 a later same-day sweep **completes it in
+place**: only the missing-and-now-askable members are called, and their estimates are
+appended to the day's run. This is sound because the estimate is deterministic for the
+day — temperature 0 and a date-only prompt mean the appended number is exactly what it
+would have been at the run's original instant, the same premise the chart's
+step-function carry-forward rests on. Recorded members (including failure-abstentions)
+are never re-asked: one call per member per forecast per day stands.
 
 ### A useful side effect
 
@@ -322,6 +327,11 @@ second sentinel member, `'market'`, in v1.51.0.)
 
 - Selects `status = ACTIVE`, `outcomeType = BINARY`, deadline not passed.
 - Per forecast: compute hash → skip, or call all members concurrently → write one run.
+- **A matching hash with a partial member set triggers a completion pass** (§4): only the
+  missing-and-askable members are called and their estimates appended to the day's run
+  (`completed-partial` in the summary). If none of the missing members can be asked, the
+  forecast stays `skipped`; if all completion calls throw, nothing is appended and the
+  next tick retries.
 - A failed member call is an **abstention**. If *every* member's call throws, nothing is
   written — otherwise the date gate would suppress retries until tomorrow, turning a bad
   API key into a silent 24h outage. (A run where members deliberately returned `null`
@@ -401,13 +411,14 @@ Open, roughly in order of value:
 - **CI does not run integration tests.** `deploy.yml` runs `npm test`, which excludes
   `**/*.integration.test.ts`; the matched-time FK is covered by unit tests there, and the
   integration test must be run locally with `npm run test:integration`.
-- **A partial run blocks same-day completion.** When the OpenRouter members are
-  auth-disabled mid-sweep, the Bedrock-only run still carries the day's hash: fixing the
-  key and re-running does nothing until the next UTC day, and commitments that pin such
-  a run are permanently unscoreable for the missing members (they were never asked, so
-  no abstention row exists). Staging has one such 1-member run from the 2026-07-10
-  incident. Open fix idea: skip only when the latest run's hash matches *and* its
-  estimate set covers the current roster.
+- **Partial runs are completed in place** (since v1.53.0 — see §4). A sweep that finds
+  the day's run missing roster members appends their estimates once they can be asked
+  (`completed-partial` in the sweep summary), so a fixed key fills the same day's hole
+  and commitments pinning the partial run become scoreable for the filled members.
+  Members that still can't be authenticated keep the forecast quietly `skipped` — a
+  deliberate Bedrock-only (no-key) deployment does not report failures. Historical note:
+  staging's 1-member run from the 2026-07-10 incident predates the fix and stays
+  incomplete (its day has passed).
 - **Failed call vs deliberate abstention is implicit in the data.** Both store
   `probability: null, insufficientData: true`; they differ only in that a failed call has
   null `latencyMs`/token counts. Day-one staging data shows the distinction is real:

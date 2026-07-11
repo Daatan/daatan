@@ -19,7 +19,7 @@ function req(query = '', headers: Record<string, string> = { 'x-cron-secret': 't
   return new NextRequest(`http://localhost/api/cron/ai-panel${query}`, { headers })
 }
 
-const okSummary = { considered: 3, written: 2, skipped: 1, failed: 0, dryRun: 0 }
+const okSummary = { considered: 3, written: 2, completedPartial: 0, skipped: 1, failed: 0, dryRun: 0 }
 
 describe('GET /api/cron/ai-panel', () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('GET /api/cron/ai-panel', () => {
   })
 
   it('200s when dormant — no credentials at all is a deliberate state, not a breakage', async () => {
-    sweep.mockResolvedValue({ considered: 0, written: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true })
+    sweep.mockResolvedValue({ considered: 0, written: 0, completedPartial: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true })
     const res = await GET(req())
     const body = await res.json()
     expect(res.status).toBe(200)
