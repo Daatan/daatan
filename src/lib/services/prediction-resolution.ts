@@ -60,7 +60,9 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           // The AI-panel run current when this user staked, for matched-time Brier
           // (docs/LASSO.md §7). Null on commitments placed before the first run.
           aiRunAtCommit: {
-            select: { estimates: { select: { model: true, probability: true } } },
+            select: {
+              estimates: { select: { model: true, probability: true, promptVersion: true } },
+            },
           },
         },
       },
@@ -172,7 +174,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           outcomeNumeric,
         )
         if (marketBrier != null) {
-          memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier })
+          memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier, promptVersion: null })
         }
 
         for (const ms of memberScores) {
@@ -183,8 +185,9 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
               commitmentId: commitment.id,
               model: ms.model,
               brierScore: ms.brierScore,
+              promptVersion: ms.promptVersion,
             },
-            update: { brierScore: ms.brierScore },
+            update: { brierScore: ms.brierScore, promptVersion: ms.promptVersion },
           })
         }
       }
