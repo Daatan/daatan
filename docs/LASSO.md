@@ -314,9 +314,9 @@ second sentinel member, `'market'`, in v1.51.0.)
 - Expect member lines to render **nearly flat** between date changes. That is the prior
   doing its job, not a rendering bug.
 - Same treatment planned for `elections/src/components/CombinedSourcesChart.tsx`
-  (still open, §10). Known gap: the localized forecast routes (`/he/…`, `/ru/…`)
-  don't load the panel series yet — opted-in users see the lines only on the
-  canonical route.
+  (still open, §10). The localized forecast routes (`/he/…`, `/ru/…`) load the panel
+  behind the same opt-in gate as the canonical route (since v1.53.2). They still omit
+  the market line — a gap that predates the panel.
 
 ---
 
