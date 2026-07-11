@@ -13,6 +13,7 @@ import type { Comment } from '@/components/comments/CommentThread'
 import { JsonLd } from '@/components/JsonLd'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
+import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
 
@@ -206,11 +207,21 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     notFound()
   }
 
-  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory] = await Promise.all([
+  // The AI panel is a hidden, opt-in source (docs/LASSO.md §8), same gate as the
+  // canonical /forecasts/[id] route: only load and pass its series when THIS viewer
+  // enabled it in Settings. Read from the DB rather than the session token so the
+  // toggle takes effect without re-login. Anonymous viewers never see it.
+  const showAiPanel = session?.user?.id
+    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { showAiPanel: true } }))
+        ?.showAiPanel ?? false
+    : false
+
+  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory, panelSeries] = await Promise.all([
     getInitialComments(prediction.id),
     getInitialContextSnapshots(prediction.id),
     getContributingSources(prediction.id),
     getProbabilityHistory(prediction.id),
+    showAiPanel ? getPanelSeries(prediction.id) : Promise.resolve([]),
   ])
   // Chart series: includes kind='clock' glide requotes (unlike the event
   // timeline above) so the daily time-decay adjustment shows as movement.
@@ -282,6 +293,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           initialContextSnapshots={initialContextSnapshots}
           initialProbabilityHistory={initialProbabilityHistory}
           initialContributingSources={initialContributingSources}
+          aiPanelSeries={panelSeries}
+          showAiPanel={showAiPanel}
         />
       </Suspense>
     </>
