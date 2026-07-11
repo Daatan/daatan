@@ -19,7 +19,7 @@ describe('getPanelSeries', () => {
   it('queries only real, non-abstained estimates for the prediction', async () => {
     findMany.mockResolvedValue([])
     await getPanelSeries('pred-1')
-    const where = findMany.mock.calls[0][0].where
+    const where = findMany.mock.calls[0]?.[0]?.where
     expect(where).toMatchObject({
       run: { predictionId: 'pred-1' },
       insufficientData: false,
