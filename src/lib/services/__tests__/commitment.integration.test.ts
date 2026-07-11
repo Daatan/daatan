@@ -55,7 +55,7 @@ describe('Commitment Service Integration', () => {
     expect(unchangedUser?.rs).toBe(100)
   })
 
-  // Matched-time Brier for the AI panel (docs/AI_PANEL.md §7). This FK is the one
+  // Matched-time Brier for the AI panel (docs/LASSO.md §7). This FK is the one
   // value that cannot be reconstructed after the fact: it records which panel run was
   // current at the instant the user staked. If it is not captured on write, the
   // commitment is permanently unscoreable against the panel.

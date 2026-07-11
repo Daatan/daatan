@@ -1,5 +1,5 @@
 /**
- * Matched-time Brier for the AI panel at resolution (docs/AI_PANEL.md §7).
+ * Matched-time Brier for the AI panel at resolution (docs/LASSO.md §7).
  *
  * A human stakes once; the panel updates daily. So we do NOT score the panel on all its
  * estimates — that flatters it (an estimate the day before resolution is nearly free).

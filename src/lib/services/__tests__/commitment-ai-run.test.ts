@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * Guards `Commitment.aiRunIdAtCommit` — the AI panel's matched-time Brier anchor
- * (docs/AI_PANEL.md §7).
+ * (docs/LASSO.md §7).
  *
  * This lives in the UNIT suite on purpose. The equivalent integration test exercises
  * the real FK and migration, but CI runs only `npm test`, whose vitest config excludes

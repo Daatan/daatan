@@ -1,12 +1,41 @@
-# AI Panel — multi-model forecast estimates
+# LASSO — LLM AS SOurce
 
-**Status:** PR 1 (backend) implemented. No UI yet — the panel ships dark and accrues
-data. Chart + preference toggle is PR 2; Brier scoring + leaderboard is PR 3.
+**Status:** live in production since v1.50.0 (2026-07-11). Estimate → chart → score →
+rank, all shipped. Pooling and the Oracle-integration are the open extensions (§10).
 
-A panel of independent LLMs, each producing a probability for every open forecast. The
-panel is a **source shown on charts**, never an input to the needle, the gauge, or any
-user-facing score. Members are scored against resolutions so we can eventually answer:
-*do LLM forecasters beat the Oracle, the crowd, or each other?*
+> Internally the code still calls this the "AI panel" (`ai_estimates`, `ai-panel.ts`,
+> `PANEL_MEMBERS`, `/api/cron/ai-panel`). **LASSO is the project name; "AI panel" is the
+> subsystem.** A code-identifier rename is deliberately deferred — it would churn DB
+> tables and every call site for no behavioural gain. This doc is the source of truth for
+> what the thing *is*.
+
+## What LASSO is (and is not)
+
+Several independent LLMs each estimate a probability for every open forecast. **The name
+is the thesis: each LLM is treated AS a candidate SOurce of forecasting signal** — sitting
+alongside daatan's other sources (the crowd, linked markets, the Oracle) — and then
+*measured* on how good a source it actually is.
+
+The pun is deliberate: statistical **LASSO regression** does feature *selection* — keeping
+the predictors that carry signal and shrinking the rest to zero. LASSO-the-system does the
+same to models: score each one against real outcomes and learn which to trust, per topic.
+
+Two things it is **not**:
+
+- **Not the Oracle.** The Oracle (TruthMachine) is *one grounded verdict* — it searches,
+  weighs evidence by source credibility, and emits a single reasoned probability. LASSO is
+  *many unaided priors*, compared. The Oracle is scored inside LASSO as just another
+  member (`'oracle'`), so the board answers "does the grounded Oracle beat the raw LLMs?".
+- **Not (yet) a source for anything.** An LLM here is a **candidate being measured**, not a
+  deployed input. Nothing consumes LASSO's output as a forecasting signal today — not the
+  Oracle, not the needle, not any score. It only *earns a track record*. Wiring a proven
+  model back in (as the Oracle's prior, say) is a future extension (§10), not the current
+  reality.
+
+So LASSO never moves the needle, the gauge, or any user-facing score. It produces
+estimates, charts them as an opt-in source, scores them at resolution, and ranks them —
+to answer: *do LLM forecasters beat the Oracle, the crowd, or each other, and which one
+where?*
 
 ---
 
@@ -322,21 +351,44 @@ cheap LLMs with no search at all. (PR 3.)
 
 ---
 
-## 10. Deferred
+## 10. Extensions
 
-- Pooling (log-odds median + extremization factor `a`, fitted on ≥100 resolutions).
-- Grounded mode (~$180/mo at N=300 via OpenRouter web search).
-- Negation-coherence check (`p + p̄ ≈ 100`).
-- `MULTIPLE_CHOICE` / `NUMERIC_THRESHOLD` outcome types.
-- Public AI-vs-humans leaderboard.
+Shipped: estimate (5-member roster), date-hash-gated cron, opt-in chart, matched-time
+Brier, AI-vs-humans leaderboard (`/leaderboard/ai`).
 
-## 11. Open questions
+Open, roughly in order of value:
 
-- **N = 57 on staging** (measured 2026-07-09). Prod is unmeasured; confirm with
-  `SELECT count(*) FROM predictions WHERE status='ACTIVE' AND "outcomeType"='BINARY';`
-- Can `reasoning` actually be disabled on `x-ai/grok-4.3`? Measure `completion_tokens`
-  on the first real sweep — `max_tokens: 64` bounds the damage either way.
-- OpenRouter prices verified live 2026-07-09. They move.
+- **Graduate a source (the "AS SOurce" payoff).** Today an LLM is only *measured*. Once
+  the leaderboard shows a model reliably beating the crowd on a topic, wire it back in as
+  an actual input — most naturally as the **Oracle's ungrounded prior before it searches**,
+  or its per-topic best model. This is the reverse of today's wiring (LASSO contains the
+  Oracle; here the Oracle would consume LASSO) and it lives in `retro/`, not daatan. It is
+  the reason the name is "as SOurce" and not "vs humans" — see the cross-repo note in
+  `Daatan/docs/lasso.md`.
+- **Pooling** — one blended LASSO line from the members (log-odds median + a fitted
+  extremization factor `a`). Deferred until ≥~100 resolutions exist to fit `a` against;
+  premature before then, and a plain mean collapses toward 50.
+- **Grounded mode** — members with vendor web search (~$180/mo at N=300). Worth revisiting
+  once per-member Brier shows whether the ungrounded priors are worth anything.
+- **Negation-coherence check** — ask each member the claim *and* its negation, record
+  `p + p̄`; deviation from 100 is a per-member calibration signal for one extra call.
+- `MULTIPLE_CHOICE` / `NUMERIC_THRESHOLD` outcome types (today: `BINARY` only).
+- **Elections mirror** — `elections/` needs the `ai_estimate*` tables (a subset mirror) to
+  chart LASSO there too.
+
+## 11. Notes & gotchas
+
+- **Migration files keep the old `AI_PANEL.md` path** in their comments
+  (`20260715…_ai_panel`, `…_user_show_ai_panel`, `…_ai_member_score`). They are
+  checksummed and immutable — editing an applied migration triggers Prisma drift — so the
+  historical reference stays. This doc is the live source of truth.
+- **Grok honors `reasoning: {enabled: false}`** — confirmed on the first real sweep (5–6
+  completion tokens, not ~800), so the `max_tokens: 64` cap never trips on it. The
+  question that drove that cap is closed.
+- **OpenAI is excluded.** The gpt-5 lineup on OpenRouter is reasoning-mandatory
+  (`reasoning: {enabled:false}` → HTTP 400), incompatible with the panel's design; DeepSeek
+  and a 4B Gemma control replaced the two OpenAI slots (2026-07-11).
 - **CI does not run integration tests.** `deploy.yml` runs `npm test`, which excludes
-  `**/*.integration.test.ts`. The FK is covered by unit tests there; the integration
-  test covering the real FK/migration must be run locally with `npm run test:integration`.
+  `**/*.integration.test.ts`; the matched-time FK is covered by unit tests there, and the
+  integration test must be run locally with `npm run test:integration`.
+- OpenRouter prices were verified live 2026-07-09/11; they move.

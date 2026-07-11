@@ -204,7 +204,7 @@ async function callMembers(
  * Run one panel sweep over one forecast, unless the date-gate says nothing changed.
  *
  * Never writes `Prediction.confidence` / `aiCiLow` / `aiCiHigh`, and never calls
- * `recordEstimate()`. See docs/AI_PANEL.md §1 — that isolation is the feature.
+ * `recordEstimate()`. See docs/LASSO.md §1 — that isolation is the feature.
  */
 export async function runPanelForPrediction(
   prediction: PanelPrediction,

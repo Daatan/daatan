@@ -55,7 +55,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
             },
           },
           // The AI-panel run current when this user staked, for matched-time Brier
-          // (docs/AI_PANEL.md §7). Null on commitments placed before the first run.
+          // (docs/LASSO.md §7). Null on commitments placed before the first run.
           aiRunAtCommit: {
             select: { estimates: { select: { model: true, probability: true } } },
           },

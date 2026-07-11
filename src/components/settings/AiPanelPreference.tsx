@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 /**
- * Toggle for the experimental AI-panel chart lines (docs/AI_PANEL.md §8). Off by
+ * Toggle for the experimental AI-panel chart lines (docs/LASSO.md §8). Off by
  * default; when on, forecast charts show the per-model estimate lines as a hidden,
  * opt-in source — separate from and with no effect on the Oracle line.
  */

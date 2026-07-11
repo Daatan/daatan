@@ -38,7 +38,7 @@ model User {
   emailNotifications Boolean @default(true)
   preferredLanguage  String  @default("en") @db.VarChar(10) // ISO 639-1 code (en, he, etc.)
   isPublic           Boolean @default(true)
-  // Show the experimental AI-panel member lines on forecast charts (docs/AI_PANEL.md §8).
+  // Show the experimental AI-panel member lines on forecast charts (docs/LASSO.md §8).
   // Off by default: the panel is a hidden source, opt-in per user via Settings. Read
   // server-side in the forecast page loader, so it takes effect without re-login.
   showAiPanel        Boolean @default(false) @map("show_ai_panel")
@@ -591,7 +591,7 @@ model ExternalMarketPriceSnapshot {
 }
 
 // ============================================
-// AI PANEL (multi-model estimates — docs/AI_PANEL.md)
+// AI PANEL (multi-model estimates — docs/LASSO.md)
 // ============================================
 
 /// One sweep of the AI panel over one forecast: every member's estimate, taken at
@@ -628,7 +628,7 @@ model AiEstimateRun {
 /// panel never calls `recordEstimate()`. That isolation is structural: the gauge
 /// (`Speedometer.tsx`) reads only those columns, so no panel value can reach the
 /// needle, the high-confidence Telegram alert, `awaitingAiResolution`, or any
-/// ELO/Glicko/leaderboard path. See docs/AI_PANEL.md §1.
+/// ELO/Glicko/leaderboard path. See docs/LASSO.md §1.
 model AiEstimate {
   id    String        @id @default(cuid())
   runId String        @map("run_id")
@@ -661,7 +661,7 @@ model AiEstimate {
   @@map("ai_estimates")
 }
 
-/// Matched-time Brier for one panel member on one commitment (docs/AI_PANEL.md §7).
+/// Matched-time Brier for one panel member on one commitment (docs/LASSO.md §7).
 ///
 /// Written at resolution, one row per (commitment, member): the member's probability in
 /// the run current when that user staked, scored against the outcome. Directly comparable
@@ -761,7 +761,7 @@ model Commitment {
   aiScore                      Float? @map("ai_score")
   eloChange                    Int?   @map("elo_change")
 
-  // The AI-panel run current at commit time — matched-time Brier (docs/AI_PANEL.md §7).
+  // The AI-panel run current at commit time — matched-time Brier (docs/LASSO.md §7).
   // A run FK, NOT a scalar: `aiProbabilityAtCommit` above collapses the Oracle to one
   // number, which is fine because the Oracle IS one number. The panel is many, and a
   // scalar here would destroy per-model scoring at the exact instant we capture it.

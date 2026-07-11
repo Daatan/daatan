@@ -42,7 +42,7 @@ type ChartMarketPoint = {
   probability: number
 }
 
-/** One AI-panel member's estimate history (docs/AI_PANEL.md §8). A hidden, opt-in
+/** One AI-panel member's estimate history (docs/LASSO.md §8). A hidden, opt-in
  *  source: rendered only when the viewer enabled it in Settings, as dashed lines
  *  distinct from the solid Oracle `ai` line, which it never touches. */
 type ChartPanelMember = {
@@ -481,7 +481,7 @@ export default function ProbabilityChart({
             />
           )}
 
-          {/* AI-panel member lines (docs/AI_PANEL.md §8): thinner, finer-dashed and
+          {/* AI-panel member lines (docs/LASSO.md §8): thinner, finer-dashed and
               semi-transparent so they read as a secondary, experimental source and never
               compete with the Oracle line. */}
           {panelMembers.map(m => (

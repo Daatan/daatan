@@ -261,7 +261,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     permanentRedirect(`/forecasts/${prediction.slug}`)
   }
 
-  // The AI panel is a hidden, opt-in source (docs/AI_PANEL.md §8): only load and pass its
+  // The AI panel is a hidden, opt-in source (docs/LASSO.md §8): only load and pass its
   // series when THIS viewer enabled it in Settings. Read here rather than from the session
   // token so the toggle takes effect without re-login. Anonymous viewers never see it.
   const showAiPanel = session?.user?.id

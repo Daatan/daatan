@@ -1,7 +1,7 @@
 name: AI Panel
 
 # Twice-daily trigger for /api/cron/ai-panel — the multi-model estimate panel
-# (docs/AI_PANEL.md). Each member answers an ungrounded prompt (claim + dates +
+# (docs/LASSO.md). Each member answers an ungrounded prompt (claim + dates +
 # resolution rules, no article text) and its probability is stored as an AiEstimate.
 #
 # WHERE THIS RUNS:

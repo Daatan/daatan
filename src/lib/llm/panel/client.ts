@@ -21,7 +21,7 @@ function getBedrockClient(): BedrockRuntimeClient {
  * model ignored `reasoning: { enabled: false }` and started thinking out loud on our
  * bill (Gemini prices internal reasoning at the output rate). Capping bounds the
  * blast radius — the call fails and the member abstains, rather than quietly
- * costing 9× (docs/AI_PANEL.md §5).
+ * costing 9× (docs/LASSO.md §5).
  */
 const MAX_TOKENS = 64
 
