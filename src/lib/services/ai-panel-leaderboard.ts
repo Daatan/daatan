@@ -4,6 +4,9 @@ import { ORACLE_MEMBER, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
 
 export interface MemberLeaderboardRow {
   model: string
+  /** Prompt-template fingerprint the row's scores were produced under; null for the
+   *  'oracle'/'market' sentinels. Part of member identity (docs/LASSO.md §6). */
+  promptVersion: string | null
   label: string
   /** Mean matched-time Brier (lower is better); 0 = perfect, 0.25 = a coin flip. */
   avgBrier: number
@@ -34,27 +37,45 @@ export interface AiLeaderboard {
  * doesn't top the board.
  */
 export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
+  // Grouped by (model, promptVersion), not model alone: scores produced under different
+  // prompt templates are different members (docs/LASSO.md §6) and must never be averaged
+  // into one row. Sentinels ('oracle'/'market') have a null promptVersion → one row each.
   const grouped = await prisma.aiMemberScore.groupBy({
-    by: ['model'],
+    by: ['model', 'promptVersion'],
     _avg: { brierScore: true },
     _count: { brierScore: true },
   })
 
-  const members: MemberLeaderboardRow[] = grouped
-    .filter((g) => g._count.brierScore >= minCount && g._avg.brierScore != null)
-    .map((g) => ({
-      model: g.model,
-      label:
+  const qualifying = grouped.filter(
+    (g) => g._count.brierScore >= minCount && g._avg.brierScore != null,
+  )
+  // Label rows plainly until a model actually spans prompt versions; only then add a
+  // fingerprint suffix so the two series are distinguishable on the board.
+  const versionsPerModel = new Map<string, number>()
+  for (const g of qualifying) {
+    versionsPerModel.set(g.model, (versionsPerModel.get(g.model) ?? 0) + 1)
+  }
+
+  const members: MemberLeaderboardRow[] = qualifying
+    .map((g) => {
+      const baseLabel =
         g.model === ORACLE_MEMBER
           ? 'Oracle'
           : g.model === MARKET_MEMBER
             ? 'Market'
-            : panelMemberLabel(g.model),
-      avgBrier: Math.round((g._avg.brierScore as number) * 1000) / 1000,
-      count: g._count.brierScore,
-      isOracle: g.model === ORACLE_MEMBER,
-      isMarket: g.model === MARKET_MEMBER,
-    }))
+            : panelMemberLabel(g.model)
+      const pv = g.promptVersion
+      const ambiguous = pv != null && (versionsPerModel.get(g.model) ?? 0) > 1
+      return {
+        model: g.model,
+        promptVersion: pv,
+        label: ambiguous ? `${baseLabel} · ${pv.slice(0, 6)}` : baseLabel,
+        avgBrier: Math.round((g._avg.brierScore as number) * 1000) / 1000,
+        count: g._count.brierScore,
+        isOracle: g.model === ORACLE_MEMBER,
+        isMarket: g.model === MARKET_MEMBER,
+      }
+    })
     .sort((a, b) => a.avgBrier - b.avgBrier)
 
   // Humans on the commitments that carry AT LEAST ONE member score — the same population

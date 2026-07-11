@@ -413,8 +413,9 @@ Open, roughly in order of value:
   null `latencyMs`/token counts. Day-one staging data shows the distinction is real:
   DeepSeek's 19 nulls were all transport failures (pinned single provider), Grok's 23
   were genuine "too vague" declines.
-- **`ai_member_scores` does not store `promptVersion`**, and the leaderboard groups by
-  `model` alone — so after a prompt change the board averages two incomparable series,
-  the exact failure §6 says `promptVersion` exists to prevent. Add the column (or a
-  group-by) before replacing the PLACEHOLDER Bedrock prompt.
+- **`ai_member_scores` stores `promptVersion`** (since v1.52.0; null for the
+  `'oracle'`/`'market'` sentinels) and the leaderboard groups by
+  `(model, promptVersion)`, so a prompt change forks a member's board row instead of
+  silently averaging two incomparable series — closing the gap §6 warns about. Rows
+  are labelled with a fingerprint suffix only when a model actually spans versions.
 - OpenRouter prices were verified live 2026-07-09/11; they move.

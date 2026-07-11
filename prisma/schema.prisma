@@ -683,6 +683,10 @@ model AiMemberScore {
 
   model      String @db.VarChar(64)
   brierScore Float  @map("brier_score") // (probability − outcome)², both on 0–1
+  // Part of member identity (docs/LASSO.md §6): scores from different prompt versions
+  // are not comparable and the leaderboard groups by it. Null for the 'oracle'/'market'
+  // sentinels, which have no prompt.
+  promptVersion String? @map("prompt_version") @db.VarChar(32)
 
   createdAt DateTime @default(now())
 

@@ -15,11 +15,16 @@ export interface MatchedMemberEstimate {
   model: string
   /** 0–100, or null when the member abstained on that run. */
   probability: number | null
+  /** Prompt-template fingerprint the estimate was produced under (docs/LASSO.md §6). */
+  promptVersion: string
 }
 
 export interface MemberBrier {
   model: string
   brierScore: number
+  /** Carried onto the score row so the leaderboard never averages across prompt
+   *  versions. Null for the 'oracle'/'market' sentinels, which have no prompt. */
+  promptVersion: string | null
 }
 
 /** Sentinel model id for the Oracle needle, scored as a member for zero extra calls. */
@@ -82,11 +87,19 @@ export function computeMemberScores(
   for (const m of members) {
     if (m.probability == null) continue
     const p = m.probability / 100
-    rows.push({ model: m.model, brierScore: (p - outcomeNumeric) ** 2 })
+    rows.push({
+      model: m.model,
+      brierScore: (p - outcomeNumeric) ** 2,
+      promptVersion: m.promptVersion,
+    })
   }
 
   if (oracleProbability != null) {
-    rows.push({ model: ORACLE_MEMBER, brierScore: (oracleProbability - outcomeNumeric) ** 2 })
+    rows.push({
+      model: ORACLE_MEMBER,
+      brierScore: (oracleProbability - outcomeNumeric) ** 2,
+      promptVersion: null,
+    })
   }
 
   return rows

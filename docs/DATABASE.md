@@ -207,9 +207,10 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
   `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel
   `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`) and
   `'market'` (linked market price as of the commit instant). Feeds only
-  `/leaderboard/ai`; no RS/ELO/Glicko path reads it. Note the table does
-  **not** carry `promptVersion`, so the leaderboard currently averages across
-  prompt versions (open finding from the 2026-07-11 review).
+  `/leaderboard/ai`; no RS/ELO/Glicko path reads it. Carries `promptVersion`
+  (null for the sentinels), and the leaderboard groups by
+  `(model, promptVersion)` — scores produced under different prompt templates
+  are different members and are never averaged into one row.
 - `users.showAiPanel` — per-user opt-in for the chart lines, default false.
 
 ## Commitments & scoring — `commitments`, ratings on `users`
