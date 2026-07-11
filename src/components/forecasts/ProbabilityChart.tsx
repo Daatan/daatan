@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -202,6 +202,26 @@ export default function ProbabilityChart({
   const [dragStart, setDragStart] = useState<number | null>(null)
   const [dragEnd, setDragEnd] = useState<number | null>(null)
 
+  // Hover-triggered tooltips have no built-in close affordance — on touch devices
+  // especially, a tapped-open tooltip has no "mouse leave" to hide it again. Any
+  // click/tap outside the card force-closes it (via Tooltip's `active` override);
+  // moving or tapping back inside re-arms normal hover behavior.
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const [tooltipDismissed, setTooltipDismissed] = useState(false)
+  useEffect(() => {
+    const handleOutside = (e: Event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setTooltipDismissed(true)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [])
+
   if (outcomeType === 'NUMERIC_THRESHOLD') return null
 
   // The market YES price is a binary probability, so we only plot it on binary
@@ -319,9 +339,11 @@ export default function ProbabilityChart({
   // ReferenceArea, then on release map it to brush indices so it zooms exactly
   // like the brush/preset path. Double-click clears back to the default window.
   const onDragStart = (s: { activeLabel?: number | string } | null) => {
+    setTooltipDismissed(false)
     if (typeof s?.activeLabel === 'number') { setDragStart(s.activeLabel); setDragEnd(s.activeLabel) }
   }
   const onDragMove = (s: { activeLabel?: number | string } | null) => {
+    setTooltipDismissed(false)
     if (dragStart != null && typeof s?.activeLabel === 'number') setDragEnd(s.activeLabel)
   }
   const onDragEnd = () => {
@@ -334,7 +356,7 @@ export default function ProbabilityChart({
   const resetZoom = () => { setBrush(null); setPicked(null); setDragStart(null); setDragEnd(null) }
 
   return (
-    <div className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
+    <div ref={wrapperRef} className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">
           Probability over time
@@ -346,7 +368,7 @@ export default function ProbabilityChart({
                 key={r.key}
                 onClick={() => { setPicked(r.key); setBrush(null) }}
                 className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors ${
-                  range === r.key ? 'bg-navy-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                  range === r.key ? 'bg-cobalt text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
                 {r.label}
@@ -386,6 +408,7 @@ export default function ProbabilityChart({
             width={36}
           />
           <Tooltip
+            active={tooltipDismissed ? false : undefined}
             contentStyle={{
               backgroundColor: '#1A202C',
               border: '1px solid #2D3748',
