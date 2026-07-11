@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Trophy, Loader2, Medal, TrendingUp, Wallet, Target, BarChart3, TrendingDown, Zap, Users, Brain, Swords, Activity } from 'lucide-react'
+import { Trophy, Loader2, Medal, TrendingUp, Wallet, Target, BarChart3, TrendingDown, Zap, Users, Brain, Swords, Activity, Bot } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
@@ -170,6 +171,13 @@ export default function LeaderboardPage() {
         </div>
         <h1 className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight">{t('title')}</h1>
         <p className="text-gray-500 max-w-md">{t('subtitle')}</p>
+        <Link
+          href="/leaderboard/ai"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300"
+        >
+          <Bot className="w-4 h-4" />
+          {t('aiPanelLink')}
+        </Link>
       </div>
 
       {/* Sort Tabs */}
