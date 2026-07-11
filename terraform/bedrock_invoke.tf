@@ -6,12 +6,13 @@
 # prompt access.
 #
 # WHY THIS EXISTS
-#   All five panel members currently run through OpenRouter, so the feature is hostage
-#   to one third-party credential — which is exactly how it failed on 2026-07-10 (a dead
-#   key, 401 on every call). `qwen.qwen3-235b-a22b-2507-v1:0` on Bedrock is the same
-#   model as the roster's `qwen/qwen3-235b-a22b-2507`, runs on the account's own
-#   credentials (i.e. AWS credits), and is the roster's only non-reasoning member — so
-#   it carries none of the hidden-token cost risk the other four do.
+#   Without a Bedrock member, all panel members run through OpenRouter and the feature
+#   is hostage to one third-party credential — which is exactly how it failed on
+#   2026-07-10 (a dead key, 401 on every call). Since v1.45.0 the roster's Qwen member
+#   runs on Bedrock: `qwen.qwen3-235b-a22b-2507-v1:0` is the same model as OpenRouter's
+#   `qwen/qwen3-235b-a22b-2507`, runs on the account's own credentials (i.e. AWS
+#   credits), and is the roster's only non-reasoning member — so it carries none of the
+#   hidden-token cost risk the other four do.
 #
 # WHY A DATA SOURCE, NOT `aws_iam_role.ec2_role`
 #   Proven with `terraform state list` against both backends:

@@ -332,6 +332,12 @@ Upload avatar image. Accepts multipart form with `file` field.
 ### `PATCH /api/profile/language` — Auth
 Set preferred display language.
 
+### `GET|PATCH /api/user/preferences` — Auth
+Chart/display preferences. Currently one whitelisted boolean: `showAiPanel`
+(the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8). PATCH body
+`{ showAiPanel: boolean }`, 400 on anything else; nothing here can touch
+scoring, roles, or profile identity.
+
 ---
 
 ## Leaderboard & Stats
@@ -605,6 +611,18 @@ Checks Oracle API reachability and version compatibility. Fires a Telegram alert
 Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Returns `{ ok, done, failed, remaining }`. Intended to run nightly.
 
 **EC2 crontab:** `30 2 * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/backfill-embeddings`
+
+### `GET /api/cron/ai-panel`
+LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an
+ungrounded probability on every open BINARY forecast; date-hash-gated to one
+call per member per forecast per day. Auth: `x-cron-secret` header
+(`BOT_RUNNER_SECRET`), 401 otherwise. Query params: `?dryRun=1` (build/log
+prompts, write nothing — reports `{written: 0, dryRun: N}`), `?limit=N`.
+Returns the sweep summary; **502** when the OpenRouter key was rejected (even
+if Bedrock members carried the sweep — a dead key must fail loudly), 200 with
+`{dormant: true}` when no member can authenticate at all (deliberate state).
+Triggered by `.github/workflows/ai-panel.yml` at 04:43 and 16:43 UTC, not the
+EC2 crontab.
 
 ---
 

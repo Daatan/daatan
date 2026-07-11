@@ -131,6 +131,11 @@ The second tick is a free no-op — no LLM calls, no writes — whenever the fir
 succeeded, because the hash is unchanged. It exists purely so a failed tick self-heals
 within 12h instead of 24h.
 
+Self-healing only covers **total** failure (nothing written, so the gate doesn't
+engage). A *partial* run — e.g. the OpenRouter key 401s and only the Bedrock member
+answers — is still a written run with the day's hash, so the missing members cannot be
+filled in until the next UTC day, even after the key is fixed. See §11.
+
 ### A useful side effect
 
 A date-only ungrounded estimate *is* a glide: the model's implicit hazard rate as the
@@ -247,7 +252,8 @@ Brier scores stop being comparable** — without this column the leaderboard wou
 silently average two different members.
 
 `elections/prisma/schema.prisma` carries a six-model subset mirror; it needs these
-tables too, or a rollup to read. (Not required until PR 2 charts the panel there.)
+tables too, or a rollup to read. (Not required until the elections mirror charts the
+panel — still open, see §10.)
 
 ---
 
@@ -281,14 +287,15 @@ data.
 
 ### The Oracle is a free fifth member
 
-The Oracle's estimates are already persisted as timestamped `ContextSnapshot` rows with
-`externalProbability`. Scoring it as a panel member costs **zero extra calls** — read
-the latest snapshot as of the commit instant. This answers whether TruthMachine beats
-cheap LLMs with no search at all. (PR 3.)
+The Oracle's needle at commit time is already pinned on the commitment as
+`aiProbabilityAtCommit`, so scoring it as a panel member (`model: 'oracle'`) costs
+**zero extra calls and zero extra columns**. This answers whether TruthMachine beats
+cheap LLMs with no search at all. (Shipped in v1.49.0; the linked market joined as a
+second sentinel member, `'market'`, in v1.51.0.)
 
 ---
 
-## 8. UI (PR 2, not yet built)
+## 8. UI (shipped in v1.48.0)
 
 `ProbabilityChart.tsx` already renders `community`, `ai` (the Oracle needle), and
 `market`. The panel adds member lines.
@@ -301,7 +308,10 @@ cheap LLMs with no search at all. (PR 3.)
   a legend disclaimer nobody reads.
 - Expect member lines to render **nearly flat** between date changes. That is the prior
   doing its job, not a rendering bug.
-- Same treatment in `elections/src/components/CombinedSourcesChart.tsx`.
+- Same treatment planned for `elections/src/components/CombinedSourcesChart.tsx`
+  (still open, §10). Known gap: the localized forecast routes (`/he/…`, `/ru/…`)
+  don't load the panel series yet — opted-in users see the lines only on the
+  canonical route.
 
 ---
 
@@ -391,4 +401,20 @@ Open, roughly in order of value:
 - **CI does not run integration tests.** `deploy.yml` runs `npm test`, which excludes
   `**/*.integration.test.ts`; the matched-time FK is covered by unit tests there, and the
   integration test must be run locally with `npm run test:integration`.
+- **A partial run blocks same-day completion.** When the OpenRouter members are
+  auth-disabled mid-sweep, the Bedrock-only run still carries the day's hash: fixing the
+  key and re-running does nothing until the next UTC day, and commitments that pin such
+  a run are permanently unscoreable for the missing members (they were never asked, so
+  no abstention row exists). Staging has one such 1-member run from the 2026-07-10
+  incident. Open fix idea: skip only when the latest run's hash matches *and* its
+  estimate set covers the current roster.
+- **Failed call vs deliberate abstention is implicit in the data.** Both store
+  `probability: null, insufficientData: true`; they differ only in that a failed call has
+  null `latencyMs`/token counts. Day-one staging data shows the distinction is real:
+  DeepSeek's 19 nulls were all transport failures (pinned single provider), Grok's 23
+  were genuine "too vague" declines.
+- **`ai_member_scores` does not store `promptVersion`**, and the leaderboard groups by
+  `model` alone — so after a prompt change the board averages two incomparable series,
+  the exact failure §6 says `promptVersion` exists to prevent. Add the column (or a
+  group-by) before replacing the PLACEHOLDER Bedrock prompt.
 - OpenRouter prices were verified live 2026-07-09/11; they move.
