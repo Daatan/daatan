@@ -1,5 +1,5 @@
 /**
- * The AI panel's members (docs/AI_PANEL.md §5).
+ * The AI panel's members (docs/LASSO.md §5).
  *
  * Deliberately data, not code: `AiEstimate.model` and `.mode` are stored as plain
  * strings, so adding or dropping a member is one entry here and no migration.

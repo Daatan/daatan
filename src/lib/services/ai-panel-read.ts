@@ -15,7 +15,7 @@ export interface PanelMemberSeries {
  *
  * Read-only and isolation-preserving: this touches ONLY `ai_estimates` — never
  * `Prediction.confidence` or the Oracle's `ContextSnapshot`. The panel is a separate
- * source (docs/AI_PANEL.md §1), so nothing here can move the needle or the Oracle line.
+ * source (docs/LASSO.md §1), so nothing here can move the needle or the Oracle line.
  *
  * Abstentions (`insufficientData`, null probability) are dropped: a member that declined
  * has no point to plot, exactly as the Oracle line skips its abstained snapshots. A

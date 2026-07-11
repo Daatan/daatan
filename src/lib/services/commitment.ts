@@ -165,7 +165,7 @@ const writeCommitmentInTx = async (
   const aiProbabilityAtCommit: number | null =
     prediction.confidence != null ? prediction.confidence / 100 : null
 
-  // Matched-time Brier for the AI panel (docs/AI_PANEL.md §7). A human stakes once
+  // Matched-time Brier for the AI panel (docs/LASSO.md §7). A human stakes once
   // while the panel updates daily, so scoring the panel on all its estimates would
   // flatter it enormously — an estimate made the day before resolution is nearly
   // free. Instead we pin the run that was current at this instant, exactly as

@@ -23,7 +23,7 @@ locals {
     "resolution-research",
     "translate",
     "topic-extraction",
-    # AI panel (docs/AI_PANEL.md). Exists nowhere yet, so creating it at PLACEHOLDER
+    # AI panel (docs/LASSO.md). Exists nowhere yet, so creating it at PLACEHOLDER
     # is safe: getPromptTemplate() treats PLACEHOLDER as "serve the hardcoded fallback",
     # which is exactly today's behaviour minus the per-sweep ParameterNotFound error.
     "panel-estimate"

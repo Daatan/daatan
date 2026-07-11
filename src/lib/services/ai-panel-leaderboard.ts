@@ -22,7 +22,7 @@ export interface AiLeaderboard {
 
 /**
  * How each panel member (and the Oracle) scored on matched-time Brier, vs humans on the
- * same commitments (docs/AI_PANEL.md §7). This is the feature's payoff: do LLMs forecast
+ * same commitments (docs/LASSO.md §7). This is the feature's payoff: do LLMs forecast
  * better than the crowd, the Oracle, or each other?
  *
  * Read-only. `ai_member_scores` is comparable to `Commitment.brierScore` because both are

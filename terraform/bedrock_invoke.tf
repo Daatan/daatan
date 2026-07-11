@@ -1,4 +1,4 @@
-# Bedrock model invocation for the AI panel (docs/AI_PANEL.md).
+# Bedrock model invocation for the AI panel (docs/LASSO.md).
 #
 # Separate from `aws_iam_role_policy.bedrock_prompts` on purpose: reading a prompt
 # template and invoking a model are different privileges with different blast radii,

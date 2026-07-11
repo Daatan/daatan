@@ -13,7 +13,7 @@ export const maxDuration = 300
 /**
  * GET /api/cron/ai-panel
  *
- * Asks every panel member (docs/AI_PANEL.md §5) for an ungrounded probability on every
+ * Asks every panel member (docs/LASSO.md §5) for an ungrounded probability on every
  * open BINARY forecast, and stores each member's answer as an `AiEstimate` row.
  *
  * The panel is a CHARTED SOURCE, not the needle: this route never writes

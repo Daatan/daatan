@@ -41,7 +41,7 @@ type PromptName =
     | 'temporal-classifier'
     // Deliberately NOT 'guess-chances': that prompt is context-fed ({{articlesText}})
     // and live on /api/forecasts/express/guess, so tuning the panel through it would
-    // silently perturb forecast creation. See docs/AI_PANEL.md §3.
+    // silently perturb forecast creation. See docs/LASSO.md §3.
     | 'panel-estimate'
 
 interface CacheEntry {
@@ -303,7 +303,7 @@ Instructions:
 
 Respond ONLY with a JSON object: { "probability": number, "reasoning": "one or two sentences explaining the number" }`,
 
-    // AI panel (docs/AI_PANEL.md §3). UNGROUNDED by construction: no article text,
+    // AI panel (docs/LASSO.md §3). UNGROUNDED by construction: no article text,
     // no search results. The only input that changes over a forecast's life is the
     // date, which is what makes the run's date-hash gate correct — and what makes
     // this member's line a *learned* glide, comparable against the arithmetic

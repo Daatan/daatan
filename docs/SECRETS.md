@@ -58,7 +58,7 @@ has, including the database password. So:
 
 On **2026-07-10** all three bit at once: a stale `OPENROUTER_API_KEY` inside the blob made
 every AI-panel call return `401 "User not found."`, and the cron reported success while
-doing so. See `docs/AI_PANEL.md`.
+doing so. See `docs/LASSO.md`.
 
 New app secrets go in SSM. Existing ones migrate out of the blob one at a time; the code
 falls back to the env var, so a parameter that does not exist yet changes nothing.

@@ -49,7 +49,7 @@ const TRUNCATABLE_TABLES = [
   'notifications', 'notification_preferences', 'push_subscriptions',
   'tags', 'bot_config', 'bot_run_logs', 'bot_rejected_topics',
   'news_anchors', 'leaderboard_cache', 'resolution_contexts',
-  // AI panel (docs/AI_PANEL.md). ai_estimates cascades from ai_estimate_runs, but
+  // AI panel (docs/LASSO.md). ai_estimates cascades from ai_estimate_runs, but
   // list both: TRUNCATE is explicit here, not inferred from FKs.
   'ai_estimate_runs', 'ai_estimates',
 ] as const
