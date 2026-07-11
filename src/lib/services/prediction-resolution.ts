@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { applyGlicko2Update } from '@/lib/services/expertise'
 import { calculateEloUpdates } from '@/lib/services/elo'
-import { computeMemberScores } from '@/lib/services/ai-panel-score'
+import { computeMemberScores, computeMarketScore, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 
@@ -40,6 +40,9 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     include: {
       tags: { select: { id: true } },
       options: true,
+      // Linked market + polarity, for the matched-time market benchmark (docs/LASSO.md §7).
+      // Loaded once; each commitment reconstructs the market price as of its own instant.
+      externalMarket: { select: { snapshots: { select: { createdAt: true, probability: true } } } },
       commitments: {
         include: {
           user: {
@@ -159,6 +162,19 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           commitment.aiProbabilityAtCommit,
           outcomeNumeric,
         )
+        // The linked market (Polymarket/Kalshi) scored on the same matched-time basis,
+        // so the leaderboard can answer "does a model beat or approach the market?".
+        // Null (skipped) when the forecast has no market or no price predates the commit.
+        const marketBrier = computeMarketScore(
+          prediction.externalMarket?.snapshots ?? [],
+          prediction.externalMarketInverted,
+          commitment.createdAt,
+          outcomeNumeric,
+        )
+        if (marketBrier != null) {
+          memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier })
+        }
+
         for (const ms of memberScores) {
           await tx.aiMemberScore.upsert({
             where: { commitmentId_model: { commitmentId: commitment.id, model: ms.model } },

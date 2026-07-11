@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { panelMemberLabel } from '@/lib/llm/panel/roster'
-import { ORACLE_MEMBER } from '@/lib/services/ai-panel-score'
+import { ORACLE_MEMBER, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
 
 export interface MemberLeaderboardRow {
   model: string
@@ -10,6 +10,9 @@ export interface MemberLeaderboardRow {
   /** Commitments this member was scored on — the sample size behind avgBrier. */
   count: number
   isOracle: boolean
+  /** The linked prediction market (Polymarket/Kalshi) — a benchmark, not an LLM. Scored
+   *  only over market-linked forecasts, so its `count` is typically lower than a model's. */
+  isMarket: boolean
 }
 
 export interface AiLeaderboard {
@@ -41,10 +44,16 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
     .filter((g) => g._count.brierScore >= minCount && g._avg.brierScore != null)
     .map((g) => ({
       model: g.model,
-      label: g.model === ORACLE_MEMBER ? 'Oracle' : panelMemberLabel(g.model),
+      label:
+        g.model === ORACLE_MEMBER
+          ? 'Oracle'
+          : g.model === MARKET_MEMBER
+            ? 'Market'
+            : panelMemberLabel(g.model),
       avgBrier: Math.round((g._avg.brierScore as number) * 1000) / 1000,
       count: g._count.brierScore,
       isOracle: g.model === ORACLE_MEMBER,
+      isMarket: g.model === MARKET_MEMBER,
     }))
     .sort((a, b) => a.avgBrier - b.avgBrier)
 

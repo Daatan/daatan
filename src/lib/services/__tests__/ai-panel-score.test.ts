@@ -47,3 +47,36 @@ describe('computeMemberScores (matched-time Brier)', () => {
     expect(computeMemberScores([{ model: 'm', probability: null }], null, 1)).toEqual([])
   })
 })
+
+import { computeMarketScore, MARKET_MEMBER } from '../ai-panel-score'
+
+describe('computeMarketScore (matched-time market benchmark)', () => {
+  const snaps = [
+    { createdAt: new Date('2026-07-01T00:00:00Z'), probability: 60 },
+    { createdAt: new Date('2026-07-03T00:00:00Z'), probability: 80 },
+  ]
+
+  it('uses the latest price at or before the commit instant', () => {
+    // commit on 07-02 → sees the 07-01 price (60), not the later 80.
+    const b = computeMarketScore(snaps, false, new Date('2026-07-02T00:00:00Z'), 1)
+    expect(b).toBeCloseTo(0.16, 6) // (0.6-1)²
+  })
+
+  it('applies inverted polarity (100 − price)', () => {
+    const b = computeMarketScore(snaps, true, new Date('2026-07-02T00:00:00Z'), 1)
+    expect(b).toBeCloseTo(0.36, 6) // (0.4-1)²
+  })
+
+  it('is null when no snapshot predates the commit', () => {
+    expect(computeMarketScore(snaps, false, new Date('2026-06-01T00:00:00Z'), 1)).toBeNull()
+  })
+
+  it('is null for an unlinked forecast (no snapshots)', () => {
+    expect(computeMarketScore([], false, new Date('2026-07-02T00:00:00Z'), 1)).toBeNull()
+  })
+
+  it('MARKET_MEMBER is a distinct sentinel from the Oracle', () => {
+    expect(MARKET_MEMBER).toBe('market')
+    expect(MARKET_MEMBER).not.toBe(ORACLE_MEMBER)
+  })
+})

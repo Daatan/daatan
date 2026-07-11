@@ -23,6 +23,44 @@ export interface MemberBrier {
 /** Sentinel model id for the Oracle needle, scored as a member for zero extra calls. */
 export const ORACLE_MEMBER = 'oracle'
 
+/** Sentinel model id for the linked prediction market (Polymarket/Kalshi), scored as a
+ *  matched-time benchmark so the leaderboard can answer "does a model beat the market?". */
+export const MARKET_MEMBER = 'market'
+
+/**
+ * Matched-time Brier for the linked market on one commitment. Pure.
+ *
+ * Reconstructs the market's price as of the commit instant from its snapshot history
+ * (the latest snapshot at or before `commitAt`), applies the forecast's polarity, and
+ * scores it against the outcome — the same matched-time basis as the models and humans.
+ * Returns null when the forecast has no linked market or no snapshot predates the commit
+ * (so an unlinked forecast simply contributes nothing to the market row).
+ *
+ * @param snapshots the market's price history: `{ createdAt, probability }` (raw 0–100).
+ * @param inverted `Prediction.externalMarketInverted` — the market asks the opposite question.
+ */
+export function computeMarketScore(
+  snapshots: { createdAt: Date; probability: number }[],
+  inverted: boolean,
+  commitAt: Date,
+  outcomeNumeric: number,
+): number | null {
+  let latest: number | null = null
+  let latestTs = -Infinity
+  for (const s of snapshots) {
+    const ts = s.createdAt.getTime()
+    if (ts <= commitAt.getTime() && ts >= latestTs) {
+      latest = s.probability
+      latestTs = ts
+    }
+  }
+  if (latest == null) return null
+
+  const display = inverted ? 100 - latest : latest
+  const p = display / 100
+  return (p - outcomeNumeric) ** 2
+}
+
 /**
  * Per-member Brier for one commitment. Pure: given the run's member estimates and the
  * Oracle probability at commit time, return one `{model, brierScore}` per member that had

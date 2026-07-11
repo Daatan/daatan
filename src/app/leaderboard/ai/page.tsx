@@ -88,6 +88,11 @@ export default async function AiLeaderboardPage() {
                         {t('oracleBadge')}
                       </span>
                     )}
+                    {m.isMarket && (
+                      <span className="ml-2 rounded bg-pink-500/15 px-1.5 py-0.5 text-xs text-pink-300">
+                        {t('marketBadge')}
+                      </span>
+                    )}
                     {m.model.startsWith('google/gemma') && (
                       <span className="ml-2 rounded bg-navy-600 px-1.5 py-0.5 text-xs text-gray-400">
                         {t('controlBadge')}

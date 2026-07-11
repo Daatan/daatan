@@ -35,6 +35,21 @@ describe('getAiLeaderboard', () => {
     expect(lb.members[1].isOracle).toBe(false)
   })
 
+  it('labels and flags the market benchmark, ranked inline with the models', async () => {
+    groupBy.mockResolvedValue([
+      { model: 'x-ai/grok-4.3', _avg: { brierScore: 0.2 }, _count: { brierScore: 12 } },
+      { model: 'market', _avg: { brierScore: 0.14 }, _count: { brierScore: 7 } },
+    ] as never)
+
+    const lb = await getAiLeaderboard()
+
+    const market = lb.members.find((m) => m.model === 'market')!
+    expect(market).toMatchObject({ label: 'Market', isMarket: true, isOracle: false })
+    // Better Brier ⇒ ranked above Grok, so you can see which models beat the market.
+    expect(lb.members[0].model).toBe('market')
+    expect(lb.members.find((m) => m.model === 'x-ai/grok-4.3')!.isMarket).toBe(false)
+  })
+
   it('omits members below the minimum sample size', async () => {
     groupBy.mockResolvedValue([
       { model: 'x-ai/grok-4.3', _avg: { brierScore: 0.05 }, _count: { brierScore: 2 } }, // lucky, too few
