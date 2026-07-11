@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useTranslations, useLocale } from 'next-intl'
 import { LanguagePicker } from '@/components/LanguagePicker'
+import AiPanelPreference from '@/components/settings/AiPanelPreference'
 import NotificationPreferences from '@/components/settings/NotificationPreferences'
 import DeleteAccountSection from '@/components/settings/DeleteAccountSection'
 
@@ -39,6 +40,7 @@ export default function SettingsPage() {
 
         <div className="p-6 space-y-6">
           <LanguagePicker currentLocale={locale} />
+          <AiPanelPreference />
         </div>
       </div>
 

@@ -42,6 +42,17 @@ type ChartMarketPoint = {
   probability: number
 }
 
+/** One AI-panel member's estimate history (docs/AI_PANEL.md §8). A hidden, opt-in
+ *  source: rendered only when the viewer enabled it in Settings, as dashed lines
+ *  distinct from the solid Oracle `ai` line, which it never touches. */
+type ChartPanelMember = {
+  model: string
+  label: string
+  color: string
+  isControl: boolean
+  points: { createdAt: string; probability: number }[]
+}
+
 type Props = {
   commitments: ChartCommitment[]
   snapshots: ChartSnapshot[]
@@ -52,6 +63,10 @@ type Props = {
   marketSnapshots?: ChartMarketPoint[]
   /** Legend name for the market line, e.g. "Market (Polymarket, inverted)". */
   marketLabel?: string
+  /** Per-member AI-panel series. Only rendered when `showAiPanel` is true. */
+  panelSeries?: ChartPanelMember[]
+  /** The viewer opted into the AI panel in Settings. Off by default. */
+  showAiPanel?: boolean
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
@@ -143,6 +158,31 @@ export function buildMarketSeries(
   })
 }
 
+/** Sanitised, collision-free dataKey for a member's step series on the merged data. */
+export function panelKey(model: string): string {
+  return 'panel_' + model.replace(/[^a-zA-Z0-9]/g, '_')
+}
+
+/** Carry each member's estimate forward as a step function across the merged timeline,
+ *  exactly as the Oracle `ai` line does — an unchanged input yields an unchanged number
+ *  (temperature 0), so a flat stretch between real updates is correct, not missing data. */
+export function buildPanelSeries(
+  members: ChartPanelMember[],
+  tsList: number[],
+): Record<string, (number | null)[]> {
+  const out: Record<string, (number | null)[]> = {}
+  for (const m of members) {
+    const sorted = [...m.points].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    )
+    out[panelKey(m.model)] = tsList.map((ts) => {
+      const upTo = sorted.filter((p) => new Date(p.createdAt).getTime() <= ts)
+      return upTo.length > 0 ? upTo[upTo.length - 1].probability : null
+    })
+  }
+  return out
+}
+
 export default function ProbabilityChart({
   commitments,
   snapshots,
@@ -150,6 +190,8 @@ export default function ProbabilityChart({
   options,
   marketSnapshots = [],
   marketLabel = 'Market (Polymarket)',
+  panelSeries = [],
+  showAiPanel = false,
 }: Props) {
   // `picked` is the user's explicit range choice; null → use the data-driven default.
   // `brush` tracks manual brush dragging, so presets and fine control coexist.
@@ -171,7 +213,10 @@ export default function ProbabilityChart({
   // is the minimum that draws a line (a single estimate is just a dot).
   const aiPointCount = snapshots.filter(s => s.externalProbability != null).length
   const showAiHistory = aiPointCount >= 2
-  if (commitments.length < 3 && !showMarket && !showAiHistory) return null
+  // A viewer who opted into the panel gets the chart as soon as the panel has any point,
+  // even on a forecast with no commitments/Oracle/market yet.
+  const hasPanelData = showAiPanel && panelSeries.some(m => m.points.length > 0)
+  if (commitments.length < 3 && !showMarket && !showAiHistory && !hasPanelData) return null
 
   const sortedCommits = [...commitments].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -185,14 +230,20 @@ export default function ProbabilityChart({
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   )
 
-  // One data point per event (commitment, Oracle run, or market snapshot), sorted chronologically
+  // Members are drawn only when the viewer opted in AND at least one has a point.
+  const panelMembers = showAiPanel ? panelSeries.filter(m => m.points.length > 0) : []
+  const panelTs = panelMembers.flatMap(m => m.points.map(p => new Date(p.createdAt).getTime()))
+
+  // One data point per event (commitment, Oracle run, market snapshot, or panel run), sorted chronologically
   const allTs = [
     ...sortedCommits.map(c => new Date(c.createdAt).getTime()),
     ...sortedSnaps.map(s => new Date(s.createdAt).getTime()),
     ...sortedMarket.map(m => new Date(m.createdAt).getTime()),
+    ...panelTs,
   ].sort((a, b) => a - b)
   const uniqueTs = [...new Set(allTs)]
   const marketSeries = buildMarketSeries(sortedMarket, uniqueTs)
+  const panelStep = buildPanelSeries(panelMembers, uniqueTs)
 
   const data = uniqueTs.map((ts, i) => {
     const upToCommits = sortedCommits.filter(c => new Date(c.createdAt).getTime() <= ts)
@@ -212,6 +263,10 @@ export default function ProbabilityChart({
       aiEvent: snapAt ? (snapAt.kind === 'clock' ? 'clock' : 'evidence') : null,
       market: latestMarket,
       marketChanged,
+    }
+
+    for (const m of panelMembers) {
+      point[panelKey(m.model)] = panelStep[panelKey(m.model)][i]
     }
 
     if (outcomeType === 'BINARY') {
@@ -402,6 +457,24 @@ export default function ProbabilityChart({
               connectNulls
             />
           )}
+
+          {/* AI-panel member lines (docs/AI_PANEL.md §8): thinner, finer-dashed and
+              semi-transparent so they read as a secondary, experimental source and never
+              compete with the Oracle line. */}
+          {panelMembers.map(m => (
+            <Line
+              key={m.model}
+              type="stepAfter"
+              dataKey={panelKey(m.model)}
+              name={m.isControl ? `${m.label} (control)` : m.label}
+              stroke={m.color}
+              strokeOpacity={0.75}
+              strokeWidth={1.5}
+              strokeDasharray="2 3"
+              dot={false}
+              connectNulls
+            />
+          ))}
 
           {showPresets && (
             <Brush

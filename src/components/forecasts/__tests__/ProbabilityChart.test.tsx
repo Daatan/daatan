@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart, { AiDot, communityProbability, tsWindowToIndices, buildMarketSeries } from '../ProbabilityChart'
+import ProbabilityChart, { AiDot, communityProbability, tsWindowToIndices, buildMarketSeries, buildPanelSeries, panelKey } from '../ProbabilityChart'
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -244,6 +244,75 @@ describe('clock snapshots in the chart series', () => {
         ]}
         outcomeType="BINARY"
         options={[]}
+      />,
+    )
+    expect(screen.getByText(HEADING)).toBeTruthy()
+  })
+})
+
+describe('AI panel series', () => {
+  it('panelKey is a collision-free, sanitised dataKey', () => {
+    expect(panelKey('x-ai/grok-4.3')).toBe('panel_x_ai_grok_4_3')
+    expect(panelKey('qwen.qwen3-235b-a22b-2507-v1:0')).toBe('panel_qwen_qwen3_235b_a22b_2507_v1_0')
+  })
+
+  it('carries each member forward as a step function across the merged timeline', () => {
+    const members = [
+      {
+        model: 'x-ai/grok-4.3',
+        label: 'Grok',
+        color: '#000',
+        isControl: false,
+        points: [
+          { createdAt: '2026-07-01T00:00:00Z', probability: 40 },
+          { createdAt: '2026-07-03T00:00:00Z', probability: 55 },
+        ],
+      },
+    ]
+    const ts = [
+      new Date('2026-07-01T00:00:00Z').getTime(),
+      new Date('2026-07-02T00:00:00Z').getTime(), // no update — carries 40
+      new Date('2026-07-03T00:00:00Z').getTime(),
+    ]
+    const series = buildPanelSeries(members, ts)
+    expect(series[panelKey('x-ai/grok-4.3')]).toEqual([40, 40, 55])
+  })
+
+  it('is null before a member’s first point (no line drawn into the past)', () => {
+    const members = [
+      { model: 'm', label: 'M', color: '#000', isControl: false, points: [{ createdAt: '2026-07-02T00:00:00Z', probability: 30 }] },
+    ]
+    const ts = [new Date('2026-07-01T00:00:00Z').getTime(), new Date('2026-07-02T00:00:00Z').getTime()]
+    expect(buildPanelSeries(members, ts)[panelKey('m')]).toEqual([null, 30])
+  })
+
+  it('does NOT render panel lines when showAiPanel is false, even with data', () => {
+    const panelSeries = [
+      { model: 'x-ai/grok-4.3', label: 'Grok', color: '#22D3EE', isControl: false,
+        points: [{ createdAt: '2026-07-01T00:00:00Z', probability: 40 }, { createdAt: '2026-07-02T00:00:00Z', probability: 45 }] },
+    ]
+    render(
+      <ProbabilityChart
+        commitments={[]} snapshots={[]} outcomeType="BINARY" options={[]}
+        panelSeries={panelSeries} showAiPanel={false}
+      />,
+    )
+    expect(screen.queryByText('Grok')).toBeNull()
+  })
+
+  // The chart becomes visible on panel data alone once opted in — even with no
+  // commitments, Oracle, or market. (recharts' Legend text isn't reliably queryable
+  // under the jsdom ResponsiveContainer stub, so the line rendering is covered by the
+  // buildPanelSeries unit tests above; here we assert the gating behaviour.)
+  it('shows the chart on panel data alone when opted in', () => {
+    const panelSeries = [
+      { model: 'x-ai/grok-4.3', label: 'Grok', color: '#22D3EE', isControl: false,
+        points: [{ createdAt: '2026-07-01T00:00:00Z', probability: 40 }, { createdAt: '2026-07-02T00:00:00Z', probability: 45 }] },
+    ]
+    render(
+      <ProbabilityChart
+        commitments={[]} snapshots={[]} outcomeType="BINARY" options={[]}
+        panelSeries={panelSeries} showAiPanel={true}
       />,
     )
     expect(screen.getByText(HEADING)).toBeTruthy()

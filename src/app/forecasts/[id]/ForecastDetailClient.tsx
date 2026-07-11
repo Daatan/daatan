@@ -53,6 +53,8 @@ export default function ForecastDetailClient({
   initialContextSnapshots,
   initialProbabilityHistory,
   initialContributingSources,
+  aiPanelSeries = [],
+  showAiPanel = false,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
@@ -61,6 +63,15 @@ export default function ForecastDetailClient({
   /** Chart series incl. kind='clock' glide requotes (the event timeline above excludes them). */
   initialProbabilityHistory?: { id: string; createdAt: string; externalProbability: number | null; kind: string }[]
   initialContributingSources?: ContributingSource[]
+  /** Per-member AI-panel series; only populated (and only rendered) when the viewer opted in. */
+  aiPanelSeries?: {
+    model: string
+    label: string
+    color: string
+    isControl: boolean
+    points: { createdAt: string; probability: number }[]
+  }[]
+  showAiPanel?: boolean
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -746,6 +757,8 @@ export default function ForecastDetailClient({
           prediction.externalMarketInverted ?? false,
           trackedOutcomeLabel(prediction.externalMarket?.outcomes),
         )}
+        panelSeries={aiPanelSeries}
+        showAiPanel={showAiPanel}
       />
 
       {/* Commitments List */}
