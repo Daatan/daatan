@@ -249,11 +249,13 @@ describe('runPanelForPrediction', () => {
     expect(result.abstained).toBe(PANEL_MEMBERS.length)
 
     const written = createRun.mock.calls[0][0].data as {
-      estimates: { create: { probability: number | null; insufficientData: boolean }[] }
+      estimates: { create: { probability: number | null; insufficientData: boolean; callFailed: boolean }[] }
     }
     for (const estimate of written.estimates.create) {
       expect(estimate.probability).toBeNull()
       expect(estimate.insufficientData).toBe(true)
+      // The model answered "too vague" — a decline, not a transport failure.
+      expect(estimate.callFailed).toBe(false)
     }
   })
 
@@ -270,10 +272,16 @@ describe('runPanelForPrediction', () => {
     expect(result.estimated).toBe(rest.length)
 
     const written = createRun.mock.calls[0][0].data as {
-      estimates: { create: { model: string; probability: number | null }[] }
+      estimates: { create: { model: string; probability: number | null; callFailed: boolean }[] }
     }
     const failed = written.estimates.create.find((e) => e.model === first.model)
     expect(failed?.probability).toBeNull()
+    // Persisted as a CALL failure — distinguishable from a deliberate "too vague" null,
+    // so provider reliability never blends into model calibration stats.
+    expect(failed?.callFailed).toBe(true)
+    for (const e of written.estimates.create.filter((e) => e.model !== first.model)) {
+      expect(e.callFailed).toBe(false)
+    }
     // Every row still names exactly the model that produced it.
     expect(written.estimates.create).toHaveLength(PANEL_MEMBERS.length)
   })

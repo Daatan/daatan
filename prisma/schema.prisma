@@ -649,6 +649,10 @@ model AiEstimate {
   /// substituted answer from another model.
   probability      Int?
   insufficientData Boolean @default(false) @map("insufficient_data")
+  /// True when the CALL threw (timeout, provider 5xx, IAM) — the model never saw the
+  /// claim. False on a deliberate null: the model answered "too vague". Per-member
+  /// stats must not blend provider reliability into model calibration.
+  callFailed Boolean @default(false) @map("call_failed")
 
   promptTokens     Int? @map("prompt_tokens")
   completionTokens Int? @map("completion_tokens")
