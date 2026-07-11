@@ -6,8 +6,10 @@ import { runPanelSweep } from '@/lib/services/ai-panel'
 
 const log = createLogger('cron-ai-panel')
 
-/** Wall-clock guard. The sweep is sequential over forecasts; a pathological run
- *  should end rather than overlap the next tick. */
+/** Platform hint only: honoured by Vercel-style hosts, INERT on the self-hosted Docker
+ *  deployment. The real guards are the 30s per-call timeout in panel/client.ts and the
+ *  curl --max-time in ai-panel.yml; overlap is harmless anyway (the unique
+ *  (predictionId, inputHash) index makes concurrent sweeps idempotent). */
 export const maxDuration = 300
 
 /**
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
   // A rejected key is an operational failure, not a quiet no-op. Returning 200 here
   // made the scheduled workflow print "✅ Panel sweep OK" while every single call had
   // 401'd — the failure was visible only as `failed: 57` inside the JSON body. 502 is
-  // what makes ai-panel.yml go red (it treats any non-200, non-404 as a failure).
+  // what makes ai-panel.yml go red (it treats any non-200 as a failure).
   //
   // `dormant` stays a 200: no key configured is a deliberate state, not a breakage.
   if (result.unauthorized) {

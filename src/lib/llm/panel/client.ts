@@ -115,28 +115,38 @@ export async function callPanelMember(
  */
 async function callBedrockMember(member: PanelMember, prompt: string): Promise<PanelCallResult> {
   const startedAt = Date.now()
+  // Same 30s bound as the OpenRouter path. The SDK's default handler has no request
+  // timeout, so without this a hung Converse call stalls a sweep worker indefinitely —
+  // and the self-hosted deployment has no server-side wall clock to catch it.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
-  const response = await getBedrockClient().send(
-    new ConverseCommand({
-      modelId: member.model,
-      messages: [{ role: 'user', content: [{ text: prompt }] }],
-      // Same ceiling and determinism as the OpenRouter path. Bedrock has no
-      // `reasoning: {enabled:false}` switch, but this member is the non-reasoning one,
-      // so there is nothing to disable — and maxTokens still bounds a surprise.
-      inferenceConfig: { maxTokens: MAX_TOKENS, temperature: 0 },
-    }),
-  )
+  try {
+    const response = await getBedrockClient().send(
+      new ConverseCommand({
+        modelId: member.model,
+        messages: [{ role: 'user', content: [{ text: prompt }] }],
+        // Same ceiling and determinism as the OpenRouter path. Bedrock has no
+        // `reasoning: {enabled:false}` switch, but this member is the non-reasoning one,
+        // so there is nothing to disable — and maxTokens still bounds a surprise.
+        inferenceConfig: { maxTokens: MAX_TOKENS, temperature: 0 },
+      }),
+      { abortSignal: controller.signal },
+    )
 
-  const text = response.output?.message?.content?.[0]?.text
-  if (typeof text !== 'string' || text.trim() === '') {
-    throw new Error(`Empty response from ${member.model}`)
-  }
+    const text = response.output?.message?.content?.[0]?.text
+    if (typeof text !== 'string' || text.trim() === '') {
+      throw new Error(`Empty response from ${member.model}`)
+    }
 
-  return {
-    probability: parseProbability(text, member.model),
-    promptTokens: response.usage?.inputTokens ?? null,
-    completionTokens: response.usage?.outputTokens ?? null,
-    latencyMs: Date.now() - startedAt,
+    return {
+      probability: parseProbability(text, member.model),
+      promptTokens: response.usage?.inputTokens ?? null,
+      completionTokens: response.usage?.outputTokens ?? null,
+      latencyMs: Date.now() - startedAt,
+    }
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

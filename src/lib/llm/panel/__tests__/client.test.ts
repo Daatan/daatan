@@ -154,6 +154,16 @@ describe('bedrock route', () => {
     expect(r).toMatchObject({ probability: 37, promptTokens: 210, completionTokens: 9 })
   })
 
+  it('passes an abort signal so a hung Converse call cannot stall a sweep worker', async () => {
+    bedrockSend.mockResolvedValue(converse('{"probability": 37}'))
+
+    await callPanelMember(BEDROCK_MEMBER, 'p', '')
+
+    const opts = bedrockSend.mock.calls[0][1] as { abortSignal?: AbortSignal }
+    expect(opts?.abortSignal).toBeInstanceOf(AbortSignal)
+    expect(opts?.abortSignal?.aborted).toBe(false)
+  })
+
   it('needs no OpenRouter key — that is the entire point of this route', async () => {
     bedrockSend.mockResolvedValue(converse('{"probability": 50}'))
     await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({
