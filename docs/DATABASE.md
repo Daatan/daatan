@@ -200,11 +200,11 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 - `ai_estimates` — one member's answer within a run. Member identity is
   `(model, mode, promptVersion)` — all plain strings, never enums, so adding
   a member needs no migration. `probability` is **0–100 Int, null =
-  abstention**. Distinguishing *why* a member abstained is implicit: a
-  deliberate "claim too vague" null has `latencyMs`/token counts set, while a
-  failed call (timeout, provider error) has them all null. `'oracle'` and
-  `'market'` never appear here — they exist only as sentinel models in
-  `ai_member_scores`.
+  abstention**, and `callFailed` says *why*: true = the call threw (timeout,
+  provider error, IAM) and the model never saw the claim; false = a genuine
+  "claim too vague" decline. (Rows predating v1.54.0 were backfilled from the
+  latency-IS-NULL inference.) `'oracle'` and `'market'` never appear here —
+  they exist only as sentinel models in `ai_member_scores`.
 - `ai_member_scores` — matched-time Brier per (commitment, member), written at
   resolution from the run pinned by `Commitment.aiRunIdAtCommit` (FK,
   `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel

@@ -419,11 +419,13 @@ Open, roughly in order of value:
   deliberate Bedrock-only (no-key) deployment does not report failures. Historical note:
   staging's 1-member run from the 2026-07-10 incident predates the fix and stays
   incomplete (its day has passed).
-- **Failed call vs deliberate abstention is implicit in the data.** Both store
-  `probability: null, insufficientData: true`; they differ only in that a failed call has
-  null `latencyMs`/token counts. Day-one staging data shows the distinction is real:
-  DeepSeek's 19 nulls were all transport failures (pinned single provider), Grok's 23
-  were genuine "too vague" declines.
+- **Failed call vs deliberate abstention is an explicit column** (since v1.54.0):
+  `ai_estimates.call_failed` is true when the CALL threw (timeout, provider 5xx, IAM) —
+  the model never saw the claim — and false on a genuine "too vague" null. Pre-existing
+  rows were backfilled by the old latency-IS-NULL inference. Day-one staging data shows
+  why it matters: DeepSeek's 19 nulls were all transport failures (pinned single
+  provider), Grok's 23 were genuine declines — provider reliability must not blend into
+  model calibration.
 - **`ai_member_scores` stores `promptVersion`** (since v1.52.0; null for the
   `'oracle'`/`'market'` sentinels) and the leaderboard groups by
   `(model, promptVersion)`, so a prompt change forks a member's board row instead of
