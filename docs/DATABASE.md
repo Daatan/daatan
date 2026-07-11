@@ -38,6 +38,8 @@ S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h).
 | Oracle wire format (`/forecast` response `mean/std/ci_low/ci_high`, and `oracleSnapshot.sources[].stance`) | **stance −1..1** (`p = (stance+1)/2`) | Float |
 | `oracleSnapshot.sources[].certainty` | 0..1 | Float |
 | `Commitment.probability`, `communityProbabilityAtCommit`, `aiProbabilityAtCommit` | **0.0–1.0** | Float |
+| `AiEstimate.probability` (LASSO panel members) | **0–100**, null = abstention | Int? |
+| `AiMemberScore.brierScore` | 0.0–1.0 (Brier, lower = better) | Float |
 
 Conversion happens once, at the Oracle boundary (`stanceToPercent` in
 `src/lib/services/oracle-snapshot.ts`). Rows written before v1.31.2 originally
@@ -181,11 +183,41 @@ YES price, and since v1.32.x are written **only on a real price change** — the
 newest snapshot's `createdAt` is the last *change*, not the last sync
 (`lastSyncedAt` on the market is the freshness signal).
 
+## LASSO (AI panel) — `ai_estimate_runs`, `ai_estimates`, `ai_member_scores`
+
+Multi-LLM ungrounded probability series, modelled on the external-market
+snapshots: charted (opt-in), scored, and **structurally unable to move the
+needle** — nothing here is read by `recordEstimate`, the gauge, or any user
+score. Canonical doc: [LASSO.md](./LASSO.md).
+
+- `ai_estimate_runs` — one panel sweep over one forecast. `inputHash` is the
+  date-gate (sha256 of claim + rules + resolveBy + UTC day + promptVersion +
+  roster signature); UNIQUE `(predictionId, inputHash)` makes the cron
+  idempotent. In practice one run per open BINARY forecast per day.
+- `ai_estimates` — one member's answer within a run. Member identity is
+  `(model, mode, promptVersion)` — all plain strings, never enums, so adding
+  a member needs no migration. `probability` is **0–100 Int, null =
+  abstention**. Distinguishing *why* a member abstained is implicit: a
+  deliberate "claim too vague" null has `latencyMs`/token counts set, while a
+  failed call (timeout, provider error) has them all null. `'oracle'` and
+  `'market'` never appear here — they exist only as sentinel models in
+  `ai_member_scores`.
+- `ai_member_scores` — matched-time Brier per (commitment, member), written at
+  resolution from the run pinned by `Commitment.aiRunIdAtCommit` (FK,
+  `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel
+  `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`) and
+  `'market'` (linked market price as of the commit instant). Feeds only
+  `/leaderboard/ai`; no RS/ELO/Glicko path reads it. Note the table does
+  **not** carry `promptVersion`, so the leaderboard currently averages across
+  prompt versions (open finding from the 2026-07-11 review).
+- `users.showAiPanel` — per-user opt-in for the chart lines, default false.
+
 ## Commitments & scoring — `commitments`, ratings on `users`
 
 `Commitment`: one per (user, prediction), `cuCommitted` stake, `probability`
 (0.0–1.0!), commit-time snapshots (`rsSnapshot`,
-`communityProbabilityAtCommit`, `aiProbabilityAtCommit`) and resolution-time
+`communityProbabilityAtCommit`, `aiProbabilityAtCommit`, `aiRunIdAtCommit` —
+the LASSO run current at stake time, see above) and resolution-time
 results (`rsChange`, `brierScore`, `peerScore`, `aiScore`, `eloChange`).
 
 Ratings live on `users` (`rs` reputation, Glicko-2 `mu/sigma/volatility`, ELO

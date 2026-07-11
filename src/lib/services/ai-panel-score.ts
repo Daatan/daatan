@@ -8,7 +8,9 @@
  * same claim, the same instant, the same information.
  */
 
-/** OUTCOME encoding matches prediction-resolution.ts: 1 = the staked side resolved true. */
+/** OUTCOME encoding matches prediction-resolution.ts: for BINARY, 1 = the claim resolved
+ *  true (the same encoding as the human's Brier); for MULTIPLE_CHOICE commitments (where
+ *  only the 'oracle'/'market' sentinels are scored), 1 = the user's chosen option won. */
 export interface MatchedMemberEstimate {
   model: string
   /** 0–100, or null when the member abstained on that run. */

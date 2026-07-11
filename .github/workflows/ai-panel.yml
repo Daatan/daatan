@@ -14,9 +14,12 @@ name: AI Panel
 #   its inputs — so the second tick is a free no-op (no LLM calls, no writes) whenever
 #   the first succeeded. It exists purely so a failed tick self-heals within 12h.
 #
-# DORMANT WITHOUT A KEY:
-#   With no OpenRouter key configured (admin Settings → env), the sweep returns
-#   {dormant: true} and does nothing. That is a 200, not a failure.
+# KEY FAILURE MODES (docs/LASSO.md §9):
+#   A missing OpenRouter key is NOT dormancy: the Bedrock member runs on the app's IAM
+#   role, so the sweep proceeds with that member alone (dormant = no key AND no
+#   non-OpenRouter member — unreachable with the current roster). A REJECTED key
+#   (401/403) makes the route answer 502 even when Bedrock carried the sweep, which
+#   fails this job — a dead credential must go red, not print a green no-op.
 
 on:
   schedule:
