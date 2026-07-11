@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { applyGlicko2Update } from '@/lib/services/expertise'
 import { calculateEloUpdates } from '@/lib/services/elo'
+import { computeMemberScores } from '@/lib/services/ai-panel-score'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 
@@ -52,6 +53,11 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
               correctPredictions: true,
               eloRating: true,
             },
+          },
+          // The AI-panel run current when this user staked, for matched-time Brier
+          // (docs/AI_PANEL.md §7). Null on commitments placed before the first run.
+          aiRunAtCommit: {
+            select: { estimates: { select: { model: true, probability: true } } },
           },
         },
       },
@@ -145,6 +151,26 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           brierScore,
           eloRating: commitment.user.eloRating,
         })
+
+        // Matched-time Brier for each panel member (and the Oracle) on this commitment.
+        // Isolation: written to ai_member_scores only; never touches this user's score.
+        const memberScores = computeMemberScores(
+          commitment.aiRunAtCommit?.estimates ?? [],
+          commitment.aiProbabilityAtCommit,
+          outcomeNumeric,
+        )
+        for (const ms of memberScores) {
+          await tx.aiMemberScore.upsert({
+            where: { commitmentId_model: { commitmentId: commitment.id, model: ms.model } },
+            create: {
+              predictionId: prediction.id,
+              commitmentId: commitment.id,
+              model: ms.model,
+              brierScore: ms.brierScore,
+            },
+            update: { brierScore: ms.brierScore },
+          })
+        }
       }
 
       await tx.commitment.update({

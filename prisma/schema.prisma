@@ -405,6 +405,7 @@ model Prediction {
   slugAliases      PredictionSlugAlias[]
   oracleCallLogs   OracleCallLog[]
   aiEstimateRuns   AiEstimateRun[]
+  aiMemberScores   AiMemberScore[]
 
   @@index([status])
   @@index([authorId])
@@ -660,6 +661,37 @@ model AiEstimate {
   @@map("ai_estimates")
 }
 
+/// Matched-time Brier for one panel member on one commitment (docs/AI_PANEL.md §7).
+///
+/// Written at resolution, one row per (commitment, member): the member's probability in
+/// the run current when that user staked, scored against the outcome. Directly comparable
+/// to the human's own `Commitment.brierScore` on the same commitment — same claim, same
+/// instant, same information — which is the whole point of matched-time.
+///
+/// `model` is a panel member slug, or the sentinel 'oracle': the Oracle needle at commit
+/// time is already on `Commitment.aiProbabilityAtCommit`, so scoring it here as a member
+/// costs zero extra calls and answers "does the Oracle beat the panel, or the crowd?".
+///
+/// Isolation holds: this is written only at resolution and read only for the AI
+/// leaderboard. Nothing here feeds a user's RS, ELO, or Glicko rating.
+model AiMemberScore {
+  id           String     @id @default(cuid())
+  predictionId String     @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  commitmentId String     @map("commitment_id")
+  commitment   Commitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
+
+  model      String @db.VarChar(64)
+  brierScore Float  @map("brier_score") // (probability − outcome)², both on 0–1
+
+  createdAt DateTime @default(now())
+
+  @@unique([commitmentId, model])
+  @@index([model])
+  @@index([predictionId])
+  @@map("ai_member_scores")
+}
+
 // ============================================
 // PREDICTION OPTIONS (for MC/Numeric)
 // ============================================
@@ -737,6 +769,7 @@ model Commitment {
   // aggregates the same way a null `brierScore` already does.
   aiRunIdAtCommit String?        @map("ai_run_id_at_commit")
   aiRunAtCommit   AiEstimateRun? @relation(fields: [aiRunIdAtCommit], references: [id], onDelete: SetNull)
+  aiMemberScores  AiMemberScore[]
 
   // Each user can only commit once per prediction
   @@unique([userId, predictionId])
