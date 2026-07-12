@@ -66,6 +66,24 @@ export async function register() {
     log.warn({ missing: missing.map(({ key, feature }) => ({ key, feature })) }, '[startup] WARNING: Missing environment variables — functionality requiring these keys will fail at runtime')
   }
 
+  // Both VAPID keys can be individually present yet belong to different keypairs — e.g. a
+  // rotation that updated VAPID_PRIVATE_KEY (server, runtime) without also updating the
+  // NEXT_PUBLIC_VAPID_PUBLIC_KEY GitHub Actions secret (baked into the client bundle at
+  // build). That fails every push send's VAPID auth (401/403) with nothing else to catch it.
+  if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    try {
+      const { createECDH } = await import('crypto')
+      const curve = createECDH('prime256v1')
+      curve.setPrivateKey(Buffer.from(process.env.VAPID_PRIVATE_KEY, 'base64url'))
+      const derivedPublicKey = curve.getPublicKey().toString('base64url')
+      if (derivedPublicKey !== process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+        log.error('[startup] VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY are not a matching keypair — every browser push notification will fail VAPID auth. Regenerate and update both together (see SECRETS.md).')
+      }
+    } catch (err) {
+      log.warn({ err }, '[startup] Could not verify VAPID keypair match')
+    }
+  }
+
   // Validate critical SSM prompt params are not PLACEHOLDER.
   // All of these are called without fallbacks in user-facing request paths;
   // a PLACEHOLDER value causes a runtime error only when the feature is used.
