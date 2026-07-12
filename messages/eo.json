@@ -1072,5 +1072,13 @@
     "emptyTitle": "Ankoraŭ neniuj poentoj",
     "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
     "footnote": "Samtempa Brier: la takso de ĉiu modelo en la momento de vetado, poentita kontraŭ la rezulto. Membroj kun malpli ol 5 poentoj estas kaŝitaj. La Orakolo estas inkluzivita por komparo; “kontrolo” estas intence malforta modelo."
+  },
+  "dateTimeField": {
+    "datePlaceholder": "TT/MM/JJJJ",
+    "timePlaceholder": "HH:MM",
+    "dateAriaLabel": "Dato (tago/monato/jaro)",
+    "timeAriaLabel": "Horo (24-hora)",
+    "openCalendar": "Malfermi kalendaron",
+    "hint": "Tago/Monato/Jaro · 24-hora horloĝo"
   }
 }

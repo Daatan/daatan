@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Sparkles, Search, FileText, Loader2, AlertCircle, Edit2, RotateCcw, ArrowLeft, X, Plus, List, Trash2, Eye, EyeOff, ShieldCheck, Newspaper, type LucideIcon } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
+import { DateTimeField } from '@/components/ui/DateTimeField'
 import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecastsWarning'
 import { createClientLogger } from '@/lib/client-logger'
+import { toLocalDatetimeInput } from '@/lib/utils/date'
 
 const log = createClientLogger('ExpressForecast')
 
@@ -313,7 +315,8 @@ export default function ExpressForecastClient({
     const finalData = isEditing ? editForm : generated
     if (!finalData) return
 
-    if (new Date(finalData.resolveByDatetime) <= new Date()) {
+    const resolveBy = new Date(finalData.resolveByDatetime)
+    if (isNaN(resolveBy.getTime()) || resolveBy <= new Date()) {
       setError(t('resolutionDateFutureError'))
       return
     }
@@ -373,6 +376,13 @@ export default function ExpressForecastClient({
       setIsEditing(false)
     }
   }
+
+  // editForm stores a UTC ISO string; DateTimeField takes local "YYYY-MM-DDTHH:MM"
+  // (and holds '' after invalid input).
+  const resolveByDate = editForm?.resolveByDatetime ? new Date(editForm.resolveByDatetime) : null
+  const resolveByInputValue = resolveByDate && !isNaN(resolveByDate.getTime())
+    ? toLocalDatetimeInput(resolveByDate)
+    : ''
 
   // Tag management in edit mode
   const addTag = () => {
@@ -685,16 +695,14 @@ export default function ExpressForecastClient({
             <div>
               <h3 className="text-sm font-bold text-text-secondary mb-2">{t('resolutionDate')}</h3>
               {isEditing ? (
-                <input
-                  type="datetime-local"
-                  aria-label="Resolve by date"
-                  value={editForm?.resolveByDatetime?.slice(0, 16)} // Format for input
-                  min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const d = new Date(e.target.value)
-                    setEditForm(prev => prev ? ({ ...prev, resolveByDatetime: isNaN(d.getTime()) ? e.target.value : d.toISOString() }) : null)
+                <DateTimeField
+                  value={resolveByInputValue}
+                  onChange={(value) => {
+                    setEditForm(prev => prev ? ({ ...prev, resolveByDatetime: value ? new Date(value).toISOString() : '' }) : null)
                   }}
-                  className={`w-full p-3 rounded-lg border bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${editForm?.resolveByDatetime && new Date(editForm.resolveByDatetime) <= new Date() ? 'border-red-500' : 'border-navy-600'}`}
+                  defaultTime="23:59"
+                  min={toLocalDatetimeInput(new Date()).slice(0, 10)}
+                  invalid={!!(resolveByDate && resolveByDate <= new Date())}
                 />
               ) : (
                 <p className="text-white">

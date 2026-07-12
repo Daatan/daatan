@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Save, 
-  AlertCircle, 
-  CheckCircle2, 
-  Loader2, 
+import {
+  Save,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
   ChevronLeft,
-  Calendar,
   Lock,
   Unlock,
   Info,
@@ -19,6 +18,7 @@ import {
 import Link from 'next/link'
 import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
+import { DateTimeField } from '@/components/ui/DateTimeField'
 import { PrimaryLink } from '@/components/ui/PrimaryLink'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput } from '@/lib/utils/date'
@@ -354,16 +354,12 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
           <label htmlFor="resolveByDatetime" className="block text-sm font-medium text-text-secondary mb-2">
             {t('resolveByLabel')} <span className="text-red-500">*</span>
           </label>
-          <div className="relative">
-            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="datetime-local"
-              id="resolveByDatetime"
-              value={formData.resolveByDatetime}
-              onChange={(e) => handleChange('resolveByDatetime', e.target.value)}
-              className="w-full pl-11 pr-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <DateTimeField
+            id="resolveByDatetime"
+            value={formData.resolveByDatetime}
+            onChange={(value) => handleChange('resolveByDatetime', value)}
+            defaultTime="23:59"
+          />
           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
             <Info className="w-3 h-3" />
             Predictions are usually resolved within 24 hours of this date.
