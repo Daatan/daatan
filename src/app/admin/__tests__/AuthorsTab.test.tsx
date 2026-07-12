@@ -8,6 +8,7 @@ const API = '/api/admin/news-indexer/authors'
 const CASPIT = '11111111-1111-4111-8111-111111111111'
 const SEGAL = '22222222-2222-4222-8222-222222222222'
 const ALIAS = '33333333-3333-4333-8333-333333333333'
+const OUTLET = '44444444-4444-4444-8444-444444444444'
 
 const renderWithIntl = (ui: React.ReactElement) =>
   render(
@@ -22,8 +23,9 @@ const people = [
     canonical_name: 'Ben Caspit',
     notes: 'Maariv',
     aliases: [{ id: ALIAS, alias: 'בן כספית' }],
+    outlets: [{ id: OUTLET, name: 'Maariv' }],
   },
-  { id: SEGAL, canonical_name: 'Amit Segal', notes: null, aliases: [] },
+  { id: SEGAL, canonical_name: 'Amit Segal', notes: null, aliases: [], outlets: [] },
 ]
 
 const ok = (body: unknown) => ({ ok: true, json: () => Promise.resolve(body) })
@@ -55,6 +57,8 @@ describe('AuthorsTab', () => {
     expect(screen.getByText('בן כספית')).toBeInTheDocument()
     // Segal has none, so his card shows the empty-alias hint rather than a chip.
     expect(screen.getByText('no aliases')).toBeInTheDocument()
+    expect(screen.getByText('Maariv')).toBeInTheDocument()
+    expect(screen.getByText('no linked outlets')).toBeInTheDocument()
 
     expect(mockFetch).toHaveBeenCalledExactlyOnceWith(API, { cache: 'no-store' })
   })
@@ -205,6 +209,56 @@ describe('AuthorsTab', () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3))
     const [url, init] = mockFetch.mock.calls[1]
     expect(url).toBe(`${API}/${CASPIT}/aliases/${ALIAS}`)
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('links an outlet via POST on the person id', async () => {
+    listOk()
+    renderWithIntl(<AuthorsTab />)
+    await waitFor(() => expect(screen.getByDisplayValue('Ben Caspit')).toBeInTheDocument())
+
+    const outletInputs = screen.getAllByPlaceholderText('Add outlet (their own channel, or one they write for)')
+    fireEvent.change(outletInputs[1], { target: { value: '  Channel 12  ' } })
+
+    mockFetch.mockResolvedValueOnce(ok({}))
+    listOk()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add outlet' })[1])
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3))
+    const [url, init] = mockFetch.mock.calls[1]
+    expect(url).toBe(`${API}/${SEGAL}/outlets`)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ outlet_name: 'Channel 12' })
+  })
+
+  it('links an outlet on Enter as well as on click', async () => {
+    listOk()
+    renderWithIntl(<AuthorsTab />)
+    await waitFor(() => expect(screen.getByDisplayValue('Ben Caspit')).toBeInTheDocument())
+
+    const outletInput = screen.getAllByPlaceholderText('Add outlet (their own channel, or one they write for)')[0]
+    fireEvent.change(outletInput, { target: { value: 'Ynet' } })
+
+    mockFetch.mockResolvedValueOnce(ok({}))
+    listOk()
+    fireEvent.keyDown(outletInput, { key: 'Enter' })
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3))
+    expect(mockFetch.mock.calls[1][0]).toBe(`${API}/${CASPIT}/outlets`)
+  })
+
+  it('removes an outlet link via DELETE on the outlet id', async () => {
+    listOk()
+    renderWithIntl(<AuthorsTab />)
+    await waitFor(() => expect(screen.getByDisplayValue('Ben Caspit')).toBeInTheDocument())
+
+    mockFetch.mockResolvedValueOnce(ok({}))
+    listOk()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove outlet Maariv' }))
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(3))
+    const [url, init] = mockFetch.mock.calls[1]
+    expect(url).toBe(`${API}/${CASPIT}/outlets/${OUTLET}`)
     expect(init.method).toBe('DELETE')
   })
 

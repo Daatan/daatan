@@ -24,6 +24,7 @@ const baseDetail = {
   sourceConfig: { type: 'rss', locator: 'https://feeds.reuters.com/reuters/topNews', language: 'en', enabled: true, domain: 'feeds.reuters.com' },
   impact: { matches: 12, forecastsAffected: 5, last30dMatches: 3, lastMatchedAt: '2026-07-01T00:00:00+00:00' },
   publications: [],
+  linkedPeople: [],
 }
 
 describe('OutletDetailPanel', () => {
@@ -86,6 +87,27 @@ describe('OutletDetailPanel', () => {
     const putCall = mockFetch.mock.calls.find(([, opts]) => opts?.method === 'PUT')
     const body = JSON.parse(putCall![1].body)
     expect(body.wikipedia_url).toBe('https://en.wikipedia.org/wiki/Reuters')
+  })
+
+  it('shows the no-linked-people hint when nobody is linked', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(baseDetail) })
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+
+    await waitFor(() => expect(screen.getByText('No people linked to this outlet yet.')).toBeInTheDocument())
+  })
+
+  it('renders linked people as read-only badges', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...baseDetail,
+        linkedPeople: [{ id: 'p1', canonicalName: 'Jane Reporter' }],
+      }),
+    })
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+
+    await waitFor(() => expect(screen.getByText('Jane Reporter')).toBeInTheDocument())
+    expect(screen.queryByText('No people linked to this outlet yet.')).not.toBeInTheDocument()
   })
 
   it('renders publications with a link to the forecast', async () => {

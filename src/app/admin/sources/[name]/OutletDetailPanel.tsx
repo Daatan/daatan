@@ -32,6 +32,8 @@ type Publication = {
   outcome: string | null
 }
 
+type LinkedPerson = { id: string; canonicalName: string }
+
 type OutletDetail = {
   name: string
   wikipediaUrl: string | null
@@ -41,6 +43,7 @@ type OutletDetail = {
   sourceConfig: SourceConfig | null
   impact: Impact
   publications: Publication[]
+  linkedPeople: LinkedPerson[]
 }
 
 interface Props {
@@ -249,6 +252,22 @@ export default function OutletDetailPanel({ name }: Props) {
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {t('sourcesDetailSave')}
         </button>
       </div>
+
+      {/* Linked people — edited from the person's side (Admin ▸ Authors), shown here read-only. */}
+      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+        {t('sourcesDetailLinkedPeople')}
+      </h3>
+      {data.linkedPeople.length === 0 ? (
+        <p className="text-sm text-gray-500 mb-8">{t('sourcesDetailNoLinkedPeople')}</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 mb-8">
+          {data.linkedPeople.map((p) => (
+            <span key={p.id} className="inline-flex items-center px-3 py-1 text-xs text-gray-300 bg-navy-900 border border-navy-600 rounded-full">
+              {p.canonicalName}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Publications */}
       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
