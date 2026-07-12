@@ -4,7 +4,14 @@ import { Loader2, RefreshCw, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 type Alias = { id: string; alias: string }
-type Person = { id: string; canonical_name: string; notes: string | null; aliases: Alias[] }
+type OutletLink = { id: string; name: string }
+type Person = {
+  id: string
+  canonical_name: string
+  notes: string | null
+  aliases: Alias[]
+  outlets: OutletLink[]
+}
 
 const API = '/api/admin/news-indexer/authors'
 
@@ -16,8 +23,8 @@ export default function AuthorsTab() {
 
   const [newName, setNewName] = useState('')
   const [newNotes, setNewNotes] = useState('')
-  // Per-person draft state for the inline name/notes editors and the alias input.
-  const [drafts, setDrafts] = useState<Record<string, { name: string; notes: string; alias: string }>>({})
+  // Per-person draft state for the inline name/notes editors, the alias input, and the outlet-link input.
+  const [drafts, setDrafts] = useState<Record<string, { name: string; notes: string; alias: string; outlet: string }>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -32,7 +39,7 @@ export default function AuthorsTab() {
       const list: Person[] = data.people ?? []
       setPeople(list)
       setDrafts(Object.fromEntries(
-        list.map((p) => [p.id, { name: p.canonical_name, notes: p.notes ?? '', alias: '' }]),
+        list.map((p) => [p.id, { name: p.canonical_name, notes: p.notes ?? '', alias: '', outlet: '' }]),
       ))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('authorsLoadError'))
@@ -96,7 +103,16 @@ export default function AuthorsTab() {
   const deleteAlias = (p: Person, alias: Alias) =>
     mutate(`/${p.id}/aliases/${alias.id}`, { method: 'DELETE' })
 
-  const setDraft = (id: string, patch: Partial<{ name: string; notes: string; alias: string }>) =>
+  const addOutlet = (p: Person) => {
+    const outlet_name = drafts[p.id]?.outlet.trim()
+    if (!outlet_name) return
+    return mutate(`/${p.id}/outlets`, { method: 'POST', body: JSON.stringify({ outlet_name }) })
+  }
+
+  const removeOutlet = (p: Person, outlet: OutletLink) =>
+    mutate(`/${p.id}/outlets/${outlet.id}`, { method: 'DELETE' })
+
+  const setDraft = (id: string, patch: Partial<{ name: string; notes: string; alias: string; outlet: string }>) =>
     setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }))
 
   const inputClass = 'px-3 py-1.5 text-sm bg-navy-900 border border-navy-600 rounded-md text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500'
@@ -156,7 +172,7 @@ export default function AuthorsTab() {
       ) : (
         <div className="flex flex-col gap-3">
           {people.map((p) => {
-            const draft = drafts[p.id] ?? { name: p.canonical_name, notes: p.notes ?? '', alias: '' }
+            const draft = drafts[p.id] ?? { name: p.canonical_name, notes: p.notes ?? '', alias: '', outlet: '' }
             return (
               <div key={p.id} className="p-4 rounded-lg border border-navy-600 bg-navy-800">
                 <div className="flex flex-wrap gap-2 items-center mb-3">
@@ -202,7 +218,7 @@ export default function AuthorsTab() {
                   ))}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 mb-3">
                   <input
                     className={`${inputClass} flex-1`}
                     placeholder={t('authorsAliasPlaceholder')}
@@ -216,6 +232,41 @@ export default function AuthorsTab() {
                     className="px-3 py-1.5 text-sm font-medium text-gray-200 bg-navy-700 hover:bg-navy-600 border border-navy-600 rounded-md transition-colors disabled:opacity-40"
                   >
                     {t('authorsAddAlias')}
+                  </button>
+                </div>
+
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">{t('authorsOutletsTitle')}</h4>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {p.outlets.length === 0 ? (
+                    <span className="text-xs text-gray-600">{t('authorsNoOutlets')}</span>
+                  ) : p.outlets.map((o) => (
+                    <span key={o.id} className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 text-xs text-gray-300 bg-navy-900 border border-navy-600 rounded-full">
+                      {o.name}
+                      <button
+                        onClick={() => removeOutlet(p, o)}
+                        aria-label={t('authorsRemoveOutlet', { name: o.name })}
+                        className="p-0.5 text-gray-500 hover:text-red-400 rounded-full transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    className={`${inputClass} flex-1`}
+                    placeholder={t('authorsOutletPlaceholder')}
+                    value={draft.outlet}
+                    onChange={(e) => setDraft(p.id, { outlet: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addOutlet(p) }}
+                  />
+                  <button
+                    onClick={() => addOutlet(p)}
+                    disabled={!draft.outlet.trim()}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-200 bg-navy-700 hover:bg-navy-600 border border-navy-600 rounded-md transition-colors disabled:opacity-40"
+                  >
+                    {t('authorsAddOutlet')}
                   </button>
                 </div>
               </div>

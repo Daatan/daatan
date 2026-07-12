@@ -21,9 +21,12 @@ import { GET, POST } from '../route'
 import { PATCH, DELETE } from '../[id]/route'
 import { POST as POST_ALIAS } from '../[id]/aliases/route'
 import { DELETE as DELETE_ALIAS } from '../[id]/aliases/[aliasId]/route'
+import { POST as POST_OUTLET } from '../[id]/outlets/route'
+import { DELETE as DELETE_OUTLET } from '../[id]/outlets/[outletId]/route'
 
 const UUID = 'd1a8046c-b8a1-4a41-b12e-7ddd89ef275c'
 const ALIAS_UUID = '4563dfba-8bee-4421-9033-84120b60c933'
+const OUTLET_UUID = '9a6e3f2b-1c4d-4e8a-9f3b-2d5e7a8c1b0f'
 
 const mockAuth = vi.mocked(auth as unknown as () => Promise<unknown>)
 const mockProxy = vi.mocked(proxyAuthorsAdmin)
@@ -106,6 +109,26 @@ describe('authors proxy — id validation', () => {
       expect(mockProxy).not.toHaveBeenCalled()
     },
   )
+
+  it('rejects a malformed outlet id with 400', async () => {
+    const res = await DELETE_OUTLET(req('DELETE'), ctx({ id: UUID, outletId: '../../ledger' }))
+    expect(res.status).toBe(400)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('forwards a well-formed outlet unlink', async () => {
+    await DELETE_OUTLET(req('DELETE'), ctx({ id: UUID, outletId: OUTLET_UUID }))
+    expect(mockProxy).toHaveBeenCalledWith(`/authors/${UUID}/outlets/${OUTLET_UUID}`, { method: 'DELETE' })
+  })
+
+  it.each(['..', 'admin/people', 'not-a-uuid'])(
+    'rejects an outlet link on person id %j with 400',
+    async (id) => {
+      const res = await POST_OUTLET(req('POST', { outlet_name: 'Maariv' }), ctx({ id }))
+      expect(res.status).toBe(400)
+      expect(mockProxy).not.toHaveBeenCalled()
+    },
+  )
 })
 
 describe('authors proxy — alias create', () => {
@@ -136,6 +159,38 @@ describe('authors proxy — alias create', () => {
     expect(mockProxy).toHaveBeenCalledWith(`/authors/${UUID}/aliases`, {
       method: 'POST',
       body: { alias: 'בן כספית' },
+    })
+  })
+})
+
+describe('authors proxy — outlet link', () => {
+  beforeEach(() => asRole('ADMIN'))
+
+  it('rejects an unauthenticated caller with 401 and never calls upstream', async () => {
+    mockAuth.mockResolvedValue(null)
+    const res = await POST_OUTLET(req('POST', { outlet_name: 'Maariv' }), ctx({ id: UUID }))
+    expect(res.status).toBe(401)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-admin caller with 403 and never calls upstream', async () => {
+    asRole('USER')
+    const res = await POST_OUTLET(req('POST', { outlet_name: 'Maariv' }), ctx({ id: UUID }))
+    expect(res.status).toBe(403)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-object body with 400', async () => {
+    const res = await POST_OUTLET(req('POST', 'oops'), ctx({ id: UUID }))
+    expect(res.status).toBe(400)
+    expect(mockProxy).not.toHaveBeenCalled()
+  })
+
+  it('forwards a well-formed outlet link', async () => {
+    await POST_OUTLET(req('POST', { outlet_name: 'Maariv' }), ctx({ id: UUID }))
+    expect(mockProxy).toHaveBeenCalledWith(`/authors/${UUID}/outlets`, {
+      method: 'POST',
+      body: { outlet_name: 'Maariv' },
     })
   })
 })
