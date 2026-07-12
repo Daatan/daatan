@@ -361,35 +361,38 @@ describe('ExpressForecastClient', () => {
       expect(screen.queryByText(/Unlisted — only people with the link/)).not.toBeInTheDocument()
     })
 
-    it('entering a valid datetime in edit mode updates the input value', async () => {
+    it('entering a valid date and 24h time in edit mode updates the field values', async () => {
       await renderInReviewState()
 
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
       })
 
-      // The input value is sliced to 16 chars (datetime-local format: YYYY-MM-DDTHH:MM)
-      const dateInput = screen.getByDisplayValue(/2026-12-31T23:59/) as HTMLInputElement
+      // DateTimeField splits the value (2026-12-31T23:59:59Z, TZ=UTC in tests)
+      // into a DD/MM/YYYY date field and a 24-hour time field.
+      const dateInput = screen.getByDisplayValue('31/12/2026') as HTMLInputElement
+      const timeInput = screen.getByDisplayValue('23:59') as HTMLInputElement
 
       await act(async () => {
-        fireEvent.change(dateInput, { target: { value: '2027-06-15T12:00' } })
+        fireEvent.change(dateInput, { target: { value: '15/06/2027' } })
+        fireEvent.change(timeInput, { target: { value: '12:00' } })
       })
 
-      // Input should reflect the new value
-      expect(dateInput.value).toBe('2027-06-15T12:00')
+      expect(dateInput.value).toBe('15/06/2027')
+      expect(timeInput.value).toBe('12:00')
     })
 
-    it('entering a partial/invalid datetime does not throw', async () => {
+    it('entering a partial/invalid date does not throw', async () => {
       await renderInReviewState()
 
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
       })
 
-      const dateInput = screen.getByDisplayValue(/2026-12-31T23:59/) as HTMLInputElement
+      const dateInput = screen.getByDisplayValue('31/12/2026') as HTMLInputElement
 
-      // Simulates the browser firing onChange mid-edit with an incomplete year like "6"
-      // Before the fix this would throw: RangeError: Invalid time value
+      // Incomplete input mid-edit (e.g. just "6") must not produce an Invalid
+      // Date; DateTimeField reports it as '' instead.
       expect(() => {
         fireEvent.change(dateInput, { target: { value: '6' } })
       }).not.toThrow()

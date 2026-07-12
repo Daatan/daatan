@@ -1072,5 +1072,13 @@
     "emptyTitle": "No scores yet",
     "emptyDesc": "AI-panel Brier scores appear once forecasts that were staked on resolve.",
     "footnote": "Matched-time Brier: each model’s estimate at the instant a user staked, scored against the outcome. Members with fewer than 5 scores are hidden. The Oracle is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet."
+  },
+  "dateTimeField": {
+    "datePlaceholder": "DD/MM/YYYY",
+    "timePlaceholder": "HH:MM",
+    "dateAriaLabel": "Date (day/month/year)",
+    "timeAriaLabel": "Time (24-hour)",
+    "openCalendar": "Open calendar",
+    "hint": "Day/Month/Year · 24-hour time"
   }
 }

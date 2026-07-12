@@ -9,6 +9,8 @@
  * `.toISOString()` convert to UTC for storage.
  */
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
 /**
  * Convert a "YYYY-MM-DD" string from <input type="date"> to a Date at
  * 23:59:59.999 in the user's local timezone.
@@ -25,7 +27,6 @@ export function localEndOfDay(dateStr: string): Date {
  * server — toISOString() would give UTC which the input then misinterprets.
  */
 export function toLocalDatetimeInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
   return (
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
@@ -61,4 +62,42 @@ export function formatDisplayDateTime(date: string | Date | null | undefined): s
     timeZone: 'UTC',
     timeZoneName: 'short',
   })
+}
+
+/**
+ * Day-first text entry, used by DateTimeField instead of the native
+ * datetime-local input whose display order follows the browser locale
+ * (month-first for en-US users) rather than the site's DD/MM/YYYY convention.
+ */
+
+/** "YYYY-MM-DD" → "DD/MM/YYYY". Returns '' for input not in YYYY-MM-DD form. */
+export function formatDdmmyyyy(ymd: string): string {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  return `${m[3]}/${m[2]}/${m[1]}`
+}
+
+/**
+ * Parse day-first text ("31/12/2026", also "." or "-" separators, 1-digit day
+ * and month allowed) to "YYYY-MM-DD". Returns null unless the text is a
+ * complete, real calendar date with a 4-digit year.
+ */
+export function parseDdmmyyyy(text: string): string | null {
+  const m = text.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/)
+  if (!m) return null
+  const [day, month, year] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  // Round-trip through Date to reject impossible dates like 31/02 (the
+  // constructor would silently roll them over into the next month).
+  const d = new Date(year, month - 1, day)
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null
+  return `${year}-${pad(month)}-${pad(day)}`
+}
+
+/** Parse 24-hour time text ("9:05", "18:30") to "HH:MM"; null if invalid. */
+export function parseTime24(text: string): string | null {
+  const m = text.trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const [hours, minutes] = [Number(m[1]), Number(m[2])]
+  if (hours > 23 || minutes > 59) return null
+  return `${pad(hours)}:${m[2]}`
 }

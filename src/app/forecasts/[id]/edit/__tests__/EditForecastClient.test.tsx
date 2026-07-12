@@ -229,6 +229,32 @@ describe('EditForecastClient', () => {
     expect(screen.getByText('Save Changes').closest('button')).toBeDisabled()
   })
 
+  it('shows the resolution date as DD/MM/YYYY with a 24h time field', async () => {
+    mockFetchLoad()
+    renderWithIntl(<EditForecastClient id="pred-1" />)
+
+    // resolveByDatetime is 2027-01-01T00:00:00.000Z and tests run with TZ=UTC.
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('01/01/2027')).toBeInTheDocument()
+    })
+    expect(screen.getByDisplayValue('00:00')).toBeInTheDocument()
+  })
+
+  it('disables Save when the date is invalid', async () => {
+    mockFetchLoad()
+    renderWithIntl(<EditForecastClient id="pred-1" />)
+
+    await waitFor(() => screen.getByDisplayValue('01/01/2027'))
+
+    // DateTimeField reports an unparseable date as '', which disables Save
+    // (same pattern as an empty claimText).
+    fireEvent.change(screen.getByDisplayValue('01/01/2027'), {
+      target: { value: '99/99/2027' },
+    })
+
+    expect(screen.getByText('Save Changes').closest('button')).toBeDisabled()
+  })
+
   it('loads the original-language text (not the English canonical) and shows the notice', async () => {
     mockFetchLoad({
       ...BASE_PREDICTION,
