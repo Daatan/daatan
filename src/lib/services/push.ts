@@ -53,6 +53,16 @@ export async function dispatchBrowserPush(
       const statusCode = (error as { statusCode?: number }).statusCode
       if (statusCode === 410 || statusCode === 404) {
         staleIds.push(sub.id)
+      } else if (statusCode === 401 || statusCode === 403) {
+        // VAPID auth rejected: the subscription's public key doesn't match
+        // VAPID_PRIVATE_KEY (e.g. a key rotation that updated one but not the other).
+        // Retrying won't help — prune it so the client re-subscribes, and log loudly
+        // since this silently breaks every send until someone notices.
+        staleIds.push(sub.id)
+        log.error(
+          { endpoint: sub.endpoint, statusCode },
+          'Push rejected as unauthorized — VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY may not be a matching keypair',
+        )
       } else if (attemptsLeft > 1) {
         await new Promise((r) => setTimeout(r, 500))
         return sendWithRetry(sub, attemptsLeft - 1)
