@@ -349,6 +349,7 @@
     "preferencesDescription": "Manage your display and language settings.",
     "aiPanel": "AI panel",
     "aiPanelDescription": "Show experimental per-model AI estimate lines on forecast charts. Off by default; separate from the Oracle and never affects your scores.",
+    "aiPanelSaveError": "Couldn't save the AI panel setting — please try again.",
     "language": "Language",
     "languageDescription": "Choose your preferred display language",
     "notifications": "Notifications",

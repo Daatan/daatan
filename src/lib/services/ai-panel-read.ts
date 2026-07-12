@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { panelMemberLabel, panelMemberColor } from '@/lib/llm/panel/roster'
+import { panelMemberLabel, panelMemberColor, isControlModel, PANEL_MEMBERS } from '@/lib/llm/panel/roster'
 
 /** One member's time series for the chart: only its real, non-abstained estimates. */
 export interface PanelMemberSeries {
@@ -46,13 +46,25 @@ export async function getPanelSeries(predictionId: string): Promise<PanelMemberS
         model: e.model,
         label: panelMemberLabel(e.model),
         color: panelMemberColor(e.model),
-        // A 4B control model is labelled as such so a viewer doesn't read it as a peer.
-        isControl: e.model.startsWith('google/gemma'),
+        // The control member is labelled as such so a viewer doesn't read it as a
+        // peer. Read from the roster's flag — never re-derived from the model name.
+        isControl: isControlModel(e.model),
         points: [],
       }
       byModel.set(e.model, series)
     }
     series.points.push({ createdAt: e.run.createdAt.toISOString(), probability: e.probability })
+  }
+
+  // Prefix labels collide when a member is renamed (qwen/… → qwen.…) and both have
+  // history on this forecast: keep the plain label for the current roster member and
+  // mark the retired series, so two "Qwen" lines stay distinguishable in the legend.
+  const labelCounts = new Map<string, number>()
+  for (const s of byModel.values()) labelCounts.set(s.label, (labelCounts.get(s.label) ?? 0) + 1)
+  for (const s of byModel.values()) {
+    if ((labelCounts.get(s.label) ?? 0) > 1 && !PANEL_MEMBERS.some((m) => m.model === s.model)) {
+      s.label = `${s.label} (legacy)`
+    }
   }
 
   // Stable order: roster position (via colour index is fragile), so sort by label.

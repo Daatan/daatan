@@ -624,6 +624,22 @@ if Bedrock members carried the sweep — a dead key must fail loudly), 200 with
 Triggered by `.github/workflows/ai-panel.yml` at 04:43 and 16:43 UTC, not the
 EC2 crontab.
 
+### `POST /api/cron/requote`
+Temporal-clock daily driver: pure-arithmetic glide requote per open forecast
+(no Oracle/search/LLM call except the bounded self-heal classification pass).
+Auth: `x-cron-secret` header. JSON body `{ archetypes?: string[], dryRun?:
+boolean }` — archetypes defaults to `["diffuse"]` and comes from the
+`TEMPORAL_CLOCK_ARCHETYPES` repo variable; `TEMPORAL_CLOCK_DISABLED=true` on
+the server is a hard kill switch (returns `{ok: true, disabled: true}`).
+Triggered by `.github/workflows/requote.yml` daily at 05:31 UTC.
+
+### `GET /api/cron/external-market-sync`
+Refreshes every cached Polymarket/Kalshi market that at least one forecast
+links to: pulls the latest YES price, writes an `ExternalMarketPriceSnapshot`
+(only on a real price change — drives the "Market" chart line), and updates
+resolution status. Auth: `x-cron-secret` header. Best-effort per market, never
+throws. Triggered hourly by `.github/workflows/external-market-sync.yml`.
+
 ---
 
 ## Notifications

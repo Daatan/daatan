@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import toast from 'react-hot-toast'
 
 /**
  * Toggle for the experimental AI-panel chart lines (docs/LASSO.md §8). Off by
@@ -31,9 +32,14 @@ export default function AiPanelPreference() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ showAiPanel: next }),
       })
-      if (!res.ok) setEnabled(!next) // revert on failure
+      if (!res.ok) {
+        // Revert AND say so — a switch that silently flips back reads as a UI bug.
+        setEnabled(!next)
+        toast.error(t('aiPanelSaveError'))
+      }
     } catch {
       setEnabled(!next)
+      toast.error(t('aiPanelSaveError'))
     } finally {
       setSaving(false)
     }

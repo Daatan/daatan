@@ -59,4 +59,21 @@ describe('getPanelSeries', () => {
     const series = await getPanelSeries('pred-1')
     expect(new Set(series.map((s) => s.color)).size).toBe(series.length)
   })
+
+  it('disambiguates a renamed member: the retired series is marked, the current one keeps its label', async () => {
+    // The roster comment's own scenario: historical OpenRouter qwen/… rows alongside
+    // the current Bedrock qwen.… member — both prefix-label to "Qwen".
+    findMany.mockResolvedValue([
+      row('qwen.qwen3-235b-a22b-2507-v1:0', 40, '2026-07-02T00:00:00Z'),
+      row('qwen/qwen3-235b-a22b-2507', 38, '2026-07-01T00:00:00Z'),
+    ] as never)
+
+    const series = await getPanelSeries('pred-1')
+
+    const current = series.find((s) => s.model === 'qwen.qwen3-235b-a22b-2507-v1:0')!
+    const retired = series.find((s) => s.model === 'qwen/qwen3-235b-a22b-2507')!
+    expect(current.label).toBe('Qwen')
+    expect(retired.label).toBe('Qwen (legacy)')
+    expect(new Set(series.map((s) => s.label)).size).toBe(2)
+  })
 })

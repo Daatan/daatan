@@ -159,36 +159,43 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
 
         // Matched-time Brier for each panel member (and the Oracle) on this commitment.
         // Isolation: written to ai_member_scores only; never touches this user's score.
-        const memberScores = computeMemberScores(
-          commitment.aiRunAtCommit?.estimates ?? [],
-          commitment.aiProbabilityAtCommit,
-          outcomeNumeric,
-        )
-        // The linked market (Polymarket/Kalshi) scored on the same matched-time basis,
-        // so the leaderboard can answer "does a model beat or approach the market?".
-        // Null (skipped) when the forecast has no market or no price predates the commit.
-        const marketBrier = computeMarketScore(
-          prediction.externalMarket?.snapshots ?? [],
-          prediction.externalMarketInverted,
-          commitment.createdAt,
-          outcomeNumeric,
-        )
-        if (marketBrier != null) {
-          memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier, promptVersion: null })
-        }
+        //
+        // BINARY only, sentinels included. Panel members estimate P(claim) and only ever
+        // run on BINARY forecasts; on MULTIPLE_CHOICE the per-commitment outcome is
+        // "did this user's option win" — a different question. Scoring the oracle/market
+        // sentinels against it would blend two question types into one leaderboard row.
+        if (prediction.outcomeType === 'BINARY') {
+          const memberScores = computeMemberScores(
+            commitment.aiRunAtCommit?.estimates ?? [],
+            commitment.aiProbabilityAtCommit,
+            outcomeNumeric,
+          )
+          // The linked market (Polymarket/Kalshi) scored on the same matched-time basis,
+          // so the leaderboard can answer "does a model beat or approach the market?".
+          // Null (skipped) when the forecast has no market or no price predates the commit.
+          const marketBrier = computeMarketScore(
+            prediction.externalMarket?.snapshots ?? [],
+            prediction.externalMarketInverted,
+            commitment.createdAt,
+            outcomeNumeric,
+          )
+          if (marketBrier != null) {
+            memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier, promptVersion: null })
+          }
 
-        for (const ms of memberScores) {
-          await tx.aiMemberScore.upsert({
-            where: { commitmentId_model: { commitmentId: commitment.id, model: ms.model } },
-            create: {
-              predictionId: prediction.id,
-              commitmentId: commitment.id,
-              model: ms.model,
-              brierScore: ms.brierScore,
-              promptVersion: ms.promptVersion,
-            },
-            update: { brierScore: ms.brierScore, promptVersion: ms.promptVersion },
-          })
+          for (const ms of memberScores) {
+            await tx.aiMemberScore.upsert({
+              where: { commitmentId_model: { commitmentId: commitment.id, model: ms.model } },
+              create: {
+                predictionId: prediction.id,
+                commitmentId: commitment.id,
+                model: ms.model,
+                brierScore: ms.brierScore,
+                promptVersion: ms.promptVersion,
+              },
+              update: { brierScore: ms.brierScore, promptVersion: ms.promptVersion },
+            })
+          }
         }
       }
 
@@ -242,7 +249,12 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     }
 
     return updatedPrediction
-  })
+  },
+  // Prisma's default interactive-transaction timeout is 5s. Resolution does several
+  // sequential writes per commitment (RS/Glicko/ELO plus up to 7 ai_member_scores
+  // upserts), so a heavily-committed forecast can legitimately exceed that — and a
+  // timeout here rolls back the entire resolution.
+  { timeout: 60_000 })
 
   log.info(
     { predictionId, outcome, commitmentCount: prediction.commitments.length },
