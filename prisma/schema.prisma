@@ -610,7 +610,14 @@ model AiEstimateRun {
   prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
 
   /// sha256 of claim + rules + resolveBy + UTC day + promptVersion + roster signature.
+  /// Grounded-scoped forecasts (docs/LASSO.md §9a) additionally fold in the grounded
+  /// prompt's version and the context snapshot's fingerprint.
   inputHash String @map("input_hash") @db.VarChar(64)
+
+  /// The article set retrieved for this run's grounded-indexer members, frozen at run
+  /// creation (`PanelContextSnapshot`): a completion pass re-asks against exactly this,
+  /// never a fresh retrieval. Null = ungrounded-only run.
+  contextSnapshot Json? @map("context_snapshot")
 
   createdAt DateTime @default(now())
 
@@ -637,7 +644,7 @@ model AiEstimate {
   /// OpenRouter slug, e.g. "x-ai/grok-4.3". String, not enum — adding a member
   /// must never require a migration.
   model String @db.VarChar(64)
-  /// 'ungrounded' today; 'grounded' once vendor-native search lands.
+  /// 'ungrounded', or 'grounded-indexer' for the news-fed twins (docs/LASSO.md §9a).
   mode  String @db.VarChar(16)
   /// Fingerprint of the prompt template behind this estimate. Member identity is
   /// (model, mode, promptVersion): change the prompt and prior Brier scores stop
@@ -686,6 +693,10 @@ model AiMemberScore {
   commitment   Commitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
 
   model      String @db.VarChar(64)
+  // Member identity's mode axis: a grounded-indexer twin shares its sibling's model
+  // string, so model alone would collide. 'sentinel' for the oracle/market benchmark
+  // rows — not null, because a nullable member of a compound unique breaks upsert.
+  mode       String @default("ungrounded") @db.VarChar(16)
   brierScore Float  @map("brier_score") // (probability − outcome)², both on 0–1
   // Part of member identity (docs/LASSO.md §6): scores from different prompt versions
   // are not comparable and the leaderboard groups by it. Null for the 'oracle'/'market'
@@ -694,7 +705,7 @@ model AiMemberScore {
 
   createdAt DateTime @default(now())
 
-  @@unique([commitmentId, model])
+  @@unique([commitmentId, model, mode])
   @@index([model])
   @@index([predictionId])
   @@map("ai_member_scores")

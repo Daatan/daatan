@@ -192,11 +192,15 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 
 - `ai_estimate_runs` — one panel sweep over one forecast. `inputHash` is the
   date-gate (sha256 of claim + rules + resolveBy + UTC day + promptVersion +
-  roster signature); UNIQUE `(predictionId, inputHash)` makes the cron
-  idempotent. In practice one run per open BINARY forecast per day. A run
-  written while some members couldn't be authenticated is *completed in place*
-  by a later same-day sweep (estimates appended, LASSO.md §4), so a run's
-  estimates may carry a later `createdAt` than the run itself.
+  roster signature; grounded-scoped forecasts additionally fold in the grounded
+  prompt's version and the article-set fingerprint, LASSO.md §9a); UNIQUE
+  `(predictionId, inputHash)` makes the cron idempotent. In practice one run
+  per open BINARY forecast per day. `contextSnapshot` (JSONB, null on
+  ungrounded-only runs) freezes the news-indexer articles the grounded twins
+  answered against — completion passes reuse it verbatim, never re-retrieve. A
+  run written while some members couldn't be authenticated is *completed in
+  place* by a later same-day sweep (estimates appended, LASSO.md §4), so a
+  run's estimates may carry a later `createdAt` than the run itself.
 - `ai_estimates` — one member's answer within a run. Member identity is
   `(model, mode, promptVersion)` — all plain strings, never enums, so adding
   a member needs no migration. `probability` is **0–100 Int, null =
@@ -209,11 +213,14 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
   resolution from the run pinned by `Commitment.aiRunIdAtCommit` (FK,
   `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel
   `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`) and
-  `'market'` (linked market price as of the commit instant). Feeds only
-  `/leaderboard/ai`; no RS/ELO/Glicko path reads it. Carries `promptVersion`
-  (null for the sentinels), and the leaderboard groups by
-  `(model, promptVersion)` — scores produced under different prompt templates
-  are different members and are never averaged into one row.
+  `'market'` (linked market price as of the commit instant); both carry
+  `mode = 'sentinel'`. Feeds only `/leaderboard/ai`; no RS/ELO/Glicko path
+  reads it. Carries the full member identity — `mode` (a grounded-indexer twin
+  shares its sibling's model string; UNIQUE is `(commitmentId, model, mode)`)
+  and `promptVersion` (null for the sentinels) — and the leaderboard groups by
+  `(model, mode, promptVersion)`: scores produced under different prompt
+  templates, or with vs without injected articles, are different members and
+  are never averaged into one row.
 - `users.showAiPanel` — per-user opt-in for the chart lines, default false.
 
 ## Commitments & scoring — `commitments`, ratings on `users`

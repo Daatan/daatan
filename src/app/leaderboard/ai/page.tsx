@@ -80,7 +80,7 @@ export default async function AiLeaderboardPage() {
             <tbody>
               {lb.members.map((m, i) => (
                 <tr
-                  key={`${m.model}:${m.promptVersion ?? ''}`}
+                  key={`${m.model}:${m.mode}:${m.promptVersion ?? ''}`}
                   className="border-b border-navy-600/50 last:border-0"
                 >
                   <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>

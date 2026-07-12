@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { applyGlicko2Update } from '@/lib/services/expertise'
 import { calculateEloUpdates } from '@/lib/services/elo'
-import { computeMemberScores, computeMarketScore, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
+import { computeMemberScores, computeMarketScore, MARKET_MEMBER, SENTINEL_MODE } from '@/lib/services/ai-panel-score'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 
@@ -61,7 +61,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           // (docs/LASSO.md §7). Null on commitments placed before the first run.
           aiRunAtCommit: {
             select: {
-              estimates: { select: { model: true, probability: true, promptVersion: true } },
+              estimates: { select: { model: true, mode: true, probability: true, promptVersion: true } },
             },
           },
         },
@@ -180,16 +180,23 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
             outcomeNumeric,
           )
           if (marketBrier != null) {
-            memberScores.push({ model: MARKET_MEMBER, brierScore: marketBrier, promptVersion: null })
+            memberScores.push({ model: MARKET_MEMBER, mode: SENTINEL_MODE, brierScore: marketBrier, promptVersion: null })
           }
 
           for (const ms of memberScores) {
             await tx.aiMemberScore.upsert({
-              where: { commitmentId_model: { commitmentId: commitment.id, model: ms.model } },
+              where: {
+                commitmentId_model_mode: {
+                  commitmentId: commitment.id,
+                  model: ms.model,
+                  mode: ms.mode,
+                },
+              },
               create: {
                 predictionId: prediction.id,
                 commitmentId: commitment.id,
                 model: ms.model,
+                mode: ms.mode,
                 brierScore: ms.brierScore,
                 promptVersion: ms.promptVersion,
               },

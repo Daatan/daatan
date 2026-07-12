@@ -28,6 +28,14 @@ vi.mock('@/lib/llm/panel/client', async (importOriginal) => ({
   logMemberFailure: vi.fn(),
 }))
 
+// Retrieval is network; the pure helpers (fingerprint, articles block) stay real so
+// hashes and prompts in these tests match production byte-for-byte.
+vi.mock('@/lib/llm/panel/context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/llm/panel/context')>()),
+  retrievePanelContext: vi.fn(),
+  groundedPanelTag: vi.fn(() => null),
+}))
+
 import { prisma } from '@/lib/prisma'
 import { getPromptTemplate } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
@@ -42,12 +50,20 @@ import {
   runPanelSweep,
   utcDay,
 } from '@/lib/services/ai-panel'
-import { PANEL_MEMBERS } from '@/lib/llm/panel/roster'
+import { PANEL_MEMBERS, GROUNDED_PANEL_MEMBERS } from '@/lib/llm/panel/roster'
+import {
+  contextFingerprint,
+  groundedPanelTag,
+  retrievePanelContext,
+  type PanelContextSnapshot,
+} from '@/lib/llm/panel/context'
 
 const findFirst = vi.mocked(prisma.aiEstimateRun.findFirst)
 const createRun = vi.mocked(prisma.aiEstimateRun.create)
 const appendEstimates = vi.mocked(prisma.aiEstimate.createMany)
 const findManyPredictions = vi.mocked(prisma.prediction.findMany)
+const retrieve = vi.mocked(retrievePanelContext)
+const groundedTag = vi.mocked(groundedPanelTag)
 const getTemplate = vi.mocked(getPromptTemplate)
 const getKey = vi.mocked(getOpenRouterKey)
 const callMember = vi.mocked(callPanelMember)
@@ -516,5 +532,149 @@ describe('runPanelSweep', () => {
     expect(summary).toMatchObject({ written: 0, dryRun: 1 })
     expect(callMember).not.toHaveBeenCalled()
     expect(createRun).not.toHaveBeenCalled()
+  })
+})
+
+describe('grounded-indexer (docs/LASSO.md §9a)', () => {
+  const GROUNDED_TEMPLATE = TEMPLATE + '\nArticles:\n{{articlesBlock}}'
+  const FULL_ROSTER = [...PANEL_MEMBERS, ...GROUNDED_PANEL_MEMBERS]
+  const SNAPSHOT: PanelContextSnapshot = {
+    query: prediction.claimText,
+    retrievedAt: NOW.toISOString(),
+    articles: [
+      {
+        title: 'Dissolution vote set',
+        url: 'https://news.example/a1',
+        snippet: 'Vote due Wednesday.',
+        source: 'ynet',
+        publishedDate: '2026-07-08',
+      },
+    ],
+  }
+  const grounded = { ...prediction, grounded: true }
+
+  function groundedHashOf(snap: PanelContextSnapshot): string {
+    return computeInputHash(prediction, NOW, promptVersionOf(TEMPLATE), FULL_ROSTER, {
+      promptVersion: promptVersionOf(GROUNDED_TEMPLATE),
+      contextFingerprint: contextFingerprint(snap),
+    })
+  }
+
+  beforeEach(() => {
+    getTemplate.mockImplementation(async (name) =>
+      name === 'panel-estimate-grounded' ? GROUNDED_TEMPLATE : TEMPLATE,
+    )
+    // clearAllMocks clears calls, not return values — reset the default explicitly so
+    // one test's configured tag can't leak into the next.
+    groundedTag.mockReturnValue(null)
+  })
+
+  it('a fresh grounded run retrieves once, feeds only the twins articles, and freezes the snapshot', async () => {
+    retrieve.mockResolvedValue(SNAPSHOT)
+
+    const result = await runPanelForPrediction(grounded, { now: NOW, apiKey: 'sk-test' })
+
+    expect(result.status).toBe('written')
+    expect(retrieve).toHaveBeenCalledTimes(1)
+    expect(callMember).toHaveBeenCalledTimes(FULL_ROSTER.length)
+
+    for (const [member, prompt] of callMember.mock.calls) {
+      if (member.mode === 'grounded-indexer') expect(prompt).toContain('Dissolution vote set')
+      else expect(prompt).not.toContain('Dissolution vote set')
+    }
+
+    const data = createRun.mock.calls[0][0].data as {
+      inputHash: string
+      contextSnapshot?: PanelContextSnapshot
+      estimates: { create: { model: string; mode: string; promptVersion: string }[] }
+    }
+    expect(data.inputHash).toBe(groundedHashOf(SNAPSHOT))
+    expect(data.contextSnapshot).toEqual(SNAPSHOT)
+    expect(data.estimates.create).toHaveLength(FULL_ROSTER.length)
+    for (const e of data.estimates.create) {
+      expect(e.promptVersion).toBe(
+        e.mode === 'grounded-indexer' ? promptVersionOf(GROUNDED_TEMPLATE) : promptVersionOf(TEMPLATE),
+      )
+    }
+  })
+
+  it('the completion pass re-asks against the FROZEN snapshot — no fresh retrieval', async () => {
+    findFirst.mockResolvedValue({
+      id: 'run-1',
+      inputHash: groundedHashOf(SNAPSHOT),
+      contextSnapshot: SNAPSHOT,
+      estimates: PANEL_MEMBERS.map((m) => ({ model: m.model, mode: m.mode })),
+    } as never)
+
+    const result = await runPanelForPrediction(grounded, { now: NOW, apiKey: 'sk-test' })
+
+    expect(result.status).toBe('completed-partial')
+    expect(retrieve).not.toHaveBeenCalled()
+
+    const asked = callMember.mock.calls.map(([m]) => `${m.model}:${m.mode}`).sort()
+    expect(asked).toEqual(GROUNDED_PANEL_MEMBERS.map((m) => `${m.model}:${m.mode}`).sort())
+    for (const [, prompt] of callMember.mock.calls) expect(prompt).toContain('Dissolution vote set')
+
+    const append = appendEstimates.mock.calls[0][0] as { data: { promptVersion: string }[] }
+    for (const row of append.data) expect(row.promptVersion).toBe(promptVersionOf(GROUNDED_TEMPLATE))
+  })
+
+  it('retrieval failure degrades the tick to ungrounded-only, self-healing on recovery', async () => {
+    retrieve.mockResolvedValue(null)
+
+    const result = await runPanelForPrediction(grounded, { now: NOW, apiKey: 'sk-test' })
+
+    expect(result.status).toBe('written')
+    expect(callMember).toHaveBeenCalledTimes(PANEL_MEMBERS.length)
+
+    const data = createRun.mock.calls[0][0].data as { inputHash: string; contextSnapshot?: unknown }
+    expect(data.contextSnapshot).toBeUndefined()
+    // The pre-grounding hash: a recovered retrieval later today computes a different
+    // one, so that tick starts a fresh full-roster run instead of being gated out.
+    expect(data.inputHash).toBe(computeInputHash(prediction, NOW, promptVersionOf(TEMPLATE)))
+  })
+
+  it('an empty index result still grounds: the twins run, told there is no matching news', async () => {
+    const empty: PanelContextSnapshot = { ...SNAPSHOT, articles: [] }
+    retrieve.mockResolvedValue(empty)
+
+    await runPanelForPrediction(grounded, { now: NOW, apiKey: 'sk-test' })
+
+    const twins = callMember.mock.calls.filter(([m]) => m.mode === 'grounded-indexer')
+    expect(twins).toHaveLength(GROUNDED_PANEL_MEMBERS.length)
+    for (const [, prompt] of twins) expect(prompt).toContain('no matching articles')
+
+    const data = createRun.mock.calls[0][0].data as { contextSnapshot?: PanelContextSnapshot }
+    expect(data.contextSnapshot).toEqual(empty)
+  })
+
+  it('the sweep grounds only the forecasts carrying the configured tag', async () => {
+    groundedTag.mockReturnValue('israeli-elections-2026')
+    retrieve.mockResolvedValue(SNAPSHOT)
+    const unscoped = { ...prediction, id: 'pred-2' }
+    findManyPredictions
+      .mockResolvedValueOnce([{ id: prediction.id }] as never) // tag-scoped ids
+      .mockResolvedValueOnce([prediction, unscoped] as never) // the sweep set
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(summary.written).toBe(2)
+    // Full roster for the scoped forecast, plain roster for the other.
+    expect(callMember).toHaveBeenCalledTimes(FULL_ROSTER.length + PANEL_MEMBERS.length)
+    expect(retrieve).toHaveBeenCalledTimes(1)
+    expect(findManyPredictions.mock.calls[0][0]?.where?.tags).toEqual({
+      some: { slug: 'israeli-elections-2026' },
+    })
+  })
+
+  it('the sweep never queries tags or the grounded template when grounding is unconfigured', async () => {
+    findManyPredictions.mockResolvedValue([prediction] as never)
+
+    await runPanelSweep({ now: NOW })
+
+    expect(findManyPredictions).toHaveBeenCalledTimes(1)
+    expect(getTemplate).toHaveBeenCalledWith('panel-estimate')
+    expect(getTemplate).not.toHaveBeenCalledWith('panel-estimate-grounded')
+    expect(retrieve).not.toHaveBeenCalled()
   })
 })

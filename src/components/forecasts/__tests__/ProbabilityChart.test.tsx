@@ -252,14 +252,21 @@ describe('clock snapshots in the chart series', () => {
 
 describe('AI panel series', () => {
   it('panelKey is a collision-free, sanitised dataKey', () => {
-    expect(panelKey('x-ai/grok-4.3')).toBe('panel_x_ai_grok_4_3')
-    expect(panelKey('qwen.qwen3-235b-a22b-2507-v1:0')).toBe('panel_qwen_qwen3_235b_a22b_2507_v1_0')
+    expect(panelKey('x-ai/grok-4.3', 'ungrounded')).toBe('panel_x_ai_grok_4_3_ungrounded')
+    expect(panelKey('qwen.qwen3-235b-a22b-2507-v1:0', 'ungrounded')).toBe(
+      'panel_qwen_qwen3_235b_a22b_2507_v1_0_ungrounded',
+    )
+    // A grounded twin shares its sibling's model string but is its own series.
+    expect(panelKey('deepseek/deepseek-chat', 'grounded-indexer')).not.toBe(
+      panelKey('deepseek/deepseek-chat', 'ungrounded'),
+    )
   })
 
   it('carries each member forward as a step function across the merged timeline', () => {
     const members = [
       {
         model: 'x-ai/grok-4.3',
+        mode: 'ungrounded',
         label: 'Grok',
         color: '#000',
         isControl: false,
@@ -275,20 +282,20 @@ describe('AI panel series', () => {
       new Date('2026-07-03T00:00:00Z').getTime(),
     ]
     const series = buildPanelSeries(members, ts)
-    expect(series[panelKey('x-ai/grok-4.3')]).toEqual([40, 40, 55])
+    expect(series[panelKey('x-ai/grok-4.3', 'ungrounded')]).toEqual([40, 40, 55])
   })
 
   it('is null before a member’s first point (no line drawn into the past)', () => {
     const members = [
-      { model: 'm', label: 'M', color: '#000', isControl: false, points: [{ createdAt: '2026-07-02T00:00:00Z', probability: 30 }] },
+      { model: 'm', mode: 'ungrounded', label: 'M', color: '#000', isControl: false, points: [{ createdAt: '2026-07-02T00:00:00Z', probability: 30 }] },
     ]
     const ts = [new Date('2026-07-01T00:00:00Z').getTime(), new Date('2026-07-02T00:00:00Z').getTime()]
-    expect(buildPanelSeries(members, ts)[panelKey('m')]).toEqual([null, 30])
+    expect(buildPanelSeries(members, ts)[panelKey('m', 'ungrounded')]).toEqual([null, 30])
   })
 
   it('does NOT render panel lines when showAiPanel is false, even with data', () => {
     const panelSeries = [
-      { model: 'x-ai/grok-4.3', label: 'Grok', color: '#22D3EE', isControl: false,
+      { model: 'x-ai/grok-4.3', mode: 'ungrounded', label: 'Grok', color: '#22D3EE', isControl: false,
         points: [{ createdAt: '2026-07-01T00:00:00Z', probability: 40 }, { createdAt: '2026-07-02T00:00:00Z', probability: 45 }] },
     ]
     render(
@@ -306,7 +313,7 @@ describe('AI panel series', () => {
   // buildPanelSeries unit tests above; here we assert the gating behaviour.)
   it('shows the chart on panel data alone when opted in', () => {
     const panelSeries = [
-      { model: 'x-ai/grok-4.3', label: 'Grok', color: '#22D3EE', isControl: false,
+      { model: 'x-ai/grok-4.3', mode: 'ungrounded', label: 'Grok', color: '#22D3EE', isControl: false,
         points: [{ createdAt: '2026-07-01T00:00:00Z', probability: 40 }, { createdAt: '2026-07-02T00:00:00Z', probability: 45 }] },
     ]
     render(

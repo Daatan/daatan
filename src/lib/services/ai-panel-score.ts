@@ -14,6 +14,8 @@
  *  blend into the same leaderboard rows. */
 export interface MatchedMemberEstimate {
   model: string
+  /** 'ungrounded' or 'grounded-indexer' — the twin axis of member identity (§9a). */
+  mode: string
   /** 0–100, or null when the member abstained on that run. */
   probability: number | null
   /** Prompt-template fingerprint the estimate was produced under (docs/LASSO.md §6). */
@@ -22,11 +24,17 @@ export interface MatchedMemberEstimate {
 
 export interface MemberBrier {
   model: string
+  /** Member identity's mode axis; `SENTINEL_MODE` for the oracle/market rows. */
+  mode: string
   brierScore: number
   /** Carried onto the score row so the leaderboard never averages across prompt
    *  versions. Null for the 'oracle'/'market' sentinels, which have no prompt. */
   promptVersion: string | null
 }
+
+/** Mode stored on the oracle/market rows: they are benchmarks, not panel members, and
+ *  must never collide with a real member's (model, mode) pair. */
+export const SENTINEL_MODE = 'sentinel'
 
 /** Sentinel model id for the Oracle needle, scored as a member for zero extra calls. */
 export const ORACLE_MEMBER = 'oracle'
@@ -90,6 +98,7 @@ export function computeMemberScores(
     const p = m.probability / 100
     rows.push({
       model: m.model,
+      mode: m.mode,
       brierScore: (p - outcomeNumeric) ** 2,
       promptVersion: m.promptVersion,
     })
@@ -98,6 +107,7 @@ export function computeMemberScores(
   if (oracleProbability != null) {
     rows.push({
       model: ORACLE_MEMBER,
+      mode: SENTINEL_MODE,
       brierScore: (oracleProbability - outcomeNumeric) ** 2,
       promptVersion: null,
     })

@@ -142,6 +142,10 @@ export const env = createEnv({
     NEWS_INDEXER_URL: z.string().url().optional(),      // outbound: Daatan → news-indexer
     NEWS_INDEXER_API_KEY: z.string().min(1).optional(), // outbound: api key for news-indexer
 
+    // AI panel grounded-indexer scope (docs/LASSO.md §9a): tag slug whose forecasts get
+    // the news-fed grounded twins. Unset = grounding off; also needs NEWS_INDEXER_URL/KEY.
+    AI_PANEL_GROUNDED_TAG: z.string().min(1).optional(),
+
     // Telegram — prod-only "clean" channel for high-signal events/alarms.
     // Falls back to TELEGRAM_CHAT_ID (the noisy channel) when unset.
     TELEGRAM_CLEAN_CHAT_ID: z.string().min(1).optional(),
@@ -199,6 +203,7 @@ export const env = createEnv({
     NEWS_INDEXER_SECRET: process.env.NEWS_INDEXER_SECRET,
     NEWS_INDEXER_URL: process.env.NEWS_INDEXER_URL,
     NEWS_INDEXER_API_KEY: process.env.NEWS_INDEXER_API_KEY,
+    AI_PANEL_GROUNDED_TAG: process.env.AI_PANEL_GROUNDED_TAG,
     TELEGRAM_CLEAN_CHAT_ID: process.env.TELEGRAM_CLEAN_CHAT_ID,
     NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
     NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
