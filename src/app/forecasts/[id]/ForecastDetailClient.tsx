@@ -66,6 +66,7 @@ export default function ForecastDetailClient({
   /** Per-member AI-panel series; only populated (and only rendered) when the viewer opted in. */
   aiPanelSeries?: {
     model: string
+    mode: string
     label: string
     color: string
     isControl: boolean

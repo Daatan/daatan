@@ -9,8 +9,8 @@ import { getPanelSeries } from '../ai-panel-read'
 
 const findMany = vi.mocked(prisma.aiEstimate.findMany)
 
-function row(model: string, probability: number | null, iso: string) {
-  return { model, probability, run: { createdAt: new Date(iso) } }
+function row(model: string, probability: number | null, iso: string, mode = 'ungrounded') {
+  return { model, mode, probability, run: { createdAt: new Date(iso) } }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -75,5 +75,23 @@ describe('getPanelSeries', () => {
     expect(current.label).toBe('Qwen')
     expect(retired.label).toBe('Qwen (legacy)')
     expect(new Set(series.map((s) => s.label)).size).toBe(2)
+  })
+
+  it('splits a grounded twin into its own series with its own label and colour', async () => {
+    findMany.mockResolvedValue([
+      row('deepseek/deepseek-chat', 30, '2026-07-01T00:00:00Z'),
+      row('deepseek/deepseek-chat', 45, '2026-07-01T00:00:00Z', 'grounded-indexer'),
+    ] as never)
+
+    const series = await getPanelSeries('pred-1')
+
+    expect(series).toHaveLength(2)
+    const plain = series.find((s) => s.mode === 'ungrounded')!
+    const grounded = series.find((s) => s.mode === 'grounded-indexer')!
+    expect(plain.label).toBe('DeepSeek')
+    expect(grounded.label).toBe('DeepSeek (news)')
+    expect(grounded.color).not.toBe(plain.color)
+    // Neither is "(legacy)": both identities are on a current roster.
+    expect(series.some((s) => s.label.includes('legacy'))).toBe(false)
   })
 })

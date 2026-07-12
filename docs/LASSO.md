@@ -65,7 +65,7 @@ zero supporting evidence. Routed through `recordEstimate`, that would trip
 
 | Dimension | Beta | Deferred |
 |---|---|---|
-| Mode | ungrounded only | vendor-native web search |
+| Mode | ungrounded + `grounded-indexer` (off by default, §9a) | vendor-native web search |
 | Outcome types | `BINARY` only | `MULTIPLE_CHOICE`, `NUMERIC_THRESHOLD` |
 | Pooling | none — chart members individually | log-odds pooling + extremization |
 | Members | 4 + 1 control | more, driven by Brier |
@@ -371,10 +371,66 @@ second sentinel member, `'market'`, in v1.51.0.)
 
 ---
 
+## 9a. Grounded-indexer mode (shipped dormant)
+
+The first grounded variant — **our own news index, not vendor web search**. Scoped
+forecasts get three extra members (`mode: 'grounded-indexer'` in
+`GROUNDED_PANEL_MEMBERS`): the same Qwen/DeepSeek/Gemini-Flash models, same routes and
+provider pins as their ungrounded siblings, differing only in mode and prompt — so the
+per-model grounded-vs-ungrounded Brier delta isolates exactly what the injected
+articles are worth. Grok is deliberately absent (it alone is ~80% of panel token cost)
+and the control stays ungrounded (a grounded control would falsify a different
+instrument). Costs tokens only: Qwen rides Bedrock credits, retrieval is our own
+pgvector index — roughly **$3–5/mo at the elections scope**, vs ~$60–150/mo for vendor
+search at the same cadence.
+
+**Configuration.** `AI_PANEL_GROUNDED_TAG` (e.g. `israeli-elections-2026`) names the tag
+whose forecasts get the twins; `NEWS_INDEXER_URL`/`NEWS_INDEXER_API_KEY` must also be
+set (they already are, for the context routes). Any piece missing → the panel is exactly
+the ungrounded feature: same hashes, same rosters, zero retrieval calls. Unset in prod
+and staging until deliberately enabled.
+
+**Retrieval** (`src/lib/llm/panel/context.ts`): one `GET /search?q=<claimText>&limit=5`
+against news-indexer per scoped forecast per run — title, source, date and the stored
+snippet (first two sentences, ≤400 chars; ~700 tokens for all five). An **empty result
+is a real state, not a failure**: the index has nothing relevant, the twins still run
+and are told so — that is precisely the day their answer should equal their prior.
+
+**Determinism.** The retrieved set is frozen onto the run
+(`AiEstimateRun.contextSnapshot`) and its fingerprint — with the grounded template's
+own promptVersion — is folded into the run's input hash. The completion pass (§4)
+recomputes the hash **from the stored snapshot first**: on a match it re-asks the
+missing twins against byte-identical input and never retrieves again, preserving the
+temp-0 appending rationale. Mid-day index churn therefore cannot double-run a forecast.
+
+**Degradation.** Retrieval failure (down, timeout, non-OK) degrades that forecast to
+ungrounded-only *for the tick* — the pre-grounding hash and roster, so nothing else
+changes. It self-heals: a recovered retrieval computes a different hash and starts a
+fresh full-roster run the same day. The one accepted cost: the ungrounded members are
+re-asked once (temp-0, same answers) and the day briefly has two runs; charts read
+runs in order and commitments pin whichever run was current.
+
+**Identity everywhere.** Member identity was always `(model, mode, promptVersion)`;
+this mode makes the axis load-bearing: `ai_member_scores` now carries `mode` (unique
+key `(commitmentId, model, mode)`, `'sentinel'` for the oracle/market rows), the
+leaderboard groups by it, and chart series/dataKeys are keyed by `(model, mode)`. A
+twin charts as its own line — "DeepSeek (news)", a deeper shade of its sibling's hue —
+and scores as its own leaderboard row, never averaged with its sibling.
+
+**Prompt.** `panel-estimate-grounded` (hardcoded fallback in `bedrock-prompts.ts`; no
+SSM parameter yet — absence falls back, same as `panel-estimate`'s PLACEHOLDER). It
+wraps `{{articlesBlock}}` in an ignore-instructions guard: snippets are third-party
+text and occasionally *state* the outcome — that turns the twin into a nowcaster,
+which is exactly the regime difference the mode split exists to measure, but it must
+never be silently pooled with priors.
+
+---
+
 ## 10. Extensions
 
 Shipped: estimate (5-member roster), date-hash-gated cron, opt-in chart, matched-time
-Brier, AI-vs-humans leaderboard (`/leaderboard/ai`).
+Brier, AI-vs-humans leaderboard (`/leaderboard/ai`), grounded-indexer twins (§9a,
+dormant until `AI_PANEL_GROUNDED_TAG` is set).
 
 Open, roughly in order of value:
 
@@ -388,8 +444,10 @@ Open, roughly in order of value:
 - **Pooling** — one blended LASSO line from the members (log-odds median + a fitted
   extremization factor `a`). Deferred until ≥~100 resolutions exist to fit `a` against;
   premature before then, and a plain mean collapses toward 50.
-- **Grounded mode** — members with vendor web search (~$180/mo at N=300). Worth revisiting
-  once per-member Brier shows whether the ungrounded priors are worth anything.
+- **Grounded mode, vendor-search variant** — members with vendor-native web search
+  (~$180/mo at N=300). The indexer-fed variant shipped first (§9a) at ~1/30th the cost;
+  revisit vendor search only if the twins' Brier shows the index's coverage is the
+  bottleneck.
 - **Negation-coherence check** — ask each member the claim *and* its negation, record
   `p + p̄`; deviation from 100 is a per-member calibration signal for one extra call.
 - `MULTIPLE_CHOICE` / `NUMERIC_THRESHOLD` outcome types (today: `BINARY` only).

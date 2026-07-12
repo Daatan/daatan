@@ -1,9 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { panelMemberLabel, isControlModel } from '@/lib/llm/panel/roster'
+import { panelSeriesLabel, isControlModel } from '@/lib/llm/panel/roster'
 import { ORACLE_MEMBER, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
 
 export interface MemberLeaderboardRow {
   model: string
+  /** 'ungrounded', 'grounded-indexer', or 'sentinel' for the oracle/market rows — the
+   *  mode axis of member identity: a grounded twin is a separate row from its sibling. */
+  mode: string
   /** Prompt-template fingerprint the row's scores were produced under; null for the
    *  'oracle'/'market' sentinels. Part of member identity (docs/LASSO.md §6). */
   promptVersion: string | null
@@ -40,11 +43,13 @@ export interface AiLeaderboard {
  * doesn't top the board.
  */
 export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
-  // Grouped by (model, promptVersion), not model alone: scores produced under different
-  // prompt templates are different members (docs/LASSO.md §6) and must never be averaged
-  // into one row. Sentinels ('oracle'/'market') have a null promptVersion → one row each.
+  // Grouped by the full member identity (model, mode, promptVersion), never model
+  // alone: scores produced under different prompt templates — or by a grounded twin vs
+  // its ungrounded sibling — are different members (docs/LASSO.md §6, §9a) and must
+  // never be averaged into one row. Sentinels ('oracle'/'market') have a null
+  // promptVersion and the 'sentinel' mode → one row each.
   const grouped = await prisma.aiMemberScore.groupBy({
-    by: ['model', 'promptVersion'],
+    by: ['model', 'mode', 'promptVersion'],
     _avg: { brierScore: true },
     _count: { brierScore: true },
   })
@@ -54,9 +59,10 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
   )
   // Label rows plainly until a model actually spans prompt versions; only then add a
   // fingerprint suffix so the two series are distinguishable on the board.
-  const versionsPerModel = new Map<string, number>()
+  const versionsPerMember = new Map<string, number>()
   for (const g of qualifying) {
-    versionsPerModel.set(g.model, (versionsPerModel.get(g.model) ?? 0) + 1)
+    const k = `${g.model}:${g.mode}`
+    versionsPerMember.set(k, (versionsPerMember.get(k) ?? 0) + 1)
   }
 
   const members: MemberLeaderboardRow[] = qualifying
@@ -66,11 +72,12 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
           ? 'Oracle'
           : g.model === MARKET_MEMBER
             ? 'Market'
-            : panelMemberLabel(g.model)
+            : panelSeriesLabel(g.model, g.mode)
       const pv = g.promptVersion
-      const ambiguous = pv != null && (versionsPerModel.get(g.model) ?? 0) > 1
+      const ambiguous = pv != null && (versionsPerMember.get(`${g.model}:${g.mode}`) ?? 0) > 1
       return {
         model: g.model,
+        mode: g.mode,
         promptVersion: pv,
         label: ambiguous ? `${baseLabel} · ${pv.slice(0, 6)}` : baseLabel,
         avgBrier: Math.round((g._avg.brierScore as number) * 1000) / 1000,

@@ -6,8 +6,13 @@
  * Per-member Brier is what decides who stays — don't agonize over the roster.
  */
 
-/** Ungrounded = claim + dates + rules, no article text, no web search. */
-export type PanelMode = 'ungrounded'
+/**
+ * Ungrounded = claim + dates + rules, no article text, no web search.
+ * Grounded-indexer = the same, plus the top news-indexer snippets matched to the claim
+ * (docs/LASSO.md §9a): our own index rather than vendor web search, so it costs tokens
+ * only — no per-request search fees.
+ */
+export type PanelMode = 'ungrounded' | 'grounded-indexer'
 
 /**
  * Where a member's inference runs.
@@ -109,6 +114,39 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
 ] as const
 
 /**
+ * The grounded-indexer twins (docs/LASSO.md §9a): the same model + route + provider pin
+ * as their ungrounded counterpart, differing ONLY in mode — so the grounded-vs-ungrounded
+ * Brier delta per model isolates the value of the injected articles.
+ *
+ * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), DeepSeek and Gemini
+ * Flash are the two cheapest OpenRouter members. Grok is deliberately absent (it alone
+ * is ~80% of panel token cost) and the control stays ungrounded — a grounded control
+ * would no longer falsify the same instrument.
+ *
+ * These members join a forecast's roster only when grounding is configured AND the
+ * forecast carries the scope tag — see `runPanelSweep`.
+ */
+export const GROUNDED_PANEL_MEMBERS: readonly PanelMember[] = [
+  {
+    model: 'qwen.qwen3-235b-a22b-2507-v1:0',
+    mode: 'grounded-indexer',
+    route: 'bedrock',
+  },
+  {
+    model: 'deepseek/deepseek-chat',
+    mode: 'grounded-indexer',
+    route: 'openrouter',
+    providerOrder: ['deepinfra/fp4'],
+  },
+  {
+    model: 'google/gemini-2.5-flash',
+    mode: 'grounded-indexer',
+    route: 'openrouter',
+    providerOrder: ['google-vertex/eu'],
+  },
+] as const
+
+/**
  * Stable fingerprint of the roster, folded into the run's input hash. Adding or
  * removing a member therefore forces a fresh sweep rather than silently producing
  * runs with different member sets under the same hash.
@@ -161,4 +199,29 @@ export function panelMemberColor(model: string, members: readonly PanelMember[] 
   let hash = 0
   for (let c = 0; c < model.length; c++) hash = (hash * 31 + model.charCodeAt(c)) >>> 0
   return PANEL_MEMBER_COLORS[hash % PANEL_MEMBER_COLORS.length]
+}
+
+/** Grounded twins keep their ungrounded sibling's hue family, one shade deeper, so the
+ *  pairing is readable on the chart without the two lines being indistinguishable. */
+export const GROUNDED_MEMBER_COLORS = ['#0891B2', '#7C3AED', '#DB2777'] as const
+
+/**
+ * Colour for one chart/leaderboard series, keyed by the FULL member identity axis the
+ * chart draws on. `panelMemberColor` alone would give a grounded twin the same colour
+ * as its ungrounded sibling — two same-colour dashed lines on one forecast.
+ */
+export function panelSeriesColor(model: string, mode: string): string {
+  if (mode !== 'grounded-indexer') return panelMemberColor(model)
+  const i = GROUNDED_PANEL_MEMBERS.findIndex((m) => m.model === model)
+  if (i >= 0) return GROUNDED_MEMBER_COLORS[i % GROUNDED_MEMBER_COLORS.length]
+  let hash = 0
+  for (let c = 0; c < model.length; c++) hash = (hash * 31 + model.charCodeAt(c)) >>> 0
+  return GROUNDED_MEMBER_COLORS[hash % GROUNDED_MEMBER_COLORS.length]
+}
+
+/** Legend/leaderboard label for a member identity: the model's short name, with the
+ *  grounded twin marked. "(news)" not "(grounded)" — viewers shouldn't need the jargon. */
+export function panelSeriesLabel(model: string, mode: string): string {
+  const base = panelMemberLabel(model)
+  return mode === 'grounded-indexer' ? `${base} (news)` : base
 }

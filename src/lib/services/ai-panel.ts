@@ -6,7 +6,19 @@ import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
 import { warmAwsSecrets } from '@/lib/aws/secrets'
 import { callPanelMember, logMemberFailure, PanelAuthError } from '@/lib/llm/panel/client'
-import { PANEL_MEMBERS, rosterSignature, type PanelMember } from '@/lib/llm/panel/roster'
+import {
+  PANEL_MEMBERS,
+  GROUNDED_PANEL_MEMBERS,
+  rosterSignature,
+  type PanelMember,
+} from '@/lib/llm/panel/roster'
+import {
+  groundedPanelTag,
+  retrievePanelContext,
+  contextFingerprint,
+  formatArticlesBlock,
+  type PanelContextSnapshot,
+} from '@/lib/llm/panel/context'
 
 const log = createLogger('ai-panel')
 
@@ -42,6 +54,10 @@ export interface PanelPrediction {
   claimText: string
   resolutionRules: string | null
   resolveByDatetime: Date
+  /** In the grounded-indexer scope (docs/LASSO.md §9a): the grounded twins join this
+   *  forecast's roster and its runs freeze an article snapshot. Set by the sweep only
+   *  when grounding is configured; absent = the pre-grounding behavior, exactly. */
+  grounded?: boolean
 }
 
 /** Fingerprint of the prompt template. Part of member identity — a prompt change
@@ -76,23 +92,26 @@ export function computeInputHash(
   now: Date,
   promptVersion: string,
   roster: readonly PanelMember[] = PANEL_MEMBERS,
+  /** For grounded-scoped forecasts: the grounded template's version and the article
+   *  snapshot's fingerprint, so a prompt edit or a changed article set forces a fresh
+   *  run. Appended rather than always-present: non-scoped forecasts must keep their
+   *  pre-grounding hashes, or enabling the feature would re-run the whole panel. */
+  grounded?: { promptVersion: string; contextFingerprint: string },
 ): string {
-  return createHash('sha256')
-    .update(
-      // JSON.stringify, not join(sep): with any plain separator, a claim ending in
-      // "x" plus rules "y" hashes identically to claim "x y" plus empty rules. Such a
-      // collision would make the sweep silently skip a forecast whose text changed.
-      // Field boundaries must not be forgeable from user-authored claim text.
-      JSON.stringify([
-        prediction.claimText,
-        prediction.resolutionRules ?? '',
-        prediction.resolveByDatetime.toISOString(),
-        utcDay(now),
-        promptVersion,
-        rosterSignature(roster),
-      ]),
-    )
-    .digest('hex')
+  // JSON.stringify, not join(sep): with any plain separator, a claim ending in
+  // "x" plus rules "y" hashes identically to claim "x y" plus empty rules. Such a
+  // collision would make the sweep silently skip a forecast whose text changed.
+  // Field boundaries must not be forgeable from user-authored claim text.
+  const fields: (string | number)[] = [
+    prediction.claimText,
+    prediction.resolutionRules ?? '',
+    prediction.resolveByDatetime.toISOString(),
+    utcDay(now),
+    promptVersion,
+    rosterSignature(roster),
+  ]
+  if (grounded) fields.push(grounded.promptVersion, grounded.contextFingerprint)
+  return createHash('sha256').update(JSON.stringify(fields)).digest('hex')
 }
 
 export function buildPanelPrompt(
@@ -106,6 +125,24 @@ export function buildPanelPrompt(
     resolveByDate: prediction.resolveByDatetime.toISOString().slice(0, 10),
     todayDate: utcDay(now),
     daysRemaining: daysRemaining(prediction.resolveByDatetime, now),
+  })
+}
+
+/** The grounded twins' prompt: everything the ungrounded one carries, plus the run's
+ *  frozen article snapshot rendered as {{articlesBlock}}. */
+export function buildGroundedPanelPrompt(
+  template: string,
+  prediction: PanelPrediction,
+  now: Date,
+  snapshot: PanelContextSnapshot,
+): string {
+  return fillPrompt(template, {
+    claimText: prediction.claimText,
+    resolutionRules: prediction.resolutionRules ?? '(none specified)',
+    resolveByDate: prediction.resolveByDatetime.toISOString().slice(0, 10),
+    todayDate: utcDay(now),
+    daysRemaining: daysRemaining(prediction.resolveByDatetime, now),
+    articlesBlock: formatArticlesBlock(snapshot.articles),
   })
 }
 
@@ -145,7 +182,9 @@ export function isDormant(apiKey: string, members: readonly PanelMember[]): bool
 
 async function callMembers(
   members: readonly PanelMember[],
-  prompt: string,
+  // Per member, not one string: grounded twins answer the article-fed prompt while
+  // their ungrounded siblings answer the bare one, within the same run.
+  promptFor: (member: PanelMember) => string,
   apiKey: string,
   predictionId: string,
   ctx: SweepContext,
@@ -160,7 +199,7 @@ async function callMembers(
     for (let member = queue.shift(); member; member = queue.shift()) {
       if (member.route === 'openrouter' && ctx.openRouterDisabled) continue
       try {
-        const result = await callPanelMember(member, prompt, apiKey)
+        const result = await callPanelMember(member, promptFor(member), apiKey)
         outcomes.push({
           member,
           probability: result.probability,
@@ -217,6 +256,7 @@ export async function runPanelForPrediction(
     dryRun?: boolean
     apiKey: string
     template?: string
+    groundedTemplate?: string
     /** Shared across the sweep so a rejected OpenRouter key latches once, not per forecast. */
     ctx?: SweepContext
   },
@@ -229,14 +269,75 @@ export async function runPanelForPrediction(
   // sweep different promptVersions, which silently splits one member into two.
   const template = opts.template ?? (await getPromptTemplate('panel-estimate'))
   const promptVersion = promptVersionOf(template)
-  const inputHash = computeInputHash(prediction, now, promptVersion)
   const ctx = opts.ctx ?? { openRouterDisabled: !opts.apiKey, sawOpenRouterAuthError: false }
+
+  const groundedTemplate = prediction.grounded
+    ? (opts.groundedTemplate ?? (await getPromptTemplate('panel-estimate-grounded')))
+    : null
+  const groundedPromptVersion = groundedTemplate ? promptVersionOf(groundedTemplate) : null
 
   const latestRun = await prisma.aiEstimateRun.findFirst({
     where: { predictionId: prediction.id },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, inputHash: true, estimates: { select: { model: true, mode: true } } },
+    select: {
+      id: true,
+      inputHash: true,
+      contextSnapshot: true,
+      estimates: { select: { model: true, mode: true } },
+    },
   })
+
+  // Resolve the day's input: roster, hash, and — for grounded forecasts — the article
+  // snapshot. The latest run's STORED snapshot is tried first: if it reproduces that
+  // run's hash, this tick is a completion candidate and no retrieval happens at all,
+  // so members answering late see byte-identical input (the determinism the appending
+  // rationale below rests on). Only a miss — new day, prompt or roster change —
+  // retrieves fresh articles. Retrieval failure degrades this forecast to
+  // ungrounded-only for the tick, the pre-grounding behavior exactly; it self-heals
+  // because a recovered retrieval yields a new hash, hence a fresh full-roster run.
+  let roster: readonly PanelMember[] = PANEL_MEMBERS
+  let snapshot: PanelContextSnapshot | null = null
+  let inputHash: string
+  if (groundedTemplate !== null && groundedPromptVersion !== null) {
+    const fullRoster = [...PANEL_MEMBERS, ...GROUNDED_PANEL_MEMBERS]
+    const groundedHash = (s: PanelContextSnapshot): string =>
+      computeInputHash(prediction, now, promptVersion, fullRoster, {
+        promptVersion: groundedPromptVersion,
+        contextFingerprint: contextFingerprint(s),
+      })
+    const stored =
+      latestRun?.contextSnapshot != null ? (latestRun.contextSnapshot as PanelContextSnapshot) : null
+    roster = fullRoster
+    if (stored !== null && latestRun !== null && groundedHash(stored) === latestRun.inputHash) {
+      snapshot = stored
+      inputHash = latestRun.inputHash
+    } else {
+      const fresh = await retrievePanelContext(prediction.claimText, now)
+      if (fresh !== null) {
+        snapshot = fresh
+        inputHash = groundedHash(fresh)
+      } else {
+        roster = PANEL_MEMBERS
+        inputHash = computeInputHash(prediction, now, promptVersion)
+      }
+    }
+  } else {
+    inputHash = computeInputHash(prediction, now, promptVersion)
+  }
+
+  const prompt = buildPanelPrompt(template, prediction, now)
+  const groundedPrompt =
+    groundedTemplate !== null && snapshot !== null
+      ? buildGroundedPanelPrompt(groundedTemplate, prediction, now, snapshot)
+      : null
+  // The roster contains grounded twins only when a snapshot exists, so the fallback arm
+  // is unreachable — it exists to satisfy the types without an assertion.
+  const promptFor = (m: PanelMember): string =>
+    m.mode === 'grounded-indexer' && groundedPrompt !== null ? groundedPrompt : prompt
+  const promptVersionFor = (m: PanelMember): string =>
+    m.mode === 'grounded-indexer' && groundedPromptVersion !== null
+      ? groundedPromptVersion
+      : promptVersion
 
   if (latestRun?.inputHash === inputHash) {
     // Completion pass. A run written while some members couldn't be authenticated (a
@@ -253,7 +354,7 @@ export async function runPanelForPrediction(
     // rests on. Members that already have a row (including failure-abstentions) are
     // never re-asked: one call per member per forecast per day stands.
     const recorded = new Set(latestRun.estimates.map((e) => `${e.model}:${e.mode}`))
-    const missing = PANEL_MEMBERS.filter((m) => !recorded.has(`${m.model}:${m.mode}`))
+    const missing = roster.filter((m) => !recorded.has(`${m.model}:${m.mode}`))
     // Members we still cannot authenticate stay quiet: a deliberate Bedrock-only mode
     // (no OpenRouter key) must keep reporting skipped, not failed, on the second tick.
     const askable = missing.filter((m) => !(m.route === 'openrouter' && ctx.openRouterDisabled))
@@ -262,17 +363,21 @@ export async function runPanelForPrediction(
       return { predictionId: prediction.id, status: 'skipped-unchanged', estimated: 0, abstained: 0 }
     }
 
-    const prompt = buildPanelPrompt(template, prediction, now)
-
     if (opts.dryRun) {
       log.info(
-        { predictionId: prediction.id, promptVersion, missing: askable.map((m) => m.model), prompt },
+        {
+          predictionId: prediction.id,
+          promptVersion,
+          missing: askable.map((m) => `${m.model}:${m.mode}`),
+          prompt,
+          groundedPrompt,
+        },
         'Panel dry run (would complete a partial run)',
       )
       return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
     }
 
-    const outcomes = await callMembers(askable, prompt, opts.apiKey, prediction.id, ctx)
+    const outcomes = await callMembers(askable, promptFor, opts.apiKey, prediction.id, ctx)
 
     // Same rule as a fresh run: if nobody was reachable, write nothing so the next
     // tick (or the next key fix) can still retry today.
@@ -288,7 +393,7 @@ export async function runPanelForPrediction(
         runId: latestRun.id,
         model: o.member.model,
         mode: o.member.mode,
-        promptVersion,
+        promptVersion: promptVersionFor(o.member),
         probability: o.probability,
         insufficientData: o.insufficientData,
         callFailed: o.failed,
@@ -312,14 +417,12 @@ export async function runPanelForPrediction(
     }
   }
 
-  const prompt = buildPanelPrompt(template, prediction, now)
-
   if (opts.dryRun) {
-    log.info({ predictionId: prediction.id, promptVersion, prompt }, 'Panel dry run')
+    log.info({ predictionId: prediction.id, promptVersion, prompt, groundedPrompt }, 'Panel dry run')
     return { predictionId: prediction.id, status: 'dry-run', estimated: 0, abstained: 0 }
   }
 
-  const outcomes = await callMembers(PANEL_MEMBERS, prompt, opts.apiKey, prediction.id, ctx)
+  const outcomes = await callMembers(roster, promptFor, opts.apiKey, prediction.id, ctx)
 
   // No outcomes at all means every member was unauthenticated (no key, no IAM) — we
   // asked nobody. Same treatment as everybody failing: write nothing, retry next tick.
@@ -345,11 +448,12 @@ export async function runPanelForPrediction(
       data: {
         predictionId: prediction.id,
         inputHash,
+        ...(snapshot !== null ? { contextSnapshot: snapshot satisfies Prisma.InputJsonValue } : {}),
         estimates: {
           create: outcomes.map((o) => ({
             model: o.member.model,
             mode: o.member.mode,
-            promptVersion,
+            promptVersion: promptVersionFor(o.member),
             probability: o.probability,
             insufficientData: o.insufficientData,
             callFailed: o.failed,
@@ -444,6 +548,27 @@ export async function runPanelSweep(opts?: {
   // Resolved once, so every forecast in this sweep shares one promptVersion.
   const template = await getPromptTemplate('panel-estimate')
 
+  // Grounding scope (docs/LASSO.md §9a): forecasts carrying the configured tag get the
+  // grounded twins. Null tag (unset env, or no news-indexer connection) = the sweep is
+  // exactly the ungrounded feature — same hashes, same rosters, no retrieval calls.
+  const groundedTag = groundedPanelTag()
+  const groundedTemplate = groundedTag ? await getPromptTemplate('panel-estimate-grounded') : undefined
+  const groundedIds = groundedTag
+    ? new Set(
+        (
+          await prisma.prediction.findMany({
+            where: {
+              status: 'ACTIVE',
+              outcomeType: 'BINARY',
+              resolveByDatetime: { gt: now },
+              tags: { some: { slug: groundedTag } },
+            },
+            select: { id: true },
+          })
+        ).map((p) => p.id),
+      )
+    : null
+
   const predictions = await prisma.prediction.findMany({
     where: {
       status: 'ACTIVE',
@@ -466,13 +591,17 @@ export async function runPanelSweep(opts?: {
 
   for (const prediction of predictions) {
     try {
-      const result = await runPanelForPrediction(prediction, {
-        now,
-        dryRun: opts?.dryRun,
-        apiKey,
-        template,
-        ctx,
-      })
+      const result = await runPanelForPrediction(
+        groundedIds?.has(prediction.id) ? { ...prediction, grounded: true } : prediction,
+        {
+          now,
+          dryRun: opts?.dryRun,
+          apiKey,
+          template,
+          groundedTemplate,
+          ctx,
+        },
+      )
       if (result.status === 'written') summary.written += 1
       else if (result.status === 'completed-partial') summary.completedPartial += 1
       else if (result.status === 'dry-run') summary.dryRun += 1

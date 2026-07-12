@@ -47,6 +47,9 @@ type ChartMarketPoint = {
  *  distinct from the solid Oracle `ai` line, which it never touches. */
 type ChartPanelMember = {
   model: string
+  /** 'ungrounded' or 'grounded-indexer' — twins share a model string, so the mode is
+   *  part of the series key (docs/LASSO.md §9a). */
+  mode: string
   label: string
   color: string
   isControl: boolean
@@ -158,9 +161,10 @@ export function buildMarketSeries(
   })
 }
 
-/** Sanitised, collision-free dataKey for a member's step series on the merged data. */
-export function panelKey(model: string): string {
-  return 'panel_' + model.replace(/[^a-zA-Z0-9]/g, '_')
+/** Sanitised, collision-free dataKey for a member's step series on the merged data.
+ *  Keyed by (model, mode): a grounded twin and its sibling are two lines. */
+export function panelKey(model: string, mode: string): string {
+  return 'panel_' + `${model}_${mode}`.replace(/[^a-zA-Z0-9]/g, '_')
 }
 
 /** Carry each member's estimate forward as a step function across the merged timeline,
@@ -175,7 +179,7 @@ export function buildPanelSeries(
     const sorted = [...m.points].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     )
-    out[panelKey(m.model)] = tsList.map((ts) => {
+    out[panelKey(m.model, m.mode)] = tsList.map((ts) => {
       const upTo = sorted.filter((p) => new Date(p.createdAt).getTime() <= ts)
       return upTo.length > 0 ? upTo[upTo.length - 1].probability : null
     })
@@ -286,7 +290,7 @@ export default function ProbabilityChart({
     }
 
     for (const m of panelMembers) {
-      point[panelKey(m.model)] = panelStep[panelKey(m.model)][i]
+      point[panelKey(m.model, m.mode)] = panelStep[panelKey(m.model, m.mode)][i]
     }
 
     if (outcomeType === 'BINARY') {
@@ -486,9 +490,9 @@ export default function ProbabilityChart({
               compete with the Oracle line. */}
           {panelMembers.map(m => (
             <Line
-              key={m.model}
+              key={`${m.model}:${m.mode}`}
               type="stepAfter"
-              dataKey={panelKey(m.model)}
+              dataKey={panelKey(m.model, m.mode)}
               name={m.isControl ? `${m.label} (control)` : m.label}
               stroke={m.color}
               strokeOpacity={0.75}

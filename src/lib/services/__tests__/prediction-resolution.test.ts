@@ -106,9 +106,11 @@ describe('resolvePrediction — ai_member_scores write path', () => {
             aiProbabilityAtCommit: 0.9,
             aiRunAtCommit: {
               estimates: [
-                { model: 'qwen.qwen3-235b-a22b-2507-v1:0', probability: 80, promptVersion: 'pv1' },
-                { model: 'x-ai/grok-4.3', probability: 40, promptVersion: 'pv1' },
-                { model: 'google/gemma-3-4b-it', probability: null, promptVersion: 'pv1' },
+                { model: 'qwen.qwen3-235b-a22b-2507-v1:0', mode: 'ungrounded', probability: 80, promptVersion: 'pv1' },
+                // The grounded twin: same model string, its own row via the mode axis.
+                { model: 'qwen.qwen3-235b-a22b-2507-v1:0', mode: 'grounded-indexer', probability: 70, promptVersion: 'pv2' },
+                { model: 'x-ai/grok-4.3', mode: 'ungrounded', probability: 40, promptVersion: 'pv1' },
+                { model: 'google/gemma-3-4b-it', mode: 'ungrounded', probability: null, promptVersion: 'pv1' },
               ],
             },
           }),
@@ -119,17 +121,22 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
 
     const rows = upserts(tx)
-    const byModel = new Map(rows.map((r) => [r.create.model, r]))
-    expect([...byModel.keys()].sort()).toEqual([
-      'market',
-      'oracle',
-      'qwen.qwen3-235b-a22b-2507-v1:0',
-      'x-ai/grok-4.3',
+    const byMember = new Map(rows.map((r) => [`${r.create.model}:${r.create.mode}`, r]))
+    expect([...byMember.keys()].sort()).toEqual([
+      'market:sentinel',
+      'oracle:sentinel',
+      'qwen.qwen3-235b-a22b-2507-v1:0:grounded-indexer',
+      'qwen.qwen3-235b-a22b-2507-v1:0:ungrounded',
+      'x-ai/grok-4.3:ungrounded',
     ])
 
-    const qwen = byModel.get('qwen.qwen3-235b-a22b-2507-v1:0')!
+    const qwen = byMember.get('qwen.qwen3-235b-a22b-2507-v1:0:ungrounded')!
     expect(qwen.where).toEqual({
-      commitmentId_model: { commitmentId: 'c1', model: 'qwen.qwen3-235b-a22b-2507-v1:0' },
+      commitmentId_model_mode: {
+        commitmentId: 'c1',
+        model: 'qwen.qwen3-235b-a22b-2507-v1:0',
+        mode: 'ungrounded',
+      },
     })
     expect(qwen.create).toMatchObject({
       predictionId: 'p1',
@@ -140,13 +147,19 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     // Re-resolution overwrites in place: update mirrors create.
     expect(qwen.update).toEqual({ brierScore: qwen.create.brierScore, promptVersion: 'pv1' })
 
-    expect(byModel.get('x-ai/grok-4.3')!.create.brierScore).toBeCloseTo(0.36, 6)
-    expect(byModel.get('oracle')!.create).toMatchObject({
+    // The twin scores independently, under its own prompt version.
+    expect(byMember.get('qwen.qwen3-235b-a22b-2507-v1:0:grounded-indexer')!.create).toMatchObject({
+      brierScore: expect.closeTo(0.09, 6), // (0.7 − 1)²
+      promptVersion: 'pv2',
+    })
+
+    expect(byMember.get('x-ai/grok-4.3:ungrounded')!.create.brierScore).toBeCloseTo(0.36, 6)
+    expect(byMember.get('oracle:sentinel')!.create).toMatchObject({
       brierScore: expect.closeTo(0.01, 6), // (0.9 − 1)²
       promptVersion: null,
     })
     // Market price as of the commit instant (60, not the later 90), straight polarity.
-    expect(byModel.get('market')!.create).toMatchObject({
+    expect(byMember.get('market:sentinel')!.create).toMatchObject({
       brierScore: expect.closeTo(0.16, 6), // (0.6 − 1)²
       promptVersion: null,
     })
@@ -189,7 +202,7 @@ describe('resolvePrediction — ai_member_scores write path', () => {
           commitment({
             aiProbabilityAtCommit: 0.9,
             aiRunAtCommit: {
-              estimates: [{ model: 'x-ai/grok-4.3', probability: 40, promptVersion: 'pv1' }],
+              estimates: [{ model: 'x-ai/grok-4.3', mode: 'ungrounded', probability: 40, promptVersion: 'pv1' }],
             },
           }),
         ],
