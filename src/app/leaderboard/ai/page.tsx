@@ -96,7 +96,7 @@ export default async function AiLeaderboardPage() {
                         {t('marketBadge')}
                       </span>
                     )}
-                    {m.model.startsWith('google/gemma') && (
+                    {m.isControl && (
                       <span className="ml-2 rounded bg-navy-600 px-1.5 py-0.5 text-xs text-gray-400">
                         {t('controlBadge')}
                       </span>

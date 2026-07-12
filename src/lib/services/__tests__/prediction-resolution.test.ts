@@ -217,11 +217,18 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     expect(data).toMatchObject({ status: 'RESOLVED_CORRECT', resolutionOutcome: 'correct' })
   })
 
-  it('MULTIPLE_CHOICE: the oracle sentinel is scored against each user’s own option, per current semantics', async () => {
+  it('MULTIPLE_CHOICE resolutions write no member scores — sentinels are BINARY-only', async () => {
+    // On MC the per-commitment outcome is "did this user's option win", a different
+    // question from the BINARY "did the claim resolve true" every other row answers.
+    // Mixing them would blend two question types into one leaderboard aggregate, so
+    // oracle/market sentinels are not scored on MC — the humans still resolve normally.
     findUnique.mockResolvedValue(
       prediction({
         outcomeType: 'MULTIPLE_CHOICE',
         options: [{ id: 'o1' }, { id: 'o2' }],
+        externalMarket: {
+          snapshots: [{ createdAt: new Date('2026-07-01T00:00:00Z'), probability: 60 }],
+        },
         commitments: [
           commitment({ id: 'cA', userId: 'u1', optionId: 'o1', cuCommitted: 70, aiProbabilityAtCommit: 0.9, user: user('u1') }),
           commitment({ id: 'cB', userId: 'u2', optionId: 'o2', cuCommitted: 70, aiProbabilityAtCommit: 0.9, user: user('u2') }),
@@ -235,11 +242,13 @@ describe('resolvePrediction — ai_member_scores write path', () => {
       correctOptionId: 'o1',
     })
 
-    const rows = upserts(tx)
-    const oracleA = rows.find((r) => r.create.commitmentId === 'cA')!
-    const oracleB = rows.find((r) => r.create.commitmentId === 'cB')!
-    // Same oracle probability, opposite outcomes: 1 for the winning option, 0 otherwise.
-    expect(oracleA.create.brierScore).toBeCloseTo(0.01, 6) // (0.9 − 1)²
-    expect(oracleB.create.brierScore).toBeCloseTo(0.81, 6) // (0.9 − 0)²
+    expect(tx.aiMemberScore.upsert).not.toHaveBeenCalled()
+    // The human side of the resolution is untouched by the sentinel gate.
+    expect(tx.commitment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'cA' },
+        data: expect.objectContaining({ brierScore: expect.closeTo(0.09, 6) }), // (0.7 − 1)²
+      }),
+    )
   })
 })

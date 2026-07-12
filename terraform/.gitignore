@@ -24,6 +24,12 @@ override.tf.json
 tfplan
 *.tfplan
 
+# Working scratch — state snapshots and captured plan output must never be committed
+# (a future state snapshot could carry secrets); tooling downloads stay local too.
+terraform_state_tmp.json
+plan_output.txt
+*.deb
+
 # CLI configuration files
 .terraformrc
 terraform.rc

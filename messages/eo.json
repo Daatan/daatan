@@ -349,6 +349,7 @@
     "preferencesDescription": "Administru viajn ekranajn kaj lingvajn agordojn.",
     "aiPanel": "AI-panelo",
     "aiPanelDescription": "Montru eksperimentajn po-modelajn AI-takso-liniojn sur prognozaj diagramoj. Defaŭlte malŝaltita; sendependa de la Orakolo kaj neniam influas viajn poentojn.",
+    "aiPanelSaveError": "Ne eblis konservi la agordon de la AI-panelo — bonvolu reprovi.",
     "language": "Lingvo",
     "languageDescription": "Elektu vian preferatan montran lingvon",
     "notifications": "Sciigoj",

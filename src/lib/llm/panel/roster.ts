@@ -53,12 +53,6 @@ export interface PanelMember {
   control?: boolean
 }
 
-/** True when any member needs an OpenRouter key. A Bedrock-only roster is not dormant
- *  just because no OpenRouter key is configured. */
-export function needsOpenRouter(members: readonly PanelMember[] = PANEL_MEMBERS): boolean {
-  return members.some((m) => m.route === 'openrouter')
-}
-
 export const PANEL_MEMBERS: readonly PanelMember[] = [
   // Non-reasoning, and the most decorrelated lineage available (non-Western corpus
   // and RLHF). Doubles as the deterministic baseline: no hidden thinking tokens.
@@ -142,6 +136,15 @@ export function panelMemberLabel(model: string): string {
 }
 
 /**
+ * Whether a model id is the roster's deliberately-weak control member. The single
+ * source of truth is the roster's `control` flag — callers must not re-derive this
+ * from model-name prefixes, or swapping the control model silently mislabels it.
+ */
+export function isControlModel(model: string, members: readonly PanelMember[] = PANEL_MEMBERS): boolean {
+  return members.some((m) => m.control === true && m.model === model)
+}
+
+/**
  * A distinct, stable colour per member for the dashed panel lines. Deliberately not
  * the Oracle's amber (#FBBF24), the community blue, or the market pink — the panel is
  * its own source. Indexed by roster position so colours don't shuffle when a member
@@ -151,5 +154,11 @@ export const PANEL_MEMBER_COLORS = ['#22D3EE', '#A78BFA', '#F472B6', '#4ADE80', 
 
 export function panelMemberColor(model: string, members: readonly PanelMember[] = PANEL_MEMBERS): string {
   const i = members.findIndex((m) => m.model === model)
-  return PANEL_MEMBER_COLORS[(i < 0 ? 0 : i) % PANEL_MEMBER_COLORS.length]
+  if (i >= 0) return PANEL_MEMBER_COLORS[i % PANEL_MEMBER_COLORS.length]
+  // Retired members (historical rows whose model left the roster) get a stable
+  // hash-derived colour instead of all collapsing onto index 0 — otherwise a renamed
+  // member (qwen/… → qwen.…) charts two identical-colour lines.
+  let hash = 0
+  for (let c = 0; c < model.length; c++) hash = (hash * 31 + model.charCodeAt(c)) >>> 0
+  return PANEL_MEMBER_COLORS[hash % PANEL_MEMBER_COLORS.length]
 }

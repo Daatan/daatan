@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { panelMemberLabel } from '@/lib/llm/panel/roster'
+import { panelMemberLabel, isControlModel } from '@/lib/llm/panel/roster'
 import { ORACLE_MEMBER, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
 
 export interface MemberLeaderboardRow {
@@ -16,6 +16,9 @@ export interface MemberLeaderboardRow {
   /** The linked prediction market (Polymarket/Kalshi) — a benchmark, not an LLM. Scored
    *  only over market-linked forecasts, so its `count` is typically lower than a model's. */
   isMarket: boolean
+  /** The roster's deliberately-weak falsification member — from the roster's `control`
+   *  flag, never re-derived from the model name. */
+  isControl: boolean
 }
 
 export interface AiLeaderboard {
@@ -74,6 +77,7 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
         count: g._count.brierScore,
         isOracle: g.model === ORACLE_MEMBER,
         isMarket: g.model === MARKET_MEMBER,
+        isControl: isControlModel(g.model),
       }
     })
     .sort((a, b) => a.avgBrier - b.avgBrier)
