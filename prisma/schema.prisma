@@ -476,6 +476,16 @@ model ContextSnapshot {
 /// estimate yet — that's a separate follow-up. One row per (predictionId,
 /// urlHash): the row IS the extraction cache, so re-discovering an already-pooled
 /// article on a later run updates its signal in place.
+/// pending: claimed for extraction, not yet complete (or a prior attempt failed
+/// and is being retried). complete: contentHash reflects the currently-stored
+/// stance/claims. failed: the last extraction attempt errored — statusReason
+/// carries a short machine-readable cause; eligible for retry once stale.
+enum EvidencePoolStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
 model EvidencePoolArticle {
   id           String     @id @default(cuid())
   predictionId String
@@ -486,6 +496,26 @@ model EvidencePoolArticle {
   title   String? @db.VarChar(500)
   source  String? @db.VarChar(200) // outlet/domain, e.g. "reuters.com"
   publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
+
+  // Content fingerprint (hash of title+snippet as pushed by the discovering
+  // path — the only fields news-indexer's webhook actually sends; no full
+  // article body reaches daatan) — distinguishes "same URL, same content,
+  // safe to skip re-extraction" from "same URL, content changed (e.g. a
+  // live-blog update), legitimately new evidence." Null on rows written
+  // before this field existed; treated as always-changed on next encounter,
+  // no backfill needed (the gap self-heals, 286 rows at introduction).
+  contentHash String? @map("content_hash") @db.VarChar(64)
+  // Claim/completion lifecycle for the atomic extraction gate (evidence-pool.ts
+  // claimArticleForExtraction/completeArticleExtraction/failArticleExtraction).
+  // Lets two near-simultaneous discoveries of the same (predictionId, url) —
+  // news-indexer's delivery is at-least-once — serialize on a single Postgres
+  // create-then-conditional-updateMany instead of racing a separate
+  // findFirst-then-create (the bug this replaces: two writers both read
+  // "not a duplicate" before either commits, both call the extractor, both
+  // persist a ContextSnapshot — confirmed in prod, 7 cases, 3 with conflicting
+  // stance from the same near-simultaneous article).
+  status       EvidencePoolStatus @default(COMPLETE)
+  statusReason String?            @map("status_reason") @db.VarChar(64) // set only when status='failed'
 
   // Extracted signal, same shape as EnrichedOracleSource — stance/certainty stay on
   // the Oracle's raw [-1,1]/[0,1] scale (see oracle-snapshot.ts), not converted here.

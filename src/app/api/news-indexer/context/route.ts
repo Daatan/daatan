@@ -7,7 +7,12 @@ import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
 import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
-import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
+import {
+  addArticlesToPool,
+  shadowCompareRecompute,
+  claimArticlesForExtraction,
+  failClaimedArticles,
+} from '@/lib/services/evidence-pool'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 
@@ -103,11 +108,51 @@ export async function POST(request: NextRequest) {
       publishedDate: a.publishedAt ?? undefined,
     }))
 
-    const { forecast: oracleForecast } = await getOracleForecast(
-      prediction.claimText,
-      { articles, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
-      { source: 'news-indexer', predictionId: prediction.id },
+    // Atomic claim gate (evidence-pool.ts) — fixes a confirmed race where
+    // news-indexer's at-least-once webhook delivery let two near-simultaneous
+    // pushes for the same article both call the (slow, non-deterministic)
+    // extractor and both persist a snapshot. If every article in this push is
+    // either already-extracted-with-identical-content or claimed by another
+    // still-fresh in-flight request, there is nothing new to extract — skip
+    // the Oracle call entirely rather than paying for a redundant/racy run.
+    const claimResults = await claimArticlesForExtraction(
+      prediction.id,
+      items.map((a) => ({
+        url: a.url,
+        title: a.title,
+        snippet: a.snippet,
+        source: a.source ?? null,
+        publishedAt: a.publishedAt ?? null,
+      })),
+      'news-indexer',
     )
+    if (!claimResults.some((r) => r === 'claimed')) {
+      log.info(
+        { predictionId: prediction.id, articles: items.length },
+        'news-indexer: all articles already claimed/unchanged, skipping oracle call',
+      )
+      return NextResponse.json({
+        ok: true,
+        stance: null,
+        certainty: null,
+        claim: null,
+        probability: null,
+        sources: [],
+        skipped: 'unchanged',
+      })
+    }
+
+    let oracleForecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
+    try {
+      ;({ forecast: oracleForecast } = await getOracleForecast(
+        prediction.claimText,
+        { articles, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
+        { source: 'news-indexer', predictionId: prediction.id },
+      ))
+    } catch (err) {
+      await failClaimedArticles(prediction.id, items.map((a) => a.url), 'extractor_error')
+      throw err
+    }
 
     let probability: number | null = null
     // Only set alongside probability, in the same block below — kept in this
@@ -201,6 +246,11 @@ export async function POST(request: NextRequest) {
         'news-indexer: oracle updated',
       )
     } else {
+      // No estimate to report, but the claim itself still succeeded (the
+      // extractor ran, just produced nothing usable) — release it immediately
+      // rather than leaving these articles blocked for the full staleness
+      // window before a later push can retry them.
+      await failClaimedArticles(prediction.id, items.map((a) => a.url), 'oracle_null')
       log.info(
         { predictionId: prediction.id, articles: items.length, similarity: triggerSimilarity },
         'news-indexer: oracle returned null, skipping probability update',

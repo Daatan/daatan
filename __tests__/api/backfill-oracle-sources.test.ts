@@ -51,7 +51,7 @@ describe('POST /api/admin/forecasts/backfill-oracle-sources', () => {
     const { POST } = await import('@/app/api/admin/forecasts/backfill-oracle-sources/route')
     const res = await POST(makeRequest('cron-sec'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ processed: 2, ok: 1, noArticles: 1, noOracle: 0, failed: 0, remaining: 7 })
+    expect(await res.json()).toEqual({ processed: 2, ok: 1, noArticles: 1, noOracle: 0, unchanged: 0, failed: 0, remaining: 7 })
     expect(mockRefresh).toHaveBeenCalledTimes(2)
   })
 
