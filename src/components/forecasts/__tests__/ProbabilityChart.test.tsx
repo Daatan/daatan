@@ -1,6 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import ProbabilityChart, { AiDot, communityProbability, tsWindowToIndices, buildMarketSeries, buildPanelSeries, panelKey } from '../ProbabilityChart'
+
+// Captures the `data` array reference handed to recharts' LineChart on each render,
+// so tests can assert referential stability without poking at recharts' internal
+// Redux-managed Brush state.
+let capturedDataRefs: unknown[] = []
 
 // recharts' ResponsiveContainer needs a sized box; stub it so children render in jsdom.
 vi.mock('recharts', async () => {
@@ -10,6 +15,10 @@ vi.mock('recharts', async () => {
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
       <div style={{ width: 400, height: 200 }}>{children}</div>
     ),
+    LineChart: (props: React.ComponentProps<typeof actual.LineChart>) => {
+      capturedDataRefs.push(props.data)
+      return <actual.LineChart {...props} />
+    },
   }
 })
 
@@ -323,5 +332,64 @@ describe('AI panel series', () => {
       />,
     )
     expect(screen.getByText(HEADING)).toBeTruthy()
+  })
+})
+
+describe('chart data referential stability (recharts Brush reset regression)', () => {
+  // recharts resets its internal Brush window (snapping the zoomed-in view back to
+  // "all time") whenever the `data` array reference it's handed changes — even if
+  // the contents are identical. A parent re-render that rebuilds `commitments` from
+  // scratch (e.g. ForecastDetailClient's post-mount refetch) must not cause that.
+  beforeEach(() => {
+    capturedDataRefs = []
+  })
+
+  it('keeps the same `data` reference across a re-render with equal-but-new-reference props', () => {
+    const commitments = [
+      commitment('2026-06-01', true),
+      commitment('2026-06-02', false),
+      commitment('2026-06-03', true),
+    ]
+    const { rerender } = render(
+      <ProbabilityChart commitments={commitments} snapshots={[]} outcomeType="BINARY" options={[]} />,
+    )
+    expect(capturedDataRefs).toHaveLength(1)
+
+    // Same values, but a brand-new array/object graph — exactly what a refetch produces.
+    rerender(
+      <ProbabilityChart
+        commitments={commitments.map(c => ({ ...c }))}
+        snapshots={[]}
+        outcomeType="BINARY"
+        options={[]}
+      />,
+    )
+
+    expect(capturedDataRefs).toHaveLength(2)
+    expect(capturedDataRefs[1]).toBe(capturedDataRefs[0])
+  })
+
+  it('still recomputes `data` when the content actually changes', () => {
+    const commitments = [
+      commitment('2026-06-01', true),
+      commitment('2026-06-02', false),
+      commitment('2026-06-03', true),
+    ]
+    const { rerender } = render(
+      <ProbabilityChart commitments={commitments} snapshots={[]} outcomeType="BINARY" options={[]} />,
+    )
+
+    rerender(
+      <ProbabilityChart
+        commitments={[...commitments, commitment('2026-06-04', true)]}
+        snapshots={[]}
+        outcomeType="BINARY"
+        options={[]}
+      />,
+    )
+
+    expect(capturedDataRefs).toHaveLength(2)
+    expect(capturedDataRefs[1]).not.toBe(capturedDataRefs[0])
+    expect((capturedDataRefs[1] as unknown[]).length).toBeGreaterThan((capturedDataRefs[0] as unknown[]).length)
   })
 })
