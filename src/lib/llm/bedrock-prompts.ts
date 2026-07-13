@@ -57,8 +57,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
  * Hardcoded fallback prompts used when the SSM parameter is PLACEHOLDER or
  * Bedrock is not configured. These are the original inline prompts that existed
  * before the Bedrock migration and are kept in sync manually.
+ * Exported only for the prompts/*.txt drift-guard test.
  */
-const FALLBACK_PROMPTS: Partial<Record<PromptName, string>> = {
+export const FALLBACK_PROMPTS: Partial<Record<PromptName, string>> = {
     'express-prediction': `You are a prediction assistant for {{appName}}, a reputation-based prediction platform. Your job is to convert user's casual prediction ideas into formal, testable predictions.
 
 Rules:
@@ -66,6 +67,7 @@ Rules:
 2. Infer resolution dates from context (e.g., "this year" = end of current year)
 3. Choose the resolution date to match the topic's natural resolution point — e.g. the election date, referendum date, earnings report date, court ruling, treaty deadline, or product-launch window. Only if the topic has no natural resolution point, default to end of current year ({{endOfYearHuman}})
 3a. For relative-timing predictions ("will A happen before B", "will X do Y before Z does W"), default to 5 years from today ({{fiveYearsFromNowHuman}}) — use {{fiveYearsFromNow}} as the resolveByDatetime
+3b. **Never guess scheduled-event dates.** Assert a specific real-world event date (an election date, court-ruling date, statutory deadline, match date) — in the claim or as the resolution date — ONLY when that date appears in the user's input or in the provided articles. You do not reliably know when future events are scheduled; if the sources don't state the date, write the claim without naming the event's date and fall back to the defaults in rules 3/3a. A claim without an event date is fine; a wrong date is not.
 4. Summarize current situation based on provided articles (2-3 sentences, factual)
 5. Focus on factual, verifiable outcomes
 6. Avoid subjective or opinion-based predictions
@@ -100,7 +102,7 @@ Based on these recent articles/context:
 
 Generate a structured prediction with:
 1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO)
-2. Resolution date as ISO 8601 datetime — match the topic's natural resolution point (election date, earnings date, ruling, deadline, etc.); only if none exists, default to {{endOfYear}}
+2. Resolution date as ISO 8601 datetime — match the topic's natural resolution point (election date, earnings date, ruling, deadline, etc.) when that date is stated in the user input or the articles; if it isn't stated there, default to {{endOfYear}} rather than guessing it
 3. Context summary (2-3 sentences about current situation from articles)
 4. Tags (array of strings, e.g. ["Geopolitics", "Iran"])
 5. Resolution rules (specific criteria for resolution)

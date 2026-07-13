@@ -73,6 +73,13 @@ See `docs/bots.md` → [Bedrock Prompts Catalog](bots.md#bedrock-prompts-catalog
 
 Requires `AWS_REGION` and an IAM role/profile with `bedrock:GetPrompt` and `ssm:GetParameter` permissions.
 
+### Express prediction date grounding (#1086)
+
+The model must not invent dates for scheduled events (elections, rulings, statutory deadlines) — it does not reliably know when future events happen. Two layers enforce this:
+
+1. **Prompt rule 3b** in `express-prediction`: a specific event date may appear in the claim or resolution date only when the user's input or the retrieved articles state it; otherwise the claim omits the event date and the deterministic defaults apply (end of current year, or +5 years for relative-timing claims).
+2. **`findUngroundedYears()`** (`src/lib/llm/expressPrediction.ts`): after generation, any future year in the claim or resolution date that appears nowhere in the user input or article text — and isn't one of the two defaults — is returned as `ungroundedYears` on the result. The Express review screen renders these as an "Unverified date" warning; editing the claim or the date clears it.
+
 ## Usage
 
 ### Standard requests (Gemini → Oracle → OpenRouter → Ollama fallback)

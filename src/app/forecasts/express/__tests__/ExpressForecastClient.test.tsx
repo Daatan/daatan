@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
-import ExpressForecastClient from '../ExpressForecastClient'
+import ExpressForecastClient, { type GeneratedPrediction } from '../ExpressForecastClient'
 import messages from '../../../../../messages/en.json'
 
 // Mock next/navigation
@@ -15,18 +15,6 @@ vi.mock('next/navigation', () => ({
 
 const renderWithIntl = (ui: React.ReactElement) =>
   render(<NextIntlClientProvider locale="en" messages={messages}>{ui}</NextIntlClientProvider>)
-
-interface GeneratedPrediction {
-  claimText: string
-  resolveByDatetime: string
-  detailsText: string
-  tags: string[]
-  resolutionRules: string
-  outcomeType: 'BINARY' | 'MULTIPLE_CHOICE'
-  options: string[]
-  newsAnchor: { url: string; title: string; snippet: string }
-  additionalLinks: Array<{ url: string; title: string }>
-}
 
 describe('ExpressForecastClient', () => {
   beforeEach(() => {
@@ -193,6 +181,8 @@ describe('ExpressForecastClient', () => {
       resolutionRules: 'Resolved by CoinMarketCap',
       outcomeType: 'BINARY',
       options: [],
+      probabilitySuggestion: 60,
+      probabilityReasoning: 'Momentum is strong',
       newsAnchor: {
         url: 'https://example.com',
         title: 'Bitcoin News',
@@ -396,6 +386,66 @@ describe('ExpressForecastClient', () => {
       expect(() => {
         fireEvent.change(dateInput, { target: { value: '6' } })
       }).not.toThrow()
+    })
+
+    it('shows the unverified-date warning when the server flags ungrounded years', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        claimText: 'Knesset elections will be held by December 31, 2027',
+        resolveByDatetime: '2027-12-31T23:59:59Z',
+        ungroundedYears: ['2027'],
+      })
+
+      expect(screen.getByText('Unverified date: 2027')).toBeInTheDocument()
+      expect(screen.getByText(/The AI inferred this date/)).toBeInTheDocument()
+    })
+
+    it('shows no date warning when ungroundedYears is absent or empty', async () => {
+      await renderInReviewState({ ...generatedData, ungroundedYears: [] })
+
+      expect(screen.queryByText(/Unverified date/)).not.toBeInTheDocument()
+    })
+
+    it('clears the date warning once the author removes the flagged year from the claim', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        claimText: 'Knesset elections will be held by December 31, 2027',
+        ungroundedYears: ['2027'],
+      })
+      expect(screen.getByText('Unverified date: 2027')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      fireEvent.change(screen.getByLabelText('Claim text'), {
+        target: { value: 'Knesset elections will be held by December 31, 2026' },
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.queryByText(/Unverified date/)).not.toBeInTheDocument()
+    })
+
+    it('keeps the date warning while the flagged year survives the edit', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        claimText: 'Knesset elections will be held by December 31, 2027',
+        ungroundedYears: ['2027'],
+      })
+
+      // Rewords the claim but leaves the suspect 2027 in place — still unverified.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      fireEvent.change(screen.getByLabelText('Claim text'), {
+        target: { value: 'The next Knesset elections will happen by December 31, 2027' },
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.getByText('Unverified date: 2027')).toBeInTheDocument()
     })
 
     it('reverts button when publish API fails', async () => {

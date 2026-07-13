@@ -7,6 +7,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecastsWarning'
+import { WarningBanner } from '@/components/ui/WarningBanner'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput } from '@/lib/utils/date'
 
@@ -18,7 +19,7 @@ interface ExpressForecastClientProps {
   onInputChange?: (val: string) => void
 }
 
-interface GeneratedPrediction {
+export interface GeneratedPrediction {
   claimText: string
   resolveByDatetime: string
   detailsText: string
@@ -38,6 +39,7 @@ interface GeneratedPrediction {
     url: string
     title: string
   }>
+  ungroundedYears?: string[]
   localized?: {
     language: string
     claimText: string
@@ -372,7 +374,14 @@ export default function ExpressForecastClient({
 
   const handleSaveEdit = () => {
     if (editForm) {
-      setGenerated(editForm)
+      // A flagged year stays suspect until it's gone from both the claim and the
+      // date — an edit that leaves it in place hasn't fixed it. Any year the
+      // author types themselves is grounded by definition, so filtering the
+      // original flags is enough.
+      const ungroundedYears = (generated?.ungroundedYears ?? []).filter(
+        y => editForm.claimText.includes(y) || editForm.resolveByDatetime.startsWith(y),
+      )
+      setGenerated({ ...editForm, ungroundedYears })
       setIsEditing(false)
     }
   }
@@ -689,6 +698,15 @@ export default function ExpressForecastClient({
 
             {!isEditing && (
               <SimilarForecastsWarning claimText={generated.claimText} tags={generated.tags} />
+            )}
+
+            {!isEditing && generated.ungroundedYears && generated.ungroundedYears.length > 0 && (
+              <WarningBanner
+                icon={<AlertCircle className="w-4 h-4" />}
+                title={t('dateWarningTitle', { years: generated.ungroundedYears.join(', ') })}
+              >
+                <p className="text-xs text-gray-500">{t('dateWarningHint')}</p>
+              </WarningBanner>
             )}
 
             {/* Resolution Date */}

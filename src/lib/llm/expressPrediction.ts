@@ -119,6 +119,10 @@ export interface ExpressPredictionResult {
     url: string
     title: string
   }>
+  // Future years the model asserted (in the claim or resolution date) that appear
+  // nowhere in the user's input or the source articles — the signature of a
+  // hallucinated scheduled-event date (#1086). The review screen warns on these.
+  ungroundedYears: string[]
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -141,8 +145,44 @@ interface ParsedPrediction {
   relevantArticleIndices?: number[]
 }
 
+// Prompt rule 3a's default horizon for relative-timing claims ("will A happen
+// before B"). Shared by getFiveYearsFromNow (which feeds it into the prompt)
+// and findUngroundedYears (which must not flag it as a hallucination).
+const RELATIVE_TIMING_HORIZON_YEARS = 5
+
+/**
+ * Future years asserted in the claim or resolution date that appear nowhere in
+ * the grounding text (user input + article snippets the model was shown). Such
+ * a year came from the model's parametric memory, not from the sources — the
+ * failure mode of #1086, where a Knesset-elections claim shipped with an
+ * invented 2027 deadline.
+ *
+ * Past and current years are context, not guesses, and the two documented
+ * defaults are deliberate: end of the current year (rule 3) and the
+ * relative-timing horizon (rule 3a). Only what's left is suspect.
+ */
+export function findUngroundedYears(
+  claimText: string,
+  resolveByDatetime: string,
+  groundingText: string,
+  now: Date,
+): string[] {
+  const currentYear = now.getFullYear()
+  const candidates = new Set<string>()
+  for (const m of claimText.matchAll(/\b(2\d{3})\b/g)) candidates.add(m[1])
+  const resolveYear = resolveByDatetime.match(/^(\d{4})-/)
+  if (resolveYear) candidates.add(resolveYear[1])
+  return [...candidates]
+    .filter(y => {
+      const year = Number(y)
+      if (year <= currentYear || year === currentYear + RELATIVE_TIMING_HORIZON_YEARS) return false
+      return !groundingText.includes(y)
+    })
+    .sort()
+}
+
 export function getFiveYearsFromNow(now: Date) {
-  const d = new Date(now.getFullYear() + 5, now.getMonth(), now.getDate())
+  const d = new Date(now.getFullYear() + RELATIVE_TIMING_HORIZON_YEARS, now.getMonth(), now.getDate())
   return {
     iso: d.toISOString().split('T')[0] + 'T23:59:59Z',
     human: d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -238,7 +278,13 @@ export async function generateExpressPrediction(
       { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
       userInput,
     )
-    return { ...prediction, newsAnchor: null, additionalLinks: [], localized }
+    const ungroundedYears = findUngroundedYears(
+      prediction.claimText,
+      prediction.resolveByDatetime,
+      `${userInput}\n${articlesText}`,
+      now,
+    )
+    return { ...prediction, newsAnchor: null, additionalLinks: [], ungroundedYears, localized }
   }
 
   // Honor a source URL pasted anywhere in the input, not only when the entire
@@ -512,6 +558,12 @@ URL: ${article.url}
       }
       : null,
     additionalLinks,
+    ungroundedYears: findUngroundedYears(
+      prediction.claimText,
+      prediction.resolveByDatetime,
+      `${userInput}\n${articlesText}`,
+      now,
+    ),
     localized,
   }
 }

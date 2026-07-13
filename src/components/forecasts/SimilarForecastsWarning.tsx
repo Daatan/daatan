@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Copy } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { WarningBanner } from '@/components/ui/WarningBanner'
 
 interface SimilarForecast {
   id: string
@@ -55,11 +56,7 @@ export function SimilarForecastsWarning({
   if (items.length === 0) return null
 
   return (
-    <div className="p-4 bg-navy-800 border border-yellow-600/40 rounded-lg space-y-2">
-      <div className="flex items-center gap-2 text-yellow-500 text-sm font-semibold">
-        <Copy className="w-4 h-4" />
-        {t('similarWarningTitle')}
-      </div>
+    <WarningBanner icon={<Copy className="w-4 h-4" />} title={t('similarWarningTitle')}>
       <div className="space-y-1.5">
         {items.map(f => (
           <Link
@@ -73,6 +70,6 @@ export function SimilarForecastsWarning({
         ))}
       </div>
       <p className="text-xs text-gray-500">{t('similarWarningHint')}</p>
-    </div>
+    </WarningBanner>
   )
 }

@@ -718,7 +718,9 @@
     "confirmPublish": "Confirm & Publish",
     "createFailed": "Failed to create forecast",
     "publishFailed": "Created as draft, but failed to publish",
-    "publishError": "Failed to publish prediction"
+    "publishError": "Failed to publish prediction",
+    "dateWarningTitle": "Unverified date: {years}",
+    "dateWarningHint": "The AI inferred this date — it doesn't appear in your input or the sources. Check the real schedule before publishing, or edit the forecast to fix it."
   },
   "admin": {
     "panel": "Admin Panel",
