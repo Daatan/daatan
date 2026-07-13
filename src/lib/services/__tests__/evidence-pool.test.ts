@@ -7,6 +7,8 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }))
@@ -22,16 +24,36 @@ vi.mock('@/lib/logger', () => ({
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
-import { ClaimDirection } from '@prisma/client'
-import { addArticlesToPool, getPoolArticles, setArticleExcluded, shadowCompareRecompute, pushCredibilityFeedback } from '../evidence-pool'
+import { ClaimDirection, Prisma } from '@prisma/client'
+import {
+  addArticlesToPool,
+  getPoolArticles,
+  setArticleExcluded,
+  shadowCompareRecompute,
+  pushCredibilityFeedback,
+  claimArticleForExtraction,
+  claimArticlesForExtraction,
+  failClaimedArticles,
+  hashArticleContent,
+} from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 
 const upsert = vi.mocked(prisma.evidencePoolArticle.upsert)
 const findMany = vi.mocked(prisma.evidencePoolArticle.findMany)
 const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
 const update = vi.mocked(prisma.evidencePoolArticle.update)
+const create = vi.mocked(prisma.evidencePoolArticle.create)
+const updateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
 const mockOracleFetch = vi.mocked(oracleFetch)
+
+/** A P2002 unique-constraint-violation error, as Prisma throws it. */
+function uniqueViolation(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '7.8.0',
+  })
+}
 
 const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource => ({
   sourceId: 's1',
@@ -369,6 +391,145 @@ describe('pushCredibilityFeedback', () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOracleFetch.mockRejectedValue(new Error('network down'))
     await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+})
+
+describe('hashArticleContent', () => {
+  it('is stable for the same title+snippet', () => {
+    expect(hashArticleContent('T', 'S')).toBe(hashArticleContent('T', 'S'))
+  })
+
+  it('changes when the snippet changes (a live-blog update)', () => {
+    expect(hashArticleContent('T', 'S1')).not.toBe(hashArticleContent('T', 'S2'))
+  })
+
+  it('changes when the title changes', () => {
+    expect(hashArticleContent('T1', 'S')).not.toBe(hashArticleContent('T2', 'S'))
+  })
+})
+
+const article = (over: Partial<{ url: string; title: string; snippet: string; source: string | null; publishedAt: string | null }> = {}) => ({
+  url: 'https://reuters.com/a',
+  title: 'Headline',
+  snippet: 'A snippet',
+  source: 'reuters.com',
+  publishedAt: '2026-07-01',
+  ...over,
+})
+
+describe('claimArticleForExtraction', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('claims via a plain create when no row exists yet for (predictionId, urlHash)', async () => {
+    create.mockResolvedValue({} as never)
+
+    const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    expect(result).toBe('claimed')
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        predictionId: 'pred-1',
+        url: 'https://reuters.com/a',
+        urlHash: hashUrl('https://reuters.com/a'),
+        contentHash: hashArticleContent('Headline', 'A snippet'),
+        status: 'PENDING',
+        origin: 'news-indexer',
+      }),
+    })
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a conditional updateMany on a unique-constraint conflict, and claims when it matches (content changed)', async () => {
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    expect(result).toBe('claimed')
+    expect(updateMany).toHaveBeenCalledTimes(1)
+    const call = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
+    expect(call.where).toMatchObject({ predictionId: 'pred-1', urlHash: hashUrl('https://reuters.com/a') })
+    expect(call.data).toMatchObject({ status: 'PENDING', statusReason: null, contentHash: hashArticleContent('Headline', 'A snippet') })
+  })
+
+  it('skips when the conditional updateMany matches nothing (same content, still COMPLETE or a fresh in-flight PENDING claim)', async () => {
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 0 })
+
+    const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+    expect(result).toBe('skip')
+  })
+
+  it("the updateMany's WHERE admits a stale PENDING claim, an unchanged-content FAILED row, a null contentHash, and a changed contentHash", async () => {
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+    expect(call.where.OR).toEqual(
+      expect.arrayContaining([
+        { contentHash: null },
+        { contentHash: { not: hashArticleContent('Headline', 'A snippet') } },
+        { status: 'FAILED' },
+        { status: 'PENDING', updatedAt: { lt: expect.any(Date) } },
+      ]),
+    )
+  })
+
+  it('re-throws non-P2002 errors from create rather than treating them as a lost race', async () => {
+    create.mockRejectedValue(new Error('connection reset'))
+    await expect(claimArticleForExtraction('pred-1', article(), 'news-indexer')).rejects.toThrow('connection reset')
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('claimArticlesForExtraction', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('claims each article independently and returns per-article results in order', async () => {
+    create
+      .mockResolvedValueOnce({} as never) // first: new row, claimed
+      .mockRejectedValueOnce(uniqueViolation()) // second: conflict, falls to updateMany
+    updateMany.mockResolvedValueOnce({ count: 0 }) // second: skip
+
+    const results = await claimArticlesForExtraction(
+      'pred-1',
+      [article({ url: 'https://a.com/1' }), article({ url: 'https://b.com/2' })],
+      'news-indexer',
+    )
+
+    expect(results).toEqual(['claimed', 'skip'])
+  })
+})
+
+describe('failClaimedArticles', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('marks the given URLs FAILED with a truncated reason, scoped to still-PENDING rows', async () => {
+    updateMany.mockResolvedValue({ count: 2 })
+
+    await failClaimedArticles('pred-1', ['https://a.com/1', 'https://b.com/2'], 'extractor_error')
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        predictionId: 'pred-1',
+        urlHash: { in: [hashUrl('https://a.com/1'), hashUrl('https://b.com/2')] },
+        status: 'PENDING',
+      },
+      data: { status: 'FAILED', statusReason: 'extractor_error' },
+    })
+  })
+
+  it('does nothing for an empty url list', async () => {
+    await failClaimedArticles('pred-1', [], 'extractor_error')
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('never throws when the update itself fails', async () => {
+    updateMany.mockRejectedValue(new Error('db down'))
+    await expect(failClaimedArticles('pred-1', ['https://a.com/1'], 'extractor_error')).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 })

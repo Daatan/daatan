@@ -20,6 +20,8 @@ vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn()
 vi.mock('@/lib/services/evidence-pool', () => ({
   addArticlesToPool: vi.fn(),
   shadowCompareRecompute: vi.fn(),
+  claimArticlesForExtraction: vi.fn(),
+  failClaimedArticles: vi.fn(),
 }))
 
 vi.mock('@/lib/api-error', () => ({
@@ -41,7 +43,12 @@ import { getOracleForecast } from '@/lib/services/oracle'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
-import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
+import {
+  addArticlesToPool,
+  shadowCompareRecompute,
+  claimArticlesForExtraction,
+  failClaimedArticles,
+} from '@/lib/services/evidence-pool'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,6 +107,10 @@ describe('POST /api/news-indexer/context', () => {
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
     vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
     vi.mocked(shadowCompareRecompute).mockResolvedValue(undefined)
+    // Default: the claim gate always admits the push (existing tests exercise
+    // the "something new" path); the skip-when-unchanged path has its own tests below.
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed'])
+    vi.mocked(failClaimedArticles).mockResolvedValue(undefined)
   })
 
   it('rejects a wrong secret with 401 before doing any work', async () => {
@@ -329,6 +340,61 @@ describe('POST /api/news-indexer/context', () => {
 
       expect(addArticlesToPool).not.toHaveBeenCalled()
       expect(shadowCompareRecompute).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('extraction claim gate (evidence-pool.ts) — fixes the confirmed near-instant duplicate-write race', () => {
+    it('skips the Oracle call entirely when every article is already claimed/unchanged', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip'])
+
+      const res = await POST(post('test-secret'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+
+      expect(getOracleForecast).not.toHaveBeenCalled()
+      expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
+      expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
+      expect(body).toMatchObject({ ok: true, probability: null, skipped: 'unchanged' })
+    })
+
+    it('proceeds to call the Oracle when at least one article in a multi-article push is newly claimed', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      const res = await POST(post('test-secret'))
+      expect(res.status).toBe(200)
+      expect(getOracleForecast).toHaveBeenCalledTimes(1)
+    })
+
+    it('claims each article in the push with its url/title/snippet, keyed to this prediction', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      expect(claimArticlesForExtraction).toHaveBeenCalledWith(
+        'pred-1',
+        [
+          expect.objectContaining({ url: 'https://bbc.com/news/x', title: 'Headline', snippet: 'A snippet.' }),
+        ],
+        'news-indexer',
+      )
+    })
+
+    it('releases the claim (status=FAILED) when the Oracle call itself throws, and rethrows', async () => {
+      vi.mocked(getOracleForecast).mockRejectedValue(new Error('oracle timeout'))
+
+      const res = await POST(post('test-secret'))
+
+      expect(res.status).toBe(500)
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'extractor_error')
+    })
+
+    it('releases the claim when the Oracle returns no usable forecast, so the next push can retry immediately', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_null')
     })
   })
 })

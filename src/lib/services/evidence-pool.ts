@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
@@ -55,6 +57,11 @@ export async function addArticlesToPool(
           relevanceScore: s.relevanceScore,
           evidenceClass: s.evidenceClass,
           origin,
+          // No claim step for this row (e.g. the analyze path, which always
+          // calls the extractor fresh rather than gating on content-hash) —
+          // written straight to COMPLETE. See claimArticleForExtraction below
+          // for rows that DO go through the claim lifecycle.
+          status: 'COMPLETE',
         },
         update: {
           url: s.url,
@@ -71,10 +78,140 @@ export async function addArticlesToPool(
           relevanceScore: s.relevanceScore,
           evidenceClass: s.evidenceClass,
           origin,
+          // Flips a PENDING row (claimed by claimArticleForExtraction, then
+          // successfully extracted) to COMPLETE. Deliberately does not touch
+          // contentHash — it's already correct from the claim step.
+          status: 'COMPLETE',
+          statusReason: null,
         },
       }),
     ),
   )
+}
+
+/** hash(title+snippet) — the only fields news-indexer's webhook (and the
+ *  analyze/backfill search results) actually carry; no full article body
+ *  reaches daatan. This is what a live-blog update or a corrected headline
+ *  changes; a plain re-crawl of a static article stays stable. */
+export function hashArticleContent(title: string, snippet: string): string {
+  return crypto.createHash('sha256').update(`${title}\n${snippet}`).digest('hex')
+}
+
+/** A PENDING claim older than this is treated as abandoned (crashed request,
+ *  process killed mid-extraction) and eligible for a fresh claim — comfortably
+ *  past the Oracle's own p99 latency (~226s) so it never preempts a genuinely
+ *  in-flight call. */
+const PENDING_CLAIM_STALE_MS = 10 * 60 * 1000
+
+export interface ClaimableArticle {
+  url: string
+  title: string
+  snippet: string
+  source: string | null
+  publishedAt: string | null
+}
+
+export type ClaimResult = 'claimed' | 'skip'
+
+/**
+ * Atomically claim one (predictionId, url) pair for extraction — the fix for
+ * the confirmed news-indexer race (at-least-once webhook delivery let two
+ * concurrent pushes both pass a separate findFirst-then-create dedup check
+ * before either committed, both call the extractor, both persist a
+ * ContextSnapshot). Returns 'claimed' when the caller should proceed to call
+ * the extractor for this article; 'skip' when an equivalent, non-stale claim
+ * already covers it (either COMPLETE with the same content, or another
+ * request's still-fresh PENDING claim).
+ *
+ * Implemented as create-then-conditional-updateMany rather than a single
+ * raw-SQL upsert: both are single atomic statements (Postgres serializes
+ * concurrent INSERTs on the same unique key, and a conditional UPDATE's WHERE
+ * is evaluated under the same row lock), and this stays on the standard
+ * Prisma Client API used everywhere else in this codebase.
+ */
+export async function claimArticleForExtraction(
+  predictionId: string,
+  article: ClaimableArticle,
+  origin: PoolOrigin,
+): Promise<ClaimResult> {
+  const urlHash = hashUrl(article.url)
+  const contentHash = hashArticleContent(article.title, article.snippet)
+
+  try {
+    await prisma.evidencePoolArticle.create({
+      data: {
+        predictionId,
+        url: article.url,
+        urlHash,
+        title: article.title,
+        source: article.source,
+        publishedDate: article.publishedAt,
+        contentHash,
+        status: 'PENDING',
+        origin,
+      },
+    })
+    return 'claimed'
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
+  }
+
+  const staleCutoff = new Date(Date.now() - PENDING_CLAIM_STALE_MS)
+  const { count } = await prisma.evidencePoolArticle.updateMany({
+    where: {
+      predictionId,
+      urlHash,
+      OR: [
+        { contentHash: null },
+        { contentHash: { not: contentHash } },
+        { status: 'FAILED' },
+        { status: 'PENDING', updatedAt: { lt: staleCutoff } },
+      ],
+    },
+    data: {
+      url: article.url,
+      title: article.title,
+      source: article.source,
+      publishedDate: article.publishedAt,
+      contentHash,
+      status: 'PENDING',
+      statusReason: null,
+      origin,
+    },
+  })
+  return count > 0 ? 'claimed' : 'skip'
+}
+
+/** Claim a whole evidence set. Per-article results, same order as `articles`. */
+export async function claimArticlesForExtraction(
+  predictionId: string,
+  articles: ClaimableArticle[],
+  origin: PoolOrigin,
+): Promise<ClaimResult[]> {
+  return Promise.all(articles.map((a) => claimArticleForExtraction(predictionId, a, origin)))
+}
+
+/**
+ * Release a batch of claims after the extractor call itself failed (timeout,
+ * provider error) — marks them FAILED with a short machine-readable reason so
+ * the staleness window doesn't have to elapse before the next legitimate push
+ * retries them. Never throws — mirrors this file's fire-and-forget convention
+ * for pool bookkeeping that must not block the caller's real response.
+ */
+export async function failClaimedArticles(
+  predictionId: string,
+  urls: string[],
+  reason: string,
+): Promise<void> {
+  if (urls.length === 0) return
+  try {
+    await prisma.evidencePoolArticle.updateMany({
+      where: { predictionId, urlHash: { in: urls.map(hashUrl) }, status: 'PENDING' },
+      data: { status: 'FAILED', statusReason: reason.slice(0, 64) },
+    })
+  } catch (err) {
+    log.warn({ predictionId, urls, reason, err }, 'event=evidence_pool_fail_claim_failed')
+  }
 }
 
 /** List a forecast's pooled articles, most recently added first. Admin visibility only. */

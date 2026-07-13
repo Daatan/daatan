@@ -310,60 +310,28 @@ export interface SaveNewsIndexerMatchInput {
 /** externalReasoning marker identifying snapshots written by the news-indexer push path. */
 const NEWS_INDEXER_REASONING = 'TruthMachine Oracle (news-indexer match)'
 
-/** Identity of an evidence set for dedup purposes: its sorted source-URL list. */
-function sourceUrlKey(sources: unknown): string {
-  if (!Array.isArray(sources)) return ''
-  return sources
-    .map(s => String((s as { url?: unknown })?.url ?? ''))
-    .sort()
-    .join('|')
-}
-
-/** The Oracle mean out of a stored/incoming oracleSnapshot payload, else null. */
-function oracleMean(snapshot: unknown): number | null {
-  const mean = (snapshot as { mean?: unknown })?.mean
-  return typeof mean === 'number' ? mean : null
-}
-
 /**
  * Persist a news-indexer article match: creates a ContextSnapshot (no LLM summary)
  * and updates the prediction's probability fields.
  * Does NOT touch detailsText or contextUpdatedAt — preserves user-triggered context
  * and does not consume the 1-hour user cooldown.
  *
- * Dedup: the news-indexer matcher re-pushes the same article set on every poll
- * cycle while its cooldown window rolls, which used to stack identical timeline
- * entries minutes apart. If the latest snapshot is a news-indexer match with the
- * same probability, the same Oracle mean, and the same source-URL set, this push
- * is the same measurement re-delivered — skip the write entirely.
+ * No dedup check here — the caller (news-indexer/context/route.ts) already
+ * gates on `claimArticlesForExtraction` (evidence-pool.ts) before ever calling
+ * the extractor, so this is only reached when at least one article in the
+ * push is genuinely new or changed. That atomic, per-article claim replaced
+ * this function's former findFirst-then-create dedup check, which compared
+ * probability/oracleMean/source-URL-set against the latest snapshot — a
+ * check-then-act race under news-indexer's at-least-once delivery (two
+ * concurrent pushes could both pass it before either committed; confirmed in
+ * prod as 7 near-simultaneous duplicate snapshots, 3 with conflicting stance).
  *
- * `stored` tells the caller whether anything actually changed, so a re-delivered
- * push can skip its Telegram notification too, not just the database write.
+ * `stored` is always true; kept in the return shape so callers don't need a
+ * second signature change on top of the dedup-removal.
  */
 export async function saveNewsIndexerMatch(
   input: SaveNewsIndexerMatchInput,
 ): Promise<{ stored: boolean }> {
-  // Skip clock rows when finding "the latest push": a daily requote sitting
-  // between two identical article pushes must not defeat this dedup check
-  // (the origin/reasoning comparison would never match a clock row anyway,
-  // silently re-admitting the exact duplicate #1006 fixed).
-  const latest = await prisma.contextSnapshot.findFirst({
-    where: { predictionId: input.predictionId, ...NOT_CLOCK },
-    orderBy: { createdAt: 'desc' },
-    select: { origin: true, externalReasoning: true, externalProbability: true, sources: true, oracleSnapshot: true },
-  })
-  if (
-    latest &&
-    // Reasoning-marker fallback: rows written before the origin column existed.
-    (latest.origin === 'news-indexer' || latest.externalReasoning === NEWS_INDEXER_REASONING) &&
-    latest.externalProbability === input.externalProbability &&
-    oracleMean(latest.oracleSnapshot) === oracleMean(input.oracleSnapshot) &&
-    sourceUrlKey(latest.sources) === sourceUrlKey(input.sources)
-  ) {
-    log.info({ predictionId: input.predictionId }, 'Skipped duplicate news-indexer snapshot')
-    return { stored: false }
-  }
-
   await recordEstimate({
     predictionId: input.predictionId,
     origin: 'news-indexer',

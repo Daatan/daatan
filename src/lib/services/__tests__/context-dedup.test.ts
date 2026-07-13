@@ -24,8 +24,6 @@ vi.mock('@/lib/services/telegram', () => ({
 import { prisma } from '@/lib/prisma'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 
-const findFirst = vi.mocked(prisma.contextSnapshot.findFirst)
-
 const sources = [
   { url: 'https://jpost.com/a', title: 'A', source: 'jpost.com', publishedDate: null },
   { url: 'https://ynet.co.il/b', title: 'B', source: 'ynet.co.il', publishedDate: null },
@@ -40,17 +38,17 @@ const input = () => ({
   oracleSnapshot: { mean: 0.3443, std: 0.43 },
 })
 
-/** The latest stored snapshot as the dedup query returns it. */
-const storedMatch = (overrides: Record<string, unknown> = {}) => ({
-  externalReasoning: 'TruthMachine Oracle (news-indexer match)',
-  externalProbability: 67,
-  // Stored order intentionally differs from the incoming order — URL-set identity.
-  sources: [sources[1], sources[0]],
-  oracleSnapshot: { mean: 0.3443, std: 0.43 },
-  ...overrides,
-})
-
-describe('saveNewsIndexerMatch dedup', () => {
+/**
+ * saveNewsIndexerMatch no longer does its own findFirst-then-compare dedup —
+ * that was a check-then-act race under news-indexer's at-least-once webhook
+ * delivery (confirmed in prod: 7 near-simultaneous duplicate snapshots, 3
+ * with conflicting stance on the same article). Dedup now happens earlier and
+ * atomically, per-article, via evidence-pool.ts's claimArticleForExtraction —
+ * the route only calls this function once that gate has already confirmed
+ * there's something new to record. So this function's only job now is to
+ * write, unconditionally, every time it's called.
+ */
+describe('saveNewsIndexerMatch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never)
@@ -61,43 +59,20 @@ describe('saveNewsIndexerMatch dedup', () => {
     } as never)
   })
 
-  it('skips the write when the latest snapshot is the same measurement, and reports stored: false', async () => {
-    findFirst.mockResolvedValue(storedMatch() as never)
-    const result = await saveNewsIndexerMatch(input())
-    expect(prisma.$transaction).not.toHaveBeenCalled()
-    expect(result).toEqual({ stored: false })
-  })
-
-  it('writes when the probability changed, and reports stored: true', async () => {
-    findFirst.mockResolvedValue(storedMatch({ externalProbability: 65 }) as never)
+  it('always writes a new snapshot and reports stored: true', async () => {
     const result = await saveNewsIndexerMatch(input())
     expect(prisma.$transaction).toHaveBeenCalledOnce()
     expect(result).toEqual({ stored: true })
   })
 
-  it('writes when the Oracle mean changed even at the same rounded probability', async () => {
-    findFirst.mockResolvedValue(
-      storedMatch({ oracleSnapshot: { mean: 0.3401, std: 0.43 } }) as never,
-    )
+  it('never reads the prior snapshot before writing (no dedup lookup)', async () => {
     await saveNewsIndexerMatch(input())
-    expect(prisma.$transaction).toHaveBeenCalledOnce()
+    expect(prisma.contextSnapshot.findFirst).not.toHaveBeenCalled()
   })
 
-  it('writes when the source set changed', async () => {
-    findFirst.mockResolvedValue(storedMatch({ sources: [sources[0]] }) as never)
+  it('writes even when called twice in a row with identical input (caller-level gating, not this function, prevents duplicates)', async () => {
     await saveNewsIndexerMatch(input())
-    expect(prisma.$transaction).toHaveBeenCalledOnce()
-  })
-
-  it('writes when the latest snapshot is not a news-indexer match', async () => {
-    findFirst.mockResolvedValue(storedMatch({ externalReasoning: 'analyze run' }) as never)
     await saveNewsIndexerMatch(input())
-    expect(prisma.$transaction).toHaveBeenCalledOnce()
-  })
-
-  it('writes when there is no previous snapshot at all', async () => {
-    findFirst.mockResolvedValue(null as never)
-    await saveNewsIndexerMatch(input())
-    expect(prisma.$transaction).toHaveBeenCalledOnce()
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
   })
 })

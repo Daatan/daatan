@@ -3,17 +3,29 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockSearch, mockForecast, mockMeta, mockSave, mockMark, mockBuildQuery, mockAddToPool, mockShadowCompare } =
-  vi.hoisted(() => ({
-    mockSearch: vi.fn(),
-    mockForecast: vi.fn(),
-    mockMeta: vi.fn(),
-    mockSave: vi.fn(),
-    mockMark: vi.fn(),
-    mockBuildQuery: vi.fn(),
-    mockAddToPool: vi.fn(),
-    mockShadowCompare: vi.fn(),
-  }))
+const {
+  mockSearch,
+  mockForecast,
+  mockMeta,
+  mockSave,
+  mockMark,
+  mockBuildQuery,
+  mockAddToPool,
+  mockShadowCompare,
+  mockClaim,
+  mockFailClaimed,
+} = vi.hoisted(() => ({
+  mockSearch: vi.fn(),
+  mockForecast: vi.fn(),
+  mockMeta: vi.fn(),
+  mockSave: vi.fn(),
+  mockMark: vi.fn(),
+  mockBuildQuery: vi.fn(),
+  mockAddToPool: vi.fn(),
+  mockShadowCompare: vi.fn(),
+  mockClaim: vi.fn(),
+  mockFailClaimed: vi.fn(),
+}))
 
 vi.mock('@/lib/services/oracleSearch', () => ({ oracleSearch: (...a: unknown[]) => mockSearch(...a) }))
 vi.mock('@/lib/llm/searchQuery', () => ({ buildSearchQuery: (...a: unknown[]) => mockBuildQuery(...a) }))
@@ -29,6 +41,8 @@ vi.mock('@/lib/services/context', () => ({
 vi.mock('@/lib/services/evidence-pool', () => ({
   addArticlesToPool: (...a: unknown[]) => mockAddToPool(...a),
   shadowCompareRecompute: (...a: unknown[]) => mockShadowCompare(...a),
+  claimArticlesForExtraction: (...a: unknown[]) => mockClaim(...a),
+  failClaimedArticles: (...a: unknown[]) => mockFailClaimed(...a),
 }))
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -44,6 +58,10 @@ beforeEach(() => {
   mockMeta.mockResolvedValue(new Map())
   mockAddToPool.mockResolvedValue(undefined)
   mockShadowCompare.mockResolvedValue(undefined)
+  // Default: the claim gate always admits the run (existing tests exercise the
+  // "something new" path); the skip-when-unchanged path has its own tests below.
+  mockClaim.mockResolvedValue(['claimed'])
+  mockFailClaimed.mockResolvedValue(undefined)
 })
 
 describe('refreshOracleSnapshot', () => {
@@ -151,6 +169,51 @@ describe('refreshOracleSnapshot', () => {
 
       expect(mockAddToPool).not.toHaveBeenCalled()
       expect(mockShadowCompare).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('extraction claim gate (evidence-pool.ts)', () => {
+    it('reports status: unchanged and skips the Oracle call when every searched article is already claimed/unchanged', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockClaim.mockResolvedValue(['skip'])
+
+      const r = await refreshOracleSnapshot(prediction)
+
+      expect(r).toEqual({ status: 'unchanged' })
+      expect(mockForecast).not.toHaveBeenCalled()
+      expect(mockSave).not.toHaveBeenCalled()
+      expect(mockMark).not.toHaveBeenCalled()
+    })
+
+    it('claims the searched articles before calling the Oracle', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedDate: '2026-07-01' }])
+      mockForecast.mockResolvedValue({ forecast: null })
+
+      await refreshOracleSnapshot(prediction)
+
+      expect(mockClaim).toHaveBeenCalledWith(
+        'p1',
+        [{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedAt: '2026-07-01' }],
+        'backfill',
+      )
+    })
+
+    it('releases the claim (FAILED, oracle_null) and still marks attempted when the Oracle returns no usable forecast', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast: null })
+
+      await refreshOracleSnapshot(prediction)
+
+      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'oracle_null')
+      expect(mockMark).toHaveBeenCalledWith('p1', 'no-oracle')
+    })
+
+    it('releases the claim (FAILED, extractor_error) and rethrows when the Oracle call itself throws', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockRejectedValue(new Error('oracle timeout'))
+
+      await expect(refreshOracleSnapshot(prediction)).rejects.toThrow('oracle timeout')
+      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'extractor_error')
     })
   })
 })

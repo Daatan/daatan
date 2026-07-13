@@ -5,7 +5,12 @@ import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
-import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
+import {
+  addArticlesToPool,
+  shadowCompareRecompute,
+  claimArticlesForExtraction,
+  failClaimedArticles,
+} from '@/lib/services/evidence-pool'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('oracle-backfill')
@@ -14,6 +19,7 @@ export type RefreshResult =
   | { status: 'ok'; sources: number }
   | { status: 'no-articles' }
   | { status: 'no-oracle' }
+  | { status: 'unchanged' }
 
 /**
  * Run the Oracle's analysis for one forecast and persist its source roster as an
@@ -36,12 +42,40 @@ export async function refreshOracleSnapshot(
     return { status: 'no-articles' }
   }
 
-  const { forecast } = await getOracleForecast(
-    prediction.claimText,
-    { articles: searchResults, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
-    { source: 'context-update', predictionId: prediction.id },
+  // Same atomic claim gate as the news-indexer push path (evidence-pool.ts) —
+  // if every searched article is already extracted with identical content (or
+  // claimed by another still-fresh in-flight run), there's nothing new to
+  // extract. Backfill targets forecasts with NO oracle snapshot yet, so this
+  // rarely fires on a first pass, but it does protect a re-run over the same
+  // candidate from redundantly re-calling the Oracle.
+  const claimResults = await claimArticlesForExtraction(
+    prediction.id,
+    searchResults.map((r) => ({
+      url: r.url,
+      title: r.title,
+      snippet: r.snippet,
+      source: r.source ?? null,
+      publishedAt: r.publishedDate ?? null,
+    })),
+    'backfill',
   )
+  if (!claimResults.some((r) => r === 'claimed')) {
+    return { status: 'unchanged' }
+  }
+
+  let forecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
+  try {
+    ;({ forecast } = await getOracleForecast(
+      prediction.claimText,
+      { articles: searchResults, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
+      { source: 'context-update', predictionId: prediction.id },
+    ))
+  } catch (err) {
+    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), 'extractor_error')
+    throw err
+  }
   if (forecast === null) {
+    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), 'oracle_null')
     await markOracleAttempted(prediction.id, 'no-oracle')
     return { status: 'no-oracle' }
   }
