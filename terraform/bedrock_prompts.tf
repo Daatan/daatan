@@ -3,12 +3,6 @@ locals {
   # `ignore_changes = [value]` only protects a parameter AFTER Terraform owns it, so
   # adding a name for a parameter that already exists out-of-band would overwrite its
   # live Bedrock ARN with PLACEHOLDER. Import it first (import → no-op plan), then add.
-  #
-  # Known unmanaged parameters that exist in SSM but are deliberately NOT listed here
-  # for exactly that reason: content-moderation, temporal-classifier. They currently
-  # resolve only because of the hand-made `daatan-bedrock-prompts-fix` inline policy
-  # (a wildcard grant that is not in Terraform). Importing them, then dropping that
-  # wildcard, is a separate change.
   prompt_names = [
     "express-prediction",
     "extract-prediction",
@@ -26,7 +20,12 @@ locals {
     # AI panel (docs/LASSO.md). Exists nowhere yet, so creating it at PLACEHOLDER
     # is safe: getPromptTemplate() treats PLACEHOLDER as "serve the hardcoded fallback",
     # which is exactly today's behaviour minus the per-sweep ParameterNotFound error.
-    "panel-estimate"
+    "panel-estimate",
+    # Hand-created with live Bedrock ARNs; imported into BOTH states 2026-07-13
+    # (import → no-op plan) so the hand-made `daatan-bedrock-prompts-fix` wildcard
+    # could be retired. Same for panel-estimate-grounded when it gets promoted.
+    "content-moderation",
+    "temporal-classifier"
   ]
   prompt_envs = ["staging", "prod"]
 }
@@ -34,7 +33,11 @@ locals {
 # Allow EC2 to read Bedrock prompts by ARN and SSM prompt params
 resource "aws_iam_role_policy" "bedrock_prompts" {
   name = "daatan-bedrock-prompts"
-  role = aws_iam_role.ec2_role.id
+  # By-name lookup (same pattern as bedrock_invoke.tf): resolves to THIS environment's
+  # role whether or not this state owns it — the prod role is Terraform-managed here,
+  # the staging role is not. Binding to `aws_iam_role.ec2_role` instead would attach
+  # the staging state's copy of this policy to the PROD role.
+  role = data.aws_iam_role.app_ec2_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
