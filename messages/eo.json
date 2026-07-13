@@ -718,7 +718,9 @@
     "confirmPublish": "Konfirmi kaj publikigi",
     "createFailed": "Malsukcesis krei prognozon",
     "publishFailed": "Kreita kiel malneto, sed malsukcesis publikigi",
-    "publishError": "Malsukcesis publikigi prognozon"
+    "publishError": "Malsukcesis publikigi prognozon",
+    "dateWarningTitle": "Nekonfirmita dato: {years}",
+    "dateWarningHint": "La AI mem konkludis ĉi tiun daton — ĝi aperas nek en via enigo nek en la fontoj. Kontrolu la realan planon antaŭ publikigo, aŭ redaktu la prognozon por korekti ĝin."
   },
   "admin": {
     "panel": "Administra Panelo",
