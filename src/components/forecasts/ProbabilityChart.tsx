@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -226,8 +226,6 @@ export default function ProbabilityChart({
     }
   }, [])
 
-  if (outcomeType === 'NUMERIC_THRESHOLD') return null
-
   // The market YES price is a binary probability, so we only plot it on binary
   // forecasts. When a linked market has history we render the chart even with
   // <3 commitments, so the market line shows before the community moves.
@@ -240,72 +238,99 @@ export default function ProbabilityChart({
   // A viewer who opted into the panel gets the chart as soon as the panel has any point,
   // even on a forecast with no commitments/Oracle/market yet.
   const hasPanelData = showAiPanel && panelSeries.some(m => m.points.length > 0)
-  if (commitments.length < 3 && !showMarket && !showAiHistory && !hasPanelData) return null
-
-  const sortedCommits = [...commitments].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  )
-
-  const sortedSnaps = snapshots
-    .filter(s => s.externalProbability != null)
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-
-  const sortedMarket = [...marketSnapshots].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  )
+  const shouldRender =
+    outcomeType !== 'NUMERIC_THRESHOLD' &&
+    !(commitments.length < 3 && !showMarket && !showAiHistory && !hasPanelData)
 
   // Members are drawn only when the viewer opted in AND at least one has a point.
   const panelMembers = showAiPanel ? panelSeries.filter(m => m.points.length > 0) : []
-  const panelTs = panelMembers.flatMap(m => m.points.map(p => new Date(p.createdAt).getTime()))
 
-  // One data point per event (commitment, Oracle run, market snapshot, or panel run), sorted chronologically
-  const allTs = [
-    ...sortedCommits.map(c => new Date(c.createdAt).getTime()),
-    ...sortedSnaps.map(s => new Date(s.createdAt).getTime()),
-    ...sortedMarket.map(m => new Date(m.createdAt).getTime()),
-    ...panelTs,
-  ].sort((a, b) => a - b)
-  const uniqueTs = [...new Set(allTs)]
-  const marketSeries = buildMarketSeries(sortedMarket, uniqueTs)
-  const panelStep = buildPanelSeries(panelMembers, uniqueTs)
+  // `commitments`/`snapshots`/`marketSnapshots`/`panelSeries` get a fresh array
+  // reference on every parent re-render (e.g. the post-mount refetch in
+  // ForecastDetailClient) even when their contents haven't changed. Recharts resets
+  // its internal Brush window whenever the `data` array we hand it gets a new
+  // reference, snapping the zoomed-in view back to "all time" while the preset
+  // button still shows the old range as selected. Memoizing on a content signature
+  // (not the array references) keeps `data` — and the Brush window — stable across
+  // those no-op re-renders.
+  const dataSignature = JSON.stringify([
+    commitments.map(c => [c.createdAt, c.cuCommitted, c.binaryChoice, c.option?.id ?? null]),
+    snapshots.map(s => [s.createdAt, s.externalProbability ?? null, s.kind ?? null]),
+    marketSnapshots.map(m => [m.createdAt, m.probability]),
+    panelMembers.map(m => [m.model, m.mode, m.points.map(p => [p.createdAt, p.probability])]),
+    outcomeType,
+    options.map(o => o.id),
+  ])
 
-  const data = uniqueTs.map((ts, i) => {
-    const upToCommits = sortedCommits.filter(c => new Date(c.createdAt).getTime() <= ts)
-    const upToSnaps = sortedSnaps.filter(s => new Date(s.createdAt).getTime() <= ts)
-    // Carry AI estimate forward as a step function
-    const latestAi = upToSnaps.length > 0 ? upToSnaps[upToSnaps.length - 1].externalProbability : null
+  const data = useMemo(() => {
+    if (!shouldRender) return []
 
-    const { market: latestMarket, marketChanged } = marketSeries[i]
+    const sortedCommits = [...commitments].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    )
 
-    // The snapshot exactly at this timestamp (if any) — drives the AiDot so
-    // markers appear at real AI events only, styled by evidence vs clock.
-    const snapAt = sortedSnaps.filter(s => new Date(s.createdAt).getTime() === ts).pop()
+    const sortedSnaps = snapshots
+      .filter(s => s.externalProbability != null)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
-    const point: Record<string, number | string | boolean | null> = {
-      ts,
-      ai: latestAi ?? null,
-      aiEvent: snapAt ? (snapAt.kind === 'clock' ? 'clock' : 'evidence') : null,
-      market: latestMarket,
-      marketChanged,
-    }
+    const sortedMarket = [...marketSnapshots].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    )
 
-    for (const m of panelMembers) {
-      point[panelKey(m.model, m.mode)] = panelStep[panelKey(m.model, m.mode)][i]
-    }
+    const panelTs = panelMembers.flatMap(m => m.points.map(p => new Date(p.createdAt).getTime()))
 
-    if (outcomeType === 'BINARY') {
-      const community = communityProbability(upToCommits)
-      if (community != null) point.community = community
-    } else {
-      // MULTIPLE_CHOICE: rolling share per option
-      for (const opt of options) {
-        const count = upToCommits.filter(c => c.option?.id === opt.id).length
-        point[opt.id] = upToCommits.length > 0 ? Math.round((count / upToCommits.length) * 100) : null
+    // One data point per event (commitment, Oracle run, market snapshot, or panel run), sorted chronologically
+    const allTs = [
+      ...sortedCommits.map(c => new Date(c.createdAt).getTime()),
+      ...sortedSnaps.map(s => new Date(s.createdAt).getTime()),
+      ...sortedMarket.map(m => new Date(m.createdAt).getTime()),
+      ...panelTs,
+    ].sort((a, b) => a - b)
+    const uniqueTs = [...new Set(allTs)]
+    const marketSeries = buildMarketSeries(sortedMarket, uniqueTs)
+    const panelStep = buildPanelSeries(panelMembers, uniqueTs)
+
+    return uniqueTs.map((ts, i) => {
+      const upToCommits = sortedCommits.filter(c => new Date(c.createdAt).getTime() <= ts)
+      const upToSnaps = sortedSnaps.filter(s => new Date(s.createdAt).getTime() <= ts)
+      // Carry AI estimate forward as a step function
+      const latestAi = upToSnaps.length > 0 ? upToSnaps[upToSnaps.length - 1].externalProbability : null
+
+      const { market: latestMarket, marketChanged } = marketSeries[i]
+
+      // The snapshot exactly at this timestamp (if any) — drives the AiDot so
+      // markers appear at real AI events only, styled by evidence vs clock.
+      const snapAt = sortedSnaps.filter(s => new Date(s.createdAt).getTime() === ts).pop()
+
+      const point: Record<string, number | string | boolean | null> = {
+        ts,
+        ai: latestAi ?? null,
+        aiEvent: snapAt ? (snapAt.kind === 'clock' ? 'clock' : 'evidence') : null,
+        market: latestMarket,
+        marketChanged,
       }
-    }
 
-    return point
-  })
+      for (const m of panelMembers) {
+        point[panelKey(m.model, m.mode)] = panelStep[panelKey(m.model, m.mode)][i]
+      }
+
+      if (outcomeType === 'BINARY') {
+        const community = communityProbability(upToCommits)
+        if (community != null) point.community = community
+      } else {
+        // MULTIPLE_CHOICE: rolling share per option
+        for (const opt of options) {
+          const count = upToCommits.filter(c => c.option?.id === opt.id).length
+          point[opt.id] = upToCommits.length > 0 ? Math.round((count / upToCommits.length) * 100) : null
+        }
+      }
+
+      return point
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSignature, shouldRender])
+
+  if (!shouldRender) return null
 
   // A line with few data points draws a barely-visible (or zero-length) segment,
   // so a sparse forecast — e.g. two same-day Oracle estimates, or a lone market
@@ -460,7 +485,7 @@ export default function ProbabilityChart({
             />
           ))}
 
-          {sortedSnaps.length > 0 && (
+          {aiPointCount > 0 && (
             <Line
               type="stepAfter"
               dataKey="ai"
