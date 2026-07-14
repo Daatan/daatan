@@ -7,11 +7,20 @@
  * 2. Source coverage — every static t('key') call paired with a
  *    useTranslations('namespace') in source files must resolve to a real key
  *    in en.json. Prevents MISSING_MESSAGE console errors at runtime.
+ *
+ * 3. ICU validity — every message in every locale must parse as ICU. Key parity
+ *    alone cannot catch a malformed plural (e.g. a missing `other` clause),
+ *    which throws only when the string is actually rendered.
+ *
+ * 4. Placeholder parity — a translation must carry the same {placeholders} as
+ *    its English source, so no locale silently drops an interpolated value.
  */
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { IntlMessageFormat } from 'intl-messageformat'
+import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messageformat-parser'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -122,6 +131,98 @@ function extractTranslationUsages(source: string): { namespace: string; key: str
   }
   return usages
 }
+
+// ─── Test 3: ICU validity ─────────────────────────────────────────────────────
+
+/** Flatten to dot-notation entries, keeping the string values. */
+function flatEntries(obj: Record<string, unknown>, prefix = ''): [string, string][] {
+  return Object.entries(obj).flatMap(([k, v]) => {
+    const full = prefix ? `${prefix}.${k}` : k
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      return flatEntries(v as Record<string, unknown>, full)
+    }
+    return typeof v === 'string' ? ([[full, v]] as [string, string][]) : []
+  })
+}
+
+const LOCALES: [string, Record<string, unknown>][] = [
+  ['en', en],
+  ['he', he],
+  ['ru', ru],
+  ['eo', eo],
+]
+
+describe('i18n ICU validity', () => {
+  it.each(LOCALES)('every message in %s.json parses as ICU', (locale, messages) => {
+    const broken: string[] = []
+    for (const [key, value] of flatEntries(messages)) {
+      try {
+        // Construction parses the message; it does not require format() args,
+        // so rich-text messages (<b>…</b>) are fine here.
+        new IntlMessageFormat(value, locale)
+      } catch (err) {
+        broken.push(`  ${key}: ${(err as Error).message.split('\n')[0]}`)
+      }
+    }
+    expect(broken, `Unparseable ICU messages in ${locale}.json:\n${broken.join('\n')}`).toEqual([])
+  })
+})
+
+// ─── Test 4: Placeholder parity ───────────────────────────────────────────────
+
+/**
+ * Every argument name referenced by a message, read off the ICU AST rather than
+ * by regex — a plural branch can itself contain further placeholders
+ * ("{count, plural, ...} · {cu} CU"), which brace-matching by hand gets wrong.
+ */
+function placeholders(message: string): string[] {
+  const names: string[] = []
+  const walk = (elements: MessageFormatElement[]): void => {
+    for (const el of elements) {
+      if ('value' in el && typeof el.value === 'string' && el.type !== TYPE.literal) {
+        names.push(el.value)
+      }
+      if ('options' in el && el.options) {
+        for (const option of Object.values(el.options)) walk(option.value)
+      }
+    }
+  }
+  walk(parse(message))
+  return [...new Set(names)].sort()
+}
+
+/**
+ * he.json is excluded: it predates this rule and deliberately hard-codes the
+ * singular in a few count strings (e.g. forecast.voter → "מצביע אחד"), so it has
+ * known, accepted placeholder gaps. ru/eo must stay in parity with en.
+ */
+describe('i18n placeholder parity (en ↔ ru, eo)', () => {
+  it.each([
+    ['ru', ru],
+    ['eo', eo],
+  ])('%s.json keeps every placeholder present in en.json', (locale, messages) => {
+    const target = new Map(flatEntries(messages))
+    const drift: string[] = []
+
+    for (const [key, enValue] of flatEntries(en)) {
+      const translated = target.get(key)
+      if (translated === undefined) continue // covered by the key-parity tests
+
+      // A locale may *add* placeholders (Russian wraps a bare "{count} results"
+      // in an ICU plural), so require only that every English one survives.
+      const actual = new Set(placeholders(translated))
+      const dropped = placeholders(enValue).filter(p => !actual.has(p))
+
+      if (dropped.length > 0) {
+        drift.push(`  ${key}: dropped {${dropped.join('}, {')}}\n      en: ${enValue}\n      ${locale}: ${translated}`)
+      }
+    }
+
+    expect(drift, `Placeholders dropped in ${locale}.json:\n${drift.join('\n')}`).toEqual([])
+  })
+})
+
+// ─── Test 5: Source coverage ──────────────────────────────────────────────────
 
 describe('i18n source coverage (static t() calls resolve in en.json)', () => {
   it('all static t() calls map to existing en.json keys', () => {
