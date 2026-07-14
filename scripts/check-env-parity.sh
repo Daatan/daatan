@@ -89,4 +89,26 @@ CP_STAGING=$(compose_service_keys "$COMPOSE_STAGING" "app-staging")
 check_parity "production" "$BG_PROD" "$CP_PROD"
 check_parity "staging"    "$BG_STAGING" "$CP_STAGING"
 
+# NEXT_PUBLIC_* values are substituted into the bundle by `next build`, so passing one to a
+# container at runtime does nothing at all. A copy in the compose files or ENV_ARGS is inert
+# but looks authoritative, which is exactly how VAPID broke: a 2026-03-05 rotation updated
+# NEXT_PUBLIC_VAPID_PUBLIC_KEY in the Secrets Manager bundle (inert) but not in the GitHub
+# secret (the one `next build` reads), and every browser push failed VAPID auth for four
+# months. These keys belong in GitHub Secrets + the Dockerfile build args, nowhere else.
+BUILD_TIME_ONLY=("NEXT_PUBLIC_VAPID_PUBLIC_KEY")
+
+for key in "${BUILD_TIME_ONLY[@]}"; do
+  if grep -q "$key" "$BLUE_GREEN" "$COMPOSE_PROD" "$COMPOSE_STAGING"; then
+    echo "FAIL: $key is a build-time value but is set at runtime:"
+    grep -Hn "$key" "$BLUE_GREEN" "$COMPOSE_PROD" "$COMPOSE_STAGING" | sed 's/^/  - /'
+    echo "  It is baked in by \`next build\` from the GitHub secret. A runtime copy is"
+    echo "  ignored, and drifts from the real one. Remove it. See SECRETS.md."
+    FAIL=1
+  fi
+done
+
+if [[ $FAIL -eq 0 ]]; then
+  echo "OK [build-time-only]: no NEXT_PUBLIC_* build values leaked into runtime env"
+fi
+
 exit $FAIL
