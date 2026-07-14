@@ -11,14 +11,18 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('evidence-pool')
 
 /**
- * Foundation layer for the per-forecast evidence pool (retro
- * docs/ORACLE_VARIABLES.md §6 part 2). Nothing reads this table to compute an
- * estimate yet — analyze/news-indexer/backfill only shadow-write their
- * per-source signals here, in addition to their existing writes, so real
- * data accumulates ahead of the future recompute-over-pool cutover.
- * `excluded` (see getPoolArticles/setArticleExcluded below) is settable by an
- * admin today but not yet enforced by any computation for the same reason —
- * it's ready for the cutover, not a component of it.
+ * The per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2).
+ *
+ * All three estimate paths (analyze / news-indexer / backfill) write their extracted
+ * per-source signals here. The **news-indexer push path reads it back** to compute its
+ * estimate — `recomputeFromPool` aggregates the whole pool rather than trusting the
+ * single freshly-matched article that fired the push. Analyze and backfill still only
+ * shadow-compare (`shadowCompareRecompute`); they follow once this cutover has run in
+ * prod.
+ *
+ * `excluded` (see getPoolArticles/setArticleExcluded below) is an admin's "ignore this
+ * article" switch, and is now genuinely enforced: excluded rows are dropped before the
+ * aggregate, so on the news-indexer path an exclusion actually moves the number.
  */
 export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill'
 
@@ -246,6 +250,7 @@ export async function setArticleExcluded(
 
 interface PoolAggregateApiResponse {
   mean: number
+  std: number
   ci_low: number
   ci_high: number
   articles_used: number
@@ -263,26 +268,48 @@ export interface LiveForecastForComparison {
 }
 
 /**
- * Shadow-compare retro's `/pool/aggregate` recompute against a live
- * `/forecast` result — log only, never affects the persisted estimate (retro
- * docs/ORACLE_VARIABLES.md, recompute-over-pool step 4). Proves the recompute
- * pipeline produces sane, comparable numbers before any path is cut over to
- * trust it.
- *
- * Fire-and-forget: never throws, callers should chain this *after*
- * `addArticlesToPool` resolves (not run in parallel with it) so the current
- * run's article is already in the pool the recompute reads — and must
- * `.catch()` the returned promise themselves, matching `addArticlesToPool`'s
- * own convention.
+ * An aggregate over a forecast's whole evidence pool. `mean`/`std`/`ciLow`/`ciHigh`
+ * are in the Oracle's stance space [-1, 1] — the same scale `/forecast` returns, so
+ * callers convert with `stanceToPercent`/`stanceStdToPercent` exactly as they do for
+ * a single-run forecast.
  */
-export async function shadowCompareRecompute(
+export interface PoolRecompute {
+  mean: number
+  std: number
+  ciLow: number
+  ciHigh: number
+  articlesUsed: number
+  settled: boolean
+  insufficientData: boolean
+  reason: string | null
+  poolSize: number
+  usableSize: number
+  excludedCount: number
+  incompleteCount: number
+}
+
+/**
+ * Aggregate a forecast's entire evidence pool into one estimate, via retro's
+ * `/pool/aggregate` (retro docs/ORACLE_VARIABLES.md §6).
+ *
+ * This is what an Oracle estimate *should* be: a credibility-weighted aggregate over
+ * every article we have on the claim. A single `/forecast` run only scores the articles
+ * handed to it, so on the news-indexer push path — which usually carries exactly one
+ * freshly-matched article — its `mean` is little more than that one article's stance
+ * rescaled, and the persisted estimate lurches to wherever the newest article points.
+ *
+ * Returns null when no aggregate can be formed (Oracle unconfigured, no usable pooled
+ * articles, transport error, non-200). Never throws: callers fall back to the single-run
+ * forecast rather than dropping the estimate entirely. Call it *after* `addArticlesToPool`
+ * resolves, so this run's own articles are already in the pool it reads.
+ */
+export async function recomputeFromPool(
   predictionId: string,
-  live: LiveForecastForComparison,
   claimDirection: ClaimDirection | null,
   claimDeadline: Date | null,
-): Promise<void> {
+): Promise<PoolRecompute | null> {
   const cfg = getOracleConfig()
-  if (!cfg) return
+  if (!cfg) return null
 
   const pool = await getPoolArticles(predictionId)
   const excludedCount = pool.filter((a) => a.excluded).length
@@ -295,7 +322,7 @@ export async function shadowCompareRecompute(
       a.relevanceScore !== null,
   )
   const incompleteCount = pool.length - excludedCount - usable.length
-  if (usable.length === 0) return
+  if (usable.length === 0) return null
 
   let res: Response
   try {
@@ -318,32 +345,72 @@ export async function shadowCompareRecompute(
       timeoutMs: 10_000,
     })
   } catch (err) {
-    log.warn({ predictionId, err }, 'event=pool_recompute_shadow_failed')
-    return
+    log.warn({ predictionId, err }, 'event=pool_recompute_failed')
+    return null
   }
   if (!res.ok) {
-    log.warn({ predictionId, status: res.status }, 'event=pool_recompute_shadow_failed')
-    return
+    log.warn({ predictionId, status: res.status }, 'event=pool_recompute_failed')
+    return null
   }
 
   const agg: PoolAggregateApiResponse = await res.json()
+  return {
+    mean: agg.mean,
+    std: agg.std,
+    ciLow: agg.ci_low,
+    ciHigh: agg.ci_high,
+    articlesUsed: agg.articles_used,
+    settled: agg.settled,
+    insufficientData: agg.insufficient_data,
+    reason: agg.reason,
+    poolSize: pool.length,
+    usableSize: usable.length,
+    excludedCount,
+    incompleteCount,
+  }
+}
+
+/**
+ * Shadow-compare the pool recompute against a live `/forecast` result — log only,
+ * never affects the persisted estimate (retro docs/ORACLE_VARIABLES.md,
+ * recompute-over-pool step 4).
+ *
+ * Still the behaviour of the analyze and backfill paths. The news-indexer push path
+ * has been cut over to trust the recompute (see `recomputeFromPool`); these two follow
+ * once that cutover has run in prod.
+ *
+ * Fire-and-forget: never throws, callers should chain this *after*
+ * `addArticlesToPool` resolves (not run in parallel with it) so the current
+ * run's article is already in the pool the recompute reads — and must
+ * `.catch()` the returned promise themselves, matching `addArticlesToPool`'s
+ * own convention.
+ */
+export async function shadowCompareRecompute(
+  predictionId: string,
+  live: LiveForecastForComparison,
+  claimDirection: ClaimDirection | null,
+  claimDeadline: Date | null,
+): Promise<void> {
+  const agg = await recomputeFromPool(predictionId, claimDirection, claimDeadline)
+  if (!agg) return
+
   log.info(
     {
       predictionId,
-      poolSize: pool.length,
-      usableSize: usable.length,
-      excludedCount,
-      incompleteCount,
+      poolSize: agg.poolSize,
+      usableSize: agg.usableSize,
+      excludedCount: agg.excludedCount,
+      incompleteCount: agg.incompleteCount,
       liveMean: live.mean,
       recomputeMean: agg.mean,
       meanDelta: Math.abs(live.mean - agg.mean),
       liveCiLow: live.ciLow,
       liveCiHigh: live.ciHigh,
-      recomputeCiLow: agg.ci_low,
-      recomputeCiHigh: agg.ci_high,
+      recomputeCiLow: agg.ciLow,
+      recomputeCiHigh: agg.ciHigh,
       liveSettled: live.settled,
       recomputeSettled: agg.settled,
-      recomputeInsufficient: agg.insufficient_data,
+      recomputeInsufficient: agg.insufficientData,
       recomputeReason: agg.reason,
     },
     'event=pool_recompute_shadow',

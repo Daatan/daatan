@@ -152,15 +152,31 @@ extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
 from the resolution-outcome signal, since `evidenceWeight` alone can't
 distinguish opinion from a low-certainty unclassified article.
-**Not yet enforced by any computation** — the recompute-over-pool cutover (the
-ORACLE_VARIABLES.md §6 precondition this satisfies) is still open, so
-excluding an article here has no effect on the live estimate today. As of
-`shadowCompareRecompute()` in `evidence-pool.ts`, every `analyze`,
-`news-indexer`, and `backfill` run calls retro's `POST /pool/aggregate` with
-the current non-excluded pool and logs a comparison against the live estimate
-(`event=pool_recompute_shadow`) — log-only, proving the recompute pipeline
-produces sane numbers before any path is cut over to trust it; the persisted
-estimate is still always the live `/forecast` result.
+**The `news-indexer` push path is cut over to the pool** (ORACLE_VARIABLES.md §6).
+`recomputeFromPool()` in `evidence-pool.ts` posts the current non-excluded pool to
+retro's `POST /pool/aggregate`, and that aggregate — mean, std, CI, `settled`,
+`articles_used` — *is* the persisted estimate. The `/forecast` call on the pushed
+articles is now only an **extraction** step, feeding their signals into the pool.
+
+Why: a push usually carries a single freshly-matched article, and `/forecast` over one
+article returns little more than that article's stance rescaled. Trusting it let the
+newest article yank the estimate wholesale — one live forecast swung 1% → 99% in 19
+minutes on two articles reporting the *same* event, each with a CI so tight
+(0–2, then 94–100) that the system never once signalled doubt. Aggregating the pool
+puts a single bad extraction in proportion to the evidence already gathered.
+
+The single-run forecast remains the **fallback** whenever the pool cannot produce an
+aggregate (Oracle unreachable, nothing usable pooled yet, or `insufficient_data`), so a
+flaky Oracle degrades the estimate rather than dropping it. Each push logs both numbers
+and their delta (`estimateSource`, `singleRunDelta`) — a large delta is the signature of
+an article that would have yanked the old estimate.
+
+Consequently `excluded` is now **enforced on this path**: excluded rows are dropped before
+the aggregate, so an admin's exclusion genuinely moves the number.
+
+The `analyze` and `backfill` paths still only shadow-compare — `shadowCompareRecompute()`
+logs pool-vs-live (`event=pool_recompute_shadow`) without altering their persisted
+estimate. They follow once this cutover has run in prod.
 
 ### Credibility feedback loop (retro `docs/ORACLE_VARIABLES.md` §9)
 

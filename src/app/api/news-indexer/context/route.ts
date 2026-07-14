@@ -9,9 +9,10 @@ import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
   addArticlesToPool,
-  shadowCompareRecompute,
+  recomputeFromPool,
   claimArticlesForExtraction,
   failClaimedArticles,
+  type PoolRecompute,
 } from '@/lib/services/evidence-pool'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
@@ -182,10 +183,6 @@ export async function POST(request: NextRequest) {
     const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? enrichedSources[0]
 
     if (oracleForecast) {
-      probability = stanceToPercent(oracleForecast.mean)
-      ciLow = stanceToPercent(oracleForecast.ci_low)
-      ciHigh = stanceToPercent(oracleForecast.ci_high)
-
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
       // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
@@ -194,27 +191,50 @@ export async function POST(request: NextRequest) {
       const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
       const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl)
 
-      // Evidence pool shadow-write + recompute shadow-compare (retro
-      // docs/ORACLE_VARIABLES.md §6 part 2, step 6) — additive only, never
-      // blocks or alters the estimate below. Chained (not parallel) so the
-      // recompute reads a pool that already includes this run's articles.
-      addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
-        .then(() =>
-          shadowCompareRecompute(
-            prediction.id,
-            {
-              mean: oracleForecast.mean,
-              ciLow: oracleForecast.ci_low,
-              ciHigh: oracleForecast.ci_high,
-              settled: oracleForecast.settled ?? false,
-            },
-            prediction.claimDirection,
-            prediction.claimDeadline,
-          ),
-        )
-        .catch((err) =>
-          log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write/recompute-compare failed'),
-        )
+      // The Oracle run above is an EXTRACTION step, not the estimate. A push usually
+      // carries a single freshly-matched article, and `/forecast` over one article returns
+      // little more than that article's stance rescaled — so trusting it made the persisted
+      // estimate lurch to wherever the newest article pointed (one live forecast swung
+      // 1% → 99% in 19 minutes on two articles reporting the same event).
+      //
+      // So: persist this run's extractions into the pool, then aggregate the WHOLE pool.
+      // Chained, not parallel — the recompute must read a pool that already includes them.
+      let pool: PoolRecompute | null = null
+      try {
+        await addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
+        pool = await recomputeFromPool(prediction.id, prediction.claimDirection, prediction.claimDeadline)
+      } catch (err) {
+        log.warn({ predictionId: prediction.id, err }, 'evidence pool write/recompute failed')
+      }
+
+      // Fall back to this run's single-article forecast only when the pool cannot produce an
+      // aggregate at all (Oracle down, nothing usable pooled yet, transport error) or reports
+      // `insufficientData`. Both are strictly today's behaviour, so this never regresses a path
+      // that works now — and in the thin-pool case the two agree anyway, since a pool of one is
+      // the single run. Plumbing `insufficientData` through to the snapshot (so the UI can say
+      // "insufficient evidence" instead of showing a number) is deliberately left to a follow-up.
+      const poolEstimate = pool !== null && !pool.insufficientData ? pool : null
+      const estimate = poolEstimate
+        ? {
+            mean: poolEstimate.mean,
+            std: poolEstimate.std,
+            ciLow: poolEstimate.ciLow,
+            ciHigh: poolEstimate.ciHigh,
+            settled: poolEstimate.settled,
+            articlesUsed: poolEstimate.articlesUsed,
+          }
+        : {
+            mean: oracleForecast.mean,
+            std: oracleForecast.std,
+            ciLow: oracleForecast.ci_low,
+            ciHigh: oracleForecast.ci_high,
+            settled: oracleForecast.settled ?? false,
+            articlesUsed: oracleForecast.articles_used,
+          }
+
+      probability = stanceToPercent(estimate.mean)
+      ciLow = stanceToPercent(estimate.ciLow)
+      ciHigh = stanceToPercent(estimate.ciHigh)
 
       const { stored } = await saveNewsIndexerMatch({
         predictionId: prediction.id,
@@ -229,14 +249,18 @@ export async function POST(request: NextRequest) {
         ciHigh,
         oracleSnapshot: {
           mean: probability,
-          std: stanceStdToPercent(oracleForecast.std),
+          std: stanceStdToPercent(estimate.std),
           ciLow,
           ciHigh,
-          articlesUsed: oracleForecast.articles_used,
-          settled: oracleForecast.settled ?? false,
+          articlesUsed: estimate.articlesUsed,
+          settled: estimate.settled,
+          // NOTE: still only THIS push's articles, while `mean`/`articlesUsed` above now
+          // describe the whole pool. Listing every pooled article here (so the UI can
+          // actually explain the number) is the next PR — it needs author/title lookups
+          // over pool rows and grows the stored blob, which doesn't belong in this cutover.
           sources: oracleSources,
         },
-        settled: oracleForecast.settled ?? false,
+        settled: estimate.settled,
       })
       wasStored = stored
 
@@ -247,6 +271,16 @@ export async function POST(request: NextRequest) {
           stored,
           articles: items.length,
           similarity: triggerSimilarity,
+          // Which path produced the number, and what the other one would have said — the
+          // shadow comparison, kept but inverted now that the pool is authoritative. A large
+          // `singleRunDelta` is the signature of a single article yanking the estimate.
+          estimateSource: poolEstimate ? 'pool' : 'single-run',
+          poolSize: pool?.poolSize ?? null,
+          articlesUsed: estimate.articlesUsed,
+          singleRunMean: oracleForecast.mean,
+          singleRunDelta: poolEstimate ? Math.abs(oracleForecast.mean - poolEstimate.mean) : null,
+          poolInsufficient: pool?.insufficientData ?? null,
+          poolReason: pool?.reason ?? null,
           // How many of the Oracle's sources carried a byline — the signal that makes
           // per-commentator attribution possible downstream. 0 means the lookup found none.
           bylines: oracleSources.filter((s) => s.author != null).length,

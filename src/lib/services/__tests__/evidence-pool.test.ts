@@ -29,6 +29,7 @@ import {
   addArticlesToPool,
   getPoolArticles,
   setArticleExcluded,
+  recomputeFromPool,
   shadowCompareRecompute,
   pushCredibilityFeedback,
   claimArticleForExtraction,
@@ -201,6 +202,101 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
 })
 
 const live = { mean: 0.5, ciLow: 0.2, ciHigh: 0.8, settled: false }
+
+const AGGREGATE = {
+  mean: 0.6,
+  std: 0.25,
+  ci_low: 0.3,
+  ci_high: 0.9,
+  articles_used: 4,
+  settled: false,
+  insufficient_data: false,
+  reason: null,
+}
+
+describe('recomputeFromPool', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
+  })
+
+  it('returns the aggregate, converted to camelCase, with the pool census attached', async () => {
+    findMany.mockResolvedValue([
+      poolArticle(),
+      poolArticle({ id: 'art-2' }),
+      poolArticle({ id: 'art-3', excluded: true }),
+      poolArticle({ id: 'art-4', stance: null }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    const out = await recomputeFromPool('pred-1', null, null)
+
+    expect(out).toEqual({
+      mean: 0.6,
+      std: 0.25, // carried through — the snapshot's std must describe the pool, not one article
+      ciLow: 0.3,
+      ciHigh: 0.9,
+      articlesUsed: 4,
+      settled: false,
+      insufficientData: false,
+      reason: null,
+      poolSize: 4,
+      usableSize: 2,
+      excludedCount: 1,
+      incompleteCount: 1,
+    })
+  })
+
+  it("drops admin-excluded articles from the aggregate, so an exclusion moves the number", async () => {
+    findMany.mockResolvedValue([poolArticle(), poolArticle({ id: 'art-2', excluded: true })] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    const [, , init] = mockOracleFetch.mock.calls[0]
+    expect(JSON.parse((init as { body: string }).body).sources).toHaveLength(1)
+  })
+
+  it('surfaces insufficient_data rather than passing off a non-estimate as one', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...AGGREGATE, insufficient_data: true, reason: 'no_decisive_signal' }),
+    } as never)
+
+    const out = await recomputeFromPool('pred-1', null, null)
+
+    expect(out).toMatchObject({ insufficientData: true, reason: 'no_decisive_signal' })
+  })
+
+  it('returns null when the Oracle is not configured', async () => {
+    mockGetOracleConfig.mockReturnValue(null)
+    expect(await recomputeFromPool('pred-1', null, null)).toBeNull()
+    expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns null when nothing in the pool is usable', async () => {
+    findMany.mockResolvedValue([poolArticle({ excluded: true }), poolArticle({ id: 'a2', certainty: null })] as never)
+    expect(await recomputeFromPool('pred-1', null, null)).toBeNull()
+    expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  // Both failure paths return null rather than throwing: the caller falls back to its
+  // single-run forecast, so a flaky Oracle degrades the estimate instead of dropping it.
+  it('returns null (never throws) on a non-OK status', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({ ok: false, status: 503 } as never)
+    await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+
+  it('returns null (never throws) when the fetch rejects', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockRejectedValue(new Error('network down'))
+    await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+})
 
 describe('shadowCompareRecompute', () => {
   beforeEach(() => {

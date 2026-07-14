@@ -19,7 +19,7 @@ vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() })
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
 vi.mock('@/lib/services/evidence-pool', () => ({
   addArticlesToPool: vi.fn(),
-  shadowCompareRecompute: vi.fn(),
+  recomputeFromPool: vi.fn(),
   claimArticlesForExtraction: vi.fn(),
   failClaimedArticles: vi.fn(),
 }))
@@ -45,7 +45,7 @@ import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
   addArticlesToPool,
-  shadowCompareRecompute,
+  recomputeFromPool,
   claimArticlesForExtraction,
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
@@ -107,7 +107,9 @@ describe('POST /api/news-indexer/context', () => {
     vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true })
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
     vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
-    vi.mocked(shadowCompareRecompute).mockResolvedValue(undefined)
+    // Default: no pool aggregate available, so the route falls back to the single-run
+    // forecast. That is what every test outside the pool block below asserts against.
+    vi.mocked(recomputeFromPool).mockResolvedValue(null)
     // Default: the claim gate always admits the push (existing tests exercise
     // the "something new" path); the skip-when-unchanged path has its own tests below.
     vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed'])
@@ -317,54 +319,130 @@ describe('POST /api/news-indexer/context', () => {
     })
   })
 
-  describe('evidence pool shadow-write + recompute shadow-compare (retro ORACLE_VARIABLES.md §6 step 6)', () => {
-    it('shadow-writes the pool and shadow-compares the recompute after the Oracle produces an estimate', async () => {
-      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
-        ...ACTIVE_PREDICTION,
-        claimDirection: null,
-        claimDeadline: null,
-      } as never)
+  describe('the estimate is the pool aggregate, not the single-article run', () => {
+    // The single run (ORACLE_WITH_SOURCE) means 0.5 → 75%. The pool disagrees sharply,
+    // which is the whole point: one freshly-matched article must not be able to yank the
+    // persisted estimate away from the body of evidence already pooled for the claim.
+    const POOL: Awaited<ReturnType<typeof recomputeFromPool>> = {
+      mean: -0.2, // → 40%
+      std: 0.5, // → 25
+      ciLow: -0.7, // → 15%
+      ciHigh: 0.3, // → 65%
+      articlesUsed: 10,
+      settled: false,
+      insufficientData: false,
+      reason: null,
+      poolSize: 12,
+      usableSize: 10,
+      excludedCount: 0,
+      incompleteCount: 2,
+    }
+
+    beforeEach(() => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    })
+
+    it('persists the pool aggregate — mean, CI, std and articlesUsed all come from the pool', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
 
       await POST(post('test-secret'))
 
-      await vi.waitFor(() => expect(shadowCompareRecompute).toHaveBeenCalledTimes(1))
-      expect(addArticlesToPool).toHaveBeenCalledWith('pred-1', expect.any(Array), 'news-indexer')
-      expect(shadowCompareRecompute).toHaveBeenCalledWith(
-        'pred-1',
-        { mean: 0.5, ciLow: 0.2, ciHigh: 0.8, settled: false },
-        null,
-        null,
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalProbability: 40, // pool's -0.2, NOT the single run's 0.5 → 75
+          ciLow: 15,
+          ciHigh: 65,
+          oracleSnapshot: expect.objectContaining({
+            mean: 40,
+            std: 25,
+            ciLow: 15,
+            ciHigh: 65,
+            articlesUsed: 10, // the pool, not this push's 1
+          }),
+        }),
       )
     })
 
-    it('forwards a set claimDirection/claimDeadline to the shadow-compare', async () => {
+    it('pools this push\'s articles BEFORE aggregating, so they count toward their own estimate', async () => {
+      const order: string[] = []
+      vi.mocked(addArticlesToPool).mockImplementation(async () => {
+        order.push('add')
+      })
+      vi.mocked(recomputeFromPool).mockImplementation(async () => {
+        order.push('recompute')
+        return POOL
+      })
+
+      await POST(post('test-secret'))
+
+      expect(addArticlesToPool).toHaveBeenCalledWith('pred-1', expect.any(Array), 'news-indexer')
+      expect(order).toEqual(['add', 'recompute'])
+    })
+
+    it('forwards claimDirection/claimDeadline to the recompute', async () => {
       const deadline = new Date('2026-12-31T00:00:00.000Z')
       vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
         ...ACTIVE_PREDICTION,
         claimDirection: 'ARRIVAL',
         claimDeadline: deadline,
       } as never)
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
 
       await POST(post('test-secret'))
 
-      await vi.waitFor(() => expect(shadowCompareRecompute).toHaveBeenCalledTimes(1))
-      expect(shadowCompareRecompute).toHaveBeenCalledWith(
-        'pred-1',
-        expect.objectContaining({ mean: 0.5 }),
-        'ARRIVAL',
-        deadline,
+      expect(recomputeFromPool).toHaveBeenCalledWith('pred-1', 'ARRIVAL', deadline)
+    })
+
+    it('carries the pool\'s settlement verdict, not the single run\'s', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue({ ...POOL, settled: true })
+
+      await POST(post('test-secret'))
+
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(expect.objectContaining({ settled: true }))
+    })
+
+    // ── fallbacks: never drop an estimate just because the pool could not produce one ──
+
+    it('falls back to the single run when the pool cannot aggregate at all', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue(null)
+
+      await POST(post('test-secret'))
+
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalProbability: 75, // the single run's 0.5
+          oracleSnapshot: expect.objectContaining({ articlesUsed: 1 }),
+        }),
       )
     })
 
-    it('does not shadow-compare when the Oracle returns no usable forecast', async () => {
+    it('falls back to the single run when the pool reports insufficient data', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue({
+        ...POOL,
+        insufficientData: true,
+        reason: 'no_decisive_signal',
+      })
+
+      await POST(post('test-secret'))
+
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(expect.objectContaining({ externalProbability: 75 }))
+    })
+
+    it('still persists an estimate when the pool write/recompute throws', async () => {
+      vi.mocked(addArticlesToPool).mockRejectedValue(new Error('pool down'))
+
+      await POST(post('test-secret'))
+
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(expect.objectContaining({ externalProbability: 75 }))
+    })
+
+    it('does not touch the pool when the Oracle returns no usable forecast', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))
 
       expect(addArticlesToPool).not.toHaveBeenCalled()
-      expect(shadowCompareRecompute).not.toHaveBeenCalled()
+      expect(recomputeFromPool).not.toHaveBeenCalled()
     })
   })
 
