@@ -6,6 +6,11 @@ name: TLS Cert Expiry Watch
 # alerts Telegram when fewer than WARN_DAYS remain, so a stalled renewal can be
 # fixed before it becomes an outage (cf. the 2026-06-20 cert-expiry outage).
 # Runs from a GitHub Actions runner — independent of the EC2 box and SSM.
+#
+# Every host we serve over HTTPS must be listed here. On 2026-07-13 oracle.daatan.com's
+# cert expired and took down every daatan->Oracle call for ~19h: this job existed, but
+# its matrix only covered daatan.com and staging.daatan.com, so nothing was watching the
+# host that actually broke. A cert this job does not name is a cert nobody is watching.
 
 on:
   schedule:
@@ -22,8 +27,22 @@ jobs:
         env:
           - name: production
             host: daatan.com
+            clean: true
           - name: staging
             host: staging.daatan.com
+            clean: false
+          - name: oracle
+            host: oracle.daatan.com
+            clean: true
+          - name: bayes
+            host: bayes.daatan.com
+            clean: true
+          - name: news-indexer
+            host: scrapper.daatan.com
+            clean: true
+          - name: elections
+            host: elections.daatan.com
+            clean: true
     steps:
       - name: Check days until expiry
         id: check
@@ -48,7 +67,11 @@ jobs:
           DAYS=$(( (END_EPOCH - NOW_EPOCH) / 86400 ))
           echo "$HOST cert expires $END ($DAYS days remaining)"
 
-          if [ "$DAYS" -lt "$WARN_DAYS" ]; then
+          if [ "$DAYS" -lt 0 ]; then
+            # Already expired — HTTPS clients that verify certs are failing right now.
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=has EXPIRED ($(( -DAYS ))d ago, on ${END})" >> "$GITHUB_OUTPUT"
+          elif [ "$DAYS" -lt "$WARN_DAYS" ]; then
             echo "failed=true" >> "$GITHUB_OUTPUT"
             echo "reason=expires in ${DAYS}d (on ${END})" >> "$GITHUB_OUTPUT"
           else
@@ -60,9 +83,11 @@ jobs:
         run: |
           ENV="${{ matrix.env.name }}"
           REASON="${{ steps.check.outputs.reason }}"
-          # Cert problems are high-signal → clean channel for prod, noisy for staging.
+          # Cert problems are high-signal → clean channel for every production host,
+          # noisy for staging. Set per-host in the matrix rather than inferred from the
+          # name, so a new prod host can't silently default to the noisy channel.
           CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          if [ "$ENV" = "production" ]; then
+          if [ "${{ matrix.env.clean }}" = "true" ]; then
             CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
             CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
           fi
