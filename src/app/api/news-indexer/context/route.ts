@@ -170,7 +170,16 @@ export async function POST(request: NextRequest) {
       stance: s.stance ?? null,
       certainty: s.certainty ?? null,
       claim: s.claims?.[0] ?? null,
+      // The Oracle's claim-aware relevance for this article. It was being dropped here — the same
+      // way `author` was, before #1067 — so news-indexer could never see WHY an article counted,
+      // only that it did. It is the one number that explains a match: the embedding cosine says
+      // how similar the text looks, this says whether it actually bears on the claim.
+      relevance: s.relevance_score ?? null,
     }))
+
+    // The article that triggered this push — its enrichment is what both the Telegram
+    // notification and the top-level (single-article, back-compat) response fields report.
+    const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? enrichedSources[0]
 
     if (oracleForecast) {
       probability = stanceToPercent(oracleForecast.mean)
@@ -266,7 +275,13 @@ export async function POST(request: NextRequest) {
     if (probability !== null && wasStored) {
       void notifyNewsArticleMatched(
         { id: prediction.id, claimText: prediction.claimText, slug: prediction.slug },
-        { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
+        {
+          title: triggerItem.title,
+          url: triggerItem.url,
+          source: triggerItem.source ?? null,
+          stance: triggerEnrich?.stance ?? null,
+          relevance: triggerEnrich?.relevance ?? null,
+        },
         { similarity: triggerSimilarity, articleCount: items.length },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
       )
@@ -274,13 +289,18 @@ export async function POST(request: NextRequest) {
 
     // Top-level fields echo the trigger article's enrichment (back-compat with the
     // single-article contract); `sources` carries the whole set for the multi push.
-    const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? enrichedSources[0]
     return NextResponse.json({
       ok: true,
       stance: triggerEnrich?.stance ?? null,
       certainty: triggerEnrich?.certainty ?? null,
       claim: triggerEnrich?.claim ?? null,
+      relevance: triggerEnrich?.relevance ?? null,
       probability,
+      // The estimate this push REPLACED. news-indexer records it so a match can be read as a
+      // movement (63% → 71%) rather than a bare number, which is what makes a digest legible.
+      // `prediction.confidence` is still the pre-push value here — saveNewsIndexerMatch has run,
+      // but `prediction` is the object we loaded before it.
+      previousProbability: prediction.confidence ?? null,
       sources: enrichedSources,
     })
   } catch (error) {

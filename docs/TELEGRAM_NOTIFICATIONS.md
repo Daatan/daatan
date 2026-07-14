@@ -107,7 +107,7 @@ Sent by API routes and services on business and operational events. The **Channe
 | New user registered | 🆕 | clean | `POST /api/auth/signup` (credentials) and OAuth sign-in handler |
 | Bot forecast approved | ✅ | noisy | `POST /api/forecasts/[id]/approve` |
 | Bot forecast rejected | ❌ | noisy | `POST /api/forecasts/[id]/reject` |
-| News article matched | 🗞️ | noisy | news-indexer integration |
+| News article matched | 🗞️ | noisy | news-indexer integration. Reports the estimate as a **movement** (`Oracle 63% → 71%`) plus what the triggering article actually said: `stance ±x.xx · relevance x.xx · match NN%`. **stance** [-1,1] is which way it argues, **relevance** [0,1] is the Oracle's claim-aware judgment of whether it bears on the claim at all (its *square* weights the article in aggregation), **match** is the embedding cosine — listed last because it is the weakest of the three and the one proven to misrank (news-indexer#124). Each signal is omitted when unknown rather than printed as `null`. |
 | High AI confidence (≥80%) | 📈 | clean | `src/lib/services/context.ts` — fires when the AI estimate **crosses** 80 from below (any confidence-writing path: news-indexer push, user "analyze context", admin backfill). Crossing-based, so a forecast hovering at 82 doesn't re-alert. Adds a "settled" line when the Oracle reports the outcome as an accomplished fact (resolution candidate). |
 
 ### Operational Alerts

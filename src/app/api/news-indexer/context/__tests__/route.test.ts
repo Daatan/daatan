@@ -94,6 +94,7 @@ const ORACLE_WITH_SOURCE = {
       stance: 0.42,
       certainty: 0.77,
       credibility_weight: 1.0,
+      relevance_score: 0.8,
       claims: ['First extracted claim', 'Second claim'],
     },
   ],
@@ -183,6 +184,30 @@ describe('POST /api/news-indexer/context', () => {
     const [, , , estimate] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
     // previous = the prediction's confidence BEFORE this push
     expect(estimate).toMatchObject({ probability: 75, previous: 65, ciLow: 60, ciHigh: 90 })
+  })
+
+  it('tells Telegram what the trigger article actually SAID — its stance and relevance', async () => {
+    // Without these the message reports that the estimate moved but never why: a reader cannot
+    // tell a decisive on-topic article from a marginal one that happened to clear the gate.
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+    const [, article] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
+    expect(article).toMatchObject({ stance: 0.42, relevance: 0.8 })
+  })
+
+  it('passes the Oracle relevance through to news-indexer instead of dropping it', async () => {
+    // The Oracle grades every article's claim-aware relevance and its SQUARE weights the article
+    // in aggregation — but this route used to drop the field (exactly as it once dropped `author`),
+    // so news-indexer could record THAT an article counted and never WHY.
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    const res = await POST(post('test-secret'))
+    const body = await res.json()
+    expect(body.relevance).toBe(0.8)
+    expect(body.sources[0]).toMatchObject({ url: 'https://bbc.com/news/x', stance: 0.42, relevance: 0.8 })
+    // The estimate this push replaced — so a match reads as a movement, not a bare number.
+    expect(body.previousProbability).toBe(65)
   })
 
   it('does NOT notify Telegram on a null-Oracle push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
