@@ -81,6 +81,54 @@ pass `--apply` to write. Requires `GEMINI_API_KEY` + `DATABASE_URL`. For prod, d
 via the `backfill-english-canonical` admin endpoint / GitHub Actions workflow rather
 than the script.
 
+## UI string catalogue (`messages/*.json`)
+
+Separate from the forecast-content translation above: `messages/{en,he,ru,eo}.json` hold the
+static UI strings. `en.json` is the source; the others are hand-maintained.
+
+`__tests__/config/i18n-completeness.test.ts` enforces three invariants — key parity, ICU
+validity (a malformed plural only throws at render time, so parity alone won't catch it), and
+placeholder parity (no locale may drop an `{arg}` that English has). `he.json` is exempt from
+the placeholder check: it predates the rule and deliberately hard-codes the singular in a few
+count strings.
+
+**A locale may add a plural where English has none.** ICU messages are parsed per-locale, so
+`ru.json` can carry a full `one/few/many` plural while `en.json` stays a plain string — no
+en.json or component change needed. Russian requires this: a bare `{count} результатов` renders
+"1 результатов". Prefer it over adding a second `*Plural` key.
+
+### Glossary
+
+Concept definitions come from [Daatan/docs: glossary.md](https://github.com/Daatan/docs/blob/main/glossary.md).
+
+**Wagering vocabulary is deliberate.** A commitment/stake is «ставка» in Russian and `veto`
+in Esperanto. The glossary's "no money, no gambling" line describes the *economics* (reputation
+is the only currency) — it is not a ban on the betting metaphor in UI copy. Don't "fix" these
+back to confidence vocabulary.
+
+| Concept | Russian | Esperanto | Not |
+| --- | --- | --- | --- |
+| Forecast / Prediction | прогноз | prognozo | ~~предсказание~~, ~~antaŭdiro~~ |
+| Commitment / stake | ставка | veto / veti | ~~stakumo~~, ~~stakita~~ (not Esperanto — `stako` is a *pile*) |
+| Confidence (CU) | уверенность; unit stays `CU` | konfido; unit stays `CU` | ~~KU~~ |
+| Resolution / resolved | разрешение / разрешён | solvo / solvita | ~~завершён~~, ~~rezolucio~~ (an assembly's motion), ~~decid-~~ |
+| Resolver | арбитр | solvanto | ~~Резолвер~~, ~~rezolvisto~~ |
+| Peer score | оценка коллег | samula poentaro | ~~пир~~ (= a feast) |
+| Estimate | оценка | takso | |
+| Evidence | доказательства | pruvo | ~~evidenco~~ (= obviousness) |
+| Crowd / consensus | толпа / консенсус | amaso / konsenso | ~~homaro~~ (= humanity), ~~konsento~~ (= consent) |
+| Stake pool | пул | kaso | ~~baseno~~ (= swimming pool) |
+| Run (a program) | запуск | ruli / rulo | ~~kuri~~ (= to run on foot; intransitive) |
+| Load | загрузка | ŝargi | ~~ŝarĝi~~ (= to load cargo) |
+| Moderator | модератор | moderiganto | ~~kontrolanto~~ |
+
+Russian uses ё consistently (`произойдёт`, `завершён`) and the formal lowercase «вы».
+Esperanto uses real diacritics (ĉ ĝ ĥ ĵ ŝ ŭ) — never the x-system.
+
+The betting metaphor still follows the **English sentence**, not the key name: where English
+says "forecasted" (`activity.committed`), "share your confidence" (`feed.discover`) or "Most
+Confident" (`leaderboard.sortBy.cuCommitted`), the translation says that — not "place a bet".
+
 ## Cross-language dedup
 
 Because every stored `claimText` is English-canonical, the bot dedup gate
