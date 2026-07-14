@@ -544,7 +544,13 @@ export function notifyDailySummary(stats: {
  */
 export function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
-  article: { title: string; url: string; source: string | null },
+  article: {
+    title: string
+    url: string
+    source: string | null
+    stance?: number | null
+    relevance?: number | null
+  },
   match: { similarity: number; articleCount?: number },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
 ): void {
@@ -569,12 +575,29 @@ export function notifyNewsArticleMatched(
   const countLabel = articleCount > 1 ? `${articleCount} articles · ` : ''
   const simPct = Math.round(match.similarity * 100)
 
+  // What this ONE article actually said, and how much it counted — without these the message
+  // reports that the estimate moved but never why, so a reader can't tell a decisive on-topic
+  // article from a marginal one that happened to trip the gate.
+  //   stance    [-1,1] — which way it argues. Rendered signed: -0.72 reads as "argues NO".
+  //   relevance [0,1]  — the Oracle's claim-aware judgment of whether it bears on the claim at
+  //                      all; its SQUARE weights the article in aggregation, so 0.5 counts a
+  //                      quarter as much as 1.0. This is the number that explains a match.
+  //   match %          — embedding cosine. Deliberately last: it's the weakest of the three,
+  //                      and the one we've proven misranks (news-indexer#124).
+  // Each is omitted when unknown: an older Oracle response, or a daatan prod that predates the
+  // relevance passthrough, must degrade to today's message rather than print "null".
+  const signals = [
+    article.stance != null ? `stance ${article.stance > 0 ? '+' : ''}${article.stance.toFixed(2)}` : null,
+    article.relevance != null ? `relevance ${article.relevance.toFixed(2)}` : null,
+    `match ${simPct}%`,
+  ].filter(Boolean)
+
   const msg = [
     `${headerLine}${rangeLine}`,
     `"${truncate(prediction.claimText, 120)}"`,
     '',
     `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
-    `     ${countLabel}match ${simPct}%`,
+    `     ${countLabel}${signals.join(' · ')}`,
     '',
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
