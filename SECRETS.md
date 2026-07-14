@@ -42,7 +42,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `RESEND_API_KEY` | ✅ | — | Email delivery |
 | `EMAIL_FROM` | ✅ | — | Default From: address |
 | `VAPID_PRIVATE_KEY` | ✅ | — | Web Push signing key (runtime-only) |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | ✅ | ✅ | Web Push subscription key — baked into the JS bundle at build, so it must be a GitHub secret |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | ✅ | Web Push subscription key. **GitHub secret only** — `NEXT_PUBLIC_*` is substituted into the bundle at build, so a copy in the Secrets Manager bundle would be silently ignored at runtime (see the VAPID section below) |
 | `AWS_ROLE_ARN` | — | ✅ | OIDC role the `deploy.yml` workflow assumes to reach ECR + SSM |
 
 If this table drifts from reality, the canonical cross-check is `scripts/blue-green-deploy.sh` (`ENV_ARGS`) and `docker-compose.{prod,staging}.yml`, which are gated by CI via `scripts/check-env-parity.sh`.
@@ -147,8 +147,29 @@ VAPID keys authenticate our server when sending Web Push notifications. Two keys
 
 | Key | Where set | Notes |
 |-----|-----------|-------|
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Server `.env` **+ GitHub Actions secret** | Baked into the JS bundle at build time — must be a GitHub secret so CI can pass it to `next build` |
-| `VAPID_PRIVATE_KEY` | Server `.env` only | Runtime only, never exposed to the client |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | **GitHub Actions secret only** | `NEXT_PUBLIC_*` is substituted into the bundle by `next build`. Setting it in the container's environment does nothing |
+| `VAPID_PRIVATE_KEY` | Secrets Manager bundle only | Read from the environment at runtime; never exposed to the client |
+
+There is also a `VAPID_PUBLIC_KEY` GitHub secret. **Nothing reads it** — no workflow, script or
+source file references it. It is a leftover from an earlier rotation; the key the build actually
+uses is `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Do not treat `VAPID_PUBLIC_KEY` as authoritative.
+
+> ⚠️ **The two keys reach the app through different channels, so they drift silently.**
+> The public key is frozen into the image at **build** time; the private key is read from
+> the environment at **run** time. Rotate one without the other and both stay individually
+> valid but mutually useless — the server signs with a key no browser ever subscribed
+> against, and **every** push send fails VAPID auth (401/403). Nothing else surfaces this.
+>
+> Two consequences:
+> - **A `docker restart` can never change the public key.** Only a rebuild can. Any rotation
+>   procedure that ends in "refresh `.env` and restart" will leave push silently broken.
+> - **Do not put `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in the Secrets Manager bundle.** A copy there
+>   is inert, but it looks authoritative and is the reason the 2026-03-05 rotation broke push
+>   for four months without anyone noticing.
+>
+> The app guards against this: `src/instrumentation.ts` derives the public key from
+> `VAPID_PRIVATE_KEY` at boot and logs an error if it does not match the compiled-in public
+> key. **If you see that error in the app logs, push is completely broken — do not ignore it.**
 
 **Generating new keys:**
 ```bash
@@ -158,10 +179,20 @@ npx web-push generate-vapid-keys
 # Private Key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-**After generating:**
-1. Update `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in GitHub Actions secrets (Settings → Secrets → `NEXT_PUBLIC_VAPID_PUBLIC_KEY`) so new image builds pick it up.
-2. Update both keys in `daatan-env-prod` and `daatan-env-staging` in AWS Secrets Manager (see "Updating a Secret" above).
-3. Trigger a redeploy so a new image is built with the new `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and the runtime pulls the new `VAPID_PRIVATE_KEY`.
+**After generating — do all three, in order. Skipping any one of them breaks push:**
+1. Update `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in GitHub Actions secrets (Settings → Secrets → `NEXT_PUBLIC_VAPID_PUBLIC_KEY`) so new image builds pick up the new **public** key.
+2. Update `VAPID_PRIVATE_KEY` — and **only** the private key — in `daatan-env-prod` and `daatan-env-staging` in AWS Secrets Manager (see "Updating a Secret" above).
+3. **Rebuild and redeploy.** A restart is not sufficient: the public key is compiled into the image, so it only changes when a new image is built.
+
+**Verify the rotation actually landed** (this is the step whose absence let the 2026-03-05
+rotation break push undetected). After the deploy, confirm the boot-time keypair check is
+silent — any output here means push is broken:
+
+```bash
+aws ssm send-command --instance-ids i-04ea44d4243d35624 \
+  --document-name AWS-RunShellScript \
+  --parameters 'commands=["docker logs daatan-app 2>&1 | grep -i \"not a matching keypair\""]'
+```
 
 **Key rotation (if push subscriptions break):**
 - All existing push subscriptions become invalid after key rotation — users must re-subscribe
@@ -222,9 +253,11 @@ Update the Secrets Manager bundle (prod example — repeat for staging):
 aws secretsmanager get-secret-value --secret-id daatan-env-prod \
   --region eu-central-1 --query SecretString --output text > /tmp/env.prod
 
-# Edit /tmp/env.prod — set new VAPID_PRIVATE_KEY, new
-# NEXT_PUBLIC_VAPID_PUBLIC_KEY, and keep VAPID_PRIVATE_KEY_OLD=<OLD_PRIVATE>
-# for the grace period.
+# Edit /tmp/env.prod — set the new VAPID_PRIVATE_KEY and keep
+# VAPID_PRIVATE_KEY_OLD=<OLD_PRIVATE> for the grace period.
+#
+# Do NOT add NEXT_PUBLIC_VAPID_PUBLIC_KEY here — it is a build-time value and a
+# copy in this bundle is inert. It belongs in GitHub Secrets only (see below).
 
 aws secretsmanager put-secret-value --secret-id daatan-env-prod \
   --region eu-central-1 --secret-string file:///tmp/env.prod
@@ -288,7 +321,8 @@ aws secretsmanager put-secret-value --secret-id daatan-env-prod \
 rm /tmp/env.prod
 ```
 
-Redeploy (or SSM + `fetch-secrets.sh` + `docker restart` — see above). Verify no WebPush failures:
+Redeploy. (**Not** `fetch-secrets.sh` + `docker restart` — that cannot change the compiled-in
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and will leave push silently broken.) Verify no WebPush failures:
 
 ```bash
 aws ssm start-session --target i-04ea44d4243d35624

@@ -57,26 +57,38 @@ export async function register() {
   const required: Array<{ key: string; feature: string }> = [
     { key: 'GEMINI_API_KEY', feature: 'LLM / bot-runner' },
     { key: 'VAPID_PRIVATE_KEY', feature: 'browser push notifications' },
-    { key: 'NEXT_PUBLIC_VAPID_PUBLIC_KEY', feature: 'browser push notifications' },
   ]
 
   const missing = required.filter(({ key }) => !process.env[key])
+
+  // NEXT_PUBLIC_* is substituted at build time, so it must be referenced as a static
+  // literal — a dynamic process.env[key] lookup reads the runtime environment instead,
+  // which is a different value entirely and is not what the app actually uses.
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  if (!vapidPublicKey) {
+    missing.push({ key: 'NEXT_PUBLIC_VAPID_PUBLIC_KEY', feature: 'browser push notifications' })
+  }
 
   if (missing.length > 0) {
     log.warn({ missing: missing.map(({ key, feature }) => ({ key, feature })) }, '[startup] WARNING: Missing environment variables — functionality requiring these keys will fail at runtime')
   }
 
-  // Both VAPID keys can be individually present yet belong to different keypairs — e.g. a
-  // rotation that updated VAPID_PRIVATE_KEY (server, runtime) without also updating the
-  // NEXT_PUBLIC_VAPID_PUBLIC_KEY GitHub Actions secret (baked into the client bundle at
-  // build). That fails every push send's VAPID auth (401/403) with nothing else to catch it.
-  if (process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+  // The two VAPID keys reach the app through different channels: the private key at runtime
+  // (Secrets Manager → .env), the public key at build (GitHub Actions secret → next build).
+  // Rotating one without the other leaves both individually valid but mutually useless: the
+  // server signs with a key the browsers never subscribed against, so every push send fails
+  // VAPID auth (401/403) with nothing else to catch it. This happened in prod on 2026-03-05
+  // and went unnoticed until 2026-07-14.
+  if (process.env.VAPID_PRIVATE_KEY && vapidPublicKey) {
     try {
+      // `crypto` stays inline and dynamically imported: Next also compiles this file for the
+      // edge runtime, where node builtins cannot be resolved. Moving this into a module that
+      // instrumentation imports fails the build outright.
       const { createECDH } = await import('crypto')
       const curve = createECDH('prime256v1')
       curve.setPrivateKey(Buffer.from(process.env.VAPID_PRIVATE_KEY, 'base64url'))
       const derivedPublicKey = curve.getPublicKey().toString('base64url')
-      if (derivedPublicKey !== process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      if (derivedPublicKey !== vapidPublicKey) {
         log.error('[startup] VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY are not a matching keypair — every browser push notification will fail VAPID auth. Regenerate and update both together (see SECRETS.md).')
       }
     } catch (err) {
