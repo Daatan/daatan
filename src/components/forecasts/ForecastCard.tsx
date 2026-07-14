@@ -316,6 +316,7 @@ export default function ForecastCard({
 
   const badge = getStatusBadge(prediction.status)
   const forecastUrl = `/forecasts/${prediction.slug || prediction.id}`
+  const showMenu = !canApprove && (canAdminister || canResolve)
 
   return (
     <div className="group relative block p-4 sm:p-5 bg-navy-700 border border-navy-600 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
@@ -327,10 +328,57 @@ export default function ForecastCard({
         aria-label={prediction.claimText}
         className="absolute inset-0 z-[1]"
       />
-      <div className="flex items-start justify-between gap-4">
+
+      {/* Pinned to the card corner rather than given its own flex column, so the
+          claim text and the footer rule can run the full width of the card. The
+          header row reserves space for it with pr-7. */}
+      {showMenu && (
+        <div className="absolute right-3 top-3 z-[2]" ref={menuRef}>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAdminMenu(v => !v) }}
+            className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-navy-800 transition-colors"
+            aria-label="Admin actions"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {showAdminMenu && (
+            <div className="absolute right-0 top-7 z-10 bg-navy-700 border border-navy-600 rounded-lg shadow-lg py-1 min-w-[120px]">
+              {canResolve && (
+                <button
+                  onClick={handleResolve}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary hover:bg-navy-800 transition-colors"
+                >
+                  <Gavel className="w-3.5 h-3.5" />
+                  {t('resolve')}
+                </button>
+              )}
+              {canAdminister && isEditable && (
+                <button
+                  onClick={handleEdit}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary hover:bg-navy-800 transition-colors"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  {t('edit')}
+                </button>
+              )}
+              {canAdminister && (
+                <button
+                  onClick={handleDelete}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-900/20 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {t('delete')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Header: Status, Confidence, Deadline */}
-          <div className="flex items-center flex-wrap gap-2 mb-4">
+          <div className={`flex items-center flex-wrap gap-2 mb-4 ${showMenu ? 'pr-7' : ''}`}>
             {prediction.status !== 'ACTIVE' && (
               <span
                 className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider ${badge.className}`}
@@ -476,109 +524,30 @@ export default function ForecastCard({
             </div>
           )}
 
-          {/* Footer Metadata */}
-          <div className="flex items-center justify-between mt-auto pt-4 border-t border-navy-600/50">
-            <div className="flex items-center gap-x-4 text-xs text-gray-500">
-              {/* Voter count lives in the header pill; only the personal
-                  "you committed" indicator remains down here. */}
-              {prediction.userHasCommitted && (
-                <div
-                  className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-[10px] font-medium"
-                  title={t('committedTooltip')}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>{t('committedLabel')}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Author - Moved to bottom right */}
-            <UserLink
-              userId={prediction.author.id}
-              username={prediction.author.username}
-              name={prediction.author.name}
-              image={prediction.author.image}
-              showAvatar={true}
-              avatarSize={20}
-              className="relative z-[2] last:border-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-400 hover:text-text-secondary truncate max-w-[100px]">
-                  {prediction.author.name || t('anonymous')}
-                </span>
-              </div>
-            </UserLink>
-          </div>
         </div>
 
-        {(canAdminister || canResolve || canApprove) && (
-          <div className="relative z-[2] flex-shrink-0 self-start mt-1" ref={menuRef}>
-            {canApprove ? (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleApprove}
-                  disabled={isApproving}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg transition-colors"
-                  title="Approve forecast"
-                  aria-label="Approve forecast"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {t('approve')}
-                </button>
-                <button
-                  onClick={handleReject}
-                  disabled={isApproving}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 border border-red-800/50 hover:bg-red-900/20 disabled:opacity-50 rounded-lg transition-colors"
-                  title="Reject forecast"
-                  aria-label="Reject forecast"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  {t('reject')}
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAdminMenu(v => !v) }}
-                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-navy-700 transition-colors"
-                  aria-label="Admin actions"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                {showAdminMenu && (
-                  <div className="absolute right-0 top-6 z-10 bg-navy-700 border border-navy-600 rounded-lg shadow-lg py-1 min-w-[120px]">
-                    {canResolve && (
-                      <button
-                        onClick={handleResolve}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary hover:bg-navy-800 transition-colors"
-                      >
-                        <Gavel className="w-3.5 h-3.5" />
-                        {t('resolve')}
-                      </button>
-                    )}
-                    {canAdminister && isEditable && (
-                      <button
-                        onClick={handleEdit}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary hover:bg-navy-800 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        {t('edit')}
-                      </button>
-                    )}
-                    {canAdminister && (
-                      <button
-                        onClick={handleDelete}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-900/20 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        {t('delete')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+        {canApprove && (
+          <div className="relative z-[2] flex-shrink-0 self-start mt-1 flex gap-2">
+            <button
+              onClick={handleApprove}
+              disabled={isApproving}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg transition-colors"
+              title="Approve forecast"
+              aria-label="Approve forecast"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {t('approve')}
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={isApproving}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 border border-red-800/50 hover:bg-red-900/20 disabled:opacity-50 rounded-lg transition-colors"
+              title="Reject forecast"
+              aria-label="Reject forecast"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              {t('reject')}
+            </button>
           </div>
         )}
 
@@ -590,6 +559,42 @@ export default function ForecastCard({
             <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
           </div>
         </div>
+      </div>
+
+      {/* Footer sits outside the flex row so its rule spans the whole card
+          rather than stopping short of the chevron column. */}
+      <div className="flex items-center justify-between pt-4 border-t border-navy-600/50">
+        <div className="flex items-center gap-x-4 text-xs text-gray-500">
+          {/* Voter count lives in the header pill; only the personal
+              "you committed" indicator remains down here. */}
+          {prediction.userHasCommitted && (
+            <div
+              className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-[10px] font-medium"
+              title={t('committedTooltip')}
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              <span>{t('committedLabel')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Author - Moved to bottom right */}
+        <UserLink
+          userId={prediction.author.id}
+          username={prediction.author.username}
+          name={prediction.author.name}
+          image={prediction.author.image}
+          showAvatar={true}
+          avatarSize={20}
+          className="relative z-[2] last:border-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-gray-400 hover:text-text-secondary truncate max-w-[100px]">
+              {prediction.author.name || t('anonymous')}
+            </span>
+          </div>
+        </UserLink>
       </div>
     </div>
   )
