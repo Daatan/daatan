@@ -99,14 +99,17 @@ en.json or component change needed. Russian requires this: a bare `{count} ре�
 
 ### Glossary
 
-Terms are anchored to [Daatan/docs: glossary.md](https://github.com/Daatan/docs/blob/main/glossary.md),
-which states the product has **no money and no gambling — reputation is the only currency**.
-Wagering vocabulary is therefore wrong for `commit`/`commitment`, even where it reads naturally.
+Concept definitions come from [Daatan/docs: glossary.md](https://github.com/Daatan/docs/blob/main/glossary.md).
+
+**Wagering vocabulary is deliberate.** A commitment/stake is «ставка» in Russian and `veto`
+in Esperanto. The glossary's "no money, no gambling" line describes the *economics* (reputation
+is the only currency) — it is not a ban on the betting metaphor in UI copy. Don't "fix" these
+back to confidence vocabulary.
 
 | Concept | Russian | Esperanto | Not |
 | --- | --- | --- | --- |
 | Forecast / Prediction | прогноз | prognozo | ~~предсказание~~, ~~antaŭdiro~~ |
-| Commitment (expressing confidence) | оценка / зафиксировать | engaĝiĝo / engaĝi | ~~ставка~~, ~~veto~~ (= a bet) |
+| Commitment / stake | ставка | veto / veti | ~~stakumo~~, ~~stakita~~ (not Esperanto — `stako` is a *pile*) |
 | Confidence (CU) | уверенность; unit stays `CU` | konfido; unit stays `CU` | ~~KU~~ |
 | Resolution / resolved | разрешение / разрешён | solvo / solvita | ~~завершён~~, ~~rezolucio~~ (an assembly's motion), ~~decid-~~ |
 | Resolver | арбитр | solvanto | ~~Резолвер~~, ~~rezolvisto~~ |
@@ -122,8 +125,9 @@ Wagering vocabulary is therefore wrong for `commit`/`commitment`, even where it 
 Russian uses ё consistently (`произойдёт`, `завершён`) and the formal lowercase «вы».
 Esperanto uses real diacritics (ĉ ĝ ĥ ĵ ŝ ŭ) — never the x-system.
 
-Where the **English itself** says "stake"/"staked" (`admin.colStakes`, `feed.sort.mostStaked`),
-the translations follow it. De-gambling those would be an `en.json` copy change.
+The betting metaphor still follows the **English sentence**, not the key name: where English
+says "forecasted" (`activity.committed`), "share your confidence" (`feed.discover`) or "Most
+Confident" (`leaderboard.sortBy.cuCommitted`), the translation says that — not "place a bet".
 
 ## Cross-language dedup
 
