@@ -286,6 +286,14 @@ export interface PoolRecompute {
   usableSize: number
   excludedCount: number
   incompleteCount: number
+  /**
+   * The exact rows POSTed to `/pool/aggregate` — i.e. the articles the returned
+   * estimate is an average of. `usableArticles.length === usableSize`, and (since
+   * retro sets `articles_used = len(sources)` and drops nothing internally) equals
+   * `articlesUsed` whenever the aggregate is sufficient. Callers persist these as the
+   * snapshot's `sources` so the stored blob lists exactly the articles behind its number.
+   */
+  usableArticles: EvidencePoolArticle[]
 }
 
 /**
@@ -367,6 +375,7 @@ export async function recomputeFromPool(
     usableSize: usable.length,
     excludedCount,
     incompleteCount,
+    usableArticles: usable,
   }
 }
 

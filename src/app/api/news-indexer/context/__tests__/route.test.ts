@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import type { EvidencePoolArticle } from '@prisma/client'
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before importing the route under test
@@ -320,6 +321,41 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   describe('the estimate is the pool aggregate, not the single-article run', () => {
+    // Two pooled articles, neither of them this push's bbc.com article — so a snapshot
+    // built from the pool is visibly the whole evidence set, not just what fired the push.
+    const poolRow = (over: Partial<EvidencePoolArticle>): EvidencePoolArticle =>
+      ({
+        id: 'row',
+        predictionId: 'pred-1',
+        url: 'https://example.com/a',
+        urlHash: 'h',
+        title: 'T',
+        source: 'example.com',
+        publishedDate: '2026-07-01',
+        contentHash: null,
+        status: 'COMPLETE',
+        statusReason: null,
+        stance: 0.1,
+        certainty: 0.7,
+        credibilityWeight: 1,
+        claims: ['pooled claim'],
+        settled: false,
+        quantitativeEstimate: null,
+        evidenceWeight: 0.6,
+        relevanceScore: 0.8,
+        evidenceClass: 'reported_fact',
+        origin: 'news-indexer',
+        excluded: false,
+        addedAt: new Date('2026-07-01'),
+        updatedAt: new Date('2026-07-01'),
+        ...over,
+      }) as EvidencePoolArticle
+
+    const POOL_ROWS = [
+      poolRow({ id: 'r1', url: 'https://reuters.com/p', source: 'reuters.com' }),
+      poolRow({ id: 'r2', url: 'https://guardian.com/p', source: 'guardian.com' }),
+    ]
+
     // The single run (ORACLE_WITH_SOURCE) means 0.5 → 75%. The pool disagrees sharply,
     // which is the whole point: one freshly-matched article must not be able to yank the
     // persisted estimate away from the body of evidence already pooled for the claim.
@@ -328,14 +364,15 @@ describe('POST /api/news-indexer/context', () => {
       std: 0.5, // → 25
       ciLow: -0.7, // → 15%
       ciHigh: 0.3, // → 65%
-      articlesUsed: 10,
+      articlesUsed: 2,
       settled: false,
       insufficientData: false,
       reason: null,
-      poolSize: 12,
-      usableSize: 10,
+      poolSize: 3,
+      usableSize: 2,
       excludedCount: 0,
-      incompleteCount: 2,
+      incompleteCount: 1,
+      usableArticles: POOL_ROWS,
     }
 
     beforeEach(() => {
@@ -357,10 +394,49 @@ describe('POST /api/news-indexer/context', () => {
             std: 25,
             ciLow: 15,
             ciHigh: 65,
-            articlesUsed: 10, // the pool, not this push's 1
+            articlesUsed: 2, // the pool, not this push's 1
           }),
         }),
       )
+    })
+
+    it('lists the whole usable pool in the snapshot — not just this push\'s article', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
+
+      await POST(post('test-secret'))
+
+      const snap = vi.mocked(saveNewsIndexerMatch).mock.calls[0][0].oracleSnapshot as unknown as {
+        sources: { url: string; sourceName: string | null; claims: string[] }[]
+      }
+      // sources.length === articlesUsed: the snapshot lists exactly the articles the number averages.
+      expect(snap.sources).toHaveLength(2)
+      expect(snap.sources.map((s) => s.url)).toEqual(['https://reuters.com/p', 'https://guardian.com/p'])
+      // and NOT the pushed bbc.com article, which the pre-PR snapshot would have shown alone.
+      expect(snap.sources.map((s) => s.url)).not.toContain('https://bbc.com/news/x')
+      // the pooled row's own signal is carried, not re-derived from the single run.
+      expect(snap.sources[0]).toMatchObject({ sourceName: 'reuters.com', claims: ['pooled claim'] })
+    })
+
+    it('re-looks-up authors for the pooled URLs and writes them into the snapshot', async () => {
+      vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
+      vi.mocked(getArticleMetaByUrl).mockImplementation(
+        async (urls: string[]) =>
+          new Map(
+            urls
+              .filter((u) => u === 'https://guardian.com/p')
+              .map((u) => [u, { requestedUrl: u, author: 'Pool Byline', publishedAt: null, title: null, source: null }]),
+          ) as never,
+      )
+
+      await POST(post('test-secret'))
+
+      const snap = vi.mocked(saveNewsIndexerMatch).mock.calls[0][0].oracleSnapshot as unknown as {
+        sources: { url: string; author: string | null }[]
+      }
+      const guardian = snap.sources.find((s) => s.url === 'https://guardian.com/p')
+      expect(guardian?.author).toBe('Pool Byline')
+      // a pooled URL news-indexer has no byline for is kept with a null author, never dropped.
+      expect(snap.sources.find((s) => s.url === 'https://reuters.com/p')?.author).toBeNull()
     })
 
     it('pools this push\'s articles BEFORE aggregating, so they count toward their own estimate', async () => {

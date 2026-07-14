@@ -174,6 +174,17 @@ an article that would have yanked the old estimate.
 Consequently `excluded` is now **enforced on this path**: excluded rows are dropped before
 the aggregate, so an admin's exclusion genuinely moves the number.
 
+`oracleSnapshot.sources` on this path lists the **whole usable pool** — the exact rows
+`recomputeFromPool()` posted, mapped by `poolArticleToEnrichedSource()` — so
+`sources.length === articlesUsed` and the stored snapshot lists precisely the articles its
+number averages. (Before this, `sources` held only the one or two articles that fired the
+push, next to a `mean`/`articlesUsed` describing the whole pool — the snapshot couldn't
+explain its own number, and elections' per-commentator matching saw only the pushed
+byline.) Authors aren't stored on pool rows, so they're re-looked-up from news-indexer by
+URL at snapshot time, best-effort — a pooled article with no indexed byline is kept with a
+null author, never dropped. The single-run **fallback** still stores just the pushed
+articles' sources, matching its `articlesUsed`.
+
 The `analyze` and `backfill` paths still only shadow-compare — `shadowCompareRecompute()`
 logs pool-vs-live (`event=pool_recompute_shadow`) without altering their persisted
 estimate. They follow once this cutover has run in prod.

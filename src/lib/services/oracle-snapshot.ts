@@ -1,6 +1,7 @@
 import type { OracleSource } from '@/lib/services/oracle'
 import type { SearchResult } from '@/lib/services/oracleSearch'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
+import type { EvidencePoolArticle } from '@prisma/client'
 
 /**
  * Map an aggregated Oracle stance/CI bound in [-1, 1] to a probability percent
@@ -75,6 +76,53 @@ export function enrichOracleSources(
       evidenceClass: s.evidence_class ?? null,
     }
   })
+}
+
+type EvidenceClass = NonNullable<EnrichedOracleSource['evidenceClass']>
+const EVIDENCE_CLASSES: readonly EvidenceClass[] = [
+  'reported_fact',
+  'cited_probability',
+  'cited_share',
+  'reporting',
+  'opinion',
+]
+function isEvidenceClass(v: unknown): v is EvidenceClass {
+  return typeof v === 'string' && (EVIDENCE_CLASSES as readonly string[]).includes(v)
+}
+
+/**
+ * Map one persisted evidence-pool row to the `EnrichedOracleSource` shape stored in
+ * `ContextSnapshot.oracleSnapshot.sources`. Used when the news-indexer estimate is the
+ * whole-pool aggregate (the default since v1.60.0): the snapshot must then list the pooled
+ * articles the number actually averages, not just the one article that fired the push.
+ *
+ * The pool row carries every extracted signal already (it's `EnrichedOracleSource`-shaped by
+ * design — see the schema), with two exceptions the caller supplies: `author`, which the pool
+ * table doesn't store (it's re-looked-up from news-indexer by URL, same as the single-run path),
+ * and `sourceId`, for which the pool row's own id is a stable unique key (it's only ever used as
+ * a display key). `claims` is a Json column, so it's defensively narrowed to string[].
+ */
+export function poolArticleToEnrichedSource(
+  row: EvidencePoolArticle,
+  author: string | null,
+): EnrichedOracleSource {
+  return {
+    sourceId: row.id,
+    sourceName: row.source,
+    url: row.url,
+    stance: row.stance,
+    certainty: row.certainty,
+    credibilityWeight: row.credibilityWeight,
+    claims: Array.isArray(row.claims) ? row.claims.filter((c): c is string => typeof c === 'string') : [],
+    title: row.title,
+    publishedAt: row.publishedDate,
+    author,
+    settled: row.settled,
+    quantitativeEstimate: row.quantitativeEstimate,
+    evidenceWeight: row.evidenceWeight,
+    relevanceScore: row.relevanceScore,
+    evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
+  }
 }
 
 /** Narrow an untyped value to a finite number, else null. */
