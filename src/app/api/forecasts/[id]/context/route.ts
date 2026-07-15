@@ -10,7 +10,8 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
-import { addArticlesToPool, shadowCompareRecompute } from '@/lib/services/evidence-pool'
+import { addArticlesToPool } from '@/lib/services/evidence-pool'
+import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { aiResearchEnabled } from '@/lib/capabilities'
@@ -204,48 +205,54 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 }
             }
             if (oracleForecast !== null) {
-                const prob = stanceToPercent(oracleForecast.mean)
-                const ciLow = stanceToPercent(oracleForecast.ci_low)
-                const ciHigh = stanceToPercent(oracleForecast.ci_high)
                 // Attach authors to the Oracle's sources (it omits them); best-effort,
                 // never blocks the estimate. Title/date come from the input articles below.
                 const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map(s => s.url))
                 const authorByUrl = new Map(
                     [...articleMeta.entries()].map(([url, m]) => [url, m.author]),
                 )
+                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl)
+
+                // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate —
+                // the same cutover the news-indexer push path got in v1.60.0 (#1121), previously
+                // only shadow-logged here. Awaited (not fire-and-forget) so the recompute reads a
+                // pool that already includes this run's articles and its result actually drives the
+                // persisted estimate + snapshot sources. `/pool/aggregate` is compute-only (no
+                // search, no LLM), so awaiting it inside the ESTIMATION_TIMEOUT_MS budget is cheap;
+                // on any failure resolvePooledEstimate falls back to this single run.
+                await addArticlesToPool(prediction.id, enrichedSources, 'analyze')
+                const resolved = await resolvePooledEstimate(
+                    prediction.id,
+                    {
+                        mean: oracleForecast.mean,
+                        std: oracleForecast.std,
+                        ciLow: oracleForecast.ci_low,
+                        ciHigh: oracleForecast.ci_high,
+                        settled: oracleForecast.settled ?? false,
+                        articlesUsed: oracleForecast.articles_used,
+                    },
+                    enrichedSources,
+                    prediction.claimDirection,
+                    prediction.claimDeadline,
+                    authorByUrl,
+                )
+
+                const prob = stanceToPercent(resolved.mean)
+                const ciLow = stanceToPercent(resolved.ciLow)
+                const ciHigh = stanceToPercent(resolved.ciHigh)
                 log.info(
                     {
                         predictionId: prediction.id,
                         path: 'oracle',
                         probability: prob,
-                        articlesUsed: oracleForecast.articles_used,
-                        sourceCount: oracleForecast.sources.length,
+                        estimateSource: resolved.estimateSource,
+                        poolSize: resolved.poolSize,
+                        articlesUsed: resolved.articlesUsed,
+                        singleRunMean: resolved.singleRunMean,
+                        sourceCount: resolved.snapshotSources.length,
                     },
                     'context.ai_estimate',
                 )
-                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl)
-                // Evidence pool shadow-write (foundation layer, retro
-                // docs/ORACLE_VARIABLES.md §6 part 2) — additive only, never
-                // blocks or alters the estimate below. Chained (not run in
-                // parallel) so the recompute-shadow-compare below reads a pool
-                // that already includes this run's articles.
-                addArticlesToPool(prediction.id, enrichedSources, 'analyze')
-                    .then(() =>
-                        shadowCompareRecompute(
-                            prediction.id,
-                            {
-                                mean: oracleForecast.mean,
-                                ciLow: oracleForecast.ci_low,
-                                ciHigh: oracleForecast.ci_high,
-                                settled: oracleForecast.settled ?? false,
-                            },
-                            prediction.claimDirection,
-                            prediction.claimDeadline,
-                        ),
-                    )
-                    .catch((err) =>
-                        log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write/recompute-compare failed'),
-                    )
                 return {
                     externalProbability: prob,
                     externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
@@ -253,14 +260,14 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     predictionCiHigh: ciHigh,
                     oracleSnapshotData: {
                         mean: prob,
-                        std: stanceStdToPercent(oracleForecast.std),
+                        std: stanceStdToPercent(resolved.std),
                         ciLow,
                         ciHigh,
-                        articlesUsed: oracleForecast.articles_used,
-                        settled: oracleForecast.settled ?? false,
-                        sources: enrichedSources,
+                        articlesUsed: resolved.articlesUsed,
+                        settled: resolved.settled,
+                        sources: resolved.snapshotSources,
                     },
-                    settled: oracleForecast.settled ?? false,
+                    settled: resolved.settled,
                 }
             }
 

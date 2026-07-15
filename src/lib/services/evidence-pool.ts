@@ -14,15 +14,15 @@ const log = createLogger('evidence-pool')
  * The per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2).
  *
  * All three estimate paths (analyze / news-indexer / backfill) write their extracted
- * per-source signals here. The **news-indexer push path reads it back** to compute its
- * estimate — `recomputeFromPool` aggregates the whole pool rather than trusting the
- * single freshly-matched article that fired the push. Analyze and backfill still only
- * shadow-compare (`shadowCompareRecompute`); they follow once this cutover has run in
- * prod.
+ * per-source signals here and then read the pool back to compute the persisted estimate —
+ * `recomputeFromPool` aggregates the whole pool rather than trusting the articles a single
+ * run happened to score (`resolvePooledEstimate` in pooled-estimate.ts is the shared
+ * decision; the news-indexer route inlines the same logic). news-indexer was cut over in
+ * v1.60.0 (#1121); analyze and backfill followed once that had run in prod.
  *
  * `excluded` (see getPoolArticles/setArticleExcluded below) is an admin's "ignore this
  * article" switch, and is now genuinely enforced: excluded rows are dropped before the
- * aggregate, so on the news-indexer path an exclusion actually moves the number.
+ * aggregate, so an exclusion actually moves the number on every path.
  */
 export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill'
 
@@ -259,14 +259,6 @@ interface PoolAggregateApiResponse {
   reason: string | null
 }
 
-/** The subset of a live /forecast result needed to log a shadow comparison. */
-export interface LiveForecastForComparison {
-  mean: number
-  ciLow: number
-  ciHigh: number
-  settled: boolean
-}
-
 /**
  * An aggregate over a forecast's whole evidence pool. `mean`/`std`/`ciLow`/`ciHigh`
  * are in the Oracle's stance space [-1, 1] — the same scale `/forecast` returns, so
@@ -379,53 +371,6 @@ export async function recomputeFromPool(
   }
 }
 
-/**
- * Shadow-compare the pool recompute against a live `/forecast` result — log only,
- * never affects the persisted estimate (retro docs/ORACLE_VARIABLES.md,
- * recompute-over-pool step 4).
- *
- * Still the behaviour of the analyze and backfill paths. The news-indexer push path
- * has been cut over to trust the recompute (see `recomputeFromPool`); these two follow
- * once that cutover has run in prod.
- *
- * Fire-and-forget: never throws, callers should chain this *after*
- * `addArticlesToPool` resolves (not run in parallel with it) so the current
- * run's article is already in the pool the recompute reads — and must
- * `.catch()` the returned promise themselves, matching `addArticlesToPool`'s
- * own convention.
- */
-export async function shadowCompareRecompute(
-  predictionId: string,
-  live: LiveForecastForComparison,
-  claimDirection: ClaimDirection | null,
-  claimDeadline: Date | null,
-): Promise<void> {
-  const agg = await recomputeFromPool(predictionId, claimDirection, claimDeadline)
-  if (!agg) return
-
-  log.info(
-    {
-      predictionId,
-      poolSize: agg.poolSize,
-      usableSize: agg.usableSize,
-      excludedCount: agg.excludedCount,
-      incompleteCount: agg.incompleteCount,
-      liveMean: live.mean,
-      recomputeMean: agg.mean,
-      meanDelta: Math.abs(live.mean - agg.mean),
-      liveCiLow: live.ciLow,
-      liveCiHigh: live.ciHigh,
-      recomputeCiLow: agg.ciLow,
-      recomputeCiHigh: agg.ciHigh,
-      liveSettled: live.settled,
-      recomputeSettled: agg.settled,
-      recomputeInsufficient: agg.insufficientData,
-      recomputeReason: agg.reason,
-    },
-    'event=pool_recompute_shadow',
-  )
-}
-
 interface IngestResolutionApiResponse {
   accepted: boolean
   already_ingested: boolean
@@ -453,8 +398,8 @@ interface IngestResolutionApiResponse {
  * retro's accumulating store.
  *
  * Fire-and-forget: callers must `.catch()` the returned promise themselves,
- * matching `addArticlesToPool`/`shadowCompareRecompute`'s own convention —
- * this never blocks or alters the resolution response.
+ * matching `addArticlesToPool`'s own convention — this never blocks or alters
+ * the resolution response.
  */
 export async function pushCredibilityFeedback(
   predictionId: string,
