@@ -4,6 +4,12 @@ Locales: `en` (default), `he`, `ru`, `eo` (`src/i18n/config.ts`). **English is t
 canonical source language** — every forecast's stored `claimText` / `detailsText` /
 `resolutionRules` are English, and the non-default locales are derived from them.
 
+UI locale resolution (`src/i18n/request.ts`): `NEXT_LOCALE` cookie (set only by the
+language picker) → browser `Accept-Language` (`src/i18n/negotiate.ts`, q-values
+respected, `he-IL` matches `he`) → `en`. Detection is stateless — no cookie is
+written until the user explicitly picks. URL-prefixed pages (`/he`, `/ru`, `/eo`)
+override both for `<html lang>` (see `src/middleware.ts` / root layout).
+
 ## Translation cache
 
 `PredictionTranslation` (`prediction_translations`) caches one row per
