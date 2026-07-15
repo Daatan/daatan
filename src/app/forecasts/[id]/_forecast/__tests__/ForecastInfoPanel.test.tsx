@@ -66,4 +66,12 @@ describe('ForecastInfoPanel — Tags box', () => {
     expect(screen.getByText('Crypto')).toBeInTheDocument()
     expect(screen.queryByText('None')).toBeNull()
   })
+
+  it('links each tag chip to its canonical /tags/[slug] page, not the ?tags= query param', () => {
+    // Regression: linking to /?tags=name generated an empty-SSR, unindexed
+    // shell for every tag combination (GSC Soft 404 bucket). /tags/[slug] is
+    // the crawlable, canonicalized route.
+    wrap({ ...basePrediction, tags: [{ id: 't1', name: 'Politics', slug: 'politics' }] })
+    expect(screen.getByText('Politics').closest('a')).toHaveAttribute('href', '/tags/politics')
+  })
 })
