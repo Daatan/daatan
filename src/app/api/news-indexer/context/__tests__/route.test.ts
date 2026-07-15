@@ -162,6 +162,27 @@ describe('POST /api/news-indexer/context', () => {
     expect(opts?.claimDeadline).toBe(deadline)
   })
 
+  it('threads the trigger article\'s gatekeeper verdict into the Oracle articles (Phase 1.3)', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret', { ...VALID_BODY, relevance: 0.83, isPrediction: true }))
+
+    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const trigger = opts?.articles?.find((a) => a.url === VALID_BODY.articleUrl)
+    expect(trigger?.relevance).toBe(0.83)
+    expect(trigger?.isPrediction).toBe(true)
+  })
+
+  it('omits the verdict when the push carries none (matcher fast-path)', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))  // VALID_BODY has no relevance/isPrediction
+
+    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    expect(opts?.articles?.[0]?.relevance).toBeUndefined()
+    expect(opts?.articles?.[0]?.isPrediction).toBeUndefined()
+  })
+
   it('returns null enrichment when the Oracle has no usable forecast', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 

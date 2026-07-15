@@ -33,6 +33,12 @@ export interface ArticleInput {
   snippet: string
   source?: string
   publishedDate?: string
+  /** Gatekeeper verdict news-indexer already computed for this article (its POST /relevance
+   *  result). When both are set AND the Oracle's reuse_supplied_relevance flag is on, the Oracle
+   *  reuses them instead of re-judging (kills the double-judge; see MATCHING_ARCHITECTURE.md §3).
+   *  Only the trigger article carries a verdict; both together or neither. */
+  relevance?: number | null
+  isPrediction?: boolean | null
 }
 
 /** Stored claim temporal metadata, as read off `Prediction`. Optional on every
@@ -207,6 +213,12 @@ export const getOracleForecast = async (
                 snippet: a.snippet,
                 source: a.source,
                 published_date: a.publishedDate,
+                // Reuse the caller-supplied gatekeeper verdict (both fields, or neither) so the
+                // Oracle can skip re-judging — see ArticleInput. Inert until the Oracle's
+                // reuse_supplied_relevance flag is on; absent → the Oracle judges as today.
+                ...(a.relevance != null && a.isPrediction != null
+                  ? { relevance: a.relevance, is_prediction: a.isPrediction }
+                  : {}),
               })),
             }
           : {}),

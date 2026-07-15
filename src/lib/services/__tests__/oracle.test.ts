@@ -125,6 +125,37 @@ describe('getOracleForecast', () => {
     expect(body.articles[0].publishedDate).toBeUndefined()
   })
 
+  it('threads the supplied gatekeeper verdict to the Oracle (both fields, snake_case)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleForecast('Q?', {
+      articles: [
+        { url: 'https://x.com/a', title: 'T', snippet: 'S', relevance: 0.83, isPrediction: true },
+      ],
+    })
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.articles[0].relevance).toBe(0.83)
+    expect(body.articles[0].is_prediction).toBe(true)
+    // the camelCase key must not leak through to the Oracle
+    expect(body.articles[0].isPrediction).toBeUndefined()
+  })
+
+  it('omits the verdict when absent or incomplete (both-or-neither)', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleForecast('Q?', {
+      articles: [
+        { url: 'https://x.com/a', title: 'T', snippet: 'S' },                 // no verdict
+        { url: 'https://x.com/b', title: 'T', snippet: 'S', relevance: 0.7 }, // partial -> omit both
+      ],
+    })
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.articles[0].relevance).toBeUndefined()
+    expect(body.articles[0].is_prediction).toBeUndefined()
+    expect(body.articles[1].relevance).toBeUndefined()
+    expect(body.articles[1].is_prediction).toBeUndefined()
+  })
+
   it('returns null when the response is a placeholder', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
