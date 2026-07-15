@@ -103,13 +103,27 @@ describe('resolvePooledEstimate', () => {
     expect(mockMeta).not.toHaveBeenCalled() // no author lookup on the fallback path
   })
 
-  it('falls back to the single run when the pool reports insufficient data', async () => {
-    mockRecompute.mockResolvedValue(poolResult({ insufficientData: true, reason: 'no_decisive_signal' }))
+  it('ABSTAINS (does not fall back) when the pool aggregated but found no usable signal', async () => {
+    // The pool was read and judged the whole set off-topic — falling back to the single run
+    // over those same articles would reintroduce a garbage number, so the caller must abstain.
+    mockRecompute.mockResolvedValue(poolResult({ insufficientData: true, reason: 'all_articles_off_topic' }))
 
     const out = await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
 
-    expect(out.estimateSource).toBe('single-run')
-    expect(out.mean).toBe(0.5)
+    expect(out.estimateSource).toBe('pool-insufficient')
+    expect(out.insufficientData).toBe(true)
+    expect(out.reason).toBe('all_articles_off_topic')
+    expect(out.snapshotSources).toEqual([]) // no voters on an abstention
+    expect(out.poolSize).toBe(3)
+    expect(mockMeta).not.toHaveBeenCalled() // no author lookup — there are no sources to enrich
+  })
+
+  it('distinguishes pool-insufficient (abstain) from pool-unreadable (fall back)', async () => {
+    mockRecompute.mockResolvedValue(null) // couldn't read the pool at all
+    expect((await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)).insufficientData).toBe(false)
+
+    mockRecompute.mockResolvedValue(poolResult()) // healthy aggregate
+    expect((await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)).insufficientData).toBe(false)
   })
 
   it('never throws — a recompute that throws degrades to the single run', async () => {

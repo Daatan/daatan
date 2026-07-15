@@ -20,6 +20,10 @@ export type RefreshResult =
   | { status: 'no-articles' }
   | { status: 'no-oracle' }
   | { status: 'unchanged' }
+  // The whole evidence pool is off-topic — an abstention was recorded (insufficientData
+  // snapshot). Still writes a non-null oracleSnapshot marker, so the forecast drops out of
+  // the backfill candidate set and the loop converges.
+  | { status: 'insufficient' }
 
 /**
  * Run the Oracle's analysis for one forecast and persist its source roster as an
@@ -106,6 +110,25 @@ export async function refreshOracleSnapshot(
     prediction.claimDeadline ?? null,
     authorByUrl,
   )
+
+  // The whole pool is off-topic — abstain rather than persist a number built from articles
+  // the Oracle judged irrelevant. Records confidence/CI null + insufficientData; the non-null
+  // oracleSnapshot marker still converges the backfill (this forecast now HAS a snapshot).
+  if (resolved.insufficientData) {
+    await saveOracleSnapshotOnly({
+      predictionId: prediction.id,
+      oracleSnapshot: { sources: [], insufficient: true, reason: resolved.reason },
+      confidence: null,
+      aiCiLow: null,
+      aiCiHigh: null,
+      insufficientData: true,
+    })
+    log.info(
+      { predictionId: prediction.id, estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize },
+      'oracle-backfill.insufficient',
+    )
+    return { status: 'insufficient' }
+  }
 
   const probability = stanceToPercent(resolved.mean)
   const ciLow = stanceToPercent(resolved.ciLow)

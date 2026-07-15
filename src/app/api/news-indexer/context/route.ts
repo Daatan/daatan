@@ -4,21 +4,15 @@ import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
-import {
-  stanceToPercent,
-  stanceStdToPercent,
-  enrichOracleSources,
-  poolArticleToEnrichedSource,
-} from '@/lib/services/oracle-snapshot'
+import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
   addArticlesToPool,
-  recomputeFromPool,
   claimArticlesForExtraction,
   failClaimedArticles,
-  type PoolRecompute,
 } from '@/lib/services/evidence-pool'
+import { resolvePooledEstimate, type ResolvedPoolEstimate } from '@/lib/services/pooled-estimate'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 
@@ -200,121 +194,135 @@ export async function POST(request: NextRequest) {
       // carries a single freshly-matched article, and `/forecast` over one article returns
       // little more than that article's stance rescaled — so trusting it made the persisted
       // estimate lurch to wherever the newest article pointed (one live forecast swung
-      // 1% → 99% in 19 minutes on two articles reporting the same event).
-      //
-      // So: persist this run's extractions into the pool, then aggregate the WHOLE pool.
-      // Chained, not parallel — the recompute must read a pool that already includes them.
-      let pool: PoolRecompute | null = null
+      // 1% → 99% in 19 minutes on two articles reporting the same event). So: persist this
+      // run's extractions into the pool, then aggregate the WHOLE pool. `resolvePooledEstimate`
+      // is the shared decision (also used by analyze/backfill): pool aggregate when usable,
+      // this run as fallback when the pool can't be read, ABSTAIN when the pool is off-topic.
+      // Pass the authors already fetched for this push so overlapping pool URLs aren't re-queried.
+      let resolved: ResolvedPoolEstimate | null = null
       try {
         await addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
-        pool = await recomputeFromPool(prediction.id, prediction.claimDirection, prediction.claimDeadline)
-      } catch (err) {
-        log.warn({ predictionId: prediction.id, err }, 'evidence pool write/recompute failed')
-      }
-
-      // Fall back to this run's single-article forecast only when the pool cannot produce an
-      // aggregate at all (Oracle down, nothing usable pooled yet, transport error) or reports
-      // `insufficientData`. Both are strictly today's behaviour, so this never regresses a path
-      // that works now — and in the thin-pool case the two agree anyway, since a pool of one is
-      // the single run. Plumbing `insufficientData` through to the snapshot (so the UI can say
-      // "insufficient evidence" instead of showing a number) is deliberately left to a follow-up.
-      const poolEstimate = pool !== null && !pool.insufficientData ? pool : null
-      const estimate = poolEstimate
-        ? {
-            mean: poolEstimate.mean,
-            std: poolEstimate.std,
-            ciLow: poolEstimate.ciLow,
-            ciHigh: poolEstimate.ciHigh,
-            settled: poolEstimate.settled,
-            articlesUsed: poolEstimate.articlesUsed,
-          }
-        : {
+        resolved = await resolvePooledEstimate(
+          prediction.id,
+          {
             mean: oracleForecast.mean,
             std: oracleForecast.std,
             ciLow: oracleForecast.ci_low,
             ciHigh: oracleForecast.ci_high,
             settled: oracleForecast.settled ?? false,
             articlesUsed: oracleForecast.articles_used,
-          }
-
-      probability = stanceToPercent(estimate.mean)
-      ciLow = stanceToPercent(estimate.ciLow)
-      ciHigh = stanceToPercent(estimate.ciHigh)
-
-      // The snapshot must list the articles the ESTIMATE is based on. On the pool path
-      // (the default since v1.60.0) that's the whole usable pool — exactly the rows
-      // recomputeFromPool POSTed, so `sources.length === articlesUsed` — not just this
-      // push's one or two articles. Storing only the pushed articles alongside a pooled
-      // `mean`/`articlesUsed` made the snapshot unable to explain its own number. Authors
-      // aren't kept on pool rows, so re-look them up by URL (best-effort, same as the
-      // single-run path); reuse the authors already fetched for this push so overlapping
-      // URLs aren't re-queried. On the single-run fallback, keep this push's sources.
-      let snapshotSources = oracleSources
-      if (poolEstimate) {
-        const missing = poolEstimate.usableArticles
-          .map((a) => a.url)
-          .filter((u) => !authorByUrl.has(u))
-        if (missing.length > 0) {
-          for (const [url, m] of await getArticleMetaByUrl(missing)) authorByUrl.set(url, m.author)
-        }
-        snapshotSources = poolEstimate.usableArticles.map((a) =>
-          poolArticleToEnrichedSource(a, authorByUrl.get(a.url) ?? null),
+          },
+          oracleSources,
+          prediction.claimDirection,
+          prediction.claimDeadline,
+          authorByUrl,
         )
+      } catch (err) {
+        log.warn({ predictionId: prediction.id, err }, 'evidence pool write/recompute failed')
+      }
+      // A throw above (e.g. addArticlesToPool failed) leaves `resolved` null — fall back to
+      // this run, exactly as resolvePooledEstimate does when it can't read the pool itself.
+      const est: ResolvedPoolEstimate = resolved ?? {
+        mean: oracleForecast.mean,
+        std: oracleForecast.std,
+        ciLow: oracleForecast.ci_low,
+        ciHigh: oracleForecast.ci_high,
+        settled: oracleForecast.settled ?? false,
+        articlesUsed: oracleForecast.articles_used,
+        snapshotSources: oracleSources,
+        estimateSource: 'single-run',
+        insufficientData: false,
+        reason: null,
+        poolSize: null,
+        singleRunMean: oracleForecast.mean,
       }
 
-      const { stored } = await saveNewsIndexerMatch({
-        predictionId: prediction.id,
-        sources: items.map((a) => ({
-          url: a.url,
-          title: a.title,
-          source: a.source ?? null,
-          publishedDate: a.publishedAt ?? null,
-        })),
-        externalProbability: probability,
-        ciLow,
-        ciHigh,
-        oracleSnapshot: {
-          mean: probability,
-          std: stanceStdToPercent(estimate.std),
+      const matchSources = items.map((a) => ({
+        url: a.url,
+        title: a.title,
+        source: a.source ?? null,
+        publishedDate: a.publishedAt ?? null,
+      }))
+
+      if (est.insufficientData) {
+        // The whole pool is off-topic — abstain rather than persist a number built from
+        // articles the Oracle judged irrelevant. Nulls confidence/CI; `probability` stays
+        // null so the notify block below is skipped. (A forecast with any prior on-topic
+        // evidence can't reach here: those rows keep their relevance in the accumulating pool.)
+        const { stored } = await saveNewsIndexerMatch({
+          predictionId: prediction.id,
+          sources: matchSources,
+          externalProbability: null,
+          ciLow: null,
+          ciHigh: null,
+          insufficientData: true,
+          oracleSnapshot: { sources: [], insufficient: true, reason: est.reason },
+        })
+        wasStored = stored
+        log.info(
+          {
+            predictionId: prediction.id,
+            articles: items.length,
+            similarity: triggerSimilarity,
+            estimateSource: 'pool-insufficient',
+            poolSize: est.poolSize,
+            reason: est.reason,
+            singleRunMean: est.singleRunMean,
+          },
+          'news-indexer: oracle abstained (off-topic pool)',
+        )
+      } else {
+        probability = stanceToPercent(est.mean)
+        ciLow = stanceToPercent(est.ciLow)
+        ciHigh = stanceToPercent(est.ciHigh)
+
+        const { stored } = await saveNewsIndexerMatch({
+          predictionId: prediction.id,
+          sources: matchSources,
+          externalProbability: probability,
           ciLow,
           ciHigh,
-          articlesUsed: estimate.articlesUsed,
-          settled: estimate.settled,
-          sources: snapshotSources,
-        },
-        settled: estimate.settled,
-      })
-      wasStored = stored
+          oracleSnapshot: {
+            mean: probability,
+            std: stanceStdToPercent(est.std),
+            ciLow,
+            ciHigh,
+            articlesUsed: est.articlesUsed,
+            settled: est.settled,
+            // The whole usable pool on the pool path (`sources.length === articlesUsed`),
+            // this push's sources on the single-run fallback — see resolvePooledEstimate.
+            sources: est.snapshotSources,
+          },
+          settled: est.settled,
+        })
+        wasStored = stored
 
-      log.info(
-        {
-          predictionId: prediction.id,
-          probability,
-          stored,
-          articles: items.length,
-          similarity: triggerSimilarity,
-          // Which path produced the number, and what the other one would have said — the
-          // shadow comparison, kept but inverted now that the pool is authoritative. A large
-          // `singleRunDelta` is the signature of a single article yanking the estimate.
-          estimateSource: poolEstimate ? 'pool' : 'single-run',
-          poolSize: pool?.poolSize ?? null,
-          articlesUsed: estimate.articlesUsed,
-          singleRunMean: oracleForecast.mean,
-          singleRunDelta: poolEstimate ? Math.abs(oracleForecast.mean - poolEstimate.mean) : null,
-          poolInsufficient: pool?.insufficientData ?? null,
-          poolReason: pool?.reason ?? null,
-          // How many of THIS push's Oracle sources carried a byline — the signal that makes
-          // per-commentator attribution possible downstream. 0 means the lookup found none.
-          bylines: oracleSources.filter((s) => s.author != null).length,
-          oracleSources: oracleSources.length,
-          // What actually landed in the persisted snapshot's `sources` (the whole usable
-          // pool on the pool path, this push's sources on the single-run fallback) and how
-          // many of those carried a byline — the attribution coverage of the stored record.
-          snapshotSources: snapshotSources.length,
-          snapshotBylines: snapshotSources.filter((s) => s.author != null).length,
-        },
-        'news-indexer: oracle updated',
-      )
+        log.info(
+          {
+            predictionId: prediction.id,
+            probability,
+            stored,
+            articles: items.length,
+            similarity: triggerSimilarity,
+            // Which path produced the number, and how far the single run would have been —
+            // a large `singleRunDelta` is the signature of one article yanking the estimate.
+            estimateSource: est.estimateSource,
+            poolSize: est.poolSize,
+            articlesUsed: est.articlesUsed,
+            singleRunMean: est.singleRunMean,
+            singleRunDelta: est.estimateSource === 'pool' ? Math.abs(est.singleRunMean - est.mean) : null,
+            // How many of THIS push's Oracle sources carried a byline — the signal that makes
+            // per-commentator attribution possible downstream. 0 means the lookup found none.
+            bylines: oracleSources.filter((s) => s.author != null).length,
+            oracleSources: oracleSources.length,
+            // What actually landed in the persisted snapshot's `sources` and how many carried
+            // a byline — the attribution coverage of the stored record.
+            snapshotSources: est.snapshotSources.length,
+            snapshotBylines: est.snapshotSources.filter((s) => s.author != null).length,
+          },
+          'news-indexer: oracle updated',
+        )
+      }
     } else {
       // No estimate to report, but the claim itself still succeeded (the
       // extractor ran, just produced nothing usable) — release it immediately

@@ -66,6 +66,8 @@ beforeEach(() => {
     ...singleRun,
     snapshotSources: fallbackSources,
     estimateSource: 'single-run',
+    insufficientData: false,
+    reason: null,
     poolSize: null,
     singleRunMean: singleRun.mean,
   }))
@@ -205,6 +207,26 @@ describe('refreshOracleSnapshot', () => {
 
       expect(mockAddToPool).not.toHaveBeenCalled()
       expect(mockResolvePooled).not.toHaveBeenCalled()
+    })
+
+    it('abstains (records insufficientData, no number) when the whole pool is off-topic', async () => {
+      mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+      mockForecast.mockResolvedValue({ forecast })
+      mockResolvePooled.mockResolvedValue({
+        mean: 0.2, std: 0.1, ciLow: 0.0, ciHigh: 0.4, settled: false, articlesUsed: 0,
+        snapshotSources: [], estimateSource: 'pool-insufficient',
+        insufficientData: true, reason: 'all_articles_off_topic', poolSize: 4, singleRunMean: 0.2,
+      })
+
+      const r = await refreshOracleSnapshot(prediction)
+
+      expect(r).toEqual({ status: 'insufficient' })
+      const saved = mockSave.mock.calls[0][0]
+      expect(saved.confidence).toBeNull() // no number persisted
+      expect(saved.aiCiLow).toBeNull()
+      expect(saved.insufficientData).toBe(true)
+      // a non-null oracleSnapshot marker still converges the backfill
+      expect(saved.oracleSnapshot).toMatchObject({ insufficient: true, reason: 'all_articles_off_topic' })
     })
   })
 

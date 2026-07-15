@@ -237,6 +237,23 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     authorByUrl,
                 )
 
+                // The whole pool is off-topic — abstain, exactly as the single-run abstain
+                // above does, rather than persist a number built from irrelevant articles.
+                if (resolved.insufficientData) {
+                    log.info(
+                        { predictionId: prediction.id, path: 'abstain', estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize },
+                        'context.ai_estimate',
+                    )
+                    return {
+                        externalProbability: null,
+                        externalReasoning: 'Insufficient evidence — the gathered coverage does not bear on this claim',
+                        predictionCiLow: null,
+                        predictionCiHigh: null,
+                        oracleSnapshotData: null,
+                        insufficientData: true,
+                    }
+                }
+
                 const prob = stanceToPercent(resolved.mean)
                 const ciLow = stanceToPercent(resolved.ciLow)
                 const ciHigh = stanceToPercent(resolved.ciHigh)
