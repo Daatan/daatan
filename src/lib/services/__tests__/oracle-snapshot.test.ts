@@ -4,7 +4,12 @@
 import { describe, it, expect } from 'vitest'
 import type { OracleSource } from '@/lib/services/oracle'
 import type { SearchResult } from '@/lib/services/oracleSearch'
-import { enrichOracleSources, oracleSnapshotToContributingSources } from '../oracle-snapshot'
+import type { EvidencePoolArticle } from '@prisma/client'
+import {
+  enrichOracleSources,
+  oracleSnapshotToContributingSources,
+  poolArticleToEnrichedSource,
+} from '../oracle-snapshot'
 
 const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   source_id: 's1',
@@ -74,6 +79,73 @@ describe('enrichOracleSources', () => {
       evidenceWeight: null,
       relevanceScore: null,
     })
+  })
+})
+
+const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArticle =>
+  ({
+    id: 'row-1',
+    predictionId: 'pred-1',
+    url: 'https://reuters.com/a',
+    urlHash: 'hash-1',
+    title: 'Headline',
+    source: 'reuters.com',
+    publishedDate: '2026-07-01',
+    contentHash: null,
+    status: 'COMPLETE',
+    statusReason: null,
+    stance: 0.5,
+    certainty: 0.8,
+    credibilityWeight: 1.0,
+    claims: ['it will happen', 'second claim'],
+    settled: true,
+    quantitativeEstimate: 0.62,
+    evidenceWeight: 0.6,
+    relevanceScore: 0.9,
+    evidenceClass: 'reported_fact',
+    origin: 'news-indexer',
+    excluded: false,
+    addedAt: new Date('2026-07-01'),
+    updatedAt: new Date('2026-07-01'),
+    ...over,
+  }) as EvidencePoolArticle
+
+describe('poolArticleToEnrichedSource', () => {
+  it('maps a pool row to the snapshot source shape, taking author from the caller', () => {
+    const out = poolArticleToEnrichedSource(poolArticle(), 'Jane Doe')
+    expect(out).toEqual({
+      sourceId: 'row-1', // the pool row id is the stable display key
+      sourceName: 'reuters.com',
+      url: 'https://reuters.com/a',
+      stance: 0.5,
+      certainty: 0.8,
+      credibilityWeight: 1.0,
+      claims: ['it will happen', 'second claim'],
+      title: 'Headline',
+      publishedAt: '2026-07-01',
+      author: 'Jane Doe',
+      settled: true,
+      quantitativeEstimate: 0.62,
+      evidenceWeight: 0.6,
+      relevanceScore: 0.9,
+      evidenceClass: 'reported_fact',
+    })
+  })
+
+  it('carries a null author through (pool rows never store one)', () => {
+    expect(poolArticleToEnrichedSource(poolArticle(), null).author).toBeNull()
+  })
+
+  it('coerces a non-array / dirty claims Json to a clean string[]', () => {
+    expect(poolArticleToEnrichedSource(poolArticle({ claims: null as never }), null).claims).toEqual([])
+    expect(
+      poolArticleToEnrichedSource(poolArticle({ claims: ['ok', 42, null, 'also'] as never }), null).claims,
+    ).toEqual(['ok', 'also'])
+  })
+
+  it('nulls an unrecognised evidenceClass rather than passing the raw string through', () => {
+    expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'garbage' }), null).evidenceClass).toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'opinion' }), null).evidenceClass).toBe('opinion')
   })
 })
 

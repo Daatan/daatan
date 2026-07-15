@@ -4,7 +4,12 @@ import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
-import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
+import {
+  stanceToPercent,
+  stanceStdToPercent,
+  enrichOracleSources,
+  poolArticleToEnrichedSource,
+} from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
@@ -236,6 +241,27 @@ export async function POST(request: NextRequest) {
       ciLow = stanceToPercent(estimate.ciLow)
       ciHigh = stanceToPercent(estimate.ciHigh)
 
+      // The snapshot must list the articles the ESTIMATE is based on. On the pool path
+      // (the default since v1.60.0) that's the whole usable pool — exactly the rows
+      // recomputeFromPool POSTed, so `sources.length === articlesUsed` — not just this
+      // push's one or two articles. Storing only the pushed articles alongside a pooled
+      // `mean`/`articlesUsed` made the snapshot unable to explain its own number. Authors
+      // aren't kept on pool rows, so re-look them up by URL (best-effort, same as the
+      // single-run path); reuse the authors already fetched for this push so overlapping
+      // URLs aren't re-queried. On the single-run fallback, keep this push's sources.
+      let snapshotSources = oracleSources
+      if (poolEstimate) {
+        const missing = poolEstimate.usableArticles
+          .map((a) => a.url)
+          .filter((u) => !authorByUrl.has(u))
+        if (missing.length > 0) {
+          for (const [url, m] of await getArticleMetaByUrl(missing)) authorByUrl.set(url, m.author)
+        }
+        snapshotSources = poolEstimate.usableArticles.map((a) =>
+          poolArticleToEnrichedSource(a, authorByUrl.get(a.url) ?? null),
+        )
+      }
+
       const { stored } = await saveNewsIndexerMatch({
         predictionId: prediction.id,
         sources: items.map((a) => ({
@@ -254,11 +280,7 @@ export async function POST(request: NextRequest) {
           ciHigh,
           articlesUsed: estimate.articlesUsed,
           settled: estimate.settled,
-          // NOTE: still only THIS push's articles, while `mean`/`articlesUsed` above now
-          // describe the whole pool. Listing every pooled article here (so the UI can
-          // actually explain the number) is the next PR — it needs author/title lookups
-          // over pool rows and grows the stored blob, which doesn't belong in this cutover.
-          sources: oracleSources,
+          sources: snapshotSources,
         },
         settled: estimate.settled,
       })
@@ -281,10 +303,15 @@ export async function POST(request: NextRequest) {
           singleRunDelta: poolEstimate ? Math.abs(oracleForecast.mean - poolEstimate.mean) : null,
           poolInsufficient: pool?.insufficientData ?? null,
           poolReason: pool?.reason ?? null,
-          // How many of the Oracle's sources carried a byline — the signal that makes
+          // How many of THIS push's Oracle sources carried a byline — the signal that makes
           // per-commentator attribution possible downstream. 0 means the lookup found none.
           bylines: oracleSources.filter((s) => s.author != null).length,
           oracleSources: oracleSources.length,
+          // What actually landed in the persisted snapshot's `sources` (the whole usable
+          // pool on the pool path, this push's sources on the single-run fallback) and how
+          // many of those carried a byline — the attribution coverage of the stored record.
+          snapshotSources: snapshotSources.length,
+          snapshotBylines: snapshotSources.filter((s) => s.author != null).length,
         },
         'news-indexer: oracle updated',
       )

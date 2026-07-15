@@ -244,7 +244,26 @@ describe('recomputeFromPool', () => {
       usableSize: 2,
       excludedCount: 1,
       incompleteCount: 1,
+      // The exact rows that were POSTed — art-1 and art-2. The excluded (art-3) and
+      // stance-less (art-4) rows are dropped, so the caller can list precisely the
+      // articles the estimate averages.
+      usableArticles: [poolArticle(), poolArticle({ id: 'art-2' })],
     })
+  })
+
+  it('returns usableArticles equal to the rows it POSTed — nothing more, nothing less', async () => {
+    findMany.mockResolvedValue([
+      poolArticle(),
+      poolArticle({ id: 'art-2', excluded: true }),
+      poolArticle({ id: 'art-3', relevanceScore: null }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    const out = await recomputeFromPool('pred-1', null, null)
+
+    const posted = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body).sources
+    expect(out?.usableArticles).toHaveLength(posted.length)
+    expect(out?.usableArticles.map((a) => a.id)).toEqual(['art-1'])
   })
 
   it("drops admin-excluded articles from the aggregate, so an exclusion moves the number", async () => {
