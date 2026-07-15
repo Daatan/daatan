@@ -503,6 +503,13 @@ model EvidencePoolArticle {
   author     String? @db.VarChar(200)
   personId   String? @map("person_id") @db.VarChar(64)
   personName String? @map("person_name") @db.VarChar(200)
+  // Resolved outlet identity from news-indexer (/articles/by-url), same shape and provenance
+  // as personId/personName above — an exact match against news-indexer's outlet.name (no
+  // alias table on that side; sources.yaml's `name` IS the outlet's canonical identity). Lets
+  // elections attribute a source to a tracked outlet by joining on outletId instead of
+  // re-matching TRACKED_SOURCES. All nullable; forward-populated on write, backfilled separately.
+  outletId   String? @map("outlet_id") @db.VarChar(64)
+  outletName String? @map("outlet_name") @db.VarChar(200)
   publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
 
   // Content fingerprint (hash of title+snippet as pushed by the discovering

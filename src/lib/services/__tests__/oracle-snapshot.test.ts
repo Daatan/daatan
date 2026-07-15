@@ -62,6 +62,25 @@ describe('enrichOracleSources', () => {
     expect(out[0]).toMatchObject({ title: null, publishedAt: null, author: null })
   })
 
+  it('joins resolved person/outlet identity from the identityByUrl map', () => {
+    const out = enrichOracleSources(
+      [oracleSource()],
+      [searchResult()],
+      new Map(),
+      new Map([['https://reuters.com/a', {
+        personId: 'p-1', personName: 'Jane Doe', outletId: 'o-1', outletName: 'Reuters',
+      }]]),
+    )
+    expect(out[0]).toMatchObject({
+      personId: 'p-1', personName: 'Jane Doe', outletId: 'o-1', outletName: 'Reuters',
+    })
+  })
+
+  it('defaults person/outlet identity to null when identityByUrl is omitted', () => {
+    const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(out[0]).toMatchObject({ personId: null, personName: null, outletId: null, outletName: null })
+  })
+
   it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore to null when the Oracle omits them', () => {
     const out = enrichOracleSources(
       [oracleSource({
@@ -105,6 +124,10 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     evidenceClass: 'reported_fact',
     origin: 'news-indexer',
     excluded: false,
+    personId: null,
+    personName: null,
+    outletId: 'o-1',
+    outletName: 'Reuters',
     addedAt: new Date('2026-07-01'),
     updatedAt: new Date('2026-07-01'),
     ...over,
@@ -124,6 +147,10 @@ describe('poolArticleToEnrichedSource', () => {
       title: 'Headline',
       publishedAt: '2026-07-01',
       author: 'Jane Doe',
+      personId: null,
+      personName: null,
+      outletId: 'o-1',
+      outletName: 'Reuters',
       settled: true,
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,

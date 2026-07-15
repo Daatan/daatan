@@ -201,7 +201,10 @@ export async function POST(request: NextRequest) {
       const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map((s) => s.url))
       const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
       const identityByUrl = new Map(
-        [...articleMeta.entries()].map(([url, m]) => [url, { personId: m.personId ?? null, personName: m.personName ?? null }]),
+        [...articleMeta.entries()].map(([url, m]) => [url, {
+          personId: m.personId ?? null, personName: m.personName ?? null,
+          outletId: m.outletId ?? null, outletName: m.outletName ?? null,
+        }]),
       )
       const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl, identityByUrl)
 

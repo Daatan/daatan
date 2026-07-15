@@ -70,6 +70,9 @@ type ArticleMeta = {
   // change; null for uncurated bylines and against an older news-indexer. See MATCHING_ARCHITECTURE.md.
   personId?: string | null
   personName?: string | null
+  // Resolved outlet identity (news-indexer outlet). Same provenance/nullability as personId/personName.
+  outletId?: string | null
+  outletName?: string | null
 }
 
 /**

@@ -43,6 +43,10 @@ export type EnrichedOracleSource = {
   // uncurated or when the by-url lookup didn't supply it.
   personId: string | null
   personName: string | null
+  // Resolved outlet identity (news-indexer, exact match against outlet.name). Same provenance
+  // and nullability as personId/personName above.
+  outletId: string | null
+  outletName: string | null
   settled: boolean | null
   quantitativeEstimate: number | null
   evidenceWeight: number | null
@@ -59,7 +63,10 @@ export function enrichOracleSources(
   sources: OracleSource[],
   searchResults: SearchResult[],
   authorByUrl: Map<string, string | null>,
-  identityByUrl: Map<string, { personId: string | null; personName: string | null }> = new Map(),
+  identityByUrl: Map<
+    string,
+    { personId: string | null; personName: string | null; outletId: string | null; outletName: string | null }
+  > = new Map(),
 ): EnrichedOracleSource[] {
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
@@ -77,6 +84,8 @@ export function enrichOracleSources(
       author: authorByUrl.get(s.url) ?? null,
       personId: identityByUrl.get(s.url)?.personId ?? null,
       personName: identityByUrl.get(s.url)?.personName ?? null,
+      outletId: identityByUrl.get(s.url)?.outletId ?? null,
+      outletName: identityByUrl.get(s.url)?.outletName ?? null,
       settled: s.settled ?? null,
       quantitativeEstimate: s.quantitative_estimate ?? null,
       evidenceWeight: s.evidence_weight ?? null,
@@ -127,6 +136,8 @@ export function poolArticleToEnrichedSource(
     author,
     personId: row.personId,
     personName: row.personName,
+    outletId: row.outletId,
+    outletName: row.outletName,
     settled: row.settled,
     quantitativeEstimate: row.quantitativeEstimate,
     evidenceWeight: row.evidenceWeight,

@@ -212,7 +212,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     [...articleMeta.entries()].map(([url, m]) => [url, m.author]),
                 )
                 const identityByUrl = new Map(
-                    [...articleMeta.entries()].map(([url, m]) => [url, { personId: m.personId ?? null, personName: m.personName ?? null }]),
+                    [...articleMeta.entries()].map(([url, m]) => [url, {
+                        personId: m.personId ?? null, personName: m.personName ?? null,
+                        outletId: m.outletId ?? null, outletName: m.outletName ?? null,
+                    }]),
                 )
                 const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl, identityByUrl)
 
