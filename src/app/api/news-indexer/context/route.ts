@@ -48,6 +48,11 @@ const bodySchema = z
     articleSource: z.string().nullable().optional(),
     publishedAt: z.string().nullable().optional(),
     similarity: z.number().min(0).max(1).optional(),
+    // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
+    // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
+    // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
+    relevance: z.number().min(0).max(1).nullable().optional(),
+    isPrediction: z.boolean().nullable().optional(),
   })
   .refine(
     (b) => (b.articles && b.articles.length > 0) || (b.articleUrl && b.articleTitle),
@@ -106,6 +111,13 @@ export async function POST(request: NextRequest) {
       snippet: a.snippet,
       source: a.source ?? undefined,
       publishedDate: a.publishedAt ?? undefined,
+      // Reuse the gatekeeper verdict news-indexer already computed for the TRIGGER article, so the
+      // Oracle skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
+      // trigger carries a verdict — the evidence neighbours were never judged. Fail-open: absent
+      // verdict, or the Oracle flag off, and it judges exactly as today.
+      ...(a.url === triggerUrl && body.relevance != null && body.isPrediction != null
+        ? { relevance: body.relevance, isPrediction: body.isPrediction }
+        : {}),
     }))
 
     // Atomic claim gate (evidence-pool.ts) — fixes a confirmed race where
