@@ -299,12 +299,17 @@ export interface SaveNewsIndexerMatchInput {
   predictionId: string
   /** The evidence set fed to the Oracle: [{ url, title, source, publishedDate }, ...]. */
   sources: Prisma.InputJsonValue
-  externalProbability: number
-  ciLow: number
-  ciHigh: number
+  /** Null on an abstention (`insufficientData`) — the whole pool was off-topic, so there is
+   *  no estimate to persist; `recordEstimate` nulls confidence/CI in that case. */
+  externalProbability: number | null
+  ciLow: number | null
+  ciHigh: number | null
   oracleSnapshot: Prisma.InputJsonValue
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
+  /** The pool aggregated but found no usable signal (off-topic). Records an abstention:
+   *  confidence/CI null, snapshot flagged, no notification, excluded from glide/chart. */
+  insufficientData?: boolean
 }
 
 /** externalReasoning marker identifying snapshots written by the news-indexer push path. */
@@ -339,6 +344,7 @@ export async function saveNewsIndexerMatch(
     ciLow: input.ciLow,
     ciHigh: input.ciHigh,
     settled: input.settled,
+    insufficientData: input.insufficientData,
     sources: input.sources,
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
@@ -424,6 +430,8 @@ export interface SaveOracleSnapshotInput {
   aiCiHigh: number | null
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
+  /** The pool aggregated but found no usable signal (off-topic) — records an abstention. */
+  insufficientData?: boolean
 }
 
 /**
@@ -442,6 +450,7 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     ciLow: input.aiCiLow,
     ciHigh: input.aiCiHigh,
     settled: input.settled,
+    insufficientData: input.insufficientData,
     externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
     oracleSnapshot: input.oracleSnapshot,
   })

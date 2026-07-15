@@ -492,16 +492,29 @@ describe('POST /api/news-indexer/context', () => {
       )
     })
 
-    it('falls back to the single run when the pool reports insufficient data', async () => {
+    it('ABSTAINS (no number, no notify) when the pool is off-topic — does NOT fall back to the single run', async () => {
       vi.mocked(recomputeFromPool).mockResolvedValue({
         ...POOL,
         insufficientData: true,
-        reason: 'no_decisive_signal',
+        reason: 'all_articles_off_topic',
       })
 
-      await POST(post('test-secret'))
+      const res = await POST(post('test-secret'))
 
-      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(expect.objectContaining({ externalProbability: 75 }))
+      // records an abstention, NOT the single run's 75
+      expect(saveNewsIndexerMatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalProbability: null,
+          ciLow: null,
+          ciHigh: null,
+          insufficientData: true,
+          oracleSnapshot: expect.objectContaining({ insufficient: true, reason: 'all_articles_off_topic' }),
+        }),
+      )
+      // no high-confidence notification fires on an abstention
+      expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
+      // the response carries no probability
+      expect((await res.json()).probability).toBeNull()
     })
 
     it('still persists an estimate when the pool write/recompute throws', async () => {

@@ -170,11 +170,26 @@ forecast swung 1% → 99% in 19 minutes on two articles reporting the *same* eve
 with a CI so tight (0–2, then 94–100) that the system never once signalled doubt.
 Aggregating the pool puts a single bad extraction in proportion to the evidence gathered.
 
-The single-run forecast remains the **fallback** whenever the pool cannot produce an
-aggregate (Oracle unreachable, nothing usable pooled yet, or `insufficient_data`), so a
-flaky Oracle degrades the estimate rather than dropping it. Each run logs which path won
-and the single-run mean (`estimateSource`, `singleRunMean`/`singleRunDelta`) — a large gap
-is the signature of a run that would have yanked the old estimate.
+The shared decision (`resolvePooledEstimate` in `pooled-estimate.ts`) has **three** outcomes,
+and the two "no pool number" cases are deliberately different:
+- **pool** — the aggregate is the estimate.
+- **single-run fallback** — the pool could not be *read* (Oracle unreachable, nothing usable
+  pooled yet, transport error). Fall back to this run's `/forecast` so a flaky Oracle degrades
+  the estimate rather than dropping it.
+- **abstain** — the pool *was* aggregated and returned `insufficient_data`. In prod the only
+  reason is `all_articles_off_topic` (every article scored below `relevance_weight_floor`;
+  `defer_on_thin_evidence` is off, so thin-but-on-topic pools get their CI inflated instead,
+  never marked insufficient). The run records an **abstention** — `confidence`/CI null, the
+  snapshot flagged `insufficientData: true`, no notification, excluded from the glide anchor
+  and history chart (both filter `insufficientData: false`) — rather than fall back to a
+  single run over the *same* off-topic articles, which would reintroduce a garbage number.
+  The UI renders it as "insufficient evidence" (ContextTimeline). A forecast with any prior
+  on-topic evidence can't reach this state: those rows keep their relevance in the
+  accumulating pool, so only a forecast whose *entire* pool is off-topic abstains.
+
+Each run logs which path won and the single-run mean (`estimateSource` ∈
+{`pool`,`single-run`,`pool-insufficient`}, `singleRunMean`/`singleRunDelta`) — a large gap is
+the signature of a run that would have yanked the old estimate.
 
 Consequently `excluded` is now **enforced on every path**: excluded rows are dropped before
 the aggregate, so an admin's exclusion genuinely moves the number.
