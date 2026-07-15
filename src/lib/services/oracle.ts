@@ -195,6 +195,9 @@ export const getOracleForecast = async (
       body: JSON.stringify({
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
+        // Log correlation only (retro #273) — lets gate_reused log lines join
+        // directly to a context_snapshots row instead of by timestamp.
+        ...(meta.predictionId ? { prediction_id: meta.predictionId } : {}),
         // Arms retro #244's direction guard. Both fail-open on retro's side
         // when absent — omit rather than send a value it would 422 on (NONE
         // is not a valid claim_direction).
