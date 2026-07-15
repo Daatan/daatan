@@ -66,6 +66,10 @@ type ArticleMeta = {
   publishedAt: string | null
   title: string | null
   source: string | null
+  // Resolved cross-platform identity (news-indexer person). Present since the by-url identity
+  // change; null for uncurated bylines and against an older news-indexer. See MATCHING_ARCHITECTURE.md.
+  personId?: string | null
+  personName?: string | null
 }
 
 /**

@@ -66,6 +66,8 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   title: 'Headline',
   publishedAt: '2026-06-18',
   author: 'Jane Doe',
+  personId: null,
+  personName: null,
   settled: null,
   quantitativeEstimate: null,
   evidenceWeight: null,
@@ -100,6 +102,18 @@ describe('addArticlesToPool', () => {
       certainty: 0.8,
       origin: 'analyze',
     })
+  })
+
+  it('persists the resolved author identity on the pool row (Phase 2)', async () => {
+    await addArticlesToPool(
+      'pred-1',
+      [source({ author: 'בן כספית', personId: 'p-9', personName: 'Ben Caspit' })],
+      'news-indexer',
+    )
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    const identity = { author: 'בן כספית', personId: 'p-9', personName: 'Ben Caspit' }
+    expect(call.create).toMatchObject(identity)
+    expect(call.update).toMatchObject(identity)
   })
 
   it('never writes `excluded` (an admin exclusion decision must survive re-discovery)', async () => {

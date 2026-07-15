@@ -38,6 +38,11 @@ export type EnrichedOracleSource = {
   title: string | null
   publishedAt: string | null
   author: string | null
+  // Resolved cross-platform person identity (news-indexer). Persisted on the evidence-pool row so
+  // elections can attribute a source to a tracked commentator by id/name (Phase 2). Null when
+  // uncurated or when the by-url lookup didn't supply it.
+  personId: string | null
+  personName: string | null
   settled: boolean | null
   quantitativeEstimate: number | null
   evidenceWeight: number | null
@@ -54,6 +59,7 @@ export function enrichOracleSources(
   sources: OracleSource[],
   searchResults: SearchResult[],
   authorByUrl: Map<string, string | null>,
+  identityByUrl: Map<string, { personId: string | null; personName: string | null }> = new Map(),
 ): EnrichedOracleSource[] {
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
@@ -69,6 +75,8 @@ export function enrichOracleSources(
       title: article?.title ?? null,
       publishedAt: article?.publishedDate ?? null,
       author: authorByUrl.get(s.url) ?? null,
+      personId: identityByUrl.get(s.url)?.personId ?? null,
+      personName: identityByUrl.get(s.url)?.personName ?? null,
       settled: s.settled ?? null,
       quantitativeEstimate: s.quantitative_estimate ?? null,
       evidenceWeight: s.evidence_weight ?? null,
@@ -117,6 +125,8 @@ export function poolArticleToEnrichedSource(
     title: row.title,
     publishedAt: row.publishedDate,
     author,
+    personId: row.personId,
+    personName: row.personName,
     settled: row.settled,
     quantitativeEstimate: row.quantitativeEstimate,
     evidenceWeight: row.evidenceWeight,

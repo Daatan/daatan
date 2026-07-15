@@ -211,7 +211,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 const authorByUrl = new Map(
                     [...articleMeta.entries()].map(([url, m]) => [url, m.author]),
                 )
-                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl)
+                const identityByUrl = new Map(
+                    [...articleMeta.entries()].map(([url, m]) => [url, { personId: m.personId ?? null, personName: m.personName ?? null }]),
+                )
+                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl, identityByUrl)
 
                 // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate —
                 // the same cutover the news-indexer push path got in v1.60.0 (#1121), previously
