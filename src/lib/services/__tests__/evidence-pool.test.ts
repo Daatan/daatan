@@ -68,6 +68,8 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   author: 'Jane Doe',
   personId: null,
   personName: null,
+  outletId: null,
+  outletName: null,
   settled: null,
   quantitativeEstimate: null,
   evidenceWeight: null,

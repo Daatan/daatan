@@ -152,6 +152,12 @@ extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
 from the resolution-outcome signal, since `evidenceWeight` alone can't
 distinguish opinion from a low-certainty unclassified article.
+`personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
+news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
+`docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`
+tables. All nullable, forward-populated on write only (no historical backfill); lets elections
+eventually attribute a source to a tracked commentator/outlet by id instead of string-matching
+`TRACKED_SOURCES`/`CURATED_ELECTION_AUTHORS`.
 **All three estimate paths are cut over to the pool** (ORACLE_VARIABLES.md §6).
 `recomputeFromPool()` in `evidence-pool.ts` posts the current non-excluded pool to
 retro's `POST /pool/aggregate`, and that aggregate — mean, std, CI, `settled`,
