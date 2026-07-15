@@ -1,6 +1,7 @@
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import FeedClient from '../FeedClient'
+import { generateMetadata } from '../page'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import messages from '../../../messages/en.json'
 
@@ -74,5 +75,23 @@ describe('FeedPage', () => {
     })
 
     expect(screen.getByText(messages.feed.empty)).toBeInTheDocument()
+  })
+})
+
+describe('FeedPage generateMetadata', () => {
+  it('returns no robots override for the default (unfiltered) view', async () => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({}) })
+
+    expect(metadata.robots).toBeUndefined()
+  })
+
+  it.each([
+    ['tags', { tags: 'Leadership' }],
+    ['status', { status: 'ACTIVE' }],
+    ['sortBy', { sortBy: 'trending' }],
+  ])('returns noindex when the %s param is present', async (_label, params) => {
+    const metadata = await generateMetadata({ searchParams: Promise.resolve(params) })
+
+    expect(metadata.robots).toEqual({ index: false, follow: false })
   })
 })

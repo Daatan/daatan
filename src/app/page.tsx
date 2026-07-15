@@ -8,17 +8,30 @@ import type { Prediction } from '@/components/forecasts/ForecastCard'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  // Brand-neutral (no literal name) so the self-host edition inherits it; the
-  // title already carries the brand. Kept long enough for Bing's meta-length check.
-  description:
-    'Prove you were right — without shouting into the void. A reputation-based platform to forecast the news, stake your credibility, and track your accuracy with Brier scores.',
-  alternates: {
-    canonical: 'https://daatan.com',
-  },
-  openGraph: {
-    url: 'https://daatan.com',
-  },
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; tags?: string; sortBy?: string }>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const hasCustomParams = params.status || params.tags || params.sortBy
+
+  return {
+    // Brand-neutral (no literal name) so the self-host edition inherits it; the
+    // title already carries the brand. Kept long enough for Bing's meta-length check.
+    description:
+      'Prove you were right — without shouting into the void. A reputation-based platform to forecast the news, stake your credibility, and track your accuracy with Brier scores.',
+    alternates: {
+      canonical: 'https://daatan.com',
+    },
+    openGraph: {
+      url: 'https://daatan.com',
+    },
+    // Filtered views skip SSR (see FeedPage below) and render client-side, so
+    // Google sees an empty shell — don't let it index the query-param cross
+    // product as separate pages. Mirrors the pattern in tags/[slug]/page.tsx.
+    ...(hasCustomParams ? { robots: { index: false, follow: false } } : {}),
+  }
 }
 
 function FeedLoading() {

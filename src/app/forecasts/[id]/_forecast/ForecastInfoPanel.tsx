@@ -94,7 +94,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
               prediction.tags.map((tag) => (
                 <Link
                   key={tag.id}
-                  href={`/?tags=${encodeURIComponent(tag.name)}`}
+                  href={`/tags/${tag.slug}`}
                   title={t('filterByTagTooltip', { tag: tag.name })}
                   className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600 transition-colors"
                 >
