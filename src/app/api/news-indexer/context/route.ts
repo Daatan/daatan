@@ -200,7 +200,10 @@ export async function POST(request: NextRequest) {
       // elections.daatan.com's tracked commentators — can never match a person.
       const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map((s) => s.url))
       const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
-      const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl)
+      const identityByUrl = new Map(
+        [...articleMeta.entries()].map(([url, m]) => [url, { personId: m.personId ?? null, personName: m.personName ?? null }]),
+      )
+      const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl, identityByUrl)
 
       // The Oracle run above is an EXTRACTION step, not the estimate. A push usually
       // carries a single freshly-matched article, and `/forecast` over one article returns

@@ -28,7 +28,7 @@ const SINGLE_RUN: SingleRunEstimate = {
 }
 
 const FALLBACK_SOURCES = [
-  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, settled: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null },
+  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, personId: null, personName: null, settled: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null },
 ]
 
 const poolRow = (over: Partial<EvidencePoolArticle>): EvidencePoolArticle =>

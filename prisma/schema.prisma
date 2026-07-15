@@ -495,6 +495,14 @@ model EvidencePoolArticle {
   urlHash String @map("url_hash") @db.VarChar(64) // hashUrl() — same normalization as NewsAnchor
   title   String? @db.VarChar(500)
   source  String? @db.VarChar(200) // outlet/domain, e.g. "reuters.com"
+  // Resolved author identity from news-indexer (/articles/by-url): the byline plus the
+  // cross-platform person it resolves to. Lets elections attribute a source to a tracked
+  // commentator by joining on personId/personName instead of re-matching author strings
+  // (Phase 2, docs/MATCHING_ARCHITECTURE.md). All nullable; forward-populated on write,
+  // backfilled separately. personName is news-indexer's person.canonical_name.
+  author     String? @db.VarChar(200)
+  personId   String? @map("person_id") @db.VarChar(64)
+  personName String? @map("person_name") @db.VarChar(200)
   publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
 
   // Content fingerprint (hash of title+snippet as pushed by the discovering
