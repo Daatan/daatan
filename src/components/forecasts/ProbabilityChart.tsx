@@ -64,7 +64,7 @@ type Props = {
   /** Linked external-market price history, oldest first, already polarity-adjusted
    *  by the caller (see marketDisplayProbability). Drives the "Market" line. */
   marketSnapshots?: ChartMarketPoint[]
-  /** Legend name for the market line, e.g. "Market (Polymarket, inverted)". */
+  /** Legend name for the market line, e.g. "Polymarket, inverted". */
   marketLabel?: string
   /** Per-member AI-panel series. Only rendered when `showAiPanel` is true. */
   panelSeries?: ChartPanelMember[]
@@ -193,7 +193,7 @@ export default function ProbabilityChart({
   outcomeType,
   options,
   marketSnapshots = [],
-  marketLabel = 'Market (Polymarket)',
+  marketLabel = 'Polymarket',
   panelSeries = [],
   showAiPanel = false,
 }: Props) {
@@ -518,7 +518,7 @@ export default function ProbabilityChart({
               key={`${m.model}:${m.mode}`}
               type="stepAfter"
               dataKey={panelKey(m.model, m.mode)}
-              name={m.isControl ? `${m.label} (control)` : m.label}
+              name={m.label}
               stroke={m.color}
               strokeOpacity={0.75}
               strokeWidth={1.5}

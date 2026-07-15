@@ -18,11 +18,22 @@ const MARKET_DIVERGENCE_REARM_PTS = 15
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com'
 const CLOB_BASE = 'https://clob.polymarket.com'
+/** Public, unauthenticated market-data API — auth (RSA-PSS signed requests) is only
+ *  required for trading/portfolio endpoints, which this read-only integration never calls. */
+const KALSHI_BASE = 'https://external-api.kalshi.com/trade-api/v2'
 const FETCH_TIMEOUT_MS = 8_000
 /** 12-hour candles keep even a multi-year market history to a few hundred points. */
 const HISTORY_FIDELITY_MINUTES = 720
 /** Hard cap on backfilled snapshots per market (stride-sampled down when over). */
 const MAX_BACKFILL_POINTS = 400
+/** Kalshi candlesticks have no "since market opened" shorthand like Polymarket's
+ *  `interval=max` — the endpoint needs an explicit start_ts. Most linked markets live
+ *  well under two years; anything older just loses its earliest stretch, the same
+ *  best-effort spirit as the stride-sampling cap above. */
+const KALSHI_HISTORY_LOOKBACK_DAYS = 730
+/** Kalshi candlestick granularity in minutes — daily bars, same rationale as
+ *  HISTORY_FIDELITY_MINUTES above. */
+const KALSHI_CANDLESTICK_INTERVAL_MINUTES = 1440
 /** Cosine similarity above which a market is treated as "the same question". */
 const MATCH_THRESHOLD = 0.8
 /** Cosine-similarity floor for the admin "Suggest matches" panel. Candidates
@@ -157,13 +168,16 @@ export interface MarketProvider {
   fetchMarket(id: string): Promise<NormalizedMarket | null>
   /** Suggest candidate markets for a free-text query (best-effort). */
   suggest(query: string, limit: number): Promise<MarketSuggestion[]>
+  /** Fetch full-life YES price history for backfill, keyed by the market's own
+   *  `historyId` (opaque per provider). Empty on failure or when unsupported. */
+  fetchHistory(historyId: string): Promise<HistoryPoint[]>
 }
 
 // ---------------------------------------------------------------------------
 // Polymarket provider (public Gamma API)
 // ---------------------------------------------------------------------------
 
-/** Fetch JSON from a fixed Polymarket host with a timeout; returns null on any failure. */
+/** Fetch JSON from a fixed host (Polymarket or Kalshi) with a timeout; returns null on any failure. */
 async function apiFetch<T>(base: string, path: string): Promise<T | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
@@ -354,11 +368,12 @@ async function fetchYesPriceHistory(historyId: string): Promise<HistoryPoint[]> 
  */
 async function backfillMarketHistory(
   marketId: string,
+  provider: MarketProvider,
   historyId: string,
   before: Date,
 ): Promise<number> {
   try {
-    const points = (await fetchYesPriceHistory(historyId)).filter(
+    const points = (await provider.fetchHistory(historyId)).filter(
       p => p.createdAt.getTime() < before.getTime(),
     )
     if (points.length === 0) return 0
@@ -469,11 +484,127 @@ export const polymarketProvider: MarketProvider = {
     }
     return results.slice(0, limit)
   },
+
+  fetchHistory: fetchYesPriceHistory,
 }
 
 // ---------------------------------------------------------------------------
-// Kalshi provider (stub — Phase B; needs KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY)
+// Kalshi provider (public trade-api/v2 — no auth needed for market-data reads)
 // ---------------------------------------------------------------------------
+
+const kalshiFetch = <T,>(path: string) => apiFetch<T>(KALSHI_BASE, path)
+
+/** A raw Kalshi market row is priced in dollar strings ("0.4700"), not a
+ *  0–1 float like Polymarket's outcomePrices. Parses defensively. */
+function parseDollars(value: unknown): number | null {
+  const n = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN
+  return Number.isFinite(n) ? n : null
+}
+
+/** Kalshi has no single "current price" field — yes_bid/yes_ask is the live quote,
+ *  last_price the most recent trade. Prefer the quote midpoint (standard "implied
+ *  probability" convention); fall back to last trade only when there's no live
+ *  quote yet (both bid and ask still at their zero default). */
+function midOrLastPrice(bid: unknown, ask: unknown, last: unknown): number | null {
+  const b = parseDollars(bid)
+  const a = parseDollars(ask)
+  if (b !== null && a !== null && (b > 0 || a > 0)) return (b + a) / 2
+  return parseDollars(last)
+}
+
+/** Raw Kalshi market row, narrowed to the fields normalizeKalshiMarket reads. */
+interface RawKalshiMarket {
+  ticker?: unknown
+  event_ticker?: unknown
+  title?: unknown
+  status?: unknown
+  result?: unknown
+  close_time?: unknown
+  market_type?: unknown
+  mve_selected_legs?: unknown
+  yes_bid_dollars?: unknown
+  yes_ask_dollars?: unknown
+  last_price_dollars?: unknown
+  volume_fp?: unknown
+}
+
+interface RawKalshiEvent {
+  event_ticker?: unknown
+  series_ticker?: unknown
+}
+
+/** Map a raw Kalshi market row into the normalized shape. Returns null if unusable.
+ *  `seriesTicker` (needed for the candlestick history endpoint's path) comes from the
+ *  enclosing event — Kalshi market rows don't carry their own series id. Only plain
+ *  binary Yes/No markets are supported: `mve_selected_legs` marks a multivariate combo
+ *  (several sub-questions bundled under one ticker, e.g. "yes A, yes B, yes C" as a
+ *  single title) that can't be normalized into a single claim's Yes/No pair. */
+export function normalizeKalshiMarket(
+  raw: RawKalshiMarket,
+  seriesTicker: string | null = null,
+): NormalizedMarket | null {
+  if (raw.market_type !== 'binary' || Array.isArray(raw.mve_selected_legs)) return null
+
+  const ticker = typeof raw.ticker === 'string' ? raw.ticker : null
+  const question = typeof raw.title === 'string' ? raw.title : null
+  if (!ticker || !question) return null
+
+  const mid = midOrLastPrice(raw.yes_bid_dollars, raw.yes_ask_dollars, raw.last_price_dollars)
+  if (mid === null) return null
+  const yesProbability = Math.round(Math.min(1, Math.max(0, mid)) * 100)
+
+  const closed = raw.status !== 'active'
+  const result = typeof raw.result === 'string' ? raw.result.toLowerCase() : ''
+  const resolvedOutcome = closed ? (result === 'yes' ? 'Yes' : result === 'no' ? 'No' : null) : null
+
+  const closeTimeRaw = typeof raw.close_time === 'string' ? raw.close_time : null
+  const endDate = closeTimeRaw ? new Date(closeTimeRaw) : null
+
+  return {
+    provider: 'KALSHI',
+    externalId: ticker,
+    slug: ticker,
+    url: `https://kalshi.com/markets/${ticker}`,
+    question,
+    outcomes: ['Yes', 'No'],
+    yesProbability,
+    endDate: endDate && !isNaN(endDate.getTime()) ? endDate : null,
+    closed,
+    resolvedOutcome,
+    // "seriesTicker:ticker" — candlesticks need both segments; see fetchHistory below.
+    historyId: seriesTicker ? `${seriesTicker}:${ticker}` : null,
+  }
+}
+
+/** Best-effort numeric volume from a raw Kalshi market row, used to pick the
+ *  most-traded market within an event (mirrors marketVolume() for Polymarket). */
+function kalshiMarketVolume(raw: RawKalshiMarket): number {
+  const n = parseDollars(raw.volume_fp)
+  return n ?? 0
+}
+
+/** Parse a Kalshi candlesticks payload into snapshot-ready points (asc, deduped, capped). */
+export function parseKalshiCandlesticks(payload: unknown): HistoryPoint[] {
+  const rows = (payload as { candlesticks?: unknown[] })?.candlesticks
+  if (!Array.isArray(rows)) return []
+  const points: HistoryPoint[] = []
+  for (const row of rows) {
+    const r = row as Record<string, unknown>
+    const ts = typeof r.end_period_ts === 'number' ? r.end_period_ts : null
+    if (ts === null) continue
+    const bid = (r.yes_bid as Record<string, unknown> | undefined)?.close_dollars
+    const ask = (r.yes_ask as Record<string, unknown> | undefined)?.close_dollars
+    const price = (r.price as Record<string, unknown> | undefined)?.close_dollars
+    const mid = midOrLastPrice(bid, ask, price)
+    if (mid === null) continue
+    points.push({
+      createdAt: new Date(ts * 1000),
+      probability: Math.round(Math.min(1, Math.max(0, mid)) * 100),
+    })
+  }
+  points.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  return samplePoints(dedupeConsecutive(points), MAX_BACKFILL_POINTS)
+}
 
 export const kalshiProvider: MarketProvider = {
   id: 'KALSHI',
@@ -487,23 +618,71 @@ export const kalshiProvider: MarketProvider = {
   },
 
   parseId(input: string): string | null {
+    const trimmed = input.trim()
+    if (!trimmed) return null
+    // Raw ticker (no scheme, no slashes) — accept as-is, uppercased (tickers are
+    // canonically upper-case; a pasted URL's path segment is lower-case).
+    if (!trimmed.includes('/') && !trimmed.includes(' ')) return trimmed.toUpperCase()
     try {
-      const url = new URL(input.trim())
+      const url = new URL(trimmed)
       if (!url.hostname.includes('kalshi.com')) return null
       const segments = url.pathname.split('/').filter(Boolean)
-      return segments.length > 0 ? segments[segments.length - 1] : null
+      const last = segments[segments.length - 1]
+      // Kalshi's web app links to an event page (e.g. .../markets/kxfed/fed-funds-rate/kxfed-26jul),
+      // whose last segment is an EVENT ticker, not a specific market/strike — same
+      // ambiguity fetchMarket resolves for Polymarket's grouped events below.
+      return last ? last.toUpperCase() : null
     } catch {
-      return input.trim() || null
+      return null
     }
   },
 
-  async fetchMarket(): Promise<NormalizedMarket | null> {
-    log.warn('Kalshi provider not yet configured (needs API credentials) — Phase B')
+  async fetchMarket(id: string): Promise<NormalizedMarket | null> {
+    const direct = await kalshiFetch<{ market: RawKalshiMarket }>(`/markets/${encodeURIComponent(id)}`)
+    if (direct?.market) {
+      const eventTicker = typeof direct.market.event_ticker === 'string' ? direct.market.event_ticker : null
+      const eventResp = eventTicker
+        ? await kalshiFetch<{ event: RawKalshiEvent }>(`/events/${encodeURIComponent(eventTicker)}`)
+        : null
+      const seriesTicker = typeof eventResp?.event?.series_ticker === 'string' ? eventResp.event.series_ticker : null
+      return normalizeKalshiMarket(direct.market, seriesTicker)
+    }
+
+    // `id` isn't a market ticker — try it as an event ticker and take its
+    // most-traded open binary market, the one Kalshi's event page opens on.
+    const eventResp = await kalshiFetch<{ event: RawKalshiEvent; markets: RawKalshiMarket[] }>(
+      `/events/${encodeURIComponent(id)}`,
+    )
+    if (!eventResp) return null
+    const seriesTicker = typeof eventResp.event?.series_ticker === 'string' ? eventResp.event.series_ticker : null
+    const candidates = [...(eventResp.markets ?? [])].sort(
+      (a, b) => kalshiMarketVolume(b) - kalshiMarketVolume(a),
+    )
+    for (const raw of candidates) {
+      const m = normalizeKalshiMarket(raw, seriesTicker)
+      if (m && !m.closed) return m
+    }
     return null
   },
 
   async suggest(): Promise<MarketSuggestion[]> {
+    // Kalshi has no public full-text search API (unlike Polymarket's /public-search),
+    // so there's no server-side way to turn a claim into ranked candidates. Direct
+    // URL linking (fetchMarket above) still works; only "Suggest matches" and
+    // auto-match-on-create skip Kalshi.
     return []
+  },
+
+  async fetchHistory(historyId: string): Promise<HistoryPoint[]> {
+    const [seriesTicker, ticker] = historyId.split(':')
+    if (!seriesTicker || !ticker) return []
+    const endTs = Math.floor(Date.now() / 1000)
+    const startTs = endTs - KALSHI_HISTORY_LOOKBACK_DAYS * 86_400
+    const payload = await kalshiFetch<unknown>(
+      `/series/${encodeURIComponent(seriesTicker)}/markets/${encodeURIComponent(ticker)}/candlesticks` +
+        `?start_ts=${startTs}&end_ts=${endTs}&period_interval=${KALSHI_CANDLESTICK_INTERVAL_MINUTES}`,
+    )
+    return payload ? parseKalshiCandlesticks(payload) : []
   },
 }
 
@@ -559,7 +738,8 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
     where: { marketId: market.id },
   })
   if (snapshotCount === 0) {
-    if (m.historyId) await backfillMarketHistory(market.id, m.historyId, new Date())
+    const provider = m.historyId ? getProviderById(m.provider) : null
+    if (provider && m.historyId) await backfillMarketHistory(market.id, provider, m.historyId, new Date())
     await prisma.externalMarketPriceSnapshot.create({
       data: { marketId: market.id, probability: m.yesProbability },
     })
@@ -614,7 +794,11 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
   for (const cached of markets) {
     try {
       const provider = getProviderById(cached.provider)
-      const latest = provider ? await provider.fetchMarket(cached.slug) : null
+      if (!provider) {
+        failed++
+        continue
+      }
+      const latest = await provider.fetchMarket(cached.slug)
       if (!latest) {
         failed++
         continue
@@ -632,7 +816,7 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
             orderBy: { createdAt: 'asc' },
             select: { createdAt: true },
           })
-          await backfillMarketHistory(cached.id, latest.historyId, first?.createdAt ?? new Date())
+          await backfillMarketHistory(cached.id, provider, latest.historyId, first?.createdAt ?? new Date())
         }
       }
       // Only record a new snapshot when the price actually moved — an unconditional
