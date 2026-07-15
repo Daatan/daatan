@@ -27,7 +27,10 @@ vi.mock('@/lib/services/telegram', () => ({ notifyMarketDivergence: vi.fn() }))
 
 import {
   normalizeGammaMarket,
+  normalizeKalshiMarket,
+  parseKalshiCandlesticks,
   polymarketProvider,
+  kalshiProvider,
   getProviderForUrl,
   resolveMarketByUrl,
   syncLinkedMarkets,
@@ -280,8 +283,8 @@ describe('resolveMarketByUrl', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('returns null for a Kalshi URL (provider stub returns nothing yet)', async () => {
-    global.fetch = vi.fn()
+  it('returns null for a Kalshi URL when the market/event lookups both fail', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse(null, false, 404))
     expect(await resolveMarketByUrl('https://kalshi.com/markets/abc')).toBeNull()
   })
 
@@ -932,5 +935,277 @@ describe('deadlineWeight', () => {
     expect(wYear).toBeLessThan(0.6)
     // A two-year gap is penalized harder than a one-year gap.
     expect(deadlineWeight(new Date('2028-01-01T00:00:00Z'), d)).toBeLessThan(wYear)
+  })
+})
+
+/** A representative raw Kalshi market row (binary, live quote). */
+function kalshiRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ticker: 'KXFED-27APR-T4.25',
+    event_ticker: 'KXFED-27APR',
+    title: 'Will the Fed rate be above 4.25%?',
+    market_type: 'binary',
+    status: 'active',
+    result: '',
+    close_time: '2027-04-28T17:55:00Z',
+    yes_bid_dollars: '0.3000',
+    yes_ask_dollars: '0.4000',
+    last_price_dollars: '0.3600',
+    volume_fp: '100.00',
+    ...overrides,
+  }
+}
+
+/** URL-aware fetch mock for the Kalshi trade-api/v2 shape: a single `market`,
+ *  an `event` (+ its nested `markets`), and a `candlesticks` array. */
+function kalshiFetchMock(opts: {
+  market?: Record<string, unknown> | null
+  event?: Record<string, unknown> | null
+  eventMarkets?: Record<string, unknown>[]
+  candlesticks?: unknown[]
+} = {}) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/candlesticks')) {
+      return opts.candlesticks ? jsonResponse({ candlesticks: opts.candlesticks }) : jsonResponse(null, false, 404)
+    }
+    if (url.includes('/events/')) {
+      return opts.event ? jsonResponse({ event: opts.event, markets: opts.eventMarkets ?? [] }) : jsonResponse(null, false, 404)
+    }
+    if (url.includes('/markets/')) {
+      return opts.market ? jsonResponse({ market: opts.market }) : jsonResponse(null, false, 404)
+    }
+    return jsonResponse(null, false, 404)
+  })
+}
+
+describe('kalshiProvider.matchesUrl / parseId', () => {
+  it('matches any kalshi.com URL', () => {
+    expect(kalshiProvider.matchesUrl('https://kalshi.com/markets/KXFED')).toBe(true)
+    expect(kalshiProvider.matchesUrl('https://example.com/x')).toBe(false)
+  })
+
+  it('accepts a raw ticker as-is, uppercased', () => {
+    expect(kalshiProvider.parseId('kxfed-27apr-t4.25')).toBe('KXFED-27APR-T4.25')
+  })
+
+  it('extracts and uppercases the last path segment of a flat market URL', () => {
+    expect(kalshiProvider.parseId('https://kalshi.com/markets/KXFED')).toBe('KXFED')
+  })
+
+  it("extracts the trailing segment of Kalshi's web app event-page URL", () => {
+    // .../markets/{series}/{human-slug}/{event-ticker} — the last segment is an
+    // EVENT ticker, not a market ticker; fetchMarket resolves that ambiguity.
+    expect(kalshiProvider.parseId('https://kalshi.com/markets/kxfed/fed-funds-rate/kxfed-26jul')).toBe(
+      'KXFED-26JUL',
+    )
+  })
+
+  it('strips query strings', () => {
+    expect(kalshiProvider.parseId('https://kalshi.com/markets/KXFED?ref=1')).toBe('KXFED')
+  })
+
+  it('rejects non-Kalshi URLs', () => {
+    expect(kalshiProvider.parseId('https://example.com/markets/KXFED')).toBeNull()
+  })
+})
+
+describe('normalizeKalshiMarket', () => {
+  it('derives YES probability from the bid/ask midpoint', () => {
+    const m = normalizeKalshiMarket(kalshiRow())
+    expect(m).not.toBeNull()
+    expect(m!.provider).toBe('KALSHI')
+    expect(m!.externalId).toBe('KXFED-27APR-T4.25')
+    expect(m!.outcomes).toEqual(['Yes', 'No'])
+    expect(m!.yesProbability).toBe(35) // (0.30 + 0.40) / 2
+    expect(m!.url).toBe('https://kalshi.com/markets/KXFED-27APR-T4.25')
+  })
+
+  it('falls back to the last trade price when there is no live quote yet', () => {
+    const m = normalizeKalshiMarket(
+      kalshiRow({ yes_bid_dollars: '0.0000', yes_ask_dollars: '0.0000', last_price_dollars: '0.3600' }),
+    )
+    expect(m!.yesProbability).toBe(36)
+  })
+
+  it('clamps and rounds out-of-range prices', () => {
+    const m = normalizeKalshiMarket(kalshiRow({ yes_bid_dollars: '1.2000', yes_ask_dollars: '1.6000' }))
+    expect(m!.yesProbability).toBe(100)
+  })
+
+  it('marks a closed market resolved via the result field', () => {
+    const yes = normalizeKalshiMarket(kalshiRow({ status: 'finalized', result: 'yes' }))
+    expect(yes!.closed).toBe(true)
+    expect(yes!.resolvedOutcome).toBe('Yes')
+
+    const no = normalizeKalshiMarket(kalshiRow({ status: 'finalized', result: 'no' }))
+    expect(no!.resolvedOutcome).toBe('No')
+  })
+
+  it('leaves an active market open with no resolved outcome', () => {
+    const m = normalizeKalshiMarket(kalshiRow())
+    expect(m!.closed).toBe(false)
+    expect(m!.resolvedOutcome).toBeNull()
+  })
+
+  it('rejects a non-binary market', () => {
+    expect(normalizeKalshiMarket(kalshiRow({ market_type: 'scalar' }))).toBeNull()
+  })
+
+  it('rejects a multivariate combo market even when flagged binary', () => {
+    // Real payloads bundle several sub-questions under one ticker/title when
+    // mve_selected_legs is present — not a single claim's Yes/No pair.
+    expect(
+      normalizeKalshiMarket(kalshiRow({ mve_selected_legs: [{ event_ticker: 'X', market_ticker: 'Y' }] })),
+    ).toBeNull()
+  })
+
+  it('returns null when required fields are missing', () => {
+    expect(normalizeKalshiMarket({ market_type: 'binary' })).toBeNull()
+  })
+
+  it('derives historyId from seriesTicker:ticker, null without a series', () => {
+    expect(normalizeKalshiMarket(kalshiRow(), 'KXFED')!.historyId).toBe('KXFED:KXFED-27APR-T4.25')
+    expect(normalizeKalshiMarket(kalshiRow())!.historyId).toBeNull()
+  })
+})
+
+describe('kalshiProvider.fetchMarket', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('resolves a direct ticker hit, enriched with series_ticker from its event', async () => {
+    global.fetch = kalshiFetchMock({
+      market: kalshiRow(),
+      event: { event_ticker: 'KXFED-27APR', series_ticker: 'KXFED' },
+    })
+    const m = await kalshiProvider.fetchMarket('KXFED-27APR-T4.25')
+    expect(m!.externalId).toBe('KXFED-27APR-T4.25')
+    expect(m!.historyId).toBe('KXFED:KXFED-27APR-T4.25')
+  })
+
+  it('falls back to resolving the id as an event, picking the most-traded open market', async () => {
+    global.fetch = kalshiFetchMock({
+      market: null,
+      event: { event_ticker: 'KXFED-27APR', series_ticker: 'KXFED' },
+      eventMarkets: [
+        kalshiRow({ ticker: 'KXFED-27APR-T4.00', volume_fp: '10.00' }),
+        kalshiRow({ ticker: 'KXFED-27APR-T4.25', volume_fp: '9000.00' }),
+      ],
+    })
+    const m = await kalshiProvider.fetchMarket('KXFED-27APR')
+    expect(m!.externalId).toBe('KXFED-27APR-T4.25')
+  })
+
+  it('skips closed markets when resolving an event', async () => {
+    global.fetch = kalshiFetchMock({
+      market: null,
+      event: { event_ticker: 'KXFED-27APR', series_ticker: 'KXFED' },
+      eventMarkets: [
+        kalshiRow({ ticker: 'KXFED-27APR-T4.00', volume_fp: '9000.00', status: 'finalized', result: 'yes' }),
+        kalshiRow({ ticker: 'KXFED-27APR-T4.25', volume_fp: '10.00' }),
+      ],
+    })
+    const m = await kalshiProvider.fetchMarket('KXFED-27APR')
+    expect(m!.externalId).toBe('KXFED-27APR-T4.25')
+  })
+
+  it('returns null when neither the market nor the event resolves', async () => {
+    global.fetch = kalshiFetchMock({})
+    expect(await kalshiProvider.fetchMarket('NOPE')).toBeNull()
+  })
+})
+
+describe('kalshiProvider.suggest', () => {
+  it('always returns [] — Kalshi has no public full-text search API', async () => {
+    global.fetch = vi.fn()
+    expect(await kalshiProvider.suggest('anything', 5)).toEqual([])
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('parseKalshiCandlesticks', () => {
+  it('parses candles into ascending points via the bid/ask midpoint', () => {
+    const out = parseKalshiCandlesticks({
+      candlesticks: [
+        { end_period_ts: 200, yes_bid: { close_dollars: '0.20' }, yes_ask: { close_dollars: '0.30' } },
+        { end_period_ts: 100, yes_bid: { close_dollars: '0.10' }, yes_ask: { close_dollars: '0.20' } },
+      ],
+    })
+    expect(out).toEqual([
+      { createdAt: new Date(100_000), probability: 15 },
+      { createdAt: new Date(200_000), probability: 25 },
+    ])
+  })
+
+  it('falls back to price.close_dollars when there is no bid/ask on that candle', () => {
+    const out = parseKalshiCandlesticks({
+      candlesticks: [
+        {
+          end_period_ts: 100,
+          yes_bid: { close_dollars: '0.00' },
+          yes_ask: { close_dollars: '0.00' },
+          price: { close_dollars: '0.42' },
+        },
+      ],
+    })
+    expect(out).toEqual([{ createdAt: new Date(100_000), probability: 42 }])
+  })
+
+  it('returns [] for a malformed payload', () => {
+    expect(parseKalshiCandlesticks(null)).toEqual([])
+    expect(parseKalshiCandlesticks({ candlesticks: 'nope' })).toEqual([])
+  })
+})
+
+describe('kalshiProvider.fetchHistory', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('requests the series/market candlesticks path and parses the points', async () => {
+    const fetchSpy = kalshiFetchMock({
+      candlesticks: [{ end_period_ts: 100, yes_bid: { close_dollars: '0.20' }, yes_ask: { close_dollars: '0.30' } }],
+    })
+    global.fetch = fetchSpy
+    const points = await kalshiProvider.fetchHistory('KXFED:KXFED-27APR-T4.25')
+    expect(points).toEqual([{ createdAt: new Date(100_000), probability: 25 }])
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/series/KXFED/markets/KXFED-27APR-T4.25/candlesticks'),
+      expect.any(Object),
+    )
+  })
+
+  it('returns [] for a malformed historyId', async () => {
+    global.fetch = vi.fn()
+    expect(await kalshiProvider.fetchHistory('no-colon-here')).toEqual([])
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('resolveMarketByUrl (Kalshi)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('parses, fetches, backfills history and upserts the market keyed by provider+externalId', async () => {
+    global.fetch = kalshiFetchMock({
+      market: kalshiRow(),
+      event: { event_ticker: 'KXFED-27APR', series_ticker: 'KXFED' },
+      candlesticks: [{ end_period_ts: 100, yes_bid: { close_dollars: '0.20' }, yes_ask: { close_dollars: '0.30' } }],
+    })
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarketPriceSnapshot.count).mockResolvedValue(0)
+
+    const result = await resolveMarketByUrl('https://kalshi.com/markets/KXFED-27APR-T4.25')
+
+    expect(result).toEqual({ id: 'm1' })
+    expect(prisma.externalMarket.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { provider_externalId: { provider: 'KALSHI', externalId: 'KXFED-27APR-T4.25' } },
+      }),
+    )
+    expect(prisma.externalMarketPriceSnapshot.createMany).toHaveBeenCalledWith({
+      data: [{ marketId: 'm1', probability: 25, createdAt: new Date(100_000) }],
+    })
+    // yes_bid 0.30 / yes_ask 0.40 midpoint → 35, the live seed after the backfill.
+    expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
+      data: { marketId: 'm1', probability: 35 },
+    })
   })
 })

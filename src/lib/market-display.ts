@@ -22,14 +22,14 @@ export function trackedOutcomeLabel(outcomes: unknown): string | null {
   return labels[0] ?? null
 }
 
-/** Chart legend / series name for the Market line, e.g. "Market (Polymarket, inverted)". */
+/** Chart legend / series name for the Market line, e.g. "Polymarket, inverted". */
 export function marketLineName(
   providerLabel: string,
   inverted: boolean,
   outcomeLabel: string | null,
 ): string {
   const qualifier = inverted ? `${providerLabel}, inverted` : providerLabel
-  return outcomeLabel ? `Market: "${outcomeLabel}" (${qualifier})` : `Market (${qualifier})`
+  return outcomeLabel ? `"${outcomeLabel}" (${qualifier})` : qualifier
 }
 
 /** One-line explanation of an inverted link, used as a hover hint. */

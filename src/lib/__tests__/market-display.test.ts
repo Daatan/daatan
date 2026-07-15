@@ -35,14 +35,14 @@ describe('trackedOutcomeLabel', () => {
 
 describe('marketLineName', () => {
   it('labels a plain link with the provider', () => {
-    expect(marketLineName('Polymarket', false, null)).toBe('Market (Polymarket)')
+    expect(marketLineName('Polymarket', false, null)).toBe('Polymarket')
   })
 
   it('flags inversion in the legend', () => {
-    expect(marketLineName('Polymarket', true, null)).toBe('Market (Polymarket, inverted)')
+    expect(marketLineName('Polymarket', true, null)).toBe('Polymarket, inverted')
   })
 
   it('names the tracked outcome for non-Yes/No markets', () => {
-    expect(marketLineName('Polymarket', false, 'Knicks')).toBe('Market: "Knicks" (Polymarket)')
+    expect(marketLineName('Polymarket', false, 'Knicks')).toBe('"Knicks" (Polymarket)')
   })
 })
