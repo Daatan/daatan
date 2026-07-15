@@ -152,42 +152,43 @@ extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
 from the resolution-outcome signal, since `evidenceWeight` alone can't
 distinguish opinion from a low-certainty unclassified article.
-**The `news-indexer` push path is cut over to the pool** (ORACLE_VARIABLES.md §6).
+**All three estimate paths are cut over to the pool** (ORACLE_VARIABLES.md §6).
 `recomputeFromPool()` in `evidence-pool.ts` posts the current non-excluded pool to
 retro's `POST /pool/aggregate`, and that aggregate — mean, std, CI, `settled`,
-`articles_used` — *is* the persisted estimate. The `/forecast` call on the pushed
+`articles_used` — *is* the persisted estimate. The `/forecast` call on the run's
 articles is now only an **extraction** step, feeding their signals into the pool.
+news-indexer was cut over first in v1.60.0 (#1121); `analyze` and `backfill` followed
+once that had run in prod. The shared decision lives in `resolvePooledEstimate()`
+(`pooled-estimate.ts`), used by `analyze` and `backfill`; the news-indexer route inlines
+the same logic. (`shadowCompareRecompute()` — the log-only pool-vs-live comparison these
+two paths used before the cutover — has been removed.)
 
-Why: a push usually carries a single freshly-matched article, and `/forecast` over one
-article returns little more than that article's stance rescaled. Trusting it let the
-newest article yank the estimate wholesale — one live forecast swung 1% → 99% in 19
-minutes on two articles reporting the *same* event, each with a CI so tight
-(0–2, then 94–100) that the system never once signalled doubt. Aggregating the pool
-puts a single bad extraction in proportion to the evidence already gathered.
+Why: a run scores only the articles handed to it, and a news-indexer push usually carries
+a single freshly-matched article, so `/forecast` returns little more than that article's
+stance rescaled. Trusting it let the newest article yank the estimate wholesale — one live
+forecast swung 1% → 99% in 19 minutes on two articles reporting the *same* event, each
+with a CI so tight (0–2, then 94–100) that the system never once signalled doubt.
+Aggregating the pool puts a single bad extraction in proportion to the evidence gathered.
 
 The single-run forecast remains the **fallback** whenever the pool cannot produce an
 aggregate (Oracle unreachable, nothing usable pooled yet, or `insufficient_data`), so a
-flaky Oracle degrades the estimate rather than dropping it. Each push logs both numbers
-and their delta (`estimateSource`, `singleRunDelta`) — a large delta is the signature of
-an article that would have yanked the old estimate.
+flaky Oracle degrades the estimate rather than dropping it. Each run logs which path won
+and the single-run mean (`estimateSource`, `singleRunMean`/`singleRunDelta`) — a large gap
+is the signature of a run that would have yanked the old estimate.
 
-Consequently `excluded` is now **enforced on this path**: excluded rows are dropped before
+Consequently `excluded` is now **enforced on every path**: excluded rows are dropped before
 the aggregate, so an admin's exclusion genuinely moves the number.
 
-`oracleSnapshot.sources` on this path lists the **whole usable pool** — the exact rows
+`oracleSnapshot.sources` lists the **whole usable pool** on the pool path — the exact rows
 `recomputeFromPool()` posted, mapped by `poolArticleToEnrichedSource()` — so
 `sources.length === articlesUsed` and the stored snapshot lists precisely the articles its
-number averages. (Before this, `sources` held only the one or two articles that fired the
-push, next to a `mean`/`articlesUsed` describing the whole pool — the snapshot couldn't
-explain its own number, and elections' per-commentator matching saw only the pushed
-byline.) Authors aren't stored on pool rows, so they're re-looked-up from news-indexer by
-URL at snapshot time, best-effort — a pooled article with no indexed byline is kept with a
-null author, never dropped. The single-run **fallback** still stores just the pushed
-articles' sources, matching its `articlesUsed`.
-
-The `analyze` and `backfill` paths still only shadow-compare — `shadowCompareRecompute()`
-logs pool-vs-live (`event=pool_recompute_shadow`) without altering their persisted
-estimate. They follow once this cutover has run in prod.
+number averages. (Before this, `sources` held only the run's own articles next to a
+`mean`/`articlesUsed` describing the whole pool — the snapshot couldn't explain its own
+number, and elections' per-commentator matching saw only those bylines.) Authors aren't
+stored on pool rows, so they're re-looked-up from news-indexer by URL at snapshot time,
+best-effort — a pooled article with no indexed byline is kept with a null author, never
+dropped. The single-run **fallback** still stores just the run's own sources, matching its
+`articlesUsed`.
 
 ### Credibility feedback loop (retro `docs/ORACLE_VARIABLES.md` §9)
 

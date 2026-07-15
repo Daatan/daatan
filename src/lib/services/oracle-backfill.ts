@@ -4,10 +4,10 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
+import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
 import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
 import {
   addArticlesToPool,
-  shadowCompareRecompute,
   claimArticlesForExtraction,
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
@@ -84,49 +84,60 @@ export async function refreshOracleSnapshot(
   const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
   const sources = enrichOracleSources(forecast.sources, searchResults, authorByUrl)
 
-  // Evidence pool shadow-write + recompute shadow-compare (retro
-  // docs/ORACLE_VARIABLES.md §6 part 2, step 6) — additive only, never blocks
-  // or alters the estimate below. Chained (not parallel) so the recompute
-  // reads a pool that already includes this run's articles.
-  addArticlesToPool(prediction.id, sources, 'backfill')
-    .then(() =>
-      shadowCompareRecompute(
-        prediction.id,
-        {
-          mean: forecast.mean,
-          ciLow: forecast.ci_low,
-          ciHigh: forecast.ci_high,
-          settled: forecast.settled ?? false,
-        },
-        prediction.claimDirection ?? null,
-        prediction.claimDeadline ?? null,
-      ),
-    )
-    .catch((err) =>
-      log.warn({ predictionId: prediction.id, err }, 'evidence pool shadow-write/recompute-compare failed'),
-    )
+  // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate — the same
+  // cutover the news-indexer push path got in v1.60.0 (#1121), previously only shadow-logged
+  // here. Awaited (not fire-and-forget) so the recompute reads a pool that already includes
+  // this run's articles and its result actually drives the snapshot. Backfill is a background
+  // job with no request timeout, so awaiting the compute-only aggregate costs nothing; on any
+  // failure `resolvePooledEstimate` falls back to this single run.
+  await addArticlesToPool(prediction.id, sources, 'backfill')
+  const resolved = await resolvePooledEstimate(
+    prediction.id,
+    {
+      mean: forecast.mean,
+      std: forecast.std,
+      ciLow: forecast.ci_low,
+      ciHigh: forecast.ci_high,
+      settled: forecast.settled ?? false,
+      articlesUsed: forecast.articles_used,
+    },
+    sources,
+    prediction.claimDirection ?? null,
+    prediction.claimDeadline ?? null,
+    authorByUrl,
+  )
 
-  const ciLow = stanceToPercent(forecast.ci_low)
-  const ciHigh = stanceToPercent(forecast.ci_high)
-  const probability = stanceToPercent(forecast.mean)
+  const probability = stanceToPercent(resolved.mean)
+  const ciLow = stanceToPercent(resolved.ciLow)
+  const ciHigh = stanceToPercent(resolved.ciHigh)
 
   await saveOracleSnapshotOnly({
     predictionId: prediction.id,
     oracleSnapshot: {
       mean: probability,
-      std: stanceStdToPercent(forecast.std),
+      std: stanceStdToPercent(resolved.std),
       ciLow,
       ciHigh,
-      articlesUsed: forecast.articles_used,
-      settled: forecast.settled ?? false,
-      sources,
+      articlesUsed: resolved.articlesUsed,
+      settled: resolved.settled,
+      sources: resolved.snapshotSources,
     },
     confidence: probability,
     aiCiLow: ciLow,
     aiCiHigh: ciHigh,
-    settled: forecast.settled ?? false,
+    settled: resolved.settled,
   })
 
-  log.info({ predictionId: prediction.id, sources: sources.length }, 'oracle-backfill.refreshed')
-  return { status: 'ok', sources: sources.length }
+  log.info(
+    {
+      predictionId: prediction.id,
+      sources: resolved.snapshotSources.length,
+      estimateSource: resolved.estimateSource,
+      poolSize: resolved.poolSize,
+      articlesUsed: resolved.articlesUsed,
+      singleRunMean: resolved.singleRunMean,
+    },
+    'oracle-backfill.refreshed',
+  )
+  return { status: 'ok', sources: resolved.snapshotSources.length }
 }
