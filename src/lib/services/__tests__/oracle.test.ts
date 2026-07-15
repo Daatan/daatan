@@ -278,6 +278,23 @@ describe('getOracleForecast', () => {
       expect('claim_deadline' in JSON.parse(init.body as string)).toBe(false)
     })
   })
+
+  describe('prediction_id (retro #273 log correlation)', () => {
+    it('sends prediction_id when meta.predictionId is set', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', undefined, { source: 'news-indexer', predictionId: 'pred-123' })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.prediction_id).toBe('pred-123')
+    })
+
+    it('omits prediction_id when meta.predictionId is absent', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?')
+      const [, init] = fetchMock.mock.calls[0]
+      expect('prediction_id' in JSON.parse(init.body as string)).toBe(false)
+    })
+  })
 })
 
 describe('getOracleProbability', () => {
