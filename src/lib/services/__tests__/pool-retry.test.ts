@@ -4,7 +4,7 @@ const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    evidencePoolArticle: { groupBy: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    evidencePoolArticle: { groupBy: vi.fn(), findMany: vi.fn(), count: vi.fn(), updateMany: vi.fn() },
     prediction: { findMany: vi.fn() },
   },
 }))
@@ -21,6 +21,7 @@ import { retryPoolExtractions } from '../pool-retry'
 const mockGroupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
 const mockRows = vi.mocked(prisma.evidencePoolArticle.findMany)
 const mockCount = vi.mocked(prisma.evidencePoolArticle.count)
+const mockUpdateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
 const mockPredictions = vi.mocked(prisma.prediction.findMany)
 
 function row(over: Record<string, unknown> = {}) {
@@ -29,6 +30,7 @@ function row(over: Record<string, unknown> = {}) {
     title: 'Stuck headline',
     source: 'a.com',
     publishedDate: '2026-07-09',
+    statusReason: null,
     ...over,
   }
 }
@@ -39,6 +41,7 @@ describe('retryPoolExtractions', () => {
     mockRefresh.mockResolvedValue({ status: 'ok', sources: 1 })
     mockRows.mockResolvedValue([row()] as never)
     mockCount.mockResolvedValue(0)
+    mockUpdateMany.mockResolvedValue({ count: 0 } as never)
   })
 
   it('sweeps the biggest ACTIVE-forecast backlogs first, up to the limit', async () => {
@@ -82,7 +85,7 @@ describe('retryPoolExtractions', () => {
     )
   })
 
-  it('excludes oracle_omitted rows — judged irrelevant is terminal, not retryable', async () => {
+  it('excludes the terminal reasons — judged-irrelevant and twice-null rows never retry', async () => {
     mockGroupBy.mockResolvedValue([] as never)
     mockPredictions.mockResolvedValue([] as never)
 
@@ -92,9 +95,55 @@ describe('retryPoolExtractions', () => {
     expect(where).toMatchObject({ excluded: false, title: { not: null } })
     expect(where.OR).toEqual([
       { status: 'FAILED', statusReason: null },
-      { status: 'FAILED', statusReason: { not: 'oracle_omitted' } },
+      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] } },
       { status: 'PENDING' },
     ])
+  })
+
+  describe('second-strike rule (attempt cap)', () => {
+    beforeEach(() => {
+      mockGroupBy.mockResolvedValue([{ predictionId: 'p1', _count: { _all: 2 } }] as never)
+      mockPredictions.mockResolvedValue([
+        { id: 'p1', claimText: 'a', claimDirection: null, claimDeadline: null },
+      ] as never)
+      mockRows.mockResolvedValue([
+        row({ url: 'https://a.com/1', statusReason: 'oracle_null' }),
+        row({ url: 'https://b.com/2', statusReason: 'extractor_error' }),
+      ] as never)
+    })
+
+    it('finalizes rows that were already oracle_null when the run goes null again', async () => {
+      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+      mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).toHaveBeenCalledWith({
+        // Only the prior-null row; the extractor_error row keeps its first null strike.
+        where: { predictionId: 'p1', url: { in: ['https://a.com/1'] }, status: 'FAILED', statusReason: 'oracle_null' },
+        data: { statusReason: 'oracle_null_final' },
+      })
+      expect(r.finalized).toBe(1)
+    })
+
+    it('does not finalize anything when the run succeeds', async () => {
+      mockRefresh.mockResolvedValue({ status: 'ok', sources: 2 })
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(r.finalized).toBe(0)
+    })
+
+    it('does not finalize first-strike rows on a null run', async () => {
+      mockRows.mockResolvedValue([row({ url: 'https://c.com/3', statusReason: null })] as never)
+      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(r.finalized).toBe(0)
+    })
   })
 
   it('tallies outcomes per prediction and reports the remaining backlog', async () => {

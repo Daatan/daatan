@@ -425,7 +425,7 @@ List the forecast's evidence pool (`evidence_pool_articles`) — every article `
 Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Has no effect on the live estimate yet (recompute-over-pool cutover still open).
 
 ### `POST /api/admin/evidence-pool/retry` — Admin or `x-cron-secret`
-Drain stuck evidence-pool rows (FAILED except `oracle_omitted`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. `?limit=N` predictions per call (default 3, max 10 — each is one full Oracle analysis). Returns per-status tallies plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow.
+Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back `oracle_null` twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. `?limit=N` predictions per call (default 3, max 10 — each is one full Oracle analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow.
 
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).

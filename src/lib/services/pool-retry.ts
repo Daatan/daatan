@@ -15,12 +15,13 @@ const log = createLogger('pool-retry')
 const RETRY_MIN_AGE_MS = 24 * 60 * 60 * 1000
 
 /**
- * Rows worth re-driving through extraction: stuck claims EXCEPT `oracle_omitted` —
- * those were judged irrelevant by the gatekeeper, and re-asking would burn an LLM
- * call to hear "no" again. Old PENDING rows are abandoned claims (the pre-#1149
- * graveyard: claimed, then neither completed nor failed). Title is required because
- * the retry re-pushes title-only articles (pool rows never stored the snippet); a
- * claim-lifecycle row always has one.
+ * Rows worth re-driving through extraction: stuck claims EXCEPT the terminal
+ * reasons — `oracle_omitted` (judged irrelevant by the gatekeeper; re-asking burns
+ * an LLM call to hear "no" again) and `oracle_null_final` (two consecutive null
+ * runs, see the second-strike rule below). Old PENDING rows are abandoned claims
+ * (the pre-#1149 graveyard: claimed, then neither completed nor failed). Title is
+ * required because the retry re-pushes title-only articles (pool rows never stored
+ * the snippet); a claim-lifecycle row always has one.
  */
 function retryableWhere(cutoff: Date): Prisma.EvidencePoolArticleWhereInput {
   return {
@@ -29,7 +30,7 @@ function retryableWhere(cutoff: Date): Prisma.EvidencePoolArticleWhereInput {
     updatedAt: { lt: cutoff },
     OR: [
       { status: 'FAILED', statusReason: null },
-      { status: 'FAILED', statusReason: { not: 'oracle_omitted' } },
+      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] } },
       { status: 'PENDING' },
     ],
   }
@@ -45,6 +46,8 @@ export interface RetrySweepResult {
   unchanged: number
   insufficient: number
   failed: number
+  /** Rows stamped oracle_null_final this call — second consecutive null, out of the sweep. */
+  finalized: number
   /** Retryable rows still waiting on ACTIVE forecasts — the workflow's convergence gauge. */
   remaining: number
 }
@@ -84,6 +87,7 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
     unchanged: 0,
     insufficient: 0,
     failed: 0,
+    finalized: 0,
     remaining: 0,
   }
 
@@ -92,8 +96,16 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       where: { ...retryable, predictionId: p.id },
       orderBy: { updatedAt: 'asc' },
       take: DEFAULT_MAX_ARTICLES,
-      select: { url: true, title: true, source: true, publishedDate: true },
+      select: { url: true, title: true, source: true, publishedDate: true, statusReason: true },
     })
+    // Second-strike rule: a batch where the Oracle rejects EVERY article comes back as a
+    // null forecast, so its rows land on retryable `oracle_null` — indistinguishable, at
+    // that boundary, from a transport failure. Rows that were ALREADY oracle_null before
+    // this claim (captured here, since claiming resets statusReason) and go null again
+    // get stamped terminal below: two independent null runs a day apart is the article
+    // telling us it's dead, not the Oracle hiccuping. An organic re-push with changed
+    // content can still revive them — only the sweep stops asking.
+    const secondStrike = rows.filter((r) => r.title && r.statusReason === 'oracle_null').map((r) => r.url)
     const articles: SuppliedArticle[] = rows.flatMap((r) =>
       r.title
         ? [{ url: r.url, title: r.title, snippet: '', source: r.source ?? undefined, publishedDate: r.publishedDate ?? undefined }]
@@ -107,7 +119,18 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       if (r.status === 'ok') results.ok++
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++
-      else results.noOracle++
+      else {
+        results.noOracle++
+        if (r.status === 'no-oracle' && secondStrike.length > 0) {
+          const { count } = await prisma.evidencePoolArticle.updateMany({
+            // Guarded on FAILED+oracle_null so a row a concurrent push just completed
+            // (or failed for a different reason) is never stamped terminal.
+            where: { predictionId: p.id, url: { in: secondStrike }, status: 'FAILED', statusReason: 'oracle_null' },
+            data: { statusReason: 'oracle_null_final' },
+          })
+          results.finalized += count
+        }
+      }
     } catch (err) {
       results.failed++
       log.warn({ predictionId: p.id, err }, 'pool-retry.prediction_failed')
