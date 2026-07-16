@@ -60,4 +60,4 @@ For each property (`G-XZWVJM9KH4` prod, `G-Z4XXM7GYHW` staging):
 
 ## Staging vs production
 
-Staging (`NEXT_PUBLIC_ENV=staging`) adds `debug_mode: true` and an `environment: 'staging'` dimension to GA so staging traffic can be filtered out in reports. The measurement ID is hardcoded in `layout.tsx` for staging; production reads from `process.env.GA_MEASUREMENT_ID`.
+Staging (`APP_ENV=staging` — the runtime container var; staging and production run the same promoted image, see `src/env.ts`) adds `debug_mode: true` and an `environment: 'staging'` dimension to GA so staging traffic can be filtered out in reports. The measurement ID is hardcoded in `layout.tsx` for staging; production reads from `process.env.GA_MEASUREMENT_ID`.

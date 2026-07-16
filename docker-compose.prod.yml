@@ -39,7 +39,6 @@ services:
       - NODE_ENV=production
       - APP_ENV=production
       - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
-      - NEXT_PUBLIC_ENV=production
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://daatan.com
       - AUTH_TRUST_HOST=true
@@ -72,7 +71,6 @@ services:
       - EMAIL_FROM=${EMAIL_FROM:-Daatan <noreply@daatan.com>}
       - MAX_BOTS=${MAX_BOTS:-50}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
-      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
       - ORACLE_URL=${ORACLE_URL}
       - ORACLE_API_KEY=${ORACLE_API_KEY}
       - INDEXNOW_KEY=${INDEXNOW_KEY}

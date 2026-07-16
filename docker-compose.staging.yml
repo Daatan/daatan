@@ -28,7 +28,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_ENV=staging
         - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging
         - NEXTAUTH_URL=https://staging.daatan.com
     image: ${ECR_REGISTRY:-272007598366.dkr.ecr.eu-central-1.amazonaws.com}/daatan-app:staging-latest
@@ -40,7 +39,6 @@ services:
       - NODE_ENV=production
       - APP_ENV=staging
       - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging
-      - NEXT_PUBLIC_ENV=staging
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://staging.daatan.com
       - AUTH_TRUST_HOST=true
@@ -73,7 +71,6 @@ services:
       - EMAIL_FROM=${EMAIL_FROM:-Daatan <noreply@daatan.com>}
       - MAX_BOTS=${MAX_BOTS:-50}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
-      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
       - ORACLE_URL=${ORACLE_URL}
       - ORACLE_API_KEY=${ORACLE_API_KEY}
       - INDEXNOW_KEY=${INDEXNOW_KEY}
@@ -104,7 +101,6 @@ services:
       - NODE_ENV=production
       - APP_ENV=next
       - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging
-      - NEXT_PUBLIC_ENV=staging
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://next.daatan.com
       - AUTH_TRUST_HOST=true
@@ -137,7 +133,6 @@ services:
       - EMAIL_FROM=${EMAIL_FROM:-Daatan <noreply@daatan.com>}
       - MAX_BOTS=${MAX_BOTS:-50}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
-      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
       - ORACLE_URL=${ORACLE_URL}
       - ORACLE_API_KEY=${ORACLE_API_KEY}
       - INDEXNOW_KEY=${INDEXNOW_KEY}

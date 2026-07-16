@@ -86,10 +86,11 @@ export const env = createEnv({
     // Which deployed instance this is — set at container RUNTIME (docker-compose
     // `environment:` / blue-green-deploy.sh -e APP_ENV=..., not a build arg), so
     // it reads correctly even though staging and production run the same
-    // promoted Docker image. Unlike NEXT_PUBLIC_ENV (inlined at build time and
-    // therefore frozen to whatever the single shared image was built with),
-    // this is the one to use for any staging-vs-production runtime behavior
-    // (indexability, GA property, email redirect gating, debug logging, etc).
+    // promoted Docker image. This is the one to use for any staging-vs-production
+    // runtime behavior (indexability, GA property, email redirect gating, debug
+    // logging, etc). A build-time NEXT_PUBLIC_* var can never distinguish the two
+    // — it is frozen to whatever the single shared image was built with (the
+    // removed NEXT_PUBLIC_ENV was exactly that trap; see PR #1141's issue).
     APP_ENV: z.enum(['development', 'staging', 'next', 'production']).default('development'),
     
     // AI / Analytics
@@ -152,7 +153,6 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_APP_VERSION: z.string().optional(),
-    NEXT_PUBLIC_ENV: z.enum(['development', 'staging', 'production']).default('development'),
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(1).optional(),
   },
   // If you're using Next.js < 13.4.4, you'll need to specify the runtimeEnv manually
@@ -206,7 +206,6 @@ export const env = createEnv({
     AI_PANEL_GROUNDED_TAG: process.env.AI_PANEL_GROUNDED_TAG,
     TELEGRAM_CLEAN_CHAT_ID: process.env.TELEGRAM_CLEAN_CHAT_ID,
     NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
-    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   },
   // validation logic
