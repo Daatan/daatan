@@ -290,7 +290,7 @@ terraform/
 | `DAATAN_CORE.md` | Source of Truth — vision and principles |
 | `GLOSSARY.md` | Terminology definitions |
 | `FORECASTS_FLOW.md` | Forecast system implementation flow |
-| `TODO.md` | Development tasks and guidelines |
+| `TODO.md` | Pointer to the GitHub Issues backlog |
 | `TECH.md` | Technical architecture (this file) |
 | `INFRASTRUCTURE_SPLIT.md` | Prod / staging EC2 split details |
 | `docs/DEPLOYMENT.md` | Canonical deployment pipeline |
@@ -853,5 +853,5 @@ free -m                                     # Memory
 
 - [DEPLOYMENT.md](./DEPLOYMENT.md) — Deployment procedures and operations
 - [PRODUCT.md](./PRODUCT.md) — Product documentation
-- [TODO.md](./TODO.md) — Technical debt and roadmap
+- [GitHub Issues](https://github.com/Daatan/daatan/issues) — Technical debt and roadmap (`P1`/`P2`/`P3`/`icebox` labels)
 - [SECRETS.md](./SECRETS.md) — Secrets management guide

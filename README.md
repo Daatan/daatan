@@ -127,7 +127,7 @@ git push origin v1.1.1
 | [VERSIONING.md](./VERSIONING.md) | Semantic versioning rules |
 | [TESTING.md](./TESTING.md) | Testing strategy and guidelines |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |
-| [TODO.md](./TODO.md) | Active development tasks |
+| [TODO.md](./TODO.md) | Pointer to the task backlog ([GitHub Issues](https://github.com/Daatan/daatan/issues), `P1`/`P2`/`P3`/`icebox` labels) |
 | [POST_MORTEM.md](./POST_MORTEM.md) | Incident history and retrospectives |
 | [docs/bots.md](./docs/bots.md) | Autonomous bot system design and usage |
 | [docs/BOT_APPROVAL_WORKFLOW.md](./docs/BOT_APPROVAL_WORKFLOW.md) | Bot approval workflow (v1.7.31+) |

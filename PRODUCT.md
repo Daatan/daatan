@@ -253,6 +253,6 @@ On mobile, the header search icon opens an inline search field in the top bar �
 - [DAATAN_CORE.md](./DAATAN_CORE.md) — Source of Truth (vision and principles)
 - [GLOSSARY.md](./GLOSSARY.md) — Terminology definitions
 - [FORECASTS_FLOW.md](./FORECASTS_FLOW.md) — Prediction system implementation
-- [TODO.md](./TODO.md) — Development tasks and priorities
+- [GitHub Issues](https://github.com/Daatan/daatan/issues) — Development tasks and priorities (`P1`/`P2`/`P3`/`icebox` labels)
 - [TECH.md](./TECH.md) — Technical architecture, infrastructure, and project structure
 - [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) — Deployment procedures and operations (canonical)
