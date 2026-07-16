@@ -23,9 +23,18 @@ variable "ssh_key_name" {
 }
 
 variable "ec2_instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type (staging)"
   type        = string
   default     = "t3.small"
+}
+
+# Split from ec2_instance_type so prod can grow without dragging staging along.
+# Upsized t3.small -> t3.medium 2026-07-16 (#1133): 2 GB was too thin for
+# app + postgres + nginx + certbot — see the 2026-05-05 OOM incident.
+variable "ec2_instance_type_prod" {
+  description = "EC2 instance type (production)"
+  type        = string
+  default     = "t3.medium"
 }
 
 variable "github_repository" {

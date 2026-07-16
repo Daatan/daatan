@@ -122,6 +122,9 @@ services:
   certbot:
     image: certbot/dns-route53
     container_name: daatan-certbot
+    # Without this the container dies permanently on every instance reboot and
+    # cert renewal silently stops (found during the 2026-07-16 t3.medium resize).
+    restart: unless-stopped
     environment:
       - AWS_DEFAULT_REGION=eu-central-1
     volumes:
