@@ -147,7 +147,6 @@ jobs:
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
-            NEXT_PUBLIC_ENV=production
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
 
       - name: Build and push migrations image to ECR
@@ -166,7 +165,6 @@ jobs:
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
-            NEXT_PUBLIC_ENV=production
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
 
   # Deploy to STAGING (on push to main)
@@ -273,7 +271,6 @@ jobs:
               "echo \"🚀 Executing blue-green deployment...\"",
               "export GIT_COMMIT='"${{ github.sha }}"'",
               "export SKIP_BUILD=true",
-              "export NEXT_PUBLIC_APP_VERSION='"${{ needs.build.outputs.app_version }}"'",
               "./scripts/blue-green-deploy.sh staging"
             ]' \
             --output text \
@@ -500,7 +497,6 @@ jobs:
               "echo \"🚀 Executing blue-green deployment...\"",
               "export GIT_COMMIT='"${{ github.sha }}"'",
               "export SKIP_BUILD=true",
-              "export NEXT_PUBLIC_APP_VERSION='"${{ needs.build.outputs.app_version }}"'",
               "./scripts/blue-green-deploy.sh production"
             ]' \
             --output text \

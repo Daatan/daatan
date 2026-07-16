@@ -53,7 +53,6 @@ jobs:
           docker build \
             --build-arg DATABASE_URL=$DATABASE_URL \
             --build-arg NEXTAUTH_URL=https://next.daatan.com \
-            --build-arg NEXT_PUBLIC_ENV=staging \
             --build-arg NEXT_PUBLIC_APP_VERSION=$APP_VERSION \
             --build-arg GIT_COMMIT=${{ github.sha }} \
             --build-arg BUILD_TIMESTAMP=$(date +%s) \

@@ -9,7 +9,6 @@ WORKDIR /app
 # Stable build args (rarely change — declared before npm ci to maximise layer cache)
 ARG DATABASE_URL
 ARG NEXTAUTH_URL
-ARG NEXT_PUBLIC_ENV="production"
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Hardcoded fallback values for the build phase only (@t3-oss/env-nextjs validates at runtime; skip during build)
@@ -19,7 +18,6 @@ ENV NEXTAUTH_SECRET="dummy-secret-for-build"
 ENV NEXTAUTH_URL=${NEXTAUTH_URL:-"http://localhost:3000"}
 ENV GOOGLE_CLIENT_ID=123456789-dummy.apps.googleusercontent.com
 ENV GOOGLE_CLIENT_SECRET=dummysecret12
-ENV NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Copy package files and install dependencies.
