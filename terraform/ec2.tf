@@ -17,12 +17,12 @@ data "aws_ami" "ubuntu" {
 # ====================================================================
 # PRODUCTION INSTANCE (daatan.com)
 # ====================================================================
-# t3.small instance for production workloads
+# t3.medium instance for production workloads (upsized from t3.small, #1133)
 # Hosts daatan-app (production) + daatan-postgres (production DB)
 # DNS: daatan.com, www.daatan.com
 resource "aws_instance" "production" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.ec2_instance_type
+  instance_type               = var.ec2_instance_type_prod
   key_name                    = var.ssh_key_name
   subnet_id                   = aws_subnet.public_a.id
   vpc_security_group_ids      = [aws_security_group.ec2.id]
