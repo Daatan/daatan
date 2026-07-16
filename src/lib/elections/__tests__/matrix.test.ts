@@ -17,6 +17,33 @@ describe('matchCuratedAuthor', () => {
     expect(matchCuratedAuthor({ author: 'Some Rando', sourceName: 'Reuters' })).toBeNull()
     expect(matchCuratedAuthor({ author: null, sourceName: null })).toBeNull()
   })
+
+  describe('person_id fast path (evidence-pool rows, Phase 2.3)', () => {
+    const CASPIT_ID = '6b9ee26f-b1be-4ad4-be60-0a747a2caf07'
+
+    it('resolves by person id alone — a surname-only byline no alias reaches', () => {
+      expect(matchCuratedAuthor({ author: 'כספית' })).toBeNull()
+      expect(matchCuratedAuthor({ author: 'כספית', personId: CASPIT_ID })).toBe('ben-caspit')
+    })
+
+    it('beats the alias match when both would fire', () => {
+      expect(matchCuratedAuthor({ author: 'Amit Segal', personId: CASPIT_ID })).toBe('ben-caspit')
+    })
+
+    it('falls back to aliases for a person id we do not curate', () => {
+      expect(matchCuratedAuthor({ author: 'Amit Segal', personId: '00000000-0000-0000-0000-000000000000' })).toBe(
+        'amit-segal',
+      )
+    })
+
+    it('every curated author with a person id resolves by it', () => {
+      const withId = CURATED_ELECTION_AUTHORS.filter((a) => a.personId)
+      expect(withId.map((a) => a.key).sort()).toEqual(['ben-caspit', 'edy-cohen', 'guy-bechor', 'ksenia-svetlova'])
+      for (const a of withId) {
+        expect(matchCuratedAuthor({ author: null, sourceName: null, personId: a.personId })).toBe(a.key)
+      }
+    })
+  })
 })
 
 describe('stanceSide', () => {

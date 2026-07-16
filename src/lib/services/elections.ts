@@ -1,12 +1,12 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
-import { buildElectionMatrix, type ElectionMatrix, type ElectionEventInput } from '@/lib/elections/matrix'
+import { poolArticleToEnrichedSource } from '@/lib/services/oracle-snapshot'
+import { buildElectionMatrix, type ElectionMatrix, type ElectionEventInput, type ElectionSourceInput } from '@/lib/elections/matrix'
 
 /** slugify('Israeli Elections 2026') — the tag that labels an election forecast. */
 export const ELECTION_TAG_SLUG = 'israeli-elections-2026'
 
-type OracleSnapshotShape = { mean?: number | null; sources?: EnrichedOracleSource[] } | null
+type OracleSnapshotShape = { mean?: number | null } | null
 
 /**
  * `oracleSnapshot.mean` is probability percent 0–100 on every stored row
@@ -21,7 +21,9 @@ export function meanToProbability(mean: number | null | undefined): number | nul
 /**
  * Load the election-2026 top-table matrix: forecasts tagged "Israeli Elections 2026"
  * as columns, the curated Israeli authors as rows, each cell drawn from the forecast's
- * latest evidence-bearing Oracle snapshot. Fully live off the app DB.
+ * usable evidence pool — the typed, current-state article set, identity-resolved via
+ * person_id where news-indexer knows the author (Phase 2.3). `probabilityYes` still
+ * comes from the latest snapshot: the pool has no aggregate. Fully live off the app DB.
  */
 export async function getElectionMatrix(): Promise<ElectionMatrix> {
   const predictions = await prisma.prediction.findMany({
@@ -45,18 +47,38 @@ export async function getElectionMatrix(): Promise<ElectionMatrix> {
     orderBy: { resolveByDatetime: 'asc' },
   })
 
+  // A cell aggregates the author's full usable pool for the event, not just the
+  // articles the last Oracle run happened to cite. Stance-less rows (extraction
+  // still pending) can't color a cell, so they're filtered at the query.
+  const poolRows = await prisma.evidencePoolArticle.findMany({
+    where: {
+      predictionId: { in: predictions.map((p) => p.id) },
+      status: 'COMPLETE',
+      excluded: false,
+      stance: { not: null },
+    },
+  })
+  const sourcesByPrediction = new Map<string, ElectionSourceInput[]>()
+  for (const row of poolRows) {
+    const s = poolArticleToEnrichedSource(row, row.author)
+    const input: ElectionSourceInput = {
+      author: s.author,
+      sourceName: s.sourceName,
+      url: s.url,
+      stance: s.stance,
+      certainty: s.certainty,
+      claims: s.claims,
+      title: s.title,
+      personId: s.personId,
+    }
+    const list = sourcesByPrediction.get(row.predictionId)
+    if (list) list.push(input)
+    else sourcesByPrediction.set(row.predictionId, [input])
+  }
+
   const eventInputs: ElectionEventInput[] = predictions.map((p) => {
     const snapshot = p.contextSnapshots[0]
     const oracle = (snapshot?.oracleSnapshot as OracleSnapshotShape) ?? null
-    const sources = (oracle?.sources ?? []).map((s) => ({
-      author: s.author ?? null,
-      sourceName: s.sourceName ?? null,
-      url: s.url,
-      stance: s.stance ?? null,
-      certainty: s.certainty ?? null,
-      claims: s.claims ?? [],
-      title: s.title ?? null,
-    }))
     return {
       id: p.id,
       slug: p.slug,
@@ -64,7 +86,7 @@ export async function getElectionMatrix(): Promise<ElectionMatrix> {
       resolveByISO: p.resolveByDatetime.toISOString(),
       status: p.status,
       probabilityYes: snapshot?.externalProbability ?? meanToProbability(oracle?.mean),
-      sources,
+      sources: sourcesByPrediction.get(p.id) ?? [],
     }
   })
 

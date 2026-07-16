@@ -114,10 +114,11 @@ function isEvidenceClass(v: unknown): v is EvidenceClass {
  * articles the number actually averages, not just the one article that fired the push.
  *
  * The pool row carries every extracted signal already (it's `EnrichedOracleSource`-shaped by
- * design — see the schema), with two exceptions the caller supplies: `author`, which the pool
- * table doesn't store (it's re-looked-up from news-indexer by URL, same as the single-run path),
- * and `sourceId`, for which the pool row's own id is a stable unique key (it's only ever used as
- * a display key). `claims` is a Json column, so it's defensively narrowed to string[].
+ * design — see the schema), with two exceptions the caller supplies: `author` — the snapshot
+ * paths re-look it up from news-indexer by URL for freshness, while pool-only readers pass
+ * `row.author` (stored since Phase 2.1) — and `sourceId`, for which the pool row's own id is a
+ * stable unique key (it's only ever used as a display key). `claims` is a Json column, so it's
+ * defensively narrowed to string[].
  */
 export function poolArticleToEnrichedSource(
   row: EvidencePoolArticle,
