@@ -3,9 +3,9 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
-import type { EvidencePoolArticle, ClaimDirection } from '@prisma/client'
+import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
-import { claimDirectionParam } from '@/lib/services/oracle'
+import { claimArchetypeParam, claimDirectionParam } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('evidence-pool')
@@ -64,6 +64,7 @@ export async function addArticlesToPool(
           credibilityWeight: s.credibilityWeight,
           claims: s.claims,
           settled: s.settled,
+          settlementEventDate: s.settlementEventDate,
           quantitativeEstimate: s.quantitativeEstimate,
           evidenceWeight: s.evidenceWeight,
           relevanceScore: s.relevanceScore,
@@ -90,6 +91,7 @@ export async function addArticlesToPool(
           credibilityWeight: s.credibilityWeight,
           claims: s.claims,
           settled: s.settled,
+          settlementEventDate: s.settlementEventDate,
           quantitativeEstimate: s.quantitativeEstimate,
           evidenceWeight: s.evidenceWeight,
           relevanceScore: s.relevanceScore,
@@ -320,6 +322,8 @@ export async function recomputeFromPool(
   predictionId: string,
   claimDirection: ClaimDirection | null,
   claimDeadline: Date | null,
+  claimCreatedAt: Date | null = null,
+  claimArchetype: ClaimArchetype | null = null,
 ): Promise<PoolRecompute | null> {
   const cfg = getOracleConfig()
   if (!cfg) return null
@@ -351,9 +355,14 @@ export async function recomputeFromPool(
           evidence_weight: a.evidenceWeight,
           published_date: a.publishedDate,
           settled: a.settled ?? false,
+          // The settlement anchor (retro #291) — lets aggregation-time
+          // revalidation re-check this vote instead of trusting the stored bit.
+          settlement_event_date: a.settlementEventDate,
         })),
         ...(claimDirectionParam(claimDirection) ? { claim_direction: claimDirectionParam(claimDirection) } : {}),
         ...(claimDeadline ? { claim_deadline: claimDeadline.toISOString() } : {}),
+        ...(claimCreatedAt ? { claim_created_at: claimCreatedAt.toISOString() } : {}),
+        ...(claimArchetypeParam(claimArchetype) ? { claim_archetype: claimArchetypeParam(claimArchetype) } : {}),
       }),
       timeoutMs: 10_000,
     })

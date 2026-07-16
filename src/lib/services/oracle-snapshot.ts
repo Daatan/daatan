@@ -48,6 +48,9 @@ export type EnrichedOracleSource = {
   outletId: string | null
   outletName: string | null
   settled: boolean | null
+  // The settlement anchor date (retro #291) — persisted next to `settled` so
+  // pool recomputes can re-validate the vote. Strict YYYY-MM-DD from retro.
+  settlementEventDate: string | null
   quantitativeEstimate: number | null
   evidenceWeight: number | null
   relevanceScore: number | null
@@ -87,6 +90,7 @@ export function enrichOracleSources(
       outletId: identityByUrl.get(s.url)?.outletId ?? null,
       outletName: identityByUrl.get(s.url)?.outletName ?? null,
       settled: s.settled ?? null,
+      settlementEventDate: s.settlement_event_date ?? null,
       quantitativeEstimate: s.quantitative_estimate ?? null,
       evidenceWeight: s.evidence_weight ?? null,
       relevanceScore: s.relevance_score ?? null,
@@ -140,6 +144,7 @@ export function poolArticleToEnrichedSource(
     outletId: row.outletId,
     outletName: row.outletName,
     settled: row.settled,
+    settlementEventDate: row.settlementEventDate,
     quantitativeEstimate: row.quantitativeEstimate,
     evidenceWeight: row.evidenceWeight,
     relevanceScore: row.relevanceScore,

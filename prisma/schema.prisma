@@ -539,6 +539,14 @@ model EvidencePoolArticle {
   credibilityWeight    Float?  @map("credibility_weight")
   claims               Json    @default("[]")
   settled              Boolean?
+  // The settlement anchor (retro PR #291): strict YYYY-MM-DD as emitted and
+  // validated by retro's extractor — the outcome's occurrence date for a
+  // positive settlement, the foreclosing event's date for a negative one, null
+  // when legitimately undated (post-deadline expiry). Sent back on
+  // /pool/aggregate so aggregation-time revalidation can re-check the
+  // settlement vote on every recompute; a plain String pass-through like
+  // publishedDate — daatan imposes no date semantics of its own.
+  settlementEventDate String? @map("settlement_event_date")
   quantitativeEstimate Float?  @map("quantitative_estimate")
   // Retro's resolved evidence_class weight (S2 cutover, retro PR #249/#251) —
   // the `class_weight[evidence_class]`/certainty-fallback value already

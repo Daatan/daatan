@@ -1,4 +1,4 @@
-import { ClaimDirection } from '@prisma/client'
+import { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { createLogger } from '@/lib/logger'
 import {
   getOracleBaseUrl,
@@ -42,10 +42,15 @@ export interface ArticleInput {
 }
 
 /** Stored claim temporal metadata, as read off `Prediction`. Optional on every
- *  Oracle call site — retro's direction guard (#244) is fail-open without it. */
+ *  Oracle call site — retro's direction guard (#244) is fail-open without it.
+ *  `claimCreatedAt`/`claimArchetype` bound the settlement window on retro's
+ *  side (a 'scheduled' claim can't be settled by an event predating its own
+ *  creation — an earlier instance of the recurring event); fail-open too. */
 export interface ClaimMeta {
   claimDirection?: ClaimDirection | null
   claimDeadline?: Date | null
+  claimCreatedAt?: Date | null
+  claimArchetype?: ClaimArchetype | null
 }
 
 /** Map to retro's `ForecastRequest.claim_direction` — a strict
@@ -55,6 +60,19 @@ export interface ClaimMeta {
 export function claimDirectionParam(direction: ClaimDirection | null | undefined): 'arrival' | 'survival' | undefined {
   if (direction === ClaimDirection.ARRIVAL) return 'arrival'
   if (direction === ClaimDirection.SURVIVAL) return 'survival'
+  return undefined
+}
+
+/** Map to retro's `claim_archetype` — a strict lowercase
+ *  `Literal["scheduled", "diffuse", "threshold", "none"]`. Unclassified (null)
+ *  must be omitted entirely, same contract as `claimDirectionParam`. */
+export function claimArchetypeParam(
+  archetype: ClaimArchetype | null | undefined,
+): 'scheduled' | 'diffuse' | 'threshold' | 'none' | undefined {
+  if (archetype === ClaimArchetype.SCHEDULED) return 'scheduled'
+  if (archetype === ClaimArchetype.DIFFUSE) return 'diffuse'
+  if (archetype === ClaimArchetype.THRESHOLD) return 'threshold'
+  if (archetype === ClaimArchetype.NONE) return 'none'
   return undefined
 }
 
@@ -85,6 +103,11 @@ export interface OracleSource {
    *  (retro #255) — used by the credibility feedback loop to exclude
    *  opinion-class articles from the resolution-outcome signal. */
   evidence_class?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
+  /** When settled: the ISO date anchoring the settlement (retro #291) — the
+   *  outcome's occurrence for a positive settlement, the foreclosing event for
+   *  a negative one; null when legitimately undated (post-deadline expiry).
+   *  Persisted next to `settled` so pool recomputes can re-validate the vote. */
+  settlement_event_date?: string | null
 }
 
 /** Full response from POST /forecast. */
@@ -205,6 +228,12 @@ export const getOracleForecast = async (
           ? { claim_direction: claimDirectionParam(options?.claimDirection) }
           : {}),
         ...(options?.claimDeadline ? { claim_deadline: options.claimDeadline.toISOString() } : {}),
+        // Settlement-window metadata (retro #291) — bounds which events may
+        // settle the claim; fail-open on retro's side when absent.
+        ...(options?.claimCreatedAt ? { claim_created_at: options.claimCreatedAt.toISOString() } : {}),
+        ...(claimArchetypeParam(options?.claimArchetype)
+          ? { claim_archetype: claimArchetypeParam(options?.claimArchetype) }
+          : {}),
         // Oracle's ArticleInput uses snake_case `published_date`; map from our
         // camelCase `publishedDate` so recency weighting on the Oracle side
         // actually receives the date (otherwise it's dropped and treated as now).

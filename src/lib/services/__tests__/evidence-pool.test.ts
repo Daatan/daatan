@@ -71,6 +71,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   outletId: null,
   outletName: null,
   settled: null,
+  settlementEventDate: null,
   quantitativeEstimate: null,
   evidenceWeight: null,
   relevanceScore: null,
@@ -205,6 +206,7 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
   credibilityWeight: 1.0,
   claims: [],
   settled: false,
+  settlementEventDate: null,
   quantitativeEstimate: null,
   evidenceWeight: 0.6,
   relevanceScore: 0.9,
@@ -278,6 +280,33 @@ describe('recomputeFromPool', () => {
     const posted = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body).sources
     expect(out?.usableArticles).toHaveLength(posted.length)
     expect(out?.usableArticles.map((a) => a.id)).toEqual(['art-1'])
+  })
+
+  it('sends each row\'s settlement anchor date and the claim window metadata', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ settled: true, settlementEventDate: '2026-07-14' }),
+      poolArticle({ id: 'art-2' }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', 'ARRIVAL' as never, new Date('2026-07-19T23:59:59Z'), new Date('2026-07-04T10:00:00Z'), 'SCHEDULED' as never)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources[0].settlement_event_date).toBe('2026-07-14')
+    expect(body.sources[1].settlement_event_date).toBeNull()
+    expect(body.claim_created_at).toBe('2026-07-04T10:00:00.000Z')
+    expect(body.claim_archetype).toBe('scheduled')
+  })
+
+  it('omits claim_created_at/claim_archetype entirely when unclassified — retro must fail open', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect('claim_created_at' in body).toBe(false)
+    expect('claim_archetype' in body).toBe(false)
   })
 
   it("drops admin-excluded articles from the aggregate, so an exclusion moves the number", async () => {

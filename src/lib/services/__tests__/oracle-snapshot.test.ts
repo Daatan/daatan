@@ -20,6 +20,7 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   credibility_weight: 1,
   claims: ['it will happen'],
   settled: true,
+  settlement_event_date: '2026-06-15',
   quantitative_estimate: 0.62,
   evidence_weight: 0.6,
   relevance_score: 0.85,
@@ -51,6 +52,7 @@ describe('enrichOracleSources', () => {
       publishedAt: '2026-06-18',
       author: 'Jane Doe',
       settled: true,
+      settlementEventDate: '2026-06-15',
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
       relevanceScore: 0.85,
@@ -85,6 +87,7 @@ describe('enrichOracleSources', () => {
     const out = enrichOracleSources(
       [oracleSource({
         settled: undefined,
+        settlement_event_date: undefined,
         quantitative_estimate: undefined,
         evidence_weight: undefined,
         relevance_score: undefined,
@@ -94,6 +97,7 @@ describe('enrichOracleSources', () => {
     )
     expect(out[0]).toMatchObject({
       settled: null,
+      settlementEventDate: null,
       quantitativeEstimate: null,
       evidenceWeight: null,
       relevanceScore: null,
@@ -118,6 +122,7 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     credibilityWeight: 1.0,
     claims: ['it will happen', 'second claim'],
     settled: true,
+    settlementEventDate: '2026-06-15',
     quantitativeEstimate: 0.62,
     evidenceWeight: 0.6,
     relevanceScore: 0.9,
@@ -152,6 +157,7 @@ describe('poolArticleToEnrichedSource', () => {
       outletId: 'o-1',
       outletName: 'Reuters',
       settled: true,
+      settlementEventDate: '2026-06-15',
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
       relevanceScore: 0.9,

@@ -1,4 +1,4 @@
-import type { ClaimDirection } from '@prisma/client'
+import type { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { recomputeFromPool, type PoolRecompute } from '@/lib/services/evidence-pool'
 import { poolArticleToEnrichedSource, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
@@ -71,10 +71,12 @@ export async function resolvePooledEstimate(
   claimDirection: ClaimDirection | null,
   claimDeadline: Date | null,
   authorByUrl: Map<string, string | null> = new Map(),
+  claimCreatedAt: Date | null = null,
+  claimArchetype: ClaimArchetype | null = null,
 ): Promise<ResolvedPoolEstimate> {
   let pool: PoolRecompute | null = null
   try {
-    pool = await recomputeFromPool(predictionId, claimDirection, claimDeadline)
+    pool = await recomputeFromPool(predictionId, claimDirection, claimDeadline, claimCreatedAt, claimArchetype)
   } catch {
     // recomputeFromPool already swallows transport/non-200 into null; this guards only an
     // unexpected throw (e.g. the pool read itself failing) so a caller never loses its estimate.
