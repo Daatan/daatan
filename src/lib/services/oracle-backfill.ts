@@ -95,6 +95,14 @@ export async function refreshOracleSnapshot(
   // job with no request timeout, so awaiting the compute-only aggregate costs nothing; on any
   // failure `resolvePooledEstimate` falls back to this single run.
   await addArticlesToPool(prediction.id, sources, 'backfill')
+  // Release this run's claims the Oracle omitted (gatekeeper-rejected), or they rot as
+  // PENDING forever — same lifecycle close as the news-indexer route; the PENDING filter
+  // inside failClaimedArticles is the set-difference against what the pool write completed.
+  await failClaimedArticles(
+    prediction.id,
+    searchResults.filter((_, i) => claimResults[i] === 'claimed').map((r) => r.url),
+    'oracle_omitted',
+  )
   const resolved = await resolvePooledEstimate(
     prediction.id,
     {

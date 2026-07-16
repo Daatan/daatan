@@ -273,5 +273,25 @@ describe('refreshOracleSnapshot', () => {
       await expect(refreshOracleSnapshot(prediction)).rejects.toThrow('oracle timeout')
       expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'extractor_error')
     })
+
+    it('releases claims the Oracle omitted after pooling (FAILED, oracle_omitted), scoped to this run\'s claims', async () => {
+      mockSearch.mockResolvedValue([
+        { url: 'https://a.com/1', title: 't', snippet: 's' },
+        { url: 'https://b.com/2', title: 't2', snippet: 's2' },
+      ])
+      mockClaim.mockResolvedValue(['skip', 'claimed'])
+      mockForecast.mockResolvedValue({
+        forecast: {
+          mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
+          sources: [{ source_id: 's1', source_name: 'BBC', url: 'https://a.com/1', stance: 0.2, certainty: 0.6, credibility_weight: 1, claims: ['c'] }],
+        },
+      })
+
+      await refreshOracleSnapshot(prediction)
+
+      // Only the url THIS run claimed — the skipped one belongs to another in-flight run.
+      // failClaimedArticles' PENDING filter subtracts what the pool write completed.
+      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://b.com/2'], 'oracle_omitted')
+    })
   })
 })
