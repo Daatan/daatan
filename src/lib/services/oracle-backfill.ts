@@ -10,6 +10,7 @@ import {
   addArticlesToPool,
   claimArticlesForExtraction,
   failClaimedArticles,
+  type PoolOrigin,
 } from '@/lib/services/evidence-pool'
 import { createLogger } from '@/lib/logger'
 
@@ -25,24 +26,48 @@ export type RefreshResult =
   // the backfill candidate set and the loop converges.
   | { status: 'insufficient' }
 
+/** An article handed to refreshOracleSnapshot instead of a fresh search — the retry
+ *  sweep rebuilds these from stuck pool rows (which store title but not snippet; the
+ *  Oracle fetches article content itself, so an empty snippet costs little). */
+export type SuppliedArticle = {
+  url: string
+  title: string
+  snippet: string
+  source?: string
+  publishedDate?: string
+}
+
 /**
  * Run the Oracle's analysis for one forecast and persist its source roster as an
  * Oracle snapshot — WITHOUT touching the user-facing context summary (uses
  * saveOracleSnapshotOnly). This is the building block of the active-forecast
  * backfill that populates the "sources behind the AI estimate" panel for forecasts
- * created before per-source capture existed. Reuses the same search → Oracle →
- * enrich path as the user-triggered analyze route.
+ * created before per-source capture existed, and (via `opts.articles`) of the
+ * pool-retry sweep, which re-drives stuck pool rows through the same path instead
+ * of searching. Reuses the same search → Oracle → enrich path as the user-triggered
+ * analyze route.
+ *
+ * With supplied articles the two empty-marker writes (`markOracleAttempted`) are
+ * skipped: they exist only so the backfill's candidate query converges, and on a
+ * retried forecast — which already has real snapshots — an empty marker would
+ * become the LATEST evidence snapshot that every latest-snapshot reader trusts.
  */
 export async function refreshOracleSnapshot(
   prediction: { id: string; claimText: string; claimDirection?: ClaimDirection | null; claimDeadline?: Date | null },
+  opts?: { articles?: SuppliedArticle[]; origin?: PoolOrigin },
 ): Promise<RefreshResult> {
-  const query = await buildSearchQuery(prediction.claimText)
-  const searchResults = await oracleSearch(query, DEFAULT_MAX_ARTICLES, undefined, {
-    source: 'context-update',
-    predictionId: prediction.id,
-  })
+  const supplied = opts?.articles
+  const origin: PoolOrigin = opts?.origin ?? 'backfill'
+  let searchResults: SuppliedArticle[] | null = supplied ?? null
+  if (!searchResults) {
+    const query = await buildSearchQuery(prediction.claimText)
+    searchResults = await oracleSearch(query, DEFAULT_MAX_ARTICLES, undefined, {
+      source: 'context-update',
+      predictionId: prediction.id,
+    })
+  }
   if (!searchResults || searchResults.length === 0) {
-    await markOracleAttempted(prediction.id, 'no-articles')
+    if (!supplied) await markOracleAttempted(prediction.id, 'no-articles')
     return { status: 'no-articles' }
   }
 
@@ -61,7 +86,7 @@ export async function refreshOracleSnapshot(
       source: r.source ?? null,
       publishedAt: r.publishedDate ?? null,
     })),
-    'backfill',
+    origin,
   )
   if (!claimResults.some((r) => r === 'claimed')) {
     return { status: 'unchanged' }
@@ -80,7 +105,7 @@ export async function refreshOracleSnapshot(
   }
   if (forecast === null) {
     await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), 'oracle_null')
-    await markOracleAttempted(prediction.id, 'no-oracle')
+    if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
     return { status: 'no-oracle' }
   }
 
@@ -94,7 +119,7 @@ export async function refreshOracleSnapshot(
   // this run's articles and its result actually drives the snapshot. Backfill is a background
   // job with no request timeout, so awaiting the compute-only aggregate costs nothing; on any
   // failure `resolvePooledEstimate` falls back to this single run.
-  await addArticlesToPool(prediction.id, sources, 'backfill')
+  await addArticlesToPool(prediction.id, sources, origin)
   // Release this run's claims the Oracle omitted (gatekeeper-rejected), or they rot as
   // PENDING forever — same lifecycle close as the news-indexer route; the PENDING filter
   // inside failClaimedArticles is the set-difference against what the pool write completed.

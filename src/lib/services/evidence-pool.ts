@@ -23,8 +23,11 @@ const log = createLogger('evidence-pool')
  * `excluded` (see getPoolArticles/setArticleExcluded below) is an admin's "ignore this
  * article" switch, and is now genuinely enforced: excluded rows are dropped before the
  * aggregate, so an exclusion actually moves the number on every path.
+ *
+ * 'retry' marks rows whose latest signal came from the pool-retry sweep
+ * (pool-retry.ts) re-driving a stuck FAILED/stale-PENDING claim through extraction.
  */
-export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill'
+export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry'
 
 /**
  * Upsert one batch of extracted sources into a forecast's evidence pool, keyed

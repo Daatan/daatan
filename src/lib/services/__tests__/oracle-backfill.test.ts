@@ -274,6 +274,41 @@ describe('refreshOracleSnapshot', () => {
       expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'extractor_error')
     })
 
+    it('with supplied articles (retry sweep): skips search, claims and pools under the supplied origin', async () => {
+      mockForecast.mockResolvedValue({
+        forecast: {
+          mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
+          sources: [{ source_id: 's1', source_name: 'BBC', url: 'https://a.com/1', stance: 0.2, certainty: 0.6, credibility_weight: 1, claims: ['c'] }],
+        },
+      })
+
+      const r = await refreshOracleSnapshot(prediction, {
+        articles: [{ url: 'https://a.com/1', title: 't', snippet: '', source: 'a.com' }],
+        origin: 'retry',
+      })
+
+      expect(r.status).toBe('ok')
+      expect(mockSearch).not.toHaveBeenCalled()
+      expect(mockBuildQuery).not.toHaveBeenCalled()
+      expect(mockClaim).toHaveBeenCalledWith('p1', [expect.objectContaining({ url: 'https://a.com/1' })], 'retry')
+      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.anything(), 'retry')
+    })
+
+    it('with supplied articles, an Oracle null releases the claims but writes NO empty marker', async () => {
+      mockForecast.mockResolvedValue({ forecast: null })
+
+      const r = await refreshOracleSnapshot(prediction, {
+        articles: [{ url: 'https://a.com/1', title: 't', snippet: '' }],
+        origin: 'retry',
+      })
+
+      expect(r.status).toBe('no-oracle')
+      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'oracle_null')
+      // markOracleAttempted would write an empty oracleSnapshot marker, which on a
+      // forecast with real snapshots becomes the LATEST one every reader trusts.
+      expect(mockMark).not.toHaveBeenCalled()
+    })
+
     it('releases claims the Oracle omitted after pooling (FAILED, oracle_omitted), scoped to this run\'s claims', async () => {
       mockSearch.mockResolvedValue([
         { url: 'https://a.com/1', title: 't', snippet: 's' },
