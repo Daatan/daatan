@@ -220,6 +220,18 @@ export async function POST(request: NextRequest) {
       let resolved: ResolvedPoolEstimate | null = null
       try {
         await addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
+        // The pool write above flips this run's extracted claims to COMPLETE. Anything
+        // this run claimed that the Oracle omitted from its sources (gatekeeper-rejected,
+        // most commonly) would otherwise stay PENDING forever: news-indexer dedups its
+        // matches, so no later push comes along to re-claim it — 985 such rows had
+        // accumulated by 2026-07-16. failClaimedArticles only touches rows still
+        // PENDING, so the set-difference against what completed happens in SQL. Scoped
+        // to this run's own claims so a concurrent run's fresh in-flight claim survives.
+        await failClaimedArticles(
+          prediction.id,
+          items.filter((_, i) => claimResults[i] === 'claimed').map((a) => a.url),
+          'oracle_omitted',
+        )
         resolved = await resolvePooledEstimate(
           prediction.id,
           {

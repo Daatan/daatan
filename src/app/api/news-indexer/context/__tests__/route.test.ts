@@ -609,5 +609,32 @@ describe('POST /api/news-indexer/context', () => {
 
       expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_null')
     })
+
+    it('releases claims the Oracle omitted after pooling — a gatekeeper-rejected article must not stay PENDING forever', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      // Called with everything this run claimed; failClaimedArticles' own PENDING
+      // filter subtracts what addArticlesToPool already flipped to COMPLETE.
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_omitted')
+    })
+
+    it('scopes the omitted-claims release to what THIS run claimed — a skipped article stays with its owner', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://a.com/1', title: 'A', snippet: 's' },
+            { url: 'https://b.com/2', title: 'B', snippet: 's' },
+          ],
+        }),
+      )
+
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://b.com/2'], 'oracle_omitted')
+    })
   })
 })
