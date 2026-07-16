@@ -19,6 +19,8 @@ export type ElectionSourceInput = {
   certainty: number | null
   claims: string[]
   title: string | null
+  /** news-indexer's resolved identity, when known — matchCuratedAuthor's fast path. */
+  personId?: string | null
 }
 
 /** One election-tagged forecast + the sources the Oracle used on it (its latest evidence snapshot). */
