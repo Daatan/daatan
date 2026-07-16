@@ -1,0 +1,86 @@
+name: Retry Pool Extractions
+
+# Drains stuck evidence-pool rows (FAILED except oracle_omitted, abandoned PENDING
+# claims) by re-driving them through extraction, in bounded rounds against
+# POST /api/admin/evidence-pool/retry. Auth is the x-cron-secret (BOT_RUNNER_SECRET)
+# header, same as the cron routes — the secret only ever lives in the Actions runner.
+#
+# Unlike the oracle-sources backfill, `remaining` may legitimately stall without
+# reaching 0: a row that fails again today leaves the retryable set only via its
+# 24h backoff, and rows younger than 24h aren't eligible yet. The loop therefore
+# exits cleanly when remaining stops decreasing, not only at 0.
+#
+# Manual, on-demand: Actions → Retry Pool Extractions → Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to sweep
+        type: choice
+        options: [staging, production]
+        default: staging
+      limit:
+        description: Predictions per round (each is one full Oracle analysis — keep small)
+        default: '2'
+      max_rounds:
+        description: Safety cap on rounds
+        default: '60'
+
+jobs:
+  retry:
+    name: Sweep ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drive retry sweep until drained or stalled
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          if [ "${{ inputs.target }}" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
+          echo "Target: $BASE (limit=${{ inputs.limit }}/round, up to ${{ inputs.max_rounds }} rounds)"
+
+          errstreak=0
+          stallstreak=0
+          prev=""
+          for i in $(seq 1 ${{ inputs.max_rounds }}); do
+            BODY=$(curl -s --max-time 300 -X POST \
+              -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+              "$BASE/api/admin/evidence-pool/retry?limit=${{ inputs.limit }}") || BODY=""
+            echo "round $i: ${BODY:-<no response>}"
+
+            REMAINING=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('remaining','ERR'))" 2>/dev/null || echo ERR)
+            if [ "$REMAINING" = "0" ]; then
+              echo "✅ Drained — no retryable rows left on active forecasts"
+              exit 0
+            fi
+            if [ "$REMAINING" = "ERR" ]; then
+              errstreak=$((errstreak + 1))
+              echo "round $i: no/invalid response (transient) — streak $errstreak"
+              if [ "$errstreak" -ge 5 ]; then
+                echo "❌ 5 consecutive bad responses — likely auth/server error, aborting"
+                exit 1
+              fi
+              sleep 8
+              continue
+            fi
+            errstreak=0
+            if [ "$REMAINING" = "$prev" ]; then
+              stallstreak=$((stallstreak + 1))
+              if [ "$stallstreak" -ge 3 ]; then
+                echo "✅ Converged for today — $REMAINING rows left, all inside their 24h backoff; re-run tomorrow"
+                exit 0
+              fi
+            else
+              stallstreak=0
+            fi
+            prev="$REMAINING"
+            sleep 3
+          done
+
+          echo "⚠️ Hit max_rounds with $REMAINING still remaining — re-run to continue"
