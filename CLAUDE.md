@@ -43,7 +43,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - Embeddings + similar-forecasts: [`docs/EMBEDDINGS.md`](./docs/EMBEDDINGS.md)
 - Search providers: [`docs/SEARCH_PROVIDERS.md`](./docs/SEARCH_PROVIDERS.md) (local summary) + canonical [Daatan/docs: search-providers.md](https://github.com/Daatan/docs/blob/main/search-providers.md)
 - API surface: [`docs/API.md`](./docs/API.md)
-- Deployment: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md), [`docs/zero-downtime-version-updates.md`](./docs/zero-downtime-version-updates.md)
+- Deployment: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) (runtime version overrides don't exist — [`docs/zero-downtime-version-updates.md`](./docs/zero-downtime-version-updates.md) is a retirement notice explaining why)
 - Telegram notifications: [`docs/TELEGRAM_NOTIFICATIONS.md`](./docs/TELEGRAM_NOTIFICATIONS.md)
 - Analytics (GA4 + consent mode): [`docs/ANALYTICS.md`](./docs/ANALYTICS.md)
 - SEO (IndexNow, JSON-LD, metadata): [`docs/SEO.md`](./docs/SEO.md)
