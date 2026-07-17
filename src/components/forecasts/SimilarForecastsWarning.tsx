@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Copy } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { WarningBanner } from '@/components/ui/WarningBanner'
 
 interface SimilarForecast {
@@ -29,6 +29,7 @@ export function SimilarForecastsWarning({
   limit = 3,
 }: Props) {
   const t = useTranslations('forecast')
+  const locale = useLocale()
   const [items, setItems] = useState<SimilarForecast[]>([])
   const lastQuery = useRef('')
 
@@ -40,7 +41,7 @@ export function SimilarForecastsWarning({
     const timer = setTimeout(async () => {
       lastQuery.current = queryKey
       try {
-        const params = new URLSearchParams({ q: claim, limit: String(limit) })
+        const params = new URLSearchParams({ q: claim, limit: String(limit), language: locale })
         if (tags.length > 0) params.set('tags', tags.join(','))
         const res = await fetch(`/api/forecasts/similar?${params}`)
         if (res.ok) {
@@ -51,7 +52,7 @@ export function SimilarForecastsWarning({
     }, debounceMs)
 
     return () => clearTimeout(timer)
-  }, [claimText, tags, minClaimLength, debounceMs, limit])
+  }, [claimText, tags, minClaimLength, debounceMs, limit, locale])
 
   if (items.length === 0) return null
 

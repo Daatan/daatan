@@ -208,6 +208,7 @@ Find forecasts similar to a given forecast (by ID) or query text, using pgvector
 | `q` | one of `id`/`q` | Free-text query to embed (max 200 chars) |
 | `tags` | no | Comma-separated tag names used to boost results with shared tags (max 10, 50 chars each) |
 | `limit` | no | Max results to return (default `3`, max `10`) |
+| `language` | no | Supported non-English locale (`he`/`ru`/`eo`): overlays cached claimText translations. Each entry gains `translated: boolean`; a cache miss keeps the English claim (clients can fill it via `POST /api/forecasts/[id]/translate`). Never triggers new translations. |
 
 **Response** — `{ similar: SimilarForecast[] }`, each entry shaped as:
 
