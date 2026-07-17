@@ -128,15 +128,33 @@ search/forecast chain).
 
 Per-forecast, keyed by `(predictionId, urlHash)` — `urlHash` is `hashUrl()`
 (same normalization as `NewsAnchor`), so http/https and trailing-slash variants
-of the same URL collapse to one row. **Foundation layer only (2026-07-09,
-retro `docs/ORACLE_VARIABLES.md` §6 part 2): nothing reads this table to
-compute an estimate yet.** `analyze`/`news-indexer`/`backfill` shadow-write
+of the same URL collapse to one row. Started as a write-only foundation layer
+(2026-07-09, retro `docs/ORACLE_VARIABLES.md` §6 part 2); since v1.60.0 it is
+the source of truth the estimate is recomputed from (see below), and since
+2026-07-16 also what the elections consumers render (elections app #50/#51,
+daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill` write
 their per-source signal here (`addArticlesToPool` in
-`src/lib/services/evidence-pool.ts`) in *addition to*, not instead of, their
-existing `ContextSnapshot`/`Prediction` writes — fire-and-forget, so a
-failure there never blocks or alters the estimate. The row IS the extraction
+`src/lib/services/evidence-pool.ts`) alongside their existing
+`ContextSnapshot`/`Prediction` writes. The row IS the extraction
 cache: re-discovering an already-pooled article updates its stored signal in
-place. `excluded` is settable via the forecast page's admin-only "Evidence
+place.
+
+Rows move through a claim lifecycle: `claimArticleForExtraction` inserts/claims
+a row as `PENDING` (a claim older than 10 min counts as abandoned and can be
+re-claimed), a successful extraction completes it, and everything a run claimed
+but got no signal for is released as `FAILED` with a `statusReason`:
+`extractor_error` (transport/extractor failure — retryable), `oracle_null` (the
+Oracle returned no forecast — retryable once), `oracle_omitted` (the Oracle ran
+but its gatekeeper dropped the article — terminal), `oracle_null_final` (second
+consecutive `oracle_null` — terminal, stamped by the retry sweep's attempt cap),
+`reextract_no_signal`. The retry sweep (`src/lib/services/pool-retry.ts`,
+exposed at `POST /api/admin/evidence-pool/retry`, driven by the weekly
+`Retry Pool Extractions` workflow) re-pushes retryable rows title-only through
+`refreshOracleSnapshot`, biggest ACTIVE-forecast backlogs first, one attempt
+per row per 24 h. Terminal rows are still revivable organically: a re-push with
+changed content re-claims the row.
+
+`excluded` is settable via the forecast page's admin-only "Evidence
 pool" panel (`EvidencePoolAdmin.tsx`, `PATCH
 /api/admin/forecasts/[id]/evidence-pool/[articleId]`) — shadow-writes never
 touch it, so an admin's exclusion decision survives re-discovery.
@@ -165,9 +183,12 @@ validates it.
 `personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
 news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`
-tables. All nullable, forward-populated on write only (no historical backfill); lets elections
-eventually attribute a source to a tracked commentator/outlet by id instead of string-matching
-`TRACKED_SOURCES`/`CURATED_ELECTION_AUTHORS`.
+tables. All nullable; `author`/`personId`/`personName` were historically backfilled
+(2026-07-15: 88% author, 24% person coverage), `outletId`/`outletName` (#1131) are
+forward-populated only. Both elections consumers now attribute by id first: the elections
+app (#50/#51) and daatan's `/elections` matrix (#1147) read usable pool rows and match
+`personId` before falling back to the `TRACKED_SOURCES`/`CURATED_ELECTION_AUTHORS` alias
+tables, which survive only for byline-only identities news-indexer can't resolve yet.
 **All three estimate paths are cut over to the pool** (ORACLE_VARIABLES.md §6).
 `recomputeFromPool()` in `evidence-pool.ts` posts the current non-excluded pool to
 retro's `POST /pool/aggregate`, and that aggregate — mean, std, CI, `settled`,
@@ -215,11 +236,12 @@ the aggregate, so an admin's exclusion genuinely moves the number.
 `sources.length === articlesUsed` and the stored snapshot lists precisely the articles its
 number averages. (Before this, `sources` held only the run's own articles next to a
 `mean`/`articlesUsed` describing the whole pool — the snapshot couldn't explain its own
-number, and elections' per-commentator matching saw only those bylines.) Authors aren't
-stored on pool rows, so they're re-looked-up from news-indexer by URL at snapshot time,
-best-effort — a pooled article with no indexed byline is kept with a null author, never
-dropped. The single-run **fallback** still stores just the run's own sources, matching its
-`articlesUsed`.
+number, and elections' per-commentator matching saw only those bylines.) The snapshot path
+resolves authors from the run's own articles plus a news-indexer by-URL lookup for the rest
+(`pooled-estimate.ts`), best-effort — a pooled article with no indexed byline is kept with a
+null author, never dropped. (Pool rows also carry `author` directly since Phase 2.1; the
+elections readers use that stored value.) The single-run **fallback** still stores just the
+run's own sources, matching its `articlesUsed`.
 
 ### Credibility feedback loop (retro `docs/ORACLE_VARIABLES.md` §9)
 
