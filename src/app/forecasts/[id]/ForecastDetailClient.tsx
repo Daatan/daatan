@@ -733,7 +733,10 @@ export default function ForecastDetailClient({
       />
 
       {/* Admin-only false-settlement override (renders nothing unless settled) */}
-      <SettledLatchAdmin prediction={prediction} />
+      <SettledLatchAdmin
+        prediction={prediction}
+        onCleared={() => setPrediction(p => (p ? { ...p, settled: false } : p))}
+      />
 
       {/* Admin-only external-market link control (renders nothing for non-admins) */}
       <ExternalMarketLinkAdmin prediction={prediction} />

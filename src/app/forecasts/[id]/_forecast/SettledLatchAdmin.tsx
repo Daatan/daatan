@@ -8,6 +8,9 @@ import type { Prediction } from './types'
 
 interface Props {
   prediction: Prediction
+  // The parent holds the prediction in client state, so router.refresh() alone
+  // can't hide this banner — the parent must drop `settled` itself.
+  onCleared: () => void
 }
 
 /**
@@ -18,7 +21,7 @@ interface Props {
  * Renders nothing unless the forecast is currently settled AND the viewer
  * is an admin.
  */
-export function SettledLatchAdmin({ prediction }: Props) {
+export function SettledLatchAdmin({ prediction, onCleared }: Props) {
   const { data: session } = useSession()
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -31,6 +34,7 @@ export function SettledLatchAdmin({ prediction }: Props) {
       const res = await fetch(`/api/admin/forecasts/${prediction.id}/settled`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Clear failed')
       toast.success('Settlement flag cleared')
+      onCleared()
       router.refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Clear failed')
