@@ -366,6 +366,23 @@ export async function getCachedPredictionTranslation(
 }
 
 /**
+ * Batch cache-only lookup of claimText translations for a set of predictions.
+ * Never calls Gemini. Returns a map of predictionId → translated claim,
+ * containing only the ids that have a cached translation.
+ */
+export async function getCachedClaimTranslations(
+  predictionIds: string[],
+  language: string,
+): Promise<Map<string, string>> {
+  if (predictionIds.length === 0) return new Map()
+  const cached = await prisma.predictionTranslation.findMany({
+    where: { predictionId: { in: predictionIds }, fieldName: 'claimText', language },
+    select: { predictionId: true, translatedText: true },
+  })
+  return new Map(cached.map((c) => [c.predictionId, c.translatedText]))
+}
+
+/**
  * Returns translated text for a comment, fetching from cache or translating on demand.
  */
 export async function translateComment(commentId: string, language: string): Promise<string> {

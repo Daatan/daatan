@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleRouteError } from '@/lib/api-error'
 import { getPredictionWithTags, findSimilarForecasts } from '@/lib/services/forecast'
+import { getCachedClaimTranslations } from '@/lib/services/translation'
 import { aiFeaturesEnabled } from '@/lib/capabilities'
+import { locales } from '@/i18n/config'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/forecasts/similar?id=<id>&limit=3
+// GET /api/forecasts/similar?id=<id>&limit=3&language=ru
 // GET /api/forecasts/similar?q=<text>&tags=<csv>&limit=3
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +22,11 @@ export async function GET(request: NextRequest) {
     const q = (searchParams.get('q') || '').slice(0, 200)
     const tagsParam = searchParams.get('tags') || ''
     const limit = Math.min(parseInt(searchParams.get('limit') || '3'), 10)
+    const languageParam = searchParams.get('language')
+    const language =
+      languageParam && languageParam !== 'en' && locales.includes(languageParam as (typeof locales)[number])
+        ? languageParam
+        : null
 
     let claimText = q
     let tags: string[] = tagsParam
@@ -38,6 +45,20 @@ export async function GET(request: NextRequest) {
     }
 
     const similar = await findSimilarForecasts({ claimText, tags, excludeId: id, limit })
+
+    // Cache-only translation overlay: a miss keeps the English claimText and
+    // reports translated: false so the client can fill it via /translate.
+    if (language && similar.length > 0) {
+      const translations = await getCachedClaimTranslations(similar.map(s => s.id), language)
+      return NextResponse.json({
+        similar: similar.map(s => ({
+          ...s,
+          claimText: translations.get(s.id) ?? s.claimText,
+          translated: translations.has(s.id),
+        })),
+      })
+    }
+
     return NextResponse.json({ similar })
   } catch (error) {
     return handleRouteError(error, 'Failed to find similar forecasts')

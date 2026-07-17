@@ -11,8 +11,13 @@ vi.mock('@/lib/services/forecast', () => ({
   findSimilarForecasts: vi.fn(),
 }))
 
+vi.mock('@/lib/services/translation', () => ({
+  getCachedClaimTranslations: vi.fn(),
+}))
+
 import { GET } from '../route'
 import { getPredictionWithTags, findSimilarForecasts } from '@/lib/services/forecast'
+import { getCachedClaimTranslations } from '@/lib/services/translation'
 
 const makeRequest = (params: Record<string, string>) => {
   const url = new URL('http://localhost/api/forecasts/similar')
@@ -95,5 +100,40 @@ describe('GET /api/forecasts/similar', () => {
     vi.mocked(getPredictionWithTags).mockRejectedValue(new Error('DB down'))
     const res = await GET(makeRequest({ id: 'fc-1' }))
     expect(res.status).toBe(500)
+  })
+
+  describe('language overlay', () => {
+    it('overlays cached translations and flags translated items', async () => {
+      vi.mocked(findSimilarForecasts).mockResolvedValue([
+        ...fakeSimilar,
+        { ...fakeSimilar[0], id: 'fc-2', slug: 'no-translation', claimText: 'Untranslated claim' },
+      ])
+      vi.mocked(getCachedClaimTranslations).mockResolvedValue(
+        new Map([['fc-1', 'Биткоин достигнет $100k']])
+      )
+
+      const res = await GET(makeRequest({ q: 'Bitcoin will reach $100k', language: 'ru' }))
+      expect(res.status).toBe(200)
+      expect(vi.mocked(getCachedClaimTranslations)).toHaveBeenCalledWith(['fc-1', 'fc-2'], 'ru')
+      const { similar } = await res.json()
+      expect(similar[0]).toMatchObject({ claimText: 'Биткоин достигнет $100k', translated: true })
+      expect(similar[1]).toMatchObject({ claimText: 'Untranslated claim', translated: false })
+    })
+
+    it('skips the overlay for English', async () => {
+      vi.mocked(findSimilarForecasts).mockResolvedValue(fakeSimilar)
+      const res = await GET(makeRequest({ q: 'Bitcoin will reach $100k', language: 'en' }))
+      expect(vi.mocked(getCachedClaimTranslations)).not.toHaveBeenCalled()
+      const { similar } = await res.json()
+      expect(similar[0].translated).toBeUndefined()
+    })
+
+    it('ignores unsupported language values', async () => {
+      vi.mocked(findSimilarForecasts).mockResolvedValue(fakeSimilar)
+      const res = await GET(makeRequest({ q: 'Bitcoin will reach $100k', language: 'xx' }))
+      expect(res.status).toBe(200)
+      expect(vi.mocked(getCachedClaimTranslations)).not.toHaveBeenCalled()
+      expect((await res.json()).similar[0].claimText).toBe('Bitcoin will reach $100k')
+    })
   })
 })
