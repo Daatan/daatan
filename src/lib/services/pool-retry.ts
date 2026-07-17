@@ -73,7 +73,7 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
   const backlogById = new Map(groups.map((g) => [g.predictionId, g._count._all]))
   const active = await prisma.prediction.findMany({
     where: { id: { in: [...backlogById.keys()] }, status: 'ACTIVE' },
-    select: { id: true, claimText: true, claimDirection: true, claimDeadline: true },
+    select: { id: true, claimText: true, claimDirection: true, claimDeadline: true, createdAt: true, claimArchetype: true },
   })
   const candidates = active
     .sort((a, b) => (backlogById.get(b.id) ?? 0) - (backlogById.get(a.id) ?? 0))

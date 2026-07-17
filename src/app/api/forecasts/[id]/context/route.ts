@@ -186,6 +186,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 })),
                 claimDirection: prediction.claimDirection,
                 claimDeadline: prediction.claimDeadline,
+                claimCreatedAt: prediction.createdAt,
+                claimArchetype: prediction.claimArchetype,
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })
             // The Oracle abstained — the evidence doesn't bear on the claim. Record
             // the abstention and do NOT fall back to an LLM guess, which would just
@@ -241,6 +243,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.claimDirection,
                     prediction.claimDeadline,
                     authorByUrl,
+                    prediction.createdAt,
+                    prediction.claimArchetype,
                 )
 
                 // The whole pool is off-topic — abstain, exactly as the single-run abstain

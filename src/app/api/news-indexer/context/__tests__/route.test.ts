@@ -478,16 +478,19 @@ describe('POST /api/news-indexer/context', () => {
 
     it('forwards claimDirection/claimDeadline to the recompute', async () => {
       const deadline = new Date('2026-12-31T00:00:00.000Z')
+      const createdAt = new Date('2026-07-04T10:00:00.000Z')
       vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
         ...ACTIVE_PREDICTION,
         claimDirection: 'ARRIVAL',
         claimDeadline: deadline,
+        createdAt,
+        claimArchetype: 'SCHEDULED',
       } as never)
       vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
 
       await POST(post('test-secret'))
 
-      expect(recomputeFromPool).toHaveBeenCalledWith('pred-1', 'ARRIVAL', deadline)
+      expect(recomputeFromPool).toHaveBeenCalledWith('pred-1', 'ARRIVAL', deadline, createdAt, 'SCHEDULED')
     })
 
     it('carries the pool\'s settlement verdict, not the single run\'s', async () => {

@@ -152,6 +152,16 @@ extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
 from the resolution-outcome signal, since `evidenceWeight` alone can't
 distinguish opinion from a low-certainty unclassified article.
+`settlementEventDate` is the settlement anchor (retro
+`SourceSignal.settlement_event_date`, PR #291): the outcome's occurrence date
+for a positive settlement, the foreclosing event's date for a negative one,
+null when legitimately undated (post-deadline expiry). Sent back on
+`/pool/aggregate` (with the prediction's `createdAt` as `claim_created_at` and
+`claimArchetype` as `claim_archetype`) so retro's aggregation-time settlement
+revalidation can re-check every stored settled vote on every recompute —
+before this, a stale/poisoned `settled` bit voted forever (the 2026-07-16
+false-pin audit). Plain String pass-through like `publishedDate`; retro
+validates it.
 `personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
 news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`

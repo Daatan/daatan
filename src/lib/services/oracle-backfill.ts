@@ -1,4 +1,4 @@
-import type { ClaimDirection } from '@prisma/client'
+import type { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
@@ -53,7 +53,14 @@ export type SuppliedArticle = {
  * become the LATEST evidence snapshot that every latest-snapshot reader trusts.
  */
 export async function refreshOracleSnapshot(
-  prediction: { id: string; claimText: string; claimDirection?: ClaimDirection | null; claimDeadline?: Date | null },
+  prediction: {
+    id: string
+    claimText: string
+    claimDirection?: ClaimDirection | null
+    claimDeadline?: Date | null
+    createdAt?: Date | null
+    claimArchetype?: ClaimArchetype | null
+  },
   opts?: { articles?: SuppliedArticle[]; origin?: PoolOrigin },
 ): Promise<RefreshResult> {
   const supplied = opts?.articles
@@ -96,7 +103,13 @@ export async function refreshOracleSnapshot(
   try {
     ;({ forecast } = await getOracleForecast(
       prediction.claimText,
-      { articles: searchResults, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
+      {
+        articles: searchResults,
+        claimDirection: prediction.claimDirection,
+        claimDeadline: prediction.claimDeadline,
+        claimCreatedAt: prediction.createdAt,
+        claimArchetype: prediction.claimArchetype,
+      },
       { source: 'context-update', predictionId: prediction.id },
     ))
   } catch (err) {
@@ -142,6 +155,8 @@ export async function refreshOracleSnapshot(
     prediction.claimDirection ?? null,
     prediction.claimDeadline ?? null,
     authorByUrl,
+    prediction.createdAt ?? null,
+    prediction.claimArchetype ?? null,
   )
 
   // The whole pool is off-topic — abstain rather than persist a number built from articles

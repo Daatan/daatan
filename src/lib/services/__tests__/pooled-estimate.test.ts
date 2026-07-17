@@ -28,7 +28,7 @@ const SINGLE_RUN: SingleRunEstimate = {
 }
 
 const FALLBACK_SOURCES = [
-  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, personId: null, personName: null, outletId: null, outletName: null, settled: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null },
+  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, personId: null, personName: null, outletId: null, outletName: null, settled: null, settlementEventDate: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null },
 ]
 
 const poolRow = (over: Partial<EvidencePoolArticle>): EvidencePoolArticle =>
@@ -48,6 +48,7 @@ const poolRow = (over: Partial<EvidencePoolArticle>): EvidencePoolArticle =>
     credibilityWeight: 1,
     claims: ['pooled claim'],
     settled: false,
+    settlementEventDate: null,
     quantitativeEstimate: null,
     evidenceWeight: 0.6,
     relevanceScore: 0.8,
@@ -89,6 +90,28 @@ describe('resolvePooledEstimate', () => {
     expect(out.snapshotSources[0]).toMatchObject({ sourceName: 'reuters.com', claims: ['pooled claim'] })
     expect(out.poolSize).toBe(3)
     expect(out.singleRunMean).toBe(0.5)
+  })
+
+  it('forwards the claim window metadata to the recompute', async () => {
+    mockRecompute.mockResolvedValue(poolResult())
+    const createdAt = new Date('2026-07-04T10:00:00Z')
+
+    await resolvePooledEstimate(
+      'p1', SINGLE_RUN, FALLBACK_SOURCES, 'ARRIVAL' as never, new Date('2026-07-19T23:59:59Z'),
+      new Map(), createdAt, 'SCHEDULED' as never,
+    )
+
+    expect(mockRecompute).toHaveBeenCalledWith(
+      'p1', 'ARRIVAL', new Date('2026-07-19T23:59:59Z'), createdAt, 'SCHEDULED',
+    )
+  })
+
+  it('defaults the claim window metadata to null for callers that do not pass it', async () => {
+    mockRecompute.mockResolvedValue(poolResult())
+
+    await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+    expect(mockRecompute).toHaveBeenCalledWith('p1', null, null, null, null)
   })
 
   it('falls back to the single run (and its own sources) when the pool cannot aggregate', async () => {
@@ -166,6 +189,6 @@ describe('resolvePooledEstimate', () => {
 
     await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, 'ARRIVAL', deadline)
 
-    expect(mockRecompute).toHaveBeenCalledWith('p1', 'ARRIVAL', deadline)
+    expect(mockRecompute).toHaveBeenCalledWith('p1', 'ARRIVAL', deadline, null, null)
   })
 })

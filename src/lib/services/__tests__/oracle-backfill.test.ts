@@ -196,6 +196,8 @@ describe('refreshOracleSnapshot', () => {
         'SURVIVAL',
         deadline,
         expect.any(Map),
+        null,
+        null,
       )
     })
 

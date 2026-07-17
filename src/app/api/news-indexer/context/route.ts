@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
         confidence: true,
         claimDirection: true,
         claimDeadline: true,
+        createdAt: true,
+        claimArchetype: true,
       },
     })
 
@@ -158,7 +160,13 @@ export async function POST(request: NextRequest) {
     try {
       ;({ forecast: oracleForecast } = await getOracleForecast(
         prediction.claimText,
-        { articles, claimDirection: prediction.claimDirection, claimDeadline: prediction.claimDeadline },
+        {
+          articles,
+          claimDirection: prediction.claimDirection,
+          claimDeadline: prediction.claimDeadline,
+          claimCreatedAt: prediction.createdAt,
+          claimArchetype: prediction.claimArchetype,
+        },
         { source: 'news-indexer', predictionId: prediction.id },
       ))
     } catch (err) {
@@ -246,6 +254,8 @@ export async function POST(request: NextRequest) {
           prediction.claimDirection,
           prediction.claimDeadline,
           authorByUrl,
+          prediction.createdAt,
+          prediction.claimArchetype,
         )
       } catch (err) {
         log.warn({ predictionId: prediction.id, err }, 'evidence pool write/recompute failed')

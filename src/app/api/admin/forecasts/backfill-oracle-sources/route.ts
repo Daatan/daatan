@@ -24,7 +24,7 @@ function parseLimit(request: NextRequest): number {
 async function runBackfill(limit: number) {
   const candidates = await prisma.prediction.findMany({
     where: NO_ORACLE_SNAPSHOT,
-    select: { id: true, claimText: true, claimDirection: true, claimDeadline: true },
+    select: { id: true, claimText: true, claimDirection: true, claimDeadline: true, createdAt: true, claimArchetype: true },
     take: limit,
   })
 
