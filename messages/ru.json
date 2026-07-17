@@ -526,9 +526,7 @@
     "countPlural": "{count, plural, one {# публикация} few {# публикации} many {# публикаций} other {# публикаций}}",
     "originOracle": "Проанализировано ИИ",
     "originIndexer": "В индексе",
-    "originBoth": "Оба",
-    "notUsed": "+{count, plural, one {# статья найдена} other {# статьи найдено}}, но не использована ИИ",
-    "notUsedPlural": "+{count, plural, one {# статья найдена} few {# статьи найдено} many {# статей найдено} other {# статей найдено}}, но не использованы ИИ"
+    "originBoth": "Оба"
   },
   "footer": {
     "privacy": "Политика конфиденциальности",

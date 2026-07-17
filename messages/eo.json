@@ -526,9 +526,7 @@
     "countPlural": "{count} publikaĵoj",
     "originOracle": "AI-analizita",
     "originIndexer": "Indeksita",
-    "originBoth": "Ambaŭ",
-    "notUsed": "+{count} artikolo kongruis sed ne estis uzita de la AI",
-    "notUsedPlural": "+{count} artikoloj kongruis sed ne estis uzitaj de la AI"
+    "originBoth": "Ambaŭ"
   },
   "footer": {
     "privacy": "Privateca Politiko",

@@ -412,9 +412,6 @@ export default function ContextTimeline({
                     {oracle && ` · ${oracle.articlesUsed} article${oracle.articlesUsed === 1 ? '' : 's'}`}
                   </p>
                 )}
-                {oracle && oracle.sources.length > 0 && (
-                  <OracleSources sources={oracle.sources} />
-                )}
               </div>
             )
           })()}
@@ -476,70 +473,6 @@ export default function ContextTimeline({
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-/** Renders Oracle per-source chips grouped by stance (YES → NO → —). */
-const OracleSources = ({ sources }: { sources: OracleSnapshotSource[] }) => {
-  const getCredibilityColor = (w: number): string => {
-    if (w >= 0.75) return 'bg-emerald-400'
-    if (w >= 0.4) return 'bg-amber-400'
-    return 'bg-gray-500'
-  }
-
-  type StanceGroup = 'yes' | 'no' | 'neutral'
-  const getStanceGroup = (stance: number): StanceGroup => {
-    if (stance > 0.15) return 'yes'
-    if (stance < -0.15) return 'no'
-    return 'neutral'
-  }
-
-  const stanceConfig: Record<StanceGroup, { label: string; chipClass: string; headerClass: string }> = {
-    yes:     { label: 'YES', chipClass: 'bg-emerald-500/20 text-emerald-300', headerClass: 'text-emerald-400' },
-    no:      { label: 'NO',  chipClass: 'bg-rose-500/20 text-rose-300',       headerClass: 'text-rose-400' },
-    neutral: { label: '—',   chipClass: 'bg-gray-500/20 text-gray-400',       headerClass: 'text-gray-500' },
-  }
-
-  const groups: Record<StanceGroup, OracleSnapshotSource[]> = { yes: [], no: [], neutral: [] }
-  for (const src of sources) groups[getStanceGroup(src.stance)].push(src)
-
-  const order: StanceGroup[] = ['yes', 'no', 'neutral']
-  const activeGroups = order.filter((g) => groups[g].length > 0)
-
-  return (
-    <div className="mt-3" data-testid="oracle-sources">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Oracle sources</p>
-      <div className="space-y-2">
-        {activeGroups.map((group) => {
-          const cfg = stanceConfig[group]
-          return (
-            <div key={group}>
-              <span className={`text-[10px] font-bold uppercase tracking-wide ${cfg.headerClass} mr-1`}>
-                {cfg.label} ({groups[group].length})
-              </span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {groups[group].map((src) => (
-                  <a
-                    key={src.sourceId}
-                    href={src.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`Credibility: ${src.credibilityWeight.toFixed(2)} · Certainty: ${(src.certainty * 100).toFixed(0)}%`}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-navy-600/60 border border-navy-500 hover:bg-navy-600 transition-colors"
-                  >
-                    <span
-                      aria-label={`credibility ${src.credibilityWeight.toFixed(2)}`}
-                      className={`w-1.5 h-1.5 rounded-full ${getCredibilityColor(src.credibilityWeight)}`}
-                    />
-                    <span className="text-xs text-gray-200">{src.sourceName}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }

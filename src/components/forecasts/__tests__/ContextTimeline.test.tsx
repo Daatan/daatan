@@ -222,7 +222,7 @@ describe('ContextTimeline', () => {
   })
 
 
-  it('renders Oracle CI text and sources when oracleSnapshot is present', async () => {
+  it('renders Oracle CI text without a per-source list when oracleSnapshot is present', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -281,20 +281,11 @@ describe('ContextTimeline', () => {
     // Articles-used suffix appended to reasoning
     expect(screen.getByText(/3 articles/)).toBeInTheDocument()
 
-    // Oracle sources sub-section with both sources rendered as chips
-    const oracleSection = screen.getByTestId('oracle-sources')
-    expect(oracleSection).toBeInTheDocument()
-    expect(screen.getByText('Reuters')).toBeInTheDocument()
-    expect(screen.getByText('Random Blog')).toBeInTheDocument()
-
-    // Stance group headers (YES/NO are now section headers with counts)
-    expect(screen.getByText(/^YES \(\d+\)/)).toBeInTheDocument()
-    expect(screen.getByText(/^NO \(\d+\)/)).toBeInTheDocument()
-
-    // Source chip links open in a new tab
-    const reutersChip = screen.getByText('Reuters').closest('a')
-    expect(reutersChip).toHaveAttribute('href', 'https://reuters.com/x')
-    expect(reutersChip).toHaveAttribute('target', '_blank')
+    // The per-source chip list moved out of the timeline — the voters panel
+    // ("Sources behind the AI estimate") is the only place sources render now.
+    expect(screen.queryByTestId('oracle-sources')).toBeNull()
+    expect(screen.queryByText('Reuters')).toBeNull()
+    expect(screen.queryByText('Random Blog')).toBeNull()
   })
 
   it('omits the Oracle sources sub-section when oracleSnapshot is null', async () => {
