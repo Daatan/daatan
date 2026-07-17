@@ -419,13 +419,13 @@ Set the link's polarity. **Body** `{ inverted: boolean }` — mark the linked ma
 Unlink the market (also clears the inverted flag).
 
 ### `GET /api/admin/forecasts/[id]/evidence-pool`
-List the forecast's evidence pool (`evidence_pool_articles`) — every article `analyze`/`news-indexer`/`backfill` have extracted a signal from. See `docs/DATABASE.md` "Evidence pool" — nothing yet computes from this table.
+List the forecast's evidence pool (`evidence_pool_articles`) — every article `analyze`/`news-indexer`/`backfill` have extracted a signal from. See `docs/DATABASE.md` "Evidence pool"; since v1.60.0 the pool aggregate *is* the persisted estimate on all three paths.
 
 ### `PATCH /api/admin/forecasts/[id]/evidence-pool/[articleId]`
-Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Has no effect on the live estimate yet (recompute-over-pool cutover still open).
+Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Excluded rows are dropped from the pool aggregate on every path, so the toggle genuinely moves the estimate.
 
 ### `POST /api/admin/evidence-pool/retry` — Admin or `x-cron-secret`
-Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back `oracle_null` twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. `?limit=N` predictions per call (default 3, max 10 — each is one full Oracle analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow.
+Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back `oracle_null` twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. `?limit=N` predictions per call (default 3, max 10 — each is one full Oracle analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow — scheduled weekly (Mondays 06:30 UTC, against production) plus manual dispatch.
 
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).
