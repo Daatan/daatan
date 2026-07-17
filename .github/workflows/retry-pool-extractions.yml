@@ -1,18 +1,23 @@
 name: Retry Pool Extractions
 
-# Drains stuck evidence-pool rows (FAILED except oracle_omitted, abandoned PENDING
-# claims) by re-driving them through extraction, in bounded rounds against
-# POST /api/admin/evidence-pool/retry. Auth is the x-cron-secret (BOT_RUNNER_SECRET)
-# header, same as the cron routes — the secret only ever lives in the Actions runner.
+# Drains stuck evidence-pool rows (FAILED except the terminal reasons
+# oracle_omitted/oracle_null_final, abandoned PENDING claims) by re-driving them
+# through extraction, in bounded rounds against POST /api/admin/evidence-pool/retry.
+# Auth is the x-cron-secret (BOT_RUNNER_SECRET) header, same as the cron routes —
+# the secret only ever lives in the Actions runner.
 #
 # Unlike the oracle-sources backfill, `remaining` may legitimately stall without
 # reaching 0: a row that fails again today leaves the retryable set only via its
 # 24h backoff, and rows younger than 24h aren't eligible yet. The loop therefore
 # exits cleanly when remaining stops decreasing, not only at 0.
 #
-# Manual, on-demand: Actions → Retry Pool Extractions → Run workflow.
+# Runs weekly against production (the attempt cap — a second consecutive
+# oracle_null is terminal — keeps each pass cheap: it only ever touches fresh
+# failures). Also manual: Actions → Retry Pool Extractions → Run workflow.
 
 on:
+  schedule:
+    - cron: '30 6 * * 1' # Mondays 06:30 UTC — clear of the 04:00/16:00 backups
   workflow_dispatch:
     inputs:
       target:
@@ -29,29 +34,33 @@ on:
 
 jobs:
   retry:
-    name: Sweep ${{ inputs.target }}
+    name: Sweep ${{ inputs.target || 'production (scheduled)' }}
     runs-on: ubuntu-latest
     steps:
       - name: Drive retry sweep until drained or stalled
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
           BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          # Empty on schedule events — the weekly run sweeps production with the defaults.
+          TARGET: ${{ inputs.target || 'production' }}
+          LIMIT: ${{ inputs.limit || '2' }}
+          MAX_ROUNDS: ${{ inputs.max_rounds || '60' }}
         run: |
-          if [ "${{ inputs.target }}" = "production" ]; then
+          if [ "$TARGET" = "production" ]; then
             BASE="https://daatan.com"
           else
             BASE="$STAGING_URL"
           fi
-          if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
-          echo "Target: $BASE (limit=${{ inputs.limit }}/round, up to ${{ inputs.max_rounds }} rounds)"
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
+          echo "Target: $BASE (limit=$LIMIT/round, up to $MAX_ROUNDS rounds)"
 
           errstreak=0
           stallstreak=0
           prev=""
-          for i in $(seq 1 ${{ inputs.max_rounds }}); do
+          for i in $(seq 1 "$MAX_ROUNDS"); do
             BODY=$(curl -s --max-time 300 -X POST \
               -H "x-cron-secret: $BOT_RUNNER_SECRET" \
-              "$BASE/api/admin/evidence-pool/retry?limit=${{ inputs.limit }}") || BODY=""
+              "$BASE/api/admin/evidence-pool/retry?limit=$LIMIT") || BODY=""
             echo "round $i: ${BODY:-<no response>}"
 
             REMAINING=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('remaining','ERR'))" 2>/dev/null || echo ERR)
