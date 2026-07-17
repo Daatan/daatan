@@ -176,7 +176,8 @@ BACKUP
   }
 
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes  = [ami, user_data]
+    prevent_destroy = true
   }
 }
 
@@ -188,6 +189,10 @@ resource "aws_eip" "production" {
   tags = {
     Name = "daatan-production-eip"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # ====================================================================
@@ -197,12 +202,17 @@ resource "aws_eip" "production" {
 # Hosts daatan-app-staging (staging) + daatan-postgres-staging (staging DB)
 # DNS: staging.daatan.com
 resource "aws_instance" "staging" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.ec2_instance_type
-  key_name                    = var.ssh_key_name
-  subnet_id                   = aws_subnet.public_a.id
-  vpc_security_group_ids      = [aws_security_group.ec2.id]
-  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.ec2_instance_type
+  key_name               = var.ssh_key_name
+  subnet_id              = aws_subnet.public_a.id
+  vpc_security_group_ids = [aws_security_group.ec2.id]
+  # LITERAL, not aws_iam_instance_profile.ec2_profile.name: this instance lives in the
+  # PROD state (applied with environment=prod), so the env-interpolated resource renders
+  # daatan-ec2-profile-prod here — applying that puts the prod IAM role on the staging
+  # box and lets it read prod secrets (the 2026-07-12 incident; #1142). The staging
+  # role/profile are managed from the staging state; this box must always wear them.
+  iam_instance_profile        = "daatan-ec2-profile-staging"
   associate_public_ip_address = true
 
   root_block_device {
@@ -338,7 +348,8 @@ BACKUP
   }
 
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes  = [ami, user_data]
+    prevent_destroy = true
   }
 }
 
@@ -349,5 +360,9 @@ resource "aws_eip" "staging" {
 
   tags = {
     Name = "daatan-staging-eip"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
