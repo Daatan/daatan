@@ -132,7 +132,7 @@ describe('ContributingSources', () => {
     expect(screen.getByText('↑ 86%')).toBeInTheDocument()
   })
 
-  it('mentions gate-rejected articles by count instead of giving them a voter card', () => {
+  it('hides gate-rejected articles entirely instead of giving them a voter card', () => {
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -142,27 +142,14 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    // Only the stance-scored article gets a voter card...
+    // Only the stance-scored article gets a voter card; the gate-rejected ones vanish.
     expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
-    // ...the two gate-rejected ones are a passing count, not their own column entries.
-    expect(screen.getByText('+2 articles matched but not used by the AI')).toBeInTheDocument()
+    expect(screen.queryByText(/matched but not used/)).toBeNull()
     expect(screen.queryByText(/^Neutral \/ unclear/)).toBeNull()
   })
 
-  it('uses the singular form for exactly one not-used article', () => {
-    renderWithIntl(
-      <ContributingSources
-        sources={[
-          src({ url: 'https://a.com/1', stance: 0.6 }),
-          src({ url: 'https://b.com/2', stance: null }),
-        ]}
-      />,
-    )
-    expect(screen.getByText('+1 article matched but not used by the AI')).toBeInTheDocument()
-  })
-
-  it('shows only a not-used count when every matched article was gate-rejected', () => {
-    renderWithIntl(
+  it('renders nothing when every matched article was gate-rejected', () => {
+    const { container } = renderWithIntl(
       <ContributingSources
         sources={[
           src({ url: 'https://a.com/1', stance: null }),
@@ -170,8 +157,6 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    expect(screen.getByText(enMessages.sources.title)).toBeInTheDocument()
-    expect(screen.getByText('+2 articles matched but not used by the AI')).toBeInTheDocument()
-    expect(screen.queryByText(/^Will happen/)).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 })

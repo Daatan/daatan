@@ -526,9 +526,7 @@
     "countPlural": "{count} publications",
     "originOracle": "AI-analysed",
     "originIndexer": "Indexed",
-    "originBoth": "Both",
-    "notUsed": "+{count} article matched but not used by the AI",
-    "notUsedPlural": "+{count} articles matched but not used by the AI"
+    "originBoth": "Both"
   },
   "footer": {
     "privacy": "Privacy Policy",

@@ -89,8 +89,7 @@ type OutletGroup = {
  * can be very certain about an off-topic article's stance on its own subject.
  * An outlet with several articles is an expandable card listing each; a
  * single-article outlet is a plain link. Articles news-indexer matched but the
- * Oracle gate-rejected as off-topic (no stance) don't get voter cards — just a
- * passing count, so they're visible without being treated as evidence.
+ * Oracle gate-rejected as off-topic (no stance) are not shown at all.
  * Sits below the human forecasters and never affects the community number.
  */
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
@@ -110,24 +109,10 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
 
   // Only stance-scored articles were actually incorporated into the Oracle's estimate;
   // a null stance means news-indexer matched it but the Oracle gate-rejected it as not
-  // bearing on the claim. Those are counted, not turned into voter cards.
+  // bearing on the claim. Those never appear here.
   const used = unique.filter((s) => s.stance != null)
-  const notUsedCount = unique.length - used.length
-  const notUsedText = notUsedCount > 0
-    ? t(notUsedCount === 1 ? 'notUsed' : 'notUsedPlural', { count: notUsedCount })
-    : null
 
-  if (used.length === 0) {
-    return (
-      <div className="mt-12" data-testid="contributing-sources">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-1">
-          <Newspaper className="w-5 h-5" />
-          {t('title')}
-        </h2>
-        {notUsedText && <p className="text-sm text-gray-500">{notUsedText}</p>}
-      </div>
-    )
-  }
+  if (used.length === 0) return null
 
   // Press lean is article-granular (it's about the coverage that fed the Oracle),
   // independent of grouping, and only over articles the Oracle actually used.
@@ -308,7 +293,6 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
         </div>
       )}
 
-      {notUsedText && <p className="mt-4 text-xs text-gray-500">{notUsedText}</p>}
     </div>
   )
 }
