@@ -250,14 +250,14 @@ export default function LeaderboardPage() {
         />
       ) : (
         <div className="bg-navy-700 border border-navy-600 rounded-2xl shadow-sm overflow-hidden">
-          <table className="w-full text-left">
+          <table className="w-full text-left table-fixed">
             <thead>
               <tr className="bg-navy-800 border-b border-navy-600">
-                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-12 sm:w-16">{t('rank')}</th>
-                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('predictor')}</th>
-                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center hidden md:table-cell">{t('sortBy.accuracy')}</th>
-                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center hidden md:table-cell">{t('correct')}</th>
-                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">{getHighlightLabel()}</th>
+                <th className="px-1.5 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words w-14 sm:w-16">{t('rank')}</th>
+                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words">{t('predictor')}</th>
+                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words text-center hidden md:table-cell md:w-28">{t('sortBy.accuracy')}</th>
+                <th className="px-3 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words text-center hidden md:table-cell md:w-24">{t('correct')}</th>
+                <th className="px-2 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words text-right w-24 sm:w-28 md:w-32">{getHighlightLabel()}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100/10">
@@ -316,7 +316,7 @@ export default function LeaderboardPage() {
                       <span className="text-[10px] text-gray-400">of {user.totalResolved}</span>
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                  <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
                     <span className={`font-black text-base sm:text-lg ${getHighlightColor(user)}`}>
                       {getHighlightValue(user)}
                     </span>
