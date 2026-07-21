@@ -116,6 +116,25 @@ export interface OracleSource {
   author_lean?: number | null
   /** How firmly the author commits to `author_lean` [0,1]; null when it is null. */
   author_lean_certainty?: number | null
+  /** The FACT-lane counterpart of `stance` (retro #313, Phase 2 un-fusing): what
+   *  the REPORTED FACTS alone imply about the event [-1,1], un-fused from author
+   *  assertion/framing — a claim-weighted MEAN over the article's fact-bearing
+   *  claims (same reduction as `stance`). null on pure opinion. Deliberately
+   *  SEPARATE from the estimate: carried only for daatan persistence + the offline
+   *  backtest; nothing in the Oracle's aggregation reads it. */
+  fact_signal?: number | null
+  /** WHO acts in the fact behind `fact_signal`, from the dominant (max |fact_signal|)
+   *  claim — for the estimator's actor-pair (dyad) check. null when `fact_signal` is. */
+  event_actors?: string | null
+  /** The TARGET of the action in the fact behind `fact_signal`, from the dominant
+   *  claim; with `event_actors` this is the fact's dyad. null when `fact_signal` is. */
+  event_target?: string | null
+  /** true when the dominant fact IS the event itself (or its definitive outcome),
+   *  false when only a precursor/precondition/escalation. null when `fact_signal` is. */
+  is_occurrence?: boolean | null
+  /** true when the dominant fact is independently reported, false when only claimed
+   *  by an interested party. null when `fact_signal` is. */
+  verified?: boolean | null
 }
 
 /** Full response from POST /forecast. */

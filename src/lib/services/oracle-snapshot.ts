@@ -60,6 +60,16 @@ export type EnrichedOracleSource = {
   // reported facts. Persisted on the pool row; nothing in aggregation reads it (shadow).
   authorLean: number | null
   authorLeanCertainty: number | null
+  // The FACT-lane counterpart of `stance` + its qualifying facets (retro #313), for the
+  // estimator lane — deliberately NOT part of the current estimate. `factSignal` is what the
+  // reported facts alone imply [-1,1]; `eventActors`/`eventTarget` name the dominant fact's
+  // dyad, `isOccurrence` marks event-itself vs precursor, `verified` marks reported vs claimed.
+  // All null on pure opinion. Persisted on the pool row; nothing in aggregation reads them (shadow).
+  factSignal: number | null
+  eventActors: string | null
+  eventTarget: string | null
+  isOccurrence: boolean | null
+  verified: boolean | null
   // Whether this source's stance is byte-identical to its reading in the immediately-prior
   // evidence snapshot for this prediction — i.e. it was swept into this snapshot by a pool
   // recompute triggered by a DIFFERENT source's new article, not itself re-evaluated. Always
@@ -109,6 +119,11 @@ export function enrichOracleSources(
       evidenceClass: s.evidence_class ?? null,
       authorLean: s.author_lean ?? null,
       authorLeanCertainty: s.author_lean_certainty ?? null,
+      factSignal: s.fact_signal ?? null,
+      eventActors: s.event_actors ?? null,
+      eventTarget: s.event_target ?? null,
+      isOccurrence: s.is_occurrence ?? null,
+      verified: s.verified ?? null,
       carriedForward: false,
     }
   })
@@ -169,6 +184,11 @@ export function poolArticleToEnrichedSource(
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
     authorLean: row.authorLean,
     authorLeanCertainty: row.authorLeanCertainty,
+    factSignal: row.factSignal,
+    eventActors: row.eventActors,
+    eventTarget: row.eventTarget,
+    isOccurrence: row.isOccurrence,
+    verified: row.verified,
     carriedForward,
   }
 }

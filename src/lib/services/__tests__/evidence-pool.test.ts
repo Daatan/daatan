@@ -78,6 +78,11 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   evidenceClass: null,
   authorLean: null,
   authorLeanCertainty: null,
+  factSignal: null,
+  eventActors: null,
+  eventTarget: null,
+  isOccurrence: null,
+  verified: null,
   carriedForward: false,
   ...over,
 })
@@ -165,6 +170,23 @@ describe('addArticlesToPool', () => {
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
     expect(call.create).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
     expect(call.update).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
+  })
+
+  it('persists the shadow factSignal + facets, in both create and update', async () => {
+    // Estimator lane (retro #313) — the fact-lane counterpart of stance, written to the pool
+    // row but never read by any estimate and never sent to /pool/aggregate. Verifies all five
+    // shadow columns are actually persisted, both branches.
+    const facts = {
+      factSignal: 0.3,
+      eventActors: 'Israel',
+      eventTarget: 'Iran',
+      isOccurrence: false,
+      verified: true,
+    }
+    await addArticlesToPool('pred-1', [source(facts)], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    expect(call.create).toMatchObject(facts)
+    expect(call.update).toMatchObject(facts)
   })
 })
 
