@@ -62,7 +62,7 @@ jobs:
           rows = sorted(((g['Keys'][0], float(g['Metrics']['UnblendedCost']['Amount'])) for g in groups), key=lambda x: -x[1])
           total = sum(a for _, a in rows)
           lines = [f'{name}: \${amt:,.2f}' for name, amt in rows[:4] if amt > 0.005]
-          print(f'TOTAL=\${total:,.2f}')
+          print(f'TOTAL={total:,.2f}')
           for l in lines:
               print(f'LINE={l}')
           " > /tmp/aws_summary.txt
