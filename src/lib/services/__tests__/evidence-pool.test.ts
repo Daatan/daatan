@@ -76,6 +76,8 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   evidenceWeight: null,
   relevanceScore: null,
   evidenceClass: null,
+  authorLean: null,
+  authorLeanCertainty: null,
   carriedForward: false,
   ...over,
 })
@@ -154,6 +156,15 @@ describe('addArticlesToPool', () => {
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
     expect(call.create).toMatchObject({ relevanceScore: 0.85 })
     expect(call.update).toMatchObject({ relevanceScore: 0.85 })
+  })
+
+  it('persists the shadow authorLean/authorLeanCertainty, in both create and update', async () => {
+    // Author-scoring lane (retro #308/#309) — written to the pool row but never read by any
+    // estimate. Verifies the un-fusing shadow column is actually persisted, both branches.
+    await addArticlesToPool('pred-1', [source({ authorLean: -0.6, authorLeanCertainty: 0.4 })], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    expect(call.create).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
+    expect(call.update).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
   })
 })
 

@@ -568,6 +568,19 @@ model EvidencePoolArticle {
   // Prisma enum — matches `origin`'s convention for this model.
   evidenceClass String? @map("evidence_class") @db.VarChar(32)
 
+  // The BYLINE author's OWN directional forecast of the event (retro #308/#309):
+  // authorLean ∈ [-1,1] (+1 the author expects it to happen, -1 expects not, 0
+  // weighs both sides), authorLeanCertainty ∈ [0,1] (how firmly they commit).
+  // Both null when the author only reported facts or relayed others' views.
+  // SHADOW / author-scoring lane ONLY — deliberately kept out of the estimate:
+  // nothing in aggregation reads these (the un-fusing work, docs/AUTHOR_SCORING.md).
+  // Populated from the Oracle's per-source SourceSignal.author_lean; null on rows
+  // written before this field existed and on the `/pool/aggregate` recompute path
+  // (compute-only, never re-extracts). No backfill without a reset→retry sweep —
+  // pool rows are a contentHash extraction cache.
+  authorLean          Float? @map("author_lean")
+  authorLeanCertainty Float? @map("author_lean_certainty")
+
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
   // latest signal, not a history of every path that ever cited this article.
