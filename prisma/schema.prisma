@@ -573,7 +573,7 @@ model EvidencePoolArticle {
   // weighs both sides), authorLeanCertainty ∈ [0,1] (how firmly they commit).
   // Both null when the author only reported facts or relayed others' views.
   // SHADOW / author-scoring lane ONLY — deliberately kept out of the estimate:
-  // nothing in aggregation reads these (the un-fusing work, docs/AUTHOR_SCORING.md).
+  // nothing in aggregation reads these (the un-fusing work, docs/DATABASE.md).
   // Populated from the Oracle's per-source SourceSignal.author_lean; null on rows
   // written before this field existed and on the `/pool/aggregate` recompute path
   // (compute-only, never re-extracts). No backfill without a reset→retry sweep —
