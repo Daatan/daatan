@@ -76,6 +76,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   evidenceWeight: null,
   relevanceScore: null,
   evidenceClass: null,
+  carriedForward: false,
   ...over,
 })
 
