@@ -195,6 +195,27 @@ only on NEW extractions (pool rows are a `contentHash` cache — no backfill
 without the reset→retry sweep). Byline-author-string scoring can start at
 ~84% `author` coverage; per-outlet scoring stays blocked until `outletId`
 populates (news-indexer #1131).
+`factSignal` + `eventActors`/`eventTarget`/`isOccurrence`/`verified` are the
+**fact-lane** counterpart of `stance` (retro `SourceSignal.fact_signal`, #313):
+`factSignal` ∈ [-1,1] is what the **reported facts alone** imply about the event,
+un-fused from author assertion/framing — a claim-weighted MEAN over the article's
+fact-bearing claims (the SAME reduction as `stance`, so the offline fact-lane
+backtest compares mean-to-mean). The four facets qualify the **dominant**
+(max |fact_signal|) claim for the estimator's future checks: `eventActors`→
+`eventTarget` name that fact's actor/target dyad (the actor-pair check, #303),
+`isOccurrence` marks the event ITSELF vs a precursor/precondition/escalation,
+`verified` marks an independently-reported fact vs an interested party's claim.
+All null when no scored claim carried a `factSignal` (e.g. pure opinion). Like
+`authorLean`, this is the **estimator lane** of the un-fusing work
+(`project_author_scoring_redesign`) — kept SEPARATE from the current estimate:
+**nothing in aggregation or the recompute reads these**, and they are never sent
+to `/pool/aggregate`. Fully shadow / additive: null on rows written before the
+columns existed, populated only on NEW extractions (pool rows are a `contentHash`
+cache — no backfill without the reset→retry sweep). The free-text facets
+(`eventActors`/`eventTarget`) are unbounded `text` so an over-long LLM value can
+never fail the shadow write. The Phase-3 estimator cutover to `factSignal` is
+gated on an offline Brier backtest — until it beats `stance` on calibration,
+`stance` stays authoritative.
 `personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
 news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`

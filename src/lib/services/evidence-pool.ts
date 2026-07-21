@@ -71,6 +71,11 @@ export async function addArticlesToPool(
           evidenceClass: s.evidenceClass,
           authorLean: s.authorLean,
           authorLeanCertainty: s.authorLeanCertainty,
+          factSignal: s.factSignal,
+          eventActors: s.eventActors,
+          eventTarget: s.eventTarget,
+          isOccurrence: s.isOccurrence,
+          verified: s.verified,
           origin,
           // No claim step for this row (e.g. the analyze path, which always
           // calls the extractor fresh rather than gating on content-hash) —
@@ -100,6 +105,11 @@ export async function addArticlesToPool(
           evidenceClass: s.evidenceClass,
           authorLean: s.authorLean,
           authorLeanCertainty: s.authorLeanCertainty,
+          factSignal: s.factSignal,
+          eventActors: s.eventActors,
+          eventTarget: s.eventTarget,
+          isOccurrence: s.isOccurrence,
+          verified: s.verified,
           origin,
           // Flips a PENDING row (claimed by claimArticleForExtraction, then
           // successfully extracted) to COMPLETE. Deliberately does not touch

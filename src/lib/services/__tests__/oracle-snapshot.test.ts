@@ -26,6 +26,11 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   relevance_score: 0.85,
   author_lean: -0.4,
   author_lean_certainty: 0.7,
+  fact_signal: 0.3,
+  event_actors: 'Israel',
+  event_target: 'Iran',
+  is_occurrence: false,
+  verified: true,
   ...over,
 })
 
@@ -60,6 +65,11 @@ describe('enrichOracleSources', () => {
       relevanceScore: 0.85,
       authorLean: -0.4,
       authorLeanCertainty: 0.7,
+      factSignal: 0.3,
+      eventActors: 'Israel',
+      eventTarget: 'Iran',
+      isOccurrence: false,
+      verified: true,
       carriedForward: false,
     })
   })
@@ -88,7 +98,7 @@ describe('enrichOracleSources', () => {
     expect(out[0]).toMatchObject({ personId: null, personName: null, outletId: null, outletName: null })
   })
 
-  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean to null when the Oracle omits them', () => {
+  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal to null when the Oracle omits them', () => {
     const out = enrichOracleSources(
       [oracleSource({
         settled: undefined,
@@ -98,6 +108,11 @@ describe('enrichOracleSources', () => {
         relevance_score: undefined,
         author_lean: undefined,
         author_lean_certainty: undefined,
+        fact_signal: undefined,
+        event_actors: undefined,
+        event_target: undefined,
+        is_occurrence: undefined,
+        verified: undefined,
       })],
       [searchResult()],
       new Map(),
@@ -110,6 +125,11 @@ describe('enrichOracleSources', () => {
       relevanceScore: null,
       authorLean: null,
       authorLeanCertainty: null,
+      factSignal: null,
+      eventActors: null,
+      eventTarget: null,
+      isOccurrence: null,
+      verified: null,
     })
   })
 })
@@ -138,6 +158,11 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     evidenceClass: 'reported_fact',
     authorLean: -0.4,
     authorLeanCertainty: 0.7,
+    factSignal: 0.3,
+    eventActors: 'Israel',
+    eventTarget: 'Iran',
+    isOccurrence: false,
+    verified: true,
     origin: 'news-indexer',
     excluded: false,
     personId: null,
@@ -175,6 +200,11 @@ describe('poolArticleToEnrichedSource', () => {
       evidenceClass: 'reported_fact',
       authorLean: -0.4,
       authorLeanCertainty: 0.7,
+      factSignal: 0.3,
+      eventActors: 'Israel',
+      eventTarget: 'Iran',
+      isOccurrence: false,
+      verified: true,
       carriedForward: false,
     })
   })

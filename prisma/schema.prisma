@@ -581,6 +581,28 @@ model EvidencePoolArticle {
   authorLean          Float? @map("author_lean")
   authorLeanCertainty Float? @map("author_lean_certainty")
 
+  // The FACT-lane counterpart of `stance` (retro #313, Phase 2 of the un-fusing
+  // work): what the REPORTED FACTS alone imply about the event, separated from
+  // author assertion/framing. `factSignal` ∈ [-1,1] — claim-weighted MEAN over
+  // the article's fact-bearing claims (the SAME reduction as `stance`, so the
+  // offline fact-lane backtest compares mean-to-mean); the four facets qualify
+  // the DOMINANT (max |fact_signal|) claim for the estimator's future checks:
+  // `eventActors`/`eventTarget` name that fact's actor→target dyad (the actor-pair
+  // check, #303), `isOccurrence` marks the event ITSELF vs a precursor/escalation,
+  // `verified` marks an independently-reported fact vs an interested party's claim.
+  // All null when no scored claim carried a fact_signal (e.g. pure opinion).
+  // Free-text facets (`eventActors`/`eventTarget`) are unbounded (no VarChar cap)
+  // so an over-long LLM value can never fail this shadow write. SHADOW / estimator
+  // lane ONLY — like `authorLean`, nothing in aggregation or the recompute reads
+  // these, and they are never sent to `/pool/aggregate`. Additive, nullable, no
+  // backfill: populated only on NEW extractions (pool rows are a contentHash
+  // cache); live `stance` and the current estimate are untouched.
+  factSignal   Float?   @map("fact_signal")
+  eventActors  String?  @map("event_actors")
+  eventTarget  String?  @map("event_target")
+  isOccurrence Boolean? @map("is_occurrence")
+  verified     Boolean?
+
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
   // latest signal, not a history of every path that ever cited this article.
