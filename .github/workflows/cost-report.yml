@@ -1,0 +1,132 @@
+name: Daily Cost Report
+#
+# Posts yesterday's AWS + OpenRouter spend to Telegram. Grew out of a July 2026
+# cost investigation (retro's Bedrock extractor + prompt caching, docs at
+# retro/docs/PROMPT_CACHING.md) — this is the ongoing visibility half of that
+# work: a number every day, not just a one-time analysis.
+#
+# AWS: Cost Explorer, RECORD_TYPE=Usage (gross spend, not netted against
+# credits — see the account's credit-consumption history), grouped by SERVICE,
+# for the previous full UTC day. Cost Explorer's API is only in us-east-1
+# regardless of where the underlying resources live.
+#
+# OpenRouter: the live app key's own usage_daily/usage_weekly fields via
+# GET /api/v1/key — not a full-account activity export (that needs a
+# management key we don't have), but this is the same key daatan's bots and
+# AI panel actually spend against, so it's the number that matters here.
+#
+# Noisy channel on purpose (not clean) — this is an operational metric digest,
+# not a page-worthy signal.
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # 12:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  cost-report:
+    name: Send daily cost report
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Query AWS spend (yesterday, gross Usage, by service)
+        id: aws_cost
+        run: |
+          YDAY=$(date -u -d 'yesterday' +%Y-%m-%d)
+          TODAY=$(date -u +%Y-%m-%d)
+
+          RESULT=$(aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${YDAY},End=${TODAY}" \
+            --granularity DAILY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json)
+
+          echo "$RESULT" > /tmp/aws_cost.json
+
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/aws_cost.json'))
+          groups = d['ResultsByTime'][0]['Groups'] if d['ResultsByTime'] else []
+          rows = sorted(((g['Keys'][0], float(g['Metrics']['UnblendedCost']['Amount'])) for g in groups), key=lambda x: -x[1])
+          total = sum(a for _, a in rows)
+          lines = [f'{name}: \${amt:,.2f}' for name, amt in rows[:4] if amt > 0.005]
+          print(f'TOTAL=\${total:,.2f}')
+          for l in lines:
+              print(f'LINE={l}')
+          " > /tmp/aws_summary.txt
+
+          cat /tmp/aws_summary.txt
+          {
+            echo "yday=${YDAY}"
+            echo "total=$(grep '^TOTAL=' /tmp/aws_summary.txt | cut -d= -f2)"
+          } >> "$GITHUB_OUTPUT"
+
+          # Multi-line top-services block for the Telegram message (order preserved).
+          {
+            echo "top_services<<COSTEOF"
+            grep '^LINE=' /tmp/aws_summary.txt | cut -d= -f2-
+            echo "COSTEOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Query OpenRouter spend
+        id: openrouter_cost
+        run: |
+          OR_KEY=$(aws ssm get-parameter --region eu-central-1 \
+            --name /daatan/prod/secrets/OPENROUTER_API_KEY \
+            --with-decryption --query Parameter.Value --output text)
+
+          # Written to a file, not embedded in an inline python -c string — the
+          # response body is untrusted input and must not be interpolated into
+          # source code (same reasoning as the aws_cost.json step above).
+          curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer ${OR_KEY}" > /tmp/or_key.json
+
+          python3 -c "
+          import json
+          body = json.load(open('/tmp/or_key.json'))
+          if 'error' in body:
+              # Fail LOUD, not quiet-as-zero: an auth/API error must not read as
+              # \\\$0.00 spend — that would silently mask the exact failure mode
+              # this report exists to catch (a stale/rotated key).
+              print(f'daily=ERROR: {body[\"error\"].get(\"message\", \"unknown\")}')
+              print('weekly=ERROR')
+              print('remaining=ERROR')
+          else:
+              d = body.get('data', {})
+              daily = d.get('usage_daily', 0) or 0
+              weekly = d.get('usage_weekly', 0) or 0
+              remaining = d.get('limit_remaining')
+              print(f'daily={daily:.2f}')
+              print(f'weekly={weekly:.2f}')
+              print(f'remaining={remaining:.2f}' if remaining is not None else 'remaining=n/a')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Post to Telegram
+        env:
+          YDAY: ${{ steps.aws_cost.outputs.yday }}
+          AWS_TOTAL: ${{ steps.aws_cost.outputs.total }}
+          AWS_TOP: ${{ steps.aws_cost.outputs.top_services }}
+          OR_DAILY: ${{ steps.openrouter_cost.outputs.daily }}
+          OR_WEEKLY: ${{ steps.openrouter_cost.outputs.weekly }}
+          OR_REMAINING: ${{ steps.openrouter_cost.outputs.remaining }}
+        run: |
+          AWS_TOP_LINES=$(echo "$AWS_TOP" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+
+          MSG="💰 <b>Daily cost report — ${YDAY}</b>%0A%0A<b>AWS (gross): \$${AWS_TOTAL}</b>%0A${AWS_TOP_LINES}%0A%0A<b>OpenRouter:</b>%0A  today: \$${OR_DAILY} · this week: \$${OR_WEEKLY} (remaining: \$${OR_REMAINING})"
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"

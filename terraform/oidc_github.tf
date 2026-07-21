@@ -104,6 +104,44 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
   })
 }
 
+# Cost Explorer (read-only) + the one SSM parameter it needs — for the daily
+# AWS + OpenRouter spend report (.github/workflows/cost-report.yml). Cost Explorer
+# has no resource-level permissions (Resource must be "*"); the SSM grant is scoped
+# to exactly the one parameter the report reads, matching the narrow-scoping
+# convention used elsewhere in this file and in iam_ssm.tf.
+resource "aws_iam_role_policy" "github_actions_cost_report" {
+  name = "daatan-github-cost-report"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ce:GetCostAndUsage"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = "arn:aws:ssm:eu-central-1:${data.aws_caller_identity.current.account_id}:parameter/daatan/prod/secrets/OPENROUTER_API_KEY"
+      },
+      {
+        # SecureString decryption with the AWS-managed aws/ssm key — same scoped
+        # pattern as aws_iam_role_policy.app_secrets_read in secrets_ssm.tf.
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = data.aws_kms_key.ssm.arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.eu-central-1.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions OIDC"
   value       = aws_iam_role.github_actions.arn
