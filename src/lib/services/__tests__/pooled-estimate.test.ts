@@ -4,9 +4,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { EvidencePoolArticle } from '@prisma/client'
 
-const { mockRecompute, mockMeta } = vi.hoisted(() => ({
+const { mockRecompute, mockMeta, mockLatestSnapshot } = vi.hoisted(() => ({
   mockRecompute: vi.fn(),
   mockMeta: vi.fn(),
+  mockLatestSnapshot: vi.fn(),
 }))
 
 vi.mock('@/lib/services/evidence-pool', () => ({
@@ -14,6 +15,9 @@ vi.mock('@/lib/services/evidence-pool', () => ({
 }))
 vi.mock('@/lib/services/forecast-sources', () => ({
   getArticleMetaByUrl: (...a: unknown[]) => mockMeta(...a),
+}))
+vi.mock('@/lib/services/context', () => ({
+  getLatestOracleSnapshot: (...a: unknown[]) => mockLatestSnapshot(...a),
 }))
 
 import { resolvePooledEstimate, type SingleRunEstimate } from '../pooled-estimate'
@@ -28,7 +32,7 @@ const SINGLE_RUN: SingleRunEstimate = {
 }
 
 const FALLBACK_SOURCES = [
-  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, personId: null, personName: null, outletId: null, outletName: null, settled: null, settlementEventDate: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null },
+  { sourceId: 's1', sourceName: 'BBC', url: 'https://bbc.com/x', stance: 0.42, certainty: 0.7, credibilityWeight: 1, claims: ['c'], title: 'T', publishedAt: null, author: null, personId: null, personName: null, outletId: null, outletName: null, settled: null, settlementEventDate: null, quantitativeEstimate: null, evidenceWeight: null, relevanceScore: null, evidenceClass: null, carriedForward: false },
 ]
 
 const poolRow = (over: Partial<EvidencePoolArticle>): EvidencePoolArticle =>
@@ -74,6 +78,7 @@ const poolResult = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks()
   mockMeta.mockResolvedValue(new Map())
+  mockLatestSnapshot.mockResolvedValue(null)
 })
 
 describe('resolvePooledEstimate', () => {
@@ -190,5 +195,47 @@ describe('resolvePooledEstimate', () => {
     await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, 'ARRIVAL', deadline)
 
     expect(mockRecompute).toHaveBeenCalledWith('p1', 'ARRIVAL', deadline, null, null)
+  })
+
+  describe('carriedForward (daatan#1166)', () => {
+    it('marks every source not carried-forward when there is no prior snapshot', async () => {
+      mockRecompute.mockResolvedValue(poolResult())
+      mockLatestSnapshot.mockResolvedValue(null)
+
+      const out = await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+      expect(mockLatestSnapshot).toHaveBeenCalledWith('p1')
+      expect(out.snapshotSources.every((s) => s.carriedForward === false)).toBe(true)
+    })
+
+    it('marks a source carried-forward only when its stance is unchanged from the prior snapshot', async () => {
+      mockRecompute.mockResolvedValue(poolResult()) // reuters stance 0.1, guardian stance 0.1 (poolRow default)
+      mockLatestSnapshot.mockResolvedValue({
+        createdAt: new Date('2026-07-01'),
+        oracleSnapshot: {
+          sources: [
+            { url: 'https://reuters.com/p', stance: 0.1 }, // unchanged
+            { url: 'https://guardian.com/p', stance: 0.9 }, // changed
+          ],
+        },
+      })
+
+      const out = await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+      expect(out.snapshotSources.find((s) => s.url === 'https://reuters.com/p')?.carriedForward).toBe(true)
+      expect(out.snapshotSources.find((s) => s.url === 'https://guardian.com/p')?.carriedForward).toBe(false)
+    })
+
+    it('treats a source absent from the prior snapshot as not carried-forward (genuinely new)', async () => {
+      mockRecompute.mockResolvedValue(poolResult())
+      mockLatestSnapshot.mockResolvedValue({
+        createdAt: new Date('2026-07-01'),
+        oracleSnapshot: { sources: [{ url: 'https://some-other-source.com/p', stance: 0.1 }] },
+      })
+
+      const out = await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+      expect(out.snapshotSources.every((s) => s.carriedForward === false)).toBe(true)
+    })
   })
 })

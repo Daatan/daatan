@@ -15,7 +15,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
-vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn() }))
+vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
 vi.mock('@/lib/services/evidence-pool', () => ({
@@ -41,7 +41,7 @@ vi.mock('@/lib/logger', () => ({
 import { POST } from '../route'
 import { prisma } from '@/lib/prisma'
 import { getOracleForecast } from '@/lib/services/oracle'
-import { saveNewsIndexerMatch } from '@/lib/services/context'
+import { saveNewsIndexerMatch, getLatestOracleSnapshot } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
@@ -111,6 +111,9 @@ describe('POST /api/news-indexer/context', () => {
     // Default: no pool aggregate available, so the route falls back to the single-run
     // forecast. That is what every test outside the pool block below asserts against.
     vi.mocked(recomputeFromPool).mockResolvedValue(null)
+    // Default: no prior evidence snapshot, so every pooled source in the pool-block tests
+    // below is (correctly) not carried-forward.
+    vi.mocked(getLatestOracleSnapshot).mockResolvedValue(null as never)
     // Default: the claim gate always admits the push (existing tests exercise
     // the "something new" path); the skip-when-unchanged path has its own tests below.
     vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed'])

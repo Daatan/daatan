@@ -55,6 +55,13 @@ export type EnrichedOracleSource = {
   evidenceWeight: number | null
   relevanceScore: number | null
   evidenceClass: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
+  // Whether this source's stance is byte-identical to its reading in the immediately-prior
+  // evidence snapshot for this prediction — i.e. it was swept into this snapshot by a pool
+  // recompute triggered by a DIFFERENT source's new article, not itself re-evaluated. Always
+  // false on a single-run enrichment (every listed source WAS just scored). Lets downstream
+  // history readers (elections' chart) skip a "new" data point for a source whose value didn't
+  // actually move (daatan#1166).
+  carriedForward: boolean
 }
 
 /**
@@ -95,6 +102,7 @@ export function enrichOracleSources(
       evidenceWeight: s.evidence_weight ?? null,
       relevanceScore: s.relevance_score ?? null,
       evidenceClass: s.evidence_class ?? null,
+      carriedForward: false,
     }
   })
 }
@@ -122,11 +130,14 @@ function isEvidenceClass(v: unknown): v is EvidenceClass {
  * paths re-look it up from news-indexer by URL for freshness, while pool-only readers pass
  * `row.author` (stored since Phase 2.1) — and `sourceId`, for which the pool row's own id is a
  * stable unique key (it's only ever used as a display key). `claims` is a Json column, so it's
- * defensively narrowed to string[].
+ * defensively narrowed to string[]. `carriedForward` defaults false for callers (e.g. the
+ * election matrix) that don't diff against a prior snapshot; `resolvePooledEstimate` passes
+ * the real comparison.
  */
 export function poolArticleToEnrichedSource(
   row: EvidencePoolArticle,
   author: string | null,
+  carriedForward = false,
 ): EnrichedOracleSource {
   return {
     sourceId: row.id,
@@ -149,6 +160,7 @@ export function poolArticleToEnrichedSource(
     evidenceWeight: row.evidenceWeight,
     relevanceScore: row.relevanceScore,
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
+    carriedForward,
   }
 }
 

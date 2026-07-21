@@ -56,6 +56,7 @@ describe('enrichOracleSources', () => {
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
       relevanceScore: 0.85,
+      carriedForward: false,
     })
   })
 
@@ -162,11 +163,17 @@ describe('poolArticleToEnrichedSource', () => {
       evidenceWeight: 0.6,
       relevanceScore: 0.9,
       evidenceClass: 'reported_fact',
+      carriedForward: false,
     })
   })
 
   it('carries a null author through (pool rows never store one)', () => {
     expect(poolArticleToEnrichedSource(poolArticle(), null).author).toBeNull()
+  })
+
+  it('defaults carriedForward to false, and passes through an explicit value', () => {
+    expect(poolArticleToEnrichedSource(poolArticle(), null).carriedForward).toBe(false)
+    expect(poolArticleToEnrichedSource(poolArticle(), null, true).carriedForward).toBe(true)
   })
 
   it('coerces a non-array / dirty claims Json to a clean string[]', () => {

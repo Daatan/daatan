@@ -1,7 +1,12 @@
 import type { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { recomputeFromPool, type PoolRecompute } from '@/lib/services/evidence-pool'
-import { poolArticleToEnrichedSource, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
+import {
+  poolArticleToEnrichedSource,
+  oracleSnapshotToContributingSources,
+  type EnrichedOracleSource,
+} from '@/lib/services/oracle-snapshot'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
+import { getLatestOracleSnapshot } from '@/lib/services/context'
 
 /**
  * A single `/forecast` run's estimate, in the Oracle's stance space [-1, 1] — the caller's
@@ -113,8 +118,16 @@ export async function resolvePooledEstimate(
   if (missing.length > 0) {
     for (const [url, m] of await getArticleMetaByUrl(missing)) authorByUrl.set(url, m.author)
   }
+  // Diff against the immediately-prior evidence snapshot so a recompute triggered by ONE new
+  // article doesn't make every other pooled source look re-evaluated too (daatan#1166) — the
+  // full roster is still persisted (other readers, e.g. the "sources behind the estimate"
+  // panel, need the complete current roster on every snapshot), only `carriedForward` is new.
+  const priorSnapshot = await getLatestOracleSnapshot(predictionId)
+  const priorStanceByUrl = new Map(
+    oracleSnapshotToContributingSources(priorSnapshot?.oracleSnapshot ?? null).map((s) => [s.url, s.stance]),
+  )
   const snapshotSources = pool.usableArticles.map((a) =>
-    poolArticleToEnrichedSource(a, authorByUrl.get(a.url) ?? null),
+    poolArticleToEnrichedSource(a, authorByUrl.get(a.url) ?? null, priorStanceByUrl.get(a.url) === a.stance),
   )
 
   return {
