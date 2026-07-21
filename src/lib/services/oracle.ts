@@ -108,6 +108,14 @@ export interface OracleSource {
    *  a negative one; null when legitimately undated (post-deadline expiry).
    *  Persisted next to `settled` so pool recomputes can re-validate the vote. */
   settlement_event_date?: string | null
+  /** The byline author's OWN directional forecast of the event (retro #308/#309):
+   *  +1 the author expects it to happen, -1 they expect it will NOT, 0 they weigh
+   *  both sides; null when the author only reports facts. Deliberately SEPARATE
+   *  from `stance`/the estimate — carried only for daatan's author-scoring lane;
+   *  nothing in the Oracle's aggregation reads it. */
+  author_lean?: number | null
+  /** How firmly the author commits to `author_lean` [0,1]; null when it is null. */
+  author_lean_certainty?: number | null
 }
 
 /** Full response from POST /forecast. */

@@ -55,6 +55,11 @@ export type EnrichedOracleSource = {
   evidenceWeight: number | null
   relevanceScore: number | null
   evidenceClass: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
+  // The byline author's OWN directional forecast of the event (retro #308/#309), for the
+  // author-scoring lane — deliberately NOT part of the estimate. Null when the author only
+  // reported facts. Persisted on the pool row; nothing in aggregation reads it (shadow).
+  authorLean: number | null
+  authorLeanCertainty: number | null
   // Whether this source's stance is byte-identical to its reading in the immediately-prior
   // evidence snapshot for this prediction — i.e. it was swept into this snapshot by a pool
   // recompute triggered by a DIFFERENT source's new article, not itself re-evaluated. Always
@@ -102,6 +107,8 @@ export function enrichOracleSources(
       evidenceWeight: s.evidence_weight ?? null,
       relevanceScore: s.relevance_score ?? null,
       evidenceClass: s.evidence_class ?? null,
+      authorLean: s.author_lean ?? null,
+      authorLeanCertainty: s.author_lean_certainty ?? null,
       carriedForward: false,
     }
   })
@@ -160,6 +167,8 @@ export function poolArticleToEnrichedSource(
     evidenceWeight: row.evidenceWeight,
     relevanceScore: row.relevanceScore,
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
+    authorLean: row.authorLean,
+    authorLeanCertainty: row.authorLeanCertainty,
     carriedForward,
   }
 }

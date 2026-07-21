@@ -24,6 +24,8 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   quantitative_estimate: 0.62,
   evidence_weight: 0.6,
   relevance_score: 0.85,
+  author_lean: -0.4,
+  author_lean_certainty: 0.7,
   ...over,
 })
 
@@ -56,6 +58,8 @@ describe('enrichOracleSources', () => {
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
       relevanceScore: 0.85,
+      authorLean: -0.4,
+      authorLeanCertainty: 0.7,
       carriedForward: false,
     })
   })
@@ -84,7 +88,7 @@ describe('enrichOracleSources', () => {
     expect(out[0]).toMatchObject({ personId: null, personName: null, outletId: null, outletName: null })
   })
 
-  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore to null when the Oracle omits them', () => {
+  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean to null when the Oracle omits them', () => {
     const out = enrichOracleSources(
       [oracleSource({
         settled: undefined,
@@ -92,6 +96,8 @@ describe('enrichOracleSources', () => {
         quantitative_estimate: undefined,
         evidence_weight: undefined,
         relevance_score: undefined,
+        author_lean: undefined,
+        author_lean_certainty: undefined,
       })],
       [searchResult()],
       new Map(),
@@ -102,6 +108,8 @@ describe('enrichOracleSources', () => {
       quantitativeEstimate: null,
       evidenceWeight: null,
       relevanceScore: null,
+      authorLean: null,
+      authorLeanCertainty: null,
     })
   })
 })
@@ -128,6 +136,8 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     evidenceWeight: 0.6,
     relevanceScore: 0.9,
     evidenceClass: 'reported_fact',
+    authorLean: -0.4,
+    authorLeanCertainty: 0.7,
     origin: 'news-indexer',
     excluded: false,
     personId: null,
@@ -163,6 +173,8 @@ describe('poolArticleToEnrichedSource', () => {
       evidenceWeight: 0.6,
       relevanceScore: 0.9,
       evidenceClass: 'reported_fact',
+      authorLean: -0.4,
+      authorLeanCertainty: 0.7,
       carriedForward: false,
     })
   })

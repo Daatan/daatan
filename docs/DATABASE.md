@@ -180,6 +180,21 @@ revalidation can re-check every stored settled vote on every recompute —
 before this, a stale/poisoned `settled` bit voted forever (the 2026-07-16
 false-pin audit). Plain String pass-through like `publishedDate`; retro
 validates it.
+`authorLean`/`authorLeanCertainty` are the **byline author's OWN** directional
+forecast of the event (retro `SourceSignal.author_lean`, #308/#309):
+`authorLean` ∈ [-1,1] (+1 the author expects it to happen, -1 expects not, 0
+weighs both sides), `authorLeanCertainty` ∈ [0,1] (how firmly they commit); both
+null when the author only reported facts or relayed others' views. This is the
+**author-scoring lane** of the extractor un-fusing work
+(`project_author_scoring_redesign`) — deliberately kept SEPARATE from the
+estimate: unlike every other signal column above, **nothing in aggregation or
+the recompute reads it**, and it is never sent to `/pool/aggregate` (that path is
+compute-only and never re-extracts, so it can't populate it either). Fully
+shadow / additive: null on rows written before the columns existed, populated
+only on NEW extractions (pool rows are a `contentHash` cache — no backfill
+without the reset→retry sweep). Byline-author-string scoring can start at
+~84% `author` coverage; per-outlet scoring stays blocked until `outletId`
+populates (news-indexer #1131).
 `personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
 news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`
