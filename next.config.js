@@ -23,6 +23,18 @@ const nextConfig = {
       },
     ]
   },
+  async rewrites() {
+    return [
+      // public/.well-known/assetlinks.json (Android TWA Digital Asset Links)
+      // is otherwise unreachable -- Next's static file server 404s any
+      // public/ path with a dot-prefixed segment. Route it to an API
+      // handler instead.
+      {
+        source: '/.well-known/assetlinks.json',
+        destination: '/api/well-known/assetlinks',
+      },
+    ]
+  },
   output: 'standalone',
   reactStrictMode: true,
   logging: {
