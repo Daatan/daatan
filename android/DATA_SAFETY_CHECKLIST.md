@@ -22,10 +22,11 @@ before pasting into the console.
 **Yes** — HTTPS everywhere (TLS terminated at nginx; see `infra/nginx/nginx-prod-ssl.conf`).
 
 ### Do you provide a way for users to request that their data be deleted?
-**Confirm with user** — check whether an account-deletion flow exists
-(grepped for one during research; if none exists, this needs either (a) an
-in-app deletion path, or (b) a documented support-email process before this
-question can be answered "Yes" truthfully in the console).
+**Yes.** Self-service, in-app, immediate — `DELETE /api/account`
+(`src/app/api/account/route.ts` → `deleteAccount()` in
+`src/lib/services/user.ts`, a hard `prisma.user.delete`), surfaced via
+`src/components/settings/DeleteAccountSection.tsx` on the settings page. No
+support-email workaround needed.
 
 ### Third parties data is shared with
 - **Google Analytics (GA4)** — internal user ID only, only after explicit
@@ -53,12 +54,10 @@ an oversight.
 - **Moderation: automated only.** `src/lib/services/moderation.ts` runs an
   LLM content check (`checkContent(text, contentType)`) pre/post-hoc against
   a `MODERATED` status; **no manual user-facing report/flag button exists
-  today** (confirmed by grep — no dedicated report/flag API route).
-  ⚠️ **Flag for the user**: Play's UGC questionnaire asks whether users can
-  report objectionable content. The honest current answer is "no manual
-  report path, automated moderation only" — worth deciding before submitting
-  whether to (a) answer accurately as-is, or (b) add a lightweight report
-  button first. Not in scope for this implementation pass.
+  today** (confirmed by grep — no dedicated report/flag API route). **Decision
+  (2026-07-24): answer honestly as-is** — automated moderation only, no
+  manual report path. A manual report button may be added later as its own
+  feature; not a blocker for this submission.
 - **Violence / sexual content / gambling simulation: No.** Text-based
   predictions on news/politics; no gambling mechanics (`PRODUCT.md`: "What
   DAATAN Is NOT" table — no real money, no cash-out, no financial incentive).

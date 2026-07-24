@@ -92,11 +92,13 @@ jobs:
         working-directory: android
         run: rm -f android.keystore
 
-      - name: Upload AAB artifact
+      - name: Upload AAB + APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: daatan-android-${{ github.ref_name }}
-          path: android/app-release-bundle.aab
+          path: |
+            android/app-release-bundle.aab
+            android/app-release-signed.apk
           retention-days: 90
 
       - name: Summary
@@ -104,9 +106,10 @@ jobs:
           {
             echo "### Android release build: ${{ github.ref_name }}"
             echo ""
-            echo "Signed AAB built and attached to this run as \`daatan-android-${{ github.ref_name }}\`."
+            echo "Signed AAB + APK built and attached to this run as \`daatan-android-${{ github.ref_name }}\`."
             echo ""
             echo "**This is a downloadable artifact only -- nothing was uploaded to Play"
-            echo "Console.** Download it and upload it by hand to the appropriate track"
-            echo "(internal testing first). See \`android/README.md\` for the full process."
+            echo "Console.** Upload the AAB to the appropriate track by hand (internal"
+            echo "testing first); the APK is for local sideload testing (\`adb install\`)."
+            echo "See \`android/README.md\` for the full process."
           } >> "$GITHUB_STEP_SUMMARY"
