@@ -65,6 +65,21 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android.keystore
 
+      - name: Generate Gradle project non-interactively
+        working-directory: android
+        run: |
+          # `bubblewrap build` prompts "No checksum file was found... would
+          # you like to regenerate your project? (Y/n)" whenever
+          # manifest-checksum.txt is absent -- which it always is here,
+          # since only twa-manifest.json is committed. There's no stdin in
+          # CI, so that prompt kills the job (exit 130). Running `update`
+          # first (with --skipVersionUpgrade, since without it bubblewrap
+          # auto-bumps appVersionCode and prompts for a new appVersionName
+          # whenever it doesn't already match the version code scheme)
+          # generates the project + checksum file up front, so the
+          # subsequent `build` finds a matching checksum and never prompts.
+          npx --yes @bubblewrap/cli update --skipVersionUpgrade
+
       - name: Build signed AAB
         working-directory: android
         env:
