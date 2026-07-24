@@ -6,6 +6,8 @@
 !README.md
 !STORE_LISTING.md
 !DATA_SAFETY_CHECKLIST.md
+!store-assets/
+!store-assets/*
 
 # Never allow a keystore to slip in even if the ignore pattern above is loosened later.
 *.keystore
