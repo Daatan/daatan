@@ -411,6 +411,7 @@ interface IngestResolutionApiResponse {
   accepted: boolean
   already_ingested: boolean
   sources_recorded: number
+  author_signals_recorded?: number
 }
 
 /**
@@ -433,6 +434,12 @@ interface IngestResolutionApiResponse {
  * nothing usable remains — an empty-sources ingest would just be noise in
  * retro's accumulating store.
  *
+ * Also carries the author-scoring lane (`author_signals`): every
+ * non-excluded row with an `author_lean`, INCLUDING opinion-class — that
+ * lane scores the author's own lean, and opinion is precisely where it
+ * lives. Retro replays these per (byline author, outlet) into its shadow
+ * author board (`GET /leaderboard/author-shadow`).
+ *
  * Fire-and-forget: callers must `.catch()` the returned promise themselves,
  * matching `addArticlesToPool`'s own convention — this never blocks or alters
  * the resolution response.
@@ -449,7 +456,8 @@ export async function pushCredibilityFeedback(
   const usable = pool.filter(
     (a) => !a.excluded && a.evidenceClass !== 'opinion' && a.source !== null && a.stance !== null,
   )
-  if (usable.length === 0) return
+  const authorSignals = pool.filter((a) => !a.excluded && a.authorLean !== null)
+  if (usable.length === 0 && authorSignals.length === 0) return
 
   let res: Response
   try {
@@ -466,6 +474,13 @@ export async function pushCredibilityFeedback(
           evidence_class: a.evidenceClass,
           credibility_weight: a.credibilityWeight,
           evidence_weight: a.evidenceWeight,
+        })),
+        author_signals: authorSignals.map((a) => ({
+          author: a.author,
+          outlet_name: a.outletName,
+          author_lean: a.authorLean,
+          author_lean_certainty: a.authorLeanCertainty,
+          evidence_class: a.evidenceClass,
         })),
       }),
       timeoutMs: 10_000,
@@ -486,8 +501,10 @@ export async function pushCredibilityFeedback(
       outcome,
       poolSize: pool.length,
       usableSize: usable.length,
+      authorSignalsSize: authorSignals.length,
       alreadyIngested: body.already_ingested,
       sourcesRecorded: body.sources_recorded,
+      authorSignalsRecorded: body.author_signals_recorded,
     },
     'event=credibility_feedback_ingest',
   )
