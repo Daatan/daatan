@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.daatan.app",
       "sha256_cert_fingerprints": [
-        "1B:79:A3:BC:73:B1:E0:DF:DC:45:2C:F4:84:F5:77:6C:1E:65:B0:D5:54:D4:44:F8:21:2B:9B:D5:4E:33:CF:18"
+        "1B:79:A3:BC:73:B1:E0:DF:DC:45:2C:F4:84:F5:77:6C:1E:65:B0:D5:54:D4:44:F8:21:2B:9B:D5:4E:33:CF:18",
+        "FC:BE:B0:3B:52:02:3C:46:75:27:E0:B5:4D:2E:C9:E9:E4:69:56:50:AD:63:0C:BB:08:D5:43:99:4E:DA:81:52"
       ]
     }
   }
