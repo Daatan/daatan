@@ -211,6 +211,22 @@ builder  ──► runner      (slim production app image, ~200MB)
 - **`runner`**: Slim production image — only `.next/standalone`, static files, and runtime node_modules
 - **`migrations`**: `FROM builder`, removes `.next/public` — retains full `node_modules` for `prisma migrate deploy`
 
+**Gotcha: dot-prefixed `public/` paths 404 in standalone mode.** Next.js's
+`output: 'standalone'` static file server refuses to serve any `public/`
+request path with a dot-prefixed path segment (a built-in security
+default) — e.g. `public/.well-known/assetlinks.json` returned a live 404
+for 4 days (2026-07-21 to 2026-07-25, see
+[daatan#1176](https://github.com/Daatan/daatan/issues/1176)) despite being
+committed, correct, and passing local `next dev` checks that didn't hit the
+standalone runner. Sibling non-dotted `public/` files served fine the whole
+time, which is what isolated it. If you ever need to serve another
+`.well-known/*` file (Apple's `apple-app-site-association`, `security.txt`,
+etc.), don't rely on `public/` — add a `next.config.js` `rewrites()` entry
+pointing the dotted path at a normal API route that reads the file from
+disk, same pattern as `src/app/api/well-known/assetlinks/route.ts`. Always
+verify with a live `curl -sD -` against the deployed URL, not just a local
+build — the standalone runner is the only place this bites.
+
 ---
 
 ## Deploy Time

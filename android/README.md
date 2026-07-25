@@ -91,16 +91,34 @@ is final, more may be added later): `komapc@gmail.com`,
 share an owner — this is what lets the TWA open **without a visible browser
 URL bar**. A mismatch here is the classic TWA bug.
 
-It currently lists only the **upload key's** SHA-256 fingerprint, which is
-correct for locally-built/sideloaded installs (`adb install`) signed
-directly with the upload key. Once the app is first uploaded to Play
-Console and enrolled in Play App Signing, Google **re-signs it with a
-different key** for Play-distributed installs. Before real users install
-from the Play Store, fetch the **App signing key certificate** SHA-256 from
-Play Console → App integrity → App signing, and add it as a **second**
-entry in the `sha256_cert_fingerprints` array (keep the upload key's entry
-too — it's still needed for local testing). Ships through daatan's normal
-PR flow like any other code change.
+It now lists **two** SHA-256 fingerprints: the **upload key** (for
+locally-built/sideloaded installs via `adb install`) and the **Play App
+Signing key** (added after the first Play Console upload — Google re-signs
+the distributed APK with a different, Google-managed key). Keep both
+entries; each is needed for a different install path.
+
+To find the Play App Signing key's SHA-256 again (e.g. if it's ever
+rotated): Play Console → **Protected with Play** → expand **"Play Store
+protection"** → **"Protect app signing key"** row → **"Manage Play app
+signing"** button → use the **classical key**'s SHA-256 (not the
+post-quantum one — Digital Asset Links verification doesn't support PQC
+keys yet). Google has moved this page at least once (it used to be under
+"App integrity → App signing" directly); if the path above is stale, use
+the console's own search or try
+`.../app/<app-id>/app-signing` directly.
+
+**Production gotcha (bit us for 4 days, 2026-07-21 to 2026-07-25):**
+Next.js's `output: 'standalone'` static file server silently 404s any
+`public/` request path with a dot-prefixed segment — so
+`/.well-known/assetlinks.json` was **completely unreachable in production**
+despite being committed and correct, and the TWA silently fell back to a
+visible-URL-bar Custom Tab the entire time. Comparing the committed file's
+*content* against the keystore is not the same as proving it's *served* —
+always do a live `curl -sD - https://daatan.com/.well-known/assetlinks.json`
+after any change here. See `docs/DEPLOYMENT.md` for the general fix
+(a `next.config.js` rewrite to a normal API route) and
+[daatan#1176](https://github.com/Daatan/daatan/issues/1176) for the full
+incident.
 
 ## Store listing
 
@@ -108,3 +126,8 @@ See [`STORE_LISTING.md`](./STORE_LISTING.md) (draft copy) and
 [`DATA_SAFETY_CHECKLIST.md`](./DATA_SAFETY_CHECKLIST.md) (draft Data Safety
 + content rating answers). Both are drafts for review — Play Console
 submission is account-tied and has to happen by hand.
+
+Real device screenshots and a composed 1024×500 feature graphic live under
+[`store-assets/`](./store-assets/) — captured from the actual running app,
+not mockups (see `android/.gitignore`, which allowlists this directory
+alongside the other hand-curated docs).
