@@ -247,6 +247,10 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
   evidenceClass: 'reported_fact',
   origin: 'analyze',
   excluded: false,
+  author: null,
+  outletName: null,
+  authorLean: null,
+  authorLeanCertainty: null,
   addedAt: new Date('2026-07-01'),
   updatedAt: new Date('2026-07-01'),
   ...over,
@@ -424,6 +428,47 @@ describe('pushCredibilityFeedback', () => {
     ] as never)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
     expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('sends author_signals for non-excluded rows with an author_lean, opinion included', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'art-opinion', evidenceClass: 'opinion', author: 'Ben Caspit', outletName: 'maariv', authorLean: 0.9, authorLeanCertainty: 0.8 }),
+      poolArticle({ id: 'art-excluded', excluded: true, authorLean: 0.5 }),
+      poolArticle({ id: 'art-no-lean' }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1, author_signals_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', false, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.author_signals).toHaveLength(1)
+    expect(body.author_signals[0]).toEqual({
+      author: 'Ben Caspit',
+      outlet_name: 'maariv',
+      author_lean: 0.9,
+      author_lean_certainty: 0.8,
+      evidence_class: 'opinion',
+    })
+  })
+
+  it('still pushes when only the author lane has signal — the stance lane being all-opinion must not gate it', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'art-opinion', evidenceClass: 'opinion', author: 'Pundit', authorLean: -0.7 }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 0, author_signals_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources).toHaveLength(0)
+    expect(body.author_signals).toHaveLength(1)
   })
 
   it('posts usable sources to /leaderboard/ingest, mapped to the wire shape', async () => {

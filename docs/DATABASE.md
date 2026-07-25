@@ -307,6 +307,13 @@ credibility_weight, evidence_weight, plus the boolean outcome). Storage-only
 on retro's side today — accumulates real resolution data ahead of a future
 scoring step; does not affect any live `credibility_weight`.
 
+The same push carries the author-scoring lane (`author_signals`): every
+non-excluded row with an `author_lean`, opinion-class INCLUDED (that lane
+scores the author's own lean; opinion is the signal). Retro replays it per
+(byline author, outlet) into a shadow author board
+(`GET /leaderboard/author-shadow`) — also shadow-only, nothing feeds back
+into forecasts.
+
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
 Cached Polymarket/Kalshi markets that forecasts link to (many-to-one).
