@@ -137,8 +137,10 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     const sorted = [...articles].sort((a, b) => signalStrength(b) - signalStrength(a))
     const lead = sorted[0]
     const side = getSide(lead.stance)
-    const leadProbYes = articleProbYes(lead)
-    const pct = side === 'yes' ? Math.round(leadProbYes * 100) : side === 'no' ? Math.round((1 - leadProbYes) * 100) : null
+    // Same number as the lead article's own row badge (raw certainty) — not the
+    // 50-100%-rescaled "implied probability" used for the press-lean bar, so the
+    // outlet card and its expanded article list never show two different % scales.
+    const pct = side !== 'neutral' && lead.certainty != null ? Math.round(lead.certainty * 100) : null
     return {
       domain,
       name: articles.find(a => a.source)?.source || domain,
