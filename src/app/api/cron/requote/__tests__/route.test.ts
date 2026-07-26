@@ -26,7 +26,7 @@ function req(body: unknown, headers: Record<string, string> = { 'x-cron-secret':
 const emptySummary = {
   examined: 0, glided: 0, pinned: 0, provisionalPins: 0, unchanged: 0,
   skippedNoAnchor: 0, skippedTeffBeforeAnchor: 0, selfHealed: 0,
-  divergenceAlerts: 0, deadlineAlerts: 0, provisionalAlerts: 0, errors: 0, deltas: [],
+  divergenceAlerts: 0, deadlineAlerts: 0, provisionalAlerts: 0, pendingDeadlineAlerts: 0, errors: 0, deltas: [],
 }
 
 describe('POST /api/cron/requote', () => {

@@ -662,6 +662,29 @@ export function notifyDeadlinePassedQuietly(
 }
 
 /**
+ * A forecast is stuck PENDING past its claim deadline with no automated path
+ * to resolution (#1185): the alert above only ever fires on ACTIVE
+ * candidates, and the AI resolution panel only picks up the probability-band
+ * flag — a PENDING pred outside that band is invisible to both. Single-shot
+ * (deduped via deadlinePassedAlertAt in temporal-clock.ts).
+ */
+export function notifyPendingPastDeadline(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  deadline: Date,
+): void {
+  if (isDevEnv()) return
+
+  const msg = [
+    `🚨 <b>Stuck PENDING past deadline</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Deadline ${deadline.toISOString().slice(0, 10)} has passed but nothing will auto-resolve this forecast — resolve it via the admin UI.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
+/**
  * The glide reached its tau_lead-adjusted horizon before the literal claim
  * deadline (a statutory/lead-time inference from the classifier LLM, not a
  * plain calendar fact) — a lower-key note, NOT the resolve-now alert above.

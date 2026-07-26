@@ -8,6 +8,7 @@ import {
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
+  notifyPendingPastDeadline,
   notifyProvisionalImpossibility,
   notifyDeadlineDivergence,
   notifyRequoteSummary,
@@ -34,6 +35,9 @@ export const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
 const P_EPSILON = 0.001
 
 const SELF_HEAL_BATCH_SIZE = 5
+
+/** #1185 sweep: leave same-day human resolutions alone before alerting. */
+const PENDING_DEADLINE_GRACE_MS = 12 * 3600_000
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
@@ -139,6 +143,7 @@ export interface RequoteSummary {
   divergenceAlerts: number
   deadlineAlerts: number
   provisionalAlerts: number
+  pendingDeadlineAlerts: number
   errors: number
   deltas: number[]
 }
@@ -156,6 +161,7 @@ function emptySummary(): RequoteSummary {
     divergenceAlerts: 0,
     deadlineAlerts: 0,
     provisionalAlerts: 0,
+    pendingDeadlineAlerts: 0,
     errors: 0,
     deltas: [],
   }
@@ -290,6 +296,39 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
   else summary.glided++
 }
 
+/**
+ * #1185: a PENDING pred outside the awaiting-AI probability band has no
+ * automated resolution path and no human alert — the deadline alert above
+ * only covers ACTIVE candidates, and the ACTIVE→PENDING transition happens
+ * lazily from the forecasts list API, so a pred can leave ACTIVE before the
+ * sweep ever alerted on it. Alert-only: surface it on the clean channel and
+ * stamp deadlinePassedAlertAt; resolution semantics stay untouched.
+ * Deliberately independent of the archetype allowlist — coupling a safety
+ * alert to unrelated gating is exactly how #1185 happened.
+ */
+async function alertPendingPastDeadline(now: Date, summary: RequoteSummary): Promise<void> {
+  const stuck = await prisma.prediction.findMany({
+    where: {
+      status: 'PENDING',
+      resolvedAt: null,
+      claimDeadline: { lt: new Date(now.getTime() - PENDING_DEADLINE_GRACE_MS) },
+      deadlinePassedAlertAt: null,
+    },
+    select: { id: true, slug: true, claimText: true, claimDeadline: true },
+  })
+
+  for (const p of stuck) {
+    try {
+      notifyPendingPastDeadline({ id: p.id, claimText: p.claimText, slug: p.slug }, p.claimDeadline!)
+      await prisma.prediction.update({ where: { id: p.id }, data: { deadlinePassedAlertAt: now } })
+      summary.pendingDeadlineAlerts++
+    } catch (err) {
+      summary.errors++
+      log.warn({ predictionId: p.id, err }, 'pending-deadline alert failed')
+    }
+  }
+}
+
 export interface RunRequoteOptions {
   /** Lowercase archetype names allowed to glide this run (e.g. ['diffuse']). Empty = no-op. */
   archetypes: string[]
@@ -309,6 +348,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
   const summary = emptySummary()
 
   if (opts.archetypes.length === 0) {
+    if (!opts.dryRun) await alertPendingPastDeadline(now, summary)
     return summary
   }
 
@@ -378,6 +418,10 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
     }
   }
 
+  if (!opts.dryRun) {
+    await alertPendingPastDeadline(now, summary)
+  }
+
   const moved = summary.glided + summary.pinned + summary.provisionalPins
   log.info(
     {
@@ -387,6 +431,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       provisionalPins: summary.provisionalPins,
       unchanged: summary.unchanged,
       selfHealed: summary.selfHealed,
+      pendingDeadlineAlerts: summary.pendingDeadlineAlerts,
       errors: summary.errors,
       deltaP50: median(summary.deltas),
       deltaMax: summary.deltas.length ? Math.max(...summary.deltas) : 0,

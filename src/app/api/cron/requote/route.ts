@@ -16,8 +16,10 @@ const log = createLogger('cron-requote')
  *
  * Body: { archetypes?: string[], dryRun?: boolean }. archetypes comes from a
  * GitHub Actions repo variable (TEMPORAL_CLOCK_ARCHETYPES) so it's flippable
- * without a deploy; empty list is a deliberate no-op. TEMPORAL_CLOCK_DISABLED
- * is a server-side hard kill switch that overrides whatever the request says.
+ * without a deploy; empty list is a deliberate glide no-op — the #1185
+ * stuck-PENDING alert sweep still runs, so pausing the glide can't silently
+ * kill the safety net. TEMPORAL_CLOCK_DISABLED is a server-side hard kill
+ * switch that overrides whatever the request says (and does stop the sweep).
  *
  * GitHub Actions (daily 05:31 UTC, off the hour):
  *   curl -sf -X POST -H "x-cron-secret: $BOT_RUNNER_SECRET" \
