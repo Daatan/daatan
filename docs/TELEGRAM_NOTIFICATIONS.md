@@ -47,6 +47,10 @@ Sent directly by `watchdog.yml` from the **GitHub Actions runner**. Both `produc
 
 Any unexpected redirect also counts as a failure (guards against redirect loops).
 
+**Retry before alerting:** each check gets one retry (10s pause) before it's counted as a failure — a single transient network blip between the runner and the target (seen 2026-07-26: all 6 checks timed out for ~2 min with no app restart and no nginx errors) no longer pages the clean channel by itself. A real outage still fails both attempts and alerts as before.
+
+**Job status reflects the alert:** the `Check production`/`Check staging` job now fails (non-zero conclusion) whenever the Telegram alert fires — previously the job always showed `success` even mid-outage, since the check script only recorded failures into an output variable without exiting non-zero.
+
 **Version drift dedup:** at most one alert per production version. Once notified that prod=vX is behind, no further alerts fire until prod itself advances to a new version.
 
 ### Disk / CPU / Memory checks (EC2)
