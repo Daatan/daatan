@@ -99,12 +99,18 @@ export async function refreshOracleSnapshot(
     return { status: 'unchanged' }
   }
 
+  // Only the newly-claimed articles go to the extractor — see the identical
+  // comment in the news-indexer context route (daatan#1172). `searchResults`
+  // (full, unfiltered) stays available below for enrichOracleSources's
+  // URL-keyed metadata lookup.
+  const articlesToScore = searchResults.filter((_, i) => claimResults[i] === 'claimed')
+
   let forecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
   try {
     ;({ forecast } = await getOracleForecast(
       prediction.claimText,
       {
-        articles: searchResults,
+        articles: articlesToScore,
         claimDirection: prediction.claimDirection,
         claimDeadline: prediction.claimDeadline,
         claimCreatedAt: prediction.createdAt,

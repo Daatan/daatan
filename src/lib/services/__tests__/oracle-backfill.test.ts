@@ -330,5 +330,24 @@ describe('refreshOracleSnapshot', () => {
       // failClaimedArticles' PENDING filter subtracts what the pool write completed.
       expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://b.com/2'], 'oracle_omitted')
     })
+
+    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted (daatan#1172)', async () => {
+      mockSearch.mockResolvedValue([
+        { url: 'https://a.com/1', title: 't', snippet: 's' },
+        { url: 'https://b.com/2', title: 't2', snippet: 's2' },
+      ])
+      mockClaim.mockResolvedValue(['skip', 'claimed'])
+      mockForecast.mockResolvedValue({
+        forecast: {
+          mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
+          sources: [{ source_id: 's1', source_name: 'BBC', url: 'https://b.com/2', stance: 0.2, certainty: 0.6, credibility_weight: 1, claims: ['c'] }],
+        },
+      })
+
+      await refreshOracleSnapshot(prediction)
+
+      const [, opts] = mockForecast.mock.calls[0]
+      expect(opts.articles).toEqual([expect.objectContaining({ url: 'https://b.com/2' })])
+    })
   })
 })

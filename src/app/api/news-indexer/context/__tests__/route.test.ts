@@ -253,6 +253,10 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('feeds the whole article set to the Oracle and returns per-article sources', async () => {
+    // Both articles are newly claimed — matches the 2-article request below.
+    // The beforeEach default (a single 'claimed') is for the single-article
+    // VALID_BODY most other tests send.
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
     const ORACLE_TWO_SOURCES = {
       ...ORACLE_WITH_SOURCE,
       articles_used: 2,
@@ -583,6 +587,29 @@ describe('POST /api/news-indexer/context', () => {
       const res = await POST(post('test-secret'))
       expect(res.status).toBe(200)
       expect(getOracleForecast).toHaveBeenCalledTimes(1)
+    })
+
+    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted (daatan#1172)', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://a.com/1', title: 'A', snippet: 's' },
+            { url: 'https://b.com/2', title: 'B', snippet: 's' },
+          ],
+        }),
+      )
+
+      expect(getOracleForecast).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          articles: [expect.objectContaining({ url: 'https://b.com/2' })],
+        }),
+        expect.anything(),
+      )
     })
 
     it('claims each article in the push with its url/title/snippet, keyed to this prediction', async () => {

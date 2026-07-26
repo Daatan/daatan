@@ -156,12 +156,22 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Only the newly-claimed articles go to the extractor. Sending the whole
+    // (unfiltered) batch here — even after confirming at least one is new —
+    // used to re-extract and overwrite already-pooled, content-unchanged
+    // articles too, which is the actual mechanism behind daatan#1172's stance
+    // jitter (one unchanged article's stance ranging -0.33 to -0.81 across
+    // ~30 re-discoveries in 2 days). `articles` stays available below for
+    // enrichOracleSources's URL-keyed metadata lookup, which is fine to run
+    // over the full set.
+    const articlesToScore = articles.filter((_, i) => claimResults[i] === 'claimed')
+
     let oracleForecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
     try {
       ;({ forecast: oracleForecast } = await getOracleForecast(
         prediction.claimText,
         {
-          articles,
+          articles: articlesToScore,
           claimDirection: prediction.claimDirection,
           claimDeadline: prediction.claimDeadline,
           claimCreatedAt: prediction.createdAt,
