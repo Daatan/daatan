@@ -40,79 +40,87 @@ jobs:
         run: |
           BASE="${{ matrix.env.base_url }}"
           FAILED=()
+          MAX_ATTEMPTS=2
+          RETRY_DELAY=10
 
           check() {
             local label="$1" url="$2" expect_key="${3:-}" expect_val="${4:-}"
-            echo "Checking $label -> $url"
+            local attempt REASON
 
-            # -w format: http_code then num_redirects on separate lines.
-            # NOTE: no leading \n — body goes to file so stdout is only the -w trailer.
-            # head -1 = http_code, tail -1 = num_redirects.
-            #
-            # Capture curl's REAL exit code. The previous form `curl ... ) || true`
-            # followed by `CURL_EXIT=$?` was broken: `$?` then read the exit of
-            # `true` (always 0), so the curl-error branch below was dead code. On
-            # the 2026-06-20 cert-expiry outage curl exited 60, was treated as a
-            # success, then `cat` on the never-written body file aborted the step
-            # under `bash -e` before `failed=true` was set — so the Telegram alert
-            # silently skipped for ~18h. `cmd || CURL_EXIT=$?` keeps `$?` pointing
-            # at curl while still not tripping `bash -e`.
-            rm -f /tmp/curl_body.txt /tmp/curl_err.txt
-            CURL_EXIT=0
-            HTTP_AND_REDIRECTS=$(curl -L --max-redirs 5 --max-time 15 \
-              -w "%{http_code}\n%{num_redirects}" \
-              -o /tmp/curl_body.txt \
-              "$url" 2>/tmp/curl_err.txt) || CURL_EXIT=$?
+            # Retries once (after RETRY_DELAY) before recording a failure — a
+            # single transient network blip between the runner and the target
+            # (2026-07-26 10:21 UTC: all 6 checks timed out for ~2 min with no
+            # app restart, no nginx errors, and no gap in the SSM-side disk
+            # check) shouldn't page the clean channel. A real outage still
+            # fails both attempts.
+            for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+              echo "Checking $label -> $url (attempt $attempt/$MAX_ATTEMPTS)"
 
-            # curl non-zero exit: map common codes to human-readable reasons
-            if [ $CURL_EXIT -ne 0 ]; then
-              ERR=$(head -1 /tmp/curl_err.txt)
-              case $CURL_EXIT in
-                6)  REASON="DNS resolution failed" ;;
-                7)  REASON="connection refused" ;;
-                28) REASON="timed out (>15s)" ;;
-                35) REASON="SSL/TLS handshake failed" ;;
-                60) REASON="SSL certificate problem (expired/invalid)" ;;
-                47) REASON="too many redirects" ;;
-                *)  REASON="curl error $CURL_EXIT" ;;
-              esac
-              echo "  FAIL $REASON: $ERR"
-              FAILED+=("$label ($REASON)")
-              return
-            fi
+              # -w format: http_code then num_redirects on separate lines.
+              # NOTE: no leading \n — body goes to file so stdout is only the -w trailer.
+              # head -1 = http_code, tail -1 = num_redirects.
+              #
+              # Capture curl's REAL exit code. The previous form `curl ... ) || true`
+              # followed by `CURL_EXIT=$?` was broken: `$?` then read the exit of
+              # `true` (always 0), so the curl-error branch below was dead code. On
+              # the 2026-06-20 cert-expiry outage curl exited 60, was treated as a
+              # success, then `cat` on the never-written body file aborted the step
+              # under `bash -e` before `failed=true` was set — so the Telegram alert
+              # silently skipped for ~18h. `cmd || CURL_EXIT=$?` keeps `$?` pointing
+              # at curl while still not tripping `bash -e`.
+              rm -f /tmp/curl_body.txt /tmp/curl_err.txt
+              CURL_EXIT=0
+              HTTP_AND_REDIRECTS=$(curl -L --max-redirs 5 --max-time 15 \
+                -w "%{http_code}\n%{num_redirects}" \
+                -o /tmp/curl_body.txt \
+                "$url" 2>/tmp/curl_err.txt) || CURL_EXIT=$?
 
-            HTTP=$(echo "$HTTP_AND_REDIRECTS" | head -1)
-            NUM_REDIRECTS=$(echo "$HTTP_AND_REDIRECTS" | tail -1)
-            BODY=$(cat /tmp/curl_body.txt 2>/dev/null || true)
+              # curl non-zero exit: map common codes to human-readable reasons
+              if [ $CURL_EXIT -ne 0 ]; then
+                ERR=$(head -1 /tmp/curl_err.txt)
+                case $CURL_EXIT in
+                  6)  REASON="DNS resolution failed" ;;
+                  7)  REASON="connection refused" ;;
+                  28) REASON="timed out (>15s)" ;;
+                  35) REASON="SSL/TLS handshake failed" ;;
+                  60) REASON="SSL certificate problem (expired/invalid)" ;;
+                  47) REASON="too many redirects" ;;
+                  *)  REASON="curl error $CURL_EXIT" ;;
+                esac
+                echo "  FAIL $REASON: $ERR"
+              else
+                HTTP=$(echo "$HTTP_AND_REDIRECTS" | head -1)
+                NUM_REDIRECTS=$(echo "$HTTP_AND_REDIRECTS" | tail -1)
+                BODY=$(cat /tmp/curl_body.txt 2>/dev/null || true)
 
-            # Any redirect from a canonical HTTPS URL is suspicious — flag it.
-            # If we followed redirects and the final status is OK, that masks loops
-            # like the 307-loop incident. Treat any redirect as a failure.
-            if [ "$NUM_REDIRECTS" -gt 0 ]; then
-              echo "  FAIL unexpected redirect(s) (count: $NUM_REDIRECTS, final HTTP $HTTP)"
-              echo "  These URLs should be canonical HTTPS — any redirect indicates misconfiguration"
-              FAILED+=("$label ($NUM_REDIRECTS redirect(s) — possible loop)")
-              return
-            fi
-
-            if [[ "$HTTP" -lt 200 || "$HTTP" -ge 400 ]]; then
-              SNIPPET=$(echo "$BODY" | head -c 120 | tr '\n' ' ')
-              echo "  FAIL HTTP $HTTP — $SNIPPET"
-              FAILED+=("$label (HTTP $HTTP)")
-              return
-            fi
-
-            # For JSON endpoints: validate a key=value pair
-            if [[ -n "$expect_key" ]]; then
-              if ! echo "$BODY" | grep -qE "\"$expect_key\":(\"$expect_val\"|$expect_val)"; then
-                SNIPPET=$(echo "$BODY" | head -c 200 | tr '\n' ' ')
-                echo "  FAIL expected $expect_key=$expect_val — got: $SNIPPET"
-                FAILED+=("$label ($expect_key≠$expect_val)")
-                return
+                # Any redirect from a canonical HTTPS URL is suspicious — flag it.
+                # If we followed redirects and the final status is OK, that masks loops
+                # like the 307-loop incident. Treat any redirect as a failure.
+                if [ "$NUM_REDIRECTS" -gt 0 ]; then
+                  echo "  FAIL unexpected redirect(s) (count: $NUM_REDIRECTS, final HTTP $HTTP)"
+                  echo "  These URLs should be canonical HTTPS — any redirect indicates misconfiguration"
+                  REASON="$NUM_REDIRECTS redirect(s) — possible loop"
+                elif [[ "$HTTP" -lt 200 || "$HTTP" -ge 400 ]]; then
+                  SNIPPET=$(echo "$BODY" | head -c 120 | tr '\n' ' ')
+                  echo "  FAIL HTTP $HTTP — $SNIPPET"
+                  REASON="HTTP $HTTP"
+                elif [[ -n "$expect_key" ]] && ! echo "$BODY" | grep -qE "\"$expect_key\":(\"$expect_val\"|$expect_val)"; then
+                  SNIPPET=$(echo "$BODY" | head -c 200 | tr '\n' ' ')
+                  echo "  FAIL expected $expect_key=$expect_val — got: $SNIPPET"
+                  REASON="$expect_key≠$expect_val"
+                else
+                  echo "  OK (HTTP $HTTP)"
+                  return
+                fi
               fi
-            fi
 
-            echo "  OK (HTTP $HTTP)"
+              if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+                echo "  RETRY $label in ${RETRY_DELAY}s (attempt $attempt/$MAX_ATTEMPTS failed: $REASON)"
+                sleep "$RETRY_DELAY"
+              fi
+            done
+
+            FAILED+=("$label ($REASON)")
           }
 
           # API health + DB
@@ -155,11 +163,18 @@ jobs:
             -d "parse_mode=HTML" \
             -d "disable_web_page_preview=true"
 
+      # Runs after the alert so a real failure still pages before the job goes
+      # red. Without this, "Check pages" never exits non-zero, so the job
+      # conclusion always showed success even when the alert above fired.
+      - name: Fail job on check failure
+        if: steps.checks.outputs.failed == 'true'
+        run: exit 1
+
       # Advisory-only: detect when production is running a version older than staging.
       # Notifies at most once per production version — subsequent watchdog runs skip
       # the alert until prod itself advances, regardless of how many times staging bumps.
       - name: Restore version-drift notification cache
-        if: matrix.env.name == 'production'
+        if: always() && matrix.env.name == 'production'
         id: drift-cache
         uses: actions/cache/restore@v5
         with:
@@ -168,7 +183,7 @@ jobs:
           restore-keys: version-drift-notified-
 
       - name: Check version drift (prod vs staging)
-        if: matrix.env.name == 'production'
+        if: always() && matrix.env.name == 'production'
         id: drift
         run: |
           # Helper: convert semver to a zero-padded integer for numeric comparison.
@@ -223,7 +238,7 @@ jobs:
           fi
 
       - name: Save version-drift notification cache
-        if: matrix.env.name == 'production' && steps.drift.outputs.save_cache == 'true'
+        if: always() && matrix.env.name == 'production' && steps.drift.outputs.save_cache == 'true'
         uses: actions/cache/save@v5
         with:
           path: /tmp/drift-notified
