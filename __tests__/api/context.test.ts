@@ -8,11 +8,25 @@ const { mockAuth } = vi.hoisted(() => ({
 }))
 vi.mock('@/auth', () => ({ auth: mockAuth }))
 
-const { mockOracleSearch, mockGenerateContent, mockPrisma, mockGetOracleForecast, mockRecordOracleFallback } = vi.hoisted(() => ({
+const {
+  mockOracleSearch,
+  mockGenerateContent,
+  mockPrisma,
+  mockGetOracleForecast,
+  mockRecordOracleFallback,
+  mockClaimArticlesForExtraction,
+  mockAddArticlesToPool,
+} = vi.hoisted(() => ({
   mockOracleSearch: vi.fn(),
   mockGenerateContent: vi.fn(),
   mockGetOracleForecast: vi.fn().mockResolvedValue({ forecast: null, logId: null }),
   mockRecordOracleFallback: vi.fn().mockResolvedValue(undefined),
+  // Every test here searches a single article, so a fixed one-element
+  // 'claimed' response keeps the claim gate (daatan#1172) a no-op for tests
+  // that predate it — they're exercising the Oracle/LLM/persistence paths,
+  // not the gate itself.
+  mockClaimArticlesForExtraction: vi.fn().mockResolvedValue(['claimed']),
+  mockAddArticlesToPool: vi.fn().mockResolvedValue(undefined),
   mockPrisma: {
     prediction: {
       findFirst: vi.fn(),
@@ -38,6 +52,11 @@ vi.mock('@/lib/services/oracle', () => ({
   DEFAULT_MAX_ARTICLES: 30,
   getOracleForecast: (...args: unknown[]) => mockGetOracleForecast(...args),
   recordOracleFallback: (...args: unknown[]) => mockRecordOracleFallback(...args),
+}))
+
+vi.mock('@/lib/services/evidence-pool', () => ({
+  claimArticlesForExtraction: (...args: unknown[]) => mockClaimArticlesForExtraction(...args),
+  addArticlesToPool: (...args: unknown[]) => mockAddArticlesToPool(...args),
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({

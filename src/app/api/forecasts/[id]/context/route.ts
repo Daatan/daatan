@@ -10,8 +10,8 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
-import { addArticlesToPool } from '@/lib/services/evidence-pool'
-import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
+import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
+import { resolvePooledEstimate, type ResolvedPoolEstimate, type SingleRunEstimate } from '@/lib/services/pooled-estimate'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { aiResearchEnabled } from '@/lib/capabilities'
@@ -174,10 +174,108 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             settled?: boolean
         }
 
+        // Same atomic claim gate as the news-indexer push / backfill paths
+        // (evidence-pool.ts) — this route previously had none at all, so every
+        // analyze call unconditionally re-extracted every search hit even when
+        // content was byte-identical to what's already pooled. That's the
+        // daatan#1172 stance-jitter mechanism: repeated extraction of unchanged
+        // text isn't stable run-to-run. The 1h cooldown above rate-limits how
+        // OFTEN this fires, not whether re-extracting unchanged content is ever
+        // worth it — it isn't.
+        const claimResults = await claimArticlesForExtraction(
+            prediction.id,
+            searchResults.map((r) => ({
+                url: r.url,
+                title: r.title,
+                snippet: r.snippet,
+                source: r.source ?? null,
+                publishedAt: r.publishedDate ?? null,
+            })),
+            'analyze',
+        )
+        const articlesToScore = searchResults.filter((_, i) => claimResults[i] === 'claimed')
+
+        // Shared mapping from a resolved pool/single-run estimate to the route's
+        // response shape — used both when this run extracted new articles and
+        // when it didn't (nothing changed, read the existing pool directly).
+        const toEstimationResult = (resolved: ResolvedPoolEstimate): EstimationResult => {
+            if (resolved.insufficientData) {
+                return {
+                    externalProbability: null,
+                    externalReasoning: 'Insufficient evidence — the gathered coverage does not bear on this claim',
+                    predictionCiLow: null,
+                    predictionCiHigh: null,
+                    oracleSnapshotData: null,
+                    insufficientData: true,
+                }
+            }
+            const prob = stanceToPercent(resolved.mean)
+            const ciLow = stanceToPercent(resolved.ciLow)
+            const ciHigh = stanceToPercent(resolved.ciHigh)
+            return {
+                externalProbability: prob,
+                externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
+                predictionCiLow: ciLow,
+                predictionCiHigh: ciHigh,
+                oracleSnapshotData: {
+                    mean: prob,
+                    std: stanceStdToPercent(resolved.std),
+                    ciLow,
+                    ciHigh,
+                    articlesUsed: resolved.articlesUsed,
+                    settled: resolved.settled,
+                    sources: resolved.snapshotSources,
+                },
+                settled: resolved.settled,
+            }
+        }
+
         // Oracle estimation starts immediately; LLM runs concurrently below
         const estimationWork: Promise<EstimationResult> = (async () => {
+            if (articlesToScore.length === 0) {
+                // Every searched article is already pooled with unchanged content —
+                // nothing to extract. Read the existing pool aggregate directly
+                // rather than either calling getOracleForecast with an empty
+                // articles list (which makes retro fall back to its OWN internal
+                // search instead of what daatan already found — a silent
+                // divergence) or falling through to the ungrounded guessChances
+                // LLM fallback, which would reintroduce exactly the kind of noisy,
+                // unrelated estimate this gate exists to prevent.
+                const noNewRun: SingleRunEstimate = { mean: 0, std: 0, ciLow: 0, ciHigh: 0, settled: false, articlesUsed: 0 }
+                const resolved = await resolvePooledEstimate(
+                    prediction.id, noNewRun, [],
+                    prediction.claimDirection, prediction.claimDeadline,
+                    new Map(), prediction.createdAt, prediction.claimArchetype,
+                )
+                if (resolved.estimateSource === 'single-run') {
+                    // The pool itself couldn't be read either (rare — e.g. Oracle
+                    // unreachable) and there's no fresh run to fall back to since we
+                    // deliberately skipped one. Report nothing this round rather than
+                    // the placeholder zero-value noNewRun above.
+                    log.info({ predictionId: prediction.id, path: 'unchanged_pool_unreadable' }, 'context.ai_estimate')
+                    return {
+                        externalProbability: null,
+                        externalReasoning: null,
+                        predictionCiLow: null,
+                        predictionCiHigh: null,
+                        oracleSnapshotData: null,
+                    }
+                }
+                log.info(
+                    {
+                        predictionId: prediction.id,
+                        path: 'unchanged_pool',
+                        estimateSource: resolved.estimateSource,
+                        poolSize: resolved.poolSize,
+                        articlesUsed: resolved.articlesUsed,
+                    },
+                    'context.ai_estimate',
+                )
+                return toEstimationResult(resolved)
+            }
+
             const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOracleForecast(prediction.claimText, {
-                articles: searchResults.map(r => ({
+                articles: articlesToScore.map(r => ({
                     url: r.url,
                     title: r.title,
                     snippet: r.snippet,
@@ -249,53 +347,22 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
 
                 // The whole pool is off-topic — abstain, exactly as the single-run abstain
                 // above does, rather than persist a number built from irrelevant articles.
-                if (resolved.insufficientData) {
-                    log.info(
-                        { predictionId: prediction.id, path: 'abstain', estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize },
-                        'context.ai_estimate',
-                    )
-                    return {
-                        externalProbability: null,
-                        externalReasoning: 'Insufficient evidence — the gathered coverage does not bear on this claim',
-                        predictionCiLow: null,
-                        predictionCiHigh: null,
-                        oracleSnapshotData: null,
-                        insufficientData: true,
-                    }
-                }
-
-                const prob = stanceToPercent(resolved.mean)
-                const ciLow = stanceToPercent(resolved.ciLow)
-                const ciHigh = stanceToPercent(resolved.ciHigh)
                 log.info(
-                    {
-                        predictionId: prediction.id,
-                        path: 'oracle',
-                        probability: prob,
-                        estimateSource: resolved.estimateSource,
-                        poolSize: resolved.poolSize,
-                        articlesUsed: resolved.articlesUsed,
-                        singleRunMean: resolved.singleRunMean,
-                        sourceCount: resolved.snapshotSources.length,
-                    },
+                    resolved.insufficientData
+                        ? { predictionId: prediction.id, path: 'abstain', estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize }
+                        : {
+                            predictionId: prediction.id,
+                            path: 'oracle',
+                            probability: stanceToPercent(resolved.mean),
+                            estimateSource: resolved.estimateSource,
+                            poolSize: resolved.poolSize,
+                            articlesUsed: resolved.articlesUsed,
+                            singleRunMean: resolved.singleRunMean,
+                            sourceCount: resolved.snapshotSources.length,
+                        },
                     'context.ai_estimate',
                 )
-                return {
-                    externalProbability: prob,
-                    externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
-                    predictionCiLow: ciLow,
-                    predictionCiHigh: ciHigh,
-                    oracleSnapshotData: {
-                        mean: prob,
-                        std: stanceStdToPercent(resolved.std),
-                        ciLow,
-                        ciHigh,
-                        articlesUsed: resolved.articlesUsed,
-                        settled: resolved.settled,
-                        sources: resolved.snapshotSources,
-                    },
-                    settled: resolved.settled,
-                }
+                return toEstimationResult(resolved)
             }
 
             const articlesMapped = searchResults.map((r: SearchResult) => ({

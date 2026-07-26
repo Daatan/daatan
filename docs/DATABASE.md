@@ -139,21 +139,31 @@ their per-source signal here (`addArticlesToPool` in
 cache: re-discovering an already-pooled article updates its stored signal in
 place.
 
-**Known gap: re-discovery's overwrite is not always a no-op.** This assumes an
-article's stance is a stable function of its (unchanged) text, so overwriting
-on re-discovery is harmless. Confirmed on prod (2026-07-21) that it isn't
-always: a single ynet article's stance ranged -0.33 to -0.81 across ~30
-re-discoveries in 2 days, with no edit to the underlying story — a genuine
-extractor non-determinism, not a duplicate write (elections' url+stance dedup
-correctly leaves it alone, since the value really does differ each time). Each
-re-extraction's drift also feeds `recomputeFromPool`'s whole-pool aggregate, so
-this isn't only a display concern — the persisted `oracleSnapshot.mean` can
-absorb it too. Filed as
-[daatan#1172](https://github.com/Daatan/daatan/issues/1172), open — not yet
-root-caused to a specific extractor/prompt/model issue. Elections mitigates the
-visible symptom with a display-only trailing-median smoothing
-(`combined-chart.ts`); nothing here in daatan addresses the underlying
-instability yet.
+**Fixed: re-discovery no longer re-extracts unchanged content.** Confirmed on
+prod (2026-07-21) that overwriting on re-discovery was NOT always a no-op: a
+single ynet article's stance ranged -0.33 to -0.81 across ~30 re-discoveries in
+2 days, with no edit to the underlying story — a genuine extractor
+non-determinism, not a duplicate write (elections' url+stance dedup correctly
+left it alone, since the value really did differ each time). Each
+re-extraction's drift also fed `recomputeFromPool`'s whole-pool aggregate, so
+it wasn't only a display concern — the persisted `oracleSnapshot.mean` could
+absorb it too.
+
+Root cause ([daatan#1172](https://github.com/Daatan/daatan/issues/1172)): the
+content-hash claim gate (`claimArticleForExtraction`/
+`claimArticlesForExtraction` below) already existed and correctly computed,
+per article, whether its content had changed since it was last pooled — but
+`analyze`/`news-indexer` only used the gate's result as an all-or-nothing
+"is there anything new in this batch at all" check, then sent the *whole*
+batch to the extractor regardless, re-extracting and overwriting
+content-unchanged articles right alongside genuinely new ones.
+`analyze` additionally had no gate at all before this fix. All three call
+sites (`analyze`, `news-indexer`, `backfill`/`retry`) now filter to only the
+newly-claimed articles before calling the Oracle; a batch where nothing is new
+reads the existing pool aggregate directly instead of extracting or falling
+back to an ungrounded LLM guess. Elections' display-only trailing-median
+smoothing (`combined-chart.ts`) remains in place as defense-in-depth, but the
+underlying instability is now addressed at the source.
 
 Rows move through a claim lifecycle: `claimArticleForExtraction` inserts/claims
 a row as `PENDING` (a claim older than 10 min counts as abandoned and can be
