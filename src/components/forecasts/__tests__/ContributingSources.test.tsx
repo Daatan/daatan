@@ -66,15 +66,16 @@ describe('ContributingSources', () => {
 
   it('shows the outlet name, its headline, and an aggregate side badge', () => {
     // Single-article outlet → a plain link card. stance 0.5, certainty 0.72 →
-    // implied P(will) 0.86 → aggregate badge "↑ 86%" (the will/won't word is dropped;
-    // the arrow + colour + column carry the side).
+    // badge shows that article's own raw certainty, "↑ 72%" (the will/won't word
+    // is dropped; the arrow + colour + column carry the side), matching what its
+    // expanded row would show — no separate rescaled "implied probability" scale.
     renderWithIntl(
       <ContributingSources
         sources={[src({ source: 'Reuters', title: 'Big scoop', certainty: 0.72, stance: 0.5 })]} />,
     )
     expect(screen.getByText('Reuters')).toBeInTheDocument()
     expect(screen.getByText('Big scoop')).toBeInTheDocument()
-    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
+    expect(screen.getByText('↑ 72%')).toBeInTheDocument()
   })
 
   it('falls back to the outlet host when there is no source name', () => {
@@ -119,7 +120,8 @@ describe('ContributingSources', () => {
     // but a much weaker stance magnitude (stance -.208, certainty .78). Averaging
     // would cancel the strong signal down to "neutral"; picking by certainty alone
     // would pick the wrong (irrelevant) article. Signal strength (|stance| ×
-    // certainty) correctly picks the on-topic one.
+    // certainty) correctly picks the on-topic one, and the badge shows ITS raw
+    // certainty (73%, rounded from .725) — the same number its own row would show.
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -129,7 +131,9 @@ describe('ContributingSources', () => {
       />,
     )
     expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
-    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
+    // Appears twice: the outlet-header badge and the lead article's own row badge
+    // show the identical number — proof there's no separate rescaled outlet-level scale.
+    expect(screen.getAllByText('↑ 73%')).toHaveLength(2)
   })
 
   it('hides gate-rejected articles entirely instead of giving them a voter card', () => {
