@@ -20,6 +20,7 @@ vi.mock('@/lib/services/temporal-classifier', () => ({
 
 vi.mock('@/lib/services/telegram', () => ({
   notifyDeadlinePassedQuietly: vi.fn(),
+  notifyPendingPastDeadline: vi.fn(),
   notifyProvisionalImpossibility: vi.fn(),
   notifyDeadlineDivergence: vi.fn(),
   notifyRequoteSummary: vi.fn(),
@@ -31,6 +32,7 @@ import { saveClockSnapshot, getLatestEvidenceEstimate } from '@/lib/services/con
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
+  notifyPendingPastDeadline,
   notifyProvisionalImpossibility,
   notifyDeadlineDivergence,
   notifyRequoteSummary,
@@ -44,6 +46,7 @@ const saveClock = vi.mocked(saveClockSnapshot)
 const getAnchor = vi.mocked(getLatestEvidenceEstimate)
 const classify = vi.mocked(classifyAndStoreTemporal)
 const deadlineAlert = vi.mocked(notifyDeadlinePassedQuietly)
+const pendingAlert = vi.mocked(notifyPendingPastDeadline)
 const provisionalAlert = vi.mocked(notifyProvisionalImpossibility)
 const divergenceAlert = vi.mocked(notifyDeadlineDivergence)
 const summaryAlert = vi.mocked(notifyRequoteSummary)
@@ -71,15 +74,19 @@ const row = (overrides: Partial<Record<string, unknown>> = {}) => ({
 describe('runRequote', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    findMany.mockResolvedValue([] as never) // base default — the #1185 sweep query in tests that don't queue it
     update.mockResolvedValue({} as never)
     saveClock.mockResolvedValue(undefined)
     classify.mockResolvedValue(null)
   })
 
-  it('no-ops entirely on an empty archetype allowlist', async () => {
+  it('no-ops the glide machinery on an empty archetype allowlist — only the #1185 sweep runs', async () => {
     const summary = await runRequote({ archetypes: [], now: NOW })
     expect(summary.examined).toBe(0)
-    expect(findMany).not.toHaveBeenCalled()
+    expect(findMany).toHaveBeenCalledTimes(1) // the sweep query, nothing else
+    expect(classify).not.toHaveBeenCalled()
+    expect(getAnchor).not.toHaveBeenCalled()
+    expect(saveClock).not.toHaveBeenCalled()
   })
 
   it('anchors on the latest evidence estimate, never on Prediction.confidence directly', async () => {
@@ -231,5 +238,71 @@ describe('runRequote', () => {
 
     await runRequote({ archetypes: ['diffuse'], now: NOW })
     expect(summaryAlert).toHaveBeenCalledTimes(1)
+  })
+
+  describe('stuck-PENDING sweep (#1185)', () => {
+    const stuck = (overrides: Partial<Record<string, unknown>> = {}) => ({
+      id: 'pred-stuck',
+      slug: 'stuck-slug',
+      claimText: 'Y will happen by May 29',
+      claimDeadline: new Date('2026-05-29T00:00:00.000Z'),
+      ...overrides,
+    })
+
+    it('alerts on the clean channel and stamps deadlinePassedAlertAt', async () => {
+      findMany.mockResolvedValueOnce([stuck()] as never)
+
+      const summary = await runRequote({ archetypes: [], now: NOW })
+
+      expect(pendingAlert).toHaveBeenCalledWith(
+        { id: 'pred-stuck', claimText: 'Y will happen by May 29', slug: 'stuck-slug' },
+        new Date('2026-05-29T00:00:00.000Z'),
+      )
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'pred-stuck' },
+        data: { deadlinePassedAlertAt: NOW },
+      })
+      expect(summary.pendingDeadlineAlerts).toBe(1)
+    })
+
+    it('queries only never-alerted PENDING preds past the 12h grace window', async () => {
+      await runRequote({ archetypes: [], now: NOW })
+
+      const where = (findMany.mock.calls[0][0] as { where: Record<string, unknown> }).where
+      expect(where).toMatchObject({
+        status: 'PENDING',
+        resolvedAt: null,
+        deadlinePassedAlertAt: null,
+        claimDeadline: { lt: new Date(NOW.getTime() - 12 * 3600_000) },
+      })
+    })
+
+    it('is skipped entirely in dryRun', async () => {
+      await runRequote({ archetypes: [], now: NOW, dryRun: true })
+      expect(findMany).not.toHaveBeenCalled()
+      expect(pendingAlert).not.toHaveBeenCalled()
+    })
+
+    it('a failed stamp counts as an error without aborting the rest of the sweep', async () => {
+      findMany.mockResolvedValueOnce([stuck(), stuck({ id: 'pred-stuck-2' })] as never)
+      update.mockRejectedValueOnce(new Error('db down'))
+
+      const summary = await runRequote({ archetypes: [], now: NOW })
+
+      expect(pendingAlert).toHaveBeenCalledTimes(2)
+      expect(summary.pendingDeadlineAlerts).toBe(1)
+      expect(summary.errors).toBe(1)
+    })
+
+    it('runs after a normal glide pass too, not only on an empty allowlist', async () => {
+      findMany.mockResolvedValueOnce([]) // self-heal
+      findMany.mockResolvedValueOnce([]) // glide candidates
+      findMany.mockResolvedValueOnce([stuck()] as never) // sweep
+
+      const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+      expect(pendingAlert).toHaveBeenCalledTimes(1)
+      expect(summary.pendingDeadlineAlerts).toBe(1)
+    })
   })
 })

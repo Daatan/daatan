@@ -637,6 +637,13 @@ boolean }` — archetypes defaults to `["diffuse"]` and comes from the
 the server is a hard kill switch (returns `{ok: true, disabled: true}`).
 Triggered by `.github/workflows/requote.yml` daily at 05:31 UTC.
 
+Each non-dry run also performs the **stuck-PENDING sweep** (#1185),
+independent of the archetype allowlist: any `PENDING` prediction whose
+`claimDeadline` passed >12h ago with no `deadlinePassedAlertAt` gets a
+one-shot clean-channel Telegram alert ("resolve via the admin UI") and the
+stamp. Alert-only — resolution semantics are untouched; only the
+`TEMPORAL_CLOCK_DISABLED` kill switch stops it.
+
 ### `GET /api/cron/external-market-sync`
 Refreshes every cached Polymarket/Kalshi market that at least one forecast
 links to: pulls the latest YES price, writes an `ExternalMarketPriceSnapshot`
