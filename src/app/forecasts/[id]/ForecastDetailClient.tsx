@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession, signIn } from 'next-auth/react'
 import Link from 'next/link'
@@ -39,12 +40,23 @@ import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
-import ProbabilityChart, { communityProbability } from '@/components/forecasts/ProbabilityChart'
+import { communityProbability } from '@/components/forecasts/ProbabilityChart'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
+
+// recharts is a heavy dependency used only here, so it's loaded on demand
+// instead of shipping in the forecast-detail page's initial JS bundle.
+const ProbabilityChart = dynamic(() => import('@/components/forecasts/ProbabilityChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[240px] flex items-center justify-center">
+      <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+    </div>
+  ),
+})
 
 export default function ForecastDetailClient({
   initialData,
