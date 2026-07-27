@@ -1105,6 +1105,37 @@
     "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
     "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean."
   },
+  "outletPage": {
+    "backToLeaderboard": "Back to source leaderboard",
+    "wikipedia": "Wikipedia",
+    "telegram": "Telegram channel",
+    "trackRecord": "Track record",
+    "skill": "Skill",
+    "brier": "Brier",
+    "authors": "Authors",
+    "predictions": "Predictions",
+    "noTrackRecord": "Not yet scored on the source leaderboard.",
+    "forecastsAffected": "Forecasts affected",
+    "matches": "Matches",
+    "last30dMatches": "Matches (30d)",
+    "linkedPeople": "Linked people",
+    "noLinkedPeople": "No people linked to this outlet yet.",
+    "publications": "Recent publications",
+    "noPublications": "No publications yet",
+    "forecast": "Forecast"
+  },
+  "authorPage": {
+    "backToLeaderboard": "Back to source leaderboard",
+    "writesFor": "Writes for",
+    "trackRecord": "Track record",
+    "skill": "Skill",
+    "brier": "Brier",
+    "predictions": "Predictions",
+    "articles": "Articles",
+    "publications": "Recent publications",
+    "noPublications": "No publications yet",
+    "forecast": "Forecast"
+  },
   "dateTimeField": {
     "datePlaceholder": "DD/MM/YYYY",
     "timePlaceholder": "HH:MM",
