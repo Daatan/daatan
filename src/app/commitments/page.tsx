@@ -24,7 +24,6 @@ import { PrimaryLink } from '@/components/ui/PrimaryLink'
 interface Commitment {
   id: string
   cuCommitted: number
-  status: 'ACTIVE' | 'RESOLVED' | 'CANCELLED'
   createdAt: string
   prediction: {
     id: string
@@ -38,6 +37,7 @@ interface Commitment {
 
 export default function CommitmentsPage() {
   const t = useTranslations('commitment')
+  const tf = useTranslations('forecast')
   const { data: session } = useSession()
   const [commitments, setCommitments] = React.useState<Commitment[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -66,6 +66,20 @@ export default function CommitmentsPage() {
   }, [session])
 
   const locale = useLocale() === 'he' ? he : enUS
+
+  const predictionStatusLabel = (status: string) => {
+    switch (status) {
+      case 'DRAFT': return tf('draft')
+      case 'ACTIVE': return tf('active')
+      case 'PENDING': return tf('pending')
+      case 'PENDING_APPROVAL': return tf('pendingApproval')
+      case 'RESOLVED_CORRECT': return tf('correct')
+      case 'RESOLVED_WRONG': return tf('wrong')
+      case 'VOID': return tf('void')
+      case 'UNRESOLVABLE': return tf('unresolvable')
+      default: return status
+    }
+  }
 
   if (loading) {
     return (
@@ -112,13 +126,13 @@ export default function CommitmentsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        commitment.status === 'ACTIVE' 
-                          ? 'bg-cobalt/10 text-cobalt-light border border-cobalt/20' 
-                          : commitment.status === 'RESOLVED'
+                        commitment.prediction.status === 'ACTIVE'
+                          ? 'bg-cobalt/10 text-cobalt-light border border-cobalt/20'
+                          : commitment.prediction.status === 'RESOLVED_CORRECT' || commitment.prediction.status === 'RESOLVED_WRONG'
                             ? 'bg-teal/10 text-teal border border-teal/20'
                             : 'bg-navy-800 text-gray-400 border border-navy-600'
                       }`}>
-                        {t(`status.${commitment.status}`)}
+                        {predictionStatusLabel(commitment.prediction.status)}
                       </span>
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
