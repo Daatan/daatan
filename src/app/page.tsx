@@ -1,10 +1,9 @@
 import { Suspense } from 'react'
-import { headers } from 'next/headers'
 import { Loader2 } from 'lucide-react'
 import type { Metadata } from 'next'
 import FeedClient from './FeedClient'
 import { JsonLd } from '@/components/JsonLd'
-import type { Prediction } from '@/components/forecasts/ForecastCard'
+import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,23 +44,24 @@ function FeedLoading() {
 
 /**
  * Fetch the default ACTIVE feed server-side so crawlers see content on first
- * load. Uses an internal request to reuse all enrichment logic in the API.
+ * load. Calls the service layer directly (matches src/app/[locale]/page.tsx)
+ * instead of a self-fetch through the API route.
  */
-async function getInitialFeed(): Promise<Prediction[]> {
-  try {
-    const headersList = await headers()
-    const host = headersList.get('host') ?? 'localhost:3000'
-    const protocol = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https'
-    const res = await fetch(
-      `${protocol}://${host}/api/forecasts?status=ACTIVE&limit=20`,
-      { cache: 'no-store' },
-    )
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.predictions ?? []
-  } catch {
-    return []
-  }
+async function getInitialFeed() {
+  const { predictions } = await listForecasts({
+    where: { status: 'ACTIVE', isPublic: true },
+    orderBy: { createdAt: 'desc' },
+    page: 1,
+    limit: 20,
+    isCuSort: false,
+    sortOrder: 'desc',
+  })
+  return enrichPredictions(predictions, undefined, {
+    page: 1,
+    limit: 20,
+    sortOrder: 'desc',
+    isCuSort: false,
+  })
 }
 
 export default async function FeedPage({
