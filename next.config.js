@@ -1,5 +1,8 @@
 const { version } = require('./package.json')
 const createNextIntlPlugin = require('next-intl/plugin')
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
@@ -37,6 +40,9 @@ const nextConfig = {
   },
   output: 'standalone',
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts'],
+  },
   logging: {
     fetches: {
       fullUrl: true,
@@ -77,4 +83,4 @@ const nextConfig = {
   },
 }
 
-module.exports = withNextIntl(nextConfig)
+module.exports = withBundleAnalyzer(withNextIntl(nextConfig))

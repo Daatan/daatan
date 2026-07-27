@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "analyze": "ANALYZE=true npm run build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -65,6 +66,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@next/bundle-analyzer": "^15.5.18",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
