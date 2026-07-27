@@ -277,6 +277,7 @@
     "title": "Leaderboard",
     "subtitle": "Top predictors ranked by performance. Prove your accuracy and climb the ranks.",
     "aiPanelLink": "AI panel leaderboard",
+    "sourceLeaderboardLink": "Source leaderboard",
     "rank": "Rank",
     "predictor": "Predictor",
     "correct": "Correct",
@@ -1079,6 +1080,30 @@
     "emptyTitle": "No scores yet",
     "emptyDesc": "AI-panel Brier scores appear once forecasts that were staked on resolve.",
     "footnote": "Matched-time Brier: each model’s estimate at the instant a user staked, scored against the outcome. Members with fewer than 5 scores are hidden. The Oracle is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet."
+  },
+  "sourceLeaderboard": {
+    "title": "Source Leaderboard",
+    "experimental": "Experimental",
+    "backToLeaderboard": "Back to leaderboard",
+    "explainer": "Byline authors and outlets scored on their own directional forecasts (author_lean), resolved against outcomes — the same accountability the user leaderboard gives predictors. Lower Brier is better; 0.25 is a coin flip.",
+    "view": {
+      "authors": "By author",
+      "outlets": "By outlet"
+    },
+    "sortBy": {
+      "skillConservative": "Skill",
+      "brierScore": "Brier score"
+    },
+    "author": "Author",
+    "outlet": "Outlet",
+    "authors": "Authors",
+    "authorsCount": "{count, plural, one {# author} other {# authors}}",
+    "skillConservative": "Skill",
+    "brierScore": "Brier",
+    "predictions": "Predictions",
+    "emptyTitle": "No scored sources yet",
+    "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
+    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean."
   },
   "dateTimeField": {
     "datePlaceholder": "DD/MM/YYYY",

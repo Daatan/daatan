@@ -24,6 +24,7 @@ export type OracleCallSource =
   | 'ibi-fetch-url'
   | 'health-cron'
   | 'leaderboard'
+  | 'source-leaderboard'
   | 'news-indexer'
   | 'other'
 
