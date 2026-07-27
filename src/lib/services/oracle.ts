@@ -216,6 +216,26 @@ export interface OracleLeaderboardResponse {
   count: number
 }
 
+/** One (byline author, outlet) row in the author-shadow scoring board. Shadow scoring —
+ *  informational track record only, never consumed by the live forecast. */
+export interface OracleAuthorShadowEntry {
+  id: string
+  author: string
+  outlet_name: string
+  brier_score: number
+  skill_mu: number
+  skill_sigma: number
+  skill_conservative: number
+  predictions: number
+  articles: number
+}
+
+/** Response from GET /leaderboard/author-shadow. */
+export interface OracleAuthorShadowResponse {
+  authors: OracleAuthorShadowEntry[]
+  count: number
+}
+
 /**
  * Call the TruthMachine Oracle API and return the full forecast payload plus the
  * id of the logged call.
@@ -375,6 +395,35 @@ export const getOracleLeaderboard = async (
       return null
     }
     const data = await res.json() as OracleLeaderboardResponse
+    void logOracleCall({ callType: 'LEADERBOARD', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, resultCount: data.count })
+    return data
+  } catch {
+    void logOracleCall({ callType: 'LEADERBOARD', status: 'ERROR', meta, durationMs: Date.now() - t0 })
+    return null
+  }
+}
+
+/**
+ * Author-shadow scoring board: per (byline author, outlet) Brier + TrueSkill-style rating
+ * computed from `author_lean` extractions, resolved against outcomes (retro PR #315). Shadow
+ * scoring — informational only, never feeds the live forecast estimate.
+ *
+ * Returns null if the Oracle is not configured or the request fails. Never throws.
+ */
+export const getAuthorShadowLeaderboard = async (
+  meta: OracleCallMeta = { source: 'source-leaderboard' },
+): Promise<OracleAuthorShadowResponse | null> => {
+  const cfg = getOracleConfig()
+  if (!cfg) return null
+
+  const t0 = Date.now()
+  try {
+    const res = await oracleFetch(cfg, '/leaderboard/author-shadow', { timeoutMs: HEALTH_TIMEOUT_MS })
+    if (!res.ok) {
+      void logOracleCall({ callType: 'LEADERBOARD', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status })
+      return null
+    }
+    const data = await res.json() as OracleAuthorShadowResponse
     void logOracleCall({ callType: 'LEADERBOARD', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, resultCount: data.count })
     return data
   } catch {

@@ -277,6 +277,7 @@
     "title": "Rangolisto",
     "subtitle": "Rangigo laŭ efikeco de prognozado",
     "aiPanelLink": "Rangolisto de AI",
+    "sourceLeaderboardLink": "Rangolisto de fontoj",
     "rank": "Rango",
     "predictor": "Prognozanto",
     "correct": "Ĝusta",
@@ -1079,6 +1080,30 @@
     "emptyTitle": "Ankoraŭ neniuj poentoj",
     "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
     "footnote": "La homa bazlinio estas la meza Brier de ĉiuj homaj poentoj en la sama periodo — se ĝi egalas la aliajn, la rangigo ankoraŭ ne estas signifa."
+  },
+  "sourceLeaderboard": {
+    "title": "Rangolisto de Fontoj",
+    "experimental": "Eksperimenta",
+    "backToLeaderboard": "← Reen al la rangolisto",
+    "explainer": "Aŭtoroj kaj fontoj poentitaj laŭ siaj propraj direktaj prognozoj (author_lean), kontrolitaj kontraŭ la rezulto — la sama respondigo kiun la rangolisto donas al prognozistoj. Malpli alta Brier estas pli bone; 0,25 estas monero-ĵeto.",
+    "view": {
+      "authors": "Laŭ aŭtoro",
+      "outlets": "Laŭ fonto"
+    },
+    "sortBy": {
+      "skillConservative": "Lerteco",
+      "brierScore": "Brier-poento"
+    },
+    "author": "Aŭtoro",
+    "outlet": "Fonto",
+    "authors": "Aŭtoroj",
+    "authorsCount": "{count, plural, one {# aŭtoro} other {# aŭtoroj}}",
+    "skillConservative": "Lerteco",
+    "brierScore": "Brier",
+    "predictions": "Prognozoj",
+    "emptyTitle": "Ankoraŭ neniuj poentitaj fontoj",
+    "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
+    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj."
   },
   "dateTimeField": {
     "datePlaceholder": "TT/MM/JJJJ",

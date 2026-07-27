@@ -33,7 +33,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
 })
 
 import { ClaimDirection } from '@prisma/client'
-import { getOracleForecast, getOracleProbability, BOT_FORECAST_TIMEOUT_MS } from '../oracle'
+import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, BOT_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
 const mockLogOracleCall = vi.mocked(logOracleCall)
@@ -367,5 +367,58 @@ describe('forecast request timeout', () => {
     const body = JSON.parse(init.body as string)
     expect(body.claim_direction).toBe('survival')
     expect(body.claim_deadline).toBe('2026-06-01T00:00:00.000Z')
+  })
+})
+
+describe('getAuthorShadowLeaderboard', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    mockLogOracleCall.mockClear()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const samplePayload = {
+    authors: [
+      {
+        id: 'Ben Caspit — maariv',
+        author: 'Ben Caspit',
+        outlet_name: 'maariv',
+        brier_score: 0.49,
+        skill_mu: 25.0,
+        skill_sigma: 8.33,
+        skill_conservative: 0.01,
+        predictions: 1,
+        articles: 3,
+      },
+    ],
+    count: 1,
+  }
+
+  it('returns the payload on a successful response', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => samplePayload })
+    const data = await getAuthorShadowLeaderboard()
+    expect(data).toEqual(samplePayload)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://oracle.daatan.com/leaderboard/author-shadow')
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'LEADERBOARD', status: 'OK', resultCount: 1 }))
+  })
+
+  it('returns null and logs ERROR on a non-OK status', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    const data = await getAuthorShadowLeaderboard()
+    expect(data).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'LEADERBOARD', status: 'ERROR', httpStatus: 503 }))
+  })
+
+  it('returns null and logs ERROR when the request throws', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    const data = await getAuthorShadowLeaderboard()
+    expect(data).toBeNull()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'LEADERBOARD', status: 'ERROR' }))
   })
 })
