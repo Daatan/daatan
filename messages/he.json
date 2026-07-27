@@ -1105,6 +1105,37 @@
     "emptyDesc": "ציוני מקורות מופיעים ברגע שתחזיות שהוכרעו נושאות אותות author_lean מהכתבות שצוטטו בהן.",
     "footnote": "ניקוד צללי: הרקורד הזה הוא מידע בלבד ואינו משפיע על אומדן התחזית החי. הכישורים הם דירוג שמרני (מנכה רעש מדגימות קטנות); Brier הוא הדיוק הגולמי, מול התוצאה שהוכרעה, של הנטייה הכיוונית של כל מקור."
   },
+  "outletPage": {
+    "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
+    "wikipedia": "ויקיפדיה",
+    "telegram": "ערוץ טלגרם",
+    "trackRecord": "רקורד",
+    "skill": "כישורים",
+    "brier": "Brier",
+    "authors": "מחברים",
+    "predictions": "תחזיות",
+    "noTrackRecord": "טרם דורג בטבלת דירוג המקורות.",
+    "forecastsAffected": "תחזיות",
+    "matches": "התאמות",
+    "last30dMatches": "התאמות (30 יום)",
+    "linkedPeople": "אנשים מקושרים",
+    "noLinkedPeople": "אין עדיין אנשים מקושרים למקור זה.",
+    "publications": "פרסומים אחרונים",
+    "noPublications": "אין עדיין פרסומים",
+    "forecast": "תחזית"
+  },
+  "authorPage": {
+    "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
+    "writesFor": "כותב עבור",
+    "trackRecord": "רקורד",
+    "skill": "כישורים",
+    "brier": "Brier",
+    "predictions": "תחזיות",
+    "articles": "כתבות",
+    "publications": "פרסומים אחרונים",
+    "noPublications": "אין עדיין פרסומים",
+    "forecast": "תחזית"
+  },
   "dateTimeField": {
     "datePlaceholder": "DD/MM/YYYY",
     "timePlaceholder": "HH:MM",

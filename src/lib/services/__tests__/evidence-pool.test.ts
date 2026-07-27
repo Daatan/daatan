@@ -28,6 +28,7 @@ import { Prisma } from '@prisma/client'
 import {
   addArticlesToPool,
   getPoolArticles,
+  getPublicArticlesByAuthorOutlet,
   setArticleExcluded,
   recomputeFromPool,
   pushCredibilityFeedback,
@@ -200,6 +201,58 @@ describe('getPoolArticles', () => {
       where: { predictionId: 'pred-1' },
       orderBy: { addedAt: 'desc' },
     })
+  })
+})
+
+describe('getPublicArticlesByAuthorOutlet', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('queries by exact author + outletName match, excluding admin-excluded rows', async () => {
+    findMany.mockResolvedValue([] as never)
+    await getPublicArticlesByAuthorOutlet('Ben Caspit', 'maariv')
+    expect(findMany).toHaveBeenCalledWith({
+      where: { author: 'Ben Caspit', outletName: 'maariv', excluded: false },
+      orderBy: { addedAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        url: true,
+        publishedDate: true,
+        predictionId: true,
+        prediction: { select: { claimText: true, status: true } },
+      },
+    })
+  })
+
+  it('flattens the joined prediction fields onto each row', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        title: 'Title',
+        url: 'https://maariv.co.il/a1',
+        publishedDate: '2026-07-01',
+        predictionId: 'pred-1',
+        prediction: { claimText: 'Will X happen?', status: 'RESOLVED_CORRECT' },
+      },
+    ] as never)
+
+    const rows = await getPublicArticlesByAuthorOutlet('Ben Caspit', 'maariv')
+    expect(rows).toEqual([{
+      id: 'a1',
+      title: 'Title',
+      url: 'https://maariv.co.il/a1',
+      publishedDate: '2026-07-01',
+      predictionId: 'pred-1',
+      predictionClaimText: 'Will X happen?',
+      predictionStatus: 'RESOLVED_CORRECT',
+    }])
+  })
+
+  it('respects a caller-supplied limit', async () => {
+    findMany.mockResolvedValue([] as never)
+    await getPublicArticlesByAuthorOutlet('Ben Caspit', 'maariv', 5)
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
   })
 })
 

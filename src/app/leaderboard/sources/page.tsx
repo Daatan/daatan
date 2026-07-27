@@ -51,6 +51,7 @@ export default async function SourceLeaderboardPage({ searchParams }: Props) {
     ? outletRows.map(r => ({
         id: r.id,
         primary: r.outletName,
+        href: `/sources/${encodeURIComponent(r.outletName)}`,
         secondary: t('authorsCount', { count: r.authorCount }),
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
@@ -59,6 +60,7 @@ export default async function SourceLeaderboardPage({ searchParams }: Props) {
     : authorRows.map(r => ({
         id: r.id,
         primary: r.author,
+        href: `/authors/${encodeURIComponent(r.author)}/${encodeURIComponent(r.outletName)}`,
         secondary: r.outletName,
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
@@ -133,7 +135,11 @@ export default async function SourceLeaderboardPage({ searchParams }: Props) {
               {rows.map((row, i) => (
                 <tr key={row.id} className="border-b border-navy-600/50 last:border-0">
                   <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
-                  <td className="px-2 py-3 text-white font-medium">{row.primary}</td>
+                  <td className="px-2 py-3 text-white font-medium">
+                    <Link href={row.href} className="hover:underline hover:text-cyan-300">
+                      {row.primary}
+                    </Link>
+                  </td>
                   <td className="px-2 py-3 text-gray-400">{row.secondary}</td>
                   <td className="px-2 py-3 text-right font-mono text-cyan-300">
                     {row.skillConservative.toFixed(3)}

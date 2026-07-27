@@ -1105,6 +1105,37 @@
     "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
     "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj."
   },
+  "outletPage": {
+    "backToLeaderboard": "Reen al la rangolisto de fontoj",
+    "wikipedia": "Vikipedio",
+    "telegram": "Telegram-kanalo",
+    "trackRecord": "Spurhistorio",
+    "skill": "Lerteco",
+    "brier": "Brier",
+    "authors": "Aŭtoroj",
+    "predictions": "Prognozoj",
+    "noTrackRecord": "Ankoraŭ ne poentita en la rangolisto de fontoj.",
+    "forecastsAffected": "Prognozoj",
+    "matches": "Kongruoj",
+    "last30dMatches": "Kongruoj (30 tagoj)",
+    "linkedPeople": "Ligitaj personoj",
+    "noLinkedPeople": "Ankoraŭ neniuj personoj ligitaj al ĉi tiu fonto.",
+    "publications": "Lastaj publikaĵoj",
+    "noPublications": "Ankoraŭ neniuj publikaĵoj",
+    "forecast": "Prognozo"
+  },
+  "authorPage": {
+    "backToLeaderboard": "Reen al la rangolisto de fontoj",
+    "writesFor": "Verkas por",
+    "trackRecord": "Spurhistorio",
+    "skill": "Lerteco",
+    "brier": "Brier",
+    "predictions": "Prognozoj",
+    "articles": "Artikoloj",
+    "publications": "Lastaj publikaĵoj",
+    "noPublications": "Ankoraŭ neniuj publikaĵoj",
+    "forecast": "Prognozo"
+  },
   "dateTimeField": {
     "datePlaceholder": "TT/MM/JJJJ",
     "timePlaceholder": "HH:MM",

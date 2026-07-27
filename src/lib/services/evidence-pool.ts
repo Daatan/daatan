@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
-import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection } from '@prisma/client'
+import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { claimArchetypeParam, claimDirectionParam } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
@@ -253,6 +253,58 @@ export async function getPoolArticles(predictionId: string): Promise<EvidencePoo
     where: { predictionId },
     orderBy: { addedAt: 'desc' },
   })
+}
+
+export interface PublicSourceArticle {
+  id: string
+  title: string | null
+  url: string
+  publishedDate: string | null
+  predictionId: string
+  predictionClaimText: string
+  predictionStatus: PredictionStatus
+}
+
+/**
+ * An (author, outlet) pair's recent pooled articles, for the public author detail page
+ * (daatan#1195 follow-up). `author`/`outletName` are exact matches against the same raw
+ * strings retro's author-shadow leaderboard is keyed by (see `pushCredibilityFeedback`,
+ * which sends these same two fields as `author_signals[].author`/`outlet_name`) — a
+ * leaderboard row for this pair only exists because at least one row here contributed to
+ * it, so this never spuriously comes back empty for a page that's actually linked to.
+ *
+ * Public-safe projection only: excludes the Oracle-estimator shadow-lane fields
+ * (stance/authorLean/factSignal/etc.) that live on the same row but were never meant for
+ * public display.
+ */
+export async function getPublicArticlesByAuthorOutlet(
+  author: string,
+  outletName: string,
+  limit = 20,
+): Promise<PublicSourceArticle[]> {
+  const rows = await prisma.evidencePoolArticle.findMany({
+    where: { author, outletName, excluded: false },
+    orderBy: { addedAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      title: true,
+      url: true,
+      publishedDate: true,
+      predictionId: true,
+      prediction: { select: { claimText: true, status: true } },
+    },
+  })
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    url: r.url,
+    publishedDate: r.publishedDate,
+    predictionId: r.predictionId,
+    predictionClaimText: r.prediction.claimText,
+    predictionStatus: r.prediction.status,
+  }))
 }
 
 /**
