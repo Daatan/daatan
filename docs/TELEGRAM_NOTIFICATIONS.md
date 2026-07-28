@@ -79,7 +79,7 @@ Only **acute** conditions alert. Each one starts, gets fixed, and stops, so a re
 | Worker unhealthy | ⚙️ | `worker.status` ≠ `ok` | 🚨 both channels |
 | Pipeline stalled | 📰 | 0 articles indexed in 24h | 🚨 both channels |
 | Queue backed up | 📮 | DLQ depth > 0, or queue depth > 500 | 🚨 both channels |
-| Indexer down | 🚨 | `/stats` unreachable | 🚨 both channels |
+| Indexer down | 🚨 | `/stats` unreachable after 3 attempts (12s/attempt, 3s between retries — rides out a normal deploy restart) | 🚨 both channels |
 | Stale feed | 🕸️ | an enabled feed stopped producing > 7d | digest only (chronic) |
 | Daily digest | 📊 | always at 08:00 UTC (disk, DB, articles, worker, matches, stale feeds) | noisy |
 

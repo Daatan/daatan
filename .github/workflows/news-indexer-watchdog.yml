@@ -52,7 +52,13 @@ jobs:
           set -uo pipefail
 
           # --- fetch /stats; an unreachable indexer is itself an alert ---
-          if ! curl -sf --max-time 25 "$STATS_URL" -o /tmp/stats.json; then
+          # news-indexer's systemd restart (Restart=always, no zero-downtime swap) briefly
+          # refuses connections on every deploy — several a day during active dev. --max-time
+          # is a per-attempt cap (curl resets it on each retry), so a short per-attempt timeout
+          # plus a couple retries rides out that restart window instead of declaring the whole
+          # indexer down over one unlucky poll. --retry-all-errors covers connection-refused,
+          # not just the default 5xx/timeout set.
+          if ! curl -sf --max-time 12 --retry 2 --retry-delay 3 --retry-all-errors "$STATS_URL" -o /tmp/stats.json; then
             echo "alert=true" >> "$GITHUB_OUTPUT"
             printf 'news-indexer /stats is unreachable — the indexer may be down.' | base64 -w0 > /tmp/p.b64
             echo "problems_b64=$(cat /tmp/p.b64)" >> "$GITHUB_OUTPUT"
