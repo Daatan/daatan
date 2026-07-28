@@ -14,7 +14,7 @@ import {
   ReferenceArea,
 } from 'recharts'
 // Canonical community-probability lives in @/lib/forecast-math so the feed card
-// and this chart agree. Re-exported below for existing importers.
+// and this chart agree.
 import { communityProbability } from '@/lib/forecast-math'
 
 type ChartSnapshot = {
@@ -115,8 +115,6 @@ const RANGES: { key: RangeKey; label: string; span: number }[] = [
   { key: '7d', label: '7d', span: 7 * DAY_MS },
   { key: 'all', label: 'All', span: Infinity },
 ]
-
-export { communityProbability }
 
 /**
  * Map a [lo, hi] timestamp window (e.g. a drag selection) onto inclusive brush
