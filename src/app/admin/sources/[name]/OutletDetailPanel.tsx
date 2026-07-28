@@ -34,6 +34,15 @@ type Publication = {
 
 type LinkedPerson = { id: string; canonicalName: string }
 
+type AuthorScoringRow = {
+  id: string
+  author: string
+  skillConservative: number
+  brierScore: number
+  predictions: number
+  articles: number
+}
+
 type OutletDetail = {
   name: string
   wikipediaUrl: string | null
@@ -56,10 +65,12 @@ function isUrl(s: string | null | undefined): s is string {
 
 export default function OutletDetailPanel({ name }: Props) {
   const t = useTranslations('admin')
+  const tBoard = useTranslations('sourceLeaderboard')
   const [data, setData] = useState<OutletDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [authorScoring, setAuthorScoring] = useState<AuthorScoringRow[] | null>(null)
 
   // Edit-form state, seeded from the loaded detail.
   const [wikipediaUrl, setWikipediaUrl] = useState('')
@@ -92,6 +103,15 @@ export default function OutletDetailPanel({ name }: Props) {
   }, [endpoint])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/admin/news-indexer/sources/${encodeURIComponent(name)}/shadow-score`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { rows: [] }))
+      .then((body: { rows?: AuthorScoringRow[] }) => { if (!cancelled) setAuthorScoring(body.rows ?? []) })
+      .catch(() => { if (!cancelled) setAuthorScoring([]) })
+    return () => { cancelled = true }
+  }, [name])
 
   async function save() {
     setSaving(true)
@@ -266,6 +286,44 @@ export default function OutletDetailPanel({ name }: Props) {
               {p.canonicalName}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Author scoring — this outlet's rows on retro's author-shadow board (shadow scoring,
+          informational only; see /leaderboard/sources for the full board). */}
+      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+        {t('sourcesDetailAuthorScoring')}
+      </h3>
+      {authorScoring === null ? (
+        <div className="flex justify-center py-6 mb-8">
+          <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+        </div>
+      ) : authorScoring.length === 0 ? (
+        <p className="text-sm text-gray-500 mb-8">{t('sourcesDetailNoAuthorScoring')}</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-navy-600 mb-8">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-navy-800 text-gray-400 text-left text-xs uppercase tracking-wide">
+                <th className="px-3 py-2 font-medium">{tBoard('author')}</th>
+                <th className="px-3 py-2 font-medium">{tBoard('skillConservative')}</th>
+                <th className="px-3 py-2 font-medium">{tBoard('brierScore')}</th>
+                <th className="px-3 py-2 font-medium">{tBoard('predictions')}</th>
+                <th className="px-3 py-2 font-medium">{tBoard('articles')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {authorScoring.map((row) => (
+                <tr key={row.id} className="border-t border-navy-700">
+                  <td className="px-3 py-2 text-white">{row.author}</td>
+                  <td className="px-3 py-2 text-gray-300 tabular-nums">{row.skillConservative.toFixed(3)}</td>
+                  <td className="px-3 py-2 text-gray-300 tabular-nums">{row.brierScore.toFixed(3)}</td>
+                  <td className="px-3 py-2 text-gray-400 tabular-nums">{row.predictions}</td>
+                  <td className="px-3 py-2 text-gray-400 tabular-nums">{row.articles}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

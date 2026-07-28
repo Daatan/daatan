@@ -116,3 +116,15 @@ export async function getSourceLeaderboard(
     outletRows: sortRows(aggregateByOutlet(entries), sortBy),
   }
 }
+
+/**
+ * Author-shadow rows for a single outlet — backs the admin outlet detail page
+ * (`/admin/sources/[name]`). Reuses the full-board fetch and filters by `outlet_name`
+ * in-memory; the board already carries it on every row, so no separate Oracle endpoint is
+ * needed. Fails open to `[]`, same as `getSourceLeaderboard`.
+ */
+export async function getAuthorShadowRowsForOutlet(outletName: string): Promise<AuthorLeaderboardRow[]> {
+  const data = await getAuthorShadowLeaderboard({ source: 'admin-outlet-detail' })
+  const entries = (data?.authors ?? []).filter(e => e.outlet_name === outletName)
+  return sortRows(entries.map(toAuthorRow), 'skillConservative')
+}
