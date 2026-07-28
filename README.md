@@ -78,6 +78,7 @@ npm run dev
 ```bash
 npm run dev        # Start dev server
 npm run build      # Build for production
+npm run analyze    # Build with @next/bundle-analyzer reports (.next/analyze/*.html)
 npm run lint       # Run linter
 npm run typecheck  # Type check
 npm test           # Run unit tests
