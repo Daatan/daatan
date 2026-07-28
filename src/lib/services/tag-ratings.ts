@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { calculateEloUpdates, replayEloHistory } from '@/lib/services/elo'
 import { glicko2Update, replayGlicko2History } from '@/lib/services/expertise'
+import { replayPunditEloHistory, replayPunditGlickoHistory } from '@/lib/services/pundit-rating'
 
 // Seed per-tag ratings from full history replay if the tag has no stored rows.
 // No-ops if at least one row already exists for the tag.
@@ -27,6 +28,43 @@ export async function ensureTagRatingsSeeded(tagId: string, tagSlug: string): Pr
       mu: glickoMap.get(userId)?.mu ?? 1500,
       sigma: glickoMap.get(userId)?.sigma ?? 350,
       volatility: glickoMap.get(userId)?.volatility ?? 0.06,
+      updatedAt: now,
+    })),
+    skipDuplicates: true,
+  })
+}
+
+// Seed pundit per-tag ratings from full evidence-pool replay if the tag has no
+// stored rows. Unlike ensureTagRatingsSeeded, there's no incremental update
+// path (pundits don't commit, so there's no resolution transaction to hook
+// into) — this replay-on-first-read is the only way pundit ratings get
+// computed. No-ops if at least one row already exists for the tag; to force a
+// recompute (e.g. after a reference-set or scoring change), delete the tag's
+// rows first.
+export async function ensurePunditTagRatingsSeeded(tagId: string, tagSlug: string): Promise<void> {
+  const count = await prisma.punditTagRating.count({ where: { tagId } })
+  if (count > 0) return
+
+  const [eloMap, glickoMap] = await Promise.all([
+    replayPunditEloHistory(tagSlug),
+    replayPunditGlickoHistory(tagSlug),
+  ])
+
+  const personIds = new Set([...eloMap.keys(), ...glickoMap.keys()])
+  if (personIds.size === 0) return
+
+  const now = new Date()
+  await prisma.punditTagRating.createMany({
+    data: [...personIds].map(personId => ({
+      personId,
+      personName: glickoMap.get(personId)?.personName ?? null,
+      tagId,
+      elo: eloMap.get(personId) ?? 1500,
+      mu: glickoMap.get(personId)?.mu ?? 1500,
+      sigma: glickoMap.get(personId)?.sigma ?? 350,
+      volatility: glickoMap.get(personId)?.volatility ?? 0.06,
+      totalPredictions: glickoMap.get(personId)?.totalPredictions ?? 0,
+      correctPredictions: glickoMap.get(personId)?.correctPredictions ?? 0,
       updatedAt: now,
     })),
     skipDuplicates: true,

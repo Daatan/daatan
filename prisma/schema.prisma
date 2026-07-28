@@ -212,10 +212,39 @@ model Tag {
   slug      String   @unique @db.VarChar(50) // e.g., "politics", "ai", "crypto"
   createdAt DateTime @default(now())
 
-  predictions    Prediction[]
-  userTagRatings UserTagRating[]
+  predictions      Prediction[]
+  userTagRatings   UserTagRating[]
+  punditTagRatings PunditTagRating[]
 
   @@map("tags")
+}
+
+// Per-tag ELO/Glicko-2 rating for a tracked pundit/outlet (news-indexer Person,
+// not a daatan User — pundits don't commit/stake, their signal is evidence-pool
+// stance attributed to their bylines). Same formula and shape as UserTagRating,
+// computed by a parallel replay over EvidencePoolArticle instead of Commitment —
+// see src/lib/services/pundit-rating.ts. personName is denormalized from
+// news-indexer's person.canonical_name so consumers don't need a cross-DB join.
+model PunditTagRating {
+  id         String  @id @default(cuid())
+  personId   String  @map("person_id") @db.VarChar(64)
+  personName String? @map("person_name") @db.VarChar(200)
+  tagId      String
+  tag        Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  elo        Float @default(1500)
+  mu         Float @default(1500)
+  sigma      Float @default(350)
+  volatility Float @default(0.06)
+
+  totalPredictions   Int @default(0) @map("total_predictions")
+  correctPredictions Int @default(0) @map("correct_predictions")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([personId, tagId])
+  @@index([tagId])
+  @@map("pundit_tag_ratings")
 }
 
 model UserTagRating {
