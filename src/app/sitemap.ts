@@ -19,7 +19,14 @@ const fetchSitemapData = unstable_cache(
           isPublic: true,
           status: { in: ['ACTIVE', 'PENDING', 'RESOLVED_CORRECT', 'RESOLVED_WRONG'] },
         },
-        select: { id: true, slug: true, status: true, updatedAt: true },
+        select: {
+          id: true,
+          slug: true,
+          status: true,
+          updatedAt: true,
+          detailsText: true,
+          _count: { select: { commitments: true } },
+        },
       }),
       prisma.predictionTranslation.findMany({
         where: { language: { in: ['he', 'ru'] } },
@@ -50,6 +57,26 @@ const fetchSitemapData = unstable_cache(
   ['sitemap-data'],
   { revalidate: 3600, tags: ['sitemap'] },
 )
+
+// Submitting a bare, untouched forecast (no stakes, no context beyond the
+// claim line) wastes crawl budget on thin content and drags down the whole
+// domain's "Crawled - currently not indexed" rate (see docs/SEO.md). A
+// resolved forecast is exempt — resolution is itself a content event
+// (outcome, resolvedAt) regardless of how quiet the forecast was.
+const MIN_DETAILS_TEXT_LENGTH = 40
+const RESOLVED_STATUSES = ['RESOLVED_CORRECT', 'RESOLVED_WRONG']
+
+export function isSitemapEligible(p: {
+  status: string
+  detailsText: string | null
+  _count: { commitments: number }
+}): boolean {
+  return (
+    RESOLVED_STATUSES.includes(p.status) ||
+    p._count.commitments > 0 ||
+    (p.detailsText?.trim().length ?? 0) >= MIN_DETAILS_TEXT_LENGTH
+  )
+}
 
 const BASE_URL = getAppUrl()
 
@@ -159,11 +186,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     translatedPredictionIds.map((t) => `${t.predictionId}:${t.language}`),
   )
 
-  const resolvedStatuses = ['RESOLVED_CORRECT', 'RESOLVED_WRONG']
+  const sitemapEligiblePredictions = predictions.filter(isSitemapEligible)
 
-  const forecastRoutes: MetadataRoute.Sitemap = predictions.map((p) => {
+  const forecastRoutes: MetadataRoute.Sitemap = sitemapEligiblePredictions.map((p) => {
     const slug = p.slug || p.id
-    const isResolved = resolvedStatuses.includes(p.status)
+    const isResolved = RESOLVED_STATUSES.includes(p.status)
     const hasHe = translatedSet.has(`${p.id}:he`)
     const hasRu = translatedSet.has(`${p.id}:ru`)
     return {
@@ -183,9 +210,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   })
 
   // 4. Locale forecast routes — only when a translation exists
-  const localeForecastRoutes: MetadataRoute.Sitemap = predictions.flatMap((p) => {
+  const localeForecastRoutes: MetadataRoute.Sitemap = sitemapEligiblePredictions.flatMap((p) => {
     const slug = p.slug || p.id
-    const isResolved = resolvedStatuses.includes(p.status)
+    const isResolved = RESOLVED_STATUSES.includes(p.status)
     const hasHe = translatedSet.has(`${p.id}:he`)
     const hasRu = translatedSet.has(`${p.id}:ru`)
     return SITEMAP_LOCALES.flatMap((locale) => {
