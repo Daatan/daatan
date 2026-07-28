@@ -388,6 +388,19 @@ projections** of resolved commitments (`replayGlicko2History`,
 sort indexes exist on each (`rs`, `eloRating`, `mu`, `correctPredictions` DESC).
 See [SCORING_SYSTEMS.md](./SCORING_SYSTEMS.md).
 
+`pundit_tag_ratings` is the same shape and formula, for a different population:
+tracked pundits/outlets (news-indexer `Person`, keyed by `personId`, not a
+`users` row — pundits don't commit/stake) scored on `evidence_pool_articles`
+stance instead of `Commitment.probability`. No incremental update hook exists
+(no resolution transaction to attach to) — it's seeded lazily per tag on first
+read (`ensurePunditTagRatingsSeeded`, `src/lib/services/pundit-rating.ts`) by
+replaying the SAME `calculateEloUpdates`/`glicko2Update` functions used above,
+just fed evidence-pool rows. To force a recompute, delete the tag's rows.
+Elections' pundit leaderboard reads this (not `user_tag_ratings`, and not
+`getSourceLeaderboard`'s retro-backed `/leaderboard/sources` — that one is
+global/all-topics and string-keyed by `(author, outlet)`, not tag-scoped or
+`personId`-keyed).
+
 ## Users, auth & self-hosting
 
 `users` + NextAuth tables (`accounts`, `sessions`, `verification_tokens`).

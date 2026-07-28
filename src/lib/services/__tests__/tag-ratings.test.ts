@@ -8,6 +8,10 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       upsert: vi.fn(),
     },
+    punditTagRating: {
+      count: vi.fn(),
+      createMany: vi.fn(),
+    },
   },
 }))
 
@@ -19,6 +23,11 @@ vi.mock('@/lib/services/elo', () => ({
 vi.mock('@/lib/services/expertise', () => ({
   replayGlicko2History: vi.fn(),
   glicko2Update: vi.fn(),
+}))
+
+vi.mock('@/lib/services/pundit-rating', () => ({
+  replayPunditEloHistory: vi.fn(),
+  replayPunditGlickoHistory: vi.fn(),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -85,6 +94,63 @@ describe('ensureTagRatingsSeeded', () => {
     await ensureTagRatingsSeeded('tag-1', 'crypto')
 
     expect(prisma.userTagRating.createMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('ensurePunditTagRatingsSeeded', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('no-ops when rows already exist for the tag', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { replayPunditEloHistory } = await import('@/lib/services/pundit-rating')
+    const { ensurePunditTagRatingsSeeded } = await import('../tag-ratings')
+
+    vi.mocked(prisma.punditTagRating.count).mockResolvedValue(3)
+
+    await ensurePunditTagRatingsSeeded('tag-1', 'israeli-elections-2026')
+
+    expect(replayPunditEloHistory).not.toHaveBeenCalled()
+    expect(prisma.punditTagRating.createMany).not.toHaveBeenCalled()
+  })
+
+  it('runs replay and seeds when count = 0, carrying personName through', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { replayPunditEloHistory, replayPunditGlickoHistory } = await import('@/lib/services/pundit-rating')
+    const { ensurePunditTagRatingsSeeded } = await import('../tag-ratings')
+
+    vi.mocked(prisma.punditTagRating.count).mockResolvedValue(0)
+    vi.mocked(replayPunditEloHistory).mockResolvedValue(new Map([['ben-caspit', 1580]]))
+    vi.mocked(replayPunditGlickoHistory).mockResolvedValue(
+      new Map([['ben-caspit', {
+        mu: 1540, sigma: 300, volatility: 0.06,
+        personName: 'Ben Caspit', totalPredictions: 4, correctPredictions: 3,
+      }]]),
+    )
+    vi.mocked(prisma.punditTagRating.createMany).mockResolvedValue({ count: 1 })
+
+    await ensurePunditTagRatingsSeeded('tag-1', 'israeli-elections-2026')
+
+    expect(replayPunditEloHistory).toHaveBeenCalledWith('israeli-elections-2026')
+    const { data } = vi.mocked(prisma.punditTagRating.createMany).mock.calls[0][0] as any
+    expect(data).toHaveLength(1)
+    expect(data[0]).toMatchObject({
+      personId: 'ben-caspit', personName: 'Ben Caspit', tagId: 'tag-1',
+      elo: 1580, mu: 1540, sigma: 300, totalPredictions: 4, correctPredictions: 3,
+    })
+  })
+
+  it('no-ops when replay produces no pundits', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { replayPunditEloHistory, replayPunditGlickoHistory } = await import('@/lib/services/pundit-rating')
+    const { ensurePunditTagRatingsSeeded } = await import('../tag-ratings')
+
+    vi.mocked(prisma.punditTagRating.count).mockResolvedValue(0)
+    vi.mocked(replayPunditEloHistory).mockResolvedValue(new Map())
+    vi.mocked(replayPunditGlickoHistory).mockResolvedValue(new Map())
+
+    await ensurePunditTagRatingsSeeded('tag-1', 'israeli-elections-2026')
+
+    expect(prisma.punditTagRating.createMany).not.toHaveBeenCalled()
   })
 })
 
