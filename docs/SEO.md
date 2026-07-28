@@ -64,6 +64,20 @@ the only ones with the Hebrew brand name "דעתן" as visible body text (everyw
 Latin "DAATAN"), so a search for "דעתן" had zero indexed pages to ever match. Fixed by setting
 `localized: true` for both and adding matching entries to `localeStaticRoutes`.
 
+### Quality bar: thin forecasts are excluded from the sitemap
+
+`isSitemapEligible()` filters `predictions` before they become sitemap URLs (English and
+locale variants alike). A forecast must have **either** ≥1 commitment, **or** `detailsText`
+of at least 40 trimmed characters, **or** a resolved status (`RESOLVED_CORRECT`/
+`RESOLVED_WRONG` — resolution is itself a content event: outcome, `resolvedAt`, regardless of
+how quiet the forecast was). This targets the "bare claim line, no context, no engagement"
+case specifically — a bot-drafted forecast nobody has touched yet — which was a large share of
+GSC's "Crawled - currently not indexed" bucket (134 pages as of 2026-07-28). Excluding a
+forecast from the sitemap doesn't noindex or 404 it — it's still directly reachable and can
+still get indexed on its own merits — it just stops being actively submitted to Google while
+thin, and re-enters the sitemap automatically once it gains a commitment, real detail text, or
+resolves.
+
 ## Server-rendered content (Soft 404 prevention)
 
 A forecast page must carry **substantive, unique text in its initial SSR HTML** — not
