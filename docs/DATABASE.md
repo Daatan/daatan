@@ -231,6 +231,20 @@ backtest compares mean-to-mean). The four facets qualify the **dominant**
 `eventTarget` name that fact's actor/target dyad (the actor-pair check, #303),
 `isOccurrence` marks the event ITSELF vs a precursor/precondition/escalation,
 `verified` marks an independently-reported fact vs an interested party's claim.
+`carriedForward` (daatan#1166/#1167, `oracle-snapshot.ts`/`pooled-estimate.ts`)
+is true when a pooled source's stance for this recompute is UNCHANGED from the
+immediately-prior snapshot's stance at the same URL — i.e. this source wasn't
+freshly (re-)evaluated this time, just carried into the new snapshot because
+the full roster is persisted on every recompute (other readers, like the
+"sources behind the estimate" panel, need the complete current roster, not a
+diff). False for a genuinely new or re-extracted-with-a-different-stance
+source, or when there's no prior snapshot to compare against. Added
+specifically for elections' chart (`combined-chart.ts`, elections#63): before
+this field, every pooled source looked freshly re-evaluated on every
+recompute, so the chart drew a spurious new vertex per source per recompute
+even when nothing about that source had changed. Consumers read it as
+`carriedForward ?? false`, since rows written before the column existed are
+null.
 All null when no scored claim carried a `factSignal` (e.g. pure opinion). Like
 `authorLean`, this is the **estimator lane** of the un-fusing work
 (`project_author_scoring_redesign`) — kept SEPARATE from the current estimate:
