@@ -25,6 +25,7 @@ export type OracleCallSource =
   | 'health-cron'
   | 'leaderboard'
   | 'source-leaderboard'
+  | 'admin-outlet-detail'
   | 'news-indexer'
   | 'other'
 

@@ -764,6 +764,8 @@
     "sourcesDetailNotes": "הערות",
     "sourcesDetailSave": "שמור",
     "sourcesDetailSaved": "נשמר",
+    "sourcesDetailAuthorScoring": "ניקוד מחברים",
+    "sourcesDetailNoAuthorScoring": "אין עדיין נתוני ניקוד צללים למקור זה.",
     "sourcesDetailPublications": "פרסומים אחרונים",
     "sourcesDetailNoPublications": "אין עדיין פרסומים",
     "sourcesDetailLinkedPeople": "אנשים מקושרים",
@@ -1101,6 +1103,7 @@
     "skillConservative": "כישורים",
     "brierScore": "Brier",
     "predictions": "תחזיות",
+    "articles": "כתבות",
     "emptyTitle": "עדיין אין מקורות מדורגים",
     "emptyDesc": "ציוני מקורות מופיעים ברגע שתחזיות שהוכרעו נושאות אותות author_lean מהכתבות שצוטטו בהן.",
     "footnote": "ניקוד צללי: הרקורד הזה הוא מידע בלבד ואינו משפיע על אומדן התחזית החי. הכישורים הם דירוג שמרני (מנכה רעש מדגימות קטנות); Brier הוא הדיוק הגולמי, מול התוצאה שהוכרעה, של הנטייה הכיוונית של כל מקור."

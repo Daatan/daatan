@@ -764,6 +764,8 @@
     "sourcesDetailNotes": "Заметки",
     "sourcesDetailSave": "Сохранить",
     "sourcesDetailSaved": "Сохранено",
+    "sourcesDetailAuthorScoring": "Оценка авторов",
+    "sourcesDetailNoAuthorScoring": "Пока нет данных теневого рейтинга для этого источника.",
     "sourcesDetailPublications": "Недавние публикации",
     "sourcesDetailNoPublications": "Публикаций пока нет",
     "sourcesDetailLinkedPeople": "Связанные люди",
@@ -1101,6 +1103,7 @@
     "skillConservative": "Навык",
     "brierScore": "Brier",
     "predictions": "Прогнозы",
+    "articles": "Статьи",
     "emptyTitle": "Пока нет оценённых источников",
     "emptyDesc": "Оценки источников появятся, когда разрешённые прогнозы получат сигналы author_lean из процитированных статей.",
     "footnote": "Теневой рейтинг: этот показатель носит информационный характер и не влияет на текущую оценку прогноза. Навык — консервативная оценка (учитывает шум при малой выборке); Brier — необработанная точность направленной позиции источника по разрешённым исходам."

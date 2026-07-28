@@ -764,6 +764,8 @@
     "sourcesDetailNotes": "Notoj",
     "sourcesDetailSave": "Konservi",
     "sourcesDetailSaved": "Konservita",
+    "sourcesDetailAuthorScoring": "Aŭtora poentado",
+    "sourcesDetailNoAuthorScoring": "Ankoraŭ neniuj ombra-poentaj datumoj por ĉi tiu fonto.",
     "sourcesDetailPublications": "Lastaj publikaĵoj",
     "sourcesDetailNoPublications": "Ankoraŭ neniuj publikaĵoj",
     "sourcesDetailLinkedPeople": "Ligitaj personoj",
@@ -1101,6 +1103,7 @@
     "skillConservative": "Lerteco",
     "brierScore": "Brier",
     "predictions": "Prognozoj",
+    "articles": "Artikoloj",
     "emptyTitle": "Ankoraŭ neniuj poentitaj fontoj",
     "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
     "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj."

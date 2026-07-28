@@ -764,6 +764,8 @@
     "sourcesDetailNotes": "Notes",
     "sourcesDetailSave": "Save",
     "sourcesDetailSaved": "Saved",
+    "sourcesDetailAuthorScoring": "Author scoring",
+    "sourcesDetailNoAuthorScoring": "No shadow-scoring data yet for this outlet.",
     "sourcesDetailPublications": "Recent publications",
     "sourcesDetailNoPublications": "No publications yet",
     "sourcesDetailLinkedPeople": "Linked people",
@@ -1101,6 +1103,7 @@
     "skillConservative": "Skill",
     "brierScore": "Brier",
     "predictions": "Predictions",
+    "articles": "Articles",
     "emptyTitle": "No scored sources yet",
     "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
     "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean."

@@ -8,7 +8,7 @@ vi.mock('../oracle', () => ({
 }))
 
 import { getAuthorShadowLeaderboard } from '../oracle'
-import { aggregateByOutlet, getSourceLeaderboard } from '../sourceLeaderboard'
+import { aggregateByOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
@@ -113,5 +113,48 @@ describe('getSourceLeaderboard', () => {
     })
     const { outletRows } = await getSourceLeaderboard('outlets', 'skillConservative')
     expect(outletRows.map(r => r.outletName)).toEqual(['Strong Outlet', 'Weak Outlet'])
+  })
+})
+
+describe('getAuthorShadowRowsForOutlet', () => {
+  beforeEach(() => {
+    mockGetAuthorShadowLeaderboard.mockReset()
+  })
+
+  it('fails open to an empty array when the Oracle call returns null', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce(null)
+    expect(await getAuthorShadowRowsForOutlet('Some Outlet')).toEqual([])
+  })
+
+  it('filters to only the requested outlet', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [
+        entry({ author: 'A', outlet_name: 'X' }),
+        entry({ author: 'B', outlet_name: 'Y' }),
+      ],
+      count: 2,
+    })
+    const rows = await getAuthorShadowRowsForOutlet('X')
+    expect(rows.map(r => r.author)).toEqual(['A'])
+  })
+
+  it('sorts by skillConservative descending', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [
+        entry({ author: 'Low', outlet_name: 'X', skill_conservative: -0.5 }),
+        entry({ author: 'High', outlet_name: 'X', skill_conservative: 0.7 }),
+      ],
+      count: 2,
+    })
+    const rows = await getAuthorShadowRowsForOutlet('X')
+    expect(rows.map(r => r.author)).toEqual(['High', 'Low'])
+  })
+
+  it('returns an empty array when the outlet has no rows', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [entry({ author: 'A', outlet_name: 'X' })],
+      count: 1,
+    })
+    expect(await getAuthorShadowRowsForOutlet('Unrelated Outlet')).toEqual([])
   })
 })

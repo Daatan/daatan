@@ -68,7 +68,12 @@ describe('OutletDetailPanel', () => {
   })
 
   it('saves edited fields via PUT with the correct body', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(baseDetail) })
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(url.includes('shadow-score') ? { rows: [] } : baseDetail),
+      }),
+    )
     renderWithIntl(<OutletDetailPanel name="Reuters" />)
     await waitFor(() => expect(screen.getByText('Reuters')).toBeInTheDocument())
 
@@ -76,8 +81,6 @@ describe('OutletDetailPanel', () => {
       target: { value: 'https://en.wikipedia.org/wiki/Reuters' },
     })
 
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ...baseDetail, wikipediaUrl: 'https://en.wikipedia.org/wiki/Reuters' }) })
-    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ...baseDetail, wikipediaUrl: 'https://en.wikipedia.org/wiki/Reuters' }) })
     fireEvent.click(screen.getByRole('button', { name: /Save/ }))
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(
@@ -125,5 +128,35 @@ describe('OutletDetailPanel', () => {
     await waitFor(() => expect(screen.getByText('Reuters story')).toBeInTheDocument())
     const forecastLink = screen.getByRole('link', { name: 'Forecast' })
     expect(forecastLink).toHaveAttribute('href', '/forecasts/pred-1')
+  })
+
+  it('shows the no-author-scoring hint when the outlet has no shadow-scoring rows', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(url.includes('shadow-score') ? { rows: [] } : baseDetail),
+      }),
+    )
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+
+    await waitFor(() => expect(screen.getByText('No shadow-scoring data yet for this outlet.')).toBeInTheDocument())
+  })
+
+  it('renders author scoring rows from the shadow-score endpoint', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(
+          url.includes('shadow-score')
+            ? { rows: [{ id: 'a1', author: 'Jane Reporter', skillConservative: 0.42, brierScore: 0.18, predictions: 6, articles: 11 }] }
+            : baseDetail,
+        ),
+      }),
+    )
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+
+    await waitFor(() => expect(screen.getByText('Jane Reporter')).toBeInTheDocument())
+    expect(screen.getByText('0.420')).toBeInTheDocument()
+    expect(screen.getByText('0.180')).toBeInTheDocument()
   })
 })
