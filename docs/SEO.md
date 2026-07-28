@@ -97,6 +97,12 @@ Two anti-patterns previously starved the pre-render; both are fixed:
   the DOM* until expanded. They now always render into the DOM and collapse via a CSS `hidden`
   class instead of being removed, so crawlers see them (content inside collapsed/hidden
   accordions is indexed under mobile-first).
+- **`VOID`/`UNRESOLVABLE` forecasts with zero commitments** — no one ever staked on them, so
+  there's no history worth preserving and no unique content beyond the claim line. Both
+  `src/app/forecasts/[id]/page.tsx` and `src/app/[locale]/forecasts/[id]/page.tsx` call
+  `notFound()` for this case instead of rendering a thin `noindex` page at HTTP 200 (the
+  locale route was missing this check until 2026-07-28 — confirmed via GSC's Page Indexing
+  report showing the "Soft 404" bucket).
 
 Additionally, `ForecastDetailClient` renders a **server-side facts line** under the `<h1>`
 (English/canonical locale): author · opened/resolves dates · forecaster count · community

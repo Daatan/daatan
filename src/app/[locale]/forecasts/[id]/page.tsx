@@ -207,6 +207,16 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     notFound()
   }
 
+  // VOID/UNRESOLVABLE with no participants have no history worth preserving.
+  // Returning 404 prevents Google's "Soft 404" verdict (HTTP 200 + noindex + thin content).
+  // Mirrors src/app/forecasts/[id]/page.tsx — this locale route was missing the same gate.
+  if (
+    (prediction.status === 'VOID' || prediction.status === 'UNRESOLVABLE') &&
+    prediction._count.commitments === 0
+  ) {
+    notFound()
+  }
+
   // The AI panel is a hidden, opt-in source (docs/LASSO.md §8), same gate as the
   // canonical /forecasts/[id] route: only load and pass its series when THIS viewer
   // enabled it in Settings. Read from the DB rather than the session token so the
