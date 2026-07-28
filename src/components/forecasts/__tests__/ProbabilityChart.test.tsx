@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import ProbabilityChart, { AiDot, communityProbability, tsWindowToIndices, buildMarketSeries, buildPanelSeries, panelKey } from '../ProbabilityChart'
+import ProbabilityChart, { AiDot, tsWindowToIndices, buildMarketSeries, buildPanelSeries, panelKey } from '../ProbabilityChart'
+import { communityProbability } from '@/lib/forecast-math'
 
 // Captures the `data` array reference handed to recharts' LineChart on each render,
 // so tests can assert referential stability without poking at recharts' internal
