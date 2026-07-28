@@ -233,6 +233,7 @@ export function oracleSnapshotToContributingSources(oracleSnapshot: unknown): Co
       oracleProbability: null,
       outcome: null,
       origin: 'oracle',
+      outletName: null,
     })
   }
   return out

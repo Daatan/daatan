@@ -27,6 +27,11 @@ export type ContributingSource = {
   outcome: string | null
   /** Which stream surfaced this source. 'both' = analysed AND indexed. */
   origin?: 'oracle' | 'indexer' | 'both'
+  /** Resolved outlet identity (news-indexer outlet.name), for linking to /sources/[name] —
+   *  distinct from `source`, which is a raw display string and not a stable identity. Null
+   *  when the by-url identity lookup has no match (unresolved byline, or an oracle-only
+   *  source that was never enriched against news-indexer's identity index). */
+  outletName: string | null
 }
 
 /**
@@ -51,7 +56,12 @@ export async function getContributingSources(forecastId: string): Promise<Contri
       return []
     }
     const rows = (await resp.json()) as ContributingSource[]
-    return rows.map((r) => ({ ...r, origin: 'indexer' as const }))
+    const metaByUrl = await getArticleMetaByUrl(rows.map((r) => r.url))
+    return rows.map((r) => ({
+      ...r,
+      origin: 'indexer' as const,
+      outletName: metaByUrl.get(r.url)?.outletName ?? null,
+    }))
   } catch (err) {
     log.warn({ err, forecastId }, 'Failed to fetch contributing sources')
     return []
@@ -138,6 +148,7 @@ export async function getForecastVoters(forecastId: string): Promise<Contributin
       similarity: existing.similarity ?? s.similarity,
       oracleProbability: existing.oracleProbability ?? s.oracleProbability,
       outcome: existing.outcome ?? s.outcome,
+      outletName: existing.outletName ?? s.outletName,
       origin: 'both',
     })
   }

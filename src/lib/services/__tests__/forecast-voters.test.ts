@@ -21,6 +21,15 @@ function mockIndexerRows(rows: unknown[]) {
   global.fetch = vi.fn(async () => ({ ok: true, json: async () => rows })) as unknown as typeof fetch
 }
 
+/** Routes by URL so the indexer-rows fetch and the by-url identity-lookup fetch (both hit
+ *  during getContributingSources) can return different, purpose-shaped payloads. */
+function mockFetchRouted(indexerRows: unknown[], metaRows: unknown[]) {
+  global.fetch = vi.fn(async (input: unknown) => {
+    const url = String(input)
+    return { ok: true, json: async () => (url.includes('/articles/by-url') ? metaRows : indexerRows) }
+  }) as unknown as typeof fetch
+}
+
 beforeEach(() => vi.clearAllMocks())
 
 describe('getForecastVoters', () => {
@@ -56,5 +65,37 @@ describe('getForecastVoters', () => {
     expect(out[0].stance).toBe(0.5) // Oracle wins
     expect(out[0].author).toBe('Jane Doe') // filled from indexer (Oracle had null)
     expect(out[0].publishedAt).toBe('2026-06-18')
+  })
+
+  it('enriches indexer-origin rows with outletName from the by-url identity lookup', async () => {
+    mockSnapshot.mockResolvedValue(null)
+    mockFetchRouted(
+      [{ url: 'https://bbc.com/x', stance: -0.3, author: 'Tom' }],
+      [{ requestedUrl: 'https://bbc.com/x', outletName: 'bbc' }],
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out[0].outletName).toBe('bbc')
+  })
+
+  it('nulls outletName when the by-url lookup has no match for the article', async () => {
+    mockSnapshot.mockResolvedValue(null)
+    mockFetchRouted([{ url: 'https://bbc.com/x', stance: -0.3 }], [])
+    const out = await getForecastVoters('fc-1')
+    expect(out[0].outletName).toBeNull()
+  })
+
+  it('carries the indexer-resolved outletName through a both-origin merge', async () => {
+    mockSnapshot.mockResolvedValue({
+      oracleSnapshot: { sources: [{ url: 'https://reuters.com/a', stance: 0.5, certainty: 0.8 }] },
+      createdAt: new Date(),
+    } as never)
+    mockFetchRouted(
+      [{ url: 'https://www.reuters.com/a?utm_source=rss', stance: -0.9 }],
+      [{ requestedUrl: 'https://www.reuters.com/a?utm_source=rss', outletName: 'reuters' }],
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out).toHaveLength(1)
+    expect(out[0].origin).toBe('both')
+    expect(out[0].outletName).toBe('reuters')
   })
 })

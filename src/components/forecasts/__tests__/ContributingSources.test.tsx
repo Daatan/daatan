@@ -24,6 +24,7 @@ const src = (over: Partial<ContributingSource>): ContributingSource => ({
   claim: null,
   oracleProbability: null,
   outcome: null,
+  outletName: null,
   ...over,
 })
 
@@ -162,5 +163,44 @@ describe('ContributingSources', () => {
       />,
     )
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('links a single-article outlet name to its /sources/[name] profile when resolved', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[src({ source: 'Reuters', outletName: 'reuters', stance: 0.5 })]}
+      />,
+    )
+    const link = screen.getByText('Reuters').closest('a')
+    expect(link).toHaveAttribute('href', '/sources/reuters')
+  })
+
+  it('renders the outlet name as plain text (no link) when outletName is unresolved', () => {
+    renderWithIntl(
+      <ContributingSources sources={[src({ source: 'Reuters', outletName: null, stance: 0.5 })]} />,
+    )
+    const name = screen.getByText('Reuters')
+    expect(name.closest('a')).toBeNull()
+  })
+
+  it('links a multi-article outlet card name to its /sources/[name] profile when resolved', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://thehill.com/a', source: 'The Hill', outletName: 'the-hill', title: 'First', stance: 0.5 }),
+          src({ url: 'https://thehill.com/b', source: 'The Hill', outletName: 'the-hill', title: 'Second', stance: 0.4 }),
+        ]}
+      />,
+    )
+    const link = screen.getByText('The Hill').closest('a')
+    expect(link).toHaveAttribute('href', '/sources/the-hill')
+  })
+
+  it('URL-encodes the outlet name in the profile link', () => {
+    renderWithIntl(
+      <ContributingSources sources={[src({ source: 'Some/Outlet', outletName: 'some/outlet', stance: 0.5 })]} />,
+    )
+    const link = screen.getByText('Some/Outlet').closest('a')
+    expect(link).toHaveAttribute('href', '/sources/some%2Foutlet')
   })
 })

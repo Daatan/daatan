@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Newspaper, ExternalLink, ChevronDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
@@ -72,6 +73,9 @@ function signalStrength(s: ContributingSource): number {
 type OutletGroup = {
   domain: string
   name: string
+  /** Resolved outlet identity (news-indexer outlet.name), for linking to /sources/[name].
+   *  Null when no article in the group resolved one — the card falls back to plain text. */
+  outletName: string | null
   /** Sorted by signal strength, most decisive first; the first entry (not an outlet-wide average) drives side/pct. */
   articles: ContributingSource[]
   side: Side
@@ -144,6 +148,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     return {
       domain,
       name: articles.find(a => a.source)?.source || domain,
+      outletName: articles.find(a => a.outletName)?.outletName ?? null,
       articles: sorted,
       side,
       pct,
@@ -206,6 +211,22 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     )
   }
 
+  // Outlet name: a link to its /sources/[name] profile when resolved, else plain text.
+  // Never nested inside the row's own article-opening <a>/<summary> (invalid HTML / would
+  // steal the details-toggle click) — always a sibling with its own stopPropagation.
+  const OutletName = ({ g, className }: { g: OutletGroup; className: string }) =>
+    g.outletName ? (
+      <Link
+        href={`/sources/${encodeURIComponent(g.outletName)}`}
+        onClick={(e) => e.stopPropagation()}
+        className={`${className} hover:underline w-fit`}
+      >
+        {g.name}
+      </Link>
+    ) : (
+      <span className={className}>{g.name}</span>
+    )
+
   const OutletCard = ({ g }: { g: OutletGroup }) => {
     // Single-article outlet → a plain link showing the headline inline (no expand).
     if (g.articles.length === 1) {
@@ -214,21 +235,27 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
       .filter(Boolean)
       .join('\n')
       return (
-        <a
-          href={s.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={hint || undefined}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-navy-600 bg-navy-700 hover:bg-navy-600 transition-colors group/card"
-        >
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-navy-600 bg-navy-700 hover:bg-navy-600 transition-colors group/card">
           <Avatar src={null} name={g.name} size={20} className="shrink-0" />
           <span className="min-w-0 flex-1">
-            <span className="block font-medium text-white truncate">{g.name}</span>
-            {s.title && <span className="block text-xs text-gray-400 truncate group-hover/card:text-gray-300">{s.title}</span>}
+            <OutletName g={g} className="block font-medium text-white truncate" />
+            {s.title && (
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={hint || undefined}
+                className="block text-xs text-gray-400 truncate group-hover/card:text-gray-300 hover:underline"
+              >
+                {s.title}
+              </a>
+            )}
           </span>
           <Badge side={g.side} pct={g.pct} />
-          <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover/card:text-gray-300" />
-        </a>
+          <a href={s.url} target="_blank" rel="noopener noreferrer" title={hint || undefined}>
+            <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover/card:text-gray-300" />
+          </a>
+        </div>
       )
     }
 
@@ -237,7 +264,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
       <details className="group/card rounded-lg border border-navy-600 bg-navy-700 overflow-hidden">
         <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none list-none hover:bg-navy-600 [&::-webkit-details-marker]:hidden">
           <Avatar src={null} name={g.name} size={20} className="shrink-0" />
-          <span className="font-medium text-white truncate flex-1 min-w-0">{g.name}</span>
+          <OutletName g={g} className="font-medium text-white truncate flex-1 min-w-0" />
           <span className="shrink-0 text-[10px] text-gray-500">{g.articles.length}</span>
           <Badge side={g.side} pct={g.pct} />
           <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open/card:rotate-180" />
