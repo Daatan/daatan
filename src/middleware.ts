@@ -8,19 +8,6 @@ export default auth((req) => {
   const isAuth = !!req.auth
   const pathname = req.nextUrl.pathname
 
-  // Subdomain routing: elections.daatan.com serves the distinctly-branded
-  // /elections section from this same app. Rewrite the host's paths under
-  // /elections so the section owns the whole subdomain root.
-  const hostname = (req.headers.get('host') ?? '').split(':')[0]
-  const isElectionsHost = hostname === 'elections.daatan.com' || hostname.startsWith('elections.')
-  if (isElectionsHost && !pathname.startsWith('/elections')) {
-    const url = req.nextUrl.clone()
-    url.pathname = pathname === '/' ? '/elections' : `/elections${pathname}`
-    const headers = new Headers(req.headers)
-    headers.set('x-pathname', url.pathname)
-    return NextResponse.rewrite(url, { request: { headers } })
-  }
-
   // Admin routes require ADMIN role
   if (pathname.startsWith('/admin')) {
     if (!isAuth) {
