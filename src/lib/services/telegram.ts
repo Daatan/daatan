@@ -634,6 +634,11 @@ export async function notifyNewsArticleMatched(
     source: string | null
     stance?: number | null
     relevance?: number | null
+    authorLean?: number | null
+    authorLeanCertainty?: number | null
+    factSignal?: number | null
+    evidenceClass?: string | null
+    credibilityWeight?: number | null
   },
   match: { similarity: number; articleCount?: number },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
@@ -676,12 +681,31 @@ export async function notifyNewsArticleMatched(
     `match ${simPct}%`,
   ].filter(Boolean)
 
+  // Judgment-lane signals (Signal Lanes): un-fused from `stance`, shadow-only — nothing in the
+  // Oracle's own aggregation reads them yet, so this line is the only place they're visible at
+  // all. Same omit-when-unknown rule as `signals` above; `credibilityWeight` is pre-filtered to
+  // null at the caller while the credibility cutover flag is OFF, since 1.0 is a neutral default
+  // rather than a real judgment.
+  const judgmentSignals = [
+    article.authorLean != null
+      ? `author_lean ${article.authorLean > 0 ? '+' : ''}${article.authorLean.toFixed(2)}${
+          article.authorLeanCertainty != null ? ` (cert ${article.authorLeanCertainty.toFixed(2)})` : ''
+        }`
+      : null,
+    article.factSignal != null
+      ? `fact_signal ${article.factSignal > 0 ? '+' : ''}${article.factSignal.toFixed(2)}`
+      : null,
+    article.credibilityWeight != null ? `credibility ${article.credibilityWeight.toFixed(2)}` : null,
+    article.evidenceClass ?? null,
+  ].filter(Boolean)
+
   const msg = [
     `${headerLine}${rangeLine}`,
     `"${truncate(prediction.claimText, 120)}"`,
     '',
     `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
     `     ${countLabel}${signals.join(' · ')}`,
+    ...(judgmentSignals.length > 0 ? [`     🔎 ${judgmentSignals.join(' · ')}`] : []),
     '',
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
