@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 
-// Distinctly-branded section served at elections.daatan.com (host-rewritten to
-// /elections by src/middleware.ts). Kept out of the index until launch — flip
-// `robots` to allow indexing when the section is public-ready.
+// Predates the standalone Daatan/elections repo (daatan#1217) — that repo now
+// owns elections.daatan.com entirely (its own nginx/cert/container; see
+// infra/nginx/nginx-prod-ssl.conf), so this page only exists at daatan.com/elections
+// now, unlinked from any nav and kept out of the index (`robots` below).
 export const metadata: Metadata = {
   title: 'דעתן · בחירות 2026 — מי צדק?',
   description:
