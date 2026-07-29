@@ -95,6 +95,13 @@ The central table (`Prediction`). Field groups:
   market asks the opposite question — UI plots `100 − price`).
 - **Bot-creation metadata** (`source='bot'`): `sentiment`, `extractedEntities`,
   `consensusLine`, `sourceSummary`.
+- **Telegram running notification** (daatan#1215): `telegramMessageId`,
+  `telegramChatId` — the currently-live "News article matched" message for
+  this forecast, if any. `notifyNewsArticleMatched` (`src/lib/services/
+  telegram.ts`) edits this message in place on a later match instead of
+  sending a new one each time; both fields are overwritten when a fallback
+  send happens (edit failed — outside Telegram's ~48h edit window, deleted,
+  etc.). NULL = no notification sent yet.
 
 ## The AI-estimate stream — `context_snapshots`
 

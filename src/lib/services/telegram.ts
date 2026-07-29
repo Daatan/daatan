@@ -1,4 +1,5 @@
 import { createLogger } from '@/lib/logger'
+import { prisma } from '@/lib/prisma'
 
 const log = createLogger('telegram')
 
@@ -39,6 +40,43 @@ function resolveChatId(channel: TelegramChannel): string | undefined {
 }
 
 /**
+ * POST to a Telegram Bot API method. Never throws — returns null on any
+ * failure (non-2xx, `ok: false` body, or a network error), logging the
+ * reason. Shared by the send and edit paths below.
+ */
+async function callTelegramApi(
+  token: string,
+  method: 'sendMessage' | 'editMessageText',
+  body: Record<string, unknown>,
+  logContext: Record<string, unknown>,
+): Promise<{ message_id: number } | null> {
+  try {
+    const res = await fetch(`${TELEGRAM_API}${token}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    const payload = (await res.json().catch(() => null)) as
+      | { ok: true; result: { message_id: number } }
+      | { ok: false; description?: string }
+      | null
+
+    if (!res.ok || !payload?.ok) {
+      log.error(
+        { status: res.status, description: payload && !payload.ok ? payload.description : undefined, ...logContext },
+        `Telegram ${method} failed`,
+      )
+      return null
+    }
+    return payload.result
+  } catch (err) {
+    log.error({ err, ...logContext }, `Failed to call Telegram ${method}`)
+    return null
+  }
+}
+
+/**
  * Send a message to one of the configured Telegram channels.
  * Fire-and-forget: never throws, logs errors. Defaults to the noisy channel.
  */
@@ -59,27 +97,73 @@ async function sendChannelNotification(
 
   log.debug({ chatId, prefix, channel }, 'Sending Telegram notification')
 
-  try {
-    const res = await fetch(`${TELEGRAM_API}${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
+  const result = await callTelegramApi(
+    token,
+    'sendMessage',
+    { chat_id: chatId, text: prefixed, parse_mode: 'HTML', disable_web_page_preview: true },
+    { chatId, channel },
+  )
+  if (result) log.info({ chatId, channel }, 'Telegram notification sent successfully')
+}
+
+/**
+ * Send a forecast's running Telegram notification, editing the previously
+ * sent message in place when one exists (daatan#1215) instead of spamming a
+ * new one on every article match. Falls back to a fresh send — and adopts
+ * its message id going forward — when the edit fails (message outside
+ * Telegram's ~48h edit window, deleted, or any other API error).
+ */
+async function sendOrEditForecastNotification(
+  predictionId: string,
+  message: string,
+  channel: TelegramChannel = 'noisy',
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = resolveChatId(channel)
+
+  if (!token || !chatId) {
+    log.warn({ hasToken: !!token, hasChatId: !!chatId, channel }, 'Telegram not configured')
+    return
+  }
+
+  const prefixed = `[${envPrefix()}] ${message}`
+  const existing = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { telegramMessageId: true, telegramChatId: true },
+  })
+
+  if (existing?.telegramMessageId != null && existing.telegramChatId != null) {
+    const edited = await callTelegramApi(
+      token,
+      'editMessageText',
+      {
+        chat_id: existing.telegramChatId,
+        message_id: existing.telegramMessageId,
         text: prefixed,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
-      }),
-    })
-
-    if (!res.ok) {
-      const body = await res.text()
-      log.error({ status: res.status, body, chatId, channel }, 'Telegram API error')
-    } else {
-      log.info({ chatId, channel }, 'Telegram notification sent successfully')
+      },
+      { predictionId, chatId: existing.telegramChatId, messageId: existing.telegramMessageId, channel },
+    )
+    if (edited) {
+      log.info({ predictionId }, 'Telegram notification edited in place')
+      return
     }
-  } catch (err) {
-    log.error({ err, chatId, channel }, 'Failed to send Telegram notification')
+    log.warn({ predictionId }, 'telegram_edit_failed_fallback_sent')
   }
+
+  const sent = await callTelegramApi(
+    token,
+    'sendMessage',
+    { chat_id: chatId, text: prefixed, parse_mode: 'HTML', disable_web_page_preview: true },
+    { predictionId, chatId, channel },
+  )
+  if (!sent) return
+
+  log.info({ predictionId, chatId, channel }, 'Telegram notification sent successfully')
+  await prisma.prediction
+    .update({ where: { id: predictionId }, data: { telegramMessageId: sent.message_id, telegramChatId: chatId } })
+    .catch((err) => log.error({ err, predictionId }, 'Failed to persist Telegram message id'))
 }
 
 // ============================================
@@ -542,7 +626,7 @@ export function notifyDailySummary(stats: {
  * nothing (see context.ts's `saveNewsIndexerMatch`) is the caller's job to
  * skip, not this function's — see news-indexer/context/route.ts's `wasStored`.
  */
-export function notifyNewsArticleMatched(
+export async function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
   article: {
     title: string
@@ -553,7 +637,7 @@ export function notifyNewsArticleMatched(
   },
   match: { similarity: number; articleCount?: number },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
-): void {
+): Promise<void> {
   if (isDevEnv()) return
 
   const { probability, previous, ciLow, ciHigh } = estimate
@@ -602,7 +686,7 @@ export function notifyNewsArticleMatched(
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
 
-  sendChannelNotification(msg)
+  await sendOrEditForecastNotification(prediction.id, msg)
 }
 
 /**

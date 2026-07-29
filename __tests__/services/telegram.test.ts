@@ -9,6 +9,22 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
+// notifyNewsArticleMatched (daatan#1215) reads/writes Prediction.telegramMessageId
+// /telegramChatId to edit its running message in place instead of resending —
+// stub it to "no notification sent yet" so every test in this file exercises the
+// plain-send path (the edit-in-place behavior itself is covered in
+// src/lib/services/__tests__/telegram-news-match.test.ts).
+const mockFindUnique = vi.fn()
+const mockUpdate = vi.fn()
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    prediction: {
+      findUnique: (...args: unknown[]) => mockFindUnique(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+    },
+  },
+}))
+
 import {
   notifyForecastPublished,
   notifyNewCommitment,
@@ -27,7 +43,12 @@ describe('Telegram notification service', () => {
     process.env.TELEGRAM_BOT_TOKEN = 'test-token'
     process.env.TELEGRAM_CHAT_ID = '-100123'
     process.env.APP_ENV = 'production'
-    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response)
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 555 } }),
+    } as Response)
+    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
+    mockUpdate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
@@ -158,7 +179,12 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     process.env = { ...originalEnv }
     process.env.TELEGRAM_BOT_TOKEN = 'test-token'
     process.env.TELEGRAM_CHAT_ID = NOISY
-    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response)
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 555 } }),
+    } as Response)
+    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
+    mockUpdate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
@@ -346,7 +372,12 @@ describe('HTML escaping', () => {
     process.env.TELEGRAM_BOT_TOKEN = 'test-token'
     process.env.TELEGRAM_CHAT_ID = '-100123'
     process.env.APP_ENV = 'production'
-    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response)
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 555 } }),
+    } as Response)
+    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
+    mockUpdate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
