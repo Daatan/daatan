@@ -16,7 +16,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
-vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn(), sendArticleRatingPrompt: vi.fn() }))
+vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
 vi.mock('@/lib/services/evidence-pool', () => ({
   addArticlesToPool: vi.fn(),
@@ -222,6 +222,42 @@ describe('POST /api/news-indexer/context', () => {
     await POST(post('test-secret'))
     const [, article] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
     expect(article).toMatchObject({ stance: 0.42, relevance: 0.8 })
+  })
+
+  it('passes the Oracle-extracted claim as the article extract, falling back to the snippet', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+    const [, article] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
+    expect(article).toMatchObject({ extract: 'First extracted claim' })
+
+    // No extracted claim → the raw snippet stands in.
+    vi.mocked(notifyNewsArticleMatched).mockClear()
+    vi.mocked(getOracleForecast).mockResolvedValue({
+      forecast: { ...ORACLE_WITH_SOURCE, sources: [{ ...ORACLE_WITH_SOURCE.sources[0], claims: [] }] },
+      logId: null,
+    } as never)
+    await POST(post('test-secret'))
+    expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][1]).toMatchObject({ extract: 'A snippet.' })
+  })
+
+  it('threads the trigger pool row into the notify call so rating buttons attach (daatan#1223)', async () => {
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(prisma.evidencePoolArticle.findUnique).mockResolvedValue({ id: 'epa-1' } as EvidencePoolArticle)
+
+    await POST(post('test-secret'))
+    expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toEqual({
+      evidencePoolArticleId: 'epa-1',
+      contextSnapshotId: 'snap-1',
+    })
+  })
+
+  it('passes a null rating arg when the trigger pool row could not be resolved', async () => {
+    // The beforeEach default: evidencePoolArticle.findUnique resolves null.
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+    expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toBeNull()
   })
 
   it('passes the Oracle relevance through to news-indexer instead of dropping it', async () => {
