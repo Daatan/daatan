@@ -51,7 +51,7 @@ describe('manual number-rating feedback (daatan#1223)', () => {
       article: { title: 'Lapid says he can form a government', url: 'https://x.com/a', source: 'Ynet' },
     }
 
-    it('sends a message with 👍/👎 buttons carrying static callback_data (no ids)', async () => {
+    it('sends a message with a 1-5 button row carrying static callback_data (no ids)', async () => {
       await sendArticleRatingPrompt(input)
 
       const call = vi.mocked(global.fetch).mock.calls[0]
@@ -61,8 +61,11 @@ describe('manual number-rating feedback (daatan#1223)', () => {
       expect(body.reply_markup).toEqual({
         inline_keyboard: [
           [
-            { text: '👍 Good', callback_data: 'nf:g' },
-            { text: '👎 Bad', callback_data: 'nf:b' },
+            { text: '1️⃣', callback_data: 'nf:r:1' },
+            { text: '2️⃣', callback_data: 'nf:r:2' },
+            { text: '3️⃣', callback_data: 'nf:r:3' },
+            { text: '4️⃣', callback_data: 'nf:r:4' },
+            { text: '5️⃣', callback_data: 'nf:r:5' },
           ],
         ],
       })
@@ -111,29 +114,36 @@ describe('manual number-rating feedback (daatan#1223)', () => {
   })
 
   describe('updateRatingPromptButtons', () => {
-    it('refreshes button labels with tally counts, keeping callback_data static', async () => {
-      await updateRatingPromptButtons('-100', 555, 2, 1)
+    it('refreshes button labels with tally counts per rating value, keeping callback_data static', async () => {
+      // index 0 = count for "1", index 4 = count for "5"
+      await updateRatingPromptButtons('-100', 555, [0, 1, 0, 0, 2])
       const call = vi.mocked(global.fetch).mock.calls[0]
       expect(calledMethod(call)).toBe('editMessageReplyMarkup')
       const body = calledBody(call)
       expect(body.reply_markup).toEqual({
         inline_keyboard: [
           [
-            { text: '👍 Good ·2', callback_data: 'nf:g' },
-            { text: '👎 Bad ·1', callback_data: 'nf:b' },
+            { text: '1️⃣', callback_data: 'nf:r:1' },
+            { text: '2️⃣ ·1', callback_data: 'nf:r:2' },
+            { text: '3️⃣', callback_data: 'nf:r:3' },
+            { text: '4️⃣', callback_data: 'nf:r:4' },
+            { text: '5️⃣ ·2', callback_data: 'nf:r:5' },
           ],
         ],
       })
     })
 
-    it('omits the count suffix when zero', async () => {
-      await updateRatingPromptButtons('-100', 555, 0, 0)
+    it('omits the count suffix when all zero', async () => {
+      await updateRatingPromptButtons('-100', 555, [0, 0, 0, 0, 0])
       const body = calledBody(vi.mocked(global.fetch).mock.calls[0])
       expect(body.reply_markup).toEqual({
         inline_keyboard: [
           [
-            { text: '👍 Good', callback_data: 'nf:g' },
-            { text: '👎 Bad', callback_data: 'nf:b' },
+            { text: '1️⃣', callback_data: 'nf:r:1' },
+            { text: '2️⃣', callback_data: 'nf:r:2' },
+            { text: '3️⃣', callback_data: 'nf:r:3' },
+            { text: '4️⃣', callback_data: 'nf:r:4' },
+            { text: '5️⃣', callback_data: 'nf:r:5' },
           ],
         ],
       })
@@ -176,19 +186,19 @@ describe('manual number-rating feedback (daatan#1223)', () => {
   })
 
   describe('finalizeRatingDrilldown', () => {
-    it('collapses the keyboard and confirms the flagged fields by label', async () => {
-      await finalizeRatingDrilldown('999', 777, ['STANCE', 'FACT_SIGNAL'])
+    it('collapses the keyboard and confirms the rating + flagged fields by label', async () => {
+      await finalizeRatingDrilldown('999', 777, 2, ['STANCE', 'FACT_SIGNAL'])
       const call = vi.mocked(global.fetch).mock.calls[0]
       expect(calledMethod(call)).toBe('editMessageText')
       const body = calledBody(call)
-      expect(body.text).toBe('Recorded: Bad — Stance, Fact Signal')
+      expect(body.text).toBe('Recorded: 2/5 — Stance, Fact Signal')
       expect(body.reply_markup).toEqual({ inline_keyboard: [] })
     })
 
     it('reports "none" when no field was flagged', async () => {
-      await finalizeRatingDrilldown('999', 777, [])
+      await finalizeRatingDrilldown('999', 777, 1, [])
       const body = calledBody(vi.mocked(global.fetch).mock.calls[0])
-      expect(body.text).toBe('Recorded: Bad — none')
+      expect(body.text).toBe('Recorded: 1/5 — none')
     })
   })
 })

@@ -666,11 +666,6 @@ model EvidencePoolArticle {
   @@map("evidence_pool_articles")
 }
 
-enum NumberFeedbackRating {
-  GOOD
-  BAD
-}
-
 // One value per number a rater can flag as wrong on a notifyNewsArticleMatched
 // Telegram notification. AUTHOR_LEAN/FACT_SIGNAL/EVIDENCE_CLASS/CREDIBILITY cover
 // the Signal Lanes judgment-lane line (daatan#1222) ahead of it seeing real rating
@@ -687,7 +682,7 @@ enum NumberFeedbackField {
   OTHER
 }
 
-// One SENT rating-prompt Telegram message (👍/👎 buttons, daatan#1223) — a dedicated
+// One SENT rating-prompt Telegram message (1-5 rating buttons, daatan#1223) — a dedicated
 // message separate from the main edited-in-place notifyNewsArticleMatched notification
 // (daatan#1219 made that one edit-in-place per prediction, so it no longer maps 1:1 to
 // one article/push; this table restores that 1:1 mapping for rating purposes). Created
@@ -719,9 +714,9 @@ model ArticleRatingPrompt {
   @@map("article_rating_prompts")
 }
 
-// Human-in-the-loop rating of one ArticleRatingPrompt — a 👍/👎 verdict plus which
+// Human-in-the-loop rating of one ArticleRatingPrompt — a 1-5 verdict plus which
 // specific number was wrong (daatan#1223). One row per (prompt, rater): a user can
-// change their mind by tapping the other button, which just updates their own row.
+// change their mind by tapping another button, which just updates their own row.
 // Accumulates until there's enough signal to inform edits to retro's extractor prompts
 // (AUTHOR_LEAN/FACT_SIGNAL sections in pipeline/src/tm/extractor.py).
 model EvidencePoolArticleFeedback {
@@ -731,11 +726,14 @@ model EvidencePoolArticleFeedback {
   raterUserId String
   rater       User                @relation(fields: [raterUserId], references: [id], onDelete: Cascade)
 
-  rating        NumberFeedbackRating
+  // 1 (worst) .. 5 (best). Plain Int, not an enum — keeps AVG()/threshold queries natural
+  // for the later analysis pass. Validated in the webhook (1-5) before this is written.
+  rating        Int
   flaggedFields NumberFeedbackField[] @default([]) @map("flagged_fields")
   note          String?              @db.Text // captured via reply-to-message text
 
-  drilldownChatId    String? @map("drilldown_chat_id") // private DM to the rater, sent only when rating=BAD
+  // private DM to the rater, sent only when rating <= 2 (see LOW_RATING_THRESHOLD)
+  drilldownChatId    String? @map("drilldown_chat_id")
   drilldownMessageId Int?    @map("drilldown_message_id")
 
   createdAt DateTime @default(now()) @map("created_at")
