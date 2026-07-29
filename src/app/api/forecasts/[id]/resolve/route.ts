@@ -30,7 +30,7 @@ export const POST = withAuth(async (request, user, { params }) => {
     if (e.statusCode) return apiError(e.message, e.statusCode)
     throw err
   }
-  const { result, prediction } = resolveResult
+  const { result, prediction, timings } = resolveResult
 
   notifyForecastResolved(prediction, outcome, prediction.commitments.length)
 
@@ -74,5 +74,5 @@ export const POST = withAuth(async (request, user, { params }) => {
     })
   }
 
-  return NextResponse.json(result)
+  return NextResponse.json({ ...result, timings })
 }, { roles: ['ADMIN', 'RESOLVER'] })

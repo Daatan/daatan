@@ -82,6 +82,15 @@ Resolve a prediction. Processes all commitments, distributes rewards, updates ba
 }
 ```
 
+**Response** — the updated `Prediction` row, plus `timings` (daatan#1139): how long the transaction's two phases took — `scoringMs` (per-commitment Brier/RS/Glicko-2) and `updatingMs` (ELO + per-tag rating write-back). `ResolutionForm.tsx`'s "Scoring commitments…" / "Updating ratings…" step labels use these to self-calibrate their client-side timer (`@/lib/forecast-timing`, same EWMA pattern as forecast creation), the same way `POST /api/forecasts/[id]/research`'s `timings` already calibrates its own step labels.
+
+```jsonc
+{
+  "id": "cuid", "status": "RESOLVED_CORRECT", /* ...rest of the Prediction row... */
+  "timings": { "scoringMs": 340, "updatingMs": 120 }
+}
+```
+
 ---
 
 ### `POST /api/forecasts/[id]/approve` — Admin / Approver

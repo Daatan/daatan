@@ -95,7 +95,8 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
 
   const isVoidOutcome = outcome === 'void' || outcome === 'unresolvable'
 
-  const result = await prisma.$transaction(async (tx) => {
+  const { prediction: resolvedPrediction, scoringMs, updatingMs } = await prisma.$transaction(async (tx) => {
+    const tScoringStart = Date.now()
     const updatedPrediction = await tx.prediction.update({
       where: { id: predictionId },
       data: {
@@ -228,6 +229,13 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
       }
     }
 
+    // Boundary between the two phases the resolution UI already shows a step
+    // label for ("Scoring commitments…" / "Updating ratings…", daatan#1139):
+    // everything above is per-commitment Brier/RS/Glicko-2 scoring, everything
+    // below is the ELO + per-tag rating write-back.
+    const tUpdatingStart = Date.now()
+    const scoringMs = tUpdatingStart - tScoringStart
+
     // ELO: pairwise updates for all commitments with a brierScore
     if (eloInputs.length >= 2) {
       const eloDeltas = calculateEloUpdates(eloInputs)
@@ -255,7 +263,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
       await updateTagRatingsInTx(tx, prediction.tags, eloInputs)
     }
 
-    return updatedPrediction
+    return { prediction: updatedPrediction, scoringMs, updatingMs: Date.now() - tUpdatingStart }
   },
   // Prisma's default interactive-transaction timeout is 5s. Resolution does several
   // sequential writes per commitment (RS/Glicko/ELO plus up to 7 ai_member_scores
@@ -270,5 +278,5 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
 
   if (prediction.isPublic) notifySearchEngines(prediction.slug ?? prediction.id)
 
-  return { result, prediction }
+  return { result: resolvedPrediction, prediction, timings: { scoringMs, updatingMs } }
 }
