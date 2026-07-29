@@ -23,7 +23,7 @@ describe('ResolutionForm', () => {
   })
 
   it('calls resolve API on submit with correct outcome', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true })
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} onResolved={vi.fn()} />)
 
@@ -58,7 +58,7 @@ describe('ResolutionForm', () => {
   })
 
   it('calls onResolved callback when resolution succeeds', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true })
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
     const onResolved = vi.fn()
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} onResolved={onResolved} />)
@@ -73,7 +73,7 @@ describe('ResolutionForm', () => {
   })
 
   it('sends selected outcome when different option chosen', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true })
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
 
@@ -106,7 +106,7 @@ describe('ResolutionForm', () => {
   })
 
   it('includes evidence links when provided', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true })
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
 
     render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
 
@@ -199,5 +199,28 @@ describe('ResolutionForm', () => {
     const stored = JSON.parse(localStorage.getItem('daatan:research-timings') ?? 'null')
     expect(stored?.searchMs).toBe(6000)
     expect(stored?.llmMs).toBe(9000)
+  })
+
+  it('saves resolve-step timings to localStorage after a successful resolution (daatan#1139)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'pred-1', timings: { scoringMs: 1500, updatingMs: 600 } }),
+    })
+
+    render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+    fireEvent.click(screen.getByText('Correct'))
+    const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+    fireEvent.click(submitButton)
+
+    await waitFor(() => {
+      expect(screen.getByText(/resolved as: correct/i)).toBeInTheDocument()
+    })
+
+    // recordDuration is an EWMA (60% prior default, 40% latest sample), not a
+    // raw overwrite — first-ever call blends the measured value into the
+    // built-in default (1200/800ms): round(1200*.6 + 1500*.4) = 1320, round(800*.6 + 600*.4) = 720.
+    expect(Number(localStorage.getItem('daatan:timing:resolve-scoring'))).toBe(1320)
+    expect(Number(localStorage.getItem('daatan:timing:resolve-updating'))).toBe(720)
   })
 })

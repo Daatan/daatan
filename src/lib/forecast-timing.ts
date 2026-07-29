@@ -7,6 +7,12 @@ const DEFAULTS = {
   'forecast-create': 5000,
   // The publish call is a DB write + a fire-and-forget Telegram notify.
   'forecast-publish': 1500,
+  // resolvePrediction's two DB-transaction phases (daatan#1139): per-commitment
+  // Brier/RS/Glicko-2 scoring, then ELO + per-tag rating write-back. Both scale
+  // with commitment count, so these defaults (from the previous hardcoded
+  // estimate) get refined fast once real per-forecast durations come in.
+  'resolve-scoring': 1200,
+  'resolve-updating': 800,
 } as const
 
 export type TimingKey = keyof typeof DEFAULTS

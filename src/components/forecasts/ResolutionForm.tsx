@@ -4,11 +4,11 @@ import { useState, useRef } from 'react'
 import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
+import { getEstimate, recordDuration } from '@/lib/forecast-timing'
 
 const RESEARCH_TIMING_KEY = 'daatan:research-timings'
 const RESEARCH_TIMING_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const DEFAULT_RESEARCH_TIMINGS = { searchMs: 8_000, llmMs: 10_000 }
-const DEFAULT_RESOLVE_TIMINGS = { scoringMs: 1_200, updatingMs: 800 }
 
 function loadResearchTimings() {
   try {
@@ -110,7 +110,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
     }
 
     resolveTimers.current = [
-      setTimeout(() => setResolveStep('updating'), DEFAULT_RESOLVE_TIMINGS.scoringMs),
+      setTimeout(() => setResolveStep('updating'), getEstimate('resolve-scoring')),
     ]
 
     try {
@@ -133,6 +133,12 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to resolve prediction')
+      }
+
+      const data = await response.json()
+      if (data.timings) {
+        recordDuration('resolve-scoring', data.timings.scoringMs)
+        recordDuration('resolve-updating', data.timings.updatingMs)
       }
 
       setResolved(true)
