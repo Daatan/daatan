@@ -13,8 +13,9 @@ import {
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate } from '@/lib/services/pooled-estimate'
-import { notifyNewsArticleMatched } from '@/lib/services/telegram'
+import { notifyNewsArticleMatched, sendArticleRatingPrompt } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
+import { hashUrl } from '@/lib/utils/hash'
 
 const log = createLogger('news-indexer-context')
 
@@ -192,6 +193,13 @@ export async function POST(request: NextRequest) {
     // False for a re-delivered push saveNewsIndexerMatch recognized as a dedup
     // (see context.ts) — nothing changed, so nothing should notify either.
     let wasStored = false
+    // The ContextSnapshot this push created (see saveNewsIndexerMatch) — the manual
+    // number-rating feedback loop (daatan#1223) references it as a frozen source for
+    // the numbers a rating-prompt message shows, since the row is never mutated later.
+    let contextSnapshotId: string | null = null
+    // The trigger article's EvidencePoolArticle row (resolved below, after
+    // addArticlesToPool writes it) — daatan#1223's rating-prompt message hangs off it.
+    let evidencePoolArticleId: string | null = null
 
     // Per-article enrichment from the Oracle, keyed by url, so news-indexer can map
     // each article in the set back to its own forecast_match row.
@@ -249,6 +257,15 @@ export async function POST(request: NextRequest) {
       let resolved: ResolvedPoolEstimate | null = null
       try {
         await addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
+        // addArticlesToPool discards the written rows' ids — re-fetch the trigger
+        // article's row by its unique key (daatan#1223's rating-prompt message needs
+        // the id to hang the feedback relation off; a lookup miss just means no
+        // rating prompt gets sent for this push, not a hard failure).
+        const triggerPoolArticle = await prisma.evidencePoolArticle.findUnique({
+          where: { predictionId_urlHash: { predictionId: prediction.id, urlHash: hashUrl(triggerUrl) } },
+          select: { id: true },
+        })
+        evidencePoolArticleId = triggerPoolArticle?.id ?? null
         // The pool write above flips this run's extracted claims to COMPLETE. Anything
         // this run claimed that the Oracle omitted from its sources (gatekeeper-rejected,
         // most commonly) would otherwise stay PENDING forever: news-indexer dedups its
@@ -337,7 +354,7 @@ export async function POST(request: NextRequest) {
         ciLow = stanceToPercent(est.ciLow)
         ciHigh = stanceToPercent(est.ciHigh)
 
-        const { stored } = await saveNewsIndexerMatch({
+        const { stored, contextSnapshotId: snapshotId } = await saveNewsIndexerMatch({
           predictionId: prediction.id,
           sources: matchSources,
           externalProbability: probability,
@@ -357,6 +374,7 @@ export async function POST(request: NextRequest) {
           settled: est.settled,
         })
         wasStored = stored
+        contextSnapshotId = snapshotId
 
         log.info(
           {
@@ -420,6 +438,21 @@ export async function POST(request: NextRequest) {
         { similarity: triggerSimilarity, articleCount: items.length },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
       )
+      // Separate from the main notification above (daatan#1223) — a dedicated,
+      // always-fresh message so 👍/👎 buttons keep a 1:1 mapping to this specific
+      // article/push even though notifyNewsArticleMatched itself now edits a single
+      // running message in place per prediction (daatan#1219). Skipped when the
+      // trigger article's pool row couldn't be resolved (evidencePoolArticleId null)
+      // — nothing to attach the rating to.
+      if (evidencePoolArticleId) {
+        void sendArticleRatingPrompt({
+          predictionId: prediction.id,
+          evidencePoolArticleId,
+          contextSnapshotId,
+          similarity: triggerSimilarity,
+          article: { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
+        })
+      }
     }
 
     // Top-level fields echo the trigger article's enrichment (back-compat with the

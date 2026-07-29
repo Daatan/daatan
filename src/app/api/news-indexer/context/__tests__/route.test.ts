@@ -11,12 +11,12 @@ import type { EvidencePoolArticle } from '@prisma/client'
 vi.mock('@/env', () => ({ env: { NEWS_INDEXER_SECRET: 'test-secret' } }))
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { prediction: { findUnique: vi.fn() } },
+  prisma: { prediction: { findUnique: vi.fn() }, evidencePoolArticle: { findUnique: vi.fn() } },
 }))
 
 vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
-vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
+vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn(), sendArticleRatingPrompt: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
 vi.mock('@/lib/services/evidence-pool', () => ({
   addArticlesToPool: vi.fn(),
@@ -105,7 +105,8 @@ describe('POST /api/news-indexer/context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(ACTIVE_PREDICTION as never)
-    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true })
+    vi.mocked(prisma.evidencePoolArticle.findUnique).mockResolvedValue(null as never)
+    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true, contextSnapshotId: 'snap-1' })
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
     vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
     // Default: no pool aggregate available, so the route falls back to the single-run
@@ -246,7 +247,7 @@ describe('POST /api/news-indexer/context', () => {
 
   it('does NOT notify Telegram when the push dedups to nothing stored (a re-delivered measurement)', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
-    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false })
+    vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false, contextSnapshotId: 'snap-1' })
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).not.toHaveBeenCalled()

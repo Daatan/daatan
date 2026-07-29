@@ -332,12 +332,16 @@ const NEWS_INDEXER_REASONING = 'TruthMachine Oracle (news-indexer match)'
  * prod as 7 near-simultaneous duplicate snapshots, 3 with conflicting stance).
  *
  * `stored` is always true; kept in the return shape so callers don't need a
- * second signature change on top of the dedup-removal.
+ * second signature change on top of the dedup-removal. `contextSnapshotId` is
+ * the created row's id — the manual number-rating feedback loop (daatan#1223)
+ * references it as a frozen, point-in-time source for the numbers a Telegram
+ * rating-prompt message showed, since ContextSnapshot rows are never mutated
+ * after creation.
  */
 export async function saveNewsIndexerMatch(
   input: SaveNewsIndexerMatchInput,
-): Promise<{ stored: boolean }> {
-  await recordEstimate({
+): Promise<{ stored: boolean; contextSnapshotId: string }> {
+  const snapshot = await recordEstimate({
     predictionId: input.predictionId,
     origin: 'news-indexer',
     probability: input.externalProbability,
@@ -349,7 +353,7 @@ export async function saveNewsIndexerMatch(
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
   })
-  return { stored: true }
+  return { stored: true, contextSnapshotId: snapshot.id }
 }
 
 /** Fetch the context snapshot timeline for a prediction (heavy tail stripped). */

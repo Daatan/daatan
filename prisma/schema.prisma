@@ -99,6 +99,9 @@ model User {
   notificationPreferences NotificationPreference[]
   pushSubscriptions       PushSubscription[]
 
+  // Manual number-rating feedback (daatan#1223) — Telegram 👍/👎 ratings this user cast
+  evidencePoolFeedback EvidencePoolArticleFeedback[]
+
   // Leaderboard sort indexes — ORDER BY ... LIMIT N becomes a scan without these
   @@index([rs(sort: Desc)])
   @@index([eloRating(sort: Desc)])
@@ -655,9 +658,91 @@ model EvidencePoolArticle {
   addedAt   DateTime @default(now()) @map("added_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Manual number-rating feedback (daatan#1223)
+  ratingPrompts ArticleRatingPrompt[]
+
   @@unique([predictionId, urlHash])
   @@index([predictionId])
   @@map("evidence_pool_articles")
+}
+
+enum NumberFeedbackRating {
+  GOOD
+  BAD
+}
+
+// One value per number a rater can flag as wrong on a notifyNewsArticleMatched
+// Telegram notification. AUTHOR_LEAN/FACT_SIGNAL/EVIDENCE_CLASS/CREDIBILITY cover
+// the Signal Lanes judgment-lane line (daatan#1222) ahead of it seeing real rating
+// volume, so no follow-up migration is needed once that line gets tapped often.
+enum NumberFeedbackField {
+  STANCE
+  RELEVANCE
+  SIMILARITY
+  PROBABILITY // covers probability/previous/ciLow/ciHigh as one "the Oracle move" bucket
+  AUTHOR_LEAN
+  FACT_SIGNAL
+  EVIDENCE_CLASS
+  CREDIBILITY
+  OTHER
+}
+
+// One SENT rating-prompt Telegram message (👍/👎 buttons, daatan#1223) — a dedicated
+// message separate from the main edited-in-place notifyNewsArticleMatched notification
+// (daatan#1219 made that one edit-in-place per prediction, so it no longer maps 1:1 to
+// one article/push; this table restores that 1:1 mapping for rating purposes). Created
+// at SEND time, before any tap, so a frozen reference to what was actually shown
+// survives however long the message sits unrated. `contextSnapshotId` points at the
+// ContextSnapshot this same push created (saveNewsIndexerMatch) — stance/relevance/
+// authorLean/factSignal/evidenceClass/credibilityWeight/probability/ciLow/ciHigh are
+// all reachable through its `oracleSnapshot` JSON, and ContextSnapshot rows are never
+// mutated after creation, so this stays a true point-in-time reference even if
+// EvidencePoolArticle itself is later re-extracted. `snapshotSimilarity` (the embedding
+// match %) is captured directly since it isn't persisted anywhere else.
+model ArticleRatingPrompt {
+  id                    String              @id @default(cuid())
+  evidencePoolArticleId String
+  evidencePoolArticle   EvidencePoolArticle @relation(fields: [evidencePoolArticleId], references: [id], onDelete: Cascade)
+  predictionId          String // denormalized — lets "all prompts for prediction X" skip a join
+  contextSnapshotId     String? @map("context_snapshot_id") // ContextSnapshot has no back-relation; plain id
+  snapshotSimilarity    Float?  @map("snapshot_similarity")
+
+  messageChatId String @map("message_chat_id")
+  messageId     Int    @map("message_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  feedback EvidencePoolArticleFeedback[]
+
+  @@unique([messageChatId, messageId])
+  @@index([evidencePoolArticleId])
+  @@map("article_rating_prompts")
+}
+
+// Human-in-the-loop rating of one ArticleRatingPrompt — a 👍/👎 verdict plus which
+// specific number was wrong (daatan#1223). One row per (prompt, rater): a user can
+// change their mind by tapping the other button, which just updates their own row.
+// Accumulates until there's enough signal to inform edits to retro's extractor prompts
+// (AUTHOR_LEAN/FACT_SIGNAL sections in pipeline/src/tm/extractor.py).
+model EvidencePoolArticleFeedback {
+  id          String              @id @default(cuid())
+  promptId    String
+  prompt      ArticleRatingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  raterUserId String
+  rater       User                @relation(fields: [raterUserId], references: [id], onDelete: Cascade)
+
+  rating        NumberFeedbackRating
+  flaggedFields NumberFeedbackField[] @default([]) @map("flagged_fields")
+  note          String?              @db.Text // captured via reply-to-message text
+
+  drilldownChatId    String? @map("drilldown_chat_id") // private DM to the rater, sent only when rating=BAD
+  drilldownMessageId Int?    @map("drilldown_message_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([promptId, raterUserId])
+  @@map("evidence_pool_article_feedback")
 }
 
 // ============================================
