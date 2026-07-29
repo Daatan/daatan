@@ -9,18 +9,15 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
-// notifyNewsArticleMatched (daatan#1215) reads/writes Prediction.telegramMessageId
-// /telegramChatId to edit its running message in place instead of resending —
-// stub it to "no notification sent yet" so every test in this file exercises the
-// plain-send path (the edit-in-place behavior itself is covered in
+// notifyNewsArticleMatched persists an ArticleRatingPrompt row when given rating
+// info; the tests in this file never pass it, so the stub only needs to exist for
+// the module import (the rating-button behavior itself is covered in
 // src/lib/services/__tests__/telegram-news-match.test.ts).
-const mockFindUnique = vi.fn()
-const mockUpdate = vi.fn()
+const mockCreate = vi.fn()
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    prediction: {
-      findUnique: (...args: unknown[]) => mockFindUnique(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
+    articleRatingPrompt: {
+      create: (...args: unknown[]) => mockCreate(...args),
     },
   },
 }))
@@ -47,8 +44,7 @@ describe('Telegram notification service', () => {
       ok: true,
       json: async () => ({ ok: true, result: { message_id: 555 } }),
     } as Response)
-    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
-    mockUpdate.mockReset().mockResolvedValue({})
+    mockCreate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
@@ -183,8 +179,7 @@ describe('Telegram channel routing (clean vs noisy)', () => {
       ok: true,
       json: async () => ({ ok: true, result: { message_id: 555 } }),
     } as Response)
-    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
-    mockUpdate.mockReset().mockResolvedValue({})
+    mockCreate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
@@ -306,7 +301,7 @@ describe('Telegram channel routing (clean vs noisy)', () => {
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.text).toContain('range 44–72%')
+    expect(body.text).toMatch(/range\s+44–72%/)
   })
 
   it('omits the range line for a missing or degenerate confidence interval', async () => {
@@ -350,10 +345,11 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     const texts = vi.mocked(fetch).mock.calls.map(
       (c) => JSON.parse(c[1]!.body as string).text as string,
     )
-    expect(texts[0]).toContain('match 72%')
-    expect(texts[0]).not.toContain('articles ·')
-    expect(texts[1]).not.toContain('articles ·')
-    expect(texts[2]).toContain('3 articles · match 72%')
+    expect(texts[0]).toMatch(/match\s+72%/)
+    expect(texts[0]).not.toContain('articles')
+    expect(texts[1]).not.toContain('articles')
+    expect(texts[2]).toMatch(/articles\s+3/)
+    expect(texts[2]).toMatch(/match\s+72%/)
   })
 })
 
@@ -376,8 +372,7 @@ describe('HTML escaping', () => {
       ok: true,
       json: async () => ({ ok: true, result: { message_id: 555 } }),
     } as Response)
-    mockFindUnique.mockReset().mockResolvedValue({ telegramMessageId: null, telegramChatId: null })
-    mockUpdate.mockReset().mockResolvedValue({})
+    mockCreate.mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {

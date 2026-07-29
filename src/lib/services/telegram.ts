@@ -117,66 +117,6 @@ async function sendChannelNotification(
   return result
 }
 
-/**
- * Send a forecast's running Telegram notification, editing the previously
- * sent message in place when one exists (daatan#1215) instead of spamming a
- * new one on every article match. Falls back to a fresh send — and adopts
- * its message id going forward — when the edit fails (message outside
- * Telegram's ~48h edit window, deleted, or any other API error).
- */
-async function sendOrEditForecastNotification(
-  predictionId: string,
-  message: string,
-  channel: TelegramChannel = 'noisy',
-): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = resolveChatId(channel)
-
-  if (!token || !chatId) {
-    log.warn({ hasToken: !!token, hasChatId: !!chatId, channel }, 'Telegram not configured')
-    return
-  }
-
-  const prefixed = `[${envPrefix()}] ${message}`
-  const existing = await prisma.prediction.findUnique({
-    where: { id: predictionId },
-    select: { telegramMessageId: true, telegramChatId: true },
-  })
-
-  if (existing?.telegramMessageId != null && existing.telegramChatId != null) {
-    const edited = await callTelegramApi(
-      token,
-      'editMessageText',
-      {
-        chat_id: existing.telegramChatId,
-        message_id: existing.telegramMessageId,
-        text: prefixed,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      },
-      { predictionId, chatId: existing.telegramChatId, messageId: existing.telegramMessageId, channel },
-    )
-    if (edited) {
-      log.info({ predictionId }, 'Telegram notification edited in place')
-      return
-    }
-    log.warn({ predictionId }, 'telegram_edit_failed_fallback_sent')
-  }
-
-  const sent = await callTelegramApi(
-    token,
-    'sendMessage',
-    { chat_id: chatId, text: prefixed, parse_mode: 'HTML', disable_web_page_preview: true },
-    { predictionId, chatId, channel },
-  )
-  if (!sent) return
-
-  log.info({ predictionId, chatId, channel }, 'Telegram notification sent successfully')
-  await prisma.prediction
-    .update({ where: { id: predictionId }, data: { telegramMessageId: sent.message_id, telegramChatId: chatId } })
-    .catch((err) => log.error({ err, predictionId }, 'Failed to persist Telegram message id'))
-}
-
 // ============================================
 // Error notifications (rate-limited)
 // ============================================
@@ -630,12 +570,19 @@ export function notifyDailySummary(stats: {
 }
 
 /**
- * A news-indexer push landed a new Oracle read. Leads with the probability
- * move — that's the news; the level and its confidence band are supporting
- * detail, and similarity/article-count drop to a footer. Only called for a
- * push that actually changed something: a re-delivered push that dedups to
- * nothing (see context.ts's `saveNewsIndexerMatch`) is the caller's job to
- * skip, not this function's — see news-indexer/context/route.ts's `wasStored`.
+ * A news-indexer push landed a new Oracle read. ONE fresh message per push:
+ * the probability move leads, then the triggering article (link + short
+ * extract), every per-article number in a monospace table, the forecast link —
+ * and the 1-5 rating buttons (daatan#1223) attached when the trigger's
+ * evidence-pool row is known. Deliberately freshly sent, not edited in place:
+ * an edit never resurfaces in the channel feed, and a rating tap must map 1:1
+ * to exactly the numbers shown (which is why this function also persists the
+ * ArticleRatingPrompt row the webhook resolves taps against).
+ *
+ * Only called for a push that actually changed something: a re-delivered push
+ * that dedups to nothing (see context.ts's `saveNewsIndexerMatch`) is the
+ * caller's job to skip, not this function's — see news-indexer/context/
+ * route.ts's `wasStored`.
  */
 export async function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
@@ -643,6 +590,7 @@ export async function notifyNewsArticleMatched(
     title: string
     url: string
     source: string | null
+    extract?: string | null
     stance?: number | null
     relevance?: number | null
     authorLean?: number | null
@@ -653,6 +601,7 @@ export async function notifyNewsArticleMatched(
   },
   match: { similarity: number; articleCount?: number },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
+  rating?: { evidencePoolArticleId: string; contextSnapshotId: string | null } | null,
 ): Promise<void> {
   if (isDevEnv()) return
 
@@ -664,70 +613,96 @@ export async function notifyNewsArticleMatched(
         ? `🗞️ <b>Oracle ${probability}%</b> · unchanged`
         : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})`
 
-  // A confidence band under 2 points wide is display noise, not signal — and a
-  // missing bound (older snapshots predate ciLow/ciHigh) omits the line entirely
-  // rather than rendering a broken range.
-  const rangeLine =
-    ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? `\n     range ${ciLow}–${ciHigh}%` : ''
-
   const sourceLabel = article.source ? ` — ${escapeHtml(article.source)}` : ''
   const articleCount = match.articleCount ?? 1
-  const countLabel = articleCount > 1 ? `${articleCount} articles · ` : ''
   const simPct = Math.round(match.similarity * 100)
+  const signed = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`
 
-  // What this ONE article actually said, and how much it counted — without these the message
-  // reports that the estimate moved but never why, so a reader can't tell a decisive on-topic
-  // article from a marginal one that happened to trip the gate.
-  //   stance    [-1,1] — which way it argues. Rendered signed: -0.72 reads as "argues NO".
-  //   relevance [0,1]  — the Oracle's claim-aware judgment of whether it bears on the claim at
-  //                      all; its SQUARE weights the article in aggregation, so 0.5 counts a
-  //                      quarter as much as 1.0. This is the number that explains a match.
-  //   match %          — embedding cosine. Deliberately last: it's the weakest of the three,
-  //                      and the one we've proven misranks (news-indexer#124).
-  // Each is omitted when unknown: an older Oracle response, or a daatan prod that predates the
-  // relevance passthrough, must degrade to today's message rather than print "null".
-  const signals = [
-    article.stance != null ? `stance ${article.stance > 0 ? '+' : ''}${article.stance.toFixed(2)}` : null,
-    article.relevance != null ? `relevance ${article.relevance.toFixed(2)}` : null,
-    `match ${simPct}%`,
-  ].filter(Boolean)
-
-  // Judgment-lane signals (Signal Lanes): un-fused from `stance`, shadow-only — nothing in the
-  // Oracle's own aggregation reads them yet, so this line is the only place they're visible at
-  // all. Same omit-when-unknown rule as `signals` above; `credibilityWeight` is pre-filtered to
-  // null at the caller while the credibility cutover flag is OFF, since 1.0 is a neutral default
-  // rather than a real judgment.
-  const judgmentSignals = [
+  // Every number this push produced, one per row, null-omitted rather than printed as "null"
+  // (an older Oracle response, or a daatan prod that predates a given passthrough, must
+  // degrade to a shorter table). Row order is deliberate:
+  //   stance      [-1,1] — which way the article argues; signed, so -0.72 reads as "argues NO".
+  //   relevance   [0,1]  — the Oracle's claim-aware judgment; its SQUARE weights the article
+  //                        in aggregation, so 0.5 counts a quarter as much as 1.0.
+  //   match %            — embedding cosine, the weakest of the three and the one proven to
+  //                        misrank (news-indexer#124).
+  //   author_lean/fact_signal/credibility/class — judgment-lane signals (Signal Lanes),
+  //                        shadow-only: nothing in the Oracle's own aggregation reads them yet,
+  //                        so this table is the only place they're visible at all.
+  //                        `credibilityWeight` is pre-filtered to null at the caller while the
+  //                        credibility cutover flag is OFF (1.0 is a neutral default, not a
+  //                        judgment).
+  //   range              — omitted when under 2 points wide (display noise) or when a bound is
+  //                        missing (older snapshots predate ciLow/ciHigh).
+  const rows: Array<[string, string] | null> = [
+    article.stance != null ? ['stance', signed(article.stance)] : null,
+    article.relevance != null ? ['relevance', article.relevance.toFixed(2)] : null,
+    ['match', `${simPct}%`],
     article.authorLean != null
-      ? `author_lean ${article.authorLean > 0 ? '+' : ''}${article.authorLean.toFixed(2)}${
-          article.authorLeanCertainty != null ? ` (cert ${article.authorLeanCertainty.toFixed(2)})` : ''
-        }`
+      ? [
+          'author_lean',
+          `${signed(article.authorLean)}${
+            article.authorLeanCertainty != null ? ` · cert ${article.authorLeanCertainty.toFixed(2)}` : ''
+          }`,
+        ]
       : null,
-    article.factSignal != null
-      ? `fact_signal ${article.factSignal > 0 ? '+' : ''}${article.factSignal.toFixed(2)}`
-      : null,
-    article.credibilityWeight != null ? `credibility ${article.credibilityWeight.toFixed(2)}` : null,
-    article.evidenceClass ?? null,
-  ].filter(Boolean)
+    article.factSignal != null ? ['fact_signal', signed(article.factSignal)] : null,
+    article.credibilityWeight != null ? ['credibility', article.credibilityWeight.toFixed(2)] : null,
+    article.evidenceClass ? ['class', article.evidenceClass] : null,
+    articleCount > 1 ? ['articles', String(articleCount)] : null,
+    ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? ['range', `${ciLow}–${ciHigh}%`] : null,
+  ]
+  const table = rows
+    .filter((r): r is [string, string] => r !== null)
+    .map(([label, value]) => `${label.padEnd(12)}${value.padStart(6)}`)
+    .join('\n')
+
+  // A short quote of what was actually judged: the Oracle's extracted claim when it produced
+  // one (that's the text the numbers scored), the raw article snippet otherwise.
+  const extractLine = article.extract ? `<i>«${truncate(article.extract, 200)}»</i>` : null
 
   const msg = [
-    `${headerLine}${rangeLine}`,
-    `"${truncate(prediction.claimText, 120)}"`,
+    headerLine,
     '',
     `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
-    `     ${countLabel}${signals.join(' · ')}`,
-    ...(judgmentSignals.length > 0 ? [`     🔎 ${judgmentSignals.join(' · ')}`] : []),
+    ...(extractLine ? [extractLine] : []),
     '',
-    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+    `<pre>${escapeHtml(table)}</pre>`,
+    '',
+    `🎯 <a href="${forecastUrl(prediction)}">${truncate(prediction.claimText, 120)}</a>`,
   ].join('\n')
 
-  await sendOrEditForecastNotification(prediction.id, msg)
+  const sent = await sendChannelNotification(msg, 'noisy', rating ? buildRatingButtons() : undefined)
+  if (!sent || !rating) return
+
+  const chatId = resolveChatId('noisy')
+  if (!chatId) return // unreachable if sendChannelNotification succeeded — keeps types honest
+
+  await prisma.articleRatingPrompt
+    .create({
+      data: {
+        evidencePoolArticleId: rating.evidencePoolArticleId,
+        predictionId: prediction.id,
+        contextSnapshotId: rating.contextSnapshotId,
+        snapshotSimilarity: match.similarity,
+        messageChatId: chatId,
+        messageId: sent.message_id,
+      },
+    })
+    .catch((err) => log.error({ err, predictionId: prediction.id }, 'Failed to persist rating prompt'))
 }
 
 /**
- * 1-5 rating button row shared by the initial send and the tally-count refresh below.
- * `counts`, when given, is a 5-element array (index 0 = how many raters picked "1", ...
- * index 4 = "5") appended to each button's label.
+ * 1-5 rating button row (daatan#1223) shared by the article-match send above and the
+ * tally-count refresh below. `counts`, when given, is a 5-element array (index 0 = how
+ * many raters picked "1", ... index 4 = "5") appended to each button's label.
+ *
+ * `callback_data` deliberately carries no ids ("nf:r:<1-5>" only): a `callback_query`
+ * update always includes the message it came from (`callback_query.message.chat.id` /
+ * `.message_id`), so the webhook (src/app/api/telegram/rollback/route.ts) looks up the
+ * persisted `ArticleRatingPrompt` row by that message identity instead — the same reason
+ * `notifyNewsArticleMatched` persists the row keyed on `messageChatId`/`messageId`
+ * right after send.
  */
 const RATING_KEYCAPS: Record<number, string> = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣' }
 
@@ -740,54 +715,6 @@ function buildRatingButtons(counts?: number[]) {
       })),
     ],
   }
-}
-
-/**
- * Send a dedicated rating-prompt message (daatan#1223) — a 1-5 button row a rater taps
- * to grade whether the numbers `notifyNewsArticleMatched` just reported were right. Kept
- * separate from that notification, which edits one running message in place per
- * prediction (daatan#1219) and so no longer maps 1:1 to one article/push — buttons here
- * always land on a freshly-sent message, restoring that 1:1 mapping for rating purposes.
- *
- * `callback_data` deliberately carries no ids ("nf:r:<1-5>" only): a `callback_query`
- * update always includes the message it came from (`callback_query.message.chat.id` /
- * `.message_id`), so the webhook (src/app/api/telegram/rollback/route.ts) looks up the
- * persisted `ArticleRatingPrompt` row by that message identity instead — the same reason
- * this function persists the row keyed on `messageChatId`/`messageId` right after send.
- */
-export async function sendArticleRatingPrompt(input: {
-  predictionId: string
-  evidencePoolArticleId: string
-  contextSnapshotId: string | null
-  similarity: number
-  article: { title: string; url: string; source: string | null }
-}): Promise<void> {
-  if (isDevEnv()) return
-
-  const sourceLabel = input.article.source ? ` — ${escapeHtml(input.article.source)}` : ''
-  const text = [
-    '🔍 Rate this match (1 worst – 5 best):',
-    `<a href="${escapeHtml(input.article.url)}">${truncate(input.article.title, 100)}</a>${sourceLabel}`,
-  ].join('\n')
-
-  const sent = await sendChannelNotification(text, 'noisy', buildRatingButtons())
-  if (!sent) return
-
-  const chatId = resolveChatId('noisy')
-  if (!chatId) return // unreachable if sendChannelNotification succeeded — keeps types honest
-
-  await prisma.articleRatingPrompt
-    .create({
-      data: {
-        evidencePoolArticleId: input.evidencePoolArticleId,
-        predictionId: input.predictionId,
-        contextSnapshotId: input.contextSnapshotId,
-        snapshotSimilarity: input.similarity,
-        messageChatId: chatId,
-        messageId: sent.message_id,
-      },
-    })
-    .catch((err) => log.error({ err, predictionId: input.predictionId }, 'Failed to persist rating prompt'))
 }
 
 /**
@@ -969,8 +896,8 @@ export function notifyBackupVerificationFailed(reason: string): void {
 // ============================================
 // MANUAL NUMBER-RATING FEEDBACK (daatan#1223)
 // Outbound helpers the Telegram webhook (src/app/api/telegram/rollback/route.ts)
-// calls in response to callback_query updates. sendArticleRatingPrompt above sends
-// the initial 👍/👎 message; everything below reacts to taps on it.
+// calls in response to callback_query updates. notifyNewsArticleMatched above
+// sends the initial 1-5 button row; everything below reacts to taps on it.
 // ============================================
 
 /** Display labels for NumberFeedbackField — toggle button text in the drilldown DM,

@@ -156,13 +156,13 @@ async function triggerRollback(
 
 // ============================================
 // MANUAL NUMBER-RATING FEEDBACK (daatan#1223)
-// Handles callback_query updates from the 👍/👎 rating-prompt buttons
-// (sendArticleRatingPrompt, src/lib/services/telegram.ts) and the private
-// drilldown DM's toggle keyboard, plus free-text note replies to either message.
-// Fully separate identity check from ALLOWED_CHAT_IDS above: the rating-prompt
-// message lives in the noisy broadcast channel, not the rollback admin chat, so
-// authorization here is by TELEGRAM_ADMIN_MAP (Telegram user id -> User.id)
-// instead of a chat allowlist.
+// Handles callback_query updates from the 1-5 rating buttons attached to the
+// article-match message (notifyNewsArticleMatched, src/lib/services/telegram.ts)
+// and the private drilldown DM's toggle keyboard, plus free-text note replies to
+// either message. Fully separate identity check from ALLOWED_CHAT_IDS above: the
+// article-match message lives in the noisy broadcast channel, not the rollback
+// admin chat, so authorization here is by TELEGRAM_ADMIN_MAP (Telegram user id ->
+// User.id) instead of a chat allowlist.
 // ============================================
 
 /** TELEGRAM_ADMIN_MAP: JSON `{"<telegramUserId>":"<User.id>"}`. Mirrors

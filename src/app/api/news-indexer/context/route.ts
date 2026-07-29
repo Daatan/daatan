@@ -13,7 +13,7 @@ import {
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate } from '@/lib/services/pooled-estimate'
-import { notifyNewsArticleMatched, sendArticleRatingPrompt } from '@/lib/services/telegram'
+import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 import { hashUrl } from '@/lib/utils/hash'
 
@@ -427,6 +427,9 @@ export async function POST(request: NextRequest) {
           title: triggerItem.title,
           url: triggerItem.url,
           source: triggerItem.source ?? null,
+          // What the Oracle actually read out of the article — the claim its numbers scored.
+          // Falls back to the raw snippet when extraction produced no claim text.
+          extract: triggerEnrich?.claim ?? (triggerItem.snippet || null),
           stance: triggerEnrich?.stance ?? null,
           relevance: triggerEnrich?.relevance ?? null,
           authorLean: triggerEnrich?.authorLean ?? null,
@@ -437,22 +440,10 @@ export async function POST(request: NextRequest) {
         },
         { similarity: triggerSimilarity, articleCount: items.length },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
+        // Rating buttons (daatan#1223) attach directly to the notification; skipped when the
+        // trigger article's pool row couldn't be resolved — nothing to hang the feedback off.
+        evidencePoolArticleId ? { evidencePoolArticleId, contextSnapshotId } : null,
       )
-      // Separate from the main notification above (daatan#1223) — a dedicated,
-      // always-fresh message so 👍/👎 buttons keep a 1:1 mapping to this specific
-      // article/push even though notifyNewsArticleMatched itself now edits a single
-      // running message in place per prediction (daatan#1219). Skipped when the
-      // trigger article's pool row couldn't be resolved (evidencePoolArticleId null)
-      // — nothing to attach the rating to.
-      if (evidencePoolArticleId) {
-        void sendArticleRatingPrompt({
-          predictionId: prediction.id,
-          evidencePoolArticleId,
-          contextSnapshotId,
-          similarity: triggerSimilarity,
-          article: { title: triggerItem.title, url: triggerItem.url, source: triggerItem.source ?? null },
-        })
-      }
     }
 
     // Top-level fields echo the trigger article's enrichment (back-compat with the

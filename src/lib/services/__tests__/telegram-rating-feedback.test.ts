@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  sendArticleRatingPrompt,
   answerTelegramCallback,
   updateRatingPromptButtons,
   sendRatingDrilldownDm,
@@ -42,62 +41,8 @@ describe('manual number-rating feedback (daatan#1223)', () => {
     vi.restoreAllMocks()
   })
 
-  describe('sendArticleRatingPrompt', () => {
-    const input = {
-      predictionId: 'pred-1',
-      evidencePoolArticleId: 'epa-1',
-      contextSnapshotId: 'snap-1',
-      similarity: 0.87,
-      article: { title: 'Lapid says he can form a government', url: 'https://x.com/a', source: 'Ynet' },
-    }
-
-    it('sends a message with a 1-5 button row carrying static callback_data (no ids)', async () => {
-      await sendArticleRatingPrompt(input)
-
-      const call = vi.mocked(global.fetch).mock.calls[0]
-      expect(calledMethod(call)).toBe('sendMessage')
-      const body = calledBody(call)
-      expect(body.text).toContain(input.article.title)
-      expect(body.reply_markup).toEqual({
-        inline_keyboard: [
-          [
-            { text: '1️⃣', callback_data: 'nf:r:1' },
-            { text: '2️⃣', callback_data: 'nf:r:2' },
-            { text: '3️⃣', callback_data: 'nf:r:3' },
-            { text: '4️⃣', callback_data: 'nf:r:4' },
-            { text: '5️⃣', callback_data: 'nf:r:5' },
-          ],
-        ],
-      })
-    })
-
-    it('persists an ArticleRatingPrompt row keyed on the sent message id, after send', async () => {
-      await sendArticleRatingPrompt(input)
-
-      expect(mockCreate).toHaveBeenCalledWith({
-        data: {
-          evidencePoolArticleId: 'epa-1',
-          predictionId: 'pred-1',
-          contextSnapshotId: 'snap-1',
-          snapshotSimilarity: 0.87,
-          messageChatId: '-100',
-          messageId: 555,
-        },
-      })
-    })
-
-    it('does not persist a row when the send fails', async () => {
-      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => null }) as never
-      await sendArticleRatingPrompt(input)
-      expect(mockCreate).not.toHaveBeenCalled()
-    })
-
-    it('is a no-op in development', async () => {
-      vi.stubEnv('APP_ENV', 'development')
-      await sendArticleRatingPrompt(input)
-      expect(global.fetch).not.toHaveBeenCalled()
-    })
-  })
+  // The rating-prompt send itself lives on notifyNewsArticleMatched now (buttons attach
+  // directly to the article-match message) — covered in telegram-news-match.test.ts.
 
   describe('answerTelegramCallback', () => {
     it('posts to answerCallbackQuery with the callback id and optional toast text', async () => {
