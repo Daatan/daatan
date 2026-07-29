@@ -51,7 +51,7 @@ const input = () => ({
 describe('saveNewsIndexerMatch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(prisma.$transaction).mockResolvedValue([] as never)
+    vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-1' }] as never)
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
       confidence: 67,
       claimText: 'claim',
@@ -62,7 +62,7 @@ describe('saveNewsIndexerMatch', () => {
   it('always writes a new snapshot and reports stored: true', async () => {
     const result = await saveNewsIndexerMatch(input())
     expect(prisma.$transaction).toHaveBeenCalledOnce()
-    expect(result).toEqual({ stored: true })
+    expect(result).toEqual({ stored: true, contextSnapshotId: 'snap-1' })
   })
 
   it('never reads the prior snapshot before writing (no dedup lookup)', async () => {

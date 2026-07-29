@@ -25,6 +25,15 @@
 import { NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { secretsMatch } from '@/lib/cron-auth'
+import { prisma } from '@/lib/prisma'
+import { NumberFeedbackField } from '@prisma/client'
+import {
+  answerTelegramCallback,
+  updateRatingPromptButtons,
+  sendRatingDrilldownDm,
+  updateDrilldownButtons,
+  finalizeRatingDrilldown,
+} from '@/lib/services/telegram'
 
 const log = createLogger('telegram-rollback')
 
@@ -36,6 +45,7 @@ const ALLOWED_CHAT_IDS = (process.env.TELEGRAM_ROLLBACK_CHAT_IDS ?? '')
   .map((id) => id.trim())
   .filter(Boolean)
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? ''
+const VALID_FEEDBACK_FIELDS = new Set<string>(Object.values(NumberFeedbackField))
 
 async function sendMessage(chatId: number | string, text: string): Promise<void> {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -144,6 +154,200 @@ async function triggerRollback(
   return { ok: true, url }
 }
 
+// ============================================
+// MANUAL NUMBER-RATING FEEDBACK (daatan#1223)
+// Handles callback_query updates from the 👍/👎 rating-prompt buttons
+// (sendArticleRatingPrompt, src/lib/services/telegram.ts) and the private
+// drilldown DM's toggle keyboard, plus free-text note replies to either message.
+// Fully separate identity check from ALLOWED_CHAT_IDS above: the rating-prompt
+// message lives in the noisy broadcast channel, not the rollback admin chat, so
+// authorization here is by TELEGRAM_ADMIN_MAP (Telegram user id -> User.id)
+// instead of a chat allowlist.
+// ============================================
+
+/** TELEGRAM_ADMIN_MAP: JSON `{"<telegramUserId>":"<User.id>"}`. Mirrors
+ *  TELEGRAM_ROLLBACK_CHAT_IDS above — raw process.env, not src/env.ts's validated
+ *  schema, since that's the established pattern for this route's own env vars. */
+function resolveAdminUserId(telegramId: number | string | undefined): string | null {
+  if (telegramId == null) return null
+  try {
+    const map = JSON.parse(process.env.TELEGRAM_ADMIN_MAP ?? '{}') as Record<string, string>
+    return map[String(telegramId)] ?? null
+  } catch {
+    log.error('TELEGRAM_ADMIN_MAP is not valid JSON')
+    return null
+  }
+}
+
+async function handleRatingTap(
+  chatId: string,
+  messageId: number,
+  raterUserId: string,
+  raterTelegramId: string,
+  rating: 'GOOD' | 'BAD',
+  callbackQueryId: string,
+): Promise<void> {
+  const prompt = await prisma.articleRatingPrompt.findUnique({
+    where: { messageChatId_messageId: { messageChatId: chatId, messageId } },
+    include: { evidencePoolArticle: { select: { title: true, url: true, source: true } } },
+  })
+  if (!prompt) {
+    await answerTelegramCallback(callbackQueryId, '⚠️ This prompt has expired')
+    return
+  }
+
+  const feedback = await prisma.evidencePoolArticleFeedback.upsert({
+    where: { promptId_raterUserId: { promptId: prompt.id, raterUserId } },
+    create: { promptId: prompt.id, raterUserId, rating },
+    update: { rating },
+  })
+
+  const [goodCount, badCount] = await Promise.all([
+    prisma.evidencePoolArticleFeedback.count({ where: { promptId: prompt.id, rating: 'GOOD' } }),
+    prisma.evidencePoolArticleFeedback.count({ where: { promptId: prompt.id, rating: 'BAD' } }),
+  ])
+  await updateRatingPromptButtons(chatId, messageId, goodCount, badCount)
+  await answerTelegramCallback(callbackQueryId, rating === 'GOOD' ? '👍 Recorded' : '👎 Recorded')
+
+  // Only 👎 opens the drilldown — 👍 needs no further detail. A rater flipping
+  // GOOD -> BAD on a re-tap still gets the drilldown; flipping the other way
+  // just leaves any earlier drilldown DM as-is rather than retracting it.
+  if (rating === 'BAD') {
+    const sent = await sendRatingDrilldownDm({
+      raterTelegramId,
+      article: {
+        title: prompt.evidencePoolArticle.title ?? 'Untitled',
+        url: prompt.evidencePoolArticle.url,
+        source: prompt.evidencePoolArticle.source,
+      },
+      flaggedFields: feedback.flaggedFields,
+    })
+    if (sent) {
+      await prisma.evidencePoolArticleFeedback.update({
+        where: { id: feedback.id },
+        data: { drilldownChatId: raterTelegramId, drilldownMessageId: sent.message_id },
+      })
+    }
+  }
+}
+
+async function handleFieldToggle(
+  chatId: string,
+  messageId: number,
+  raterUserId: string,
+  field: string,
+  callbackQueryId: string,
+): Promise<void> {
+  if (!VALID_FEEDBACK_FIELDS.has(field)) {
+    await answerTelegramCallback(callbackQueryId)
+    return
+  }
+  const feedback = await prisma.evidencePoolArticleFeedback.findFirst({
+    where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: messageId },
+  })
+  if (!feedback) {
+    await answerTelegramCallback(callbackQueryId, '⚠️ Expired')
+    return
+  }
+  const typedField = field as NumberFeedbackField
+  const flaggedFields = feedback.flaggedFields.includes(typedField)
+    ? feedback.flaggedFields.filter((f) => f !== typedField)
+    : [...feedback.flaggedFields, typedField]
+  await prisma.evidencePoolArticleFeedback.update({ where: { id: feedback.id }, data: { flaggedFields } })
+  await updateDrilldownButtons(chatId, messageId, flaggedFields)
+  await answerTelegramCallback(callbackQueryId)
+}
+
+async function handleDrilldownDone(
+  chatId: string,
+  messageId: number,
+  raterUserId: string,
+  callbackQueryId: string,
+): Promise<void> {
+  const feedback = await prisma.evidencePoolArticleFeedback.findFirst({
+    where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: messageId },
+  })
+  if (!feedback) {
+    await answerTelegramCallback(callbackQueryId, '⚠️ Expired')
+    return
+  }
+  await finalizeRatingDrilldown(chatId, messageId, feedback.flaggedFields)
+  await answerTelegramCallback(callbackQueryId, 'Saved')
+}
+
+async function handleNumberFeedbackCallback(callbackQuery: {
+  id: string
+  data?: string
+  from?: { id?: number | string }
+  message?: { message_id?: number; chat?: { id?: number | string } }
+}): Promise<void> {
+  const data = callbackQuery.data ?? ''
+  const [ns, action, field] = data.split(':')
+  const messageId = callbackQuery.message?.message_id
+  const chatId = callbackQuery.message?.chat?.id
+  if (ns !== 'nf' || messageId == null || chatId == null) return // not ours — ignore silently
+
+  const raterUserId = resolveAdminUserId(callbackQuery.from?.id)
+  if (!raterUserId) {
+    await answerTelegramCallback(callbackQuery.id, '⛔ Not authorized')
+    return
+  }
+  const raterTelegramId = String(callbackQuery.from?.id)
+  const chatIdStr = String(chatId)
+
+  if (action === 'g' || action === 'b') {
+    await handleRatingTap(chatIdStr, messageId, raterUserId, raterTelegramId, action === 'g' ? 'GOOD' : 'BAD', callbackQuery.id)
+  } else if (action === 't' && field) {
+    await handleFieldToggle(chatIdStr, messageId, raterUserId, field, callbackQuery.id)
+  } else if (action === 'd') {
+    await handleDrilldownDone(chatIdStr, messageId, raterUserId, callbackQuery.id)
+  } else {
+    await answerTelegramCallback(callbackQuery.id)
+  }
+}
+
+/**
+ * A free-text reply to either the rating-prompt message or the drilldown DM sets/
+ * appends `note` on an EXISTING feedback row — matches the plan's design: a note
+ * before any 👍/👎 tap has nothing to attach to, so it's left unhandled (falls
+ * through to the normal command flow below, which reports it as unrecognized).
+ * Returns true when the reply was recognized and handled (caller should stop).
+ */
+async function handleNumberFeedbackNote(message: {
+  text?: string
+  reply_to_message?: { message_id?: number }
+  chat?: { id?: number | string }
+  from?: { id?: number | string }
+}): Promise<boolean> {
+  const replyToId = message.reply_to_message?.message_id
+  const text = (message.text ?? '').trim()
+  if (replyToId == null || message.chat?.id == null || !text) return false
+
+  const raterUserId = resolveAdminUserId(message.from?.id)
+  if (!raterUserId) return false
+
+  const chatId = String(message.chat.id)
+
+  const prompt = await prisma.articleRatingPrompt.findUnique({
+    where: { messageChatId_messageId: { messageChatId: chatId, messageId: replyToId } },
+  })
+  const feedback = prompt
+    ? await prisma.evidencePoolArticleFeedback.findUnique({
+        where: { promptId_raterUserId: { promptId: prompt.id, raterUserId } },
+      })
+    : await prisma.evidencePoolArticleFeedback.findFirst({
+        where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: replyToId },
+      })
+  if (!feedback) return false
+
+  await prisma.evidencePoolArticleFeedback.update({
+    where: { id: feedback.id },
+    data: { note: feedback.note ? `${feedback.note}\n${text}` : text },
+  })
+  await sendMessage(chatId, '📝 Note saved.')
+  return true
+}
+
 export async function POST(request: Request) {
   try {
     // Fail closed: the webhook secret is the only proof a request actually came
@@ -160,8 +364,25 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
+
+    // daatan#1223 — 👍/👎 rating buttons and drilldown toggle/done taps. Telegram
+    // delivers exactly one of `callback_query` or `message` per update, never both.
+    if (body?.callback_query) {
+      await handleNumberFeedbackCallback(body.callback_query)
+      return NextResponse.json({ ok: true })
+    }
+
     const message = body?.message
     if (!message) return NextResponse.json({ ok: true })
+
+    // daatan#1223 — a reply to the rating-prompt message or drilldown DM. Checked
+    // before the rollback-specific ALLOWED_CHAT_IDS gate below: this can arrive
+    // from the noisy broadcast channel, a different chat than the rollback admin
+    // chat, and is authorized by TELEGRAM_ADMIN_MAP identity instead. Falls
+    // through to the normal command flow when it's not a reply to one of ours.
+    if (message.reply_to_message && (await handleNumberFeedbackNote(message))) {
+      return NextResponse.json({ ok: true })
+    }
 
     const chatId = message.chat?.id
     const text: string = message.text ?? ''

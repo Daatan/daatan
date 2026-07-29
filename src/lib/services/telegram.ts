@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import type { NumberFeedbackField } from '@prisma/client'
 
 const log = createLogger('telegram')
 
@@ -46,7 +47,7 @@ function resolveChatId(channel: TelegramChannel): string | undefined {
  */
 async function callTelegramApi(
   token: string,
-  method: 'sendMessage' | 'editMessageText',
+  method: 'sendMessage' | 'editMessageText' | 'editMessageReplyMarkup',
   body: Record<string, unknown>,
   logContext: Record<string, unknown>,
 ): Promise<{ message_id: number } | null> {
@@ -79,17 +80,20 @@ async function callTelegramApi(
 /**
  * Send a message to one of the configured Telegram channels.
  * Fire-and-forget: never throws, logs errors. Defaults to the noisy channel.
+ * `replyMarkup` is optional — only the rating-prompt sender (daatan#1223) uses it
+ * today; every other caller ignores the returned message id.
  */
 async function sendChannelNotification(
   message: string,
   channel: TelegramChannel = 'noisy',
-): Promise<void> {
+  replyMarkup?: Record<string, unknown>,
+): Promise<{ message_id: number } | null> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = resolveChatId(channel)
 
   if (!token || !chatId) {
     log.warn({ hasToken: !!token, hasChatId: !!chatId, channel }, 'Telegram not configured')
-    return
+    return null
   }
 
   const prefix = envPrefix()
@@ -100,10 +104,17 @@ async function sendChannelNotification(
   const result = await callTelegramApi(
     token,
     'sendMessage',
-    { chat_id: chatId, text: prefixed, parse_mode: 'HTML', disable_web_page_preview: true },
+    {
+      chat_id: chatId,
+      text: prefixed,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    },
     { chatId, channel },
   )
   if (result) log.info({ chatId, channel }, 'Telegram notification sent successfully')
+  return result
 }
 
 /**
@@ -714,6 +725,61 @@ export async function notifyNewsArticleMatched(
 }
 
 /**
+ * Send a dedicated rating-prompt message (daatan#1223) — 👍/👎 buttons a rater taps to
+ * flag whether the numbers `notifyNewsArticleMatched` just reported were right. Kept
+ * separate from that notification, which edits one running message in place per
+ * prediction (daatan#1219) and so no longer maps 1:1 to one article/push — buttons here
+ * always land on a freshly-sent message, restoring that 1:1 mapping for rating purposes.
+ *
+ * `callback_data` deliberately carries no ids ("nf:g" / "nf:b" only): a `callback_query`
+ * update always includes the message it came from (`callback_query.message.chat.id` /
+ * `.message_id`), so the webhook (src/app/api/telegram/rollback/route.ts) looks up the
+ * persisted `ArticleRatingPrompt` row by that message identity instead — the same reason
+ * this function persists the row keyed on `messageChatId`/`messageId` right after send.
+ */
+export async function sendArticleRatingPrompt(input: {
+  predictionId: string
+  evidencePoolArticleId: string
+  contextSnapshotId: string | null
+  similarity: number
+  article: { title: string; url: string; source: string | null }
+}): Promise<void> {
+  if (isDevEnv()) return
+
+  const sourceLabel = input.article.source ? ` — ${escapeHtml(input.article.source)}` : ''
+  const text = [
+    '🔍 Rate this match:',
+    `<a href="${escapeHtml(input.article.url)}">${truncate(input.article.title, 100)}</a>${sourceLabel}`,
+  ].join('\n')
+
+  const sent = await sendChannelNotification(text, 'noisy', {
+    inline_keyboard: [
+      [
+        { text: '👍 Good', callback_data: 'nf:g' },
+        { text: '👎 Bad', callback_data: 'nf:b' },
+      ],
+    ],
+  })
+  if (!sent) return
+
+  const chatId = resolveChatId('noisy')
+  if (!chatId) return // unreachable if sendChannelNotification succeeded — keeps types honest
+
+  await prisma.articleRatingPrompt
+    .create({
+      data: {
+        evidencePoolArticleId: input.evidencePoolArticleId,
+        predictionId: input.predictionId,
+        contextSnapshotId: input.contextSnapshotId,
+        snapshotSimilarity: input.similarity,
+        messageChatId: chatId,
+        messageId: sent.message_id,
+      },
+    })
+    .catch((err) => log.error({ err, predictionId: input.predictionId }, 'Failed to persist rating prompt'))
+}
+
+/**
  * The AI estimate crossed the high-confidence threshold (≥80%) from below.
  * Fired by every path that writes a new confidence value (news-indexer pushes,
  * user-triggered "analyze context", admin backfill) — the crossing check lives
@@ -887,4 +953,170 @@ export function notifyBackupVerificationFailed(reason: string): void {
     `<b>Manual investigation required — backup may be corrupt.</b>`,
   ].join('\n')
   sendChannelNotification(msg, 'clean')
+}
+
+// ============================================
+// MANUAL NUMBER-RATING FEEDBACK (daatan#1223)
+// Outbound helpers the Telegram webhook (src/app/api/telegram/rollback/route.ts)
+// calls in response to callback_query updates. sendArticleRatingPrompt above sends
+// the initial 👍/👎 message; everything below reacts to taps on it.
+// ============================================
+
+/** Display labels for NumberFeedbackField — toggle button text in the drilldown DM,
+ *  and the plain-text confirmation once a rater taps Done. */
+const FEEDBACK_FIELD_LABELS: Record<NumberFeedbackField, string> = {
+  STANCE: 'Stance',
+  RELEVANCE: 'Relevance',
+  SIMILARITY: 'Similarity',
+  PROBABILITY: 'Probability',
+  AUTHOR_LEAN: 'Author Lean',
+  FACT_SIGNAL: 'Fact Signal',
+  EVIDENCE_CLASS: 'Evidence Class',
+  CREDIBILITY: 'Credibility',
+  OTHER: 'Other',
+}
+
+const FEEDBACK_FIELD_ORDER: NumberFeedbackField[] = [
+  'STANCE',
+  'RELEVANCE',
+  'SIMILARITY',
+  'PROBABILITY',
+  'AUTHOR_LEAN',
+  'FACT_SIGNAL',
+  'EVIDENCE_CLASS',
+  'CREDIBILITY',
+  'OTHER',
+]
+
+function buildDrilldownKeyboard(flaggedFields: NumberFeedbackField[]) {
+  const flagged = new Set(flaggedFields)
+  const fieldButtons = FEEDBACK_FIELD_ORDER.map((field) => ({
+    text: `${flagged.has(field) ? '✅ ' : ''}${FEEDBACK_FIELD_LABELS[field]}`,
+    callback_data: `nf:t:${field}`,
+  }))
+  // Two per row keeps the keyboard compact on a phone screen.
+  const rows: { text: string; callback_data: string }[][] = []
+  for (let i = 0; i < fieldButtons.length; i += 2) rows.push(fieldButtons.slice(i, i + 2))
+  rows.push([{ text: '✅ Done', callback_data: 'nf:d' }])
+  return { inline_keyboard: rows }
+}
+
+/**
+ * Must be called within ~30s of a tap or the tapped button shows a stuck loading
+ * spinner in the Telegram client. `text` becomes a small toast when given.
+ */
+export async function answerTelegramCallback(callbackQueryId: string, text?: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  try {
+    await fetch(`${TELEGRAM_API}${token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, ...(text ? { text } : {}) }),
+    })
+  } catch (err) {
+    log.error({ err, callbackQueryId }, 'Failed to answer Telegram callback query')
+  }
+}
+
+/** Refresh the rating-prompt message's buttons to show current tally counts. */
+export async function updateRatingPromptButtons(
+  chatId: string,
+  messageId: number,
+  goodCount: number,
+  badCount: number,
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  await callTelegramApi(
+    token,
+    'editMessageReplyMarkup',
+    {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: `👍 Good${goodCount ? ` ·${goodCount}` : ''}`, callback_data: 'nf:g' },
+            { text: `👎 Bad${badCount ? ` ·${badCount}` : ''}`, callback_data: 'nf:b' },
+          ],
+        ],
+      },
+    },
+    { chatId, messageId },
+  )
+}
+
+/**
+ * Send the private drilldown DM — sent only when a rater taps 👎, lets them flag
+ * which specific number was wrong via a toggle keyboard, plus a Done button.
+ * `raterTelegramId` doubles as the DM's chat id: Telegram private chats use the
+ * user's own id once they've started a conversation with the bot.
+ */
+export async function sendRatingDrilldownDm(input: {
+  raterTelegramId: string
+  article: { title: string; url: string; source: string | null }
+  flaggedFields: NumberFeedbackField[]
+}): Promise<{ message_id: number } | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return null
+
+  const sourceLabel = input.article.source ? ` — ${escapeHtml(input.article.source)}` : ''
+  const text = [
+    'Which number was wrong?',
+    `<a href="${escapeHtml(input.article.url)}">${truncate(input.article.title, 100)}</a>${sourceLabel}`,
+  ].join('\n')
+
+  return callTelegramApi(
+    token,
+    'sendMessage',
+    {
+      chat_id: input.raterTelegramId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup: buildDrilldownKeyboard(input.flaggedFields),
+    },
+    { raterTelegramId: input.raterTelegramId },
+  )
+}
+
+/** Refresh the drilldown DM's toggle checkmarks after a field tap. */
+export async function updateDrilldownButtons(
+  chatId: string,
+  messageId: number,
+  flaggedFields: NumberFeedbackField[],
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  await callTelegramApi(
+    token,
+    'editMessageReplyMarkup',
+    { chat_id: chatId, message_id: messageId, reply_markup: buildDrilldownKeyboard(flaggedFields) },
+    { chatId, messageId },
+  )
+}
+
+/** Collapse the drilldown DM to a plain confirmation once the rater taps Done.
+ *  Only ever reached via the 👎 path, so the verdict is always "Bad". */
+export async function finalizeRatingDrilldown(
+  chatId: string,
+  messageId: number,
+  flaggedFields: NumberFeedbackField[],
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  const fieldsText =
+    flaggedFields.length > 0 ? flaggedFields.map((f) => FEEDBACK_FIELD_LABELS[f]).join(', ') : 'none'
+  await callTelegramApi(
+    token,
+    'editMessageText',
+    {
+      chat_id: chatId,
+      message_id: messageId,
+      text: `Recorded: Bad — ${fieldsText}`,
+      reply_markup: { inline_keyboard: [] },
+    },
+    { chatId, messageId },
+  )
 }
