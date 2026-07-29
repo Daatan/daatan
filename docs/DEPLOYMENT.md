@@ -349,4 +349,4 @@ full health check. See `.claude/commands/` for details.
 | `TELEGRAM_WEBHOOK_SECRET`      | Shared secret for the Telegram rollback webhook — unset = fail closed |
 | `TELEGRAM_ROLLBACK_CHAT_IDS`   | Comma-separated Telegram chat IDs allowed to issue `/rollback` |
 | `GH_ROLLBACK_TOKEN`            | GitHub PAT with `actions:write` to trigger the Rollback workflow |
-| `TELEGRAM_ADMIN_MAP`           | JSON map of Telegram user id → `User.id` (`{"123":"cuid1"}`) — identity auth for the manual number-rating feedback buttons (daatan#1223), independent of `TELEGRAM_ROLLBACK_CHAT_IDS` |
+| `TELEGRAM_ADMIN_MAP`           | JSON map of Telegram user id → `User.id` (`{"123":"cuid1"}`) — optional User-link enrichment for the manual number-rating feedback buttons (daatan#1223); voting is open to all channel members, safe to leave unset |

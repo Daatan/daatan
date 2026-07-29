@@ -719,12 +719,18 @@ model ArticleRatingPrompt {
 // change their mind by tapping another button, which just updates their own row.
 // Accumulates until there's enough signal to inform edits to retro's extractor prompts
 // (AUTHOR_LEAN/FACT_SIGNAL sections in pipeline/src/tm/extractor.py).
+//
+// Any channel member can vote BY DESIGN — rater identity is the tapper's Telegram
+// user id (always present on a callback_query, needs no setup). raterUserId is
+// optional enrichment via TELEGRAM_ADMIN_MAP (Telegram id → User.id), never a gate.
 model EvidencePoolArticleFeedback {
-  id          String              @id @default(cuid())
-  promptId    String
-  prompt      ArticleRatingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  raterUserId String
-  rater       User                @relation(fields: [raterUserId], references: [id], onDelete: Cascade)
+  id              String              @id @default(cuid())
+  promptId        String
+  prompt          ArticleRatingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  raterTelegramId String              @map("rater_telegram_id")
+  raterName       String?             @map("rater_name") // display name captured from the tap
+  raterUserId     String?
+  rater           User?               @relation(fields: [raterUserId], references: [id], onDelete: SetNull)
 
   // 1 (worst) .. 5 (best). Plain Int, not an enum — keeps AVG()/threshold queries natural
   // for the later analysis pass. Validated in the webhook (1-5) before this is written.
@@ -739,7 +745,7 @@ model EvidencePoolArticleFeedback {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([promptId, raterUserId])
+  @@unique([promptId, raterTelegramId])
   @@map("evidence_pool_article_feedback")
 }
 

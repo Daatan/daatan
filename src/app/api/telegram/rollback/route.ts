@@ -159,16 +159,19 @@ async function triggerRollback(
 // Handles callback_query updates from the 1-5 rating buttons attached to the
 // article-match message (notifyNewsArticleMatched, src/lib/services/telegram.ts)
 // and the private drilldown DM's toggle keyboard, plus free-text note replies to
-// either message. Fully separate identity check from ALLOWED_CHAT_IDS above: the
-// article-match message lives in the noisy broadcast channel, not the rollback
-// admin chat, so authorization here is by TELEGRAM_ADMIN_MAP (Telegram user id ->
-// User.id) instead of a chat allowlist.
+// either message. ANY channel member can vote BY DESIGN — there is no
+// authorization gate (unlike ALLOWED_CHAT_IDS above): being able to see the
+// message in the channel is the access control, and rater identity is the
+// tapper's Telegram user id, which every callback_query carries. One vote per
+// (article, Telegram user); a re-tap updates that voter's own row.
 // ============================================
 
-/** TELEGRAM_ADMIN_MAP: JSON `{"<telegramUserId>":"<User.id>"}`. Mirrors
- *  TELEGRAM_ROLLBACK_CHAT_IDS above — raw process.env, not src/env.ts's validated
- *  schema, since that's the established pattern for this route's own env vars. */
-function resolveAdminUserId(telegramId: number | string | undefined): string | null {
+/** TELEGRAM_ADMIN_MAP: JSON `{"<telegramUserId>":"<User.id>"}`. Optional
+ *  enrichment only, never a gate: when the map knows a Telegram id, the rating row
+ *  also links to that daatan User for later analysis. Raw process.env, not
+ *  src/env.ts's validated schema — the established pattern for this route's own
+ *  env vars (mirrors TELEGRAM_ROLLBACK_CHAT_IDS above). */
+function resolveLinkedUserId(telegramId: number | string | undefined): string | null {
   if (telegramId == null) return null
   try {
     const map = JSON.parse(process.env.TELEGRAM_ADMIN_MAP ?? '{}') as Record<string, string>
@@ -186,8 +189,7 @@ const LOW_RATING_THRESHOLD = 2
 async function handleRatingTap(
   chatId: string,
   messageId: number,
-  raterUserId: string,
-  raterTelegramId: string,
+  rater: { telegramId: string; name: string | null; linkedUserId: string | null },
   rating: number,
   callbackQueryId: string,
 ): Promise<void> {
@@ -201,9 +203,15 @@ async function handleRatingTap(
   }
 
   const feedback = await prisma.evidencePoolArticleFeedback.upsert({
-    where: { promptId_raterUserId: { promptId: prompt.id, raterUserId } },
-    create: { promptId: prompt.id, raterUserId, rating },
-    update: { rating },
+    where: { promptId_raterTelegramId: { promptId: prompt.id, raterTelegramId: rater.telegramId } },
+    create: {
+      promptId: prompt.id,
+      raterTelegramId: rater.telegramId,
+      raterName: rater.name,
+      raterUserId: rater.linkedUserId,
+      rating,
+    },
+    update: { rating, raterName: rater.name },
   })
 
   const tally = await prisma.evidencePoolArticleFeedback.groupBy({
@@ -213,14 +221,14 @@ async function handleRatingTap(
   })
   const counts = [1, 2, 3, 4, 5].map((n) => tally.find((t) => t.rating === n)?._count ?? 0)
   await updateRatingPromptButtons(chatId, messageId, counts)
-  await answerTelegramCallback(callbackQueryId, `Rated ${rating}/5`)
 
   // A rater flipping from a low rating to a high one on a re-tap still gets the
   // drilldown if the NEW tap is low; flipping the other way just leaves any earlier
   // drilldown DM as-is rather than retracting it.
+  let toast = `Rated ${rating}/5`
   if (rating <= LOW_RATING_THRESHOLD) {
     const sent = await sendRatingDrilldownDm({
-      raterTelegramId,
+      raterTelegramId: rater.telegramId,
       article: {
         title: prompt.evidencePoolArticle.title ?? 'Untitled',
         url: prompt.evidencePoolArticle.url,
@@ -231,16 +239,22 @@ async function handleRatingTap(
     if (sent) {
       await prisma.evidencePoolArticleFeedback.update({
         where: { id: feedback.id },
-        data: { drilldownChatId: raterTelegramId, drilldownMessageId: sent.message_id },
+        data: { drilldownChatId: rater.telegramId, drilldownMessageId: sent.message_id },
       })
+    } else {
+      // Telegram forbids bots from DMing users who never opened a chat with them —
+      // likely for an open-channel voter. The rating itself is stored regardless;
+      // the toast tells them how to unlock the which-number-was-wrong follow-up.
+      toast = `Rated ${rating}/5. To flag which number was wrong, open @DaatanClawBot and send /start, then re-tap.`
     }
   }
+  await answerTelegramCallback(callbackQueryId, toast)
 }
 
 async function handleFieldToggle(
   chatId: string,
   messageId: number,
-  raterUserId: string,
+  raterTelegramId: string,
   field: string,
   callbackQueryId: string,
 ): Promise<void> {
@@ -249,7 +263,7 @@ async function handleFieldToggle(
     return
   }
   const feedback = await prisma.evidencePoolArticleFeedback.findFirst({
-    where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: messageId },
+    where: { raterTelegramId, drilldownChatId: chatId, drilldownMessageId: messageId },
   })
   if (!feedback) {
     await answerTelegramCallback(callbackQueryId, '⚠️ Expired')
@@ -267,11 +281,11 @@ async function handleFieldToggle(
 async function handleDrilldownDone(
   chatId: string,
   messageId: number,
-  raterUserId: string,
+  raterTelegramId: string,
   callbackQueryId: string,
 ): Promise<void> {
   const feedback = await prisma.evidencePoolArticleFeedback.findFirst({
-    where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: messageId },
+    where: { raterTelegramId, drilldownChatId: chatId, drilldownMessageId: messageId },
   })
   if (!feedback) {
     await answerTelegramCallback(callbackQueryId, '⚠️ Expired')
@@ -284,7 +298,7 @@ async function handleDrilldownDone(
 async function handleNumberFeedbackCallback(callbackQuery: {
   id: string
   data?: string
-  from?: { id?: number | string }
+  from?: { id?: number | string; first_name?: string; last_name?: string; username?: string }
   message?: { message_id?: number; chat?: { id?: number | string } }
 }): Promise<void> {
   const data = callbackQuery.data ?? ''
@@ -293,21 +307,27 @@ async function handleNumberFeedbackCallback(callbackQuery: {
   const chatId = callbackQuery.message?.chat?.id
   if (ns !== 'nf' || messageId == null || chatId == null) return // not ours — ignore silently
 
-  const raterUserId = resolveAdminUserId(callbackQuery.from?.id)
-  if (!raterUserId) {
-    await answerTelegramCallback(callbackQuery.id, '⛔ Not authorized')
-    return
+  // Any channel member can vote BY DESIGN — no authorization gate. Identity is the
+  // tapper's Telegram user id; TELEGRAM_ADMIN_MAP only enriches the row with a
+  // daatan User link when it happens to know the id.
+  const from = callbackQuery.from
+  if (from?.id == null) return
+  const rater = {
+    telegramId: String(from.id),
+    name:
+      [from.first_name, from.last_name].filter(Boolean).join(' ') ||
+      (from.username ? `@${from.username}` : null),
+    linkedUserId: resolveLinkedUserId(from.id),
   }
-  const raterTelegramId = String(callbackQuery.from?.id)
   const chatIdStr = String(chatId)
 
   const rating = action === 'r' ? Number(arg) : NaN
   if (action === 'r' && Number.isInteger(rating) && rating >= 1 && rating <= 5) {
-    await handleRatingTap(chatIdStr, messageId, raterUserId, raterTelegramId, rating, callbackQuery.id)
+    await handleRatingTap(chatIdStr, messageId, rater, rating, callbackQuery.id)
   } else if (action === 't' && arg) {
-    await handleFieldToggle(chatIdStr, messageId, raterUserId, arg, callbackQuery.id)
+    await handleFieldToggle(chatIdStr, messageId, rater.telegramId, arg, callbackQuery.id)
   } else if (action === 'd') {
-    await handleDrilldownDone(chatIdStr, messageId, raterUserId, callbackQuery.id)
+    await handleDrilldownDone(chatIdStr, messageId, rater.telegramId, callbackQuery.id)
   } else {
     await answerTelegramCallback(callbackQuery.id)
   }
@@ -330,8 +350,8 @@ async function handleNumberFeedbackNote(message: {
   const text = (message.text ?? '').trim()
   if (replyToId == null || message.chat?.id == null || !text) return false
 
-  const raterUserId = resolveAdminUserId(message.from?.id)
-  if (!raterUserId) return false
+  if (message.from?.id == null) return false
+  const raterTelegramId = String(message.from.id)
 
   const chatId = String(message.chat.id)
 
@@ -340,10 +360,10 @@ async function handleNumberFeedbackNote(message: {
   })
   const feedback = prompt
     ? await prisma.evidencePoolArticleFeedback.findUnique({
-        where: { promptId_raterUserId: { promptId: prompt.id, raterUserId } },
+        where: { promptId_raterTelegramId: { promptId: prompt.id, raterTelegramId } },
       })
     : await prisma.evidencePoolArticleFeedback.findFirst({
-        where: { raterUserId, drilldownChatId: chatId, drilldownMessageId: replyToId },
+        where: { raterTelegramId, drilldownChatId: chatId, drilldownMessageId: replyToId },
       })
   if (!feedback) return false
 
@@ -382,10 +402,11 @@ export async function POST(request: Request) {
     const message = body?.message
     if (!message) return NextResponse.json({ ok: true })
 
-    // daatan#1223 — a reply to the rating-prompt message or drilldown DM. Checked
+    // daatan#1223 — a reply to the article-match message or drilldown DM. Checked
     // before the rollback-specific ALLOWED_CHAT_IDS gate below: this can arrive
     // from the noisy broadcast channel, a different chat than the rollback admin
-    // chat, and is authorized by TELEGRAM_ADMIN_MAP identity instead. Falls
+    // chat, and needs no authorization — a note only ever attaches to the
+    // replier's own existing rating (matched by Telegram user id). Falls
     // through to the normal command flow when it's not a reply to one of ours.
     if (message.reply_to_message && (await handleNumberFeedbackNote(message))) {
       return NextResponse.json({ ok: true })
