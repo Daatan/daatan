@@ -92,6 +92,62 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).toContain('match 37%')
   })
 
+  it('reports judgment-lane signals (Signal Lanes) on their own line when present', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        authorLean: 0.6,
+        authorLeanCertainty: 0.8,
+        factSignal: 0.3,
+        evidenceClass: 'reporting',
+        credibilityWeight: 1.24,
+      },
+      MATCH,
+      ESTIMATE,
+    )
+
+    const msg = sentMessage()
+    expect(msg).toContain('author_lean +0.60 (cert 0.80)')
+    expect(msg).toContain('fact_signal +0.30')
+    expect(msg).toContain('credibility 1.24')
+    expect(msg).toContain('reporting')
+  })
+
+  it('omits the judgment-lane line entirely when none of those fields are present', async () => {
+    // Matches most matches today: the credibility cutover flag is OFF and author_lean/fact_signal
+    // are sparse by design (null on pure reporting). The message must degrade to the pre-Signal-
+    // Lanes shape, not print an empty "🔎 " line.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', stance: 0.1, relevance: 0.5 },
+      MATCH,
+      ESTIMATE,
+    )
+
+    const msg = sentMessage()
+    expect(msg).not.toContain('🔎')
+    expect(msg).not.toContain('author_lean')
+    expect(msg).not.toContain('fact_signal')
+    expect(msg).not.toContain('credibility')
+  })
+
+  it('renders only the judgment fields that are present, omitting the rest', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', factSignal: -0.45 },
+      MATCH,
+      ESTIMATE,
+    )
+
+    const msg = sentMessage()
+    expect(msg).toContain('🔎 fact_signal -0.45')
+    expect(msg).not.toContain('author_lean')
+    expect(msg).not.toContain('credibility')
+  })
+
   it('sends a new message and persists its id when no notification exists yet (daatan#1215)', async () => {
     await notifyNewsArticleMatched(
       PREDICTION,

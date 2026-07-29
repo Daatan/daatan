@@ -205,6 +205,17 @@ export async function POST(request: NextRequest) {
       // only that it did. It is the one number that explains a match: the embedding cosine says
       // how similar the text looks, this says whether it actually bears on the claim.
       relevance: s.relevance_score ?? null,
+      // Judgment-lane signals (Signal Lanes): un-fused from `stance` upstream, shadow-only —
+      // nothing in the Oracle's own aggregation reads them yet. Threaded through here so a human
+      // reading the match notification can see WHY, the same rationale as `relevance` above.
+      authorLean: s.author_lean ?? null,
+      authorLeanCertainty: s.author_lean_certainty ?? null,
+      factSignal: s.fact_signal ?? null,
+      evidenceClass: s.evidence_class ?? null,
+      // 1.0 is the neutral default the Oracle returns while the credibility cutover flag is OFF —
+      // not a real signal, so callers should treat it as absent rather than display "1.00" as if
+      // it meant something.
+      credibilityWeight: s.credibility_weight !== 1 ? s.credibility_weight : null,
     }))
 
     // The article that triggered this push — its enrichment is what both the Telegram
@@ -400,6 +411,11 @@ export async function POST(request: NextRequest) {
           source: triggerItem.source ?? null,
           stance: triggerEnrich?.stance ?? null,
           relevance: triggerEnrich?.relevance ?? null,
+          authorLean: triggerEnrich?.authorLean ?? null,
+          authorLeanCertainty: triggerEnrich?.authorLeanCertainty ?? null,
+          factSignal: triggerEnrich?.factSignal ?? null,
+          evidenceClass: triggerEnrich?.evidenceClass ?? null,
+          credibilityWeight: triggerEnrich?.credibilityWeight ?? null,
         },
         { similarity: triggerSimilarity, articleCount: items.length },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
