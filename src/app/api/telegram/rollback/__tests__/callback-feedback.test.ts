@@ -14,7 +14,7 @@ const prismaMock = {
   articleRatingPrompt: { findUnique: vi.fn() },
   evidencePoolArticleFeedback: {
     upsert: vi.fn(),
-    count: vi.fn(),
+    groupBy: vi.fn(),
     update: vi.fn(),
     findFirst: vi.fn(),
     findUnique: vi.fn(),
@@ -75,47 +75,64 @@ describe('POST /api/telegram/rollback — manual number-rating feedback (daatan#
 
   it('rejects a tap from a Telegram user not in TELEGRAM_ADMIN_MAP, with no DB write', async () => {
     const { POST } = await loadRoute()
-    const res = await POST(postWith(callback('nf:g', 999)))
+    const res = await POST(postWith(callback('nf:r:3', 999)))
 
     expect(res.status).toBe(200)
     expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1', expect.stringContaining('Not authorized'))
     expect(prismaMock.evidencePoolArticleFeedback.upsert).not.toHaveBeenCalled()
   })
 
-  it('👍 tap upserts a GOOD row, refreshes tally counts, and does not open a drilldown', async () => {
+  it('a high rating (5) upserts the row, refreshes per-value tally counts, and does not open a drilldown', async () => {
     prismaMock.articleRatingPrompt.findUnique.mockResolvedValue({
       id: 'prompt-1',
       evidencePoolArticle: { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
     })
     prismaMock.evidencePoolArticleFeedback.upsert.mockResolvedValue({ id: 'fb-1', flaggedFields: [] })
-    prismaMock.evidencePoolArticleFeedback.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0)
+    prismaMock.evidencePoolArticleFeedback.groupBy.mockResolvedValue([{ rating: 5, _count: 1 }])
 
     const { POST } = await loadRoute()
-    const res = await POST(postWith(callback('nf:g', 111)))
+    const res = await POST(postWith(callback('nf:r:5', 111)))
 
     expect(res.status).toBe(200)
     expect(prismaMock.evidencePoolArticleFeedback.upsert).toHaveBeenCalledWith({
       where: { promptId_raterUserId: { promptId: 'prompt-1', raterUserId: 'user-mark' } },
-      create: { promptId: 'prompt-1', raterUserId: 'user-mark', rating: 'GOOD' },
-      update: { rating: 'GOOD' },
+      create: { promptId: 'prompt-1', raterUserId: 'user-mark', rating: 5 },
+      update: { rating: 5 },
     })
-    expect(telegramMock.updateRatingPromptButtons).toHaveBeenCalledWith('-100', 555, 1, 0)
+    expect(telegramMock.updateRatingPromptButtons).toHaveBeenCalledWith('-100', 555, [0, 0, 0, 0, 1])
     expect(telegramMock.sendRatingDrilldownDm).not.toHaveBeenCalled()
-    expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1', expect.stringContaining('Recorded'))
+    expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1', 'Rated 5/5')
   })
 
-  it('👎 tap upserts a BAD row and opens the private drilldown DM, persisting its message id', async () => {
+  it('a rating of exactly 3 (the neutral midpoint) does not open the drilldown', async () => {
     prismaMock.articleRatingPrompt.findUnique.mockResolvedValue({
       id: 'prompt-1',
       evidencePoolArticle: { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
     })
     prismaMock.evidencePoolArticleFeedback.upsert.mockResolvedValue({ id: 'fb-1', flaggedFields: [] })
-    prismaMock.evidencePoolArticleFeedback.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1)
+    prismaMock.evidencePoolArticleFeedback.groupBy.mockResolvedValue([])
+
+    const { POST } = await loadRoute()
+    await POST(postWith(callback('nf:r:3', 111)))
+
+    expect(telegramMock.sendRatingDrilldownDm).not.toHaveBeenCalled()
+  })
+
+  it('a low rating (<=2) upserts the row and opens the private drilldown DM, persisting its message id', async () => {
+    prismaMock.articleRatingPrompt.findUnique.mockResolvedValue({
+      id: 'prompt-1',
+      evidencePoolArticle: { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+    })
+    prismaMock.evidencePoolArticleFeedback.upsert.mockResolvedValue({ id: 'fb-1', flaggedFields: [] })
+    prismaMock.evidencePoolArticleFeedback.groupBy.mockResolvedValue([{ rating: 1, _count: 1 }])
     telegramMock.sendRatingDrilldownDm.mockResolvedValue({ message_id: 888 })
 
     const { POST } = await loadRoute()
-    await POST(postWith(callback('nf:b', 111)))
+    await POST(postWith(callback('nf:r:1', 111)))
 
+    expect(prismaMock.evidencePoolArticleFeedback.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { promptId: 'prompt-1', raterUserId: 'user-mark', rating: 1 } }),
+    )
     expect(telegramMock.sendRatingDrilldownDm).toHaveBeenCalledWith({
       raterTelegramId: '111',
       article: { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
@@ -131,10 +148,18 @@ describe('POST /api/telegram/rollback — manual number-rating feedback (daatan#
     prismaMock.articleRatingPrompt.findUnique.mockResolvedValue(null)
 
     const { POST } = await loadRoute()
-    await POST(postWith(callback('nf:g', 111)))
+    await POST(postWith(callback('nf:r:3', 111)))
 
     expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1', expect.stringContaining('expired'))
     expect(prismaMock.evidencePoolArticleFeedback.upsert).not.toHaveBeenCalled()
+  })
+
+  it('ignores an out-of-range rating value with no DB write', async () => {
+    const { POST } = await loadRoute()
+    await POST(postWith(callback('nf:r:9', 111)))
+
+    expect(prismaMock.articleRatingPrompt.findUnique).not.toHaveBeenCalled()
+    expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1')
   })
 
   it('toggling an unset field adds it to flaggedFields and refreshes the drilldown keyboard', async () => {
@@ -170,13 +195,13 @@ describe('POST /api/telegram/rollback — manual number-rating feedback (daatan#
     expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1')
   })
 
-  it('Done finalizes the drilldown with the current flagged fields', async () => {
-    prismaMock.evidencePoolArticleFeedback.findFirst.mockResolvedValue({ id: 'fb-1', flaggedFields: ['CREDIBILITY'] })
+  it('Done finalizes the drilldown with the current rating and flagged fields', async () => {
+    prismaMock.evidencePoolArticleFeedback.findFirst.mockResolvedValue({ id: 'fb-1', rating: 2, flaggedFields: ['CREDIBILITY'] })
 
     const { POST } = await loadRoute()
     await POST(postWith(callback('nf:d', 111)))
 
-    expect(telegramMock.finalizeRatingDrilldown).toHaveBeenCalledWith('-100', 555, ['CREDIBILITY'])
+    expect(telegramMock.finalizeRatingDrilldown).toHaveBeenCalledWith('-100', 555, 2, ['CREDIBILITY'])
     expect(telegramMock.answerTelegramCallback).toHaveBeenCalledWith('cb-1', 'Saved')
   })
 

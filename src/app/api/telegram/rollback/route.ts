@@ -179,12 +179,16 @@ function resolveAdminUserId(telegramId: number | string | undefined): string | n
   }
 }
 
+// A rating at or below this opens the drilldown DM — "something's wrong enough to be
+// worth naming which number." 3 (neutral) and above need no further detail.
+const LOW_RATING_THRESHOLD = 2
+
 async function handleRatingTap(
   chatId: string,
   messageId: number,
   raterUserId: string,
   raterTelegramId: string,
-  rating: 'GOOD' | 'BAD',
+  rating: number,
   callbackQueryId: string,
 ): Promise<void> {
   const prompt = await prisma.articleRatingPrompt.findUnique({
@@ -202,17 +206,19 @@ async function handleRatingTap(
     update: { rating },
   })
 
-  const [goodCount, badCount] = await Promise.all([
-    prisma.evidencePoolArticleFeedback.count({ where: { promptId: prompt.id, rating: 'GOOD' } }),
-    prisma.evidencePoolArticleFeedback.count({ where: { promptId: prompt.id, rating: 'BAD' } }),
-  ])
-  await updateRatingPromptButtons(chatId, messageId, goodCount, badCount)
-  await answerTelegramCallback(callbackQueryId, rating === 'GOOD' ? '👍 Recorded' : '👎 Recorded')
+  const tally = await prisma.evidencePoolArticleFeedback.groupBy({
+    by: ['rating'],
+    where: { promptId: prompt.id },
+    _count: true,
+  })
+  const counts = [1, 2, 3, 4, 5].map((n) => tally.find((t) => t.rating === n)?._count ?? 0)
+  await updateRatingPromptButtons(chatId, messageId, counts)
+  await answerTelegramCallback(callbackQueryId, `Rated ${rating}/5`)
 
-  // Only 👎 opens the drilldown — 👍 needs no further detail. A rater flipping
-  // GOOD -> BAD on a re-tap still gets the drilldown; flipping the other way
-  // just leaves any earlier drilldown DM as-is rather than retracting it.
-  if (rating === 'BAD') {
+  // A rater flipping from a low rating to a high one on a re-tap still gets the
+  // drilldown if the NEW tap is low; flipping the other way just leaves any earlier
+  // drilldown DM as-is rather than retracting it.
+  if (rating <= LOW_RATING_THRESHOLD) {
     const sent = await sendRatingDrilldownDm({
       raterTelegramId,
       article: {
@@ -271,7 +277,7 @@ async function handleDrilldownDone(
     await answerTelegramCallback(callbackQueryId, '⚠️ Expired')
     return
   }
-  await finalizeRatingDrilldown(chatId, messageId, feedback.flaggedFields)
+  await finalizeRatingDrilldown(chatId, messageId, feedback.rating, feedback.flaggedFields)
   await answerTelegramCallback(callbackQueryId, 'Saved')
 }
 
@@ -282,7 +288,7 @@ async function handleNumberFeedbackCallback(callbackQuery: {
   message?: { message_id?: number; chat?: { id?: number | string } }
 }): Promise<void> {
   const data = callbackQuery.data ?? ''
-  const [ns, action, field] = data.split(':')
+  const [ns, action, arg] = data.split(':')
   const messageId = callbackQuery.message?.message_id
   const chatId = callbackQuery.message?.chat?.id
   if (ns !== 'nf' || messageId == null || chatId == null) return // not ours — ignore silently
@@ -295,10 +301,11 @@ async function handleNumberFeedbackCallback(callbackQuery: {
   const raterTelegramId = String(callbackQuery.from?.id)
   const chatIdStr = String(chatId)
 
-  if (action === 'g' || action === 'b') {
-    await handleRatingTap(chatIdStr, messageId, raterUserId, raterTelegramId, action === 'g' ? 'GOOD' : 'BAD', callbackQuery.id)
-  } else if (action === 't' && field) {
-    await handleFieldToggle(chatIdStr, messageId, raterUserId, field, callbackQuery.id)
+  const rating = action === 'r' ? Number(arg) : NaN
+  if (action === 'r' && Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+    await handleRatingTap(chatIdStr, messageId, raterUserId, raterTelegramId, rating, callbackQuery.id)
+  } else if (action === 't' && arg) {
+    await handleFieldToggle(chatIdStr, messageId, raterUserId, arg, callbackQuery.id)
   } else if (action === 'd') {
     await handleDrilldownDone(chatIdStr, messageId, raterUserId, callbackQuery.id)
   } else {

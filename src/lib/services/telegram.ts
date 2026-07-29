@@ -725,13 +725,31 @@ export async function notifyNewsArticleMatched(
 }
 
 /**
- * Send a dedicated rating-prompt message (daatan#1223) — 👍/👎 buttons a rater taps to
- * flag whether the numbers `notifyNewsArticleMatched` just reported were right. Kept
+ * 1-5 rating button row shared by the initial send and the tally-count refresh below.
+ * `counts`, when given, is a 5-element array (index 0 = how many raters picked "1", ...
+ * index 4 = "5") appended to each button's label.
+ */
+const RATING_KEYCAPS: Record<number, string> = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣' }
+
+function buildRatingButtons(counts?: number[]) {
+  return {
+    inline_keyboard: [
+      [1, 2, 3, 4, 5].map((n) => ({
+        text: `${RATING_KEYCAPS[n]}${counts?.[n - 1] ? ` ·${counts[n - 1]}` : ''}`,
+        callback_data: `nf:r:${n}`,
+      })),
+    ],
+  }
+}
+
+/**
+ * Send a dedicated rating-prompt message (daatan#1223) — a 1-5 button row a rater taps
+ * to grade whether the numbers `notifyNewsArticleMatched` just reported were right. Kept
  * separate from that notification, which edits one running message in place per
  * prediction (daatan#1219) and so no longer maps 1:1 to one article/push — buttons here
  * always land on a freshly-sent message, restoring that 1:1 mapping for rating purposes.
  *
- * `callback_data` deliberately carries no ids ("nf:g" / "nf:b" only): a `callback_query`
+ * `callback_data` deliberately carries no ids ("nf:r:<1-5>" only): a `callback_query`
  * update always includes the message it came from (`callback_query.message.chat.id` /
  * `.message_id`), so the webhook (src/app/api/telegram/rollback/route.ts) looks up the
  * persisted `ArticleRatingPrompt` row by that message identity instead — the same reason
@@ -748,18 +766,11 @@ export async function sendArticleRatingPrompt(input: {
 
   const sourceLabel = input.article.source ? ` — ${escapeHtml(input.article.source)}` : ''
   const text = [
-    '🔍 Rate this match:',
+    '🔍 Rate this match (1 worst – 5 best):',
     `<a href="${escapeHtml(input.article.url)}">${truncate(input.article.title, 100)}</a>${sourceLabel}`,
   ].join('\n')
 
-  const sent = await sendChannelNotification(text, 'noisy', {
-    inline_keyboard: [
-      [
-        { text: '👍 Good', callback_data: 'nf:g' },
-        { text: '👎 Bad', callback_data: 'nf:b' },
-      ],
-    ],
-  })
+  const sent = await sendChannelNotification(text, 'noisy', buildRatingButtons())
   if (!sent) return
 
   const chatId = resolveChatId('noisy')
@@ -1019,37 +1030,29 @@ export async function answerTelegramCallback(callbackQueryId: string, text?: str
   }
 }
 
-/** Refresh the rating-prompt message's buttons to show current tally counts. */
+/**
+ * Refresh the rating-prompt message's buttons to show current tally counts.
+ * `counts` is a 5-element array, index 0 = how many raters picked "1" .. index 4 = "5".
+ */
 export async function updateRatingPromptButtons(
   chatId: string,
   messageId: number,
-  goodCount: number,
-  badCount: number,
+  counts: number[],
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) return
   await callTelegramApi(
     token,
     'editMessageReplyMarkup',
-    {
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `👍 Good${goodCount ? ` ·${goodCount}` : ''}`, callback_data: 'nf:g' },
-            { text: `👎 Bad${badCount ? ` ·${badCount}` : ''}`, callback_data: 'nf:b' },
-          ],
-        ],
-      },
-    },
+    { chat_id: chatId, message_id: messageId, reply_markup: buildRatingButtons(counts) },
     { chatId, messageId },
   )
 }
 
 /**
- * Send the private drilldown DM — sent only when a rater taps 👎, lets them flag
- * which specific number was wrong via a toggle keyboard, plus a Done button.
+ * Send the private drilldown DM — sent only when a rater picks a low rating (see
+ * LOW_RATING_THRESHOLD in the webhook), lets them flag which specific number was wrong
+ * via a toggle keyboard, plus a Done button.
  * `raterTelegramId` doubles as the DM's chat id: Telegram private chats use the
  * user's own id once they've started a conversation with the bot.
  */
@@ -1097,11 +1100,11 @@ export async function updateDrilldownButtons(
   )
 }
 
-/** Collapse the drilldown DM to a plain confirmation once the rater taps Done.
- *  Only ever reached via the 👎 path, so the verdict is always "Bad". */
+/** Collapse the drilldown DM to a plain confirmation once the rater taps Done. */
 export async function finalizeRatingDrilldown(
   chatId: string,
   messageId: number,
+  rating: number,
   flaggedFields: NumberFeedbackField[],
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -1114,7 +1117,7 @@ export async function finalizeRatingDrilldown(
     {
       chat_id: chatId,
       message_id: messageId,
-      text: `Recorded: Bad — ${fieldsText}`,
+      text: `Recorded: ${rating}/5 — ${fieldsText}`,
       reply_markup: { inline_keyboard: [] },
     },
     { chatId, messageId },
