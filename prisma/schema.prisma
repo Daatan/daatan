@@ -413,6 +413,15 @@ model Prediction {
   // once it closes so a later re-crossing fires again (see checkMarketDivergence).
   marketDivergenceAlertAt DateTime? @map("market_divergence_alert_at")
 
+  // The running Telegram notification for this forecast's news-article matches
+  // (daatan#1215). NULL = no notification sent yet. Latest-state, not a log:
+  // notifyNewsArticleMatched edits this message in place on a later match
+  // instead of spamming a new one, falling back to a fresh send (and
+  // overwriting both fields with the new message's) when the edit fails —
+  // e.g. the old message is outside Telegram's ~48h edit window or deleted.
+  telegramMessageId Int?    @map("telegram_message_id")
+  telegramChatId    String? @map("telegram_chat_id")
+
   // External prediction-market link (opt-in — only some forecasts are linked).
   // Linking is admin-authoritative or via URL import; AI only suggests candidates.
   externalMarketId         String?         @map("external_market_id")
