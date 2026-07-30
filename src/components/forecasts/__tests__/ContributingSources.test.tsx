@@ -137,6 +137,35 @@ describe('ContributingSources', () => {
     expect(screen.getAllByText('↑ 73%')).toHaveLength(2)
   })
 
+  it("shows the outlet-wide P(YES) range next to the lead badge, on the same scale as the press-lean bar", () => {
+    // Same domain, three articles the lead pct alone can't tell apart from:
+    // A: yes, certainty .9 → P(YES) 95%, signalStrength .54 (the lead)
+    // B: no,  certainty .3 → P(YES) 35%, signalStrength .18
+    // C: stance .1 (neutral band) → P(YES) 50% regardless of its .9 certainty
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://outlet.com/a', source: 'outlet.com', title: 'A', stance: 0.6, certainty: 0.9 }),
+          src({ url: 'https://outlet.com/b', source: 'outlet.com', title: 'B', stance: -0.6, certainty: 0.3 }),
+          src({ url: 'https://outlet.com/c', source: 'outlet.com', title: 'C', stance: 0.1, certainty: 0.9 }),
+        ]}
+      />,
+    )
+    // Appears twice: the outlet-header badge and lead article A's own row badge.
+    expect(screen.getAllByText('↑ 90%')).toHaveLength(2)
+    const range = screen.getByText('35–95%')
+    expect(range).toHaveAttribute('title', 'Range across 3 articles')
+  })
+
+  it('does not show a range on a single-article outlet — nothing to span', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[src({ source: 'Reuters', title: 'Solo piece', certainty: 0.72, stance: 0.5 })]}
+      />,
+    )
+    expect(screen.queryByText(/^\d+–\d+%$/)).toBeNull()
+  })
+
   it('hides gate-rejected articles entirely instead of giving them a voter card', () => {
     renderWithIntl(
       <ContributingSources

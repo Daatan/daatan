@@ -525,6 +525,7 @@
     "certainty": "{value}% certeco",
     "count": "{count} publikaĵo",
     "countPlural": "{count} publikaĵoj",
+    "sourceRange": "Amplekso trans {count} artikoloj",
     "originOracle": "AI-analizita",
     "originIndexer": "Indeksita",
     "originBoth": "Ambaŭ"

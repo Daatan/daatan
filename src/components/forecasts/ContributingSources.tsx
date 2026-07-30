@@ -80,6 +80,12 @@ type OutletGroup = {
   articles: ContributingSource[]
   side: Side
   pct: number | null
+  /** Min/max of every article's P(YES) in the group (see articleProbYes) — the spread the
+   *  single lead pct doesn't show. A group can span both sides (grouping is domain-only,
+   *  not side-filtered), so this is on the same 0-100 P(YES) scale as the press-lean bar,
+   *  not raw certainty — an opposing article reads as a low number instead of needing
+   *  separate handling. */
+  range: { min: number; max: number }
 }
 
 /**
@@ -145,6 +151,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     // 50-100%-rescaled "implied probability" used for the press-lean bar, so the
     // outlet card and its expanded article list never show two different % scales.
     const pct = side !== 'neutral' && lead.certainty != null ? Math.round(lead.certainty * 100) : null
+    const probs = articles.map((a) => Math.round(articleProbYes(a) * 100))
     return {
       domain,
       name: articles.find(a => a.source)?.source || domain,
@@ -152,6 +159,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
       articles: sorted,
       side,
       pct,
+      range: { min: Math.min(...probs), max: Math.max(...probs) },
     }
   })
   const byCol: Record<Side, OutletGroup[]> = { yes: [], no: [], neutral: [] }
@@ -266,6 +274,12 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           <Avatar src={null} name={g.name} size={20} className="shrink-0" />
           <OutletName g={g} className="font-medium text-white truncate flex-1 min-w-0" />
           <span className="shrink-0 text-[10px] text-gray-500">{g.articles.length}</span>
+          <span
+            title={t('sourceRange', { count: g.articles.length })}
+            className="shrink-0 text-[10px] tabular-nums text-gray-400 px-1.5 py-0.5 rounded border border-navy-600"
+          >
+            {g.range.min}–{g.range.max}%
+          </span>
           <Badge side={g.side} pct={g.pct} />
           <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open/card:rotate-180" />
         </summary>
