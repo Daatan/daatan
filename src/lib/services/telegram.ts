@@ -592,6 +592,7 @@ export async function notifyNewsArticleMatched(
     source: string | null
     extract?: string | null
     stance?: number | null
+    certainty?: number | null
     relevance?: number | null
     authorLean?: number | null
     authorLeanCertainty?: number | null
@@ -599,62 +600,71 @@ export async function notifyNewsArticleMatched(
     evidenceClass?: string | null
     credibilityWeight?: number | null
   },
-  match: { similarity: number; articleCount?: number },
+  match: { similarity: number; articleCount?: number; poolSize?: number | null },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
   rating?: { evidencePoolArticleId: string; contextSnapshotId: string | null } | null,
 ): Promise<void> {
   if (isDevEnv()) return
 
   const { probability, previous, ciLow, ciHigh } = estimate
+
+  // Evidence-volume context lives in the header, next to the move it explains: how many
+  // articles this push carried, and — when the estimate came from the pool path — how many
+  // articles the whole evidence pool aggregates. One weak article barely moving a 22-article
+  // pool is expected behavior, and this is what makes that legible.
+  const articleCount = match.articleCount ?? 1
+  const volumeLabel =
+    match.poolSize != null
+      ? ` · ${articleCount} new / ${match.poolSize} in pool`
+      : articleCount > 1
+        ? ` · ${articleCount} articles`
+        : ''
   const headerLine =
     previous === null
-      ? `🗞️ <b>Oracle ${probability}%</b> · first estimate`
+      ? `🗞️ <b>Oracle ${probability}%</b> · first estimate${volumeLabel}`
       : previous === probability
-        ? `🗞️ <b>Oracle ${probability}%</b> · unchanged`
-        : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})`
+        ? `🗞️ <b>Oracle ${probability}%</b> · unchanged${volumeLabel}`
+        : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})${volumeLabel}`
 
   const sourceLabel = article.source ? ` — ${escapeHtml(article.source)}` : ''
-  const articleCount = match.articleCount ?? 1
   const simPct = Math.round(match.similarity * 100)
   const signed = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`
+  const cert = (v: number | null | undefined) => (v != null ? ` (cert ${v.toFixed(2)})` : '')
 
   // Every number this push produced, one per row, null-omitted rather than printed as "null"
   // (an older Oracle response, or a daatan prod that predates a given passthrough, must
-  // degrade to a shorter table). Row order is deliberate:
+  // degrade to a shorter panel). Row order is deliberate:
   //   stance      [-1,1] — which way the article argues; signed, so -0.72 reads as "argues NO".
+  //                        The extractor's certainty about that reading rides along.
   //   relevance   [0,1]  — the Oracle's claim-aware judgment; its SQUARE weights the article
   //                        in aggregation, so 0.5 counts a quarter as much as 1.0.
   //   match %            — embedding cosine, the weakest of the three and the one proven to
   //                        misrank (news-indexer#124).
   //   author_lean/fact_signal/credibility/class — judgment-lane signals (Signal Lanes),
   //                        shadow-only: nothing in the Oracle's own aggregation reads them yet,
-  //                        so this table is the only place they're visible at all.
+  //                        so this panel is the only place they're visible at all.
   //                        `credibilityWeight` is pre-filtered to null at the caller while the
   //                        credibility cutover flag is OFF (1.0 is a neutral default, not a
   //                        judgment).
   //   range              — omitted when under 2 points wide (display noise) or when a bound is
   //                        missing (older snapshots predate ciLow/ciHigh).
   const rows: Array<[string, string] | null> = [
-    article.stance != null ? ['stance', signed(article.stance)] : null,
+    article.stance != null ? ['stance', `${signed(article.stance)}${cert(article.certainty)}`] : null,
     article.relevance != null ? ['relevance', article.relevance.toFixed(2)] : null,
     ['match', `${simPct}%`],
     article.authorLean != null
-      ? [
-          'author_lean',
-          `${signed(article.authorLean)}${
-            article.authorLeanCertainty != null ? ` · cert ${article.authorLeanCertainty.toFixed(2)}` : ''
-          }`,
-        ]
+      ? ['author_lean', `${signed(article.authorLean)}${cert(article.authorLeanCertainty)}`]
       : null,
     article.factSignal != null ? ['fact_signal', signed(article.factSignal)] : null,
     article.credibilityWeight != null ? ['credibility', article.credibilityWeight.toFixed(2)] : null,
     article.evidenceClass ? ['class', article.evidenceClass] : null,
-    articleCount > 1 ? ['articles', String(articleCount)] : null,
     ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? ['range', `${ciLow}–${ciHigh}%`] : null,
   ]
-  const table = rows
+  // A Telegram blockquote, not <pre>: the quote bar visually groups the numbers into a
+  // panel without the monospace code chrome ("copy code") clients hang on pre blocks.
+  const panel = rows
     .filter((r): r is [string, string] => r !== null)
-    .map(([label, value]) => `${label.padEnd(12)}${value.padStart(6)}`)
+    .map(([label, value]) => `<b>${label}</b>  ${escapeHtml(value)}`)
     .join('\n')
 
   // A short quote of what was actually judged: the Oracle's extracted claim when it produced
@@ -667,7 +677,7 @@ export async function notifyNewsArticleMatched(
     `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
     ...(extractLine ? [extractLine] : []),
     '',
-    `<pre>${escapeHtml(table)}</pre>`,
+    `<blockquote>${panel}</blockquote>`,
     '',
     `🎯 <a href="${forecastUrl(prediction)}">${truncate(prediction.claimText, 120)}</a>`,
   ].join('\n')

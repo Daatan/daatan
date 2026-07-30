@@ -200,6 +200,9 @@ export async function POST(request: NextRequest) {
     // The trigger article's EvidencePoolArticle row (resolved below, after
     // addArticlesToPool writes it) — daatan#1223's rating-prompt message hangs off it.
     let evidencePoolArticleId: string | null = null
+    // How many articles the whole evidence pool aggregates (null on the single-run
+    // fallback) — header context for the Telegram notification.
+    let poolSize: number | null = null
 
     // Per-article enrichment from the Oracle, keyed by url, so news-indexer can map
     // each article in the set back to its own forecast_match row.
@@ -353,6 +356,7 @@ export async function POST(request: NextRequest) {
         probability = stanceToPercent(est.mean)
         ciLow = stanceToPercent(est.ciLow)
         ciHigh = stanceToPercent(est.ciHigh)
+        poolSize = est.poolSize
 
         const { stored, contextSnapshotId: snapshotId } = await saveNewsIndexerMatch({
           predictionId: prediction.id,
@@ -431,6 +435,7 @@ export async function POST(request: NextRequest) {
           // Falls back to the raw snippet when extraction produced no claim text.
           extract: triggerEnrich?.claim ?? (triggerItem.snippet || null),
           stance: triggerEnrich?.stance ?? null,
+          certainty: triggerEnrich?.certainty ?? null,
           relevance: triggerEnrich?.relevance ?? null,
           authorLean: triggerEnrich?.authorLean ?? null,
           authorLeanCertainty: triggerEnrich?.authorLeanCertainty ?? null,
@@ -438,7 +443,7 @@ export async function POST(request: NextRequest) {
           evidenceClass: triggerEnrich?.evidenceClass ?? null,
           credibilityWeight: triggerEnrich?.credibilityWeight ?? null,
         },
-        { similarity: triggerSimilarity, articleCount: items.length },
+        { similarity: triggerSimilarity, articleCount: items.length, poolSize },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
         // Rating buttons (daatan#1223) attach directly to the notification; skipped when the
         // trigger article's pool row couldn't be resolved — nothing to hang the feedback off.

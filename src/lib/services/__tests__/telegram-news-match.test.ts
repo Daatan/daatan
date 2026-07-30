@@ -58,11 +58,22 @@ describe('notifyNewsArticleMatched', () => {
 
     const msg = sentMessage()
     expect(msg).toContain('Oracle 63% → 71%') // old → new
-    expect(msg).toContain('<pre>')
-    expect(msg).toMatch(/stance\s+-0\.72/) // signed: reads as "argues NO"
-    expect(msg).toMatch(/relevance\s+0\.80/)
-    expect(msg).toMatch(/match\s+37%/) // the embedding cosine: the weakest signal
-    expect(msg).toMatch(/range\s+55–85%/)
+    expect(msg).toContain('<blockquote>') // quote-bar panel, not <pre> (no "copy code" chrome)
+    expect(msg).not.toContain('<pre>')
+    expect(msg).toContain('<b>stance</b>  -0.72') // signed: reads as "argues NO"
+    expect(msg).toContain('<b>relevance</b>  0.80')
+    expect(msg).toContain('<b>match</b>  37%') // the embedding cosine: the weakest signal
+    expect(msg).toContain('<b>range</b>  55–85%')
+  })
+
+  it("shows the extractor's certainty alongside stance when known", async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', stance: -0.72, certainty: 0.77 },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>stance</b>  -0.72 (cert 0.77)')
   })
 
   it('links both the article and the forecast by name', async () => {
@@ -99,7 +110,7 @@ describe('notifyNewsArticleMatched', () => {
       MATCH,
       ESTIMATE,
     )
-    expect(sentMessage()).toMatch(/stance\s+\+0\.42/)
+    expect(sentMessage()).toContain('<b>stance</b>  +0.42')
   })
 
   it('omits stance/relevance rows when unknown rather than printing null', async () => {
@@ -116,7 +127,7 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).not.toContain('null')
     expect(msg).not.toContain('stance')
     expect(msg).not.toContain('relevance')
-    expect(msg).toMatch(/match\s+37%/)
+    expect(msg).toContain('<b>match</b>  37%')
   })
 
   it('reports judgment-lane signals (Signal Lanes) as table rows when present', async () => {
@@ -137,10 +148,10 @@ describe('notifyNewsArticleMatched', () => {
     )
 
     const msg = sentMessage()
-    expect(msg).toMatch(/author_lean\s+\+0\.60 · cert 0\.80/)
-    expect(msg).toMatch(/fact_signal\s+\+0\.30/)
-    expect(msg).toMatch(/credibility\s+1\.24/)
-    expect(msg).toMatch(/class\s+reporting/)
+    expect(msg).toContain('<b>author_lean</b>  +0.60 (cert 0.80)')
+    expect(msg).toContain('<b>fact_signal</b>  +0.30')
+    expect(msg).toContain('<b>credibility</b>  1.24')
+    expect(msg).toContain('<b>class</b>  reporting')
   })
 
   it('renders only the judgment fields that are present, omitting the rest', async () => {
@@ -154,19 +165,29 @@ describe('notifyNewsArticleMatched', () => {
     )
 
     const msg = sentMessage()
-    expect(msg).toMatch(/fact_signal\s+-0\.45/)
+    expect(msg).toContain('<b>fact_signal</b>  -0.45')
     expect(msg).not.toContain('author_lean')
     expect(msg).not.toContain('credibility')
   })
 
-  it('shows an articles row only for a multi-article push', async () => {
+  it('puts evidence volume in the header: pool size when known, bare count for a multi-article push', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+      { similarity: 0.368, articleCount: 3, poolSize: 22 },
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('Oracle 63% → 71%</b>  (+8) · 3 new / 22 in pool')
+
+    // No pool (single-run fallback): only a multi-article push shows a count at all.
+    vi.mocked(global.fetch).mockClear()
     await notifyNewsArticleMatched(
       PREDICTION,
       { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
       { similarity: 0.368, articleCount: 3 },
       ESTIMATE,
     )
-    expect(sentMessage()).toMatch(/articles\s+3/)
+    expect(sentMessage()).toContain('· 3 articles')
 
     vi.mocked(global.fetch).mockClear()
     await notifyNewsArticleMatched(PREDICTION, { title: 'T', url: 'https://x.com/a', source: 'Ynet' }, MATCH, ESTIMATE)

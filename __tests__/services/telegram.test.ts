@@ -301,7 +301,7 @@ describe('Telegram channel routing (clean vs noisy)', () => {
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.text).toMatch(/range\s+44–72%/)
+    expect(body.text).toContain('<b>range</b>  44–72%')
   })
 
   it('omits the range line for a missing or degenerate confidence interval', async () => {
@@ -345,11 +345,11 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     const texts = vi.mocked(fetch).mock.calls.map(
       (c) => JSON.parse(c[1]!.body as string).text as string,
     )
-    expect(texts[0]).toMatch(/match\s+72%/)
+    expect(texts[0]).toContain('<b>match</b>  72%')
     expect(texts[0]).not.toContain('articles')
     expect(texts[1]).not.toContain('articles')
-    expect(texts[2]).toMatch(/articles\s+3/)
-    expect(texts[2]).toMatch(/match\s+72%/)
+    expect(texts[2]).toContain('· 3 articles')
+    expect(texts[2]).toContain('<b>match</b>  72%')
   })
 })
 
