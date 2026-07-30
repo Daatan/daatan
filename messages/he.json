@@ -525,6 +525,7 @@
     "certainty": "{value}% ודאות",
     "count": "פרסום אחד",
     "countPlural": "{count} פרסומים",
+    "sourceRange": "טווח על פני {count} כתבות",
     "originOracle": "נותח ב-AI",
     "originIndexer": "באינדקס",
     "originBoth": "שניהם"

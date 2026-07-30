@@ -525,6 +525,7 @@
     "certainty": "{value}% certainty",
     "count": "{count} publication",
     "countPlural": "{count} publications",
+    "sourceRange": "Range across {count} articles",
     "originOracle": "AI-analysed",
     "originIndexer": "Indexed",
     "originBoth": "Both"
