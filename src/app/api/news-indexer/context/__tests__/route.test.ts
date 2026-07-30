@@ -220,8 +220,10 @@ describe('POST /api/news-indexer/context', () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
-    const [, article] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
-    expect(article).toMatchObject({ stance: 0.42, relevance: 0.8 })
+    const [, article, match] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
+    expect(article).toMatchObject({ stance: 0.42, certainty: 0.77, relevance: 0.8 })
+    // Single-run fallback (the beforeEach default): no pool behind the estimate.
+    expect(match).toMatchObject({ poolSize: null })
   })
 
   it('passes the Oracle-extracted claim as the article extract, falling back to the snippet', async () => {
