@@ -454,6 +454,8 @@ model Prediction {
   @@index([resolveByDatetime])
   @@index([isPublic])
   @@index([externalMarketId])
+  @@index([status, isPublic, createdAt])
+  @@index([status, isPublic, updatedAt])
   @@map("predictions")
 }
 
