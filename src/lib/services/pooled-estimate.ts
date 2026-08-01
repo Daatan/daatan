@@ -30,14 +30,15 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
   snapshotSources: EnrichedOracleSource[]
   estimateSource: 'pool' | 'single-run' | 'pool-insufficient'
   /**
-   * The pool aggregated but returned no usable estimate — in prod the only reason is
-   * `all_articles_off_topic` (see `reason`). The caller must record an ABSTENTION
+   * The pool aggregated but returned no usable estimate — in prod either
+   * `all_articles_off_topic` or `no_usable_weight` (see `reason`; the Oracle may add more,
+   * so never switch on the value here). The caller must record an ABSTENTION
    * (probability null, snapshot `insufficientData: true`), NOT fall back to the single run:
    * that run scored the same off-topic articles, so its number is meaningless. The
    * `mean`/`ciLow`/… fields are the single run's and are unused in this case.
    */
   insufficientData: boolean
-  /** The pool's insufficiency reason (e.g. `all_articles_off_topic`), or null. */
+  /** The pool's insufficiency reason (e.g. `all_articles_off_topic`, `no_usable_weight`), or null. */
   reason: string | null
   /** Diagnostics for the caller's log line. `poolSize` is null when no pool read happened. */
   poolSize: number | null
