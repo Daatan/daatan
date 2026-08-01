@@ -296,10 +296,13 @@ and the two "no pool number" cases are deliberately different:
 - **single-run fallback** — the pool could not be *read* (Oracle unreachable, nothing usable
   pooled yet, transport error). Fall back to this run's `/forecast` so a flaky Oracle degrades
   the estimate rather than dropping it.
-- **abstain** — the pool *was* aggregated and returned `insufficient_data`. In prod the only
-  reason is `all_articles_off_topic` (every article scored below `relevance_weight_floor`;
-  `defer_on_thin_evidence` is off, so thin-but-on-topic pools get their CI inflated instead,
-  never marked insufficient). The run records an **abstention** — `confidence`/CI null, the
+- **abstain** — the pool *was* aggregated and returned `insufficient_data`. In prod there are
+  two reasons: `all_articles_off_topic` (every article scored below `relevance_weight_floor`)
+  and, since the Oracle's 2026-08-01 R3 release, `no_usable_weight` (rows exist but every one
+  of them carries zero aggregation weight — blocked by credibility, zeroed by relevance, or
+  both; the Oracle used to answer such a pool with equal weights instead). Thin-but-on-topic
+  pools are still NOT insufficient — `defer_on_thin_evidence` is off, so they get their CI
+  inflated instead. Treat the reason as an opaque string: it is the Oracle's to extend. The run records an **abstention** — `confidence`/CI null, the
   snapshot flagged `insufficientData: true`, no notification, excluded from the glide anchor
   and history chart (both filter `insufficientData: false`) — rather than fall back to a
   single run over the *same* off-topic articles, which would reintroduce a garbage number.
