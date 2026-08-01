@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/leaderboard/route'
 
+// unstable_cache needs Next's real incremental-cache backend, which doesn't
+// exist outside next dev/start — pass through so these tests still exercise
+// getLeaderboard fresh against the mocked Prisma calls below.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: unknown) => fn,
+}))
+
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn().mockReturnValue({ allowed: true, remaining: 59, resetAt: Date.now() + 3600000 }),
   rateLimitResponse: vi.fn().mockReturnValue(new Response(JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }), { status: 429 })),
