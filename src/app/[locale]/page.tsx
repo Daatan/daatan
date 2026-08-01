@@ -65,7 +65,7 @@ export default async function LocaleHomePage() {
     isCuSort: false,
     sortOrder: 'desc',
   })
-  const initialPredictions = enrichPredictions(predictions, undefined, {
+  const initialPredictions = enrichPredictions(predictions, {
     page: 1,
     limit: 20,
     sortOrder: 'desc',

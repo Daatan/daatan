@@ -61,7 +61,7 @@ export default async function TagPage({ params, searchParams }: Props) {
     isCuSort: false,
     sortOrder: 'desc',
   })
-  const initialPredictions = enrichPredictions(predictions, undefined, {
+  const initialPredictions = enrichPredictions(predictions, {
     page,
     limit: PAGE_LIMIT,
     sortOrder: 'desc',

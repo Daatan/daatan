@@ -9,7 +9,6 @@ import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { createLogger } from '@/lib/logger'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordEstimate } from '@/lib/services/context'
-import { communityProbability } from '@/lib/forecast-math'
 import {
   normalizeForecastToEnglish,
   translatePredictionToAllLocales,
@@ -59,6 +58,99 @@ export interface ListForecastsQuery {
   limit: number
   isCuSort: boolean
   sortOrder: 'asc' | 'desc'
+  /** Resolves per-prediction userHasCommitted. Omit for SSR/unauthenticated fetches. */
+  userId?: string
+}
+
+type CommitmentStats = {
+  totalCuCommitted: number
+  avgCuCommitted: number | null
+  yesCu: number
+  noCu: number
+  optionCounts: Map<string, number>
+  userHasCommitted: boolean
+}
+
+const EMPTY_COMMITMENT_STATS: CommitmentStats = {
+  totalCuCommitted: 0,
+  avgCuCommitted: null,
+  yesCu: 0,
+  noCu: 0,
+  optionCounts: new Map(),
+  userHasCommitted: false,
+}
+
+// Aggregates commitment stats DB-side instead of fetching every commitment row
+// per prediction (daatan#1203) — cost was scaling with total commitment volume
+// on popular predictions rather than the page size. Split into 3 groupBy shapes
+// because each answers a different question: (a) total/avg per prediction, (b)
+// yes/no CU split (binaryChoice is derived from cuCommitted's sign on every
+// write in commitment.ts, so summing per group and taking abs is exactly
+// equivalent to the old per-row abs-then-sum), (c) per-option commitment count.
+async function getCommitmentStats(
+  predictionIds: string[],
+  userId?: string,
+): Promise<Map<string, CommitmentStats>> {
+  const stats = new Map<string, CommitmentStats>()
+  if (predictionIds.length === 0) return stats
+
+  // Pre-seed every requested id so a row from any of the 4 queries below
+  // always has an entry to update — a prediction can appear in userCommitted
+  // (or, in principle, in only one of the other 2 groupBys) without also
+  // appearing in `totals` if the queries ever disagree; don't rely on `totals`
+  // being the sole source of map entries.
+  for (const id of predictionIds) {
+    stats.set(id, { ...EMPTY_COMMITMENT_STATS, optionCounts: new Map() })
+  }
+
+  const [totals, byChoice, byOption, userCommitted] = await Promise.all([
+    prisma.commitment.groupBy({
+      by: ['predictionId'],
+      where: { predictionId: { in: predictionIds } },
+      _sum: { cuCommitted: true },
+      _avg: { cuCommitted: true },
+    }),
+    prisma.commitment.groupBy({
+      by: ['predictionId', 'binaryChoice'],
+      where: { predictionId: { in: predictionIds }, binaryChoice: { not: null } },
+      _sum: { cuCommitted: true },
+    }),
+    prisma.commitment.groupBy({
+      by: ['predictionId', 'optionId'],
+      where: { predictionId: { in: predictionIds }, optionId: { not: null } },
+      _count: { _all: true },
+    }),
+    userId
+      ? prisma.commitment.findMany({
+          where: { predictionId: { in: predictionIds }, userId },
+          select: { predictionId: true },
+        })
+      : Promise.resolve([]),
+  ])
+
+  for (const row of totals) {
+    const entry = stats.get(row.predictionId)
+    if (!entry) continue
+    entry.totalCuCommitted = row._sum.cuCommitted ?? 0
+    entry.avgCuCommitted = row._avg.cuCommitted ?? null
+  }
+  for (const row of byChoice) {
+    const entry = stats.get(row.predictionId)
+    if (!entry) continue
+    const sum = row._sum.cuCommitted ?? 0
+    if (row.binaryChoice === true) entry.yesCu = sum
+    else if (row.binaryChoice === false) entry.noCu = Math.abs(sum)
+  }
+  for (const row of byOption) {
+    if (!row.optionId) continue
+    stats.get(row.predictionId)?.optionCounts.set(row.optionId, row._count._all)
+  }
+  for (const row of userCommitted) {
+    const entry = stats.get(row.predictionId)
+    if (entry) entry.userHasCommitted = true
+  }
+
+  return stats
 }
 
 export async function listForecasts(query: ListForecastsQuery) {
@@ -71,14 +163,6 @@ export async function listForecasts(query: ListForecastsQuery) {
         tags: { select: { name: true, slug: true } },
         options: { orderBy: { displayOrder: 'asc' } },
         _count: { select: { commitments: true } },
-        commitments: {
-          select: {
-            cuCommitted: true,
-            userId: true,
-            binaryChoice: true,
-            optionId: true,
-          },
-        },
       },
       orderBy: query.orderBy,
       skip: query.isCuSort ? 0 : (query.page - 1) * query.limit,
@@ -86,46 +170,46 @@ export async function listForecasts(query: ListForecastsQuery) {
     }),
     prisma.prediction.count({ where: query.where }),
   ])
-  return { predictions, total }
+
+  const commitmentStats = await getCommitmentStats(predictions.map(p => p.id), query.userId)
+
+  return {
+    predictions: predictions.map(p => ({
+      ...p,
+      commitmentStats: commitmentStats.get(p.id) ?? EMPTY_COMMITMENT_STATS,
+    })),
+    total,
+  }
 }
 
 export function enrichPredictions(
   predictions: Awaited<ReturnType<typeof listForecasts>>['predictions'],
-  userId: string | undefined,
   query: Pick<ListForecastsQuery, 'page' | 'limit' | 'sortOrder' | 'isCuSort'>,
 ) {
-  const enriched = predictions.map(({ commitments, ...pred }) => {
-    const totalCuCommitted = commitments
-      ? commitments.reduce((sum, c) => sum + c.cuCommitted, 0)
-      : 0
-    const userHasCommitted = userId && commitments
-      ? commitments.some((c) => c.userId === userId)
-      : false
+  const enriched = predictions.map(({ commitmentStats, ...pred }) => {
+    const { totalCuCommitted, avgCuCommitted, yesCu, noCu, optionCounts, userHasCommitted } = commitmentStats
 
-    let yesCount = 0
-    let noCount = 0
-    // Canonical community probability (mean of stated P(YES)) — the same number
-    // the detail page shows. Kept separate from yes/noCount, which are CU-weighted
-    // stake sums used only for the YES/NO split bar.
-    let communityProb: number | null = null
-    if (pred.outcomeType === 'BINARY' && commitments) {
-      yesCount = commitments
-        .filter(c => c.binaryChoice === true)
-        .reduce((sum, c) => sum + c.cuCommitted, 0)
-      noCount = commitments
-        .filter(c => c.binaryChoice === false)
-        .reduce((sum, c) => sum + Math.abs(c.cuCommitted), 0)
-      communityProb = communityProbability(commitments)
-    }
+    // communityProbability(commits) averages (cuCommitted+100)/200 per commit — a
+    // linear transform, so plugging the DB-computed avg into the same formula is
+    // exactly equivalent without re-fetching every row.
+    const communityProb = pred.outcomeType === 'BINARY' && avgCuCommitted !== null
+      ? Math.round(((avgCuCommitted + 100) / 200) * 100)
+      : null
 
     const options = pred.options?.map((opt) => ({
       ...opt,
-      commitmentsCount: commitments
-        ? commitments.filter((c) => c.optionId === opt.id).length
-        : 0,
+      commitmentsCount: optionCounts.get(opt.id) ?? 0,
     })) ?? []
 
-    return { ...pred, totalCuCommitted, userHasCommitted, yesCount, noCount, communityProbability: communityProb, options }
+    return {
+      ...pred,
+      totalCuCommitted,
+      userHasCommitted,
+      yesCount: yesCu,
+      noCount: noCu,
+      communityProbability: communityProb,
+      options,
+    }
   })
 
   if (!query.isCuSort) return enriched
