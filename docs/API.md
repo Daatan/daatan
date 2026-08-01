@@ -354,6 +354,9 @@ scoring, roles, or profile identity.
 
 ### `GET /api/leaderboard`
 Top users ranked by the selected scoring system. Public. Rate-limited to 60 requests/hour per IP.
+Result cached 5 min per `(limit, sortBy, tag)` combination via `unstable_cache` (#1204) — rankings
+move slowly (only on resolution events), so this avoids the full multi-query aggregation
+(scoped to all `isPublic` users) rerunning on every page view/filter change.
 
 | Query | Type | Default | Description |
 |-------|------|---------|-------------|
