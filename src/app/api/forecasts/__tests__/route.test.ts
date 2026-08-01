@@ -50,10 +50,6 @@ vi.mock('@/lib/prisma', () => ({
     },
 }))
 
-vi.mock('@/lib/services/prediction-lifecycle', () => ({
-    transitionExpiredPredictions: vi.fn().mockResolvedValue(0),
-}))
-
 describe('/api/forecasts', () => {
     beforeEach(() => {
         vi.clearAllMocks()

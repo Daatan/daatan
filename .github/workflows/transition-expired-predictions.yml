@@ -1,0 +1,65 @@
+name: Transition Expired Predictions
+
+# Periodic trigger for /api/cron/transition-expired-predictions (daatan#1202).
+# Previously this ran inline on every GET /api/forecasts request — the feed's
+# hottest read path was paying for a write-scan before doing any read. Moved
+# to a schedule since the transition doesn't gate commitment eligibility
+# (getCommitmentLockReason checks resolveByDatetime directly, independent of
+# status) — a periodic sweep is safe, it only affects how promptly a forecast
+# moves into the "Awaiting Resolution" list-status filter.
+#
+# WHERE THIS RUNS:
+#   Same mechanism as heartbeat.yml / requote.yml — a GitHub Actions runner
+#   makes the HTTP request, the EC2 app process does the work.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  transition-expired-predictions:
+    name: Transition ${{ matrix.env.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - name: production
+            url: https://daatan.com
+          - name: staging
+
+    steps:
+      - name: Trigger transition
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          ENV="${{ matrix.env.name }}"
+          if [ "$ENV" = "staging" ]; then
+            BASE="$STAGING_URL"
+          else
+            BASE="${{ matrix.env.url }}"
+          fi
+
+          if [ -z "$BASE" ]; then
+            echo "⚠️ No URL configured for $ENV — skipping"
+            exit 0
+          fi
+
+          HTTP=$(curl -s -o /tmp/transition_body.txt -w "%{http_code}" \
+            --max-time 30 \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            "$BASE/api/cron/transition-expired-predictions")
+
+          BODY=$(cat /tmp/transition_body.txt)
+          echo "HTTP $HTTP — $BODY"
+
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Transition OK for $ENV"
+          elif [ "$HTTP" = "404" ]; then
+            echo "ℹ️ Route not deployed yet on $ENV (HTTP 404) — skipping"
+          else
+            echo "❌ Transition failed for $ENV (HTTP $HTTP)"
+            exit 1
+          fi
