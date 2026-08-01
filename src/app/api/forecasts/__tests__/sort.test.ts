@@ -18,6 +18,10 @@ vi.mock('@/lib/prisma', () => ({
             findMany: vi.fn(),
             count: vi.fn(),
         },
+        commitment: {
+            groupBy: vi.fn().mockResolvedValue([]),
+            findMany: vi.fn().mockResolvedValue([]),
+        },
     },
 }))
 
@@ -97,14 +101,20 @@ describe('/api/forecasts sort parameters', () => {
 
         it('sorts by CU in memory (desc default)', async () => {
             const { prisma } = await import('@/lib/prisma')
-            
+
             const mockForecasts = [
-                { id: '1', claimText: 'Low CU', commitments: [{ cuCommitted: 10 }] },
-                { id: '2', claimText: 'High CU', commitments: [{ cuCommitted: 100 }] },
+                { id: '1', claimText: 'Low CU' },
+                { id: '2', claimText: 'High CU' },
             ]
 
             vi.mocked(prisma.prediction.findMany).mockResolvedValue(mockForecasts as any)
             vi.mocked(prisma.prediction.count).mockResolvedValue(2)
+            // totalCuCommitted now comes from the groupBy(by: ['predictionId']) aggregate
+            // (the first of 3 groupBy calls in getCommitmentStats), not an inline array.
+            vi.mocked(prisma.commitment.groupBy).mockResolvedValueOnce([
+                { predictionId: '1', _sum: { cuCommitted: 10 }, _avg: { cuCommitted: 10 } },
+                { predictionId: '2', _sum: { cuCommitted: 100 }, _avg: { cuCommitted: 100 } },
+            ] as any)
 
             const request = new NextRequest('http://localhost/api/forecasts?sortBy=cu')
             const response = await GET(request)
@@ -116,14 +126,18 @@ describe('/api/forecasts sort parameters', () => {
 
         it('sorts by CU in memory (asc explicit)', async () => {
             const { prisma } = await import('@/lib/prisma')
-            
+
             const mockForecasts = [
-                { id: '1', claimText: 'Low CU', commitments: [{ cuCommitted: 10 }] },
-                { id: '2', claimText: 'High CU', commitments: [{ cuCommitted: 100 }] },
+                { id: '1', claimText: 'Low CU' },
+                { id: '2', claimText: 'High CU' },
             ]
 
             vi.mocked(prisma.prediction.findMany).mockResolvedValue(mockForecasts as any)
             vi.mocked(prisma.prediction.count).mockResolvedValue(2)
+            vi.mocked(prisma.commitment.groupBy).mockResolvedValueOnce([
+                { predictionId: '1', _sum: { cuCommitted: 10 }, _avg: { cuCommitted: 10 } },
+                { predictionId: '2', _sum: { cuCommitted: 100 }, _avg: { cuCommitted: 100 } },
+            ] as any)
 
             const request = new NextRequest('http://localhost/api/forecasts?sortBy=cu&sortOrder=asc')
             const response = await GET(request)

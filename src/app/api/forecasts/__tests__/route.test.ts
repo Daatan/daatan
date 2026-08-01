@@ -41,6 +41,10 @@ vi.mock('@/lib/prisma', () => ({
             findUnique: vi.fn(),
             updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
+        commitment: {
+            groupBy: vi.fn().mockResolvedValue([]),
+            findMany: vi.fn().mockResolvedValue([]),
+        },
         user: {
             findUnique: vi.fn(),
         },

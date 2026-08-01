@@ -28,7 +28,7 @@ const fetchInitialFeed = unstable_cache(
       isCuSort: false,
       sortOrder: 'desc',
     })
-    return enrichPredictions(predictions, undefined, {
+    return enrichPredictions(predictions, {
       page: 1,
       limit: 20,
       sortOrder: 'desc',

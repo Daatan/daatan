@@ -119,16 +119,10 @@ export async function GET(request: NextRequest) {
     const { predictions, total } = await listForecasts({
       where, orderBy, page: query.page, limit: query.limit,
       isCuSort, sortOrder: query.sortOrder as 'asc' | 'desc',
+      userId: session?.user?.id,
     })
 
-    let userId: string | undefined
-    try {
-      userId = (await auth())?.user?.id
-    } catch {
-      userId = undefined
-    }
-
-    const finalPredictions = enrichPredictions(predictions, userId, {
+    const finalPredictions = enrichPredictions(predictions, {
       page: query.page, limit: query.limit,
       sortOrder: query.sortOrder as 'asc' | 'desc', isCuSort,
     })
