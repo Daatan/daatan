@@ -2,12 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/forecasts/route'
 
-const { mockAuth, mockFindMany, mockCount, mockUpdateMany, mockTransition } = vi.hoisted(() => ({
+const { mockAuth, mockFindMany, mockCount, mockUpdateMany } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockFindMany: vi.fn().mockResolvedValue([]),
   mockCount: vi.fn().mockResolvedValue(0),
   mockUpdateMany: vi.fn().mockResolvedValue({ count: 0 }),
-  mockTransition: vi.fn().mockResolvedValue(0),
 }))
 
 vi.mock('@/auth', () => ({ auth: mockAuth }))
@@ -22,25 +21,12 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-vi.mock('@/lib/services/prediction-lifecycle', () => ({
-  transitionExpiredPredictions: mockTransition,
-}))
-
 describe('GET /api/forecasts - Status Filters', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFindMany.mockResolvedValue([])
     mockCount.mockResolvedValue(0)
     mockAuth.mockResolvedValue(null)
-    mockTransition.mockResolvedValue(0)
-  })
-
-  it('calls transitionExpiredPredictions before querying', async () => {
-    const request = new NextRequest('http://localhost/api/forecasts?status=ACTIVE')
-    await GET(request)
-
-    expect(mockTransition).toHaveBeenCalledTimes(1)
-    expect(mockFindMany).toHaveBeenCalled()
   })
 
   it('filters ACTIVE predictions correctly', async () => {

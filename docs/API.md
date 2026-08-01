@@ -660,6 +660,15 @@ links to: pulls the latest YES price, writes an `ExternalMarketPriceSnapshot`
 resolution status. Auth: `x-cron-secret` header. Best-effort per market, never
 throws. Triggered hourly by `.github/workflows/external-market-sync.yml`.
 
+### `GET /api/cron/transition-expired-predictions`
+Transitions `ACTIVE` predictions past their `resolveByDatetime` to `PENDING`.
+Moved off the `GET /api/forecasts` hot read path (#1202) — every feed load
+was paying for this write-scan before doing any read. Doesn't gate commitment
+eligibility (`getCommitmentLockReason` checks `resolveByDatetime` directly),
+so a periodic sweep is safe. Auth: `x-cron-secret` header. Returns
+`{ ok, transitioned }`. Triggered every 15 minutes by
+`.github/workflows/transition-expired-predictions.yml`.
+
 ---
 
 ## Notifications
