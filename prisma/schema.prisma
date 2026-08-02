@@ -563,6 +563,14 @@ model EvidencePoolArticle {
   // before this field existed; treated as always-changed on next encounter,
   // no backfill needed (the gap self-heals, 286 rows at introduction).
   contentHash String? @map("content_hash") @db.VarChar(64)
+  // The snippet the discovering path pushed, kept so a RETRY can re-send the same
+  // text the original attempt had (daatan#1232). Without it the retry sweep re-pushed
+  // title-only (`snippet: ''`), i.e. strictly LESS text than the attempt that already
+  // failed — for a Telegram row whose only content IS the snippet that made the second
+  // null near-deterministic, and the terminal `oracle_null_final` stamp a self-fulfilling
+  // prophecy rather than a genuine re-test. Nullable; rows written before this existed
+  // stay null and the sweep falls back to title-only for them, exactly as before.
+  snippet String? @db.VarChar(2000)
   // Claim/completion lifecycle for the atomic extraction gate (evidence-pool.ts
   // claimArticleForExtraction/completeArticleExtraction/failArticleExtraction).
   // Lets two near-simultaneous discoveries of the same (predictionId, url) —

@@ -148,6 +148,44 @@ export function hashArticleContent(title: string, snippet: string): string {
  *  in-flight call. */
 const PENDING_CLAIM_STALE_MS = 10 * 60 * 1000
 
+/**
+ * How long a FAILED row is left alone before an organic re-push may re-claim it with
+ * IDENTICAL content (daatan#1232).
+ *
+ * There used to be no gate at all: `{ status: 'FAILED' }` was its own OR-arm, so a row
+ * that failed was immediately re-claimable. news-indexer re-pushes the same article set
+ * on every poll cycle while its 5-minute cooldown rolls, so an article that always nulls
+ * looped FAILED → PENDING → FAILED, burning a full Oracle run (fetch + gatekeeper +
+ * extractor) each time. The schema's own comment — "eligible for retry once stale" — was
+ * stricter than the code implementing it.
+ *
+ * 24h, matching `pool-retry`'s `RETRY_MIN_AGE_MS`, so the two retry surfaces cost the same
+ * article the same order of budget instead of the organic path being ~288× cheaper to
+ * trigger than the sweep it was silently competing with.
+ *
+ * This gate applies ONLY to re-claims with unchanged content. A content change still
+ * re-claims immediately via the `contentHash` arms — that is genuinely new evidence (a
+ * live-blog update), not a retry, and it is also the documented escape hatch that keeps
+ * terminal rows revivable.
+ */
+const FAILED_RECLAIM_BACKOFF_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Reasons that mean "stop asking about this row" — a verdict, not a transient miss.
+ *
+ * - `oracle_omitted`: the Oracle ran and its gatekeeper dropped the article. Re-asking
+ *   burns an LLM call to hear "no" again.
+ * - `oracle_null_final`: two independent null runs a day apart (`pool-retry`'s attempt cap).
+ *
+ * `pool-retry` has always excluded these from the SWEEP. They were still re-claimable on
+ * the ORGANIC path with identical content, which made "terminal" true of one retry surface
+ * and not the other. Now neither re-asks about unchanged content, while a content change
+ * still revives them through the `contentHash` arms — preserving the deliberate escape
+ * hatch documented in pool-retry.ts, and only closing the loop that had no new information
+ * in it.
+ */
+export const TERMINAL_POOL_REASONS: readonly string[] = ['oracle_omitted', 'oracle_null_final']
+
 export interface ClaimableArticle {
   url: string
   title: string
@@ -189,6 +227,9 @@ export async function claimArticleForExtraction(
         url: article.url,
         urlHash,
         title: article.title,
+        // Stored so a later retry can re-send the same text this attempt had — see the
+        // `snippet` column comment and daatan#1232.
+        snippet: article.snippet || null,
         source: article.source,
         publishedDate: article.publishedAt,
         contentHash,
@@ -202,20 +243,35 @@ export async function claimArticleForExtraction(
   }
 
   const staleCutoff = new Date(Date.now() - PENDING_CLAIM_STALE_MS)
+  const failedCutoff = new Date(Date.now() - FAILED_RECLAIM_BACKOFF_MS)
   const { count } = await prisma.evidencePoolArticle.updateMany({
     where: {
       predictionId,
       urlHash,
       OR: [
+        // Content changed (or was never fingerprinted) — genuinely new evidence, not a
+        // retry. Re-claims immediately whatever the row's previous outcome was, which is
+        // also what keeps terminal rows revivable.
         { contentHash: null },
         { contentHash: { not: contentHash } },
-        { status: 'FAILED' },
+        // Same content, previously FAILED: allowed, but only after a backoff, and never
+        // for a terminal reason. Two arms because SQL's `NOT IN` is false for NULL, so a
+        // null statusReason has to be matched explicitly — same shape as pool-retry's
+        // `retryableWhere`, deliberately, since these are the two halves of one policy.
+        {
+          status: 'FAILED',
+          statusReason: { notIn: [...TERMINAL_POOL_REASONS] },
+          updatedAt: { lt: failedCutoff },
+        },
+        { status: 'FAILED', statusReason: null, updatedAt: { lt: failedCutoff } },
+        // An abandoned in-flight claim.
         { status: 'PENDING', updatedAt: { lt: staleCutoff } },
       ],
     },
     data: {
       url: article.url,
       title: article.title,
+      snippet: article.snippet || null,
       source: article.source,
       publishedDate: article.publishedAt,
       contentHash,

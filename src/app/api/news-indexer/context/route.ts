@@ -414,7 +414,16 @@ export async function POST(request: NextRequest) {
       // retro's 90s, a timeout and an all-articles-off-topic abstention wrote byte-identical
       // rows, and the real cause survived only in OracleCallLog, which the retry sweep never
       // reads. `oracle_null` remains the residual for the (unreachable) unclassified case.
-      await failClaimedArticles(prediction.id, items.map((a) => a.url), failureClass ?? 'oracle_null')
+      // Scoped to THIS request's own claims, like the success path 130 lines above
+      // (daatan#1232). Unfiltered, a null forecast also failed articles a concurrent
+      // request had just claimed and was still extracting: `failClaimedArticles` only
+      // touches PENDING rows, and a fresh in-flight claim is exactly that. The other
+      // request would then complete against a row this one had already marked FAILED.
+      await failClaimedArticles(
+        prediction.id,
+        items.filter((_, i) => claimResults[i] === 'claimed').map((a) => a.url),
+        failureClass ?? 'oracle_null',
+      )
       log.info(
         { predictionId: prediction.id, articles: items.length, similarity: triggerSimilarity, failureClass },
         'news-indexer: oracle returned null, skipping probability update',

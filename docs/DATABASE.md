@@ -177,6 +177,24 @@ a row as `PENDING` (a claim older than 10 min counts as abandoned and can be
 re-claimed), a successful extraction completes it, and everything a run claimed
 but got no signal for is released as `FAILED` with a `statusReason`.
 
+**Re-claiming a FAILED row** (daatan#1232) is gated on three things, and the gate
+distinguishes *new evidence* from *a retry*:
+
+- **Content changed** (`contentHash` differs, or is null on a pre-fingerprint row) —
+  re-claims **immediately, whatever the row's previous outcome was**. That is genuinely
+  new evidence (a live-blog update), and it is also the documented escape hatch that
+  keeps terminal rows revivable.
+- **Same content, non-terminal failure** — re-claimable only after
+  `FAILED_RECLAIM_BACKOFF_MS` (24 h, matching `pool-retry`'s `RETRY_MIN_AGE_MS`).
+- **Same content, terminal reason** (`TERMINAL_POOL_REASONS`) — never re-claimed.
+
+This used to be a bare `{ status: 'FAILED' }` arm: no age gate, no reason filter. Since
+news-indexer re-pushes the same article set on every poll cycle while its 5-minute
+cooldown rolls, an always-null article looped `FAILED → PENDING → FAILED`, burning a
+full Oracle run (fetch + gatekeeper + extractor) every few minutes — and "terminal" was
+true of the sweep but false of every organic re-push, because only `pool-retry` honoured
+it. The schema comment "eligible for retry once stale" was stricter than the code.
+
 **The null family** (daatan#1231) — the Oracle produced no forecast, split by WHY.
 This used to be one string, `oracle_null`, covering six different situations: 73% of
 the 200 most recent pool fetches (2026-07-31) carried it, and because
@@ -208,10 +226,19 @@ terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`.
 `getOracleForecast`, which never throws, so the branch was dead code (removed in
 daatan#1231). Historical rows carrying it remain retryable. The retry sweep (`src/lib/services/pool-retry.ts`,
 exposed at `POST /api/admin/evidence-pool/retry`, driven by the weekly
-`Retry Pool Extractions` workflow) re-pushes retryable rows title-only through
+`Retry Pool Extractions` workflow) re-pushes retryable rows through
 `refreshOracleSnapshot`, biggest ACTIVE-forecast backlogs first, one attempt
 per row per 24 h. Terminal rows are still revivable organically: a re-push with
 changed content re-claims the row.
+
+The sweep re-pushes each row with the **stored `snippet`** (daatan#1232). It previously
+sent title-only (`snippet: ''`), because the pool never persisted the snippet — so for a
+Telegram row whose only content *is* the snippet, the retry carried strictly less text
+than the attempt that had already failed, making the second null and the terminal
+`oracle_null_final` stamp near-deterministic rather than a genuine re-test. `snippet` is
+nullable with **no backfill** (the text was never stored on this side and is
+unrecoverable); rows predating the column fall back to title-only exactly as before, and
+self-heal on the next organic re-push.
 
 `excluded` is settable via the forecast page's admin-only "Evidence
 pool" panel (`EvidencePoolAdmin.tsx`, `PATCH

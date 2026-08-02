@@ -1,0 +1,17 @@
+-- daatan#1232: keep the snippet the discovering path pushed, so a retry can
+-- re-send the same text the original attempt had.
+--
+-- The retry sweep re-pushes stuck rows title-only (`snippet: ''`) because the
+-- pool never stored the snippet. For a Telegram row whose only content IS the
+-- snippet, that means the retry carries strictly LESS text than the attempt
+-- that already failed — so the second null, and the terminal
+-- `oracle_null_final` stamp that follows it, were near-deterministic rather
+-- than a genuine re-test.
+--
+-- Additive and nullable. NO BACKFILL: the snippet of an already-pooled row was
+-- never persisted anywhere on this side and cannot be recovered. Existing rows
+-- stay NULL and the sweep falls back to title-only for them, exactly as today;
+-- they self-heal on the next organic re-push, which carries the snippet again.
+--
+-- No index: only ever read by primary key alongside the rest of the row.
+ALTER TABLE "evidence_pool_articles" ADD COLUMN "snippet" VARCHAR(2000);

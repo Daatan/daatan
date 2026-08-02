@@ -123,7 +123,14 @@ export async function refreshOracleSnapshot(
     // THROUGH here, so without it the sweep would keep writing the very `oracle_null`
     // rows it is meant to be draining, and the two paths would disagree about what a
     // pool row means.
-    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), failureClass ?? 'oracle_null')
+    // Scoped to this run's own claims, same fix and same reason as the news-indexer
+    // route (daatan#1232) — unfiltered, a null run also failed a concurrent request's
+    // still-PENDING claims.
+    await failClaimedArticles(
+      prediction.id,
+      searchResults.filter((_, i) => claimResults[i] === 'claimed').map((r) => r.url),
+      failureClass ?? 'oracle_null',
+    )
     if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
     return { status: 'no-oracle' }
   }
