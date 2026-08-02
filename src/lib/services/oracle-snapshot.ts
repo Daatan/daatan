@@ -1,4 +1,4 @@
-import type { OracleSource } from '@/lib/services/oracle'
+import type { OracleClaimDetail, OracleSource } from '@/lib/services/oracle'
 import type { SearchResult } from '@/lib/services/oracleSearch'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import type { EvidencePoolArticle } from '@prisma/client'
@@ -70,6 +70,13 @@ export type EnrichedOracleSource = {
   eventTarget: string | null
   isOccurrence: boolean | null
   verified: boolean | null
+  // The per-claim layer behind every scalar above (F1/F15, daatan#1235 + retro#364) —
+  // each claim's own stance/certainty/class/fact_signal/facets, as retro's fusion
+  // consumed them. This is where the inputs to those reductions used to die. Null on
+  // rows extracted before it existed (no backfill — the data is gone, not derivable).
+  // Persisted verbatim; nothing in aggregation reads it and it is never sent back to
+  // `/pool/aggregate` (shadow, like authorLean/factSignal).
+  claimsDetail: OracleClaimDetail[] | null
   // Whether this source's stance is byte-identical to its reading in the immediately-prior
   // evidence snapshot for this prediction — i.e. it was swept into this snapshot by a pool
   // recompute triggered by a DIFFERENT source's new article, not itself re-evaluated. Always
@@ -124,6 +131,7 @@ export function enrichOracleSources(
       eventTarget: s.event_target ?? null,
       isOccurrence: s.is_occurrence ?? null,
       verified: s.verified ?? null,
+      claimsDetail: s.claims_detail ?? null,
       carriedForward: false,
     }
   })
@@ -139,6 +147,28 @@ const EVIDENCE_CLASSES: readonly EvidenceClass[] = [
 ]
 function isEvidenceClass(v: unknown): v is EvidenceClass {
   return typeof v === 'string' && (EVIDENCE_CLASSES as readonly string[]).includes(v)
+}
+
+/**
+ * Narrow the `claims_detail` Json column back to `OracleClaimDetail[]`.
+ *
+ * Defensive in the same spirit as the `claims` narrowing above: this is an
+ * untyped Json column written by an external service, so a malformed or
+ * legacy value degrades to null rather than propagating a bad shape into a
+ * snapshot. Only the two fields every claim must have — a `claim` string and
+ * a numeric `stance` — are checked; the rest are optional on the wire and a
+ * future retro version may add more, which must not invalidate the row.
+ */
+function toClaimsDetail(v: unknown): OracleClaimDetail[] | null {
+  if (!Array.isArray(v) || v.length === 0) return null
+  const ok = v.every(
+    (c): c is OracleClaimDetail =>
+      typeof c === 'object' &&
+      c !== null &&
+      typeof (c as { claim?: unknown }).claim === 'string' &&
+      typeof (c as { stance?: unknown }).stance === 'number',
+  )
+  return ok ? (v as OracleClaimDetail[]) : null
 }
 
 /**
@@ -189,6 +219,7 @@ export function poolArticleToEnrichedSource(
     eventTarget: row.eventTarget,
     isOccurrence: row.isOccurrence,
     verified: row.verified,
+    claimsDetail: toClaimsDetail(row.claimsDetail),
     carriedForward,
   }
 }

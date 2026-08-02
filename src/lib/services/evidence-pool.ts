@@ -76,6 +76,10 @@ export async function addArticlesToPool(
           eventTarget: s.eventTarget,
           isOccurrence: s.isOccurrence,
           verified: s.verified,
+          // F1/F15 (daatan#1235, retro#364) — the per-claim layer behind every
+          // scalar above. `Prisma.DbNull` (not `null`) is how a nullable Json
+          // column is written to SQL NULL.
+          claimsDetail: s.claimsDetail ?? Prisma.DbNull,
           origin,
           // No claim step for this row (e.g. the analyze path, which always
           // calls the extractor fresh rather than gating on content-hash) —
@@ -110,6 +114,14 @@ export async function addArticlesToPool(
           eventTarget: s.eventTarget,
           isOccurrence: s.isOccurrence,
           verified: s.verified,
+          // F1/F15 — deliberately `undefined` (= leave the column alone), NOT
+          // DbNull. A path that re-touches a pool row without carrying per-claim
+          // data (a recompute, an older Oracle build, a partial response) must
+          // not erase per-claim data we already hold: it is unrecoverable, since
+          // there is no backfill. This is the daatan#1237 failure mode — "re-
+          // extraction nulls fields the response merely omitted" — which the
+          // scalar fields above still have and this field deliberately does not.
+          claimsDetail: s.claimsDetail ?? undefined,
           origin,
           // Flips a PENDING row (claimed by claimArticleForExtraction, then
           // successfully extracted) to COMPLETE. Deliberately does not touch

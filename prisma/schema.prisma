@@ -646,6 +646,33 @@ model EvidencePoolArticle {
   isOccurrence Boolean? @map("is_occurrence")
   verified     Boolean?
 
+  // The per-claim layer behind every extracted scalar above (F1/F15, daatan#1235
+  // + retro#364). Each element carries one claim's own stance, certainty,
+  // specificity, kind, evidence_class, quantitative_estimate, settled, event_date,
+  // fact_signal and the four fact facets — see retro's ClaimDetail model, which is
+  // the wire shape stored here verbatim.
+  //
+  // Why this column exists: everything above is a REDUCTION. A multi-article claim
+  // set was collapsed into five article-level scalars computed over five different
+  // claim subsets, and this is where the inputs to those reductions physically died
+  // — unrecoverably. Without it there is no retroactive backtesting (we cannot
+  // re-score history we never kept), no per-claim credibility attribution, no way to
+  // measure extractor instability over time, and nothing for a shadow pool to read.
+  //
+  // Two collapses are only visible here: `evidenceClass` above is the article's most
+  // COMMON class (mixed-class articles are unattributable above this layer), and the
+  // fact facets above ride from the single DOMINANT claim (so a lone over-cap
+  // interested-party claim diluted by in-contract siblings is invisible — retro#378).
+  //
+  // SHADOW / storage only — like `authorLean` and `factSignal`, nothing in
+  // aggregation reads this and it is never sent to `/pool/aggregate`; the estimator
+  // keeps its eight-scalar whitelist. Additive, nullable, NO BACKFILL: for rows
+  // written before this existed the per-claim data is gone and must not be
+  // fabricated. Populated only on new extractions (pool rows are a contentHash
+  // extraction cache), and deliberately never NULLED by an update that merely omits
+  // it (see addArticlesToPool — the daatan#1237 failure mode).
+  claimsDetail Json? @map("claims_detail")
+
   // Which path most recently (re-)extracted this article: 'analyze' |
   // 'news-indexer' | 'backfill'. Overwritten on re-discovery — provenance of the
   // latest signal, not a history of every path that ever cited this article.

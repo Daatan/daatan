@@ -263,6 +263,29 @@ cache — no backfill without the reset→retry sweep). The free-text facets
 never fail the shadow write. The Phase-3 estimator cutover to `factSignal` is
 gated on an offline Brier backtest — until it beats `stance` on calibration,
 `stance` stays authoritative.
+`claimsDetail` (jsonb, F1/F15 — daatan#1235 + retro#364) is the **per-claim layer
+behind every extracted scalar above**. Each element is one claim as retro's fusion
+consumed it: its own `stance`, `certainty`, `specificity`, `prediction_type`,
+`evidence_class`, `quantitative_estimate`, `settled`, `event_date`, `fact_signal`
+and the four fact facets, plus the `claim` summary and its verbatim `quote`. Every
+other extracted column on this row is a **reduction** — five article-level scalars
+computed over five different claim subsets — and this column is where the inputs to
+those reductions used to die, unrecoverably. Without it there is no retroactive
+backtesting (we cannot re-score history we never kept), no per-claim credibility
+attribution, and no way to measure extractor instability over time.
+Two collapses are visible only here: `evidenceClass` above is the article's most
+**common** class, so mixed-class articles are unattributable above this layer; and
+the fact facets above ride from the single **dominant** claim, so a lone over-cap
+interested-party claim diluted by in-contract siblings is invisible (retro#378).
+Same shadow discipline as `authorLean`/`factSignal`: **nothing in aggregation or the
+recompute reads it**, and it is never sent to `/pool/aggregate` — the estimator keeps
+its eight-scalar whitelist. Additive and nullable with **no backfill**: for rows
+extracted before the column existed the per-claim data is gone and must not be
+fabricated. One deliberate difference from the scalar shadow columns above: an
+update that merely *omits* `claimsDetail` leaves the stored value alone rather than
+nulling it (`addArticlesToPool` passes `undefined`, not `DbNull`), because the data
+is unrecoverable — that is the daatan#1237 failure mode, which the scalar columns
+still have and this one does not.
 `personId`/`personName`/`outletId`/`outletName` are resolved cross-platform identity from
 news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexer
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`

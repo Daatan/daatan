@@ -77,6 +77,53 @@ export function claimArchetypeParam(
 }
 
 /** Per-source signal returned by the Oracle's /forecast endpoint. */
+/** One extracted claim as the Oracle emits it (retro's `ClaimDetail`, retro#364) —
+ *  the per-claim layer every article-level scalar on `OracleSource` is a reduction
+ *  OF. Values are post-resolution: the numbers retro's fusion actually consumed,
+ *  so the article-level scalars stay derivable from them.
+ *
+ *  Stored verbatim on the evidence-pool row (`claimsDetail`, daatan#1235).
+ *  Nothing in daatan computes on it yet, and it is never sent back to
+ *  `/pool/aggregate` — the estimator keeps its eight-scalar whitelist. */
+// A `type` alias, not an `interface`, on purpose: interfaces have no implicit
+// index signature, so an interface-typed field would make the whole
+// `EnrichedOracleSource` un-assignable to Prisma's `InputJsonValue` — and that
+// snapshot is written to a Json column (`ContextSnapshot.oracleSnapshot`).
+export type OracleClaimDetail = {
+  /** One-sentence neutral summary of the claim. */
+  claim: string
+  /** The article's verbatim sentence(s) behind the claim, so a persisted claim
+   *  stands alone and stays auditable later. */
+  quote?: string | null
+  /** This claim's own stance [-1, 1]. */
+  stance: number
+  /** This claim's own certainty [0, 1] — its weight in the within-article mean. */
+  certainty: number
+  /** Multiplies certainty in the within-article reduction; null ⇒ a neutral 1.0. */
+  specificity?: number | null
+  /** binary | continuous | range | trend. */
+  prediction_type?: string | null
+  /** This claim's OWN evidence class — the article-level field is only the most
+   *  common one, so mixed-class articles are unattributable above this layer. */
+  evidence_class?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
+  /** An explicit modeled/poll/market probability [0,1] cited for the event. */
+  quantitative_estimate?: number | null
+  /** The extractor's settlement flag for THIS claim — a lower bar than the
+   *  article-level `settled`, which additionally requires settlement grade. */
+  settled?: boolean | null
+  /** ISO date the article gives for the event itself (or the foreclosing event). */
+  event_date?: string | null
+  /** This claim's fact-lane value [-1, 1], already precursor-capped in retro. */
+  fact_signal?: number | null
+  /** Per-claim fact facets. The article-level equivalents ride from the single
+   *  dominant claim only, which is why an over-cap interested-party claim diluted
+   *  by in-contract siblings is invisible above this layer (retro#378). */
+  event_actors?: string | null
+  event_target?: string | null
+  is_occurrence?: boolean | null
+  verified?: boolean | null
+}
+
 export interface OracleSource {
   source_id: string
   source_name: string
@@ -135,6 +182,11 @@ export interface OracleSource {
   /** true when the dominant fact is independently reported, false when only claimed
    *  by an interested party. null when `fact_signal` is. */
   verified?: boolean | null
+  /** The article's claims with their per-claim fields intact (retro#364) — the layer
+   *  every scalar above is a reduction of. Same order as `claims`, except that
+   *  `claims` drops empty summaries while this does not. Persisted as-is
+   *  (daatan#1235); nothing in the estimate reads it. */
+  claims_detail?: OracleClaimDetail[] | null
 }
 
 /** Full response from POST /forecast. */
