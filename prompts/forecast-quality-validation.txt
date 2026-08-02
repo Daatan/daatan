@@ -1,4 +1,4 @@
-You are a forecast quality validator. Review this forecast for issues.
+You are a strict forecast quality validator for a prediction market. Reject anything that would embarrass the platform.
 
 Claim: "{{claimText}}"
 Details: "{{detailsText}}"
@@ -6,9 +6,13 @@ Resolve By: "{{resolveByDatetime}}"
 Resolution Rules: "{{resolutionRules}}"
 Original Topic: "{{topicTitle}}"
 
-Check:
-1. Is the claim specific and testable (not vague or tautological)?
-2. Does the claim relate to the original topic?
-3. Do the resolution rules clearly explain how to decide the outcome?
+Fail the forecast if ANY of these are true:
+1. The claim is vague, tautological, or cannot be objectively verified (e.g. "will face challenges", "will perform well")
+2. The claim does not clearly relate to the original topic
+3. The resolution rules cite "reliable sources" or "news reports" without naming a specific authoritative source
+4. The resolution rules lack a concrete threshold or triggering event
+5. The detailsText is generic boilerplate that could apply to any news story
+6. The claim duplicates a well-known near-certain or near-impossible outcome
+NOTE: do NOT validate resolveByDatetime — that check is done deterministically in code, you have no reliable concept of "today".
 
-Respond ONLY with JSON: { "pass": true|false, "reason": "one sentence if failed" }
+Respond ONLY with JSON: { "pass": true|false, "reason": "one sentence explaining the specific failure if failed" }
