@@ -447,6 +447,7 @@ model Prediction {
   oracleCallLogs   OracleCallLog[]
   aiEstimateRuns   AiEstimateRun[]
   aiMemberScores   AiMemberScore[]
+  calibrationRecord CalibrationRecord?
 
   @@index([status])
   @@index([authorId])
@@ -510,6 +511,81 @@ model ContextSnapshot {
 
   @@index([predictionId, createdAt])
   @@map("context_snapshots")
+}
+
+/// One resolved binary, frozen at resolution time, so system calibration stops
+/// being an ad-hoc research query (daatan#1233).
+///
+/// Measuring calibration today means lateral joins over context_snapshots ×
+/// predictions, re-derived by hand each time — which is why it had been measured
+/// exactly once (2026-08-01: Brier 0.298 over 17 scorable pairs, worse than
+/// always-50%, and a CI-width-vs-error correlation of −0.07). With this row the
+/// reliability curve, Brier-by-horizon, the CI-honesty check and the glide
+/// backtest all rebuild themselves on every resolution.
+///
+/// Written AFTER the resolution transaction commits, deliberately: a defect in
+/// calibration bookkeeping must never be able to roll back a resolution. A
+/// missing row is a gap in a research table; a rolled-back resolution is lost
+/// user-facing state.
+///
+/// Nothing here is derived-and-stored: Brier, log score and calibration bins are
+/// all computable from `pFinal` + `outcome`, so they are not columns. What IS
+/// stored is what cannot be recovered later — the published numbers as of
+/// specific instants, which the glide keeps overwriting.
+model CalibrationRecord {
+  id           String     @id @default(cuid())
+  predictionId String     @unique
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  /// 'correct' | 'wrong'. Void/unresolvable never produce a record — there is
+  /// no outcome to score against.
+  outcome    String   @db.VarChar(16)
+  resolvedAt DateTime @map("resolved_at")
+
+  /// The last published probability before resolution, 0–100, and when it was
+  /// published. INCLUDES kind='clock' rows: the glide's requote is what the
+  /// page actually showed, and scoring the system means scoring what it said.
+  /// `pFinalKind`/`pFinalOrigin` are what let a fit separate "the evidence said
+  /// this" from "the clock said this" after the fact.
+  pFinal       Int?      @map("p_final")
+  pFinalAt     DateTime? @map("p_final_at")
+  pFinalKind   String?   @map("p_final_kind") @db.VarChar(32)
+  pFinalOrigin String?   @map("p_final_origin") @db.VarChar(32)
+
+  /// The Oracle's own interval at that instant, 0–100, and whether it was a
+  /// settlement pin rather than a pooled estimate. The CI-honesty check is the
+  /// point: audit F16 predicts these widths carry no risk information, and the
+  /// first measurement (r = −0.07) agreed.
+  ciLow          Float?   @map("ci_low")
+  ciHigh         Float?   @map("ci_high")
+  settledAtFinal Boolean? @map("settled_at_final")
+
+  /// The same published probability as of 7 and 30 days before resolution —
+  /// Brier-by-horizon, i.e. whether the system was right early or only at the
+  /// end. Null when the forecast did not exist, or carried no estimate, that
+  /// far back.
+  p7d    Int?      @map("p_7d")
+  p7dAt  DateTime? @map("p_7d_at")
+  p30d   Int?      @map("p_30d")
+  p30dAt DateTime? @map("p_30d_at")
+
+  /// How much of this forecast's history was clock glide vs. actual evidence —
+  /// the denominator for the glide backtest.
+  clockSnapshots    Int @default(0) @map("clock_snapshots")
+  evidenceSnapshots Int @default(0) @map("evidence_snapshots")
+
+  /// Set when the machine and the human resolver read the question differently
+  /// (daatan#1234) — e.g. a claim saying "in 2025" resolved against a 2027
+  /// deadline, where a confident pin was recorded as a catastrophic miss on a
+  /// question that was ambiguous rather than mis-forecast. Such pairs must be
+  /// annotatable and excludable from fits instead of silently poisoning them.
+  disputed     Boolean @default(false)
+  disputeNote  String? @map("dispute_note") @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([resolvedAt])
+  @@map("calibration_records")
 }
 
 /// Per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2, foundation

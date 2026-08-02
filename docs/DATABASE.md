@@ -131,6 +131,38 @@ Supporting tables: `context_timings` (per-analyze phase latencies),
 chain, failure reason, LLM-fallback flag — the observability layer for the
 search/forecast chain).
 
+## Calibration — `calibration_records`
+
+One row per resolved **binary**, frozen at resolution time (daatan#1233). Written
+by `recordCalibration()` from `resolvePrediction`, **after** the resolution
+transaction commits — a defect in a research row must never be able to roll back
+a resolution, which is also why that function never throws.
+
+It exists because every number in it is one the system *overwrites*: the glide
+requotes daily, so "what did we publish 7 days before this resolved" is only
+answerable while snapshot history survives, and only via a lateral join nobody
+re-runs. The consequence was that system calibration had been measured exactly
+once (2026-08-01: Brier 0.298 over 17 scorable pairs — worse than always
+answering 50%; CI-width-vs-error correlation −0.07).
+
+| column | what |
+|---|---|
+| `p_final`, `p_final_at`, `p_final_kind`, `p_final_origin` | the last published probability before resolution, 0–100. **Includes `kind='clock'`** — the glide's requote is what the page showed, and scoring the system means scoring what it said. The kind/origin columns are what let a fit separate clock from evidence afterwards. |
+| `ci_low`, `ci_high`, `settled_at_final` | the Oracle's interval at that instant (percent) and whether it was a settlement pin. The CI-honesty check is the point — audit F16 predicts these widths carry no risk information. |
+| `p_7d`, `p_30d` (+ `_at`) | the same published number as of 7/30 days before resolution — Brier-by-horizon. Null when the forecast had said nothing that far back. |
+| `clock_snapshots`, `evidence_snapshots` | the denominator for the glide backtest. |
+| `disputed`, `dispute_note` | set when the machine and the human resolver read the question differently (daatan#1234), so a semantics dispute can be excluded from a fit instead of silently poisoning it. |
+
+**Nothing derived is stored.** Brier, log score and calibration bins all follow
+from `p_final` + `outcome`; a derived column that can disagree with its inputs is
+the defect this codebase keeps finding elsewhere.
+
+Backfill: `npx tsx scripts/backfill-calibration-records.ts [--dry-run]`,
+idempotent, and it reuses the live writer's own selection rules rather than
+reimplementing them. Expect many rows with `p_final = null` — most resolutions
+predate Oracle snapshot coverage, and a null record is the honest way to say
+"not scorable".
+
 ## Evidence pool (foundation layer) — `evidence_pool_articles`
 
 Per-forecast, keyed by `(predictionId, urlHash)` — `urlHash` is `hashUrl()`
