@@ -213,6 +213,12 @@ only in `OracleCallLog.failureReason`, which the retry sweep never reads.
 | `oracle_no_articles` | ran, but produced no usable mean / zero articles used |
 | `oracle_null` | residual, and every row written before the split |
 
+These reasons are daatan's slice of a chain that starts in news-indexer and passes through
+retro; each of those keeps its own, differently-named drop labels, and no single store holds
+an article's whole journey. The cross-repo map is
+[funnel.md](https://github.com/Daatan/docs/blob/main/funnel.md) — §9 lines the
+three vocabularies up side by side.
+
 Consumers must match the whole family via `ORACLE_NULL_REASONS` (`src/lib/services/oracle.ts`),
 never the literal `'oracle_null'` — the retry sweep's second-strike rule did the
 latter, and a strict-equality check would silently stop finalizing rows.
