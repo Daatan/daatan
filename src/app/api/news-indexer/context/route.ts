@@ -167,23 +167,21 @@ export async function POST(request: NextRequest) {
     // over the full set.
     const articlesToScore = articles.filter((_, i) => claimResults[i] === 'claimed')
 
-    let oracleForecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
-    try {
-      ;({ forecast: oracleForecast } = await getOracleForecast(
-        prediction.claimText,
-        {
-          articles: articlesToScore,
-          claimDirection: prediction.claimDirection,
-          claimDeadline: prediction.claimDeadline,
-          claimCreatedAt: prediction.createdAt,
-          claimArchetype: prediction.claimArchetype,
-        },
-        { source: 'news-indexer', predictionId: prediction.id },
-      ))
-    } catch (err) {
-      await failClaimedArticles(prediction.id, items.map((a) => a.url), 'extractor_error')
-      throw err
-    }
+    // No try/catch: `getOracleForecast` never throws — it classifies every failure and
+    // returns. The `extractor_error` branch that used to sit here was unreachable (its
+    // only `await` inside the catch, `logOracleCall`, is itself fire-and-forget), so it
+    // was dead code claiming to handle a case that cannot occur (daatan#1231).
+    const { forecast: oracleForecast, failureClass } = await getOracleForecast(
+      prediction.claimText,
+      {
+        articles: articlesToScore,
+        claimDirection: prediction.claimDirection,
+        claimDeadline: prediction.claimDeadline,
+        claimCreatedAt: prediction.createdAt,
+        claimArchetype: prediction.claimArchetype,
+      },
+      { source: 'news-indexer', predictionId: prediction.id },
+    )
 
     let probability: number | null = null
     // Only set alongside probability, in the same block below — kept in this
@@ -407,13 +405,18 @@ export async function POST(request: NextRequest) {
         )
       }
     } else {
-      // No estimate to report, but the claim itself still succeeded (the
-      // extractor ran, just produced nothing usable) — release it immediately
-      // rather than leaving these articles blocked for the full staleness
-      // window before a later push can retry them.
-      await failClaimedArticles(prediction.id, items.map((a) => a.url), 'oracle_null')
+      // No estimate to report — release the claims immediately rather than leaving these
+      // articles blocked for the full staleness window before a later push can retry them.
+      //
+      // The reason stamped here is the CLASS, not a blanket `oracle_null` (daatan#1231).
+      // The old comment on this branch — "the extractor ran, just produced nothing usable"
+      // — was simply untrue for the transport share: with a 12s client budget against
+      // retro's 90s, a timeout and an all-articles-off-topic abstention wrote byte-identical
+      // rows, and the real cause survived only in OracleCallLog, which the retry sweep never
+      // reads. `oracle_null` remains the residual for the (unreachable) unclassified case.
+      await failClaimedArticles(prediction.id, items.map((a) => a.url), failureClass ?? 'oracle_null')
       log.info(
-        { predictionId: prediction.id, articles: items.length, similarity: triggerSimilarity },
+        { predictionId: prediction.id, articles: items.length, similarity: triggerSimilarity, failureClass },
         'news-indexer: oracle returned null, skipping probability update',
       )
     }

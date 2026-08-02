@@ -105,25 +105,25 @@ export async function refreshOracleSnapshot(
   // URL-keyed metadata lookup.
   const articlesToScore = searchResults.filter((_, i) => claimResults[i] === 'claimed')
 
-  let forecast: Awaited<ReturnType<typeof getOracleForecast>>['forecast']
-  try {
-    ;({ forecast } = await getOracleForecast(
-      prediction.claimText,
-      {
-        articles: articlesToScore,
-        claimDirection: prediction.claimDirection,
-        claimDeadline: prediction.claimDeadline,
-        claimCreatedAt: prediction.createdAt,
-        claimArchetype: prediction.claimArchetype,
-      },
-      { source: 'context-update', predictionId: prediction.id },
-    ))
-  } catch (err) {
-    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), 'extractor_error')
-    throw err
-  }
+  // No try/catch — `getOracleForecast` never throws; the `extractor_error` branch that
+  // used to sit here was dead code. Same removal as the news-indexer route (daatan#1231).
+  const { forecast, failureClass } = await getOracleForecast(
+    prediction.claimText,
+    {
+      articles: articlesToScore,
+      claimDirection: prediction.claimDirection,
+      claimDeadline: prediction.claimDeadline,
+      claimCreatedAt: prediction.createdAt,
+      claimArchetype: prediction.claimArchetype,
+    },
+    { source: 'context-update', predictionId: prediction.id },
+  )
   if (forecast === null) {
-    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), 'oracle_null')
+    // Classified, like the push path. This one matters twice over: the retry sweep runs
+    // THROUGH here, so without it the sweep would keep writing the very `oracle_null`
+    // rows it is meant to be draining, and the two paths would disagree about what a
+    // pool row means.
+    await failClaimedArticles(prediction.id, searchResults.map((r) => r.url), failureClass ?? 'oracle_null')
     if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
     return { status: 'no-oracle' }
   }

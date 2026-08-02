@@ -225,6 +225,125 @@ describe('getOracleForecast', () => {
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'network' }))
   })
 
+  describe('failureClass — why the forecast is null (daatan#1231)', () => {
+    // `getOracleForecast` returns null for six different reasons and used to say which
+    // only in OracleCallLog, which the evidence-pool retry sweep never reads. So a 12s
+    // client timeout and a deliberate all-articles-off-topic abstention wrote BYTE-
+    // IDENTICAL pool rows, both stamped `oracle_null` — 73% of the 200 most recent
+    // fetches on 2026-07-31. These pin one class per branch: the whole value of the
+    // change is that no two of them collide.
+
+    it('classifies a deliberate abstention as oracle_abstain', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, mean: 0, articles_used: 0, placeholder: true, insufficient_data: true, reason: 'all_low_certainty' }),
+      })
+      const { failureClass, insufficientData } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_abstain')
+      expect(insufficientData).toBe(true)
+    })
+
+    it('classifies a client timeout as oracle_timeout — NOT an abstention', async () => {
+      // The distinction that motivated the issue. FORECAST_TIMEOUT_MS is 12s against
+      // retro's own 90s budget, so some share of what the pool recorded as "the
+      // extractor produced nothing" never reached the extractor at all.
+      const err = new Error('aborted')
+      err.name = 'TimeoutError'
+      fetchMock.mockRejectedValueOnce(err)
+      const { failureClass } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_timeout')
+    })
+
+    it('classifies a generic transport error as oracle_network', async () => {
+      fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+      const { failureClass } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_network')
+    })
+
+    it('classifies a non-OK status as oracle_http', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
+      const { failureClass } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_http')
+    })
+
+    it('classifies a placeholder response as oracle_placeholder', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, placeholder: true, reason: 'no_search_results' }),
+      })
+      const { failureClass } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_placeholder')
+    })
+
+    it('classifies zero usable articles as oracle_no_articles', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, articles_used: 0, reason: 'all_articles_off_topic' }),
+      })
+      const { failureClass } = await getOracleForecast('Q?')
+      expect(failureClass).toBe('oracle_no_articles')
+    })
+
+    it('leaves failureClass undefined on a successful forecast', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      const { forecast, failureClass } = await getOracleForecast('Q?')
+      expect(forecast).not.toBeNull()
+      expect(failureClass).toBeUndefined()
+    })
+
+    it('never rejects — the invariant that makes callers\' catch blocks dead code', async () => {
+      // Two callers wrapped this in a try/catch that stamped `extractor_error`, and both
+      // were unreachable: `getOracleConfig` is a pure env read, every network and parse
+      // path is inside this function's own try, and the catch's single await
+      // (`logOracleCall`) swallows its own errors. Those branches are removed
+      // (daatan#1231) — which is only safe while this stays true, so pin it here rather
+      // than leaving it as a comment. A future `await` added outside the try would break
+      // it silently: claims would be left PENDING for the full staleness window.
+      fetchMock.mockRejectedValueOnce(new Error('boom'))
+      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => { throw new SyntaxError('Unexpected token < in JSON') },
+      })
+      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        text: async () => { throw new Error('unreadable body') },
+      })
+      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+    })
+
+    it('every null branch sets a class — none may fall through to the residual', async () => {
+      // The property that makes the split worth having. If any branch forgot its class,
+      // the caller's `?? 'oracle_null'` would quietly recreate the original bug for that
+      // one cause, and it would look fixed everywhere else.
+      const timeoutErr = new Error('aborted')
+      timeoutErr.name = 'TimeoutError'
+      const nullResponses = [
+        { ok: false, status: 502, json: async () => ({}), text: async () => '' },
+        { ok: true, status: 200, json: async () => ({ ...fullPayload, placeholder: true, reason: 'x' }) },
+        { ok: true, status: 200, json: async () => ({ ...fullPayload, articles_used: 0, reason: 'x' }) },
+        { ok: true, status: 200, json: async () => ({ ...fullPayload, articles_used: 0, insufficient_data: true, reason: 'x' }) },
+      ]
+      for (const res of nullResponses) {
+        fetchMock.mockResolvedValueOnce(res)
+        const { forecast, failureClass } = await getOracleForecast('Q?')
+        expect(forecast).toBeNull()
+        expect(failureClass).toBeDefined()
+      }
+      fetchMock.mockRejectedValueOnce(timeoutErr)
+      expect((await getOracleForecast('Q?')).failureClass).toBeDefined()
+    })
+  })
+
   describe('claim direction/deadline (retro #244 direction guard)', () => {
     it('sends claim_direction: "arrival" for ClaimDirection.ARRIVAL', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })

@@ -120,10 +120,55 @@ describe('retryPoolExtractions', () => {
 
       expect(mockUpdateMany).toHaveBeenCalledWith({
         // Only the prior-null row; the extractor_error row keeps its first null strike.
-        where: { predictionId: 'p1', url: { in: ['https://a.com/1'] }, status: 'FAILED', statusReason: 'oracle_null' },
+        where: {
+          predictionId: 'p1',
+          url: { in: ['https://a.com/1'] },
+          status: 'FAILED',
+          statusReason: { in: expect.arrayContaining(['oracle_null']) },
+        },
         data: { statusReason: 'oracle_null_final' },
       })
       expect(r.finalized).toBe(1)
+    })
+
+    it.each([
+      'oracle_abstain',
+      'oracle_timeout',
+      'oracle_network',
+      'oracle_http',
+      'oracle_placeholder',
+      'oracle_no_articles',
+    ])('finalizes a prior-%s row too — the split must not disarm the attempt cap', async (reason) => {
+      // The silent break daatan#1231 could have shipped. This rule used to match the
+      // literal `'oracle_null'`; once that string was split per cause, a strict-equality
+      // check would stop recognising every newly-written row — no second strike, no
+      // `oracle_null_final`, and the daily sweep re-driving dead articles forever. The
+      // failure mode is invisible: nothing errors, the backlog just never drains.
+      mockRows.mockResolvedValue([row({ url: 'https://a.com/1', statusReason: reason })] as never)
+      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+      mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ url: { in: ['https://a.com/1'] } }),
+          data: { statusReason: 'oracle_null_final' },
+        }),
+      )
+      expect(r.finalized).toBe(1)
+    })
+
+    it('still ignores reasons outside the null family', async () => {
+      // `oracle_omitted` is the gatekeeper saying "irrelevant" — a verdict, not a null
+      // run — and must never be swept up by the widened match.
+      mockRows.mockResolvedValue([row({ url: 'https://d.com/4', statusReason: 'oracle_omitted' })] as never)
+      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(r.finalized).toBe(0)
     })
 
     it('does not finalize anything when the run succeeds', async () => {

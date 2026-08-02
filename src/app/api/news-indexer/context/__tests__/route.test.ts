@@ -665,16 +665,29 @@ describe('POST /api/news-indexer/context', () => {
       )
     })
 
-    it('releases the claim (status=FAILED) when the Oracle call itself throws, and rethrows', async () => {
-      vi.mocked(getOracleForecast).mockRejectedValue(new Error('oracle timeout'))
+    // The `extractor_error` test that used to sit here is gone with the branch it covered
+    // (daatan#1231). It asserted a throw from `getOracleForecast` released the claim and
+    // returned 500 — but `getOracleForecast` cannot throw: `getOracleConfig` is a pure env
+    // read, every network/parse path is inside its own try, and the catch's only await
+    // (`logOracleCall`) swallows its own errors. The mock could do what the real function
+    // cannot. That invariant is pinned directly in oracle.test.ts → "never rejects".
 
-      const res = await POST(post('test-secret'))
+    it('stamps the Oracle failure CLASS on the released claims, not a blanket oracle_null', async () => {
+      // The measured problem: a 12s client timeout and a deliberate abstention wrote
+      // byte-identical pool rows, so 73% of recent fetches carried one uninformative
+      // string and the retry sweep could not tell "not worth re-asking" from "never got
+      // an answer". The cause now lands where the sweep can read it.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
 
-      expect(res.status).toBe(500)
-      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'extractor_error')
+      await POST(post('test-secret'))
+
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_timeout')
     })
 
-    it('releases the claim when the Oracle returns no usable forecast, so the next push can retry immediately', async () => {
+    it('falls back to oracle_null when no class is supplied, so claims are always released', async () => {
+      // Belt and braces: an unclassified null is unreachable today (every branch sets a
+      // class, pinned in oracle.test.ts), but releasing the claim must never depend on
+      // that — a claim left PENDING blocks the article for the full staleness window.
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))

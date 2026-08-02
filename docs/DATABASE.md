@@ -175,12 +175,38 @@ underlying instability is now addressed at the source.
 Rows move through a claim lifecycle: `claimArticleForExtraction` inserts/claims
 a row as `PENDING` (a claim older than 10 min counts as abandoned and can be
 re-claimed), a successful extraction completes it, and everything a run claimed
-but got no signal for is released as `FAILED` with a `statusReason`:
-`extractor_error` (transport/extractor failure — retryable), `oracle_null` (the
-Oracle returned no forecast — retryable once), `oracle_omitted` (the Oracle ran
-but its gatekeeper dropped the article — terminal), `oracle_null_final` (second
-consecutive `oracle_null` — terminal, stamped by the retry sweep's attempt cap),
-`reextract_no_signal`. The retry sweep (`src/lib/services/pool-retry.ts`,
+but got no signal for is released as `FAILED` with a `statusReason`.
+
+**The null family** (daatan#1231) — the Oracle produced no forecast, split by WHY.
+This used to be one string, `oracle_null`, covering six different situations: 73% of
+the 200 most recent pool fetches (2026-07-31) carried it, and because
+`getOracleForecast` never throws, a 12-second client timeout and a deliberate
+all-articles-off-topic abstention wrote byte-identical rows. The real cause survived
+only in `OracleCallLog.failureReason`, which the retry sweep never reads.
+
+| reason | meaning |
+|---|---|
+| `oracle_abstain` | the Oracle RAN and declined (`insufficient_data`) — usually its gatekeeper rejecting every article |
+| `oracle_timeout` | no answer within daatan's 12 s client budget (retro's own budget is 90 s) |
+| `oracle_network` | transport failure other than a timeout |
+| `oracle_http` | retro answered non-OK |
+| `oracle_unconfigured` | no Oracle URL/key on this deployment — says nothing about the article |
+| `oracle_placeholder` | retro returned its stub response |
+| `oracle_no_articles` | ran, but produced no usable mean / zero articles used |
+| `oracle_null` | residual, and every row written before the split |
+
+Consumers must match the whole family via `ORACLE_NULL_REASONS` (`src/lib/services/oracle.ts`),
+never the literal `'oracle_null'` — the retry sweep's second-strike rule did the
+latter, and a strict-equality check would silently stop finalizing rows.
+**Retry policy is still uniform across the family** — differentiating it (an
+abstention on identical input is not worth re-asking; a timeout is) is daatan#1232.
+
+Other reasons: `oracle_omitted` (the Oracle ran but its gatekeeper dropped the
+article — terminal), `oracle_null_final` (second consecutive null-family run —
+terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`.
+`extractor_error` is **no longer written**: it was stamped in a `catch` around
+`getOracleForecast`, which never throws, so the branch was dead code (removed in
+daatan#1231). Historical rows carrying it remain retryable. The retry sweep (`src/lib/services/pool-retry.ts`,
 exposed at `POST /api/admin/evidence-pool/retry`, driven by the weekly
 `Retry Pool Extractions` workflow) re-pushes retryable rows title-only through
 `refreshOracleSnapshot`, biggest ACTIVE-forecast backlogs first, one attempt
