@@ -268,13 +268,26 @@ describe('refreshOracleSnapshot', () => {
       expect(mockMark).toHaveBeenCalledWith('p1', 'no-oracle')
     })
 
-    it('releases the claim (FAILED, extractor_error) and rethrows when the Oracle call itself throws', async () => {
+    it('stamps the specific failure class, not a blanket oracle_null', async () => {
+      // daatan#1231. This path is what the RETRY SWEEP runs through, so if it kept
+      // writing bare `oracle_null` while the push path wrote classes, the two would
+      // disagree about what a pool row means and the sweep would keep manufacturing
+      // exactly the rows it exists to drain.
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
-      mockForecast.mockRejectedValue(new Error('oracle timeout'))
+      mockForecast.mockResolvedValue({ forecast: null, failureClass: 'oracle_timeout' })
 
-      await expect(refreshOracleSnapshot(prediction)).rejects.toThrow('oracle timeout')
-      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'extractor_error')
+      await refreshOracleSnapshot(prediction)
+
+      expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'oracle_timeout')
     })
+
+    // The `extractor_error` test that used to sit here is gone with the branch it covered
+    // (daatan#1231). It asserted that a throw from `getOracleForecast` released the claim and
+    // rethrew — but `getOracleForecast` cannot throw: `getOracleConfig` is a pure env read,
+    // every network/parse path is inside its own try, and the catch's only await
+    // (`logOracleCall`) swallows its own errors. The test reached the branch solely because
+    // the mock could do what the real function cannot. The invariant that makes the catch
+    // unnecessary is now pinned directly, in oracle.test.ts → "never rejects".
 
     it('with supplied articles (retry sweep): skips search, claims and pools under the supplied origin', async () => {
       mockForecast.mockResolvedValue({

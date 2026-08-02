@@ -215,6 +215,58 @@ export interface OracleForecastResponse {
   settled?: boolean
 }
 
+/**
+ * WHY `forecast` came back null. Six distinct situations used to be indistinguishable
+ * on the evidence-pool row, all stamped `oracle_null` (daatan#1231): 73% of the 200
+ * most recent pool fetches (2026-07-31) carried that one string, and the real cause
+ * survived only in `OracleCallLog.failureReason` — which the retry sweep never reads.
+ *
+ * They are not the same fact and they do not deserve the same retry:
+ * - `oracle_abstain` — the Oracle RAN and deliberately declined (`insufficient_data`),
+ *   most often the gatekeeper rejecting every article. Re-asking with identical input
+ *   buys the same answer.
+ * - `oracle_timeout` / `oracle_network` — we never got an answer. Note
+ *   `FORECAST_TIMEOUT_MS` is 12s against retro's own 90s budget, so a real share of
+ *   what looked like "the extractor produced nothing" is pure latency. Worth retrying.
+ * - `oracle_http` — retro answered non-OK. Worth retrying; a 4xx repeatedly is a bug.
+ * - `oracle_unconfigured` — no Oracle URL/key here. Says nothing about the article.
+ * - `oracle_placeholder` — retro returned its stub response.
+ * - `oracle_no_articles` — ran, but no usable mean / zero articles used.
+ *
+ * Retry POLICY per class is deliberately NOT changed here — see daatan#1232. This
+ * only makes the cause visible on the row, which is the precondition for that work
+ * and for measuring whether any funnel fix helped at all.
+ */
+export type OracleFailureClass =
+  | 'oracle_abstain'
+  | 'oracle_timeout'
+  | 'oracle_network'
+  | 'oracle_http'
+  | 'oracle_unconfigured'
+  | 'oracle_placeholder'
+  | 'oracle_no_articles'
+
+/**
+ * Every reason that means "a run happened (or was attempted) and produced no
+ * estimate" — the split-out descendants of the old single `oracle_null`, plus
+ * `oracle_null` itself for rows written before the split.
+ *
+ * Consumers must match on this SET, never on the literal `'oracle_null'`. The
+ * second-strike rule in `pool-retry.ts` did exactly that, so without this a
+ * freshly-classified row would never reach `oracle_null_final` and the daily
+ * sweep would re-drive it forever.
+ */
+export const ORACLE_NULL_REASONS: readonly string[] = [
+  'oracle_null',
+  'oracle_abstain',
+  'oracle_timeout',
+  'oracle_network',
+  'oracle_http',
+  'oracle_unconfigured',
+  'oracle_placeholder',
+  'oracle_no_articles',
+]
+
 /** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the
  *  id of the logged call, so a caller can attribute its LLM fallback to it. */
 export interface OracleForecastResult {
@@ -225,6 +277,10 @@ export interface OracleForecastResult {
    *  transport error / not-configured. Callers should surface "insufficient
    *  evidence" rather than substituting an ungrounded estimate. */
   insufficientData?: boolean
+  /** Why `forecast` is null — set on every null path, absent when a forecast came
+   *  back. Callers stamp it onto the evidence-pool row so the cause survives where
+   *  the retry sweep can see it. See {@link OracleFailureClass}. */
+  failureClass?: OracleFailureClass
 }
 
 /**
@@ -306,7 +362,7 @@ export const getOracleForecast = async (
   const cfg = getOracleConfig()
   if (!cfg) {
     log.debug('Oracle not configured — skipping')
-    return { forecast: null, logId: null }
+    return { forecast: null, logId: null, failureClass: 'oracle_unconfigured' }
   }
 
   const t0 = Date.now()
@@ -361,7 +417,7 @@ export const getOracleForecast = async (
       const errorBody = await res.text().catch(() => '(unreadable)')
       log.warn({ status: res.status, body: errorBody, durationMs: Date.now() - t0 }, 'Oracle returned non-OK status')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, failureReason: res.status >= 500 ? 'http_5xx' : 'http_4xx' })
-      return { forecast: null, logId }
+      return { forecast: null, logId, failureClass: 'oracle_http' }
     }
 
     const data: OracleForecastResponse = await res.json()
@@ -373,19 +429,19 @@ export const getOracleForecast = async (
     if (data.insufficient_data) {
       log.debug({ reason: data.reason, articlesUsed: data.articles_used }, 'Oracle abstained — insufficient evidence')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
-      return { forecast: null, logId, insufficientData: true }
+      return { forecast: null, logId, insufficientData: true, failureClass: 'oracle_abstain' }
     }
 
     if (data.placeholder) {
       log.debug('Oracle returned placeholder response — no real forecast available')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason) })
-      return { forecast: null, logId }
+      return { forecast: null, logId, failureClass: 'oracle_placeholder' }
     }
 
     if (typeof data.mean !== 'number' || data.articles_used === 0) {
       log.debug({ articlesUsed: data.articles_used, reason: data.reason }, 'Oracle returned no usable articles')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
-      return { forecast: null, logId }
+      return { forecast: null, logId, failureClass: 'oracle_no_articles' }
     }
 
     log.info(
@@ -402,8 +458,12 @@ export const getOracleForecast = async (
     return { forecast: data, logId }
   } catch (err) {
     log.warn({ err, durationMs: Date.now() - t0 }, 'Oracle request failed')
-    const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, query: question, failureReason: transportFailureReason(err) })
-    return { forecast: null, logId }
+    // 12s client budget against retro's own 90s — an unknown share of what the pool
+    // recorded as "the extractor produced nothing" was this line, and nothing on the
+    // row said so (daatan#1231).
+    const reason = transportFailureReason(err)
+    const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, query: question, failureReason: reason })
+    return { forecast: null, logId, failureClass: reason === 'timeout' ? 'oracle_timeout' : 'oracle_network' }
   }
 }
 

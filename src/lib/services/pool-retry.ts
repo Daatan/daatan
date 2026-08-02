@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
+import { DEFAULT_MAX_ARTICLES, ORACLE_NULL_REASONS } from '@/lib/services/oracle'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
 
@@ -99,13 +99,21 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       select: { url: true, title: true, source: true, publishedDate: true, statusReason: true },
     })
     // Second-strike rule: a batch where the Oracle rejects EVERY article comes back as a
-    // null forecast, so its rows land on retryable `oracle_null` — indistinguishable, at
-    // that boundary, from a transport failure. Rows that were ALREADY oracle_null before
-    // this claim (captured here, since claiming resets statusReason) and go null again
-    // get stamped terminal below: two independent null runs a day apart is the article
-    // telling us it's dead, not the Oracle hiccuping. An organic re-push with changed
-    // content can still revive them — only the sweep stops asking.
-    const secondStrike = rows.filter((r) => r.title && r.statusReason === 'oracle_null').map((r) => r.url)
+    // null forecast, so its rows land on a retryable null-family reason. Rows that were
+    // ALREADY null-family before this claim (captured here, since claiming resets
+    // statusReason) and go null again get stamped terminal below: two independent null
+    // runs a day apart is the article telling us it's dead, not the Oracle hiccuping. An
+    // organic re-push with changed content can still revive them — only the sweep stops.
+    //
+    // Matched against the SET, not the literal `'oracle_null'`. daatan#1231 split that one
+    // string into per-cause reasons, and a strict-equality check here would silently stop
+    // recognising every newly-written row — no second strike, no `oracle_null_final`, and
+    // the sweep would re-drive dead articles forever. (`oracle_null` stays in the set for
+    // rows written before the split.) Which of these classes DESERVES a retry is a
+    // separate question, deliberately left to daatan#1232.
+    const secondStrike = rows
+      .filter((r) => r.title && r.statusReason && ORACLE_NULL_REASONS.includes(r.statusReason))
+      .map((r) => r.url)
     const articles: SuppliedArticle[] = rows.flatMap((r) =>
       r.title
         ? [{ url: r.url, title: r.title, snippet: '', source: r.source ?? undefined, publishedDate: r.publishedDate ?? undefined }]
@@ -123,9 +131,10 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
         results.noOracle++
         if (r.status === 'no-oracle' && secondStrike.length > 0) {
           const { count } = await prisma.evidencePoolArticle.updateMany({
-            // Guarded on FAILED+oracle_null so a row a concurrent push just completed
-            // (or failed for a different reason) is never stamped terminal.
-            where: { predictionId: p.id, url: { in: secondStrike }, status: 'FAILED', statusReason: 'oracle_null' },
+            // Guarded on FAILED + a null-family reason so a row a concurrent push just
+            // completed (or failed for an unrelated reason like oracle_omitted) is never
+            // stamped terminal.
+            where: { predictionId: p.id, url: { in: secondStrike }, status: 'FAILED', statusReason: { in: [...ORACLE_NULL_REASONS] } },
             data: { statusReason: 'oracle_null_final' },
           })
           results.finalized += count
