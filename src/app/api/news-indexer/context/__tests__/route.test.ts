@@ -684,6 +684,30 @@ describe('POST /api/news-indexer/context', () => {
       expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_timeout')
     })
 
+    it('fails only THIS request\'s claims on a null forecast, never a concurrent run\'s', async () => {
+      // daatan#1232. The null path passed the whole pushed set unfiltered, while the
+      // success path 130 lines above scopes to `claimResults[i] === 'claimed'`.
+      // `failClaimedArticles` only touches PENDING rows — and a concurrent request's
+      // fresh, still-extracting claim is exactly that. So a null here marked another
+      // in-flight request's article FAILED underneath it.
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://a.com/1', title: 'A', snippet: 's' },  // another run's claim
+            { url: 'https://b.com/2', title: 'B', snippet: 's' },  // ours
+          ],
+        }),
+      )
+
+      const urls = vi.mocked(failClaimedArticles).mock.calls[0][1]
+      expect(urls).toEqual(['https://b.com/2'])
+      expect(urls).not.toContain('https://a.com/1')
+    })
+
     it('falls back to oracle_null when no class is supplied, so claims are always released', async () => {
       // Belt and braces: an unclassified null is unreachable today (every branch sets a
       // class, pinned in oracle.test.ts), but releasing the claim must never depend on

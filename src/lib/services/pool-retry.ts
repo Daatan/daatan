@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_MAX_ARTICLES, ORACLE_NULL_REASONS } from '@/lib/services/oracle'
+import { TERMINAL_POOL_REASONS } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
 
@@ -16,12 +17,15 @@ const RETRY_MIN_AGE_MS = 24 * 60 * 60 * 1000
 
 /**
  * Rows worth re-driving through extraction: stuck claims EXCEPT the terminal
- * reasons — `oracle_omitted` (judged irrelevant by the gatekeeper; re-asking burns
- * an LLM call to hear "no" again) and `oracle_null_final` (two consecutive null
- * runs, see the second-strike rule below). Old PENDING rows are abandoned claims
- * (the pre-#1149 graveyard: claimed, then neither completed nor failed). Title is
- * required because the retry re-pushes title-only articles (pool rows never stored
- * the snippet); a claim-lifecycle row always has one.
+ * reasons (`TERMINAL_POOL_REASONS` — the gatekeeper's "irrelevant" verdict, and the
+ * twice-null attempt cap below). Old PENDING rows are abandoned claims (the
+ * pre-#1149 graveyard: claimed, then neither completed nor failed). Title is
+ * required because a row without one cannot be re-pushed at all; a claim-lifecycle
+ * row always has one.
+ *
+ * The terminal list is shared with the organic claim gate (evidence-pool.ts) rather
+ * than repeated here: the two used to disagree, so "terminal" was true of the sweep
+ * and false of every re-push arriving from news-indexer (daatan#1232).
  */
 function retryableWhere(cutoff: Date): Prisma.EvidencePoolArticleWhereInput {
   return {
@@ -30,7 +34,7 @@ function retryableWhere(cutoff: Date): Prisma.EvidencePoolArticleWhereInput {
     updatedAt: { lt: cutoff },
     OR: [
       { status: 'FAILED', statusReason: null },
-      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] } },
+      { status: 'FAILED', statusReason: { notIn: [...TERMINAL_POOL_REASONS] } },
       { status: 'PENDING' },
     ],
   }
@@ -96,7 +100,7 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       where: { ...retryable, predictionId: p.id },
       orderBy: { updatedAt: 'asc' },
       take: DEFAULT_MAX_ARTICLES,
-      select: { url: true, title: true, source: true, publishedDate: true, statusReason: true },
+      select: { url: true, title: true, snippet: true, source: true, publishedDate: true, statusReason: true },
     })
     // Second-strike rule: a batch where the Oracle rejects EVERY article comes back as a
     // null forecast, so its rows land on a retryable null-family reason. Rows that were
@@ -114,9 +118,15 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
     const secondStrike = rows
       .filter((r) => r.title && r.statusReason && ORACLE_NULL_REASONS.includes(r.statusReason))
       .map((r) => r.url)
+    // Re-push with the snippet the ORIGINAL attempt carried (daatan#1232). This used to
+    // hard-code `snippet: ''`, so the retry sent strictly less text than the attempt that
+    // already failed — for a Telegram row whose only content is the snippet, that made the
+    // second null near-deterministic and the `oracle_null_final` stamp below a
+    // self-fulfilling prophecy rather than a genuine re-test. Rows pooled before the column
+    // existed still have no snippet and fall back to title-only, exactly as before.
     const articles: SuppliedArticle[] = rows.flatMap((r) =>
       r.title
-        ? [{ url: r.url, title: r.title, snippet: '', source: r.source ?? undefined, publishedDate: r.publishedDate ?? undefined }]
+        ? [{ url: r.url, title: r.title, snippet: r.snippet ?? '', source: r.source ?? undefined, publishedDate: r.publishedDate ?? undefined }]
         : [],
     )
     if (articles.length === 0) continue

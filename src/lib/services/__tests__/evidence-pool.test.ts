@@ -688,7 +688,12 @@ describe('claimArticleForExtraction', () => {
     expect(result).toBe('skip')
   })
 
-  it("the updateMany's WHERE admits a stale PENDING claim, an unchanged-content FAILED row, a null contentHash, and a changed contentHash", async () => {
+  it("the updateMany's WHERE admits changed content, a backed-off non-terminal FAILED row, and a stale PENDING claim", async () => {
+    // The FAILED arm used to be a bare `{ status: 'FAILED' }` — no age gate, no reason
+    // filter. news-indexer re-pushes the same set every poll cycle while its 5-minute
+    // cooldown rolls, so an always-null article looped FAILED → PENDING → FAILED, burning
+    // a full Oracle run (fetch + gatekeeper + extractor) each time (daatan#1232). The
+    // schema's own comment, "eligible for retry once stale", was stricter than the code.
     create.mockRejectedValue(uniqueViolation())
     updateMany.mockResolvedValue({ count: 1 })
 
@@ -699,9 +704,95 @@ describe('claimArticleForExtraction', () => {
       expect.arrayContaining([
         { contentHash: null },
         { contentHash: { not: hashArticleContent('Headline', 'A snippet') } },
-        { status: 'FAILED' },
+        {
+          status: 'FAILED',
+          statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] },
+          updatedAt: { lt: expect.any(Date) },
+        },
+        { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
         { status: 'PENDING', updatedAt: { lt: expect.any(Date) } },
       ]),
+    )
+    // And the ungated arm is GONE — its presence is the bug.
+    expect(call.where.OR).not.toContainEqual({ status: 'FAILED' })
+  })
+
+  it('gates FAILED re-claims at 24h — the same budget the sweep spends on the same row', async () => {
+    // Not an arbitrary number: pool-retry's RETRY_MIN_AGE_MS. Before this the organic path
+    // was ~288× cheaper to trigger than the sweep it was silently competing with.
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    const before = Date.now()
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+    const failedArm = call.where.OR.find(
+      (a) => a.status === 'FAILED' && a.statusReason === null,
+    ) as { updatedAt: { lt: Date } }
+    const ageMs = before - failedArm.updatedAt.lt.getTime()
+    expect(ageMs).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000)
+    expect(ageMs).toBeLessThan(24 * 60 * 60 * 1000 + 5_000)
+  })
+
+  it('never re-claims a terminal row on unchanged content, but a content change still revives it', async () => {
+    // "Terminal" used to be true of the SWEEP and false of every organic re-push:
+    // pool-retry excluded oracle_omitted/oracle_null_final, the claim gate did not. Both
+    // now agree. The contentHash arms are deliberately left un-gated, preserving the
+    // documented escape hatch — a re-push with genuinely changed content still revives
+    // a terminal row, because that is new evidence rather than a retry.
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+    const failedArms = call.where.OR.filter((a) => a.status === 'FAILED')
+    // Every FAILED arm is both age-gated and terminal-aware.
+    for (const arm of failedArms) {
+      expect(arm).toHaveProperty('updatedAt')
+      expect('statusReason' in arm).toBe(true)
+    }
+    // The revival route is unconditional on status.
+    expect(call.where.OR).toContainEqual({ contentHash: null })
+    expect(call.where.OR).toContainEqual({
+      contentHash: { not: hashArticleContent('Headline', 'A snippet') },
+    })
+  })
+
+  it('stores the snippet so a later retry can re-send the text this attempt had', async () => {
+    // Without it, pool-retry re-pushed title-only — strictly LESS text than the attempt
+    // that already failed. For a Telegram row whose only content IS the snippet, that made
+    // the second null near-deterministic and `oracle_null_final` a self-fulfilling
+    // prophecy rather than a genuine re-test (daatan#1232).
+    create.mockResolvedValue({} as never)
+
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ snippet: 'A snippet' }) }),
+    )
+  })
+
+  it('stores the snippet on the re-claim path too, not just on first insert', async () => {
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    const call = updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data.snippet).toBe('A snippet')
+  })
+
+  it('normalizes an empty snippet to null rather than storing an empty string', async () => {
+    // So "we never had a snippet" and "the snippet was empty" read the same downstream —
+    // pool-retry falls back to title-only on null, which is the pre-existing behaviour.
+    create.mockResolvedValue({} as never)
+
+    await claimArticleForExtraction('pred-1', article({ snippet: '' }), 'news-indexer')
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ snippet: null }) }),
     )
   })
 

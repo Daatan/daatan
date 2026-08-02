@@ -28,6 +28,7 @@ function row(over: Record<string, unknown> = {}) {
   return {
     url: 'https://a.com/1',
     title: 'Stuck headline',
+    snippet: null,
     source: 'a.com',
     publishedDate: '2026-07-09',
     statusReason: null,
@@ -63,6 +64,46 @@ describe('retryPoolExtractions', () => {
     // Only ACTIVE predictions were even considered
     const predWhere = mockPredictions.mock.calls[0][0] as { where: { status: string } }
     expect(predWhere.where.status).toBe('ACTIVE')
+  })
+
+  it('re-pushes the snippet the original attempt carried, not title-only', async () => {
+    // daatan#1232. This hard-coded `snippet: ''`, so the retry sent strictly LESS text than
+    // the attempt that already failed. For a Telegram row whose only content IS the
+    // snippet, the second null was near-deterministic — which means the `oracle_null_final`
+    // stamp that follows it was a self-fulfilling prophecy, not a genuine re-test.
+    mockGroupBy.mockResolvedValue([{ predictionId: 'p1', _count: { _all: 1 } }] as never)
+    mockPredictions.mockResolvedValue([
+      { id: 'p1', claimText: 'a', claimDirection: null, claimDeadline: null },
+    ] as never)
+    mockRows.mockResolvedValue([row({ snippet: 'Sharren Haskel resigned as Deputy FM.' })] as never)
+    mockRefresh.mockResolvedValue({ status: 'ok', sources: 1 })
+
+    await retryPoolExtractions(3)
+
+    expect(mockRefresh).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        articles: [expect.objectContaining({ snippet: 'Sharren Haskel resigned as Deputy FM.' })],
+      }),
+    )
+  })
+
+  it('still falls back to title-only for rows pooled before the snippet column existed', async () => {
+    // No backfill is possible — the snippet was never persisted on this side. Those rows
+    // must keep working exactly as before rather than erroring or being skipped.
+    mockGroupBy.mockResolvedValue([{ predictionId: 'p1', _count: { _all: 1 } }] as never)
+    mockPredictions.mockResolvedValue([
+      { id: 'p1', claimText: 'a', claimDirection: null, claimDeadline: null },
+    ] as never)
+    mockRows.mockResolvedValue([row({ snippet: null })] as never)
+    mockRefresh.mockResolvedValue({ status: 'ok', sources: 1 })
+
+    await retryPoolExtractions(3)
+
+    expect(mockRefresh).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ articles: [expect.objectContaining({ snippet: '' })] }),
+    )
   })
 
   it('re-drives rows as title-only articles under origin retry', async () => {
