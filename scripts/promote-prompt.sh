@@ -10,7 +10,8 @@
 #   ./scripts/promote-prompt.sh prod express-prediction --rollback
 #
 # Valid envs:    staging | prod
-# Valid prompts: express-prediction | extract-prediction | suggest-tags | update-context
+# Valid prompts: see VALID_PROMPTS below — it must track terraform/bedrock_prompts.tf's
+#                `prompt_names`, since promoting writes the SSM parameter that file creates.
 
 set -euo pipefail
 
@@ -26,7 +27,11 @@ if [[ -z "$ENV" || -z "$PROMPT" || -z "$ACTION" ]]; then
 fi
 
 VALID_ENVS=("staging" "prod")
-VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "translate" "topic-extraction" "content-moderation" "guess-chances" "temporal-classifier")
+# Mirrors terraform/bedrock_prompts.tf `prompt_names`. Keep the two in step: a name
+# here with no SSM parameter fails at the put-parameter, and a name missing here blocks
+# a promotion that would have worked. `guess-chances` was listed here but has no
+# parameter (nothing in terraform creates it); `panel-estimate` has one but was missing.
+VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "translate" "topic-extraction" "content-moderation" "panel-estimate" "temporal-classifier")
 
 if [[ ! " ${VALID_ENVS[*]} " =~ " ${ENV} " ]]; then
   echo "Error: env must be one of: ${VALID_ENVS[*]}"

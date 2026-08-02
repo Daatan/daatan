@@ -1,5 +1,5 @@
-You are defining a new autonomous agent for a prediction market platform. 
-The bot's name is "{{name}}". 
+You are defining a new autonomous agent for a prediction market platform.
+The bot's name is "{{name}}".
 
 Based on this name, infer what kind of topics it cares about, its personality, and what news sources it should read.
 Generate a JSON object with:
