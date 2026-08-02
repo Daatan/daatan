@@ -14,6 +14,11 @@ vi.mock('@/lib/services/telegram', () => ({
   notifySecurityError: vi.fn(),
 }))
 
+// This suite exercises the resolve ROUTE, not calibration bookkeeping. Left
+// unmocked, recordCalibration reaches for contextSnapshot on a prisma mock that
+// has none, logs a fail-open error and passes anyway — which is correct
+// behaviour but prints a stack trace on every run of an unrelated test file.
+vi.mock('@/lib/services/calibration', () => ({ recordCalibration: vi.fn() }))
 vi.mock('@/lib/services/notification', () => ({
   createNotification: vi.fn(),
 }))
