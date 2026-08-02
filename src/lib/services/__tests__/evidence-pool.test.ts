@@ -84,6 +84,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   eventTarget: null,
   isOccurrence: null,
   verified: null,
+  claimsDetail: null,
   carriedForward: false,
   ...over,
 })
@@ -188,6 +189,38 @@ describe('addArticlesToPool', () => {
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
     expect(call.create).toMatchObject(facts)
     expect(call.update).toMatchObject(facts)
+  })
+
+  it('persists claimsDetail — the per-claim layer — in both create and update', async () => {
+    // F1/F15 (daatan#1235, retro#364). Every other extracted column on this row is a
+    // REDUCTION; this is the layer they reduce from, and it is where the inputs used
+    // to die. Storage only — nothing reads it, and it is never sent to /pool/aggregate.
+    const claimsDetail = [
+      { claim: 'The vote was scheduled.', quote: 'The speaker set a date.', stance: 0.6, certainty: 0.8, evidence_class: 'reported_fact' as const, fact_signal: 0.2, is_occurrence: false, verified: true },
+      { claim: 'A minister denied it.', stance: -0.4, certainty: 0.5, evidence_class: 'opinion' as const },
+    ]
+    await addArticlesToPool('pred-1', [source({ claimsDetail })], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    expect(call.create).toMatchObject({ claimsDetail })
+    expect(call.update).toMatchObject({ claimsDetail })
+  })
+
+  it('writes SQL NULL on create when no per-claim data was supplied', async () => {
+    // A nullable Json column needs Prisma.DbNull, not `null`, to reach SQL NULL.
+    await addArticlesToPool('pred-1', [source()], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown> }
+    expect(call.create.claimsDetail).toBe(Prisma.DbNull)
+  })
+
+  it('never NULLS stored claimsDetail on an update that merely omits it', async () => {
+    // The daatan#1237 failure mode, deliberately not repeated here: a re-touch that
+    // carries no per-claim data (a recompute, an older Oracle build, a partial
+    // response) must leave what we already hold alone. `undefined` tells Prisma to
+    // skip the column; there is no backfill, so an erased row is gone for good.
+    await addArticlesToPool('pred-1', [source()], 'analyze')
+    const call = upsert.mock.calls[0][0] as { update: Record<string, unknown> }
+    expect(call.update.claimsDetail).toBeUndefined()
+    expect('claimsDetail' in call.update).toBe(true) // present-but-undefined, i.e. skipped
   })
 })
 

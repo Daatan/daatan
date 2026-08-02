@@ -44,6 +44,19 @@ const searchResult = (over: Partial<SearchResult> = {}): SearchResult => ({
 })
 
 describe('enrichOracleSources', () => {
+  it('carries the Oracle\'s per-claim layer through untouched (F1, retro#364)', () => {
+    const claims_detail = [
+      { claim: 'A.', quote: 'Verbatim.', stance: 0.6, certainty: 0.8, evidence_class: 'reported_fact' as const },
+    ]
+    const out = enrichOracleSources([oracleSource({ claims_detail })], [searchResult()], new Map())
+    expect(out[0].claimsDetail).toEqual(claims_detail)
+  })
+
+  it('defaults claimsDetail to null when the Oracle omitted it (older build)', () => {
+    const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(out[0].claimsDetail).toBeNull()
+  })
+
   it('joins title + date from the input articles and author from the lookup', () => {
     const out = enrichOracleSources(
       [oracleSource()],
@@ -205,6 +218,7 @@ describe('poolArticleToEnrichedSource', () => {
       eventTarget: 'Iran',
       isOccurrence: false,
       verified: true,
+      claimsDetail: null,
       carriedForward: false,
     })
   })
@@ -228,6 +242,36 @@ describe('poolArticleToEnrichedSource', () => {
   it('nulls an unrecognised evidenceClass rather than passing the raw string through', () => {
     expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'garbage' }), null).evidenceClass).toBeNull()
     expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'opinion' }), null).evidenceClass).toBe('opinion')
+  })
+
+  // F1/F15 (daatan#1235, retro#364) — claims_detail is an untyped Json column written
+  // by an external service, so it gets the same defensive narrowing as `claims`.
+  it('reads back a well-formed claimsDetail array', () => {
+    const claimsDetail = [
+      { claim: 'A.', stance: 0.6, certainty: 0.8, evidence_class: 'reported_fact', verified: true },
+      { claim: 'B.', stance: -0.4, certainty: 0.5 },
+    ]
+    const out = poolArticleToEnrichedSource(poolArticle({ claimsDetail } as never), null)
+    expect(out.claimsDetail).toEqual(claimsDetail)
+    // Per-claim facets survive the round trip — the whole point of the column.
+    expect(out.claimsDetail?.[0].verified).toBe(true)
+  })
+
+  it('nulls a legacy or malformed claimsDetail instead of propagating a bad shape', () => {
+    // Legacy rows (pre-column, and every row extracted before it existed) have no
+    // per-claim data at all — there is no backfill, so null is the honest answer.
+    expect(poolArticleToEnrichedSource(poolArticle(), null).claimsDetail).toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ claimsDetail: null } as never), null).claimsDetail).toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ claimsDetail: [] } as never), null).claimsDetail).toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ claimsDetail: 'nope' } as never), null).claimsDetail).toBeNull()
+    // One bad element invalidates the array — a partially-readable claim set would
+    // silently under-report the article's claims to whatever reads this next.
+    expect(
+      poolArticleToEnrichedSource(
+        poolArticle({ claimsDetail: [{ claim: 'ok', stance: 0.1 }, { claim: 'no stance' }] } as never),
+        null,
+      ).claimsDetail,
+    ).toBeNull()
   })
 })
 

@@ -1,0 +1,12 @@
+-- F1/F15 (daatan#1235, retro#364): persist the per-claim layer behind the
+-- article-level scalars on evidence_pool_articles.
+--
+-- Additive and nullable by design. NO BACKFILL: for every existing row the
+-- per-claim data was discarded at extraction time and is unrecoverable —
+-- reconstructing it from the fused scalars would fabricate data, which is
+-- precisely the failure this column exists to prevent. Existing rows stay NULL
+-- and self-heal only if that article is ever re-extracted.
+--
+-- No index: nothing queries on it yet (storage-only, shadow lane). Add one with
+-- the issue that first reads it (R1 claim-level weighting / retro#355).
+ALTER TABLE "evidence_pool_articles" ADD COLUMN "claims_detail" JSONB;
