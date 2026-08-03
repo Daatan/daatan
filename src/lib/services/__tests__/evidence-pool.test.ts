@@ -725,14 +725,21 @@ describe('claimArticleForExtraction', () => {
 
     const before = Date.now()
     await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+    const after = Date.now()
 
     const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
     const failedArm = call.where.OR.find(
       (a) => a.status === 'FAILED' && a.statusReason === null,
     ) as { updatedAt: { lt: Date } }
-    const ageMs = before - failedArm.updatedAt.lt.getTime()
-    expect(ageMs).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000)
-    expect(ageMs).toBeLessThan(24 * 60 * 60 * 1000 + 5_000)
+    // The cutoff is `Date.now() - BACKOFF` evaluated INSIDE the call, so it is bounded by the
+    // clock either side of the call and by nothing tighter. Asserting `>= before - BACKOFF` with
+    // only `before` captured is a race that passes solely when both reads land in the same
+    // millisecond — true on a fast runner, false on a real machine, so it failed 3/3 locally
+    // while CI stayed green.
+    const cutoff = failedArm.updatedAt.lt.getTime()
+    const BACKOFF = 24 * 60 * 60 * 1000
+    expect(cutoff).toBeGreaterThanOrEqual(before - BACKOFF)
+    expect(cutoff).toBeLessThanOrEqual(after - BACKOFF)
   })
 
   it('never re-claims a terminal row on unchanged content, but a content change still revives it', async () => {
