@@ -7,7 +7,7 @@ import { llmService } from '@/lib/llm'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
+import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
@@ -286,6 +286,11 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 claimDeadline: prediction.claimDeadline,
                 claimCreatedAt: prediction.createdAt,
                 claimArchetype: prediction.claimArchetype,
+                // Must stay under ESTIMATION_TIMEOUT_MS: this whole block is raced
+                // against it below, so a longer Oracle budget would just be abandoned
+                // 15s in — with the call still running, uncancelled. The default (30s)
+                // is for the background push/sweep paths. See daatan#1254.
+                timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS,
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })
             // The Oracle abstained — the evidence doesn't bear on the claim. Record
             // the abstention and do NOT fall back to an LLM guess, which would just

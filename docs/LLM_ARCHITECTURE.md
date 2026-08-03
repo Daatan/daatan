@@ -129,7 +129,16 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 
 ### Fallback chain for forecast "AI %"
 
-1.  **Oracle** (`POST /forecast` with 12s timeout (bots use 20s)) — calibrated multi-source estimate.
+1.  **Oracle** (`POST /forecast`) — calibrated multi-source estimate. The client budget is
+    per path, not global (`src/lib/services/oracle.ts`): **30 s** by default for
+    server-to-server/background callers (news-indexer push, the retry sweep), **20 s** for
+    bot voting, **12 s** (`INTERACTIVE_FORECAST_TIMEOUT_MS`) for the two interactive callers,
+    which race the Oracle against their own wall clock and fall back to the LLM.
+    Every budget must stay strictly above the server budget it waits on: retro does not
+    cancel on client disconnect, so aborting early discards a forecast already paid for and
+    records it as a failure. 30 s is derived from retro's own server-side latency (p99 25.0 s,
+    clamped by its `per_article_timeout_seconds = 25`), not from its nominal
+    `forecast_timeout_seconds = 90`, which has fired once in 93 days. See daatan#1254.
 2.  **LLM `guessChances`** (Gemini → Oracle → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracle path is not configured, times out, returns a placeholder response, or has zero usable articles.
 
 ### Call sites

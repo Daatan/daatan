@@ -33,7 +33,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
 })
 
 import { ClaimDirection } from '@prisma/client'
-import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, BOT_FORECAST_TIMEOUT_MS } from '../oracle'
+import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
 const mockLogOracleCall = vi.mocked(logOracleCall)
@@ -245,9 +245,10 @@ describe('getOracleForecast', () => {
     })
 
     it('classifies a client timeout as oracle_timeout — NOT an abstention', async () => {
-      // The distinction that motivated the issue. FORECAST_TIMEOUT_MS is 12s against
-      // retro's own 90s budget, so some share of what the pool recorded as "the
-      // extractor produced nothing" never reached the extractor at all.
+      // The distinction that motivated the issue: some share of what the pool recorded
+      // as "the extractor produced nothing" never reached the extractor at all. The
+      // budget was 12s against a server whose p99 is 25s (daatan#1254, now 30s) — the
+      // class stays load-bearing because a timeout still says nothing about the article.
       const err = new Error('aborted')
       err.name = 'TimeoutError'
       fetchMock.mockRejectedValueOnce(err)
@@ -460,15 +461,42 @@ describe('forecast request timeout', () => {
     timeoutSpy.mockRestore()
   })
 
-  it('defaults to the 12s timeout for interactive callers', async () => {
+  it('defaults to the 30s background budget, not the interactive one', async () => {
+    // daatan#1254. The default serves the server-to-server callers (news-indexer push,
+    // oracle-backfill sweep); retro's p99 on that path is 25.0s, so the old 12s default
+    // discarded 15.3% of forecasts it had already paid for. The default is deliberately
+    // the LONG one: a new background caller silently censoring completed work is worse
+    // than a new interactive caller waiting too long.
     await getOracleForecast('Q?')
-    expect(timeoutSpy).toHaveBeenCalledWith(12_000)
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000)
+  })
+
+  it('keeps the background budget above the measured retro ceiling', () => {
+    // retro's per_article_timeout_seconds=25 is the real clamp (its declared
+    // forecast_timeout_seconds=90 fired once in 93 days). A background budget at or
+    // below 25s re-introduces the censoring this issue fixed.
+    const RETRO_MEASURED_CEILING_MS = 25_000
+    expect(FORECAST_TIMEOUT_MS).toBeGreaterThan(RETRO_MEASURED_CEILING_MS)
+    // The two short budgets are deliberate opt-outs, both raced against a caller-side
+    // wall clock. Ordering them here pins the intent: interactive < bot < background.
+    expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(BOT_FORECAST_TIMEOUT_MS)
+    expect(BOT_FORECAST_TIMEOUT_MS).toBeLessThan(FORECAST_TIMEOUT_MS)
+  })
+
+  it('interactive callers fit inside the 15s estimation race they run under', async () => {
+    // forecasts/[id]/context races the whole estimation at ESTIMATION_TIMEOUT_MS=15s.
+    // An Oracle budget above that is abandoned one level up while still running — the
+    // same inversion, one hop further in. Keep them consistent.
+    const ESTIMATION_TIMEOUT_MS = 15_000
+    expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(ESTIMATION_TIMEOUT_MS)
+    await getOracleForecast('Q?', { timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS })
+    expect(timeoutSpy).toHaveBeenCalledWith(INTERACTIVE_FORECAST_TIMEOUT_MS)
   })
 
   it('uses a caller-supplied timeout when provided', async () => {
     await getOracleForecast('Q?', { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(BOT_FORECAST_TIMEOUT_MS)
-    expect(BOT_FORECAST_TIMEOUT_MS).toBeGreaterThan(12_000)
+    expect(BOT_FORECAST_TIMEOUT_MS).toBeGreaterThan(INTERACTIVE_FORECAST_TIMEOUT_MS)
   })
 
   it('getOracleProbability forwards its timeout option to the request', async () => {

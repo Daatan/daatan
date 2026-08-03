@@ -50,6 +50,7 @@ const {
 
 vi.mock('@/lib/services/oracle', () => ({
   DEFAULT_MAX_ARTICLES: 30,
+  INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
   getOracleForecast: (...args: unknown[]) => mockGetOracleForecast(...args),
   recordOracleFallback: (...args: unknown[]) => mockRecordOracleFallback(...args),
 }))

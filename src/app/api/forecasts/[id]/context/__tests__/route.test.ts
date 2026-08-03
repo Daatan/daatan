@@ -46,6 +46,7 @@ vi.mock('@/lib/services/oracle', () => ({
   getOracleForecast: vi.fn(),
   recordOracleFallback: vi.fn(),
   DEFAULT_MAX_ARTICLES: 10,
+  INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
 }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn().mockResolvedValue(new Map()) }))
 vi.mock('@/lib/services/evidence-pool', () => ({
@@ -75,7 +76,7 @@ import {
 } from '@/lib/services/context'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast } from '@/lib/services/oracle'
+import { getOracleForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
@@ -170,6 +171,24 @@ describe('POST /api/forecasts/[id]/context', () => {
         }),
         expect.anything(),
       )
+    })
+
+    it('asks the Oracle with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
+      // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (15s), so the
+      // Oracle call must fit inside it. The service default is 30s — sized for the
+      // background push/sweep paths — and inheriting it here would mean the race abandons
+      // a call that is still running: the same timeout inversion, one hop further in.
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+
+      const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+      await collectDoneEvent(res)
+
+      expect(getOracleForecast).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS }),
+        expect.anything(),
+      )
+      expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(15_000)
     })
 
     it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {
