@@ -341,6 +341,40 @@ describe('POST /api/news-indexer/context', () => {
     expect(sources).toHaveLength(2)
   })
 
+  it('reports NO top-level signal when the Oracle omitted the trigger article (daatan#1252)', async () => {
+    // The trigger is dropped by the Oracle (gate-rejected / extraction failed) while a neighbour
+    // in the same evidence set survives. news-indexer writes these top-level fields into
+    // forecast_match FOR THE TRIGGER, under the trigger's person_id, and that row feeds
+    // source_accuracy and the public by-source panel — so echoing the neighbour's numbers here
+    // credits one author with another's claim. Only reachable at PUSH_EVIDENCE_COUNT > 1, which
+    // production runs (8).
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+    vi.mocked(getOracleForecast).mockResolvedValue({
+      // Only the BBC (non-trigger) article comes back; the AJ trigger is absent.
+      forecast: { ...ORACLE_WITH_SOURCE, articles_used: 1, sources: [ORACLE_WITH_SOURCE.sources[0]] },
+      logId: null,
+    } as never)
+
+    const res = await POST(
+      post('test-secret', {
+        predictionId: 'pred-1',
+        triggerArticleUrl: 'https://aljazeera.com/news/y',
+        articles: [
+          { url: 'https://bbc.com/news/x', title: 'BBC', snippet: 's1', source: 'bbc.com', similarity: 0.5 },
+          { url: 'https://aljazeera.com/news/y', title: 'AJ', snippet: 's2', source: 'aljazeera.com', similarity: 0.7 },
+        ],
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    // Null, NOT the surviving neighbour's signal.
+    expect(body).toMatchObject({ ok: true, stance: null, certainty: null, claim: null, relevance: null })
+    // The neighbour is still reported in its own right, under its own url.
+    expect(body.sources).toHaveLength(1)
+    expect(body.sources[0]).toMatchObject({ url: 'https://bbc.com/news/x' })
+  })
+
   describe('author passthrough', () => {
     // Downstream (elections.daatan.com) matches tracked commentators on
     // `oracleSnapshot.sources[].author`; the Oracle response never carries one.

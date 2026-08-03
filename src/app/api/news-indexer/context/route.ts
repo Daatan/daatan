@@ -229,7 +229,16 @@ export async function POST(request: NextRequest) {
 
     // The article that triggered this push — its enrichment is what both the Telegram
     // notification and the top-level (single-article, back-compat) response fields report.
-    const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? enrichedSources[0]
+    // NO fallback to enrichedSources[0]. If the trigger article isn't in the Oracle's sources it
+    // wasn't extracted, and the honest answer is "no signal" — not a neighbour's. The fallback
+    // that used to sit here was unreachable while PUSH_EVIDENCE_COUNT was 1; prod runs 8, so a
+    // push carries the trigger plus up to 7 neighbours and the trigger is routinely the one the
+    // Oracle drops. news-indexer writes these top-level fields into forecast_match FOR THE
+    // TRIGGER, under the trigger's person_id — so the neighbour's stance was being recorded, and
+    // then scored, against a journalist who never made that claim (daatan#1252). Measured before
+    // the fix: Telegram ledger rows carrying a stance 2,092 vs 767 articles actually extracted
+    // (+173%), against a +7% web control. Every consumer below is `?? null`-guarded already.
+    const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? null
 
     if (oracleForecast) {
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
