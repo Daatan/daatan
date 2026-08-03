@@ -1,5 +1,5 @@
 import { guessChances } from '@/lib/llm/expressPrediction'
-import { getOracleProbability } from '@/lib/services/oracle'
+import { getOracleProbability, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { z } from 'zod'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
@@ -29,7 +29,14 @@ export const POST = withAuth(async (request, user) => {
     const { claimText, detailsText, articles } = guessSchema.parse(body)
 
     const t0 = Date.now()
-    const oracleProb = await getOracleProbability(claimText, { source: 'express-guess', userId: user.id })
+    // Interactive: a user is waiting on this while drafting a claim, and the LLM
+    // fallback below is the better trade past ~12s. Opts out of the default (30s),
+    // which is sized for the background push/sweep paths — see oracle.ts.
+    const oracleProb = await getOracleProbability(
+      claimText,
+      { source: 'express-guess', userId: user.id },
+      { timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS },
+    )
     log.info({ durationMs: Date.now() - t0, source: oracleProb !== null ? 'oracle' : 'llm' }, 'express-guess: probability')
     if (oracleProb !== null) {
       return NextResponse.json({

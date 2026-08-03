@@ -13,11 +13,57 @@ export { recordOracleFallback } from '@/lib/services/oracleClient'
 const log = createLogger('oracle')
 
 const EXPECTED_API_VERSION = '0.1'
-const FORECAST_TIMEOUT_MS = 12_000
+
+/**
+ * Default Oracle budget: server-to-server and background callers (the news-indexer
+ * push route, the retry sweep). A client budget must be strictly LARGER than the
+ * server budget it waits on, and retro does not cancel on client disconnect —
+ * `_run_forecast_inner` runs to completion and writes into `forecast_cache`. Aborting
+ * early therefore saves nothing: we pay for the extraction, discard the answer, and
+ * label the row a failure.
+ *
+ * Derived from retro's OWN server-side `phase=total` log (Oracle box
+ * i-00ac444b94c5ff9b2, n=17,006 over 93 days), NOT from daatan's numbers — those are
+ * censored by this very timeout and cannot show what they truncate. On the push path
+ * (`provider=caller`, n=13,688):
+ *
+ *   all-time   p50 7.8s · p95 23.1s · p99 25.0s   >12s 17.31%  >30s 0.32%
+ *   last 7d    p50 5.7s · p95 12.4s · p99 25.0s   >12s  5.59%  >30s 0.00%  max 25.6s
+ *
+ * The knee just above 25s is retro's `per_article_timeout_seconds = 25`; its declared
+ * `forecast_timeout_seconds = 90` has fired exactly once in those 93 days, so 90 is
+ * the wrong number to size against. 30s clears the real clamp with headroom and covers
+ * 99.7% of all-time / 100% of the last 7 days.
+ *
+ * What the old 12s cost: 2,106 ERROR/`timeout` rows at a mean of 12,002ms in 30 days of
+ * prod `oracle_call_logs` — 15.3% of all news-indexer forecasts — with a 2,236-row spike
+ * in the [12000,12183] bucket against 673 in [11000,11999]. That is right-censoring, not
+ * failure: the work completed on retro's side. See daatan#1254.
+ *
+ * Callers that outlast this one must move with it: news-indexer's push client
+ * (`matcher.PUSH_TIMEOUT_SECONDS`, 45s) wraps this whole route.
+ */
+export const FORECAST_TIMEOUT_MS = 30_000
+
+/**
+ * Interactive budget: a user's request is blocked on the answer, so this stays short
+ * and the caller falls back to the LLM instead of waiting. It is NOT the default —
+ * a new background caller silently discarding completed work (the bug above, invisible
+ * for months) is worse than a new interactive caller waiting too long (visible at once).
+ *
+ * Both current interactive callers race the Oracle against their own wall-clock budget,
+ * so a longer Oracle wait would only be abandoned one level up: `forecasts/[id]/context`
+ * races the whole estimation at `ESTIMATION_TIMEOUT_MS` (15s), and `express/guess`
+ * answers a user typing a claim.
+ */
+export const INTERACTIVE_FORECAST_TIMEOUT_MS = 12_000
+
 // Bot voting runs in a background cron (bots.yml, ~270s budget) where latency is
 // not user-facing, so it tolerates a longer Oracle wait than the interactive
 // paths. Consultations are sequential and capped per run (see voting.ts); that
-// cap is lowered in step so cap × timeout stays within the run budget.
+// cap is lowered in step so cap × timeout stays within the run budget. Deliberately
+// left at 20s rather than raised to FORECAST_TIMEOUT_MS: cap × timeout must stay
+// inside the run budget, so raising it means lowering the cap in voting.ts too.
 export const BOT_FORECAST_TIMEOUT_MS = 20_000
 const HEALTH_TIMEOUT_MS = 5_000
 /**
@@ -225,9 +271,12 @@ export interface OracleForecastResponse {
  * - `oracle_abstain` — the Oracle RAN and deliberately declined (`insufficient_data`),
  *   most often the gatekeeper rejecting every article. Re-asking with identical input
  *   buys the same answer.
- * - `oracle_timeout` / `oracle_network` — we never got an answer. Note
- *   `FORECAST_TIMEOUT_MS` is 12s against retro's own 90s budget, so a real share of
- *   what looked like "the extractor produced nothing" is pure latency. Worth retrying.
+ * - `oracle_timeout` / `oracle_network` — we never got an answer. Worth retrying, but
+ *   note what a timeout does NOT mean: retro does not cancel, so the forecast it was
+ *   computing still finished. Until daatan#1254 this budget was 12s against a server
+ *   whose p99 is 25s, and 15.3% of news-indexer forecasts were recorded as failures at
+ *   exactly 12,002ms — a real share of what looked like "the extractor produced
+ *   nothing" was pure latency. Now 30s; expect this class to shrink sharply.
  * - `oracle_http` — retro answered non-OK. Worth retrying; a 4xx repeatedly is a bug.
  * - `oracle_unconfigured` — no Oracle URL/key here. Says nothing about the article.
  * - `oracle_placeholder` — retro returned its stub response.
