@@ -137,7 +137,10 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
     results.processed++
     results.rowsRetried += articles.length
     try {
-      const r = await refreshOracleSnapshot(p, { articles, origin: 'retry' })
+      // `reask: true` — the sweep pays for a full extraction per row batch, and a
+      // client timeout discards it exactly as the push path does (daatan#1262).
+      // Nothing waits on the sweep's response, so the recovery is free to be late.
+      const r = await refreshOracleSnapshot(p, { articles, origin: 'retry', reask: true })
       if (r.status === 'ok') results.ok++
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++

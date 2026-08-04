@@ -5,7 +5,7 @@ import { hashUrl } from '@/lib/utils/hash'
 import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
 import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
-import { claimArchetypeParam, claimDirectionParam } from '@/lib/services/oracle'
+import { claimArchetypeParam, claimDirectionParam, TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('evidence-pool')
@@ -171,6 +171,26 @@ const PENDING_CLAIM_STALE_MS = 10 * 60 * 1000
 const FAILED_RECLAIM_BACKOFF_MS = 24 * 60 * 60 * 1000
 
 /**
+ * The same gate, for a row whose last failure was a TRANSPORT event rather than a
+ * verdict (`TRANSPORT_NULL_REASONS` — we hung up, or the wire broke). 60s, not 24h.
+ *
+ * The 24h backoff above is priced against a specific waste: an article that always
+ * nulls, re-pushed every poll cycle, burning a full fetch + gatekeeper + extractor
+ * run each time. That pricing assumes the previous run TOLD us something about the
+ * article. A client timeout tells us nothing about it — retro does not cancel, so
+ * the run we abandoned very likely completed and is sitting in `forecast_cache` for
+ * an hour. Charging a wire event 24h of silence was the residual bite of
+ * mislabelling it FAILED (daatan#1261): it is also precisely what made daatan#1262
+ * impossible by construction, since the cache TTL is 1h and the earliest re-ask on
+ * either retry surface was 24h — the two windows could never overlap.
+ *
+ * 60s rather than zero so a hard-down Oracle still can't be hot-looped by
+ * news-indexer's re-push cycle, and comfortably shorter than `REASK_DELAY_MS`
+ * (120s) so our own scheduled re-ask is never refused by this gate as `unchanged`.
+ */
+const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
+
+/**
  * Reasons that mean "stop asking about this row" — a verdict, not a transient miss.
  *
  * - `oracle_omitted`: the Oracle ran and its gatekeeper dropped the article. Re-asking
@@ -244,6 +264,7 @@ export async function claimArticleForExtraction(
 
   const staleCutoff = new Date(Date.now() - PENDING_CLAIM_STALE_MS)
   const failedCutoff = new Date(Date.now() - FAILED_RECLAIM_BACKOFF_MS)
+  const transportCutoff = new Date(Date.now() - TRANSPORT_RECLAIM_BACKOFF_MS)
   const { count } = await prisma.evidencePoolArticle.updateMany({
     where: {
       predictionId,
@@ -264,6 +285,15 @@ export async function claimArticleForExtraction(
           updatedAt: { lt: failedCutoff },
         },
         { status: 'FAILED', statusReason: null, updatedAt: { lt: failedCutoff } },
+        // Same content, previously failed on the WIRE — the short lane. Listed after
+        // the 24h arms rather than instead of them: those already match these rows
+        // (a transport reason is not terminal), so this arm only ever widens the
+        // window, never narrows it. daatan#1261.
+        {
+          status: 'FAILED',
+          statusReason: { in: [...TRANSPORT_NULL_REASONS] },
+          updatedAt: { lt: transportCutoff },
+        },
         // An abandoned in-flight claim.
         { status: 'PENDING', updatedAt: { lt: staleCutoff } },
       ],

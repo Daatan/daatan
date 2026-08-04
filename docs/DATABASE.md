@@ -218,6 +218,17 @@ distinguishes *new evidence* from *a retry*:
   keeps terminal rows revivable.
 - **Same content, non-terminal failure** — re-claimable only after
   `FAILED_RECLAIM_BACKOFF_MS` (24 h, matching `pool-retry`'s `RETRY_MIN_AGE_MS`).
+- **Same content, previous failure was on the WIRE** (`TRANSPORT_NULL_REASONS` —
+  `oracle_timeout`/`oracle_network`) — re-claimable after `TRANSPORT_RECLAIM_BACKOFF_MS`
+  (60 s) instead (daatan#1261). The 24 h figure is priced against an article that
+  *always* nulls, which assumes the last run told us something **about the article**;
+  a client timeout does not. retro does not cancel on disconnect, so the run we
+  abandoned very likely completed and is sitting in its `forecast_cache` for an hour —
+  and a 1 h cache against a 24 h floor can never overlap, which is exactly what made
+  daatan#1262 impossible by construction. 60 s rather than 0 so a hard-down Oracle
+  still cannot be hot-looped by the re-push cycle. This arm only ever *widens* the
+  window: the 24 h arms already matched these rows, since a transport reason is not
+  terminal.
 - **Same content, terminal reason** (`TERMINAL_POOL_REASONS`) — never re-claimed.
 
 This used to be a bare `{ status: 'FAILED' }` arm: no age gate, no reason filter. Since
@@ -254,8 +265,39 @@ three vocabularies up side by side.
 Consumers must match the whole family via `ORACLE_NULL_REASONS` (`src/lib/services/oracle.ts`),
 never the literal `'oracle_null'` — the retry sweep's second-strike rule did the
 latter, and a strict-equality check would silently stop finalizing rows.
-**Retry policy is still uniform across the family** — differentiating it (an
-abstention on identical input is not worth re-asking; a timeout is) is daatan#1232.
+**Retry policy is no longer uniform across the family.** The transport classes
+(`TRANSPORT_NULL_REASONS` — `oracle_timeout`/`oracle_network`) are treated as *we never
+got an answer* rather than *the articles said nothing*, and they alone get the 60 s
+re-claim lane above and the re-ask below (daatan#1261/#1262). An abstention on identical
+input still buys the same answer, so it keeps the full 24 h backoff.
+
+**Going back for an abandoned run (daatan#1262).** retro finishes a forecast the client
+hung up on and stores it in `forecast_cache` for `cache_ttl_seconds` (3600). daatan used
+to never read it — its earliest re-ask was 24 h — so ~72 completed Claude Haiku 4.5
+extractions a day were paid for and discarded. On a transport class the push route and
+the retry sweep now schedule `scheduleOracleReask` (`src/lib/services/oracle-backfill.ts`),
+which after `REASK_DELAY_MS` (120 s) re-drives the run through `refreshOracleSnapshot`:
+
+- **The article set must be IDENTICAL.** retro keys the cache on
+  `sha256(question | max_articles | md5(sorted urls)[:12] | claim_direction|claim_deadline)`,
+  so the re-ask carries the *claimed subset* — what was actually sent — not the whole push.
+  A set that merely overlaps is a different key and re-runs the extractor, paying twice to
+  save once. `claim_created_at`/`claim_archetype` are **not** in that key and may vary.
+- **120 s is sized off retro's clocks**, not ours: retro caps a run at
+  `forecast_timeout_seconds` (90 s) from its own request start, so by then the run has
+  either completed and cached or given up. It must also exceed the 60 s re-claim backoff,
+  or daatan's own gate refuses the re-ask as `unchanged`.
+- **One attempt.** The re-ask runs with `reask: false`, so a re-ask that times out again
+  does not chain; the row falls back to the daily sweep. Concurrent re-asks are capped.
+- **Known ceiling:** retro runs gunicorn `--workers 2` and its forecast cache is
+  per-process in memory, so a re-ask lands on the worker holding the entry roughly half
+  the time. A miss still returns a real forecast and still completes the pool row — it
+  just costs a second extraction instead of nothing. So the recovered-**estimate** rate is
+  ~100% and the *free*-recovery rate is ~50%. Making it deterministic needs a shared cache
+  on retro's side.
+- A recovered push persists via `saveOracleSnapshotOnly`, so the estimate lands but the
+  ContextSnapshot reads as a background refresh rather than a news-indexer match, and no
+  Telegram notification fires.
 
 Other reasons: `oracle_omitted` (the Oracle ran but its gatekeeper dropped the
 article — terminal), `oracle_null_final` (two consecutive **attributable** null runs —

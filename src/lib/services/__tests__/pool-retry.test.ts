@@ -122,6 +122,10 @@ describe('retryPoolExtractions', () => {
           { url: 'https://a.com/1', title: 'Stuck headline', snippet: '', source: 'a.com', publishedDate: '2026-07-09' },
         ],
         origin: 'retry',
+        // The sweep pays for a full extraction per batch and discards it on a client
+        // timeout exactly as the push path does, and nothing waits on its response —
+        // so it opts into the re-ask too (daatan#1262).
+        reask: true,
       },
     )
   })

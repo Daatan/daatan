@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const {
   mockSearch,
@@ -14,7 +14,9 @@ const {
   mockResolvePooled,
   mockClaim,
   mockFailClaimed,
+  mockPredictionFind,
 } = vi.hoisted(() => ({
+  mockPredictionFind: vi.fn(),
   mockSearch: vi.fn(),
   mockForecast: vi.fn(),
   mockMeta: vi.fn(),
@@ -29,9 +31,15 @@ const {
 
 vi.mock('@/lib/services/oracleSearch', () => ({ oracleSearch: (...a: unknown[]) => mockSearch(...a) }))
 vi.mock('@/lib/llm/searchQuery', () => ({ buildSearchQuery: (...a: unknown[]) => mockBuildQuery(...a) }))
-vi.mock('@/lib/services/oracle', () => ({
+// `isTransportNullReason` comes from the REAL module — it is the rule deciding which
+// failures are recoverable, and a stub here would keep passing after that rule changed.
+vi.mock('@/lib/services/oracle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/services/oracle')>()),
   getOracleForecast: (...a: unknown[]) => mockForecast(...a),
   DEFAULT_MAX_ARTICLES: 15,
+}))
+vi.mock('@/lib/prisma', () => ({
+  prisma: { prediction: { findUnique: (...a: unknown[]) => mockPredictionFind(...a) } },
 }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: (...a: unknown[]) => mockMeta(...a) }))
 vi.mock('@/lib/services/context', () => ({
@@ -50,7 +58,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-import { refreshOracleSnapshot } from '../oracle-backfill'
+import { refreshOracleSnapshot, scheduleOracleReask, runOracleReask, REASK_DELAY_MS, _reaskInFlight } from '../oracle-backfill'
 
 const prediction = { id: 'p1', claimText: 'Will X happen?' }
 
@@ -75,6 +83,177 @@ beforeEach(() => {
   // "something new" path); the skip-when-unchanged path has its own tests below.
   mockClaim.mockResolvedValue(['claimed'])
   mockFailClaimed.mockResolvedValue(undefined)
+  mockPredictionFind.mockResolvedValue({ status: 'ACTIVE' })
+})
+
+describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
+  const supplied = [
+    { url: 'https://a.com/1', title: 'A', snippet: 'sa' },
+    { url: 'https://b.com/2', title: 'B', snippet: 'sb' },
+  ]
+
+  /** Let the scheduled re-ask's promise chain settle after the timer fires. */
+  const settle = async () => {
+    for (let i = 0; i < 8; i++) await Promise.resolve()
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    // Drain anything still pending so `inFlightReasks` — deliberately module state —
+    // does not leak a slot into the next test and quietly trip the cap.
+    await vi.runAllTimersAsync()
+    await settle()
+    vi.useRealTimers()
+    expect(_reaskInFlight()).toBe(0)
+  })
+
+  it('re-asks with the IDENTICAL article set, which is the whole mechanism', async () => {
+    // retro keys `forecast_cache` on sha256(question | max_articles | md5(sorted urls) |
+    // claim_direction|claim_deadline). Membership of the URL set is therefore load-bearing:
+    // a re-ask over a different set is a different key and re-runs the extractor, paying
+    // twice to save once. Asserted against what the FIRST call actually sent.
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+
+    const r = await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    expect(r).toMatchObject({ status: 'no-oracle', failureClass: 'oracle_timeout' })
+    expect(mockForecast).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    expect(mockForecast).toHaveBeenCalledTimes(2)
+    const sent = (n: number) =>
+      (mockForecast.mock.calls[n][1] as { articles: { url: string }[] }).articles.map((a) => a.url).sort()
+    expect(sent(1)).toEqual(sent(0))
+    // …and the claim question/metadata that also feed retro's key are unchanged.
+    expect(mockForecast.mock.calls[1][0]).toBe(mockForecast.mock.calls[0][0])
+  })
+
+  it('does not fire before the delay is up', async () => {
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+
+    // One millisecond short. The delay has to clear retro's own 90s per-run cap, or the
+    // re-ask races a run that has not written to the cache yet.
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS - 1)
+    await settle()
+    expect(mockForecast).toHaveBeenCalledTimes(1)
+    expect(REASK_DELAY_MS).toBeGreaterThan(90_000)
+  })
+
+  it('does NOT re-ask when the Oracle ran and declined', async () => {
+    // `oracle_abstain` is a verdict about the articles — the run completed, there is
+    // nothing abandoned to collect, and re-asking buys the same answer at full price.
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    expect(mockForecast).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT re-ask unless the caller opted in', async () => {
+    // The admin backfill route calls refreshOracleSnapshot with no opts; it must not
+    // acquire a background side effect it never asked for.
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry' })
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    expect(mockForecast).toHaveBeenCalledTimes(1)
+  })
+
+  it('a re-ask that times out again does not chain a third', async () => {
+    // Depth guard. Without `reask: false` on the inner call, a hard-down Oracle turns
+    // every push into an unbounded 2-minute retry chain.
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS * 5)
+    await settle()
+
+    expect(mockForecast).toHaveBeenCalledTimes(2)
+  })
+
+  it('only re-asks for the subset that was actually SENT', async () => {
+    // The extractor only ever saw the claimed articles, so only those are in retro's
+    // cache key. Re-asking with the whole batch would miss the entry AND re-extract.
+    // Per-article, not a fixed array: the re-ask sends a SHORTER list, and a canned
+    // 2-element verdict would silently mis-align with it.
+    mockClaim.mockImplementation(async (_id: string, arts: { url: string }[]) =>
+      arts.map((a) => (a.url === 'https://a.com/1' ? 'skip' : 'claimed')),
+    )
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_network' })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    const urls = (mockForecast.mock.calls[1][1] as { articles: { url: string }[] }).articles.map((a) => a.url)
+    expect(urls).toEqual(['https://b.com/2'])
+  })
+
+  it('collects the recovered forecast into the pool instead of leaving the row FAILED', async () => {
+    // The point of the whole exercise: the second call comes back from `forecast_cache`
+    // and the article joins the estimate, rather than the row staying FAILED and the
+    // paid extraction being discarded.
+    mockForecast
+      .mockResolvedValueOnce({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+      .mockResolvedValueOnce({
+        forecast: { mean: 0.5, std: 0.1, ci_low: 0.3, ci_high: 0.7, articles_used: 2, sources: [{ url: 'https://a.com/1' }], settled: false },
+        logId: 'l1',
+      })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    expect(mockAddToPool).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    expect(mockAddToPool).toHaveBeenCalledTimes(1)
+    // The pool row keeps the origin of the push that earned it, not 'backfill'.
+    expect(mockAddToPool.mock.calls[0][2]).toBe('retry')
+    expect(mockSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a forecast that resolved during the delay', async () => {
+    // Two minutes is short but not zero, and every other caller of refreshOracleSnapshot
+    // filters on ACTIVE upstream. This is the only path with a gap to cover.
+    mockPredictionFind.mockResolvedValue({ status: 'RESOLVED' })
+    mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
+
+    await refreshOracleSnapshot(prediction, { articles: supplied, origin: 'retry', reask: true })
+    await vi.advanceTimersByTimeAsync(REASK_DELAY_MS)
+    await settle()
+
+    expect(mockForecast).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops re-asks past the concurrency cap rather than queueing them', async () => {
+    // These are background promises nothing blocks on, so an Oracle that is hard-down
+    // would otherwise turn every push into another queued 90s call.
+    for (let i = 0; i < 12; i++) {
+      scheduleOracleReask({ id: `p${i}`, claimText: 'q' }, supplied, 'news-indexer')
+    }
+    expect(_reaskInFlight()).toBe(4)
+  })
+
+  it('ignores an empty article set — there is no cache key to hit', () => {
+    scheduleOracleReask(prediction, [], 'news-indexer')
+    expect(_reaskInFlight()).toBe(0)
+  })
+
+  it('never throws out of the background path', async () => {
+    // It runs detached from any request; an unhandled rejection here would take the
+    // process's error budget for a recovery that is best-effort by design.
+    mockPredictionFind.mockRejectedValue(new Error('db down'))
+    await expect(runOracleReask(prediction, supplied, 'news-indexer')).resolves.toBeUndefined()
+  })
 })
 
 describe('refreshOracleSnapshot', () => {
