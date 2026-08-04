@@ -69,6 +69,11 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
  * has resolved, so this run's own articles are already in the pool it reads. `/pool/aggregate`
  * is compute-only (no search, no LLM), so it's fast; a caller under a hard timeout can await
  * it without meaningfully widening its budget.
+ *
+ * Pass `claimText`: it is what lets the settlement match gate run on this path at all
+ * (daatan#1264). Omitting it does not fail the recompute — retro skips the gate and logs
+ * `reason=no_question` — so the cost of forgetting it is silent, which is exactly why every
+ * caller threads it.
  */
 export async function resolvePooledEstimate(
   predictionId: string,
@@ -79,10 +84,11 @@ export async function resolvePooledEstimate(
   authorByUrl: Map<string, string | null> = new Map(),
   claimCreatedAt: Date | null = null,
   claimArchetype: ClaimArchetype | null = null,
+  claimText: string | null = null,
 ): Promise<ResolvedPoolEstimate> {
   let pool: PoolRecompute | null = null
   try {
-    pool = await recomputeFromPool(predictionId, claimDirection, claimDeadline, claimCreatedAt, claimArchetype)
+    pool = await recomputeFromPool(predictionId, claimDirection, claimDeadline, claimCreatedAt, claimArchetype, claimText)
   } catch {
     // recomputeFromPool already swallows transport/non-200 into null; this guards only an
     // unexpected throw (e.g. the pool read itself failing) so a caller never loses its estimate.

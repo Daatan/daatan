@@ -246,6 +246,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.id, noNewRun, [],
                     prediction.claimDirection, prediction.claimDeadline,
                     new Map(), prediction.createdAt, prediction.claimArchetype,
+                    prediction.claimText,
                 )
                 if (resolved.estimateSource === 'single-run') {
                     // The pool itself couldn't be read either (rare — e.g. Oracle
@@ -348,6 +349,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     authorByUrl,
                     prediction.createdAt,
                     prediction.claimArchetype,
+                    prediction.claimText,
                 )
 
                 // The whole pool is off-topic — abstain, exactly as the single-run abstain

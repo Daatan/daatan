@@ -578,7 +578,9 @@ describe('POST /api/news-indexer/context', () => {
 
       await POST(post('test-secret'))
 
-      expect(recomputeFromPool).toHaveBeenCalledWith('pred-1', 'ARRIVAL', deadline, createdAt, 'SCHEDULED')
+      // claimText rides along so the settlement match gate can run on this path
+      // (daatan#1264) — without it retro skips with `reason=no_question`.
+      expect(recomputeFromPool).toHaveBeenCalledWith('pred-1', 'ARRIVAL', deadline, createdAt, 'SCHEDULED', 'Will X happen?')
     })
 
     it('carries the pool\'s settlement verdict, not the single run\'s', async () => {

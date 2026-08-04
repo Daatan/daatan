@@ -179,18 +179,28 @@ function isEvidenceClass(v: unknown): v is EvidenceClass {
  * Defensive in the same spirit as the `claims` narrowing above: this is an
  * untyped Json column written by an external service, so a malformed or
  * legacy value degrades to null rather than propagating a bad shape into a
- * snapshot. Only the two fields every claim must have — a `claim` string and
- * a numeric `stance` — are checked; the rest are optional on the wire and a
- * future retro version may add more, which must not invalidate the row.
+ * snapshot. Only the three fields every claim must have — a `claim` string
+ * and numeric `stance`/`certainty` — are checked; the rest are optional on
+ * the wire and a future retro version may add more, which must not
+ * invalidate the row.
+ *
+ * `certainty` is checked because it is non-optional on `OracleClaimDetail`
+ * (so omitting the check made this cast a lie) and because retro's own
+ * `ClaimDetail` requires it: `recomputeFromPool` feeds this narrowing's
+ * output straight back to `/pool/aggregate`, where one claim missing it 422s
+ * the WHOLE request. That would drop the estimate to the single-run
+ * fallback, which is a far worse failure than dropping one row's per-claim
+ * layer — so the stricter bar belongs here, on the shared read path.
  */
-function toClaimsDetail(v: unknown): OracleClaimDetail[] | null {
+export function toClaimsDetail(v: unknown): OracleClaimDetail[] | null {
   if (!Array.isArray(v) || v.length === 0) return null
   const ok = v.every(
     (c): c is OracleClaimDetail =>
       typeof c === 'object' &&
       c !== null &&
       typeof (c as { claim?: unknown }).claim === 'string' &&
-      typeof (c as { stance?: unknown }).stance === 'number',
+      typeof (c as { stance?: unknown }).stance === 'number' &&
+      typeof (c as { certainty?: unknown }).certainty === 'number',
   )
   return ok ? (v as OracleClaimDetail[]) : null
 }

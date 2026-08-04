@@ -374,6 +374,7 @@ export async function POST(request: NextRequest) {
           authorByUrl,
           prediction.createdAt,
           prediction.claimArchetype,
+          prediction.claimText,
         )
       } catch (err) {
         log.warn({ predictionId: prediction.id, err }, 'evidence pool write/recompute failed')

@@ -194,6 +194,7 @@ export async function refreshOracleSnapshot(
     authorByUrl,
     prediction.createdAt ?? null,
     prediction.claimArchetype ?? null,
+    prediction.claimText,
   )
 
   // The whole pool is off-topic — abstain rather than persist a number built from articles

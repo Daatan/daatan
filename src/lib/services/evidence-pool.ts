@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
-import type { EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
+import { toClaimsDetail, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
 import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { claimArchetypeParam, claimDirectionParam, TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
@@ -488,6 +488,7 @@ export async function recomputeFromPool(
   claimDeadline: Date | null,
   claimCreatedAt: Date | null = null,
   claimArchetype: ClaimArchetype | null = null,
+  claimText: string | null = null,
 ): Promise<PoolRecompute | null> {
   const cfg = getOracleConfig()
   if (!cfg) return null
@@ -522,7 +523,29 @@ export async function recomputeFromPool(
           // The settlement anchor (retro #291) — lets aggregation-time
           // revalidation re-check this vote instead of trusting the stored bit.
           settlement_event_date: a.settlementEventDate,
+          // The per-claim layer the settlement match gate votes on (daatan#1264).
+          // Without it retro's `_settlement_votes()` finds nothing and the gate
+          // skips with `reason=no_claim_detail`, so a pin published through the
+          // recompute path would bypass a gate that has been ENFORCING on
+          // `/forecast` since 2026-08-03 (retro#395). Narrowed through the same
+          // validator the read path uses: an untyped Json column that fails
+          // retro's stricter `ClaimDetail` would 422 the entire aggregate.
+          // Legacy rows (pre-2026-08-02 extractions) send null and the gate
+          // skips those — correct, and self-healing as the pool re-extracts.
+          claims_detail: toClaimsDetail(a.claimsDetail),
+          // Vote identity, so the recompute gate sees what the live gate sees:
+          // retro builds each vote's attribution from `outlet or url`. Both are
+          // whitelisted out of the estimator on retro's side, so neither can
+          // move the number.
+          url: a.url,
+          outlet: a.outletName,
         })),
+        // The claim being recomputed — the gate is the first rule that is
+        // semantic rather than arithmetic, so without it retro skips with
+        // `reason=no_question`. Guarded on retro's own `min_length=5`; the
+        // 500-char cap matches `Prediction.claimText`'s `VarChar(500)` exactly,
+        // so no truncation is possible here.
+        ...(claimText && claimText.trim().length >= 5 ? { question: claimText.trim() } : {}),
         ...(claimDirectionParam(claimDirection) ? { claim_direction: claimDirectionParam(claimDirection) } : {}),
         ...(claimDeadline ? { claim_deadline: claimDeadline.toISOString() } : {}),
         ...(claimCreatedAt ? { claim_created_at: claimCreatedAt.toISOString() } : {}),
