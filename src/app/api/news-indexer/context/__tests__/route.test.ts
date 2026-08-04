@@ -751,18 +751,47 @@ describe('POST /api/news-indexer/context', () => {
       expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBeUndefined()
     })
 
-    it('rejects a body over the Oracle\'s own truncation point instead of forwarding it', async () => {
-      // The Oracle truncates at 4,000 chars on arrival, so a longer body is discarded having
-      // crossed two hops. A 400 tells the producer that; a silent slice here would not.
-      const res = await POST(
+    it('truncates a body over the Oracle\'s truncation point instead of dropping the push', async () => {
+      // daatan#1278. This used to be a schema `.max()`, which rejected the WHOLE request — so one
+      // over-long article killed an 8-article push, including the seven that were fine, over a
+      // field whose entire contract is "absent means fetch it yourself".
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(
         post('test-secret', {
           predictionId: 'pred-1',
-          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: 'x'.repeat(4001) }],
+          articles: [
+            { url: 'https://a.com/1', title: 'A', snippet: 's', text: 'x'.repeat(4001) },
+            { url: 'https://a.com/2', title: 'B', snippet: 's', text: 'a good body' },
+          ],
         }),
       )
 
-      expect(res.status).toBe(500)  // handleRouteError maps the ZodError
-      expect(getOracleForecast).not.toHaveBeenCalled()
+      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      expect(sent[0].text).toHaveLength(4000)
+      // The innocent neighbour still arrives — that is the whole point of the change.
+      expect(sent[1].text).toBe('a good body')
+    })
+
+    it('survives an emoji body that a code-point-capping producer considers in bounds', async () => {
+      // The exact prod failure (news-indexer#207): news-indexer caps with Python's `t[:4000]`,
+      // which counts CODE POINTS, while JS `.length` counts UTF-16 units — an emoji is 1 there
+      // and 2 here. So a body news-indexer measured at 4,000 arrived measuring 8,000 and the
+      // `.max(4000)` 400'd the entire push on its first live payload.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      const inBoundsForPython = '😀'.repeat(4000) // 4,000 code points, 8,000 UTF-16 units
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: inBoundsForPython }],
+        }),
+      )
+
+      expect(getOracleForecast).toHaveBeenCalled()
+      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!.length).toBeLessThanOrEqual(4000)
     })
 
     it('stamps the Oracle failure CLASS on the released claims, not a blanket oracle_null', async () => {
