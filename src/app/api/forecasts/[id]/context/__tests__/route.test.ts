@@ -207,7 +207,8 @@ describe('POST /api/forecasts/[id]/context', () => {
         'pred-1',
         expect.objectContaining({ articlesUsed: 0 }),
         [],
-        null, null, expect.any(Map), expect.any(Date), null,
+        // Trailing claimText is the settlement match gate's `question` (daatan#1264).
+        null, null, expect.any(Map), expect.any(Date), null, 'Will X happen?',
       )
       expect(done.snapshot).toBeTruthy()
       const saved = vi.mocked(saveContextUpdate).mock.calls[0][0]

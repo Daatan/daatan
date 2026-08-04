@@ -275,6 +275,15 @@ describe('poolArticleToEnrichedSource', () => {
         null,
       ).claimsDetail,
     ).toBeNull()
+    // `certainty` is non-optional on OracleClaimDetail AND required by retro's own
+    // ClaimDetail — and `recomputeFromPool` feeds this output straight back to
+    // /pool/aggregate (daatan#1264), where one claim missing it 422s the entire request.
+    expect(
+      poolArticleToEnrichedSource(
+        poolArticle({ claimsDetail: [{ claim: 'ok', stance: 0.1 }] } as never),
+        null,
+      ).claimsDetail,
+    ).toBeNull()
   })
 })
 

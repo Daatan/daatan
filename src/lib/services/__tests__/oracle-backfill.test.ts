@@ -387,6 +387,8 @@ describe('refreshOracleSnapshot', () => {
         expect.any(Map),
         null,
         null,
+        // The settlement match gate's `question` (daatan#1264).
+        'Will X happen?',
       )
     })
 

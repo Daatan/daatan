@@ -425,9 +425,20 @@ Two collapses are visible only here: `evidenceClass` above is the article's most
 **common** class, so mixed-class articles are unattributable above this layer; and
 the fact facets above ride from the single **dominant** claim, so a lone over-cap
 interested-party claim diluted by in-contract siblings is invisible (retro#378).
-Same shadow discipline as `authorLean`/`factSignal`: **nothing in aggregation or the
-recompute reads it**, and it is never sent to `/pool/aggregate` — the estimator keeps
-its eight-scalar whitelist. Additive and nullable with **no backfill**: for rows
+Same shadow discipline as `authorLean`/`factSignal` where the *estimate* is concerned:
+**nothing in aggregation or the recompute reads it** — retro keeps its eight-scalar
+whitelist, so a recompute is bit-identical whether or not this column is sent.
+Since daatan#1264 it **is** sent on `/pool/aggregate` (with the prediction's
+`claimText` as `question`), because the **settlement match gate** — the one rule that
+is semantic rather than arithmetic — votes on these per-claim `claim`/`quote`/
+`event_date` values. Without both fields retro skipped the gate explicitly
+(`reason=no_question` / `no_claim_detail`), so a pin published through the recompute
+path would have bypassed a gate that has been ENFORCING on `/forecast` since
+2026-08-03 (retro#395). Sending it is gated on the same narrowing the read path uses:
+retro's `ClaimDetail` requires `claim`+`stance`+`certainty`, and one malformed element
+would 422 the whole aggregate and drop the estimate to the single-run fallback, so an
+unusable value is sent as null and the gate skips that row.
+Additive and nullable with **no backfill**: for rows
 extracted before the column existed the per-claim data is gone and must not be
 fabricated. One deliberate difference from the scalar shadow columns above: an
 update that merely *omits* `claimsDetail` leaves the stored value alone rather than

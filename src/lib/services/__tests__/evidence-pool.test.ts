@@ -435,6 +435,58 @@ describe('recomputeFromPool', () => {
     expect('claim_archetype' in body).toBe(false)
   })
 
+  // daatan#1264 — the settlement match gate needs BOTH `question` and per-source
+  // `claims_detail`. With only one of them retro skips explicitly (`no_question` /
+  // `no_claim_detail`), so a pin published through the recompute path would bypass a
+  // gate that has been ENFORCING on `/forecast` since 2026-08-03 (retro#395).
+  it('sends the claim text and the per-claim layer the settlement gate votes on', async () => {
+    const claimsDetail = [
+      { claim: 'The vote passed.', quote: 'Parliament passed it Tuesday.', stance: 0.9, certainty: 0.9, settled: true, event_date: '2026-07-14' },
+      { claim: 'Turnout was high.', stance: 0.2, certainty: 0.5, settled: false },
+    ]
+    findMany.mockResolvedValue([poolArticle({ claimsDetail, outletName: 'Reuters' })] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null, null, null, 'Will the bill pass by July?')
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.question).toBe('Will the bill pass by July?')
+    expect(body.sources[0].claims_detail).toEqual(claimsDetail)
+    // Vote identity — retro attributes each vote via `outlet or url`.
+    expect(body.sources[0].url).toBe('https://reuters.com/a')
+    expect(body.sources[0].outlet).toBe('Reuters')
+  })
+
+  it('omits question entirely when there is no usable claim text — retro must skip, not guess', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+    expect('question' in JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
+
+    // Below retro's `min_length=5`: sending it would 422 the WHOLE aggregate and drop the
+    // estimate to the single-run fallback — far worse than skipping the gate.
+    mockOracleFetch.mockClear()
+    await recomputeFromPool('pred-1', null, null, null, null, '  hi  ')
+    expect('question' in JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
+  })
+
+  it('nulls a legacy or malformed claims_detail instead of 422ing the whole aggregate', async () => {
+    findMany.mockResolvedValue([
+      poolArticle(), // legacy row: column never written
+      poolArticle({ id: 'art-2', claimsDetail: [{ claim: 'no certainty', stance: 0.4 }] }),
+      poolArticle({ id: 'art-3', claimsDetail: 'nope' }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null, null, null, 'Will the bill pass by July?')
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    // retro's ClaimDetail requires claim+stance+certainty; one bad element would reject the
+    // request outright, so an unusable value is dropped to null and the gate skips that row.
+    expect(body.sources.map((s: { claims_detail: unknown }) => s.claims_detail)).toEqual([null, null, null])
+  })
+
   it("drops admin-excluded articles from the aggregate, so an exclusion moves the number", async () => {
     findMany.mockResolvedValue([poolArticle(), poolArticle({ id: 'art-2', excluded: true })] as never)
     mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)

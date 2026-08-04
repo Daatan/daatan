@@ -103,12 +103,23 @@ describe('resolvePooledEstimate', () => {
 
     await resolvePooledEstimate(
       'p1', SINGLE_RUN, FALLBACK_SOURCES, 'ARRIVAL' as never, new Date('2026-07-19T23:59:59Z'),
-      new Map(), createdAt, 'SCHEDULED' as never,
+      new Map(), createdAt, 'SCHEDULED' as never, 'Will the bill pass by July?',
     )
 
     expect(mockRecompute).toHaveBeenCalledWith(
-      'p1', 'ARRIVAL', new Date('2026-07-19T23:59:59Z'), createdAt, 'SCHEDULED',
+      'p1', 'ARRIVAL', new Date('2026-07-19T23:59:59Z'), createdAt, 'SCHEDULED', 'Will the bill pass by July?',
     )
+  })
+
+  // daatan#1264 — claimText is what lets the settlement match gate run on the recompute
+  // path. Forgetting it is silent (retro skips with `reason=no_question`), so the default
+  // is pinned here rather than left to each caller's discretion.
+  it('defaults claimText to null when a caller does not thread it', async () => {
+    mockRecompute.mockResolvedValue(poolResult())
+
+    await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+    expect(mockRecompute).toHaveBeenCalledWith('p1', null, null, null, null, null)
   })
 
   it('defaults the claim window metadata to null for callers that do not pass it', async () => {
@@ -116,7 +127,7 @@ describe('resolvePooledEstimate', () => {
 
     await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
 
-    expect(mockRecompute).toHaveBeenCalledWith('p1', null, null, null, null)
+    expect(mockRecompute).toHaveBeenCalledWith('p1', null, null, null, null, null)
   })
 
   it('falls back to the single run (and its own sources) when the pool cannot aggregate', async () => {
@@ -194,7 +205,7 @@ describe('resolvePooledEstimate', () => {
 
     await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, 'ARRIVAL', deadline)
 
-    expect(mockRecompute).toHaveBeenCalledWith('p1', 'ARRIVAL', deadline, null, null)
+    expect(mockRecompute).toHaveBeenCalledWith('p1', 'ARRIVAL', deadline, null, null, null)
   })
 
   describe('carriedForward (daatan#1166)', () => {
