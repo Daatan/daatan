@@ -659,3 +659,34 @@ export async function pushCredibilityFeedback(
     'event=credibility_feedback_ingest',
   )
 }
+
+/** Pool rows added in a window, split by whether they became usable evidence. */
+export interface PoolThroughput {
+  /** Rows the extractor was spent on, whatever the outcome. */
+  attempted: number
+  /** Rows that reached COMPLETE *with* a stance — the only ones aggregation can use. */
+  usable: number
+}
+
+/**
+ * How much of what the extractor was spent on actually became evidence.
+ *
+ * This is the denominator of the weekly LLM waste report (docs#57): spend alone
+ * cannot be acted on, spend over usable output can. `attempted - usable` IS the
+ * waste, because a row that never got a stance cost a full extraction and
+ * contributes nothing to any aggregate.
+ *
+ * COMPLETE-without-a-stance counts as waste deliberately: `recomputeFromPool`
+ * requires a stance, so such a row is indistinguishable from a failure downstream
+ * however cleanly it finished.
+ */
+export async function getPoolThroughput(days: number): Promise<PoolThroughput> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const [attempted, usable] = await Promise.all([
+    prisma.evidencePoolArticle.count({ where: { addedAt: { gt: since } } }),
+    prisma.evidencePoolArticle.count({
+      where: { addedAt: { gt: since }, status: 'COMPLETE', stance: { not: null } },
+    }),
+  ])
+  return { attempted, usable }
+}
