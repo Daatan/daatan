@@ -5,6 +5,7 @@ import { calculateEloUpdates } from '@/lib/services/elo'
 import { computeMemberScores, computeMarketScore, MARKET_MEMBER, SENTINEL_MODE } from '@/lib/services/ai-panel-score'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
+import { recordCalibration } from '@/lib/services/calibration'
 
 const log = createLogger('prediction-resolution')
 
@@ -275,6 +276,22 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     { predictionId, outcome, commitmentCount: prediction.commitments.length },
     'Prediction resolved',
   )
+
+  // Freeze what the system published, for calibration (daatan#1233). Binaries
+  // only — a multiple-choice forecast has no single probability to score — and
+  // never for void/unresolvable, which have no outcome to score against.
+  //
+  // Outside the transaction on purpose: this is a research row, and a defect in
+  // it must not be able to roll back a resolution. recordCalibration never
+  // throws for the same reason, and awaiting it keeps the write ordered before
+  // the response without making the resolution depend on it.
+  if (!isVoidOutcome && !isMultipleChoice) {
+    await recordCalibration({
+      predictionId,
+      outcome: outcome as 'correct' | 'wrong',
+      resolvedAt: resolvedPrediction.resolvedAt ?? new Date(),
+    })
+  }
 
   if (prediction.isPublic) notifySearchEngines(prediction.slug ?? prediction.id)
 

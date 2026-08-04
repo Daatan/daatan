@@ -15,8 +15,10 @@ vi.mock('@/lib/services/expertise', () => ({ applyGlicko2Update: vi.fn() }))
 vi.mock('@/lib/services/elo', () => ({ calculateEloUpdates: vi.fn(() => new Map()) }))
 vi.mock('@/lib/services/tag-ratings', () => ({ updateTagRatingsInTx: vi.fn() }))
 vi.mock('@/lib/services/indexnow', () => ({ notifySearchEngines: vi.fn() }))
+vi.mock('@/lib/services/calibration', () => ({ recordCalibration: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
+import { recordCalibration } from '@/lib/services/calibration'
 import { resolvePrediction } from '../prediction-resolution'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
@@ -265,3 +267,54 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     )
   })
 })
+
+/**
+ * daatan#1233 — the calibration record is written from here, and only here, so
+ * every resolution produces one without anyone remembering to.
+ */
+describe('resolvePrediction — calibration record', () => {
+  const recorded = vi.mocked(recordCalibration)
+
+  it('records a resolved binary', async () => {
+    findUnique.mockResolvedValue(prediction() as never)
+    tx.prediction.update.mockResolvedValue({
+      id: 'p1', status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-08-01T12:00:00Z'),
+    })
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
+
+    expect(recorded).toHaveBeenCalledWith(
+      expect.objectContaining({ predictionId: 'p1', outcome: 'correct' }),
+    )
+  })
+
+  it('records nothing for void or unresolvable — there is no outcome to score against', async () => {
+    for (const outcome of ['void', 'unresolvable'] as const) {
+      vi.clearAllMocks()
+      tx = makeTx()
+      transaction.mockImplementation(async (cb: unknown) => (cb as (t: typeof tx) => unknown)(tx))
+      findUnique.mockResolvedValue(prediction() as never)
+
+      await resolvePrediction('p1', { outcome, resolvedById: 'admin' })
+
+      expect(recorded).not.toHaveBeenCalled()
+    }
+  })
+
+  it('records nothing for multiple choice — there is no single probability to score', async () => {
+    findUnique.mockResolvedValue(
+      prediction({
+        outcomeType: 'MULTIPLE_CHOICE',
+        options: [{ id: 'o1' }, { id: 'o2' }],
+        commitments: [],
+      }) as never,
+    )
+
+    await resolvePrediction('p1', {
+      outcome: 'correct', resolvedById: 'admin', correctOptionId: 'o1',
+    })
+
+    expect(recorded).not.toHaveBeenCalled()
+  })
+})
+
