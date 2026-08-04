@@ -26,11 +26,40 @@ export const dynamic = 'force-dynamic'
  * Wire cap on a forwarded article body.
  *
  * Matches the Oracle's own `max_article_chars` (4000): it truncates to that the moment it
- * accepts the body, so a longer payload is discarded on arrival having crossed two hops. A
- * schema `.max()` rather than a silent `.slice()` — this is the trust boundary, and a producer
- * sending 10 MB bodies should learn it from a 400, not have it quietly trimmed here.
+ * accepts the body, so a longer payload is discarded on arrival having crossed two hops.
+ *
+ * This was a schema `.max()` until daatan#1278 — the argument being that a producer sending 10 MB
+ * bodies should learn it from a 400 rather than have it quietly trimmed. That reasoning was sound
+ * for 10 MB and wrong for 8 characters. `text` is an OPTIONAL enrichment on a path that fails open
+ * everywhere else (no body ⇒ the Oracle fetches the origin), but a `.max()` violation rejected the
+ * entire request — so one over-long article dropped a whole 8-article push, including the seven
+ * that were fine. It fired on the first real payload: news-indexer caps in Python code points
+ * while Zod counts UTF-16 units, so an emoji-bearing Telegram body measured 4008 here
+ * (news-indexer#207).
+ *
+ * We now truncate and log instead. Oversized input still cannot reach the Oracle, and a
+ * misbehaving producer is still visible — but never at the cost of a delivery.
  */
 const ARTICLE_TEXT_MAX_CHARS = 4000
+
+/**
+ * Trim a forwarded body to the wire cap, recording the URL when it had to.
+ *
+ * Note the cap is in JS string length — UTF-16 code units — which is NOT what a producer counting
+ * Unicode code points measures. That mismatch is exactly what made the old `.max()` a 400 machine
+ * (news-indexer#207 fixes the producer side), and it is another reason this end truncates: the two
+ * ends will drift again, and a delivery must not depend on them agreeing to the character.
+ */
+const capArticleText = (
+  text: string | null | undefined,
+  overCap: string[],
+  url: string,
+): string | undefined => {
+  if (!text) return undefined
+  if (text.length <= ARTICLE_TEXT_MAX_CHARS) return text
+  overCap.push(url)
+  return text.slice(0, ARTICLE_TEXT_MAX_CHARS)
+}
 
 // One article in the evidence set. `similarity` is per-article so the trigger
 // (the article that fired this push) can be reported even when several are sent.
@@ -45,9 +74,8 @@ const articleItemSchema = z.object({
    *  Oracle as `ArticleInput.text`, which it has always accepted — "if omitted, oracle fetches
    *  via trafilatura" — and which nothing ever filled: 1.5% of its 88,033 article reads were
    *  pre-fetched, and 19% fell through to running the extractor over title+snippet (~215 chars).
-   *  Capped here, not just upstream: this route is the trust boundary, and the Oracle truncates
-   *  at 4,000 anyway, so anything longer is discarded after crossing two hops. */
-  text: z.string().max(ARTICLE_TEXT_MAX_CHARS).nullable().optional(),
+   *  Length is enforced by truncation, not rejection — see ARTICLE_TEXT_MAX_CHARS. */
+  text: z.string().nullable().optional(),
 })
 
 // Accepts two shapes:
@@ -69,7 +97,7 @@ const bodySchema = z
     similarity: z.number().min(0).max(1).optional(),
     // The legacy body spells its fields `article*`; inside `articles[]` the same value is
     // plain `text`. news-indexer sends whichever matches the shape it is sending.
-    articleText: z.string().max(ARTICLE_TEXT_MAX_CHARS).nullable().optional(),
+    articleText: z.string().nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
     // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
@@ -130,6 +158,10 @@ export async function POST(request: NextRequest) {
     const triggerItem = items.find((a) => a.url === triggerUrl) ?? items[0]
     const triggerSimilarity = triggerItem.similarity ?? body.similarity ?? 0
 
+    // Producers that overshoot the wire cap get trimmed, not rejected — but they get logged, so
+    // the overshoot is still findable. Collected across the set to keep it to one line per push.
+    const overCap: string[] = []
+
     const articles: ArticleInput[] = items.map((a) => ({
       url: a.url,
       title: a.title,
@@ -139,7 +171,7 @@ export async function POST(request: NextRequest) {
       // The body news-indexer archived at ingest (news-indexer#201 / daatan#1255). Absent — which
       // is every push until news-indexer's `PUSH_ARTICLE_TEXT` is on, and afterwards any article
       // with nothing in S3 — leaves the Oracle fetching the origin exactly as it does today.
-      text: a.text ?? undefined,
+      text: capArticleText(a.text, overCap, a.url),
       // Reuse the gatekeeper verdict news-indexer already computed for the TRIGGER article, so the
       // Oracle skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
       // trigger carries a verdict — the evidence neighbours were never judged. Fail-open: absent
@@ -148,6 +180,18 @@ export async function POST(request: NextRequest) {
         ? { relevance: body.relevance, isPrediction: body.isPrediction }
         : {}),
     }))
+
+    if (overCap.length > 0) {
+      log.warn(
+        {
+          predictionId: body.predictionId,
+          count: overCap.length,
+          max: ARTICLE_TEXT_MAX_CHARS,
+          urls: overCap.slice(0, 3),
+        },
+        'news-indexer: article body over the wire cap, truncated (push kept)',
+      )
+    }
 
     // Atomic claim gate (evidence-pool.ts) — fixes a confirmed race where
     // news-indexer's at-least-once webhook delivery let two near-simultaneous
