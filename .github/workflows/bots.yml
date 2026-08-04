@@ -1,9 +1,23 @@
 name: Bot Runner
 
 on:
-  schedule:
-    # Every 5 minutes — the API checks which bots are actually due
-    - cron: '*/5 * * * *'
+  # STOPPED 2026-08-04 by explicit instruction, and disabled at the Actions API
+  # as well (`gh workflow disable bots.yml`) so it is off from both directions.
+  #
+  # Why: this fired every 5 minutes (288 triggers/day) at STAGING, and staging's
+  # ORACLE_URL points at the PRODUCTION Oracle. Each resulting forecast sends no
+  # `articles` array, so retro ran its own search chain and extracted up to
+  # max_articles=10 articles on Claude Haiku per request — ~64 prod Oracle calls
+  # a day originating from staging, against ~$3.2k of remaining AWS credits.
+  # That is docs#57's finding 1, and this schedule was its mechanism.
+  #
+  # To restart: uncomment the schedule AND run `gh workflow enable bots.yml`.
+  # Before doing either, point staging at a non-production Oracle or give it a
+  # key with a per-key max_articles cap — otherwise restarting restores the burn.
+  #
+  # schedule:
+  #   # Every 5 minutes — the API checks which bots are actually due
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
