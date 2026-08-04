@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
-import { getOracleForecast, type ArticleInput } from '@/lib/services/oracle'
+import { getOracleForecast, isTransportNullReason, type ArticleInput } from '@/lib/services/oracle'
+import { scheduleOracleReask } from '@/lib/services/oracle-backfill'
 import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
@@ -433,6 +434,29 @@ export async function POST(request: NextRequest) {
         items.filter((_, i) => claimResults[i] === 'claimed').map((a) => a.url),
         failureClass ?? 'oracle_null',
       )
+      // A transport class means we hung up, not that the articles said nothing —
+      // retro does not cancel, so it is finishing the run and will hold the answer
+      // in `forecast_cache` for an hour. Go back for it (daatan#1261/#1262).
+      //
+      // The set handed over is `items.filter(claimed)`, which is `articlesToScore`
+      // by URL: same filter, same order, same source array. That identity is the
+      // whole mechanism — retro keys its cache on the sorted URL set, so a set that
+      // merely overlaps re-runs the extractor and inverts the saving.
+      if (isTransportNullReason(failureClass)) {
+        scheduleOracleReask(
+          prediction,
+          items
+            .filter((_, i) => claimResults[i] === 'claimed')
+            .map((a) => ({
+              url: a.url,
+              title: a.title,
+              snippet: a.snippet,
+              source: a.source ?? undefined,
+              publishedDate: a.publishedAt ?? undefined,
+            })),
+          'news-indexer',
+        )
+      }
       log.info(
         { predictionId: prediction.id, articles: items.length, similarity: triggerSimilarity, failureClass },
         'news-indexer: oracle returned null, skipping probability update',

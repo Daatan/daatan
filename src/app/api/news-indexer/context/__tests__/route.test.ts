@@ -14,7 +14,14 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { prediction: { findUnique: vi.fn() }, evidencePoolArticle: { findUnique: vi.fn() } },
 }))
 
-vi.mock('@/lib/services/oracle', () => ({ getOracleForecast: vi.fn() }))
+// `isTransportNullReason` is taken from the REAL module, not stubbed: it encodes
+// which failure classes are recoverable, and a hand-copied predicate here would keep
+// passing after that set changed. Only the network call is replaced.
+vi.mock('@/lib/services/oracle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/services/oracle')>()),
+  getOracleForecast: vi.fn(),
+}))
+vi.mock('@/lib/services/oracle-backfill', () => ({ scheduleOracleReask: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
@@ -41,6 +48,7 @@ vi.mock('@/lib/logger', () => ({
 import { POST } from '../route'
 import { prisma } from '@/lib/prisma'
 import { getOracleForecast } from '@/lib/services/oracle'
+import { scheduleOracleReask } from '@/lib/services/oracle-backfill'
 import { saveNewsIndexerMatch, getLatestOracleSnapshot } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
@@ -716,6 +724,68 @@ describe('POST /api/news-indexer/context', () => {
       await POST(post('test-secret'))
 
       expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_timeout')
+    })
+
+    it('goes back for a forecast we hung up on, with the EXACT set we sent', async () => {
+      // daatan#1262. retro does not cancel on client disconnect — it finishes the run
+      // and holds it in `forecast_cache` for an hour, while daatan's earliest re-ask was
+      // 24h, so the entry always expired unread. The re-ask must carry the set that was
+      // actually SENT (the claimed subset), because retro keys its cache on the sorted
+      // URL set: a set that merely overlaps is a different key and re-runs the extractor.
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://a.com/1', title: 'A', snippet: 'sa' },  // already claimed elsewhere — never sent
+            { url: 'https://b.com/2', title: 'B', snippet: 'sb' },  // ours
+          ],
+        }),
+      )
+
+      expect(scheduleOracleReask).toHaveBeenCalledTimes(1)
+      const [, articles, origin] = vi.mocked(scheduleOracleReask).mock.calls[0]
+      // Set equality with what the extractor was handed — this is the cache key.
+      expect(articles.map((a) => a.url)).toEqual(
+        vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!.map((a) => a.url),
+      )
+      expect(articles.map((a) => a.url)).toEqual(['https://b.com/2'])
+      expect(articles[0]).toMatchObject({ title: 'B', snippet: 'sb' })
+      expect(origin).toBe('news-indexer')
+    })
+
+    it('does NOT re-ask when the Oracle actually answered and declined', async () => {
+      // `oracle_abstain` is a verdict about the articles: the run completed, so there is
+      // no abandoned result to collect and re-asking with the same set buys the same
+      // answer at full price. Only the transport classes leave work behind.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(post('test-secret'))
+
+      expect(scheduleOracleReask).not.toHaveBeenCalled()
+    })
+
+    it('does NOT re-ask on an unclassified null', async () => {
+      // Legacy `oracle_null` conflates all six causes, so it is not evidence that a run
+      // completed — same reasoning that keeps it out of ATTRIBUTABLE_NULL_REASONS.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+      await POST(post('test-secret'))
+
+      expect(scheduleOracleReask).not.toHaveBeenCalled()
+    })
+
+    it('does NOT re-ask when the Oracle returned a usable forecast', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({
+        forecast: { mean: 0.4, std: 0.1, ci_low: 0.2, ci_high: 0.6, articles_used: 1, sources: [], placeholder: false },
+        logId: null,
+      } as never)
+
+      await POST(post('test-secret'))
+
+      expect(scheduleOracleReask).not.toHaveBeenCalled()
     })
 
     it('fails only THIS request\'s claims on a null forecast, never a concurrent run\'s', async () => {

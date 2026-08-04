@@ -24,6 +24,8 @@ vi.mock('@/lib/logger', () => ({
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
+import { TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
+import { REASK_DELAY_MS } from '@/lib/services/oracle-backfill'
 import { Prisma } from '@prisma/client'
 import {
   addArticlesToPool,
@@ -740,6 +742,73 @@ describe('claimArticleForExtraction', () => {
     const BACKOFF = 24 * 60 * 60 * 1000
     expect(cutoff).toBeGreaterThanOrEqual(before - BACKOFF)
     expect(cutoff).toBeLessThanOrEqual(after - BACKOFF)
+  })
+
+  it('lets a row that failed on the WIRE be re-claimed in a minute, not a day', async () => {
+    // daatan#1261/#1262. The 24h backoff is priced against an article that always nulls
+    // — it assumes the last run told us something ABOUT the article. A client timeout
+    // tells us nothing about it: retro does not cancel, so the run finished and sits in
+    // `forecast_cache` for an hour. Charging a wire event 24h of silence is what made
+    // #1262 impossible by construction — a 1h cache against a 24h floor can never overlap.
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    const before = Date.now()
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+    const after = Date.now()
+
+    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+    const transportArm = call.where.OR.find(
+      (a) =>
+        a.status === 'FAILED' &&
+        typeof a.statusReason === 'object' &&
+        a.statusReason !== null &&
+        'in' in (a.statusReason as object),
+    ) as { statusReason: { in: string[] }; updatedAt: { lt: Date } } | undefined
+    expect(transportArm).toBeDefined()
+
+    // The set is the transport classes and ONLY them — a verdict class in here would
+    // hand `oracle_abstain` the fast lane, which is the exact waste the 24h gate exists
+    // to stop. Read off the real constant so widening it fails this test rather than
+    // silently passing.
+    expect(transportArm!.statusReason.in).toEqual([...TRANSPORT_NULL_REASONS])
+    expect(transportArm!.statusReason.in).not.toContain('oracle_abstain')
+    expect(transportArm!.statusReason.in).not.toContain('oracle_omitted')
+
+    // Bounded both sides — the cutoff is `Date.now() - BACKOFF` read INSIDE the call, so
+    // a one-sided assertion only passes when both clock reads land in the same
+    // millisecond (the daatan#1257 flake).
+    const cutoff = transportArm!.updatedAt.lt.getTime()
+    const TRANSPORT_BACKOFF = 60 * 1000
+    expect(cutoff).toBeGreaterThanOrEqual(before - TRANSPORT_BACKOFF)
+    expect(cutoff).toBeLessThanOrEqual(after - TRANSPORT_BACKOFF)
+
+    // And it really is the SHORT lane: strictly more recent than the 24h arm, i.e. it
+    // widens the window rather than being a differently-worded copy of it.
+    const failedArm = call.where.OR.find(
+      (a) => a.status === 'FAILED' && a.statusReason === null,
+    ) as { updatedAt: { lt: Date } }
+    expect(cutoff).toBeGreaterThan(failedArm.updatedAt.lt.getTime())
+  })
+
+  it('re-ask delay clears the transport backoff, so our own recovery is never refused', async () => {
+    // The failure mode daatan#1262 names: "the re-ask must not look like a fresh organic
+    // push, or it will be refused as `unchanged` before it ever reaches retro". The gate
+    // and the scheduler are two halves of one policy, and only their ORDER makes it work.
+    create.mockRejectedValue(uniqueViolation())
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+    const transportArm = call.where.OR.find(
+      (a) => a.status === 'FAILED' && typeof a.statusReason === 'object' && a.statusReason !== null && 'in' in (a.statusReason as object),
+    ) as { updatedAt: { lt: Date } }
+    const backoffMs = Date.now() - transportArm.updatedAt.lt.getTime()
+    expect(REASK_DELAY_MS).toBeGreaterThan(backoffMs)
+    // …and still far inside retro's `cache_ttl_seconds = 3600`, which is the window the
+    // recovered forecast actually lives in.
+    expect(REASK_DELAY_MS).toBeLessThan(3600 * 1000)
   })
 
   it('never re-claims a terminal row on unchanged content, but a content change still revives it', async () => {

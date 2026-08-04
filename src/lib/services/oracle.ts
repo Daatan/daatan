@@ -337,6 +337,37 @@ export const ORACLE_NULL_REASONS: readonly string[] = [
  */
 export const ATTRIBUTABLE_NULL_REASONS: readonly string[] = ['oracle_abstain', 'oracle_no_articles']
 
+/**
+ * The null classes where WE hung up (or the wire broke) on a run retro very likely
+ * finished anyway — the exact opposite end of {@link ATTRIBUTABLE_NULL_REASONS}.
+ *
+ * retro does not cancel on client disconnect: `_run_forecast_inner` runs to
+ * completion and `forecast_cache.set` stores the answer for `cache_ttl_seconds`
+ * (3600). So a row carrying one of these has, with high probability, a finished
+ * forecast sitting in retro's memory that we paid a Haiku 4.5 extraction for and
+ * never read. Two things follow, and both live off this constant:
+ *
+ *  - **the label is not a verdict** (daatan#1261). `oracle_timeout` says nothing
+ *    about the article, so it must not earn the 24h re-claim backoff that exists
+ *    to stop us paying repeatedly for an article that genuinely always nulls. See
+ *    `TRANSPORT_RECLAIM_BACKOFF_MS` in evidence-pool.ts.
+ *  - **the work is recoverable** (daatan#1262). Re-asking with the IDENTICAL
+ *    article set inside the TTL is served from `forecast_cache` at zero LLM cost.
+ *    See `scheduleOracleReask` in oracle-backfill.ts.
+ *
+ * `oracle_http` and `oracle_unconfigured` are deliberately NOT here. They are also
+ * facts about us rather than the article, but neither leaves a completed run behind
+ * to collect: a 4xx/5xx means retro rejected or failed the request, and
+ * unconfigured means we never sent one.
+ */
+export const TRANSPORT_NULL_REASONS: readonly OracleFailureClass[] = ['oracle_timeout', 'oracle_network']
+
+/** True when `reason` names a run we never got an answer to, rather than a verdict
+ *  about the articles. Accepts a raw `statusReason` string off a pool row. */
+export function isTransportNullReason(reason: string | null | undefined): boolean {
+  return reason != null && (TRANSPORT_NULL_REASONS as readonly string[]).includes(reason)
+}
+
 /** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the
  *  id of the logged call, so a caller can attribute its LLM fallback to it. */
 export interface OracleForecastResult {
