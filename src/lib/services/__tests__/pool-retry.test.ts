@@ -148,63 +148,122 @@ describe('retryPoolExtractions', () => {
         { id: 'p1', claimText: 'a', claimDirection: null, claimDeadline: null },
       ] as never)
       mockRows.mockResolvedValue([
-        row({ url: 'https://a.com/1', statusReason: 'oracle_null' }),
+        row({ url: 'https://a.com/1', statusReason: 'oracle_abstain' }),
         row({ url: 'https://b.com/2', statusReason: 'extractor_error' }),
       ] as never)
     })
 
-    it('finalizes rows that were already oracle_null when the run goes null again', async () => {
-      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+    it('finalizes rows already declined by the Oracle when it declines again', async () => {
+      mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
       mockUpdateMany.mockResolvedValue({ count: 1 } as never)
 
       const r = await retryPoolExtractions(3)
 
       expect(mockUpdateMany).toHaveBeenCalledWith({
-        // Only the prior-null row; the extractor_error row keeps its first null strike.
+        // Only the prior-abstain row; the extractor_error row keeps its first strike.
         where: {
           predictionId: 'p1',
           url: { in: ['https://a.com/1'] },
           status: 'FAILED',
-          statusReason: { in: expect.arrayContaining(['oracle_null']) },
+          statusReason: { in: expect.arrayContaining(['oracle_abstain']) },
         },
         data: { statusReason: 'oracle_null_final' },
       })
       expect(r.finalized).toBe(1)
     })
 
-    it.each([
-      'oracle_abstain',
-      'oracle_timeout',
-      'oracle_network',
-      'oracle_http',
-      'oracle_placeholder',
-      'oracle_no_articles',
-    ])('finalizes a prior-%s row too — the split must not disarm the attempt cap', async (reason) => {
-      // The silent break daatan#1231 could have shipped. This rule used to match the
-      // literal `'oracle_null'`; once that string was split per cause, a strict-equality
-      // check would stop recognising every newly-written row — no second strike, no
-      // `oracle_null_final`, and the daily sweep re-driving dead articles forever. The
-      // failure mode is invisible: nothing errors, the backlog just never drains.
-      mockRows.mockResolvedValue([row({ url: 'https://a.com/1', statusReason: reason })] as never)
-      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
-      mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+    it.each(['oracle_abstain', 'oracle_no_articles'])(
+      'finalizes a prior-%s row — the daatan#1231 split must not disarm the attempt cap',
+      async (reason) => {
+        // The silent break daatan#1231 could have shipped. This rule used to match the
+        // literal `'oracle_null'`; once that string was split per cause, a strict-equality
+        // check would stop recognising every newly-written row — no second strike, no
+        // `oracle_null_final`, and the daily sweep re-driving dead articles forever. The
+        // failure mode is invisible: nothing errors, the backlog just never drains. These
+        // two are the post-split strings that still MUST arm it.
+        mockRows.mockResolvedValue([row({ url: 'https://a.com/1', statusReason: reason })] as never)
+        mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
+        mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+
+        const r = await retryPoolExtractions(3)
+
+        expect(mockUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ url: { in: ['https://a.com/1'] } }),
+            data: { statusReason: 'oracle_null_final' },
+          }),
+        )
+        expect(r.finalized).toBe(1)
+      },
+    )
+
+    it.each(['oracle_timeout', 'oracle_network', 'oracle_http', 'oracle_unconfigured', 'oracle_placeholder', 'oracle_null'])(
+      'does NOT count a prior %s as a strike — that null was about the wire, not the article',
+      async (reason) => {
+        // daatan#1253. Strike one has to be a verdict. A row whose first null was a 12s
+        // client timeout has been judged once, not twice. `oracle_null` is here because
+        // it is the pre-split string that conflates all six causes — unknown, not
+        // attributable.
+        mockRows.mockResolvedValue([row({ url: 'https://a.com/1', statusReason: reason })] as never)
+        mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
+
+        const r = await retryPoolExtractions(3)
+
+        expect(mockUpdateMany).not.toHaveBeenCalled()
+        expect(r.finalized).toBe(0)
+      },
+    )
+
+    it.each(['oracle_timeout', 'oracle_network', 'oracle_http', 'oracle_unconfigured', 'oracle_placeholder'])(
+      'does NOT finalize when THIS run failed with %s, however many prior strikes',
+      async (failureClass) => {
+        // The headline bug (daatan#1253): one Oracle call carries up to
+        // DEFAULT_MAX_ARTICLES rows, so a single client timeout used to stamp the whole
+        // batch terminal on zero information about any article in it. 94.9% of terminal
+        // rows were retired in multi-row groups; 24% of the calls behind them were
+        // client-side errors at exactly 12,001 ms.
+        mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass })
+
+        const r = await retryPoolExtractions(3)
+
+        expect(mockUpdateMany).not.toHaveBeenCalled()
+        expect(r.finalized).toBe(0)
+      },
+    )
+
+    it('spares a whole batch when one timeout would otherwise have retired all of it', async () => {
+      // The measured shape, in miniature: every row in the batch has an attributable
+      // first strike, so pre-fix all 15 would be stamped terminal by a single timeout.
+      const batch = Array.from({ length: 15 }, (_, i) =>
+        row({ url: `https://a.com/${i}`, statusReason: 'oracle_abstain' }),
+      )
+      mockRows.mockResolvedValue(batch as never)
+      mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_timeout' })
 
       const r = await retryPoolExtractions(3)
 
-      expect(mockUpdateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ url: { in: ['https://a.com/1'] } }),
-          data: { statusReason: 'oracle_null_final' },
-        }),
-      )
-      expect(r.finalized).toBe(1)
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(r.finalized).toBe(0)
+      // Still counted as a null run — the sweep's own accounting is unchanged.
+      expect(r.noOracle).toBe(1)
+    })
+
+    it('does not finalize when the run reports no failure class at all', async () => {
+      // Unknown is not attributable. Retiring on a missing class would reintroduce the
+      // bug for any path that forgets to thread it through.
+      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+
+      const r = await retryPoolExtractions(3)
+
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(r.finalized).toBe(0)
     })
 
     it('still ignores reasons outside the null family', async () => {
       // `oracle_omitted` is the gatekeeper saying "irrelevant" — a verdict, not a null
-      // run — and must never be swept up by the widened match.
+      // run — and must never be swept up by the match.
       mockRows.mockResolvedValue([row({ url: 'https://d.com/4', statusReason: 'oracle_omitted' })] as never)
-      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+      mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
 
       const r = await retryPoolExtractions(3)
 
@@ -223,7 +282,7 @@ describe('retryPoolExtractions', () => {
 
     it('does not finalize first-strike rows on a null run', async () => {
       mockRows.mockResolvedValue([row({ url: 'https://c.com/3', statusReason: null })] as never)
-      mockRefresh.mockResolvedValue({ status: 'no-oracle' })
+      mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
 
       const r = await retryPoolExtractions(3)
 
