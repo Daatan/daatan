@@ -623,6 +623,15 @@ Checks Oracle API reachability and version compatibility. Fires a Telegram alert
 
 **EC2 crontab:** `0,30 * * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/oracle-health`
 
+### `GET /api/cron/evidence-pool-stats`
+Read-only. Returns `{ ok, days, attempted, usable }` — evidence-pool rows added in the
+last `days` (default 7, max 90), and how many of them reached `COMPLETE` *with* a stance
+and so became usable evidence. `attempted - usable` is the extraction waste. Auth:
+`x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise; 400 on a `days` outside the
+range (rejected rather than clamped, so a caller can never divide spend for one period by
+output from another). Consumed by `.github/workflows/llm-waste-report.yml` as the
+denominator of the weekly cost-per-usable-article figure (docs#57, #1274).
+
 ### `GET /api/cron/backfill-embeddings`
 Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Returns `{ ok, done, failed, remaining }`. Intended to run nightly.
 

@@ -14,8 +14,8 @@ name: Weekly LLM Waste Report
 #
 # Deliberately a WASTE report, not a spend report. Spend alone cannot be acted
 # on; spend over usable output can. The denominator is new COMPLETE pool rows —
-# articles that actually became evidence — which is why this reaches the prod DB
-# over SSM rather than stopping at Cost Explorer. docs#57 measured $0.0588 per
+# articles that actually became evidence — read from the app over HTTP rather
+# than stopping at Cost Explorer. docs#57 measured $0.0588 per
 # usable pooled article with an estimated 53-63% producing zero production
 # evidence; this reports the same ratio every week so a regression is visible
 # within days instead of at the next manual audit.
@@ -42,9 +42,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
-      - name: Query Bedrock spend (last 7 full UTC days, by usage type)
+      - name: Query LLM spend (last 7 full UTC days, by service)
         id: spend
+        # Never fail the job, for the same reason as the denominator step below:
+        # a failed step posts nothing, and a silent week is indistinguishable
+        # from a week nobody looked at. A broken numerator degrades the message.
+        continue-on-error: true
         run: |
+          set -e
           START=$(date -u -d '7 days ago' +%Y-%m-%d)
           END=$(date -u +%Y-%m-%d)
           PREV_START=$(date -u -d '14 days ago' +%Y-%m-%d)
@@ -52,48 +57,74 @@ jobs:
           # Cost Explorer lives in us-east-1 regardless of where the resources are.
           # RECORD_TYPE=Usage is gross spend, not netted against credits — the same
           # basis cost-report.yml uses, so the two reports never disagree.
+          #
+          # Anthropic models do NOT bill under the "Amazon Bedrock" service. AWS
+          # gives each third-party model its own SERVICE dimension value, e.g.
+          # "Claude Haiku 4.5 (Amazon Bedrock Edition)". Filtering to
+          # ["Amazon Bedrock"] therefore dropped the account's single largest LLM
+          # line: spend was understated 3-8x on every run and the week-over-week
+          # delta came out wrong in sign as well as magnitude (#1275).
+          #
+          # Discover the service list rather than hardcoding it — a hardcoded set
+          # is the same bug again, deferred to the next model adoption.
+          aws ce get-dimension-values --region us-east-1 \
+            --time-period "Start=${PREV_START},End=${END}" \
+            --dimension SERVICE --search-string Bedrock \
+            --output json > /tmp/services.json
+
+          # API responses are untrusted input: written to a file and read back,
+          # never interpolated into source (same rule as cost-report.yml).
+          python3 - <<'PY'
+          import json
+          svcs = sorted(v['Value'] for v in json.load(open('/tmp/services.json'))['DimensionValues'])
+          # A filter that matches nothing must not be able to report $0.00 — the
+          # absence of a measurement must never be quotable as a measurement.
+          if not svcs:
+              raise SystemExit('no Bedrock services in Cost Explorer; refusing to report a total')
+          json.dump({'And': [
+              {'Dimensions': {'Key': 'RECORD_TYPE', 'Values': ['Usage']}},
+              {'Dimensions': {'Key': 'SERVICE', 'Values': svcs}},
+          ]}, open('/tmp/filter.json', 'w'))
+          print('services in scope: ' + ', '.join(svcs))
+          PY
+
           aws ce get-cost-and-usage --region us-east-1 \
             --time-period "Start=${START},End=${END}" \
             --granularity MONTHLY --metrics "UnblendedCost" \
-            --filter '{"And":[{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}},{"Dimensions":{"Key":"SERVICE","Values":["Amazon Bedrock"]}}]}' \
-            --group-by Type=DIMENSION,Key=USAGE_TYPE \
-            --output json > /tmp/bedrock_now.json
+            --filter file:///tmp/filter.json \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json > /tmp/spend_now.json
 
           aws ce get-cost-and-usage --region us-east-1 \
             --time-period "Start=${PREV_START},End=${START}" \
             --granularity MONTHLY --metrics "UnblendedCost" \
-            --filter '{"And":[{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}},{"Dimensions":{"Key":"SERVICE","Values":["Amazon Bedrock"]}}]}' \
-            --output json > /tmp/bedrock_prev.json
+            --filter file:///tmp/filter.json \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json > /tmp/spend_prev.json
 
-          # API responses are untrusted input: written to a file and read back,
-          # never interpolated into source (same rule as cost-report.yml).
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os
+          import json
 
-          def total(path):
-              d = json.load(open(path))
-              out = 0.0
-              for period in d.get('ResultsByTime', []):
-                  if period.get('Groups'):
-                      out += sum(float(g['Metrics']['UnblendedCost']['Amount']) for g in period['Groups'])
-                  else:
-                      out += float(period['Total']['UnblendedCost']['Amount'])
-              return out
+          def by_service(path):
+              rows = {}
+              for period in json.load(open(path)).get('ResultsByTime', []):
+                  for g in period.get('Groups', []):
+                      amt = float(g['Metrics']['UnblendedCost']['Amount'])
+                      rows[g['Keys'][0]] = rows.get(g['Keys'][0], 0.0) + amt
+              return rows
 
-          now, prev = total('/tmp/bedrock_now.json'), total('/tmp/bedrock_prev.json')
-          d = json.load(open('/tmp/bedrock_now.json'))
-          rows = {}
-          for period in d.get('ResultsByTime', []):
-              for g in period.get('Groups', []):
-                  rows[g['Keys'][0]] = rows.get(g['Keys'][0], 0.0) + float(g['Metrics']['UnblendedCost']['Amount'])
-          top = sorted(rows.items(), key=lambda kv: -kv[1])[:4]
+          cur, prv = by_service('/tmp/spend_now.json'), by_service('/tmp/spend_prev.json')
+          now, prev = sum(cur.values()), sum(prv.values())
 
           print(f'total={now:.2f}')
           print(f'prev={prev:.2f}')
           delta = ((now - prev) / prev * 100) if prev > 0 else 0.0
           print(f'delta={delta:+.0f}')
+          # Break down by SERVICE, not USAGE_TYPE: with more than one service in
+          # scope, a bare "USE1-MP:USE1_CacheWriteInputTokenCount-Units" line does
+          # not say which model it belongs to, and per-model is the actionable cut.
           print('breakdown<<LLMEOF')
-          for name, amt in top:
+          for name, amt in sorted(cur.items(), key=lambda kv: -kv[1])[:5]:
               if amt > 0.005:
                   print(f'  {name}: ${amt:,.2f}')
           print('LLMEOF')
@@ -106,49 +137,43 @@ jobs:
         # indistinguishable from a week nobody looked at. A broken denominator
         # degrades the message instead (see the ERROR branch below).
         continue-on-error: true
+        env:
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
         run: |
           set +e
-          IID=i-04ea44d4243d35624
-          # One statement, read-only. Counts the last 7 days of pool rows by
-          # whether they became usable evidence. `usable` is the denominator the
-          # cost-per-article number divides by; `attempted` is every row the
-          # extractor was spent on, so attempted-minus-usable IS the waste.
-          SQL="SELECT count(*) FILTER (WHERE status='COMPLETE' AND stance IS NOT NULL) AS usable, count(*) AS attempted FROM evidence_pool_articles WHERE added_at > now() - interval '7 days';"
-          export CMD="docker exec daatan-postgres psql -U daatan -d daatan -tAF, -c \"${SQL}\""
-          export IID
-
-          # --parameters shorthand CANNOT carry this command: the SQL contains
-          # double quotes, and the shorthand parser splits on them regardless of
-          # shell escaping ("Expected: ',', received: 'S'"). Build the request as
-          # real JSON so quoting is the encoder's problem, not the shell's.
-          python3 -c "
-          import json, os
-          print(json.dumps({
-              'InstanceIds': [os.environ['IID']],
-              'DocumentName': 'AWS-RunShellScript',
-              'Parameters': {'commands': [os.environ['CMD']]},
-          }))" > /tmp/ssm_req.json
-
-          CID=$(aws ssm send-command --cli-input-json file:///tmp/ssm_req.json \
-            --query Command.CommandId --output text)
-          if [ -n "$CID" ]; then
-            aws ssm wait command-executed --command-id "$CID" --instance-id "$IID"
-            OUT=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$IID" \
-              --query StandardOutputContent --output text | tr -d '[:space:]')
-          fi
-
-          USABLE=$(echo "$OUT" | cut -d, -f1)
-          ATTEMPTED=$(echo "$OUT" | cut -d, -f2)
+          # `usable` is the denominator the cost-per-article number divides by;
+          # `attempted` is every row the extractor was spent on, so
+          # attempted-minus-usable IS the waste.
+          #
+          # This was an SSM send-command → docker exec → psql round-trip, which
+          # needed ssm:GetCommandInvocation on the CI role just to read its own
+          # answer back — widening a CI role's read access to every SSM command
+          # result in the account, to count two integers (#1274). The app owns
+          # this data and already authenticates machines with x-cron-secret (the
+          # other routes under /api/cron), so this is a plain HTTP call: no IAM
+          # change, and nothing here can run arbitrary shell on prod.
+          HTTP=$(curl -s -o /tmp/pool_stats.json -w '%{http_code}' --max-time 20 \
+            -H "x-cron-secret: ${BOT_RUNNER_SECRET}" \
+            "https://daatan.com/api/cron/evidence-pool-stats?days=7")
+          echo "HTTP ${HTTP}"
 
           # Report ERROR rather than letting a broken query read as "$0.00 per
           # article" — a broken measurement must never read as free, which is
           # exactly the shape of failure this report exists to catch.
-          if ! [ "$USABLE" -eq "$USABLE" ] 2>/dev/null || [ -z "$ATTEMPTED" ]; then
-            echo "denominator query failed; OUT=[${OUT}]"
-            { echo "usable=ERROR"; echo "attempted=ERROR"; } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          { echo "usable=${USABLE}"; echo "attempted=${ATTEMPTED}"; } >> "$GITHUB_OUTPUT"
+          python3 - "$HTTP" <<'PY' >> "$GITHUB_OUTPUT"
+          import json, sys
+          try:
+              if sys.argv[1] != '200':
+                  raise ValueError(f'HTTP {sys.argv[1]}')
+              d = json.load(open('/tmp/pool_stats.json'))
+              usable, attempted = int(d['usable']), int(d['attempted'])
+          except Exception as exc:
+              # stderr, not stdout: stdout is $GITHUB_OUTPUT here.
+              print(f'denominator query failed: {exc}', file=sys.stderr)
+              usable = attempted = 'ERROR'
+          print(f'usable={usable}')
+          print(f'attempted={attempted}')
+          PY
 
       - name: Post to Telegram
         # always(): the message goes out even if a query step degraded, because
@@ -164,19 +189,29 @@ jobs:
         run: |
           python3 - <<'PY' > /tmp/msg.txt
           import os
-          total = os.environ['TOTAL']; prev = os.environ['PREV']; delta = os.environ['DELTA']
-          usable, attempted = os.environ['USABLE'], os.environ['ATTEMPTED']
-          lines = [f"🔥 <b>Weekly LLM waste — last 7 days</b>", ""]
-          lines.append(f"<b>Bedrock (gross): ${total}</b>  ({delta}% vs prior week, ${prev})")
-          bd = os.environ.get('BREAKDOWN', '').strip()
-          if bd:
-              lines += [bd]
+          # A degraded step leaves its outputs empty rather than unset, so read
+          # defensively and treat empty as ERROR — never as zero. Reporting $0.00
+          # spend because the query broke is the exact failure this report exists
+          # to catch, and it must not be able to commit it itself.
+          total = os.environ.get('TOTAL', '').strip()
+          prev = os.environ.get('PREV', '').strip()
+          delta = os.environ.get('DELTA', '').strip()
+          usable = os.environ.get('USABLE', '').strip()
+          attempted = os.environ.get('ATTEMPTED', '').strip()
+          lines = ["🔥 <b>Weekly LLM waste — last 7 days</b>", ""]
+          if not total:
+              lines.append("⚠️ <b>Could not read LLM spend from Cost Explorer</b> — no spend figure this week.")
+          else:
+              lines.append(f"<b>LLM spend (gross): ${total}</b>  ({delta}% vs prior week, ${prev})")
+              bd = os.environ.get('BREAKDOWN', '').strip()
+              if bd:
+                  lines += [bd]
           lines.append("")
-          if usable == 'ERROR' or attempted == 'ERROR':
+          if not usable or not attempted or 'ERROR' in (usable, attempted):
               lines.append("⚠️ <b>Could not read usable-output counts from prod</b> — cost-per-article unavailable this week.")
           else:
               u, a = int(usable), int(attempted)
-              per = (float(total) / u) if u else None
+              per = (float(total) / u) if (u and total) else None
               waste = (1 - u / a) * 100 if a else 0.0
               lines.append(f"<b>Usable pooled articles:</b> {u:,} of {a:,} attempted")
               lines.append(f"<b>Waste:</b> {waste:.0f}% of extractions produced no usable evidence")
