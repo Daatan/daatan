@@ -65,55 +65,51 @@ jobs:
           # line: spend was understated 3-8x on every run and the week-over-week
           # delta came out wrong in sign as well as magnitude (#1275).
           #
-          # Discover the service list rather than hardcoding it — a hardcoded set
-          # is the same bug again, deferred to the next model adoption.
-          aws ce get-dimension-values --region us-east-1 \
-            --time-period "Start=${PREV_START},End=${END}" \
-            --dimension SERVICE --search-string Bedrock \
-            --output json > /tmp/services.json
-
-          # API responses are untrusted input: written to a file and read back,
-          # never interpolated into source (same rule as cost-report.yml).
-          python3 - <<'PY'
-          import json
-          svcs = sorted(v['Value'] for v in json.load(open('/tmp/services.json'))['DimensionValues'])
-          # A filter that matches nothing must not be able to report $0.00 — the
-          # absence of a measurement must never be quotable as a measurement.
-          if not svcs:
-              raise SystemExit('no Bedrock services in Cost Explorer; refusing to report a total')
-          json.dump({'And': [
-              {'Dimensions': {'Key': 'RECORD_TYPE', 'Values': ['Usage']}},
-              {'Dimensions': {'Key': 'SERVICE', 'Values': svcs}},
-          ]}, open('/tmp/filter.json', 'w'))
-          print('services in scope: ' + ', '.join(svcs))
-          PY
-
+          # So the service list is DISCOVERED, never hardcoded — a hardcoded set is
+          # the same bug again, deferred to the next model adoption. It is
+          # discovered from the cost data itself (group by SERVICE, no service
+          # filter, then match on the name) rather than from a separate
+          # ce:GetDimensionValues call, because this role does not have that
+          # permission — a dispatch against the real role returned
+          # AccessDeniedException on GetDimensionValues. This shape needs no IAM
+          # change at all: it is exactly the call cost-report.yml already makes
+          # with this same role every day.
           aws ce get-cost-and-usage --region us-east-1 \
             --time-period "Start=${START},End=${END}" \
             --granularity MONTHLY --metrics "UnblendedCost" \
-            --filter file:///tmp/filter.json \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
             --group-by Type=DIMENSION,Key=SERVICE \
             --output json > /tmp/spend_now.json
 
           aws ce get-cost-and-usage --region us-east-1 \
             --time-period "Start=${PREV_START},End=${START}" \
             --granularity MONTHLY --metrics "UnblendedCost" \
-            --filter file:///tmp/filter.json \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
             --group-by Type=DIMENSION,Key=SERVICE \
             --output json > /tmp/spend_prev.json
 
+          # API responses are untrusted input: written to a file and read back,
+          # never interpolated into source (same rule as cost-report.yml).
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
+          import json, sys
 
           def by_service(path):
               rows = {}
               for period in json.load(open(path)).get('ResultsByTime', []):
                   for g in period.get('Groups', []):
+                      name = g['Keys'][0]
+                      if 'bedrock' not in name.lower():
+                          continue
                       amt = float(g['Metrics']['UnblendedCost']['Amount'])
-                      rows[g['Keys'][0]] = rows.get(g['Keys'][0], 0.0) + amt
+                      rows[name] = rows.get(name, 0.0) + amt
               return rows
 
           cur, prv = by_service('/tmp/spend_now.json'), by_service('/tmp/spend_prev.json')
+          # Matching nothing must not be able to report $0.00 — the absence of a
+          # measurement must never be quotable as a measurement.
+          if not cur:
+              sys.exit('no Bedrock services in the cost data; refusing to report a total')
+          print('services in scope: ' + ', '.join(sorted(cur)), file=sys.stderr)
           now, prev = sum(cur.values()), sum(prv.values())
 
           print(f'total={now:.2f}')
