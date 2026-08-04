@@ -101,37 +101,59 @@ jobs:
 
       - name: Query usable output from prod (the denominator)
         id: output
+        # Never fail the job. A failed step posts NOTHING, and silence is the
+        # one outcome this report may not produce — a week with no message is
+        # indistinguishable from a week nobody looked at. A broken denominator
+        # degrades the message instead (see the ERROR branch below).
+        continue-on-error: true
         run: |
+          set +e
           IID=i-04ea44d4243d35624
           # One statement, read-only. Counts the last 7 days of pool rows by
           # whether they became usable evidence. `usable` is the denominator the
           # cost-per-article number divides by; `attempted` is every row the
           # extractor was spent on, so attempted-minus-usable IS the waste.
           SQL="SELECT count(*) FILTER (WHERE status='COMPLETE' AND stance IS NOT NULL) AS usable, count(*) AS attempted FROM evidence_pool_articles WHERE added_at > now() - interval '7 days';"
-          CMD="docker exec daatan-postgres psql -U daatan -d daatan -tAF, -c \"${SQL}\""
+          export CMD="docker exec daatan-postgres psql -U daatan -d daatan -tAF, -c \"${SQL}\""
+          export IID
 
-          CID=$(aws ssm send-command --instance-ids "$IID" \
-            --document-name AWS-RunShellScript \
-            --parameters "commands=[\"${CMD}\"]" \
+          # --parameters shorthand CANNOT carry this command: the SQL contains
+          # double quotes, and the shorthand parser splits on them regardless of
+          # shell escaping ("Expected: ',', received: 'S'"). Build the request as
+          # real JSON so quoting is the encoder's problem, not the shell's.
+          python3 -c "
+          import json, os
+          print(json.dumps({
+              'InstanceIds': [os.environ['IID']],
+              'DocumentName': 'AWS-RunShellScript',
+              'Parameters': {'commands': [os.environ['CMD']]},
+          }))" > /tmp/ssm_req.json
+
+          CID=$(aws ssm send-command --cli-input-json file:///tmp/ssm_req.json \
             --query Command.CommandId --output text)
-          aws ssm wait command-executed --command-id "$CID" --instance-id "$IID" || true
-          OUT=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$IID" \
-            --query StandardOutputContent --output text | tr -d '[:space:]')
+          if [ -n "$CID" ]; then
+            aws ssm wait command-executed --command-id "$CID" --instance-id "$IID"
+            OUT=$(aws ssm get-command-invocation --command-id "$CID" --instance-id "$IID" \
+              --query StandardOutputContent --output text | tr -d '[:space:]')
+          fi
 
           USABLE=$(echo "$OUT" | cut -d, -f1)
           ATTEMPTED=$(echo "$OUT" | cut -d, -f2)
 
-          # Fail LOUD rather than reporting a divide-by-zero as "$0.00 per
-          # article" — a broken query must not read as free, which is exactly
-          # the shape of failure this report exists to catch.
+          # Report ERROR rather than letting a broken query read as "$0.00 per
+          # article" — a broken measurement must never read as free, which is
+          # exactly the shape of failure this report exists to catch.
           if ! [ "$USABLE" -eq "$USABLE" ] 2>/dev/null || [ -z "$ATTEMPTED" ]; then
-            echo "usable=ERROR"; echo "attempted=ERROR"
+            echo "denominator query failed; OUT=[${OUT}]"
             { echo "usable=ERROR"; echo "attempted=ERROR"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           { echo "usable=${USABLE}"; echo "attempted=${ATTEMPTED}"; } >> "$GITHUB_OUTPUT"
 
       - name: Post to Telegram
+        # always(): the message goes out even if a query step degraded, because
+        # a silent week is the failure mode this report exists to prevent.
+        if: always()
         env:
           TOTAL: ${{ steps.spend.outputs.total }}
           PREV: ${{ steps.spend.outputs.prev }}
