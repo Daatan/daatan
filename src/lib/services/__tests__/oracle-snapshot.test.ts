@@ -9,6 +9,9 @@ import {
   enrichOracleSources,
   oracleSnapshotToContributingSources,
   poolArticleToEnrichedSource,
+  stanceToPercent,
+  PUBLISH_PERCENT_MIN,
+  PUBLISH_PERCENT_MAX,
 } from '../oracle-snapshot'
 
 const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
@@ -315,5 +318,37 @@ describe('oracleSnapshotToContributingSources', () => {
     expect(out[0].url).toBe('https://ok.com/a')
     expect(out[0].stance).toBeNull() // 'bad' coerced to null
     expect(out[0].certainty).toBe(0.5)
+  })
+})
+
+describe('stanceToPercent — the single publish point for the percent scale', () => {
+  it('maps the scale as before, away from the bounds', () => {
+    expect(stanceToPercent(0)).toBe(50)
+    expect(stanceToPercent(0.4)).toBe(70)
+    expect(stanceToPercent(-0.4)).toBe(30)
+    expect(stanceToPercent(0.94)).toBe(97) // the settlement pin's own value
+  })
+
+  it('never publishes a literal 0 or 100 (daatan#1266)', () => {
+    // The regression itself: a settlement interval endpoint is stance ±0.99,
+    // which is 99.5 on this scale, and Math.round(99.5) is 100. That reached
+    // 1,699 stored snapshots — 29% of everything written in the 48h before the
+    // clamp shipped — and daatan renders it as a literal "100%".
+    expect(stanceToPercent(0.99)).toBe(PUBLISH_PERCENT_MAX)
+    expect(stanceToPercent(-0.99)).toBe(PUBLISH_PERCENT_MIN)
+    expect(stanceToPercent(1)).toBe(PUBLISH_PERCENT_MAX)
+    expect(stanceToPercent(-1)).toBe(PUBLISH_PERCENT_MIN)
+  })
+
+  it('clamps out-of-range input rather than trusting it', () => {
+    expect(stanceToPercent(4)).toBe(PUBLISH_PERCENT_MAX)
+    expect(stanceToPercent(-4)).toBe(PUBLISH_PERCENT_MIN)
+  })
+
+  it('leaves honestly-wide intervals alone — this is not the pin convention', () => {
+    // [1,99], deliberately not the clock path's [3,97]: a forecast that means
+    // 2-98 must be able to say so. Guards against someone "unifying" the two.
+    expect(stanceToPercent(-0.96)).toBe(2)
+    expect(stanceToPercent(0.96)).toBe(98)
   })
 })

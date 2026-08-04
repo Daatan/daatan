@@ -4,15 +4,39 @@ import type { ContributingSource } from '@/lib/services/forecast-sources'
 import type { EvidencePoolArticle } from '@prisma/client'
 
 /**
+ * A published probability never touches a literal 0 or 100 — our evidence is
+ * *reporting*, not observation, so even a pinned outcome keeps a reporting-error
+ * margin (system-model §6.2).
+ *
+ * Deliberately wider than the clock path's `[PIN_LOW, PIN_HIGH]` = [3, 97]
+ * (`temporal-clock.ts`): that is the settlement *pin value* convention, and
+ * imposing it here would compress honestly-wide intervals — a forecast that
+ * means 2–98 should be allowed to say so. The only rule this bound encodes is
+ * the one §6.2 states: not 0, not 100.
+ */
+export const PUBLISH_PERCENT_MIN = 1
+export const PUBLISH_PERCENT_MAX = 99
+
+/**
  * Map an aggregated Oracle stance/CI bound in [-1, 1] to a probability percent
- * in [0, 100]. Shared by every call site that builds a `ContextSnapshot.oracleSnapshot`
+ * in [PUBLISH_PERCENT_MIN, PUBLISH_PERCENT_MAX]. Shared by every call site that
+ * builds a `ContextSnapshot.oracleSnapshot`
  * (news-indexer push, user-triggered analyze, backfill) so `mean`/`ciLow`/`ciHigh`
  * always land on the same scale inside that JSON blob — a prior split where only
  * ciLow/ciHigh went through this conversion and `mean` was stored raw made the
  * snapshot look self-contradictory (e.g. mean=0.60 next to ciLow=54/ciHigh=99).
+ *
+ * The bound lives here rather than at each writer because this function IS the
+ * single publish point for the percent scale (daatan#1266). Before it did, the
+ * clock path clamped and the evidence path did not, so an interval endpoint at
+ * stance ±0.99 → 99.5 → `Math.round` → **100** went out as a literal certainty:
+ * 1,699 snapshots on record, 1,509 of them settled, and 29% of everything
+ * written in the 48h before this shipped. The `mean` was never the problem —
+ * the Oracle's per-vote clamp already held it inside [1, 99].
  */
 export function stanceToPercent(v: number): number {
-  return Math.round(((v + 1) / 2) * 100)
+  const percent = Math.round(((v + 1) / 2) * 100)
+  return Math.min(PUBLISH_PERCENT_MAX, Math.max(PUBLISH_PERCENT_MIN, percent))
 }
 
 /** Scale a stance-space standard deviation onto the same percent scale as {@link stanceToPercent}
