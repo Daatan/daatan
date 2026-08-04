@@ -714,6 +714,57 @@ describe('POST /api/news-indexer/context', () => {
     // (`logOracleCall`) swallows its own errors. The mock could do what the real function
     // cannot. That invariant is pinned directly in oracle.test.ts → "never rejects".
 
+    it('forwards the pre-fetched article body to the Oracle', async () => {
+      // news-indexer#201 / daatan#1255. `z.object().parse()` STRIPS unknown keys, so before this
+      // the body was dropped silently at the boundary — news-indexer could have been sending it
+      // for months with no error anywhere and no effect. The Oracle has always accepted
+      // `ArticleInput.text` ("if omitted, oracle fetches via trafilatura"); daatan was the
+      // missing link. Measured: 1.5% of 88,033 Oracle article reads were pre-fetched, 19.0%
+      // fell through to the extractor running over title+snippet.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: 'the archived body' }],
+        }),
+      )
+
+      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      expect(sent[0].text).toBe('the archived body')
+    })
+
+    it('accepts the body on the legacy single-article shape too', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(post('test-secret', { ...VALID_BODY, articleText: 'legacy body' }))
+
+      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBe('legacy body')
+    })
+
+    it('leaves the body undefined when none is sent, so nothing changes for an unarchived article', async () => {
+      // The inert case, and it is the ONLY case until news-indexer's PUSH_ARTICLE_TEXT is on.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(post('test-secret'))
+
+      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBeUndefined()
+    })
+
+    it('rejects a body over the Oracle\'s own truncation point instead of forwarding it', async () => {
+      // The Oracle truncates at 4,000 chars on arrival, so a longer body is discarded having
+      // crossed two hops. A 400 tells the producer that; a silent slice here would not.
+      const res = await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: 'x'.repeat(4001) }],
+        }),
+      )
+
+      expect(res.status).toBe(500)  // handleRouteError maps the ZodError
+      expect(getOracleForecast).not.toHaveBeenCalled()
+    })
+
     it('stamps the Oracle failure CLASS on the released claims, not a blanket oracle_null', async () => {
       // The measured problem: a 12s client timeout and a deliberate abstention wrote
       // byte-identical pool rows, so 73% of recent fetches carried one uninformative

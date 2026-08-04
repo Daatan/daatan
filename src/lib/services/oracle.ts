@@ -79,6 +79,18 @@ export interface ArticleInput {
   snippet: string
   source?: string
   publishedDate?: string
+  /** Pre-fetched article body. The Oracle's `ArticleInput.text` — "if omitted, oracle fetches
+   *  via trafilatura" — has been wired to its extractor from the start and was never populated
+   *  by anything: only 1.5% of its 88,033 article reads were pre-fetched, and 19.0% fell through
+   *  to `return fallback`, i.e. the extractor running over title+snippet (~215 chars) instead of
+   *  a body news-indexer already holds in S3. ~50% on `t.me`; `lemonde.fr` 100% and `aa.com.tr`
+   *  99.8% degraded — publishers that serve the text at ingest and then block a re-fetch.
+   *  Degraded articles yield 2.9× fewer claims, so the article-level scalars every lane reduces
+   *  from are computed off one sentence.
+   *
+   *  Only the news-indexer push path fills this (news-indexer#201); search-derived articles have
+   *  no archived body to offer. Absent ⇒ the Oracle fetches the origin, exactly as today. */
+  text?: string
   /** Gatekeeper verdict news-indexer already computed for this article (its POST /relevance
    *  result). When both are set AND the Oracle's reuse_supplied_relevance flag is on, the Oracle
    *  reuses them instead of re-judging (kills the double-judge; see MATCHING_ARCHITECTURE.md §3).
@@ -501,6 +513,11 @@ export const getOracleForecast = async (
                 snippet: a.snippet,
                 source: a.source,
                 published_date: a.publishedDate,
+                // Skips the Oracle's own trafilatura fetch for this article. Omitted (not sent
+                // as null) when we have no body: the Oracle branches on falsiness, so either
+                // spelling works, but omitting keeps an un-archived article's payload
+                // byte-identical to what it sends today.
+                ...(a.text ? { text: a.text } : {}),
                 // Reuse the caller-supplied gatekeeper verdict (both fields, or neither) so the
                 // Oracle can skip re-judging — see ArticleInput. Inert until the Oracle's
                 // reuse_supplied_relevance flag is on; absent → the Oracle judges as today.

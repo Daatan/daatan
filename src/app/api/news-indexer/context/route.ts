@@ -22,6 +22,16 @@ const log = createLogger('news-indexer-context')
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Wire cap on a forwarded article body.
+ *
+ * Matches the Oracle's own `max_article_chars` (4000): it truncates to that the moment it
+ * accepts the body, so a longer payload is discarded on arrival having crossed two hops. A
+ * schema `.max()` rather than a silent `.slice()` — this is the trust boundary, and a producer
+ * sending 10 MB bodies should learn it from a 400, not have it quietly trimmed here.
+ */
+const ARTICLE_TEXT_MAX_CHARS = 4000
+
 // One article in the evidence set. `similarity` is per-article so the trigger
 // (the article that fired this push) can be reported even when several are sent.
 const articleItemSchema = z.object({
@@ -31,6 +41,13 @@ const articleItemSchema = z.object({
   source: z.string().nullable().optional(),
   publishedAt: z.string().nullable().optional(),
   similarity: z.number().min(0).max(1).optional(),
+  /** The article body news-indexer already holds in S3 (news-indexer#201). Forwarded to the
+   *  Oracle as `ArticleInput.text`, which it has always accepted — "if omitted, oracle fetches
+   *  via trafilatura" — and which nothing ever filled: 1.5% of its 88,033 article reads were
+   *  pre-fetched, and 19% fell through to running the extractor over title+snippet (~215 chars).
+   *  Capped here, not just upstream: this route is the trust boundary, and the Oracle truncates
+   *  at 4,000 anyway, so anything longer is discarded after crossing two hops. */
+  text: z.string().max(ARTICLE_TEXT_MAX_CHARS).nullable().optional(),
 })
 
 // Accepts two shapes:
@@ -50,6 +67,9 @@ const bodySchema = z
     articleSource: z.string().nullable().optional(),
     publishedAt: z.string().nullable().optional(),
     similarity: z.number().min(0).max(1).optional(),
+    // The legacy body spells its fields `article*`; inside `articles[]` the same value is
+    // plain `text`. news-indexer sends whichever matches the shape it is sending.
+    articleText: z.string().max(ARTICLE_TEXT_MAX_CHARS).nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
     // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
@@ -100,6 +120,7 @@ export async function POST(request: NextRequest) {
               source: body.articleSource ?? null,
               publishedAt: body.publishedAt ?? null,
               similarity: body.similarity,
+              text: body.articleText ?? null,
             },
           ]
 
@@ -115,6 +136,10 @@ export async function POST(request: NextRequest) {
       snippet: a.snippet,
       source: a.source ?? undefined,
       publishedDate: a.publishedAt ?? undefined,
+      // The body news-indexer archived at ingest (news-indexer#201 / daatan#1255). Absent — which
+      // is every push until news-indexer's `PUSH_ARTICLE_TEXT` is on, and afterwards any article
+      // with nothing in S3 — leaves the Oracle fetching the origin exactly as it does today.
+      text: a.text ?? undefined,
       // Reuse the gatekeeper verdict news-indexer already computed for the TRIGGER article, so the
       // Oracle skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
       // trigger carries a verdict — the evidence neighbours were never judged. Fail-open: absent
