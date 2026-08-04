@@ -199,7 +199,10 @@ jobs:
               lines.append("⚠️ <b>Could not read LLM spend from Cost Explorer</b> — no spend figure this week.")
           else:
               lines.append(f"<b>LLM spend (gross): ${total}</b>  ({delta}% vs prior week, ${prev})")
-              bd = os.environ.get('BREAKDOWN', '').strip()
+              # strip('\n'), not strip(): a bare strip() eats the leading two
+              # spaces of the FIRST breakdown line only, so the list came out
+              # visibly misaligned against every line under it.
+              bd = os.environ.get('BREAKDOWN', '').strip('\n')
               if bd:
                   lines += [bd]
           lines.append("")
