@@ -90,9 +90,19 @@ describe('refreshOracleSnapshot', () => {
     mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
     mockForecast.mockResolvedValue({ forecast: null })
     const r = await refreshOracleSnapshot(prediction)
-    expect(r).toEqual({ status: 'no-oracle' })
+    expect(r).toEqual({ status: 'no-oracle', failureClass: undefined })
     expect(mockMark).toHaveBeenCalledWith('p1', 'no-oracle')
     expect(mockSave).not.toHaveBeenCalled()
+  })
+
+  it('surfaces WHY the run produced nothing, not just that it did', async () => {
+    // daatan#1253: the class was computed here to stamp the pool rows but thrown away
+    // on the way out, so the retry sweep could not tell "the Oracle judged these and
+    // declined" from "we hung up" — and retired whole batches on the latter.
+    mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+    mockForecast.mockResolvedValue({ forecast: null, failureClass: 'oracle_timeout' })
+    const r = await refreshOracleSnapshot(prediction)
+    expect(r).toEqual({ status: 'no-oracle', failureClass: 'oracle_timeout' })
   })
 
   it('persists the enriched snapshot on success (no attempted marker)', async () => {

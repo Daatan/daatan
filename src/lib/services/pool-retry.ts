@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { DEFAULT_MAX_ARTICLES, ORACLE_NULL_REASONS } from '@/lib/services/oracle'
+import { DEFAULT_MAX_ARTICLES, ORACLE_NULL_REASONS, ATTRIBUTABLE_NULL_REASONS } from '@/lib/services/oracle'
 import { TERMINAL_POOL_REASONS } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
@@ -50,7 +50,8 @@ export interface RetrySweepResult {
   unchanged: number
   insufficient: number
   failed: number
-  /** Rows stamped oracle_null_final this call — second consecutive null, out of the sweep. */
+  /** Rows stamped oracle_null_final this call — two consecutive ATTRIBUTABLE nulls
+   *  (the Oracle ran and declined, both times), out of the sweep. */
   finalized: number
   /** Retryable rows still waiting on ACTIVE forecasts — the workflow's convergence gauge. */
   remaining: number
@@ -109,14 +110,17 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
     // runs a day apart is the article telling us it's dead, not the Oracle hiccuping. An
     // organic re-push with changed content can still revive them — only the sweep stops.
     //
-    // Matched against the SET, not the literal `'oracle_null'`. daatan#1231 split that one
-    // string into per-cause reasons, and a strict-equality check here would silently stop
-    // recognising every newly-written row — no second strike, no `oracle_null_final`, and
-    // the sweep would re-drive dead articles forever. (`oracle_null` stays in the set for
-    // rows written before the split.) Which of these classes DESERVES a retry is a
-    // separate question, deliberately left to daatan#1232.
+    // Matched against ATTRIBUTABLE_NULL_REASONS, not the whole null family: strike one
+    // only counts if it was a verdict about the article (the Oracle ran and declined),
+    // not a timeout or an HTTP error. A row whose first null was pure latency has been
+    // judged once, not twice, and the rule below wants two (daatan#1253).
+    //
+    // Never the literal `'oracle_null'` either — daatan#1231 split that string into
+    // per-cause reasons, so strict equality would stop recognising every newly-written
+    // row. It is excluded from the attributable set on purpose: pre-split rows conflate
+    // all six causes, so their cause is unknown rather than attributable.
     const secondStrike = rows
-      .filter((r) => r.title && r.statusReason && ORACLE_NULL_REASONS.includes(r.statusReason))
+      .filter((r) => r.title && r.statusReason && ATTRIBUTABLE_NULL_REASONS.includes(r.statusReason))
       .map((r) => r.url)
     // Re-push with the snippet the ORIGINAL attempt carried (daatan#1232). This used to
     // hard-code `snippet: ''`, so the retry sent strictly less text than the attempt that
@@ -139,7 +143,15 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       else if (r.status === 'insufficient') results.insufficient++
       else {
         results.noOracle++
-        if (r.status === 'no-oracle' && secondStrike.length > 0) {
+        // Strike two must ALSO be a verdict about the articles. One batch of up to
+        // DEFAULT_MAX_ARTICLES rows rides on a single Oracle call, so a client timeout
+        // used to retire every row in it permanently on zero information about any of
+        // them — 94.9% of terminal rows were retired in multi-row groups, and 24% of the
+        // calls behind them were client-side errors at exactly 12,001 ms (daatan#1253).
+        // `oracle_null_final` is terminal in TERMINAL_POOL_REASONS, so that loss is
+        // silent and unrecoverable by the sweep.
+        const attributable = r.status === 'no-oracle' && !!r.failureClass && ATTRIBUTABLE_NULL_REASONS.includes(r.failureClass)
+        if (attributable && secondStrike.length > 0) {
           const { count } = await prisma.evidencePoolArticle.updateMany({
             // Guarded on FAILED + a null-family reason so a row a concurrent push just
             // completed (or failed for an unrelated reason like oracle_omitted) is never
@@ -148,6 +160,11 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
             data: { statusReason: 'oracle_null_final' },
           })
           results.finalized += count
+        } else if (r.status === 'no-oracle' && secondStrike.length > 0) {
+          log.info(
+            { predictionId: p.id, failureClass: r.failureClass ?? null, spared: secondStrike.length },
+            'pool-retry.null_not_attributable',
+          )
         }
       }
     } catch (err) {

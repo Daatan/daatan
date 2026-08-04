@@ -316,6 +316,27 @@ export const ORACLE_NULL_REASONS: readonly string[] = [
   'oracle_no_articles',
 ]
 
+/**
+ * The subset of {@link ORACLE_NULL_REASONS} that says something about the ARTICLES
+ * rather than about the wire: the Oracle received them, ran, and produced no
+ * estimate anyway. Only these justify retiring a row (daatan#1253).
+ *
+ * Everything excluded here is a fact about us, not about the evidence:
+ * `oracle_timeout` / `oracle_network` never got an answer at all (and retro does
+ * not cancel, so the forecast probably completed after we hung up), `oracle_http`
+ * is retro erroring, `oracle_unconfigured` means we never asked, and
+ * `oracle_placeholder` is a stub. `oracle_null` is excluded too — it is the
+ * pre-split string that CONFLATES all six causes, so a row carrying it has an
+ * unknown cause, and "unknown" is not "attributable".
+ *
+ * Consequence worth knowing: pre-split rows can no longer reach
+ * `oracle_null_final` through the sweep. They keep costing one Oracle look a day
+ * until they earn a classified reason. That is the deliberate direction — an
+ * extra look costs a fraction of a cent, a wrongly-retired article is lost
+ * silently and forever.
+ */
+export const ATTRIBUTABLE_NULL_REASONS: readonly string[] = ['oracle_abstain', 'oracle_no_articles']
+
 /** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the
  *  id of the logged call, so a caller can attribute its LLM fallback to it. */
 export interface OracleForecastResult {

@@ -258,8 +258,23 @@ latter, and a strict-equality check would silently stop finalizing rows.
 abstention on identical input is not worth re-asking; a timeout is) is daatan#1232.
 
 Other reasons: `oracle_omitted` (the Oracle ran but its gatekeeper dropped the
-article — terminal), `oracle_null_final` (second consecutive null-family run —
+article — terminal), `oracle_null_final` (two consecutive **attributable** null runs —
 terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`.
+
+**"Attributable" is the load-bearing word (daatan#1253).** Only
+`ATTRIBUTABLE_NULL_REASONS` — `oracle_abstain` and `oracle_no_articles` — retire a
+row: those mean the Oracle received the articles, ran, and produced nothing anyway.
+`oracle_timeout` / `oracle_network` / `oracle_http` / `oracle_unconfigured` /
+`oracle_placeholder` are facts about the wire, not the evidence, and legacy
+`oracle_null` conflates all six so its cause is unknown. Both strikes are checked:
+the row's prior reason AND this run's failure class. This matters because one sweep
+call carries up to `DEFAULT_MAX_ARTICLES` (15) rows on a **single** Oracle call — a
+lone client timeout used to stamp the whole batch terminal on zero information about
+any article in it (94.9% of terminal rows were retired in multi-row groups). Since
+`oracle_null_final` is in `TERMINAL_POOL_REASONS`, that loss was silent and beyond
+the sweep's reach. Pre-split `oracle_null` rows consequently no longer reach the cap
+via the sweep — deliberate: one extra Oracle look a day is far cheaper than a
+wrongly-retired article.
 `extractor_error` is **no longer written**: it was stamped in a `catch` around
 `getOracleForecast`, which never throws, so the branch was dead code (removed in
 daatan#1231). Historical rows carrying it remain retryable. The retry sweep (`src/lib/services/pool-retry.ts`,

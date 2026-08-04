@@ -1,7 +1,7 @@
 import type { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
+import { getOracleForecast, DEFAULT_MAX_ARTICLES, type OracleFailureClass } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
@@ -19,7 +19,12 @@ const log = createLogger('oracle-backfill')
 export type RefreshResult =
   | { status: 'ok'; sources: number }
   | { status: 'no-articles' }
-  | { status: 'no-oracle' }
+  // `failureClass` is WHY the run produced nothing. It is already computed here to
+  // stamp the pool rows; surfacing it lets a caller tell "the Oracle judged these
+  // and declined" from "we hung up at 30s", which is the difference between a
+  // verdict and a network event (daatan#1253). Undefined only when the Oracle was
+  // never reached in a way that yielded a class.
+  | { status: 'no-oracle'; failureClass?: OracleFailureClass }
   | { status: 'unchanged' }
   // The whole evidence pool is off-topic — an abstention was recorded (insufficientData
   // snapshot). Still writes a non-null oracleSnapshot marker, so the forecast drops out of
@@ -132,7 +137,7 @@ export async function refreshOracleSnapshot(
       failureClass ?? 'oracle_null',
     )
     if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
-    return { status: 'no-oracle' }
+    return { status: 'no-oracle', failureClass }
   }
 
   const articleMeta = await getArticleMetaByUrl(forecast.sources.map(s => s.url))
