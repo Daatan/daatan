@@ -44,12 +44,35 @@ describe('buildSearchQuery', () => {
     expect(q).toBe('Some claim text')
   })
 
-  it('falls back to the cleaned claim when extraction exceeds the timeout', async () => {
-    // Resolve well after the 2s timeout; the race must return the cleaned claim first.
-    mockGenerateContent.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve({ text: 'too late' }), 5_000)),
-    )
-    const q = await buildSearchQuery('Slow claim')
-    expect(q).toBe('Slow claim')
+  // Fake timers below: these race a real setTimeout against the budget, so on the real
+  // clock they would cost the suite the whole budget in wall time — and a mock resolving
+  // AT the budget is a coin flip between two equal timers, not a test.
+  describe('timeout budget (daatan#1225)', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    const slow = (ms: number, text: string) =>
+      new Promise(resolve => setTimeout(() => resolve({ text }), ms))
+
+    it('keeps a 3.8s extraction — the exact latency that fell back in prod', async () => {
+      // The incident: Gemini took 3.8s against the old 2s budget, so search ran on the raw
+      // claim sentence, retrieved 7 off-topic Putin articles, and the Oracle abstained —
+      // the analyze run published "Insufficient evidence" for ~18 minutes.
+      mockGenerateContent.mockImplementation(() => slow(3_800, 'Putin illness health reports'))
+
+      const q = buildSearchQuery("Vladimir Putin's illness will be reported by December 31, 2026.")
+      await vi.advanceTimersByTimeAsync(4_000)
+
+      expect(await q).toBe('Putin illness health reports')
+    })
+
+    it('still falls back past the raised budget — a hung provider must never block search', async () => {
+      mockGenerateContent.mockImplementation(() => slow(20_000, 'too late'))
+
+      const q = buildSearchQuery('Slow claim')
+      await vi.advanceTimersByTimeAsync(6_000)
+
+      expect(await q).toBe('Slow claim')
+    })
   })
 })
