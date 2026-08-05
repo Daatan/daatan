@@ -125,6 +125,41 @@ describe('runRequote', () => {
     expect(saveClock).not.toHaveBeenCalled()
   })
 
+  // daatan#1265 — publish-time precedence (system-model §6.2) puts the impossibility pin
+  // ABOVE abstention: it is priced from question metadata alone and needs no articles, so
+  // "we have no evidence" must not withhold "this can no longer happen".
+  it('writes the impossibility pin onto an ABSTAINED forecast, whose null confidence used to zero the delta', async () => {
+    findMany.mockResolvedValueOnce([])
+    // Abstained row (confidence null) whose deadline has already passed → cause 'pin'.
+    findMany.mockResolvedValueOnce([row({
+      confidence: null,
+      claimDeadline: new Date('2026-05-01T00:00:00.000Z'),
+      resolveByDatetime: new Date('2026-05-01T00:00:00.000Z'),
+    })] as never)
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-04-01T00:00:00.000Z') })
+
+    const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+    // Before the fix: prevConfidence fell back to result.p, delta was exactly 0, and the
+    // row was counted `unchanged` with no write at all.
+    expect(summary.unchanged).toBe(0)
+    expect(saveClock).toHaveBeenCalledTimes(1)
+    // An ARRIVAL claim past its deadline pins to the floor — it can no longer happen.
+    expect(saveClock.mock.calls[0][0].probability).toBe(3)
+  })
+
+  it('still counts an immaterial GLIDE on a null-confidence row as unchanged — the pin carve-out is not a blanket bypass', async () => {
+    findMany.mockResolvedValueOnce([])
+    // Deadline still in the future → cause 'glide', not a pin.
+    findMany.mockResolvedValueOnce([row({ confidence: null })] as never)
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date(NOW.getTime() - 1000) })
+
+    const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+    expect(summary.unchanged).toBe(1)
+    expect(saveClock).not.toHaveBeenCalled()
+  })
+
   it('writes a clock snapshot via saveClockSnapshot for a material move, and NEVER calls notifyHighConfidence even when the value crosses 80', async () => {
     findMany.mockResolvedValueOnce([])
     findMany.mockResolvedValueOnce([row({ confidence: 30, claimDirection: 'SURVIVAL' })] as never)

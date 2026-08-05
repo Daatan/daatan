@@ -266,9 +266,19 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
     summary.provisionalAlerts++
   }
 
+  // An abstained forecast has null confidence, so `?? result.p` below makes delta exactly
+  // 0 and the material-change test swallows the write. That fallback is right for what it
+  // was written for — don't churn a first-run row that has no prior — and exactly wrong
+  // for a pin: the impossibility pin is priced from question metadata alone, needs no
+  // articles, and outranks abstention in the publish-time precedence (system-model §6.2)
+  // precisely because "we have no evidence" is not a reason to withhold "this can no
+  // longer happen". Scoped to pins: a glide over a null-confidence row still has no prior
+  // to be material against, and letting it through would churn every tick. (daatan#1265)
+  const isPin = result.cause === 'pin' || result.cause === 'pin-provisional'
+  const hasNoPrior = c.confidence === null
   const prevConfidence = c.confidence ?? result.p
   const delta = Math.abs(result.p - prevConfidence)
-  if (delta < MATERIAL_CHANGE_PTS) {
+  if (delta < MATERIAL_CHANGE_PTS && !(isPin && hasNoPrior)) {
     summary.unchanged++
     return
   }
@@ -290,7 +300,10 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
     },
   })
 
-  summary.deltas.push(delta)
+  // Only a row with a prior has a delta. Pushing the 0 that `?? result.p` manufactures for
+  // a null-confidence pin would drag deltaP50/deltaMax toward zero with a number that
+  // describes nothing (daatan#1265).
+  if (!hasNoPrior) summary.deltas.push(delta)
   if (result.cause === 'pin') summary.pinned++
   else if (result.cause === 'pin-provisional') summary.provisionalPins++
   else summary.glided++
