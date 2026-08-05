@@ -87,6 +87,10 @@ npm version major   # 1.31.0 → 2.0.0   (breaking changes)
 ```
 build ──┬──► deploy-staging    (on push to main)
         └──► deploy-production (on tag push v*)
+
+integration   (parallel with build, on all pushes and PRs — runs
+               `npm run test:integration` against the dockerized
+               test postgres from docker-compose.test.yml)
 ```
 
 ### `build` job

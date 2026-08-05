@@ -466,9 +466,10 @@ Open, roughly in order of value:
 - **OpenAI is excluded.** The gpt-5 lineup on OpenRouter is reasoning-mandatory
   (`reasoning: {enabled:false}` → HTTP 400), incompatible with the panel's design; DeepSeek
   and a 4B Gemma control replaced the two OpenAI slots (2026-07-11).
-- **CI does not run integration tests.** `deploy.yml` runs `npm test`, which excludes
-  `**/*.integration.test.ts`; the matched-time FK is covered by unit tests there, and the
-  integration test must be run locally with `npm run test:integration`.
+- **CI runs the integration suite** (since v1.65.39, daatan#1285): `deploy.yml` has a
+  dedicated `Integration Tests` job running `npm run test:integration` alongside
+  Build & Test, so the matched-time FK integration test no longer relies on someone
+  running it locally.
 - **Partial runs are completed in place** (since v1.53.0 — see §4). A sweep that finds
   the day's run missing roster members appends their estimates once they can be asked
   (`completed-partial` in the sweep summary), so a fixed key fills the same day's hole
