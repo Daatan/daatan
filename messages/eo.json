@@ -525,7 +525,8 @@
     "certainty": "{value}% certeco",
     "count": "{count} publikaĵo",
     "countPlural": "{count} publikaĵoj",
-    "sourceRange": "Amplekso trans {count} artikoloj",
+    "sourceRange": "Amplekso de implicita probablo trans {count} artikoloj",
+    "badgeHint": "{pct}% implicita probablo ke ĝi okazos — laŭ la sinteno kaj certeco de la artikolo",
     "originOracle": "AI-analizita",
     "originIndexer": "Indeksita",
     "originBoth": "Ambaŭ"

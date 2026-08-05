@@ -525,7 +525,8 @@
     "certainty": "{value}% ודאות",
     "count": "פרסום אחד",
     "countPlural": "{count} פרסומים",
-    "sourceRange": "טווח על פני {count} כתבות",
+    "sourceRange": "טווח ההסתברות המשתמעת על פני {count} כתבות",
+    "badgeHint": "{pct}% סיכוי משתמע שזה יקרה — לפי העמדה והוודאות של הכתבה",
     "originOracle": "נותח ב-AI",
     "originIndexer": "באינדקס",
     "originBoth": "שניהם"

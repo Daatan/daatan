@@ -525,7 +525,8 @@
     "certainty": "уверенность {value}%",
     "count": "{count, plural, one {# публикация} other {# публикации}}",
     "countPlural": "{count, plural, one {# публикация} few {# публикации} many {# публикаций} other {# публикаций}}",
-    "sourceRange": "Разброс по {count, plural, one {# статье} other {# статьям}}",
+    "sourceRange": "Диапазон подразумеваемой вероятности по {count, plural, one {# статье} other {# статьям}}",
+    "badgeHint": "{pct}% — подразумеваемая вероятность того, что это произойдёт (по позиции и уверенности статьи)",
     "originOracle": "Проанализировано ИИ",
     "originIndexer": "В индексе",
     "originBoth": "Оба"

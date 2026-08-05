@@ -101,6 +101,12 @@ type OutletGroup = {
  * single-article outlet is a plain link. Articles news-indexer matched but the
  * Oracle gate-rejected as off-topic (no stance) are not shown at all.
  * Sits below the human forecasters and never affects the community number.
+ *
+ * Every percentage on this panel is the same quantity: implied P(YES)
+ * (articleProbYes — 0.5 pushed by certainty toward the article's side). Badges,
+ * the outlet range and the lean bar all share it, so a collapsed range's
+ * endpoints literally appear among the expanded rows (#1249). The ↑/↓ arrow
+ * carries the stance side; the number is never raw certainty.
  */
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
   const t = useTranslations('sources')
@@ -147,10 +153,12 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     const sorted = [...articles].sort((a, b) => signalStrength(b) - signalStrength(a))
     const lead = sorted[0]
     const side = getSide(lead.stance)
-    // Same number as the lead article's own row badge (raw certainty) — not the
-    // 50-100%-rescaled "implied probability" used for the press-lean bar, so the
-    // outlet card and its expanded article list never show two different % scales.
-    const pct = side !== 'neutral' && lead.certainty != null ? Math.round(lead.certainty * 100) : null
+    // Same number as the lead article's own row badge — implied P(YES), the ONE
+    // scale every percentage on this card now shares with the range and the
+    // press-lean bar (#1249). #1189's raw-certainty badge kept card and rows
+    // agreeing with each other, but left them both on a different scale from the
+    // range added later — three quantities that read as one metric.
+    const pct = side !== 'neutral' && lead.certainty != null ? Math.round(articleProbYes(lead) * 100) : null
     const probs = articles.map((a) => Math.round(articleProbYes(a) * 100))
     return {
       domain,
@@ -188,7 +196,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     const arrow = side === 'yes' ? '↑' : side === 'no' ? '↓' : '–'
     return (
       <span
-        title={sideMeta[side].label}
+        title={pct != null ? `${sideMeta[side].label} · ${t('badgeHint', { pct })}` : sideMeta[side].label}
         className={`shrink-0 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded ${sideMeta[side].badge}`}
       >
         {arrow}{side !== 'neutral' && pct != null ? ` ${pct}%` : ''}
@@ -213,7 +221,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
       >
         <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dotColor[side]}`} />
         <span className="text-xs text-gray-300 flex-1 min-w-0 line-clamp-2 group-hover/row:text-gray-200">{title}</span>
-        <Badge side={side} pct={s.certainty != null ? Math.round(s.certainty * 100) : null} />
+        <Badge side={side} pct={s.certainty != null ? Math.round(articleProbYes(s) * 100) : null} />
         <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 mt-0.5" />
       </a>
     )
