@@ -1117,6 +1117,7 @@ model Commitment {
   aiRunIdAtCommit String?        @map("ai_run_id_at_commit")
   aiRunAtCommit   AiEstimateRun? @relation(fields: [aiRunIdAtCommit], references: [id], onDelete: SetNull)
   aiMemberScores  AiMemberScore[]
+  revisions       CommitmentRevision[]
 
   // Each user can only commit once per prediction
   @@unique([userId, predictionId])
@@ -1124,6 +1125,33 @@ model Commitment {
   @@index([userId])
   @@index([aiRunIdAtCommit])
   @@map("commitments")
+}
+
+/// Append-only history of a commitment's mutable fields (daatan#1281).
+///
+/// Written by updateCommitment inside the same transaction, BEFORE each UPDATE: the
+/// commitment row stays the current state, these rows hold the prior trajectory —
+/// side, stake, RS at write — which an in-place UPDATE otherwise destroys
+/// irrecoverably. No backfill: history that predates this table was never recorded.
+/// Storage-only; nothing in the product reads it. Deleting a commitment cascades
+/// its revisions away with it.
+model CommitmentRevision {
+  id           String     @id @default(cuid())
+  commitmentId String     @map("commitment_id")
+  commitment   Commitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
+
+  // Snapshot of the fields updateCommitment can change, plus probability for
+  // self-containment (currently written by nothing in the commit path).
+  optionId     String?  @map("option_id")
+  binaryChoice Boolean? @map("binary_choice")
+  cuCommitted  Int      @map("cu_committed")
+  probability  Float?
+  rsSnapshot   Float    @map("rs_snapshot")
+
+  supersededAt DateTime @default(now()) @map("superseded_at")
+
+  @@index([commitmentId, supersededAt])
+  @@map("commitment_revisions")
 }
 
 // ============================================
