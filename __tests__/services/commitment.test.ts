@@ -9,6 +9,7 @@ vi.mock('@/lib/prisma', () => ({
       delete: vi.fn(),
       update: vi.fn(),
     },
+    commitmentRevision: { create: vi.fn() },
     prediction: { update: vi.fn() },
     user: { findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
@@ -136,6 +137,8 @@ describe('updateCommitment', () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user-1', rs: 1 } as any)
     const updated = makeCommitment({ cuCommitted: -50, binaryChoice: false })
     vi.mocked(prisma.commitment.update).mockResolvedValue({ ...updated, user: {}, option: null } as any)
+    // The update runs inside a transaction (revision snapshot + update, daatan#1281)
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(prisma))
 
     const result = await updateCommitment('user-1', 'pred-1', { confidence: -50 })
 
@@ -144,6 +147,14 @@ describe('updateCommitment', () => {
       data: expect.objectContaining({
         cuCommitted: -50,
         binaryChoice: false,
+      }),
+    }))
+    // The revision snapshots the PRE-update state, in the same transaction
+    expect(prisma.commitmentRevision.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        commitmentId: 'c1',
+        cuCommitted: 70,
+        binaryChoice: true,
       }),
     }))
   })

@@ -587,6 +587,12 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 the LASSO run current at stake time, see above) and resolution-time
 results (`rsChange`, `brierScore`, `peerScore`, `aiScore`, `eloChange`).
 
+`commitment_revisions` (daatan#1281): append-only history of the mutable
+fields, written by `updateCommitment` in the same transaction *before* each
+in-place UPDATE — the commitment row is the current state, revisions are the
+prior trajectory. Storage-only (nothing reads it); no backfill (history before
+the table existed was never recorded); cascades away with its commitment.
+
 Ratings live on `users` (`rs` reputation, Glicko-2 `mu/sigma/volatility`, ELO
 `eloRating`) with per-tag variants in `user_tag_ratings`. All are **replayable
 projections** of resolved commitments (`replayGlicko2History`,

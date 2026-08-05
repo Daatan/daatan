@@ -199,7 +199,10 @@ describe('Commitment Service Integration', () => {
     expect(commitment?.binaryChoice).toBe(false)  // derived from negative confidence
   })
 
-  it('blocks a new commitment on a settled forecast', async () => {
+  // Settlement is notification-only since PR #1020 — a pin is classifier-derived
+  // and can misfire, so it never hard-blocks staking. These four tests asserted the
+  // pre-#1020 lock and sat stale for a month because CI does not run this suite.
+  it('allows a new commitment on a settled forecast (settlement is notification-only)', async () => {
     const user = await prisma.user.create({
       data: { email: 'settled-block@example.com', rs: 100 },
     })
@@ -217,12 +220,11 @@ describe('Commitment Service Integration', () => {
 
     const result = await createCommitment(user.id, prediction.id, { confidence: 60 })
 
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.status).toBe(409)
+    expect(result.ok).toBe(true)
     const commitment = await prisma.commitment.findFirst({
       where: { userId: user.id, predictionId: prediction.id },
     })
-    expect(commitment).toBeNull()
+    expect(commitment?.cuCommitted).toBe(60)
   })
 
   it('blocks a new commitment past the resolution deadline', async () => {
@@ -246,7 +248,7 @@ describe('Commitment Service Integration', () => {
     if (!result.ok) expect(result.status).toBe(409)
   })
 
-  it('blocks updating an existing commitment after settlement', async () => {
+  it('allows updating an existing commitment after settlement (notification-only)', async () => {
     const user = await prisma.user.create({
       data: { email: 'settled-update@example.com', rs: 100 },
     })
@@ -267,6 +269,45 @@ describe('Commitment Service Integration', () => {
     await prisma.prediction.update({ where: { id: prediction.id }, data: { settled: true } })
 
     const result = await updateCommitment(user.id, prediction.id, { confidence: 90 })
+    expect(result.ok).toBe(true)
+
+    const commitment = await prisma.commitment.findFirst({
+      where: { userId: user.id, predictionId: prediction.id },
+    })
+    expect(commitment?.cuCommitted).toBe(90)
+
+    // The successful update snapshots the prior stake
+    const revisions = await prisma.commitmentRevision.findMany({
+      where: { commitmentId: commitment!.id },
+    })
+    expect(revisions).toHaveLength(1)
+    expect(revisions[0].cuCommitted).toBe(40)
+  })
+
+  it('writes no revision when the update is blocked (deadline passed)', async () => {
+    const user = await prisma.user.create({
+      data: { email: 'blocked-update-revision@example.com', rs: 100 },
+    })
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Blocked Update Revision Prediction',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date('2030-01-01'),
+        shareToken: 'test-token-blocked-revision-' + Date.now(),
+      },
+    })
+
+    const created = await createCommitment(user.id, prediction.id, { confidence: 40 })
+    expect(created.ok).toBe(true)
+
+    await prisma.prediction.update({
+      where: { id: prediction.id },
+      data: { resolveByDatetime: new Date(Date.now() - 1000) },
+    })
+
+    const result = await updateCommitment(user.id, prediction.id, { confidence: 90 })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.status).toBe(409)
 
@@ -274,9 +315,94 @@ describe('Commitment Service Integration', () => {
       where: { userId: user.id, predictionId: prediction.id },
     })
     expect(commitment?.cuCommitted).toBe(40) // unchanged
+
+    // A blocked update must not fabricate history
+    const revisions = await prisma.commitmentRevision.findMany({
+      where: { commitmentId: commitment!.id },
+    })
+    expect(revisions).toHaveLength(0)
   })
 
-  it('blocks removing a commitment after settlement', async () => {
+  it('snapshots the prior state into commitment_revisions on every update', async () => {
+    const user = await prisma.user.create({
+      data: { email: 'revision-test@example.com', rs: 100 },
+    })
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Revision Test Prediction',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date('2030-01-01'),
+        shareToken: 'test-token-revision-' + Date.now(),
+      },
+    })
+
+    const created = await createCommitment(user.id, prediction.id, { confidence: 40 })
+    expect(created.ok).toBe(true)
+
+    const first = await updateCommitment(user.id, prediction.id, { confidence: -60 })
+    expect(first.ok).toBe(true)
+
+    const commitment = await prisma.commitment.findFirst({
+      where: { userId: user.id, predictionId: prediction.id },
+    })
+    expect(commitment?.cuCommitted).toBe(-60)
+    expect(commitment?.binaryChoice).toBe(false)
+
+    // The revision holds the PRE-update state
+    let revisions = await prisma.commitmentRevision.findMany({
+      where: { commitmentId: commitment!.id },
+      orderBy: { supersededAt: 'asc' },
+    })
+    expect(revisions).toHaveLength(1)
+    expect(revisions[0].cuCommitted).toBe(40)
+    expect(revisions[0].binaryChoice).toBe(true)
+    expect(revisions[0].rsSnapshot).toBe(100)
+
+    const second = await updateCommitment(user.id, prediction.id, { confidence: 90 })
+    expect(second.ok).toBe(true)
+
+    revisions = await prisma.commitmentRevision.findMany({
+      where: { commitmentId: commitment!.id },
+      orderBy: { supersededAt: 'asc' },
+    })
+    expect(revisions).toHaveLength(2)
+    expect(revisions[1].cuCommitted).toBe(-60)
+    expect(revisions[1].binaryChoice).toBe(false)
+  })
+
+  it('cascades revisions away when the commitment is removed', async () => {
+    const user = await prisma.user.create({
+      data: { email: 'revision-cascade@example.com', rs: 100 },
+    })
+    const prediction = await prisma.prediction.create({
+      data: {
+        claimText: 'Revision Cascade Prediction',
+        authorId: user.id,
+        status: 'ACTIVE',
+        outcomeType: 'BINARY',
+        resolveByDatetime: new Date('2030-01-01'),
+        shareToken: 'test-token-revision-cascade-' + Date.now(),
+      },
+    })
+
+    await createCommitment(user.id, prediction.id, { confidence: 40 })
+    await updateCommitment(user.id, prediction.id, { confidence: 80 })
+
+    const commitment = await prisma.commitment.findFirst({
+      where: { userId: user.id, predictionId: prediction.id },
+    })
+    const removed = await removeCommitment(user.id, prediction.id)
+    expect(removed.ok).toBe(true)
+
+    const revisions = await prisma.commitmentRevision.findMany({
+      where: { commitmentId: commitment!.id },
+    })
+    expect(revisions).toHaveLength(0)
+  })
+
+  it('allows removing a commitment after settlement (notification-only)', async () => {
     const user = await prisma.user.create({
       data: { email: 'settled-remove@example.com', rs: 100 },
     })
@@ -297,13 +423,12 @@ describe('Commitment Service Integration', () => {
     await prisma.prediction.update({ where: { id: prediction.id }, data: { settled: true } })
 
     const result = await removeCommitment(user.id, prediction.id)
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.status).toBe(409)
+    expect(result.ok).toBe(true)
 
     const commitment = await prisma.commitment.findFirst({
       where: { userId: user.id, predictionId: prediction.id },
     })
-    expect(commitment).not.toBeNull()
+    expect(commitment).toBeNull()
   })
 
   it('allows the author to stake on a PENDING_APPROVAL forecast that is not settled', async () => {
@@ -325,7 +450,7 @@ describe('Commitment Service Integration', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('blocks the author staking on a PENDING_APPROVAL forecast that is settled', async () => {
+  it('allows the author staking on a PENDING_APPROVAL forecast that is settled (notification-only)', async () => {
     const user = await prisma.user.create({
       data: { email: 'author-stake-settled@example.com', rs: 100 },
     })
@@ -342,8 +467,7 @@ describe('Commitment Service Integration', () => {
     })
 
     const result = await createCommitment(user.id, prediction.id, { confidence: 50 })
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.status).toBe(409)
+    expect(result.ok).toBe(true)
   })
 
   it('blocks a new commitment when claimDeadline has passed and agrees with resolveByDatetime', async () => {

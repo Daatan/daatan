@@ -369,17 +369,33 @@ export async function updateCommitment(
 
   const newConfidence = data.confidence ?? commitment.cuCommitted
 
-  const updated = await prisma.commitment.update({
-    where: { id: commitment.id },
-    data: {
-      cuCommitted: newConfidence,
-      binaryChoice: data.confidence !== undefined
-        ? deriveBinaryChoice(commitment.prediction.outcomeType, newConfidence)
-        : commitment.binaryChoice,
-      optionId: data.optionId ?? commitment.optionId,
-      rsSnapshot: user.rs,
-    },
-    include: commitmentInclude,
+  // Snapshot the prior state before overwriting it — the update is in-place, so
+  // without this row the previous side/stake would be destroyed irrecoverably
+  // (daatan#1281). Same transaction: a revision without its update (or vice
+  // versa) would lie about the trajectory.
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.commitmentRevision.create({
+      data: {
+        commitmentId: commitment.id,
+        optionId: commitment.optionId,
+        binaryChoice: commitment.binaryChoice,
+        cuCommitted: commitment.cuCommitted,
+        probability: commitment.probability,
+        rsSnapshot: commitment.rsSnapshot,
+      },
+    })
+    return tx.commitment.update({
+      where: { id: commitment.id },
+      data: {
+        cuCommitted: newConfidence,
+        binaryChoice: data.confidence !== undefined
+          ? deriveBinaryChoice(commitment.prediction.outcomeType, newConfidence)
+          : commitment.binaryChoice,
+        optionId: data.optionId ?? commitment.optionId,
+        rsSnapshot: user.rs,
+      },
+      include: commitmentInclude,
+    })
   })
 
   return { ok: true, data: updated, status: 200 }
