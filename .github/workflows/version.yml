@@ -1,0 +1,38 @@
+name: Version
+
+# The version gate, deliberately in its own workflow rather than a step inside
+# deploy.yml's "Build & Test": it needs no install, no build and no database, so
+# it returns in seconds and can be a required status check without making every
+# PR wait on the full suite to learn it forgot a bump.
+#
+# What it catches that the pre-commit hook cannot: two concurrent branches both
+# bumping X -> Y. Each is self-consistent and passes the hook; the second to
+# merge silently reuses a version already on main. See scripts/check-version-bump.sh.
+#
+# This runs on the PR's merge commit, so a branch whose bump collides with one
+# that landed while it was open fails here even though the files merge cleanly —
+# an identical change on both sides is not a conflict, which is exactly why this
+# class slipped through.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  version:
+    name: Version bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The check compares against origin/main, which a shallow clone lacks.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check the version advances past main
+        run: |
+          git fetch origin main --quiet
+          VERSION_CHECK_BASE=origin/main ./scripts/check-version-bump.sh
