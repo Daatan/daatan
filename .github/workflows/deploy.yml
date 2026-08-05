@@ -167,6 +167,29 @@ jobs:
             NEXTAUTH_URL=https://daatan.com
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
 
+  # Integration tests (runs on all pushes and PRs, in parallel with build)
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    concurrency:
+      group: integration-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
+
   # Deploy to STAGING (on push to main)
   deploy-staging:
     name: Deploy to Staging
