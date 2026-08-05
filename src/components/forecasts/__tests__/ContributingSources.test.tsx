@@ -67,16 +67,16 @@ describe('ContributingSources', () => {
 
   it('shows the outlet name, its headline, and an aggregate side badge', () => {
     // Single-article outlet → a plain link card. stance 0.5, certainty 0.72 →
-    // badge shows that article's own raw certainty, "↑ 72%" (the will/won't word
-    // is dropped; the arrow + colour + column carry the side), matching what its
-    // expanded row would show — no separate rescaled "implied probability" scale.
+    // badge shows implied P(YES) = 0.5 + 0.72/2 = 86% (the will/won't word is
+    // dropped; the arrow + colour + column carry the side). One scale everywhere
+    // (#1249): NOT the article's raw 72% certainty.
     renderWithIntl(
       <ContributingSources
         sources={[src({ source: 'Reuters', title: 'Big scoop', certainty: 0.72, stance: 0.5 })]} />,
     )
     expect(screen.getByText('Reuters')).toBeInTheDocument()
     expect(screen.getByText('Big scoop')).toBeInTheDocument()
-    expect(screen.getByText('↑ 72%')).toBeInTheDocument()
+    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
   })
 
   it('falls back to the outlet host when there is no source name', () => {
@@ -121,8 +121,8 @@ describe('ContributingSources', () => {
     // but a much weaker stance magnitude (stance -.208, certainty .78). Averaging
     // would cancel the strong signal down to "neutral"; picking by certainty alone
     // would pick the wrong (irrelevant) article. Signal strength (|stance| ×
-    // certainty) correctly picks the on-topic one, and the badge shows ITS raw
-    // certainty (73%, rounded from .725) — the same number its own row would show.
+    // certainty) correctly picks the on-topic one, and the badge shows ITS implied
+    // P(YES) (0.5 + .725/2 → 86%) — the same number its own row shows (#1249).
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -133,8 +133,8 @@ describe('ContributingSources', () => {
     )
     expect(screen.getByText(/^Will happen \(1\)$/)).toBeInTheDocument()
     // Appears twice: the outlet-header badge and the lead article's own row badge
-    // show the identical number — proof there's no separate rescaled outlet-level scale.
-    expect(screen.getAllByText('↑ 73%')).toHaveLength(2)
+    // show the identical number — card and rows stay on the one shared scale.
+    expect(screen.getAllByText('↑ 86%')).toHaveLength(2)
   })
 
   it("shows the outlet-wide P(YES) range next to the lead badge, on the same scale as the press-lean bar", () => {
@@ -151,10 +151,12 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    // Appears twice: the outlet-header badge and lead article A's own row badge.
-    expect(screen.getAllByText('↑ 90%')).toHaveLength(2)
+    // Appears twice: the outlet-header badge and lead article A's own row badge —
+    // and the badge number (95%) IS the range's upper endpoint, the literal
+    // correspondence #1249 was filed about.
+    expect(screen.getAllByText('↑ 95%')).toHaveLength(2)
     const range = screen.getByText('35–95%')
-    expect(range).toHaveAttribute('title', 'Range across 3 articles')
+    expect(range).toHaveAttribute('title', 'Implied-probability range across 3 articles')
   })
 
   it('does not show a range on a single-article outlet — nothing to span', () => {

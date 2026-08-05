@@ -525,7 +525,8 @@
     "certainty": "{value}% certainty",
     "count": "{count} publication",
     "countPlural": "{count} publications",
-    "sourceRange": "Range across {count} articles",
+    "sourceRange": "Implied-probability range across {count} articles",
+    "badgeHint": "{pct}% implied chance it will happen — from this article's stance and certainty",
     "originOracle": "AI-analysed",
     "originIndexer": "Indexed",
     "originBoth": "Both"
