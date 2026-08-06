@@ -796,6 +796,40 @@ describe('POST /api/news-indexer/context', () => {
       expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!.length).toBeLessThanOrEqual(4000)
     })
 
+    it('forwards the language hint to the Oracle alongside the body', async () => {
+      // daatan#1290 / news-indexer#210. news-indexer knows the language per-source but never
+      // sent it, so the Oracle stances raw Hebrew/Russian with English prompts. Inert at the
+      // Oracle until retro#417 adds the field (its pydantic model ignores extras).
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: 'גוף המאמר', language: 'he' }],
+        }),
+      )
+
+      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      expect(sent[0].language).toBe('he')
+      expect(sent[0].text).toBe('גוף המאמר')
+    })
+
+    it('accepts the language on the legacy single-article shape as articleLanguage', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(post('test-secret', { ...VALID_BODY, articleLanguage: 'ru' }))
+
+      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].language).toBe('ru')
+    })
+
+    it('leaves the language undefined when none is sent', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      await POST(post('test-secret'))
+
+      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].language).toBeUndefined()
+    })
+
     it('stamps the Oracle failure CLASS on the released claims, not a blanket oracle_null', async () => {
       // The measured problem: a 12s client timeout and a deliberate abstention wrote
       // byte-identical pool rows, so 73% of recent fetches carried one uninformative

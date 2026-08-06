@@ -82,6 +82,24 @@ describe('getOracleForecast', () => {
     expect(body.articles[1].url).toBe('https://example.com/2')
   })
 
+  it('sends text and language per article when present, omits them when absent', async () => {
+    // daatan#1290: `text` skips the Oracle's own fetch; `language` is a prompt hint retro's
+    // pydantic model ignores until retro#417 lands (default extra="ignore" — safe to send).
+    const articles = [
+      { url: 'https://example.com/1', title: 'A', snippet: 's', text: 'the body', language: 'he' },
+      { url: 'https://example.com/2', title: 'B', snippet: 's' },
+    ]
+
+    await getOracleForecast('Will X happen?', { articles })
+
+    const [, init] = mockFetch.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.articles[0].text).toBe('the body')
+    expect(body.articles[0].language).toBe('he')
+    expect('text' in body.articles[1]).toBe(false)
+    expect('language' in body.articles[1]).toBe(false)
+  })
+
   it('omits articles key from body when no articles provided', async () => {
     await getOracleForecast('Will X happen?')
 

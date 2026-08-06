@@ -91,6 +91,12 @@ export interface ArticleInput {
    *  Only the news-indexer push path fills this (news-indexer#201); search-derived articles have
    *  no archived body to offer. Absent ⇒ the Oracle fetches the origin, exactly as today. */
   text?: string
+  /** The article's language (short tag, e.g. ISO 639-1 "he", "ru"). news-indexer knows it
+   *  per-source (sources.yaml / telegram config) but never sent it, so the Oracle stances raw
+   *  Hebrew/Russian with English prompts and no signal about the input language (daatan#1290).
+   *  Forwarded on the wire as `language`; retro's ArticleInput ignores unknown fields until
+   *  retro#417 adds it, so sending it now is inert there and safe. */
+  language?: string
   /** Gatekeeper verdict news-indexer already computed for this article (its POST /relevance
    *  result). When both are set AND the Oracle's reuse_supplied_relevance flag is on, the Oracle
    *  reuses them instead of re-judging (kills the double-judge; see MATCHING_ARCHITECTURE.md §3).
@@ -518,6 +524,10 @@ export const getOracleForecast = async (
                 // spelling works, but omitting keeps an un-archived article's payload
                 // byte-identical to what it sends today.
                 ...(a.text ? { text: a.text } : {}),
+                // Language hint for the Oracle's gatekeeper/extractor prompts. retro's pydantic
+                // ArticleInput has no `language` field yet and ignores extras (default
+                // extra="ignore"), so this is inert on the wire until retro#417 lands.
+                ...(a.language ? { language: a.language } : {}),
                 // Reuse the caller-supplied gatekeeper verdict (both fields, or neither) so the
                 // Oracle can skip re-judging — see ArticleInput. Inert until the Oracle's
                 // reuse_supplied_relevance flag is on; absent → the Oracle judges as today.
