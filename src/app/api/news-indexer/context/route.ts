@@ -76,6 +76,10 @@ const articleItemSchema = z.object({
    *  pre-fetched, and 19% fell through to running the extractor over title+snippet (~215 chars).
    *  Length is enforced by truncation, not rejection — see ARTICLE_TEXT_MAX_CHARS. */
   text: z.string().nullable().optional(),
+  /** The article's language (short tag, e.g. ISO 639-1 "he"/"ru"), known per-source on the
+   *  news-indexer side (daatan#1290 / news-indexer#210). Forwarded as `ArticleInput.language`;
+   *  inert at the Oracle until retro#417 adds the field. */
+  language: z.string().max(16).nullable().optional(),
 })
 
 // Accepts two shapes:
@@ -98,6 +102,7 @@ const bodySchema = z
     // The legacy body spells its fields `article*`; inside `articles[]` the same value is
     // plain `text`. news-indexer sends whichever matches the shape it is sending.
     articleText: z.string().nullable().optional(),
+    articleLanguage: z.string().max(16).nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
     // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
@@ -149,6 +154,7 @@ export async function POST(request: NextRequest) {
               publishedAt: body.publishedAt ?? null,
               similarity: body.similarity,
               text: body.articleText ?? null,
+              language: body.articleLanguage ?? null,
             },
           ]
 
@@ -172,6 +178,7 @@ export async function POST(request: NextRequest) {
       // is every push until news-indexer's `PUSH_ARTICLE_TEXT` is on, and afterwards any article
       // with nothing in S3 — leaves the Oracle fetching the origin exactly as it does today.
       text: capArticleText(a.text, overCap, a.url),
+      language: a.language ?? undefined,
       // Reuse the gatekeeper verdict news-indexer already computed for the TRIGGER article, so the
       // Oracle skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
       // trigger carries a verdict — the evidence neighbours were never judged. Fail-open: absent
