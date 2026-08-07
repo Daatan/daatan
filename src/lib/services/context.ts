@@ -2,6 +2,7 @@ import { Prisma, type ContextSnapshot } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { notifyHighConfidence } from '@/lib/services/telegram'
+import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 
 const log = createLogger('context-service')
 
@@ -115,6 +116,35 @@ function articlesUsedOf(oracleSnapshot: unknown): number | null {
   return typeof n === 'number' ? n : null
 }
 
+/** Max parseable `publishedAt`/`publishedDate` across a JSON array of sources, else null.
+ *  Defensive: this is externally-sourced, unvalidated Json (retro's pool rows, news-indexer's
+ *  push payload) — a missing/malformed date on one row must not fail the whole extraction. */
+function maxPublishedAt(values: unknown): Date | null {
+  if (!Array.isArray(values)) return null
+  let max: Date | null = null
+  for (const v of values) {
+    const raw = (v as { publishedAt?: unknown; publishedDate?: unknown } | null)?.publishedAt
+      ?? (v as { publishedAt?: unknown; publishedDate?: unknown } | null)?.publishedDate
+    if (typeof raw !== 'string') continue
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) continue
+    if (max === null || d > max) max = d
+  }
+  return max
+}
+
+/**
+ * F17 (daatan#1236): the newest evidence-publish time behind an estimate — prefers
+ * the full weight-bearing pool (`oracleSnapshot.sources[].publishedAt`, EnrichedOracleSource
+ * shape) over the narrower push payload (`sources[].publishedDate`), since the pool is what
+ * the estimate actually averages. Null when neither yields a parseable date — callers fall
+ * back to write time.
+ */
+function evidencePublishedAt(sources: unknown, oracleSnapshot: unknown): Date | null {
+  const poolSources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
+  return maxPublishedAt(poolSources) ?? maxPublishedAt(sources)
+}
+
 /**
  * Persist one AI-estimate write — any origin — as a ContextSnapshot plus a
  * consistent Prediction update, in a single transaction.
@@ -132,6 +162,20 @@ export async function recordEstimate(input: RecordEstimateInput) {
 
   const willNotify = policy.notifyOnCrossing && !input.insufficientData && input.probability !== null
   const prev = willNotify ? await readPreviousConfidence(input.predictionId) : null
+
+  // F17 (daatan#1236): only an evidence-kind write with an actual probability is a
+  // candidate anchor at all (abstentions/no-number writes are already excluded from
+  // getLatestEvidenceEstimate by its own WHERE clause) — compute whether it moved
+  // enough from the CURRENT anchor to count as new information, and when the
+  // evidence behind it was actually published. Clock writes never anchor (NOT_CLOCK),
+  // so neither field matters for them; both keep the safe (anchor-eligible) default.
+  let materialChange = true
+  let evidenceAt: Date | null = null
+  if (policy.kind === 'evidence' && !input.insufficientData && input.probability !== null) {
+    const anchor = await getLatestEvidenceEstimate(input.predictionId)
+    materialChange = anchor === null || Math.abs(input.probability - anchor.externalProbability) >= MATERIAL_CHANGE_PTS
+    evidenceAt = evidencePublishedAt(input.sources, input.oracleSnapshot)
+  }
 
   const estimateFields: Prisma.PredictionUpdateInput = input.insufficientData
     ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
@@ -163,6 +207,8 @@ export async function recordEstimate(input: RecordEstimateInput) {
         insufficientData: input.insufficientData ?? false,
         meta: input.meta ?? undefined,
         articlesUsed: articlesUsedOf(input.oracleSnapshot),
+        materialChange,
+        evidenceAt,
       },
     }),
   ]
@@ -380,18 +426,30 @@ export async function getLatestOracleSnapshot(predictionId: string) {
 
 /**
  * The anchor for the requote cron's glide: the most recent evidence-driven
- * (non-clock) snapshot that actually carries a probability and wasn't an
- * abstention. Deliberately NOT Prediction.confidence — the clock overwrites
- * that daily, so anchoring on it would compound the glide against itself.
+ * (non-clock) snapshot that actually carries a probability, wasn't an
+ * abstention, and was MATERIAL (F17, daatan#1236) — its probability moved
+ * meaningfully from the anchor before it, so it carries new information.
+ * A same-probability re-write (e.g. a push whose only article was
+ * gatekeeper-rejected, recomputing an otherwise-unchanged pool) still gets
+ * written by `recordEstimate` — no check-then-act dedup — but is excluded
+ * here so it can't reset the glide clock. Deliberately NOT Prediction.confidence
+ * — the clock overwrites that daily, so anchoring on it would compound the
+ * glide against itself.
  */
 export async function getLatestEvidenceEstimate(
   predictionId: string,
-): Promise<{ externalProbability: number; createdAt: Date } | null> {
+): Promise<{ externalProbability: number; createdAt: Date; evidenceAt: Date | null } | null> {
   return prisma.contextSnapshot.findFirst({
-    where: { predictionId, externalProbability: { not: null }, insufficientData: false, ...NOT_CLOCK },
+    where: {
+      predictionId,
+      externalProbability: { not: null },
+      insufficientData: false,
+      materialChange: true,
+      ...NOT_CLOCK,
+    },
     orderBy: { createdAt: 'desc' },
-    select: { externalProbability: true, createdAt: true },
-  }) as Promise<{ externalProbability: number; createdAt: Date } | null>
+    select: { externalProbability: true, createdAt: true, evidenceAt: true },
+  }) as Promise<{ externalProbability: number; createdAt: Date; evidenceAt: Date | null } | null>
 }
 
 /**

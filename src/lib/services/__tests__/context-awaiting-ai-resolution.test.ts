@@ -52,6 +52,7 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-1' }] as never)
+    vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null as never)
     mockPrevious(50)
   })
 
