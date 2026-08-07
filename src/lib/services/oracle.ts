@@ -6,6 +6,7 @@ import {
   oracleFetch,
   logOracleCall,
   type OracleCallMeta,
+  type OracleTokenUsage,
 } from '@/lib/services/oracleClient'
 
 export { recordOracleFallback } from '@/lib/services/oracleClient'
@@ -277,6 +278,9 @@ export interface OracleForecastResponse {
    *  accomplished fact: mean/ci are pinned near the boundary and the forecast
    *  is a resolution candidate. */
   settled?: boolean
+  /** LLM token usage for this call (docs#57 item 3); nullable/omitted until the
+   *  retro side that reports it is deployed, or when usage is unknown. */
+  token_usage?: OracleTokenUsage | null
 }
 
 /**
@@ -556,19 +560,19 @@ export const getOracleForecast = async (
     // the caller can show "insufficient evidence" instead of guessing a number.
     if (data.insufficient_data) {
       log.debug({ reason: data.reason, articlesUsed: data.articles_used }, 'Oracle abstained — insufficient evidence')
-      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, insufficientData: true, failureClass: 'oracle_abstain' }
     }
 
     if (data.placeholder) {
       log.debug('Oracle returned placeholder response — no real forecast available')
-      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason) })
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, failureClass: 'oracle_placeholder' }
     }
 
     if (typeof data.mean !== 'number' || data.articles_used === 0) {
       log.debug({ articlesUsed: data.articles_used, reason: data.reason }, 'Oracle returned no usable articles')
-      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason) })
+      const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, failureClass: 'oracle_no_articles' }
     }
 
@@ -582,7 +586,7 @@ export const getOracleForecast = async (
       },
       'Oracle forecast',
     )
-    const logId = await logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used })
+    const logId = await logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, tokenUsage: data.token_usage })
     return { forecast: data, logId }
   } catch (err) {
     log.warn({ err, durationMs: Date.now() - t0 }, 'Oracle request failed')

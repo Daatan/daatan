@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
-import { getOracleConfig, oracleFetch, logOracleCall } from '@/lib/services/oracleClient'
+import { getOracleConfig, oracleFetch, logOracleCall, type OracleTokenUsage } from '@/lib/services/oracleClient'
 
 const schema = z.object({
   model: z.string().min(1),
@@ -25,20 +25,30 @@ export const POST = withAuth(async (request, user) => {
       body: JSON.stringify(payload),
       timeoutMs: 60_000,
     })
-    void logOracleCall({
-      callType: 'LLM', status: res.ok ? 'OK' : 'ERROR', meta: { source: 'ibi-llm', userId: user.id },
-      durationMs: Date.now() - t0, httpStatus: res.status,
-    })
+    const durationMs = Date.now() - t0
 
     const text = await res.text()
+    let oracleBody: { token_usage?: OracleTokenUsage | null } | null = null
+    let bodyIsJson = false
     try {
-      return NextResponse.json(JSON.parse(text), { status: res.status })
+      oracleBody = JSON.parse(text)
+      bodyIsJson = true
     } catch {
+      // fall through — logged and answered below
+    }
+
+    void logOracleCall({
+      callType: 'LLM', status: res.ok ? 'OK' : 'ERROR', meta: { source: 'ibi-llm', userId: user.id },
+      durationMs, httpStatus: res.status, tokenUsage: bodyIsJson ? oracleBody?.token_usage : null,
+    })
+
+    if (!bodyIsJson) {
       return NextResponse.json(
         { error: 'Oracle returned a non-JSON response' },
         { status: res.status >= 400 ? res.status : 502 },
       )
     }
+    return NextResponse.json(oracleBody, { status: res.status })
   } catch (error) {
     return handleRouteError(error, 'llm proxy failed')
   }
