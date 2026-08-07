@@ -29,6 +29,16 @@ export type OracleCallSource =
   | 'news-indexer'
   | 'other'
 
+/** LLM token usage as the Oracle reports it (`token_usage` on /forecast,
+ *  /relevance and /llm responses). Nullable/omitted when unknown. */
+export interface OracleTokenUsage {
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
+  total_tokens?: number | null
+  cache_read_tokens?: number | null
+  cache_write_tokens?: number | null
+}
+
 export interface OracleCallMeta {
   source: OracleCallSource
   /** User/bot that triggered the call; null for system/cron. */
@@ -50,6 +60,9 @@ interface LogOracleCallInput {
   resultCount?: number | null
   /** Why the call failed / came back empty; null on success. */
   failureReason?: string | null
+  /** The response's `token_usage` object, when the Oracle reported one
+   *  (FORECAST and LLM calls only — retro doesn't report usage for SEARCH etc.). */
+  tokenUsage?: OracleTokenUsage | null
 }
 
 const PRUNE_DAYS = 30
@@ -81,6 +94,11 @@ export async function logOracleCall(input: LogOracleCallInput): Promise<string |
           query: input.query ?? null,
           resultCount: input.resultCount ?? null,
           failureReason: input.failureReason ?? null,
+          promptTokens: input.tokenUsage?.prompt_tokens ?? null,
+          completionTokens: input.tokenUsage?.completion_tokens ?? null,
+          totalTokens: input.tokenUsage?.total_tokens ?? null,
+          cacheReadTokens: input.tokenUsage?.cache_read_tokens ?? null,
+          cacheWriteTokens: input.tokenUsage?.cache_write_tokens ?? null,
         },
         select: { id: true },
       }),

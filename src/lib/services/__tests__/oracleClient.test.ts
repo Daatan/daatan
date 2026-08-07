@@ -114,6 +114,11 @@ describe('logOracleCall', () => {
         query: 'Will X happen?',
         resultCount: 9,
         failureReason: null,
+        promptTokens: null,
+        completionTokens: null,
+        totalTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
       },
       select: { id: true },
     })
@@ -130,6 +135,38 @@ describe('logOracleCall', () => {
     expect(data.provider).toBeNull()
     expect(data.query).toBeNull()
     expect(data.resultCount).toBeNull()
+  })
+
+  it('maps the token_usage object onto the token columns', async () => {
+    await logOracleCall({
+      callType: 'FORECAST',
+      status: 'OK',
+      meta: { source: 'context-update' },
+      durationMs: 100,
+      tokenUsage: { prompt_tokens: 1200, completion_tokens: 340, total_tokens: 1540, cache_read_tokens: 800, cache_write_tokens: 0 },
+    })
+    const data = mockCreate.mock.calls[0][0].data
+    expect(data.promptTokens).toBe(1200)
+    expect(data.completionTokens).toBe(340)
+    expect(data.totalTokens).toBe(1540)
+    expect(data.cacheReadTokens).toBe(800)
+    expect(data.cacheWriteTokens).toBe(0)
+  })
+
+  it('writes null token columns when token_usage is absent or partial', async () => {
+    await logOracleCall({ callType: 'LLM', status: 'OK', meta: { source: 'ibi-llm' }, durationMs: 5 })
+    expect(mockCreate.mock.calls[0][0].data.totalTokens).toBeNull()
+
+    await logOracleCall({
+      callType: 'LLM', status: 'OK', meta: { source: 'ibi-llm' }, durationMs: 5,
+      tokenUsage: { prompt_tokens: 10, completion_tokens: 2 },
+    })
+    const data = mockCreate.mock.calls[1][0].data
+    expect(data.promptTokens).toBe(10)
+    expect(data.completionTokens).toBe(2)
+    expect(data.totalTokens).toBeNull()
+    expect(data.cacheReadTokens).toBeNull()
+    expect(data.cacheWriteTokens).toBeNull()
   })
 
   it('returns the created row id', async () => {

@@ -1599,6 +1599,16 @@ model OracleCallLog {
   // The 0–100 probability the LLM fallback produced (set with fellBackToLlm).
   fallbackProbability Int?
 
+  // LLM token usage as reported by the Oracle's `token_usage` response field
+  // (docs#57 item 3). Only FORECAST and LLM calls carry it (retro doesn't report
+  // usage for SEARCH etc.); null when the Oracle omitted the object or the row
+  // predates this column.
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
+
   durationMs Int
   createdAt  DateTime @default(now())
 

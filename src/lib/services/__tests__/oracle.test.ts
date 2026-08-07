@@ -100,6 +100,22 @@ describe('getOracleForecast', () => {
     expect(logId).toBe('log-1')
   })
 
+  it('threads the response token_usage into the call log (and omits it when absent)', async () => {
+    const usage = { prompt_tokens: 1200, completion_tokens: 340, total_tokens: 1540, cache_read_tokens: 800, cache_write_tokens: 0 }
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...fullPayload, token_usage: usage }),
+    })
+    await getOracleForecast('Q?')
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'OK', tokenUsage: usage }))
+
+    mockLogOracleCall.mockClear()
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleForecast('Q?')
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ tokenUsage: undefined }))
+  })
+
   it('sends the x-api-key header and posts to /forecast', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
     await getOracleForecast('Q?')

@@ -128,8 +128,9 @@ Known bypass: bot creation (`bots/stake.ts`) still writes predictions directly.
 
 Supporting tables: `context_timings` (per-analyze phase latencies),
 `oracle_call_logs` (every Oracle API call: type, source workflow, provider
-chain, failure reason, LLM-fallback flag — the observability layer for the
-search/forecast chain).
+chain, failure reason, LLM-fallback flag, and — for FORECAST/LLM calls, once
+retro reports it — per-call LLM token usage (`promptTokens`…`cacheWriteTokens`,
+docs#57 item 3) — the observability layer for the search/forecast chain).
 
 ## Calibration — `calibration_records`
 
