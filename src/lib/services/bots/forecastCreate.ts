@@ -14,6 +14,7 @@ import {
   log,
   callLLMWithTimeout,
   logBotAction,
+  validateResolveByDate,
   MIN_RESOLVE_DAYS,
   MAX_RESOLVE_DAYS,
 } from './shared'
@@ -217,17 +218,9 @@ export async function processTopic(
     }
 
     // Create the prediction in the DB
-    const resolveBy = new Date(forecast.resolveByDatetime)
-    if (isNaN(resolveBy.getTime())) {
-      log.warn({ botId: bot.id, topic: topicTitle, provided: forecast.resolveByDatetime }, 'Invalid resolveByDatetime format')
-      await logBotAction(bot.id, 'ERROR', { title: topicTitle }, null, 'Invalid date format', dryRun)
-      return 'error'
-    }
-    if (resolveBy <= new Date()) {
-      log.warn({ botId: bot.id, topic: topicTitle, provided: resolveBy.toISOString() }, 'resolveByDatetime is in the past')
-      await logBotAction(bot.id, 'ERROR', { title: topicTitle }, null, 'Past resolution date', dryRun)
-      return 'error'
-    }
+    const dateCheck = await validateResolveByDate(bot, topicTitle, { title: topicTitle }, forecast.resolveByDatetime, dryRun)
+    if (!dateCheck.ok) return 'error'
+    const resolveBy = dateCheck.resolveBy
     // Cap at 1 year from now
     const maxDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     if (resolveBy > maxDate) {
