@@ -52,7 +52,7 @@ export async function callLLMWithTimeout(
       timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
       const result = await Promise.race([
-        llm.generateContent({ prompt, temperature, schema }),
+        llm.generateContent({ prompt, temperature, schema, signal: controller.signal }),
         new Promise<never>((_, reject) => {
           controller.signal.addEventListener('abort', () => {
             reject(new Error(`LLM call timeout after ${timeoutMs}ms`))

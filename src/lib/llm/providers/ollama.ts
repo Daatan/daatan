@@ -3,6 +3,11 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('llm-ollama')
 
+/** Same order of magnitude as the other fallback legs — without this, a hung
+ *  connection to the local Ollama daemon stalls the whole fallback chain
+ *  indefinitely instead of failing over to the next provider. */
+const OLLAMA_TIMEOUT_MS = 30_000
+
 export class OllamaProvider implements LLMProvider {
   name = 'Ollama'
   private baseUrl: string
@@ -14,9 +19,14 @@ export class OllamaProvider implements LLMProvider {
   }
 
   async generateContent(request: LLMRequest): Promise<LLMResponse> {
+    const signal = request.signal
+      ? AbortSignal.any([AbortSignal.timeout(OLLAMA_TIMEOUT_MS), request.signal])
+      : AbortSignal.timeout(OLLAMA_TIMEOUT_MS)
+
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
+        signal,
         headers: {
           'Content-Type': 'application/json',
         },

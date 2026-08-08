@@ -1,6 +1,11 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import { LLMProvider, LLMRequest, LLMResponse, LLMConfig } from '../types'
 
+/** Same order of magnitude as the other fallback legs (oracle.ts 60s, panel/client.ts
+ *  30s) — without this, a hung Gemini connection stalls the whole fallback chain
+ *  indefinitely instead of failing over to the next provider. */
+const GEMINI_TIMEOUT_MS = 30_000
+
 export class GeminiProvider implements LLMProvider {
   name = 'Gemini'
   private genAI: GoogleGenerativeAI
@@ -24,7 +29,10 @@ export class GeminiProvider implements LLMProvider {
       },
     })
 
-    const result = await model.generateContent(request.prompt)
+    const result = await model.generateContent(request.prompt, {
+      timeout: GEMINI_TIMEOUT_MS,
+      signal: request.signal,
+    })
     const response = result.response
     
     return {

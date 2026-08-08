@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { suggestMarketMatch } from '@/lib/services/external-markets'
 import { externalMarketsEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const log = createLogger('forecasts-suggest-market')
 
@@ -25,10 +26,15 @@ const suggestSchema = z.object({
  * so the wizard can offer to link it. Returns `{ match: null }` otherwise.
  * Best-effort — never throws on the matching path. Any signed-in user.
  */
-export const POST = withAuth(async (request) => {
+export const POST = withAuth(async (request, user) => {
   if (!externalMarketsEnabled()) {
     return NextResponse.json({ match: null })
   }
+
+  // Embeds the claim plus every keyword-filtered candidate market (uncapped) —
+  // throttle per user like the app's other AI-cost routes.
+  const rl = checkRateLimit(`suggest-market:${user.id}`, 20, 60 * 60_000)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
   const { claimText, deadline } = suggestSchema.parse(await request.json())
 

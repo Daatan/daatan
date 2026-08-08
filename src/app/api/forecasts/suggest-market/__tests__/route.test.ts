@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from '../route'
 import { suggestMarketMatch } from '@/lib/services/external-markets'
+import { resetRateLimitStore } from '@/lib/rate-limit'
 
 const ctx = { params: Promise.resolve({}) }
 
@@ -22,6 +23,7 @@ function req(body: unknown) {
 describe('POST /api/forecasts/suggest-market', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetRateLimitStore()
     mockAuth.mockResolvedValue({ user: { id: 'u1', role: 'USER' } })
   })
 

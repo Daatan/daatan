@@ -1,5 +1,10 @@
 import { LLMProvider, LLMRequest, LLMResponse, LLMConfig } from '../types'
 
+/** Same order of magnitude as the other fallback legs — without this, a hung
+ *  connection to OpenRouter stalls the whole fallback chain indefinitely
+ *  instead of failing over to the next provider. */
+const OPENROUTER_TIMEOUT_MS = 30_000
+
 export class OpenRouterProvider implements LLMProvider {
   name = 'OpenRouter'
   private apiKey: string
@@ -36,8 +41,13 @@ export class OpenRouterProvider implements LLMProvider {
       body.messages = [{ role: 'system', content: systemContent }, ...messages]
     }
 
+    const signal = request.signal
+      ? AbortSignal.any([AbortSignal.timeout(OPENROUTER_TIMEOUT_MS), request.signal])
+      : AbortSignal.timeout(OPENROUTER_TIMEOUT_MS)
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
+      signal,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
