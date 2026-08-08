@@ -80,6 +80,102 @@ jobs:
             echo "COSTEOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Query credit runway
+        id: credit_runway
+        env:
+          # Warn when the projected runway drops below this many days. Days, not
+          # dollars: the dollar figure alone says nothing without a burn rate, and
+          # the burn rate moves. Tune here.
+          RUNWAY_WARN_DAYS: '30'
+        run: |
+          # Promotional credits mask spend from every other alarm on the account
+          # (the EstimatedCharges alarms and the old budget both net against
+          # credits and read $0.00). aws_budgets_budget.gross_spend_monthly shows
+          # burn, but nothing tracks the BALANCE — this does. See #1346.
+          #
+          # start-date is deliberately far back: it filters by credit validity
+          # window, and we want every grant that could still be live.
+          aws billing get-credits \
+            --region us-east-1 \
+            --account-id "$(aws sts get-caller-identity --query Account --output text)" \
+            --start-date 2020-01-01 \
+            --output json > /tmp/credits.json 2>/tmp/credits.err || true
+
+          # Trailing-7-day gross burn, same RECORD_TYPE=Usage basis as the daily
+          # figure above, so the runway divisor matches what the report reports.
+          WEEK_AGO=$(date -u -d '7 days ago' +%Y-%m-%d)
+          TODAY=$(date -u +%Y-%m-%d)
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${WEEK_AGO},End=${TODAY}" \
+            --granularity DAILY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --output json > /tmp/burn.json 2>/dev/null || true
+
+          # Untrusted//error-prone API output goes via files, never interpolated
+          # into a python -c string — same reasoning as the steps around this one.
+          python3 -c "
+          import json, os, datetime
+          warn_days = float(os.environ['RUNWAY_WARN_DAYS'])
+
+          def out(k, v):
+              print(f'{k}={v}')
+
+          try:
+              credits = json.load(open('/tmp/credits.json'))['credits']
+          except Exception:
+              # Fail LOUD. A credits read that errors must never render as a
+              # healthy balance — that is precisely the silent-failure mode this
+              # line exists to catch.
+              err = open('/tmp/credits.err').read().strip()[:200] or 'unparseable response'
+              out('status', 'ERROR')
+              out('line', f'⚠️ credits: READ FAILED ({err})')
+              raise SystemExit(0)
+
+          now = datetime.datetime.now(datetime.timezone.utc)
+          live = 0.0
+          for c in credits:
+              # Only ENABLED and not past endDate: an expired or disabled grant's
+              # remaining balance is unusable and would overstate the runway.
+              if c.get('creditStatus') != 'ENABLED':
+                  continue
+              try:
+                  if datetime.datetime.fromisoformat(c['endDate']) <= now:
+                      continue
+              except Exception:
+                  pass
+              # estimatedAmount already deducts month-to-date accrued usage, so it
+              # is the honest input for 'days until zero'. remainingAmount lags and
+              # reads optimistically late in a month.
+              amt = c.get('estimatedAmount') or c.get('remainingAmount') or {}
+              live += float(amt.get('currencyAmount', 0) or 0)
+
+          try:
+              days = json.load(open('/tmp/burn.json'))['ResultsByTime']
+              totals = [float(d['Total']['UnblendedCost']['Amount']) for d in days]
+              burn = sum(totals) / len(totals) if totals else 0.0
+          except Exception:
+              burn = 0.0
+
+          if live <= 0:
+              out('status', 'EXHAUSTED')
+              out('line', '⚠️ <b>credits: EXHAUSTED</b> — spend is now billed in cash')
+          elif burn <= 0:
+              out('status', 'OK')
+              out('line', f'credits: \${live:,.0f} left (burn rate unavailable)')
+          else:
+              left = live / burn
+              tag = '⚠️ <b>' if left < warn_days else ''
+              end = '</b>' if left < warn_days else ''
+              eta = (now + datetime.timedelta(days=left)).strftime('%Y-%m-%d')
+              out('status', 'WARN' if left < warn_days else 'OK')
+              out('line', f'{tag}credits: \${live:,.0f} left ≈ {left:.0f}d at \${burn:,.0f}/d (~{eta}){end}')
+          " >> "$GITHUB_OUTPUT"
+
+          echo "--- credit runway step output ---"
+          grep -E '^(status|line)=' "$GITHUB_OUTPUT" | tail -2
+
       - name: Query OpenRouter spend
         id: openrouter_cost
         run: |
@@ -117,13 +213,19 @@ jobs:
           YDAY: ${{ steps.aws_cost.outputs.yday }}
           AWS_TOTAL: ${{ steps.aws_cost.outputs.total }}
           AWS_TOP: ${{ steps.aws_cost.outputs.top_services }}
+          CREDIT_LINE: ${{ steps.credit_runway.outputs.line }}
           OR_DAILY: ${{ steps.openrouter_cost.outputs.daily }}
           OR_WEEKLY: ${{ steps.openrouter_cost.outputs.weekly }}
           OR_REMAINING: ${{ steps.openrouter_cost.outputs.remaining }}
         run: |
           AWS_TOP_LINES=$(echo "$AWS_TOP" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
 
-          MSG="💰 <b>Daily cost report — ${YDAY}</b>%0A%0A<b>AWS (gross): \$${AWS_TOTAL}</b>%0A${AWS_TOP_LINES}%0A%0A<b>OpenRouter:</b>%0A  today: \$${OR_DAILY} · this week: \$${OR_WEEKLY} (remaining: \$${OR_REMAINING})"
+          # An empty credit line means the step did not produce output at all —
+          # say so rather than dropping the line silently, which would look
+          # identical to a healthy balance.
+          CREDIT_TEXT="${CREDIT_LINE:-⚠️ credits: NO DATA (runway step produced no output)}"
+
+          MSG="💰 <b>Daily cost report — ${YDAY}</b>%0A%0A<b>AWS (gross): \$${AWS_TOTAL}</b>%0A${AWS_TOP_LINES}%0A%0A  ${CREDIT_TEXT}%0A%0A<b>OpenRouter:</b>%0A  today: \$${OR_DAILY} · this week: \$${OR_WEEKLY} (remaining: \$${OR_REMAINING})"
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
