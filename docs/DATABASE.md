@@ -70,9 +70,14 @@ The central table (`Prediction`). Field groups:
   `awaitingAiResolution` are a **denormalized cache of the latest
   ContextSnapshot**, maintained only by the `recordEstimate` funnel (below).
   `confidence` predates the funnel as "bot metadata" — treat it as the current
-  AI probability, not a bot field. `awaitingAiResolution` is level-based
-  (set while `confidence` ≥ 90 or ≤ 10, recomputed on every write, never
-  sticky) and only affects the Awaiting-Resolution tab, never `status`.
+  AI probability, not a bot field. `awaitingAiResolution` is level-based for
+  organic estimates (set while `confidence` ≥ 90 or ≤ 10, recomputed on every
+  write, never sticky) and only affects the Awaiting-Resolution tab, never
+  `status`. A **settlement pin** is its own class (daatan#1248): its
+  `confidence` is the Oracle's `settlement_stance` constant (~97), not a level,
+  so a pinned write enters the band only when its snapshot pool carries ≥2
+  settling votes — an unverifiable pin sets the flag false and skips the
+  high-confidence Telegram alert.
 - **Settlement latch**: `settled`/`settledAt` — set when the Oracle reports the
   outcome as an accomplished fact (≥2 independent sources). **One-way**: only
   ever set true by the funnel; a later unsettled run does not clear it; human

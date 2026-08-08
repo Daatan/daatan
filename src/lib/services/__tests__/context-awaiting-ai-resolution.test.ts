@@ -184,4 +184,56 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
       expect(updatedData().awaitingAiResolution).toBe(false)
     })
   })
+
+  describe('settlement pins are their own class (daatan#1248)', () => {
+    // A pin's confidence is settlement_stance (~97), a policy constant — it
+    // clears any level band by construction. So a pin enters the band as a
+    // settlement claim, gated on the settling votes its own snapshot carries,
+    // and never via the level check.
+    const pinInput = (settlingRows: Array<boolean | null>) => ({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: {
+        sources: settlingRows.map((settled, i) => ({ source: `outlet-${i}`, settled })),
+      },
+    })
+
+    it('a pin backed by two settling votes enters the band', async () => {
+      await saveNewsIndexerMatch(pinInput([true, true, null]))
+      expect(updatedData().awaitingAiResolution).toBe(true)
+    })
+
+    it('a pin with a single settling vote does not enter the band', async () => {
+      await saveNewsIndexerMatch(pinInput([true, false, null]))
+      expect(updatedData().awaitingAiResolution).toBe(false)
+    })
+
+    it('a pin without its snapshot fails closed', async () => {
+      await saveNewsIndexerMatch({ ...matchInput(97), settled: true, oracleSnapshot: {} })
+      expect(updatedData().awaitingAiResolution).toBe(false)
+    })
+
+    it('a malformed sources payload counts as zero settling votes', async () => {
+      await saveNewsIndexerMatch({
+        ...matchInput(97),
+        settled: true,
+        oracleSnapshot: { sources: 'not-an-array' },
+      })
+      expect(updatedData().awaitingAiResolution).toBe(false)
+    })
+
+    it('an organic 97 still enters via the level band', async () => {
+      await saveNewsIndexerMatch(matchInput(97))
+      expect(updatedData().awaitingAiResolution).toBe(true)
+    })
+
+    it('settling rows without the settled verdict do not change the level band', async () => {
+      // settled=false + settling rows: not a pin — 55 stays inside the band.
+      await saveNewsIndexerMatch({
+        ...matchInput(55),
+        oracleSnapshot: { sources: [{ source: 'a', settled: true }, { source: 'b', settled: true }] },
+      })
+      expect(updatedData().awaitingAiResolution).toBe(false)
+    })
+  })
 })
