@@ -2,7 +2,7 @@
 FROM node:24-bookworm-slim AS builder
 
 # Install OpenSSL for Prisma during build
-RUN apt-get update && apt-get install -y openssl libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl-dev && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -60,7 +60,7 @@ CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 FROM node:24-bookworm-slim AS runner
 
 # Install OpenSSL for Prisma and wget for health checks
-RUN apt-get update && apt-get install -y openssl wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

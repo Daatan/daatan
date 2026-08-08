@@ -66,7 +66,14 @@ jobs:
           SKIP_ENV_VALIDATION: 1
         run: npm test
 
+      # Only needed on PRs: they're the only event where the Docker build below
+      # is skipped, so this is the sole build-correctness check. On push/tag/
+      # workflow_dispatch, the Dockerfile runs its own npm ci + build — running
+      # it again here first is pure duplicate work (~1.5min/push measured
+      # 2026-08-08, daatan#1315). A broken build still fails the job either
+      # way; on push it just surfaces during the Docker build step instead.
       - name: Cache Next.js build
+        if: github.event_name == 'pull_request'
         uses: actions/cache@v5
         with:
           path: .next/cache
@@ -76,6 +83,7 @@ jobs:
             ${{ runner.os }}-nextjs-
 
       - name: Build application
+        if: github.event_name == 'pull_request'
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
