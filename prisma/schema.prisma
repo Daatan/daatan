@@ -439,6 +439,13 @@ model Prediction {
   externalMarket           ExternalMarket? @relation(fields: [externalMarketId], references: [id], onDelete: SetNull)
   externalMarketLinkedAt   DateTime?       @map("external_market_linked_at")
   externalMarketLinkMethod String?         @map("external_market_link_method") @db.VarChar(20) // 'manual' | 'ai-confirmed' | 'imported'
+
+  // daatan#1318: set true when the AI moderation check threw (timeout, provider
+  // outage, malformed response) instead of returning a verdict. The content is
+  // still published (no hard block on a transient provider error) but flagged
+  // so an admin can manually review it — checkContent() never silently treats
+  // an error as "checked and clean".
+  moderationCheckFailed Boolean @default(false) @map("moderation_check_failed")
   // The linked market asks the OPPOSITE question (e.g. claim "X will not win" vs
   // market "Will X win?"). Per-prediction, not per-market: two forecasts may link
   // the same market in opposite directions. UI plots 100 − price when set.
@@ -1239,6 +1246,10 @@ model Comment {
 
   // Soft delete
   deletedAt DateTime?
+
+  // daatan#1318: see Prediction.moderationCheckFailed — same fail-flagged-not-
+  // fail-open semantics for comments.
+  moderationCheckFailed Boolean @default(false) @map("moderation_check_failed")
 
   // Relations
   reactions    CommentReaction[]

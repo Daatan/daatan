@@ -259,6 +259,8 @@ export interface CreateForecastInput {
   tags?: string[]
   /** When the forecast was created by importing an external market (PM/Kalshi), link it. */
   externalMarketId?: string
+  /** daatan#1318: checkContent() threw instead of returning a verdict — flag for manual review. */
+  moderationCheckFailed?: boolean
 }
 
 export async function createForecast(input: CreateForecastInput) {
@@ -314,6 +316,7 @@ export async function createForecast(input: CreateForecastInput) {
           externalMarketId: input.externalMarketId,
           externalMarketLinkedAt: input.externalMarketId ? new Date() : undefined,
           externalMarketLinkMethod: input.externalMarketId ? 'imported' : undefined,
+          moderationCheckFailed: input.moderationCheckFailed ?? false,
           shareToken,
           tags: input.tags?.length
             ? {

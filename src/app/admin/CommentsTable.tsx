@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, Search, Trash2 } from 'lucide-react'
+import { Loader2, Search, Trash2, AlertCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { createClientLogger } from '@/lib/client-logger'
 import { toast } from 'react-hot-toast'
@@ -12,6 +12,7 @@ type AdminComment = {
   text: string
   createdAt: string
   deletedAt: string | null
+  moderationCheckFailed?: boolean
   author: { id: string; name: string | null; username: string | null; image: string | null }
   prediction: { id: string; slug?: string; claimText: string } | null
   _count: { replies: number; reactions: number }
@@ -109,7 +110,18 @@ export default function CommentsTable() {
               <tbody className="divide-y divide-gray-100">
                 {comments.map((c) => (
                   <tr key={c.id} className={`hover:bg-navy-800 transition-colors ${c.deletedAt ? 'opacity-50' : ''}`}>
-                    <td className="p-3 max-w-md truncate">{c.text}</td>
+                    <td className="p-3 max-w-md truncate">
+                      {c.moderationCheckFailed && (
+                        <span
+                          className="inline-flex items-center gap-1 mr-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700"
+                          title="AI moderation check failed for this content — review it manually"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          Needs review
+                        </span>
+                      )}
+                      {c.text}
+                    </td>
                     <td className="p-3 text-sm">{c.author.name}</td>
                     <td className="p-3 text-sm max-w-xs truncate">{c.prediction?.claimText || 'N/A'}</td>
                     <td className="p-3 text-right text-xs text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>

@@ -74,6 +74,8 @@ export type Prediction = {
   confidence?: number | null
   aiCiLow?: number | null
   aiCiHigh?: number | null
+  /** daatan#1318: AI moderation check errored instead of returning a verdict — needs manual review. */
+  moderationCheckFailed?: boolean | null
 }
 
 interface ForecastCardProps {
@@ -386,6 +388,16 @@ export default function ForecastCard({
               >
                 {badge.icon}
                 {badge.label}
+              </span>
+            )}
+
+            {showModerationControls && prediction.moderationCheckFailed && (
+              <span
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-red-100 text-red-700"
+                title="AI moderation check failed for this content — review it manually"
+              >
+                <AlertCircle className="w-3 h-3" />
+                Needs review
               </span>
             )}
 
