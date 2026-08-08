@@ -7,6 +7,9 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 // Mock dns to return private IPs for some domains
+const mockAaaaIps: Record<string, string[]> = {
+    'aaaa-only-private.example.com': ['fc00::1'],
+}
 vi.mock('dns', () => ({
     default: {
         resolve4: (hostname: string, callback: (err: NodeJS.ErrnoException | null, addresses: string[]) => void) => {
@@ -20,8 +23,18 @@ vi.mock('dns', () => ({
             }
             if (hostname in mockIps) {
                 callback(null, mockIps[hostname])
+            } else if (hostname in mockAaaaIps) {
+                // Simulates a real AAAA-only domain: no A record.
+                callback(new Error('ENODATA') as NodeJS.ErrnoException, [])
             } else {
                 callback(null, ['9.9.9.9'])
+            }
+        },
+        resolve6: (hostname: string, callback: (err: NodeJS.ErrnoException | null, addresses: string[]) => void) => {
+            if (hostname in mockAaaaIps) {
+                callback(null, mockAaaaIps[hostname])
+            } else {
+                callback(new Error('ENODATA') as NodeJS.ErrnoException, [])
             }
         }
     }
@@ -63,6 +76,21 @@ describe('fetchUrlContent SSRF Protection', () => {
 
     it('rejects CG-NAT IP directamente', async () => {
         await expect(fetchUrlContent('https://100.64.0.1/test')).rejects.toThrow('Fetching internal or private IPs is forbidden')
+        expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects a bracketed IPv6 loopback literal directly (daatan#1317)', async () => {
+        await expect(fetchUrlContent('https://[::1]/admin')).rejects.toThrow('Fetching internal or private IPs is forbidden')
+        expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects a bracketed IPv6 unique-local literal directly', async () => {
+        await expect(fetchUrlContent('https://[fc00::1]/test')).rejects.toThrow('Fetching internal or private IPs is forbidden')
+        expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects a domain whose only record is a private AAAA (no A record)', async () => {
+        await expect(fetchUrlContent('https://aaaa-only-private.example.com/api')).rejects.toThrow('Resolved domain points to a private/internal IP')
         expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -174,6 +202,14 @@ describe('isPrivateIP (exported)', () => {
   it('returns true for IPv4-mapped IPv6 with private address', () => {
     expect(isPrivateIP('::ffff:192.168.1.1')).toBe(true)
     expect(isPrivateIP('::ffff:127.0.0.1')).toBe(true)
+  })
+
+  it('returns true for bracketed IPv6 literals, matching URL.hostname\'s format (daatan#1317)', () => {
+    expect(isPrivateIP('[::1]')).toBe(true)
+    expect(isPrivateIP('[fe80::1]')).toBe(true)
+    expect(isPrivateIP('[fc00::1]')).toBe(true)
+    expect(isPrivateIP('[::ffff:127.0.0.1]')).toBe(true)
+    expect(isPrivateIP('[2001:db8::1]')).toBe(false) // bracketed but public
   })
 
   it('returns true for IPv6 link-local fe80::/10', () => {

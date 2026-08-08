@@ -4,9 +4,18 @@ import util from 'util'
 
 const log = createLogger('scraper')
 const resolve4 = util.promisify(dns.resolve4)
+const resolve6 = util.promisify(dns.resolve6)
 
 // Check if an IP address is in a private/local range
 export function isPrivateIP(ip: string): boolean {
+  // URL.hostname brackets IPv6 literals (e.g. new URL('https://[::1]/').hostname
+  // === '[::1]'). Strip them first so every check below — loopback, link-local,
+  // unique-local, IPv4-mapped — actually matches; otherwise a bracketed literal
+  // skips every branch here and this function wrongly reports it as public.
+  if (ip.startsWith('[') && ip.endsWith(']')) {
+    ip = ip.slice(1, -1)
+  }
+
   // IPv4 mapped IPv6 addresses
   if (ip.startsWith('::ffff:')) {
     ip = ip.substring(7)
@@ -90,18 +99,26 @@ async function assertSafeUrl(rawUrl: string): Promise<void> {
   if (isPrivateIP(parsedUrl.hostname) || parsedUrl.hostname === 'localhost') {
     throw new Error('Fetching internal or private IPs is forbidden')
   }
-  try {
-    const ips = await resolve4(parsedUrl.hostname)
-    for (const ip of ips) {
-      if (isPrivateIP(ip)) {
-        throw new Error('Resolved domain points to a private/internal IP')
+  // Check both A and AAAA records: a domain with no A record but a private
+  // AAAA record (e.g. pointing at ::1 or an fc00::/7 address) would otherwise
+  // pass this check (resolve4 fails, swallowed below as a genuine DNS miss)
+  // and then fetch() — which does support IPv6 — would connect via the
+  // unchecked AAAA record anyway.
+  for (const resolver of [resolve4, resolve6]) {
+    try {
+      const ips = await resolver(parsedUrl.hostname)
+      for (const ip of ips) {
+        if (isPrivateIP(ip)) {
+          throw new Error('Resolved domain points to a private/internal IP')
+        }
       }
-    }
-  } catch (dnsErr) {
-    // Our own violation bubbles up; a genuine DNS-resolution failure is left
-    // for fetch() to surface as a network error.
-    if (dnsErr instanceof Error && dnsErr.message.includes('Resolved domain')) {
-      throw dnsErr
+    } catch (dnsErr) {
+      // Our own violation bubbles up; a genuine DNS-resolution failure (no
+      // record of this type) is left for fetch() to surface as a network
+      // error, or is caught by the other resolver's iteration.
+      if (dnsErr instanceof Error && dnsErr.message.includes('Resolved domain')) {
+        throw dnsErr
+      }
     }
   }
 }
