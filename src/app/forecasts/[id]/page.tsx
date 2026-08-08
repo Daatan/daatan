@@ -169,6 +169,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!prediction) {
     return {
       title: 'Forecast Not Found',
+      robots: { index: false, follow: false },
     }
   }
 

@@ -129,7 +129,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
   })
 
-  if (!prediction) return { title: 'Forecast Not Found' }
+  if (!prediction) return { title: 'Forecast Not Found', robots: { index: false, follow: false } }
 
   const slug = prediction.slug || prediction.id
   const noIndexStatuses = ['DRAFT', 'PENDING_APPROVAL', 'VOID', 'UNRESOLVABLE']
