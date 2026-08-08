@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/Button'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { PrimaryLink } from '@/components/ui/PrimaryLink'
 import { createClientLogger } from '@/lib/client-logger'
-import { toLocalDatetimeInput } from '@/lib/utils/date'
+import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
+import { isDeadlineDivergent } from '@/lib/utils/deadline-divergence'
 
 const log = createClientLogger('EditForecast')
 
@@ -38,6 +39,9 @@ interface Prediction {
   detailsText: string | null
   resolutionRules: string | null
   resolveByDatetime: string
+  /** LLM-parsed from claimText by the temporal classifier; null until classified
+   *  or when the claim carries no deadline language. daatan#1234. */
+  claimDeadline?: string | null
   status: string
   isPublic: boolean
   userId: string
@@ -121,6 +125,16 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
     setSaveSuccess(false)
     setSaveError(null)
   }
+
+  // Live against the field being edited, not the last-saved value, so adjusting
+  // Resolve By clears (or introduces) the warning immediately (daatan#1234).
+  const claimDeadline = prediction?.claimDeadline ? new Date(prediction.claimDeadline) : null
+  const resolveByDate = formData.resolveByDatetime ? new Date(formData.resolveByDatetime) : null
+  const deadlineDivergent =
+    claimDeadline !== null &&
+    resolveByDate !== null &&
+    !Number.isNaN(resolveByDate.getTime()) &&
+    isDeadlineDivergent(claimDeadline, resolveByDate, new Date())
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...formData.options]
@@ -364,6 +378,12 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
             <Info className="w-3 h-3" />
             Predictions are usually resolved within 24 hours of this date.
           </p>
+          {deadlineDivergent && claimDeadline && (
+            <div className="mt-2 flex items-start gap-2 text-left text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{f('deadlineDivergenceWarning', { claimDeadline: formatDisplayDate(claimDeadline) })}</span>
+            </div>
+          )}
         </div>
 
         {/* Visibility */}

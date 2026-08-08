@@ -7,6 +7,7 @@ import {
 } from '@/lib/services/context'
 import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
+import { isDeadlineDivergent, DEADLINE_AGREEMENT_TOLERANCE_MS } from '@/lib/utils/deadline-divergence'
 import {
   notifyDeadlinePassedQuietly,
   notifyPendingPastDeadline,
@@ -23,9 +24,11 @@ export const TEMPORAL_ENGINE_VERSION = 'glide-v1'
 export const PIN_LOW = 3
 export const PIN_HIGH = 97
 
-/** claimDeadline (LLM-parsed) vs resolveByDatetime (platform-authoritative) must
- *  agree within this window, or both must already be in the past, to hard-pin. */
-export const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
+// DEADLINE_AGREEMENT_TOLERANCE_MS re-exported below for existing importers
+// (temporal-clock.math.test.ts) — the canonical definition now lives in
+// deadline-divergence.ts so a client component can share it without pulling
+// in this module's server-only deps (daatan#1234).
+export { DEADLINE_AGREEMENT_TOLERANCE_MS }
 
 /** Keeps the glide continuous as c -> 0: 0 and 1 are degenerate bases for a pure
  *  power-law interpolation (0^c stays 0 for all c>0, only jumping to 1 exactly
@@ -85,9 +88,7 @@ export function computeRequote(input: RequoteInput): RequoteResult | null {
   const { pLast, tLast, now, claimDeadline, resolveByDatetime, tauLeadDays, direction } = input
 
   const claimPassed = claimDeadline.getTime() <= now.getTime()
-  const resolvePassed = resolveByDatetime.getTime() <= now.getTime()
-  const deltaMs = Math.abs(claimDeadline.getTime() - resolveByDatetime.getTime())
-  const divergent = deltaMs > DEADLINE_AGREEMENT_TOLERANCE_MS && !(claimPassed && resolvePassed)
+  const divergent = isDeadlineDivergent(claimDeadline, resolveByDatetime, now)
 
   const horizon = divergent
     ? new Date(Math.max(claimDeadline.getTime(), resolveByDatetime.getTime()))

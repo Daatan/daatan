@@ -178,6 +178,7 @@
     "legendAI": "AI",
     "settledPinNotice": "The Oracle reads this question as already decided — this number is a settlement pin, not a pooled average of the sources.",
     "settledPinSources": "Reported as decided by: {names}",
+    "deadlineDivergenceWarning": "The claim text implies a deadline of {claimDeadline}, which disagrees with the Resolve By date above. Consider aligning them.",
     "aiInsufficientEvidence": "Insufficient evidence",
     "temporalClockAnnotation": "includes time-remaining adjustment — deadline in {days} days",
     "signInToVote": "Sign in to vote",
