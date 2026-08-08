@@ -86,7 +86,7 @@ jobs:
           # Warn when the projected runway drops below this many days. Days, not
           # dollars: the dollar figure alone says nothing without a burn rate, and
           # the burn rate moves. Tune here.
-          RUNWAY_WARN_DAYS: '30'
+          RUNWAY_WARN_DAYS: '90'   # TEMP: forcing WARN to verify the alert path
         run: |
           # Promotional credits mask spend from every other alarm on the account
           # (the EstimatedCharges alarms and the old budget both net against
