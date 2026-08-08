@@ -815,6 +815,8 @@ export default function ForecastDetailClient({
         predictionStatus={prediction.status}
         outcomeType={prediction.outcomeType}
         options={prediction.options}
+        settled={prediction.settled}
+        confidence={prediction.confidence}
       />
 
       {/* Admin-only false-settlement override (renders nothing unless settled) */}

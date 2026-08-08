@@ -146,6 +146,10 @@ export const resolvePredictionSchema = z.object({
   resolutionNote: z.string().max(2000).optional(),
   // For multiple choice: which option was correct
   correctOptionId: z.string().cuid().optional(),
+  // daatan#1234 check #2: resolver's explicit acknowledgment that a settlement
+  // pin / extreme AI confidence contradicts this outcome. Ignored when no
+  // contradiction exists; required (server-enforced) when one does.
+  resolutionOverrodePin: z.boolean().optional(),
 })
 
 export const rejectForecastSchema = z.object({

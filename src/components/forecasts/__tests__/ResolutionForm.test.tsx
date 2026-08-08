@@ -223,4 +223,77 @@ describe('ResolutionForm', () => {
     expect(Number(localStorage.getItem('daatan:timing:resolve-scoring'))).toBe(1320)
     expect(Number(localStorage.getItem('daatan:timing:resolve-updating'))).toBe(720)
   })
+
+  // daatan#1234 check #2
+  describe('pin-acknowledgment gate', () => {
+    it('does not show the banner when the outcome agrees with the pin', () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} settled confidence={3} />)
+
+      fireEvent.click(screen.getByText('Wrong'))
+      expect(screen.queryByText(/reviewed the disagreement/i)).not.toBeInTheDocument()
+    })
+
+    it('shows the banner and disables submit until acknowledged when settled contradicts the outcome', () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} settled confidence={3} />)
+
+      fireEvent.click(screen.getByText('Correct'))
+      expect(screen.getByText(/settled this forecast as an accomplished fact/i)).toBeInTheDocument()
+      const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+      expect(submitButton).toBeDisabled()
+
+      fireEvent.click(screen.getByRole('checkbox'))
+      expect(submitButton).not.toBeDisabled()
+    })
+
+    it('shows the extreme-confidence wording (not the settled wording) when unsettled but extreme', () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} confidence={95} />)
+
+      fireEvent.click(screen.getByText('Wrong'))
+      expect(screen.getByText(/current confidence is extreme/i)).toBeInTheDocument()
+    })
+
+    it('resets acknowledgment when the outcome selection changes', () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} settled confidence={3} />)
+
+      fireEvent.click(screen.getByText('Correct'))
+      fireEvent.click(screen.getByRole('checkbox'))
+      const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+      expect(submitButton).not.toBeDisabled()
+
+      fireEvent.click(screen.getByText('Wrong'))
+      fireEvent.click(screen.getByText('Correct'))
+      expect(submitButton).toBeDisabled()
+    })
+
+    it('sends resolutionOverrodePin: true once acknowledged', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} settled confidence={3} />)
+
+      fireEvent.click(screen.getByText('Correct'))
+      fireEvent.click(screen.getByRole('checkbox'))
+      const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+      fireEvent.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled()
+        const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(callBody.resolutionOverrodePin).toBe(true)
+      })
+    })
+
+    it('does not gate MULTIPLE_CHOICE resolutions even with settled + extreme confidence', () => {
+      render(
+        <ResolutionForm
+          predictionId="pred-1"
+          outcomeType="MULTIPLE_CHOICE"
+          options={[{ id: 'o1', text: 'Option A' }]}
+          settled
+          confidence={3}
+        />,
+      )
+
+      fireEvent.click(screen.getByText('Correct'))
+      expect(screen.queryByText(/reviewed the disagreement/i)).not.toBeInTheDocument()
+    })
+  })
 })

@@ -12,13 +12,17 @@ interface ModeratorResolutionSectionProps {
   predictionStatus: string
   outcomeType: string
   options: Array<{ id: string; text: string }>
+  settled?: boolean
+  confidence?: number | null
 }
 
 export function ModeratorResolutionSection({
   predictionId,
   predictionStatus,
   outcomeType,
-  options
+  options,
+  settled,
+  confidence
 }: ModeratorResolutionSectionProps) {
   const { data: session } = useSession()
   const router = useRouter()
@@ -54,6 +58,8 @@ export function ModeratorResolutionSection({
             predictionId={predictionId}
             outcomeType={outcomeType}
             options={options}
+            settled={settled}
+            confidence={confidence}
             onResolved={() => router.refresh()}
           />
         </div>

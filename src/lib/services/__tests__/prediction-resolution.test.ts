@@ -318,3 +318,67 @@ describe('resolvePrediction — calibration record', () => {
   })
 })
 
+/**
+ * daatan#1234 check #2 — recomputed server-side (never trusts the client's
+ * checkbox), so a direct API call can't bypass it and poison a future
+ * calibration-record marking with an unacknowledged disagreement.
+ */
+describe('resolvePrediction — pin-acknowledgment gate', () => {
+  it('rejects a contradicting resolution when unacknowledged', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: true, confidence: 3 }) as never)
+
+    await expect(
+      resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' }),
+    ).rejects.toMatchObject({ statusCode: 400 })
+    expect(transaction).not.toHaveBeenCalled()
+  })
+
+  it('proceeds when the contradiction is explicitly acknowledged, and persists the flag', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: true, confidence: 3 }) as never)
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin', resolutionOverrodePin: true })
+
+    expect(tx.prediction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ resolutionOverrodePin: true }) }),
+    )
+  })
+
+  it('does not gate a resolution that agrees with the pin', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: true, confidence: 3 }) as never)
+
+    await resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin' })
+
+    expect(tx.prediction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ resolutionOverrodePin: null }) }),
+    )
+  })
+
+  it('does not gate when there is no pin or extreme confidence at all', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: false, confidence: 55 }) as never)
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
+
+    expect(tx.prediction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ resolutionOverrodePin: null }) }),
+    )
+  })
+
+  it('does not gate MULTIPLE_CHOICE resolutions even with a contradicting pin', async () => {
+    findUnique.mockResolvedValue(
+      prediction({
+        outcomeType: 'MULTIPLE_CHOICE',
+        options: [{ id: 'o1' }, { id: 'o2' }],
+        settled: true,
+        confidence: 3,
+        commitments: [],
+      }) as never,
+    )
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin', correctOptionId: 'o1' })
+
+    expect(tx.prediction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ resolutionOverrodePin: null }) }),
+    )
+  })
+})
+
