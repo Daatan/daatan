@@ -33,10 +33,13 @@ export async function createAndStake(
   let stakeAmount: number | null = null
 
   if (bot.requireApprovalForForecasts) {
-    prediction = await prisma.prediction.create({ data: predictionCreateData })
-    await prisma.prediction.update({
-      where: { id: prediction.id },
-      data: { status: publishStatus, publishedAt: new Date() },
+    prediction = await prisma.$transaction(async (tx) => {
+      const pred = await tx.prediction.create({ data: predictionCreateData })
+      await tx.prediction.update({
+        where: { id: pred.id },
+        data: { status: publishStatus, publishedAt: new Date() },
+      })
+      return pred
     })
   } else {
     const stake = randomInt(bot.stakeMin, bot.stakeMax)
