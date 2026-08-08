@@ -241,8 +241,39 @@ export function toClaimsDetail(v: unknown): OracleClaimDetail[] | null {
  * election matrix) that don't diff against a prior snapshot; `resolvePooledEstimate` passes
  * the real comparison.
  */
+export type PoolArticleSnapshotRow = Pick<
+  EvidencePoolArticle,
+  | 'id'
+  | 'source'
+  | 'url'
+  | 'stance'
+  | 'certainty'
+  | 'credibilityWeight'
+  | 'claims'
+  | 'title'
+  | 'publishedDate'
+  | 'personId'
+  | 'personName'
+  | 'outletId'
+  | 'outletName'
+  | 'settled'
+  | 'settlementEventDate'
+  | 'quantitativeEstimate'
+  | 'evidenceWeight'
+  | 'relevanceScore'
+  | 'evidenceClass'
+  | 'authorLean'
+  | 'authorLeanCertainty'
+  | 'factSignal'
+  | 'eventActors'
+  | 'eventTarget'
+  | 'isOccurrence'
+  | 'verified'
+  | 'claimsDetail'
+>
+
 export function poolArticleToEnrichedSource(
-  row: EvidencePoolArticle,
+  row: PoolArticleSnapshotRow,
   author: string | null,
   carriedForward = false,
 ): EnrichedOracleSource {
