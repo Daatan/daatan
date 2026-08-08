@@ -27,6 +27,9 @@ export type ContributingSource = {
   outcome: string | null
   /** Which stream surfaced this source. 'both' = analysed AND indexed. */
   origin?: 'oracle' | 'indexer' | 'both'
+  /** This source reported the outcome as already decided — it supports the Oracle's
+   *  settlement pin (#1250). Only oracle-origin rows carry it; null = unknown. */
+  settled?: boolean | null
   /** Resolved outlet identity (news-indexer outlet.name), for linking to /sources/[name] —
    *  distinct from `source`, which is a raw display string and not a stable identity. Null
    *  when the by-url identity lookup has no match (unresolved byline, or an oracle-only
@@ -70,6 +73,7 @@ export async function getContributingSources(forecastId: string): Promise<Contri
         origin: 'indexer' as const,
         outletName: metaByUrl.get(r.url)?.outletName ?? null,
         personName: metaByUrl.get(r.url)?.personName ?? null,
+        settled: r.settled ?? null,
       })),
     )
   } catch (err) {
@@ -185,6 +189,7 @@ export async function getForecastVoters(forecastId: string): Promise<Contributin
       // indexer row always matches the pair that survives this merge.
       personName: existing.personName ?? s.personName,
       authorLinkable: existing.authorLinkable || s.authorLinkable,
+      settled: existing.settled ?? s.settled ?? null,
       origin: 'both',
     })
   }

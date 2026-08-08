@@ -20,6 +20,7 @@ import {
   Info,
   Share2,
   PenLine,
+  Gavel,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useTranslations, useLocale } from 'next-intl'
@@ -27,7 +28,7 @@ import { ModeratorResolutionSection } from './ModeratorResolutionSection'
 import CommentThread, { type Comment } from '@/components/comments/CommentThread'
 import ConfidenceSlider from '@/components/forecasts/ConfidenceSlider'
 import Speedometer from '@/components/forecasts/Speedometer'
-import ContextTimeline, { type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import ContextTimeline, { settlingSourceNames, type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import { RoleBadge } from '@/components/RoleBadge'
 import { UserLink } from '@/components/UserLink'
 import { ForecastInfoPanel } from './_forecast/ForecastInfoPanel'
@@ -489,6 +490,13 @@ export default function ForecastDetailClient({
           // hide the needle and show "Insufficient evidence".
           const aiAbstained = aiEstimate ? !!aiEstimate.abstained : !!initialContextSnapshots?.[0]?.insufficientData
           const aiVal = aiAbstained ? null : (aiEstimate?.probability ?? prediction.confidence ?? null)
+          // Settlement pin (#1250): the Oracle read the question as already
+          // decided and REPLACED the pooled estimate with a pinned constant.
+          // Same freshness rule as aiAbstained — an in-page analyze run's
+          // aiEstimate overrides the server-prefetched latest snapshot.
+          const latestOracle = initialContextSnapshots?.[0]?.oracleSnapshot ?? null
+          const aiSettled = !aiAbstained && (aiEstimate ? !!aiEstimate.settled : !!latestOracle?.settled)
+          const settlerNames = aiSettled ? settlingSourceNames(latestOracle) : []
 
           return (
             <div className="flex flex-col items-center">
@@ -531,6 +539,25 @@ export default function ForecastDetailClient({
                     </div>
                   )}
                 </div>
+
+                {/* Settlement-pin indicator (#1250): the AI number above is a pin,
+                    not a pooled average — say so, and name the settling sources. */}
+                {aiSettled && (
+                  <div
+                    className="mt-4 w-full flex items-start gap-2 text-left text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2"
+                    data-testid="settled-pin-notice"
+                  >
+                    <Gavel className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p>
+                      {t('settledPinNotice')}
+                      {settlerNames.length > 0 && (
+                        <span className="block mt-0.5 text-amber-200/80">
+                          {t('settledPinSources', { names: settlerNames.join(', ') })}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
 
                 {/* Temporal-clock annotation: only for diffuse-deadline claims the
                     daily glide actually prices (retro docs/TEMPORAL_MODEL_PLAN.md). */}

@@ -286,6 +286,55 @@ describe('ContextTimeline', () => {
     expect(screen.queryByTestId('oracle-sources')).toBeNull()
     expect(screen.queryByText('Reuters')).toBeNull()
     expect(screen.queryByText('Random Blog')).toBeNull()
+
+    // Not a settlement pin — no settled badge or note (#1250).
+    expect(screen.queryByText(enMessages.context.settledBadge)).toBeNull()
+    expect(screen.queryByTestId('settled-pin-note')).toBeNull()
+  })
+
+  it('shows the settlement-pin badge and names only the settling sources when the snapshot is settled (#1250)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        currentContext: 'Pinned context',
+        contextUpdatedAt: '2026-08-01T10:00:00Z',
+        snapshots: [
+          {
+            id: 's1',
+            summary: 'Pinned context',
+            sources: [],
+            createdAt: '2026-08-01T10:00:00Z',
+            externalProbability: 97,
+            externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
+            oracleSnapshot: {
+              mean: 97,
+              std: 3,
+              ciLow: 91,
+              ciHigh: 100,
+              articlesUsed: 12,
+              settled: true,
+              sources: [
+                { sourceId: 'a', sourceName: 'RFE/RL', url: 'https://rferl.org/x', stance: 0.9, certainty: 0.9, credibilityWeight: 1, claims: [], settled: true },
+                { sourceId: 'b', sourceName: 'Reuters', url: 'https://reuters.com/z', stance: 0.1, certainty: 0.5, credibilityWeight: 1, claims: [], settled: false },
+              ],
+            },
+          },
+        ],
+      }),
+    })
+
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+    openSection()
+
+    await waitFor(() => {
+      expect(screen.getByText(enMessages.context.settledBadge)).toBeInTheDocument()
+    })
+    const note = screen.getByTestId('settled-pin-note')
+    expect(note).toHaveTextContent(enMessages.context.settledNote)
+    expect(note).toHaveTextContent('RFE/RL')
+    expect(note).not.toHaveTextContent('Reuters')
   })
 
   it('omits the Oracle sources sub-section when oracleSnapshot is null', async () => {

@@ -176,6 +176,8 @@
     "filterByTagTooltip": "Foliumi prognozojn kun la etikedo \"{tag}\"",
     "legendYou": "Vi",
     "legendAI": "AI",
+    "settledPinNotice": "La Orakolo legas ĉi tiun demandon kiel jam deciditan — ĉi tiu nombro estas decid-fikso, ne kunigita meznombro de la fontoj.",
+    "settledPinSources": "Raportas la rezulton kiel jam deciditan: {names}",
     "aiInsufficientEvidence": "Nesufiĉaj pruvoj",
     "temporalClockAnnotation": "inkluzivas alĝustigon laŭ la restanta tempo — templimo post {days} tagoj",
     "signInToVote": "Ensalutu por voĉdoni",
@@ -505,6 +507,10 @@
     "stepEstimating": "Taksante verŝajnecon...",
     "updated": "Kunteksto ĝisdatigita!",
     "failed": "Malsukcesis analizi kuntekston",
+    "settledBadge": "Decidita",
+    "settledHint": "Decid-fikso — la Orakolo legas la demandon kiel jam deciditan, do ĉi tiu nombro anstataŭas la kunigitan takson anstataŭ mezumi ĝin.",
+    "settledNote": "La Orakolo legas ĉi tiun demandon kiel jam deciditan — la kunigita takso estis anstataŭigita per decid-fikso.",
+    "settledNoteSources": "Raportas la rezulton kiel jam deciditan: {names}",
     "lastUpdated": "Laste ĝisdatigita",
     "previousUpdates": "{count} antaŭa ĝisdatigo",
     "previousUpdatesPlural": "{count} antaŭaj ĝisdatigoj"
@@ -529,6 +535,8 @@
     "badgeHint": "{pct}% implicita probablo ke ĝi okazos — laŭ la sinteno kaj certeco de la artikolo",
     "originOracle": "AI-analizita",
     "originIndexer": "Indeksita",
+    "settledBadge": "decidiga",
+    "settledHint": "Ĉi tiu artikolo raportas la rezulton kiel jam deciditan — ĝi ekigis la decid-fikson de la Orakolo.",
     "originBoth": "Ambaŭ"
   },
   "footer": {

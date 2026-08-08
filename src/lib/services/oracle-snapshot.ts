@@ -321,6 +321,7 @@ export function oracleSnapshotToContributingSources(oracleSnapshot: unknown): Co
       origin: 'oracle',
       outletName: null,
       personName: null,
+      settled: typeof e.settled === 'boolean' ? e.settled : null,
     })
   }
   return out
