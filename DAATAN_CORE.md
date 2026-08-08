@@ -54,4 +54,4 @@ If any check fails → out of scope.
 - **Prediction Weight:** `RS × CU` — influence of a specific prediction
 - **Brier Score:** Probability calibration metric, `(probability − outcome)²` — lower is better
 
-See [GLOSSARY.md](./GLOSSARY.md) for full terminology and [PRODUCT.md](./PRODUCT.md) for detailed product documentation.
+See the [shared glossary](https://github.com/Daatan/docs/blob/main/glossary.md) for full terminology and [PRODUCT.md](./PRODUCT.md) for detailed product documentation.
