@@ -713,16 +713,21 @@ export async function notifyNewsArticleMatched(
  * persisted `ArticleRatingPrompt` row by that message identity instead — the same reason
  * `notifyNewsArticleMatched` persists the row keyed on `messageChatId`/`messageId`
  * right after send.
+ *
+ * The trailing `[?]` row (daatan#1313) is a `url` button, not `callback_data` — it opens
+ * the explainer page client-side with no webhook round trip, and needs no `nf:` handler.
  */
 const RATING_KEYCAPS: Record<number, string> = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣' }
 
 function buildRatingButtons(counts?: number[]) {
+  const base = process.env.NEXTAUTH_URL || 'https://daatan.com'
   return {
     inline_keyboard: [
       [1, 2, 3, 4, 5].map((n) => ({
         text: `${RATING_KEYCAPS[n]}${counts?.[n - 1] ? ` ·${counts[n - 1]}` : ''}`,
         callback_data: `nf:r:${n}`,
       })),
+      [{ text: '❓ What do these numbers mean?', url: `${base}/help/rating-numbers` }],
     ],
   }
 }

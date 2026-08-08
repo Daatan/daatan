@@ -40,6 +40,9 @@ export default function robots(): MetadataRoute.Robots {
         // Internal architecture docs served as static HTML (also carry a
         // noindex meta tag) — not indexable content.
         '/docs/',
+        // Telegram-bot-linked explainer (daatan#1313) — also carries page-level
+        // `robots: { index: false }` metadata; not indexable content.
+        '/help/',
         // NOTE: the OG image routes (/opengraph-image, /*/opengraph-image) are
         // intentionally NOT disallowed here. Blocking them via robots.txt would
         // require duplicating every other Disallow rule into a Googlebot-specific

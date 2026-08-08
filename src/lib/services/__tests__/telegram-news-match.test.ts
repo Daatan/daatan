@@ -214,6 +214,7 @@ describe('notifyNewsArticleMatched', () => {
           { text: '4️⃣', callback_data: 'nf:r:4' },
           { text: '5️⃣', callback_data: 'nf:r:5' },
         ],
+        [{ text: '❓ What do these numbers mean?', url: 'http://localhost:3000/help/rating-numbers' }],
       ],
     })
     expect(mockCreate).toHaveBeenCalledWith({

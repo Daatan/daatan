@@ -19,6 +19,7 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
     { id: 'bots', label: t('tabBots'), adminOnly: true, selfHostedHidden: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
+    { id: 'ratings', label: t('tabRatings'), adminOnly: true },
     // Edits news-indexer's author-identity tables through an ADMIN-gated proxy
     // (/api/admin/news-indexer/authors) — SaaS-only, no scrapper.daatan.com
     // instance exists for self-hosted deployments.

@@ -74,6 +74,7 @@ describe('manual number-rating feedback (daatan#1223)', () => {
             { text: '4️⃣', callback_data: 'nf:r:4' },
             { text: '5️⃣ ·2', callback_data: 'nf:r:5' },
           ],
+          [{ text: '❓ What do these numbers mean?', url: 'http://localhost:3000/help/rating-numbers' }],
         ],
       })
     })
@@ -90,6 +91,7 @@ describe('manual number-rating feedback (daatan#1223)', () => {
             { text: '4️⃣', callback_data: 'nf:r:4' },
             { text: '5️⃣', callback_data: 'nf:r:5' },
           ],
+          [{ text: '❓ What do these numbers mean?', url: 'http://localhost:3000/help/rating-numbers' }],
         ],
       })
     })
