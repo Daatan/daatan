@@ -5,6 +5,7 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { checkContent } from '@/lib/services/moderation'
 import { translatePredictionToAllLocales } from '@/lib/services/translation'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { listForecasts, enrichPredictions, upsertNewsAnchor, verifyUserExists, createForecast } from '@/lib/services/forecast'
 import { createLogger } from '@/lib/logger'
 import { toError } from '@/lib/utils/error'
@@ -143,6 +144,12 @@ export async function GET(request: NextRequest) {
 
 // POST /api/predictions - Create a new prediction (draft)
 export const POST = withAuth(async (request, user) => {
+  // Each create triggers an LLM moderation call plus a background
+  // translatePredictionToAllLocales sweep (one LLM call per locale) — throttle per
+  // user like the app's other AI-cost routes.
+  const rl = checkRateLimit(`forecasts-create:${user.id}`, 20, 60 * 60_000)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
+
   const body = await request.json()
   const data = createPredictionSchema.parse(body)
 

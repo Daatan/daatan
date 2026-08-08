@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { notifyNewComment } from '@/lib/services/telegram'
 import { createNotification } from '@/lib/services/notification'
 import { checkContent } from '@/lib/services/moderation'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import {
   listComments,
   createComment,
@@ -44,6 +45,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/comments - Create a new comment
 export const POST = withAuth(async (request, user) => {
+  // Every comment triggers an LLM moderation call — throttle per user like the app's
+  // other AI-cost routes (translate/suggest-tags/ai-extract).
+  const rl = checkRateLimit(`comments:${user.id}`, 30, 60 * 60_000)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
+
   const body = await request.json()
   const data = createCommentSchema.parse(body)
 

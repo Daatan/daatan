@@ -5,6 +5,7 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 
 const log = createLogger('express-guess')
@@ -23,6 +24,11 @@ export const POST = withAuth(async (request, user) => {
   if (!aiFeaturesEnabled()) {
     return apiError('AI features are not enabled on this instance', 404)
   }
+
+  // Called from the interactive drafting flow, so it's legitimately hit more than
+  // once per forecast — looser than express-generate but still throttled per user.
+  const rl = checkRateLimit(`express-guess:${user.id}`, 30, 60 * 60_000)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
   try {
     const body = await request.json()

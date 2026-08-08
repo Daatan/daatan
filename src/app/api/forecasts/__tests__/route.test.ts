@@ -31,6 +31,7 @@ vi.mock('@/lib/services/translation', () => ({
 import { describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET, POST } from '../route'
+import { resetRateLimitStore } from '@/lib/rate-limit'
 
 vi.mock('@/lib/prisma', () => ({
     prisma: {
@@ -57,6 +58,7 @@ vi.mock('@/lib/prisma', () => ({
 describe('/api/forecasts', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        resetRateLimitStore()
         // Ensure mockCheckContent always returns pass by default
         mockCheckContent.mockResolvedValue({ isOffensive: false, reason: '' })
     })

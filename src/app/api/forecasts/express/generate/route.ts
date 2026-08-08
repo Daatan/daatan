@@ -4,6 +4,7 @@ import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { aiFeaturesEnabled, aiResearchEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
 import { ForecastAttemptOutcome, Prisma } from '@prisma/client'
 
@@ -42,6 +43,11 @@ export const POST = withAuth(async (request, user) => {
   if (!aiFeaturesEnabled()) {
     return apiError('AI features are not enabled on this instance', 404)
   }
+
+  // The single most expensive AI route in the app (live article search + LLM
+  // generation) — tightest limit of the five LLM-backed mutation routes.
+  const rl = checkRateLimit(`express-generate:${user.id}`, 10, 60 * 60_000)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
   const body = await request.json()
   const { userInput, skipSources } = generateSchema.parse(body)

@@ -27,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
 import { POST } from '../route'
 import { NoArticlesFoundError } from '@/lib/llm/expressPrediction'
 import { NextRequest } from 'next/server'
+import { resetRateLimitStore } from '@/lib/rate-limit'
 
 const FAKE_USER = { id: 'user-1', email: 'u@x', name: 'U', role: 'USER' }
 
@@ -57,6 +58,7 @@ async function consumeStream(response: Response): Promise<string[]> {
 describe('POST /api/forecasts/express/generate — attempt persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetRateLimitStore()
     mockAuth.mockResolvedValue({ user: FAKE_USER })
     process.env.GEMINI_API_KEY = 'test-key'
     process.env.SERPER_API_KEY = 'test-key'
