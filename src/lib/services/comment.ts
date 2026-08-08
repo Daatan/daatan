@@ -51,6 +51,8 @@ export interface CreateCommentInput {
   text: string
   predictionId: string
   parentId?: string
+  /** daatan#1318: checkContent() threw instead of returning a verdict — flag for manual review. */
+  moderationCheckFailed?: boolean
 }
 
 export async function findCommentParent(parentId: string) {
@@ -67,6 +69,7 @@ export async function createComment(input: CreateCommentInput) {
       text: input.text,
       predictionId: input.predictionId,
       parentId: input.parentId,
+      moderationCheckFailed: input.moderationCheckFailed ?? false,
     },
     include: COMMENT_INCLUDE,
   })

@@ -25,6 +25,12 @@ export const moderationSchema: Schema = {
 export interface ModerationResult {
   isOffensive: boolean
   reason: string
+  // true when the LLM check itself failed (timeout, provider outage, malformed
+  // response) rather than returning a verdict. Callers should still publish the
+  // content (no hard block on a transient provider error) but persist this flag
+  // on the created record so it lands in manual review instead of being
+  // silently treated as "checked and clean".
+  checkFailed?: boolean
 }
 
 const moderationResultSchema = z.object({
@@ -65,8 +71,10 @@ export async function checkContent(
 
     return parsed
   } catch (error) {
-    log.error({ err: error, contentType }, 'Moderation check failed, allowing content as fallback')
-    // Fail safe: if AI moderation fails, allow content but log the error
-    return { isOffensive: false, reason: '' }
+    log.error({ err: error, contentType }, 'Moderation check failed, allowing content but flagging for manual review')
+    // Fail safe, not fail silent: don't hard-block publishing on a transient
+    // provider error, but flag the content so an admin reviews it — never
+    // return a bare "not offensive" that looks identical to a real pass.
+    return { isOffensive: false, reason: '', checkFailed: true }
   }
 }

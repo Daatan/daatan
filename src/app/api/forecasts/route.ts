@@ -194,6 +194,7 @@ export const POST = withAuth(async (request, user) => {
       newsAnchorId,
       tags: data.tags,
       externalMarketId: data.externalMarketId,
+      moderationCheckFailed: moderationResult.checkFailed,
     })
 
     withRetry(() => translatePredictionToAllLocales(prediction!.id), {

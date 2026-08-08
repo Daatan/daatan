@@ -73,6 +73,7 @@ export const POST = withAuth(async (request, user) => {
     text: data.text,
     predictionId: data.predictionId,
     parentId: data.parentId,
+    moderationCheckFailed: moderationResult.checkFailed,
   })
 
   const forecastLink = `/forecasts/${prediction.slug || prediction.id}`
