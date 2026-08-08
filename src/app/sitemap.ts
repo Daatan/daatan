@@ -24,6 +24,7 @@ const fetchSitemapData = unstable_cache(
           slug: true,
           status: true,
           updatedAt: true,
+          resolvedAt: true,
           detailsText: true,
           _count: { select: { commitments: true } },
         },
@@ -76,6 +77,18 @@ export function isSitemapEligible(p: {
     p._count.commitments > 0 ||
     (p.detailsText?.trim().length ?? 0) >= MIN_DETAILS_TEXT_LENGTH
   )
+}
+
+// Resolution is the last real content change to a resolved forecast (outcome
+// + settled state) — using it instead of the generic @updatedAt field gives
+// Google an accurate, one-time freshness signal to re-crawl, instead of a
+// timestamp that stops moving once nothing else touches the row.
+export function sitemapLastModified(p: {
+  status: string
+  updatedAt: Date
+  resolvedAt: Date | null
+}): Date {
+  return RESOLVED_STATUSES.includes(p.status) && p.resolvedAt ? p.resolvedAt : p.updatedAt
 }
 
 const BASE_URL = getAppUrl()
@@ -196,7 +209,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const hasRu = translatedSet.has(`${p.id}:ru`)
     return {
       url: `${BASE_URL}/forecasts/${slug}`,
-      lastModified: p.updatedAt,
+      lastModified: sitemapLastModified(p),
       changeFrequency: (isResolved ? 'monthly' : 'hourly') as 'monthly' | 'hourly',
       priority: isResolved ? 0.5 : 0.7,
       alternates: {
@@ -220,7 +233,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (!translatedSet.has(`${p.id}:${locale}`)) return []
       return [{
         url: `${BASE_URL}/${locale}/forecasts/${slug}`,
-        lastModified: p.updatedAt,
+        lastModified: sitemapLastModified(p),
         changeFrequency: (isResolved ? 'monthly' : 'hourly') as 'monthly' | 'hourly',
         priority: isResolved ? 0.4 : 0.6,
         alternates: {
