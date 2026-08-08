@@ -141,3 +141,35 @@ export async function countThisHourActions(botId: string, action: BotAction): Pr
 export function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
+
+// ─── Resolve-date validation ────────────────────────────────────────────────
+
+/**
+ * Validate a generated resolveByDatetime just before creating the prediction:
+ * reject unparseable dates and dates already in the past. Distinct from the
+ * MIN/MAX_RESOLVE_DAYS window check above (which runs earlier, before the LLM
+ * quality gate, to save a wasted LLM call) — this is the final DB-write-time
+ * guard. Logs and writes the ERROR run-log entry itself so both call sites
+ * get identical diagnostics; `triggerNews` lets each caller pass its own
+ * run-log payload shape (forecastCreate has a topic title, sourceless does not).
+ */
+export async function validateResolveByDate(
+  bot: BotWithUser,
+  topicLabel: string,
+  triggerNews: object | null,
+  rawResolveByDatetime: string,
+  dryRun: boolean,
+): Promise<{ ok: true; resolveBy: Date } | { ok: false }> {
+  const resolveBy = new Date(rawResolveByDatetime)
+  if (isNaN(resolveBy.getTime())) {
+    log.warn({ botId: bot.id, topic: topicLabel, provided: rawResolveByDatetime }, 'Invalid resolveByDatetime format')
+    await logBotAction(bot.id, 'ERROR', triggerNews, null, 'Invalid date format', dryRun)
+    return { ok: false }
+  }
+  if (resolveBy <= new Date()) {
+    log.warn({ botId: bot.id, topic: topicLabel, provided: resolveBy.toISOString() }, 'resolveByDatetime is in the past')
+    await logBotAction(bot.id, 'ERROR', triggerNews, null, 'Past resolution date', dryRun)
+    return { ok: false }
+  }
+  return { ok: true, resolveBy }
+}

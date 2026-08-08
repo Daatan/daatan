@@ -13,6 +13,7 @@ import {
   log,
   callLLMWithTimeout,
   logBotAction,
+  validateResolveByDate,
   MIN_RESOLVE_DAYS,
   MAX_RESOLVE_DAYS,
 } from './shared'
@@ -162,11 +163,9 @@ export async function processSourcelessForecast(
       return 'created'
     }
 
-    const resolveBy = new Date(forecast.resolveByDatetime)
-    if (isNaN(resolveBy.getTime()) || resolveBy <= new Date()) {
-      await logBotAction(bot.id, 'ERROR', {}, null, 'Invalid or past resolveByDatetime', dryRun)
-      return 'error'
-    }
+    const dateCheck = await validateResolveByDate(bot, logTopic, {}, forecast.resolveByDatetime, dryRun)
+    if (!dateCheck.ok) return 'error'
+    const resolveBy = dateCheck.resolveBy
     const maxDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     if (resolveBy > maxDate) resolveBy.setTime(maxDate.getTime())
 
