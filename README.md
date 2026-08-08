@@ -6,7 +6,7 @@
 
 [![Live](https://img.shields.io/badge/Production-daatan.com-green)](https://daatan.com)
 [![Staging](https://img.shields.io/badge/Staging-staging.daatan.com-yellow)](https://staging.daatan.com)
-[![Version](https://img.shields.io/badge/Version-1.29.4-blue)](https://github.com/Daatan/daatan/releases)
+[![Version](https://img.shields.io/badge/Version-1.65.102-blue)](https://github.com/Daatan/daatan/releases)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 
@@ -124,7 +124,7 @@ git push origin v1.1.1
 | [PRODUCT.md](./PRODUCT.md) | Product vision and feature documentation |
 | [FORECASTS_FLOW.md](./FORECASTS_FLOW.md) | End-to-end forecast creation and resolution flow |
 | [public/docs/forecast-pipeline.html](./public/docs/forecast-pipeline.html) | Visual diagram of the Create + Analyze pipelines — served live (noindex) at [daatan.com/docs/forecast-pipeline.html](https://daatan.com/docs/forecast-pipeline.html) ([staging](https://staging.daatan.com/docs/forecast-pipeline.html)) |
-| [GLOSSARY.md](./GLOSSARY.md) | Terminology definitions |
+| [Glossary](https://github.com/Daatan/docs/blob/main/glossary.md) | Terminology definitions (lives in the shared docs repo) |
 | [VERSIONING.md](./VERSIONING.md) | Semantic versioning rules |
 | [TESTING.md](./TESTING.md) | Testing strategy and guidelines |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |

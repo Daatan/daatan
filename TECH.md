@@ -1,7 +1,7 @@
 # DAATAN Technical Documentation
 
 > Technical architecture, infrastructure, project structure, and development guide.
-> Last updated: April 16, 2026
+> Last updated: August 8, 2026
 
 ---
 
@@ -71,7 +71,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
                 ▼                               ▼
 ┌─────────────────────────────────┐ ┌─────────────────────────────────┐
 │  EC2 i-04ea44d4243d35624 (prod) │ │ EC2 i-0406d237ca5d92cdf (staging)│
-│  t3.small · eu-central-1        │ │ t3.small · eu-central-1          │
+│  t3.medium · eu-central-1       │ │ t3.small · eu-central-1          │
 │  ┌───────────────────────────┐  │ │  ┌───────────────────────────┐   │
 │  │  daatan-nginx (80/443)    │  │ │  │  daatan-nginx (80/443)    │   │
 │  │           │               │  │ │  │           │               │   │
@@ -321,7 +321,8 @@ src/
 
 | Resource | Type | Details |
 |----------|------|---------|
-| EC2 Instance | t3.small | Ubuntu 24.04, 2GB RAM |
+| EC2 Instance (prod) | t3.medium | Ubuntu 24.04, 4GB RAM |
+| EC2 Instance (staging) | t3.small | Ubuntu 24.04, 2GB RAM |
 | Elastic IP | Static | Assigned to EC2 |
 | Route 53 | Hosted Zone | daatan.com |
 | S3 Bucket | Production DB backups | `daatan-db-backups-272007598366` |
@@ -339,7 +340,7 @@ src/
 | Component | Value |
 |-----------|-------|
 | Region | `eu-central-1` (Frankfurt) |
-| SSL Certificate | Valid until April 17, 2026 |
+| SSL Certificate | Let's Encrypt, auto-renewed by certbot (90-day cycle) |
 
 ### Network & DNS
 
@@ -396,12 +397,15 @@ terraform apply -var="environment=prod"
 
 ### Estimated Monthly Costs
 
+EC2/Route53/S3 costs only — excludes LLM/Bedrock spend, which dominates actual AWS billing. See the daily cost report (`.github/workflows/cost-report.yml`) for total spend.
+
 | Service | Cost |
 |---------|------|
-| EC2 t3.small | ~$17 |
+| EC2 t3.medium (prod) | ~$30 |
+| EC2 t3.small (staging) | ~$17 |
 | Route 53 | ~$0.50 |
 | S3 (backups) | ~$0.10 |
-| **Total** | **~$18/month** |
+| **Total (infra only)** | **~$48/month** |
 
 ---
 
@@ -540,13 +544,16 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 aws ssm send-command --instance-ids <ID> --document-name AWS-RunShellScript \
   --parameters '{"commands":["docker exec -i daatan-postgres psql -U daatan -d daatan -c \"\\dt\""]}'
 
-# Run migrations (always use staging app container — prod image may be outdated)
-# via SSM on the server:
-docker exec -e DATABASE_URL=postgresql://daatan:<PASS>@postgres:5432/daatan \
-  daatan-app-staging npx prisma migrate deploy
+# Migrations run via the dedicated migrations container (daatan-migrations),
+# NOT via `docker exec` on the app container — the slim app image has no
+# Prisma CLI / node_modules. See docs/DEPLOYMENT.md ("The dedicated migrations
+# container") and docs/PRISMA_MIGRATE_DEPLOY_DEPS.md for the full flow; it
+# runs automatically as Phase 5 of the blue-green deploy.
 
-# Check migration status (30 migrations total as of v1.8.x)
-docker exec daatan-app-staging npx prisma migrate status
+# Check migration status (87 migrations total as of v1.65.x)
+docker run --rm --network host \
+  -e DATABASE_URL=postgresql://daatan:<PASS>@localhost:5432/daatan \
+  daatan-migrations:staging-latest npx prisma migrate status
 
 # Manual backup (script handles this automatically)
 bash /home/ubuntu/backup-db.sh
