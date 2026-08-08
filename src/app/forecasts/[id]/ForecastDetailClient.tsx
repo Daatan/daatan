@@ -44,6 +44,7 @@ import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate } from '@/lib/utils/date'
+import { forecastQuestion, forecastAnswer, type ForecastSeoCopy, type ForecastSeoLocale } from '@/lib/forecast-seo-schema'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
@@ -66,6 +67,7 @@ export default function ForecastDetailClient({
   initialContextSnapshots,
   initialProbabilityHistory,
   initialContributingSources,
+  lastUpdatedISO = null,
   aiPanelSeries = [],
   showAiPanel = false,
 }: {
@@ -76,6 +78,9 @@ export default function ForecastDetailClient({
   /** Chart series incl. kind='clock' glide requotes (the event timeline above excludes them). */
   initialProbabilityHistory?: { id: string; createdAt: string; externalProbability: number | null; kind: string }[]
   initialContributingSources?: ContributingSource[]
+  /** Latest probability-update timestamp (server-computed, daatan#1295) — drives the
+   *  visible question/answer copy's "as of" date and the FAQPage dateModified. */
+  lastUpdatedISO?: string | null
   /** Per-member AI-panel series; only populated (and only rendered) when the viewer opted in. */
   aiPanelSeries?: {
     model: string
@@ -129,6 +134,38 @@ export default function ForecastDetailClient({
 
   const canEdit = session?.user?.id === prediction?.author.id || session?.user?.role === 'ADMIN'
   const canApprove = (session?.user?.role === 'ADMIN' || session?.user?.role === 'APPROVER') && prediction?.status === 'PENDING_APPROVAL'
+
+  // Visible question-form framing (daatan#1295) — en/he/ru only; eo has no native
+  // template (matches the existing he/ru-only translation + sitemap scope).
+  const seoLocale: ForecastSeoLocale | null =
+    locale === 'he' || locale === 'ru' || locale === 'en' ? (locale as ForecastSeoLocale) : null
+  const seoClaim = (showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction?.claimText) ?? ''
+  let seoQuestion = ''
+  let seoAnswer = ''
+  if (seoLocale && prediction) {
+    const seoCopy: ForecastSeoCopy = {
+      questionOpen: t('seoQuestionOpen'),
+      questionResolved: t('seoQuestionResolved'),
+      answerAiEstimate: t('seoAnswerAiEstimate'),
+      answerCommunity: t('seoAnswerCommunity'),
+      answerAsOf: t('seoAnswerAsOf'),
+      answerResolvedYes: t('seoAnswerResolvedYes'),
+      answerResolvedWrong: t('seoAnswerResolvedWrong'),
+      answerNoEstimate: t('seoAnswerNoEstimate'),
+      statusVoid: t('void'),
+      statusUnresolvable: t('unresolvable'),
+    }
+    seoQuestion = forecastQuestion(seoCopy, seoLocale, seoClaim, prediction.status)
+    seoAnswer = forecastAnswer(seoCopy, {
+      locale: seoLocale,
+      claim: seoClaim,
+      status: prediction.status,
+      aiProbability: prediction.outcomeType === 'BINARY' ? (prediction.confidence ?? null) : null,
+      communityProbability:
+        prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null,
+      lastUpdatedISO,
+    })
+  }
 
   useEffect(() => {
     if (prediction?.userCommitment) {
@@ -432,6 +469,15 @@ export default function ForecastDetailClient({
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-4 break-words">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
+
+        {seoLocale && (
+          <p className="text-sm text-text-secondary mb-4">
+            <span className="font-medium">{seoQuestion}</span> {seoAnswer}
+            {lastUpdatedISO && (
+              <span className="text-gray-500"> · {t('seoUpdatedOn')} {formatDisplayDate(lastUpdatedISO)}</span>
+            )}
+          </p>
+        )}
 
         <div className="xl:hidden">
           <ForecastInfoPanel prediction={prediction} variant="mobile" />

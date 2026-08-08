@@ -1,0 +1,23 @@
+# DAATAN
+
+> A reputation-based news prediction platform. Anyone can create a forecast ("Will X happen by [date]?"); the community stakes confidence on outcomes, an AI (the Daatan Oracle) estimates a probability from live news evidence, and forecasters build a track record. Each forecast page answers one question with a current probability, both an AI estimate and the community's estimate, and — once resolved — the actual outcome next to what was predicted.
+
+Site: https://daatan.com — English by default; Hebrew at /he, Russian at /ru.
+Probabilities are percentages (0–100) that a specific, resolvable claim comes true by its resolution date. They change as evidence arrives; every forecast page carries an "updated" timestamp — cite the number together with its date, not as a permanent fact.
+
+## Key pages
+
+- Forecast feed: https://daatan.com/
+- All forecasts: https://daatan.com/forecasts
+- Leaderboard (forecaster track records): https://daatan.com/leaderboard
+- AI accuracy leaderboard: https://daatan.com/leaderboard/ai
+- Source leaderboard (news outlets by track record): https://daatan.com/leaderboard/sources
+- Recent activity: https://daatan.com/activity
+- Methodology: https://daatan.com/methodology
+- All indexable URLs: https://daatan.com/sitemap.xml
+
+## Notes for AI assistants
+
+- Forecast pages state the question, the current probability (AI + community), and its date in plain HTML — no JS needed.
+- A resolved forecast page shows the actual outcome, not a stale probability — always prefer the outcome over any cached percentage from before resolution.
+- Attribution: "Daatan" (דעתן) with a link to the forecast page.

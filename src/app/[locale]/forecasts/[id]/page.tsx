@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
@@ -14,6 +15,13 @@ import { JsonLd } from '@/components/JsonLd'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
+import { communityProbability } from '@/lib/forecast-math'
+import {
+  forecastFaqJsonLd,
+  latestProbabilityUpdateISO,
+  type ForecastSeoCopy,
+  type ForecastSeoLocale,
+} from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
 
@@ -241,6 +249,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     externalProbability: s.externalProbability,
     kind: s.kind,
   }))
+  const lastUpdatedISO = latestProbabilityUpdateISO(prediction.updatedAt, initialProbabilityHistory)
 
   // Apply cached translations — never triggers Gemini, read-only
   const translations = await getCachedPredictionTranslation(prediction.id, locale)
@@ -291,10 +300,128 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     ],
   }
 
+  // Backfilled to match the canonical /forecasts/[id] route, which already has
+  // these two — this locale route previously only had Article + Breadcrumb.
+  const eventJsonLd = prediction.isPublic ? {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: localizedPrediction.claimText,
+    description: localizedPrediction.detailsText || localizedPrediction.claimText,
+    url: `https://daatan.com/forecasts/${slug}`,
+    image: `https://daatan.com/forecasts/${slug}/opengraph-image`,
+    startDate: prediction.publishedAt ?? prediction.createdAt,
+    endDate: prediction.resolveByDatetime,
+    eventStatus: prediction.status === 'VOID'
+      ? 'https://schema.org/EventCancelled'
+      : 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+    organizer: {
+      '@type': 'Person',
+      name: prediction.author.name || prediction.author.username,
+      url: `https://daatan.com/profile/${prediction.author.username}`,
+    },
+    performer: {
+      '@type': 'Person',
+      name: prediction.author.name || prediction.author.username,
+      url: `https://daatan.com/profile/${prediction.author.username}`,
+    },
+    location: {
+      '@type': 'VirtualLocation',
+      name: 'DAATAN',
+      url: `https://daatan.com/forecasts/${slug}`,
+    },
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+      url: `https://daatan.com/forecasts/${slug}`,
+    },
+  } : null
+
+  const claimReviewJsonLd =
+    prediction.isPublic &&
+    prediction.resolvedAt &&
+    (prediction.resolutionOutcome === 'correct' || prediction.resolutionOutcome === 'wrong')
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'ClaimReview',
+          url: `https://daatan.com/forecasts/${slug}`,
+          claimReviewed: localizedPrediction.claimText,
+          datePublished: prediction.resolvedAt,
+          author: {
+            '@type': 'Organization',
+            name: 'DAATAN',
+            alternateName: 'דעתן',
+            url: 'https://daatan.com',
+          },
+          creator: {
+            '@type': 'Organization',
+            name: 'DAATAN',
+            alternateName: 'דעתן',
+            url: 'https://daatan.com',
+          },
+          reviewRating: {
+            '@type': 'Rating',
+            ratingValue: prediction.resolutionOutcome === 'correct' ? 5 : 1,
+            bestRating: 5,
+            worstRating: 1,
+            alternateName: prediction.resolutionOutcome === 'correct' ? 'Correct' : 'Wrong',
+          },
+          itemReviewed: {
+            '@type': 'Claim',
+            name: localizedPrediction.claimText,
+            author: {
+              '@type': 'Person',
+              name: prediction.author.name || prediction.author.username,
+              url: `https://daatan.com/profile/${prediction.author.username}`,
+            },
+            creator: {
+              '@type': 'Person',
+              name: prediction.author.name || prediction.author.username,
+              url: `https://daatan.com/profile/${prediction.author.username}`,
+            },
+          },
+        }
+      : null
+
+  // Question-form FAQPage (daatan#1295) — en/he/ru only, matching the existing
+  // he/ru-only translation + sitemap scope; eo stays UI-only (no forecast schema).
+  const seoLocale: ForecastSeoLocale | null =
+    locale === 'he' || locale === 'ru' || locale === 'en' ? locale : null
+  let faqJsonLd: object | null = null
+  if (seoLocale && prediction.isPublic) {
+    const t = await getTranslations({ locale, namespace: 'forecast' })
+    const seoCopy: ForecastSeoCopy = {
+      questionOpen: t('seoQuestionOpen'),
+      questionResolved: t('seoQuestionResolved'),
+      answerAiEstimate: t('seoAnswerAiEstimate'),
+      answerCommunity: t('seoAnswerCommunity'),
+      answerAsOf: t('seoAnswerAsOf'),
+      answerResolvedYes: t('seoAnswerResolvedYes'),
+      answerResolvedWrong: t('seoAnswerResolvedWrong'),
+      answerNoEstimate: t('seoAnswerNoEstimate'),
+      statusVoid: t('void'),
+      statusUnresolvable: t('unresolvable'),
+    }
+    faqJsonLd = forecastFaqJsonLd(seoCopy, {
+      locale: seoLocale,
+      claim: localizedPrediction.claimText,
+      status: prediction.status,
+      aiProbability: prediction.outcomeType === 'BINARY' ? (prediction.confidence ?? null) : null,
+      communityProbability:
+        prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null,
+      lastUpdatedISO,
+    })
+  }
+
   return (
     <>
       <JsonLd data={articleJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
+      {eventJsonLd && <JsonLd data={eventJsonLd} />}
+      {claimReviewJsonLd && <JsonLd data={claimReviewJsonLd} />}
+      {faqJsonLd && <JsonLd data={faqJsonLd} />}
       <Suspense fallback={<ForecastLoading />}>
         <ForecastDetailClient
           initialData={localizedPrediction}
@@ -303,6 +430,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           initialContextSnapshots={initialContextSnapshots}
           initialProbabilityHistory={initialProbabilityHistory}
           initialContributingSources={initialContributingSources}
+          lastUpdatedISO={lastUpdatedISO}
           aiPanelSeries={panelSeries}
           showAiPanel={showAiPanel}
         />

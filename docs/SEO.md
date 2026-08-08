@@ -16,7 +16,10 @@ Forecast detail pages (`src/app/forecasts/[id]/page.tsx`) override with per-fore
 
 ## Structured data (JSON-LD)
 
-A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the locale-prefixed route emits the first two):
+A forecast page emits up to five JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the
+locale-prefixed route `src/app/[locale]/forecasts/[id]/page.tsx` mirrors all five for he/ru —
+it previously emitted only Article + BreadcrumbList, fixed in #1295 so translated pages carry
+the same structured-data strength as the English canonical):
 
 1. **Article** (`schema.org/Article`) — `headline`, `description`, `datePublished`, `dateModified`, `author` + `creator` (both the forecast author as Person), `publisher` (DAATAN Organization).
 2. **BreadcrumbList** — Home → Forecasts → [claim text]
@@ -30,6 +33,22 @@ A forecast page emits up to four JSON-LD scripts (`src/app/forecasts/[id]/page.t
    - `location`: VirtualLocation pointing at the forecast URL
    - `offers`: free Offer (`price: "0"`, `InStock`) pointing at the forecast URL — Google warns "Missing field 'offers'" without it
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
+5. **FAQPage** (`schema.org/FAQPage`, public forecasts only, #1295) — one `Question`/`Answer` pair wrapping the claim in question form ("What are the chances that …?", past-tense "Did this come true: …?" once resolved), pure builders in `src/lib/forecast-seo-schema.ts`. `dateModified` is valid here because FAQPage subtypes CreativeWork. Google restricted FAQ rich results to authoritative government/health sites in Aug 2023, so this earns no Search carousel on daatan.com — it's aimed at AI-search/LLM extraction (ChatGPT, Perplexity, AI Overviews) and the visible on-page question/answer text next to it, not a Google rich result.
+
+### Freshness: `dateModified` vs. `updatedAt`
+
+`Prediction.updatedAt` is a Prisma `@updatedAt` column — it bumps on *any* row write (a
+translation-cache write, a denormalized count), not specifically a probability update. The
+FAQPage `dateModified` and the visible "Updated {date}" stamp instead use
+`latestProbabilityUpdateISO()` (`src/lib/forecast-seo-schema.ts`): the latest `ContextSnapshot`
+that carried a probability (already fetched for the chart via `getProbabilityHistory`), falling
+back to `updatedAt` only when a forecast has no snapshots yet.
+
+### `public/llms.txt`
+
+A short plain-text site description for AI crawlers/answer engines (ChatGPT, Perplexity, Claude)
+that don't render JS or parse JSON-LD — mirrors the format `elections.daatan.com/llms.txt` already
+uses. Update it if the key-pages list changes.
 
 > **`creator` on the CreativeWork types** (Article, ClaimReview, the nested Claim): added alongside `author` because Google Search Console flags `creator` as a recommended field on CreativeWork-derived items ("Missing field 'creator'"). `creator` mirrors the corresponding `author`.
 

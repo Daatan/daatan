@@ -1,5 +1,6 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { buildForecastDescription } from '@/lib/forecast-seo'
@@ -10,6 +11,8 @@ import { getContextTimeline, getProbabilityHistory } from '@/lib/services/contex
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { getForecastVoters } from '@/lib/services/forecast-sources'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
+import { communityProbability } from '@/lib/forecast-math'
+import { forecastFaqJsonLd, latestProbabilityUpdateISO, type ForecastSeoCopy } from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 import { JsonLd } from '@/components/JsonLd'
@@ -285,6 +288,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     externalProbability: s.externalProbability,
     kind: s.kind,
   }))
+  const lastUpdatedISO = latestProbabilityUpdateISO(prediction.updatedAt, initialProbabilityHistory)
   const slug = prediction.slug || prediction.id
   const articleJsonLd = {
     '@context': 'https://schema.org',
@@ -409,18 +413,45 @@ export default async function ForecastDetailPage({ params }: Props) {
         }
       : null
 
+  const t = await getTranslations('forecast')
+  const seoCopy: ForecastSeoCopy = {
+    questionOpen: t('seoQuestionOpen'),
+    questionResolved: t('seoQuestionResolved'),
+    answerAiEstimate: t('seoAnswerAiEstimate'),
+    answerCommunity: t('seoAnswerCommunity'),
+    answerAsOf: t('seoAnswerAsOf'),
+    answerResolvedYes: t('seoAnswerResolvedYes'),
+    answerResolvedWrong: t('seoAnswerResolvedWrong'),
+    answerNoEstimate: t('seoAnswerNoEstimate'),
+    statusVoid: t('void'),
+    statusUnresolvable: t('unresolvable'),
+  }
+  const faqJsonLd = prediction.isPublic
+    ? forecastFaqJsonLd(seoCopy, {
+        locale: 'en',
+        claim: prediction.claimText,
+        status: prediction.status,
+        aiProbability: prediction.outcomeType === 'BINARY' ? (prediction.confidence ?? null) : null,
+        communityProbability:
+          prediction.outcomeType === 'BINARY' ? communityProbability(prediction.commitments) : null,
+        lastUpdatedISO,
+      })
+    : null
+
   return (
     <>
       <JsonLd data={articleJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
       {eventJsonLd && <JsonLd data={eventJsonLd} />}
       {claimReviewJsonLd && <JsonLd data={claimReviewJsonLd} />}
+      {faqJsonLd && <JsonLd data={faqJsonLd} />}
       <ForecastDetailClient
         initialData={prediction}
         initialComments={initialComments}
         initialContextSnapshots={initialContextSnapshots}
         initialProbabilityHistory={initialProbabilityHistory}
         initialContributingSources={initialContributingSources}
+        lastUpdatedISO={lastUpdatedISO}
         aiPanelSeries={panelSeries}
         showAiPanel={showAiPanel}
       />
