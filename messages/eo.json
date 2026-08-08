@@ -203,7 +203,16 @@
       "wrong": "Solvita — la aserto ne realiĝis",
       "void": "Nuligita — fermita sen solvo",
       "unresolvable": "Nesolvebla — la rezulto ne povis esti determinita"
-    }
+    },
+    "seoQuestionOpen": "Kiuj estas la ŝancoj, ke",
+    "seoQuestionResolved": "Ĉu tio efektiviĝis:",
+    "seoAnswerAiEstimate": "la takso de AI estas",
+    "seoAnswerCommunity": "la takso de la komunumo estas",
+    "seoAnswerAsOf": "Ekde",
+    "seoAnswerResolvedYes": "Jes, tio efektiviĝis.",
+    "seoAnswerResolvedWrong": "Ne, tio ne okazis.",
+    "seoAnswerNoEstimate": "Ankoraŭ ne haveblas takso.",
+    "seoUpdatedOn": "Ĝisdatigita"
   },
   "Forecasts": {
     "title": "Redakti Prognozon",

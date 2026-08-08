@@ -203,7 +203,16 @@
       "wrong": "Resolved — the claim did not come true",
       "void": "Void — cancelled without resolution",
       "unresolvable": "Unresolvable — the outcome could not be determined"
-    }
+    },
+    "seoQuestionOpen": "What are the chances that",
+    "seoQuestionResolved": "Did this come true:",
+    "seoAnswerAiEstimate": "the AI estimate is",
+    "seoAnswerCommunity": "the community estimate is",
+    "seoAnswerAsOf": "As of",
+    "seoAnswerResolvedYes": "Yes, this came true.",
+    "seoAnswerResolvedWrong": "No, this did not happen.",
+    "seoAnswerNoEstimate": "No estimate is available yet.",
+    "seoUpdatedOn": "Updated"
   },
   "Forecasts": {
     "title": "Edit Forecast",

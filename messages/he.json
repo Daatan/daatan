@@ -203,7 +203,16 @@
       "wrong": "הוכרעה — הטענה לא התממשה",
       "void": "בוטלה — נסגרה ללא הכרעה",
       "unresolvable": "לא ניתנת להכרעה — לא ניתן לקבוע את התוצאה"
-    }
+    },
+    "seoQuestionOpen": "מה הסיכויים ש",
+    "seoQuestionResolved": "האם זה התממש:",
+    "seoAnswerAiEstimate": "הערכת ה-AI היא",
+    "seoAnswerCommunity": "הערכת הקהילה היא",
+    "seoAnswerAsOf": "נכון ל-",
+    "seoAnswerResolvedYes": "כן, זה התממש.",
+    "seoAnswerResolvedWrong": "לא, זה לא קרה.",
+    "seoAnswerNoEstimate": "אין עדיין הערכה זמינה.",
+    "seoUpdatedOn": "עודכן"
   },
   "Forecasts": {
     "title": "עריכת תחזית",

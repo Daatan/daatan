@@ -203,7 +203,16 @@
       "wrong": "Разрешён — утверждение не сбылось",
       "void": "Аннулирован — отменён без разрешения",
       "unresolvable": "Неразрешим — исход невозможно определить"
-    }
+    },
+    "seoQuestionOpen": "Каковы шансы, что",
+    "seoQuestionResolved": "Сбылось ли это:",
+    "seoAnswerAiEstimate": "оценка ИИ составляет",
+    "seoAnswerCommunity": "оценка сообщества составляет",
+    "seoAnswerAsOf": "По состоянию на",
+    "seoAnswerResolvedYes": "Да, это сбылось.",
+    "seoAnswerResolvedWrong": "Нет, этого не произошло.",
+    "seoAnswerNoEstimate": "Оценка пока недоступна.",
+    "seoUpdatedOn": "Обновлено"
   },
   "Forecasts": {
     "title": "Редактировать прогноз",
