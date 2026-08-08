@@ -37,6 +37,9 @@ export default function robots(): MetadataRoute.Robots {
         '/forecasts/express',
         '/forecasts/*/edit',
         '/retroanalysis',
+        // Admin-only internal tool — same category as /admin, /settings, etc.
+        // above, just missed when this list was first written.
+        '/ibi',
         // Internal architecture docs served as static HTML (also carry a
         // noindex meta tag) — not indexable content.
         '/docs/',

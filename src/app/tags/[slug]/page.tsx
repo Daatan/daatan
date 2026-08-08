@@ -68,13 +68,14 @@ export default async function TagPage({ params, searchParams }: Props) {
     isCuSort: false,
   })
 
-  const url = `https://daatan.com/tags/${tag.slug}`
+  const appUrl = getAppUrl()
+  const url = `${appUrl}/tags/${tag.slug}`
   const breadcrumbJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://daatan.com' },
-      { '@type': 'ListItem', position: 2, name: 'Forecasts', item: 'https://daatan.com/forecasts' },
+      { '@type': 'ListItem', position: 1, name: 'Home', item: appUrl },
+      { '@type': 'ListItem', position: 2, name: 'Forecasts', item: `${appUrl}/forecasts` },
       { '@type': 'ListItem', position: 3, name: tag.name, item: url },
     ],
   }

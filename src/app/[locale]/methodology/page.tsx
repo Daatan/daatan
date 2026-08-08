@@ -2,10 +2,11 @@ import type { Metadata } from 'next'
 import { Calculator } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getAppUrl } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'שיטת הניקוד של דעתן',
-  alternates: { canonical: 'https://daatan.com/he/methodology' },
+  alternates: { canonical: `${getAppUrl()}/he/methodology` },
 }
 
 export default async function LocaleMethodologyPage({ params }: { params: Promise<{ locale: string }> }) {

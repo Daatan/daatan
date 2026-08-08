@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { Info } from 'lucide-react'
 import { redirect } from 'next/navigation'
+import { getAppUrl } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'על דעתן',
-  alternates: { canonical: 'https://daatan.com/he/about' },
+  alternates: { canonical: `${getAppUrl()}/he/about` },
 }
 
 export default async function LocaleAboutPage({ params }: { params: Promise<{ locale: string }> }) {

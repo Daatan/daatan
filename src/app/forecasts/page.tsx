@@ -4,6 +4,7 @@ import { PredictionsPage } from './PredictionsClient'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { JsonLd } from '@/components/JsonLd'
+import { getAppUrl } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'Forecasts — Browse Predictions',
@@ -59,7 +60,7 @@ export default async function ForecastsPage() {
     itemListElement: initialPredictions.slice(0, 20).map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `https://daatan.com/forecasts/${p.slug || p.id}`,
+      url: `${getAppUrl()}/forecasts/${p.slug || p.id}`,
       name: p.claimText,
     })),
   }

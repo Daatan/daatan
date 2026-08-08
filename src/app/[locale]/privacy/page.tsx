@@ -1,6 +1,7 @@
 import { Shield } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
+import { getAppUrl } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -10,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     // Content is the same English text on every locale (page literally says
     // "Authoritative version in English"), so consolidate the duplicates by
     // pointing all locale canonicals at the en URL until the content is translated.
-    alternates: { canonical: 'https://daatan.com/privacy' },
+    alternates: { canonical: `${getAppUrl()}/privacy` },
   }
 }
 

@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import FeedClient from './FeedClient'
 import { JsonLd } from '@/components/JsonLd'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
+import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +22,10 @@ export async function generateMetadata({
     description:
       'Prove you were right — without shouting into the void. A reputation-based platform to forecast the news, stake your credibility, and track your accuracy with Brier scores.',
     alternates: {
-      canonical: 'https://daatan.com',
+      canonical: getAppUrl(),
     },
     openGraph: {
-      url: 'https://daatan.com',
+      url: getAppUrl(),
     },
     // Filtered views skip SSR (see FeedPage below) and render client-side, so
     // Google sees an empty shell — don't let it index the query-param cross
@@ -80,7 +81,7 @@ export default async function FeedPage({
     '@type': 'WebSite',
     name: 'DAATAN',
     alternateName: 'דעתן',
-    url: 'https://daatan.com',
+    url: getAppUrl(),
     description: 'Prove you were right — without shouting into the void.',
   }
 

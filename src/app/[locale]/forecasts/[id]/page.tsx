@@ -14,6 +14,7 @@ import type { Comment } from '@/components/comments/CommentThread'
 import { JsonLd } from '@/components/JsonLd'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
+import { getAppUrl } from '@/lib/branding'
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { communityProbability } from '@/lib/forecast-math'
 import {
@@ -165,25 +166,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     baseCtx,
   )
 
+  const metaAppUrl = getAppUrl()
+
   return {
     title,
     description,
     ...(!hasTranslation ? { robots: { index: false, follow: false } } : {}),
     alternates: {
-      canonical: `https://daatan.com/${locale}/forecasts/${slug}`,
+      canonical: `${metaAppUrl}/${locale}/forecasts/${slug}`,
       languages: {
-        'x-default': `https://daatan.com/forecasts/${slug}`,
-        en: `https://daatan.com/forecasts/${slug}`,
-        ...(translatedLangs.has('he') ? { he: `https://daatan.com/he/forecasts/${slug}` } : {}),
-        ...(translatedLangs.has('ru') ? { ru: `https://daatan.com/ru/forecasts/${slug}` } : {}),
+        'x-default': `${metaAppUrl}/forecasts/${slug}`,
+        en: `${metaAppUrl}/forecasts/${slug}`,
+        ...(translatedLangs.has('he') ? { he: `${metaAppUrl}/he/forecasts/${slug}` } : {}),
+        ...(translatedLangs.has('ru') ? { ru: `${metaAppUrl}/ru/forecasts/${slug}` } : {}),
       },
     },
     openGraph: {
       title,
       description,
       type: 'article',
-      url: `https://daatan.com/${locale}/forecasts/${slug}`,
+      url: `${metaAppUrl}/${locale}/forecasts/${slug}`,
       locale,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      site: '@daatan_dev',
+      title,
+      description,
     },
   }
 }
@@ -262,31 +271,32 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
   }
 
   const slug = prediction.slug || prediction.id
+  const appUrl = getAppUrl()
   const articleJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: localizedPrediction.claimText,
     description: localizedPrediction.detailsText || undefined,
-    url: `https://daatan.com/forecasts/${slug}`,
-    image: `https://daatan.com/forecasts/${slug}/opengraph-image`,
+    url: `${appUrl}/forecasts/${slug}`,
+    image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     datePublished: prediction.publishedAt,
     dateModified: prediction.updatedAt,
     author: {
       '@type': 'Person',
       name: prediction.author.name || prediction.author.username,
-      url: `https://daatan.com/profile/${prediction.author.username}`,
+      url: `${appUrl}/profile/${prediction.author.username}`,
     },
     creator: {
       '@type': 'Person',
       name: prediction.author.name || prediction.author.username,
-      url: `https://daatan.com/profile/${prediction.author.username}`,
+      url: `${appUrl}/profile/${prediction.author.username}`,
     },
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
       alternateName: 'דעתן',
-      url: 'https://daatan.com',
-      logo: { '@type': 'ImageObject', url: 'https://daatan.com/logo-icon.png' },
+      url: appUrl,
+      logo: { '@type': 'ImageObject', url: `${appUrl}/logo-icon.png` },
     },
   }
 
@@ -294,9 +304,9 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: `https://daatan.com/${locale}` },
-      { '@type': 'ListItem', position: 2, name: 'Forecasts', item: `https://daatan.com/${locale}/forecasts` },
-      { '@type': 'ListItem', position: 3, name: localizedPrediction.claimText, item: `https://daatan.com/${locale}/forecasts/${slug}` },
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${appUrl}/${locale}` },
+      { '@type': 'ListItem', position: 2, name: 'Forecasts', item: `${appUrl}/${locale}/forecasts` },
+      { '@type': 'ListItem', position: 3, name: localizedPrediction.claimText, item: `${appUrl}/${locale}/forecasts/${slug}` },
     ],
   }
 
@@ -307,8 +317,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     '@type': 'Event',
     name: localizedPrediction.claimText,
     description: localizedPrediction.detailsText || localizedPrediction.claimText,
-    url: `https://daatan.com/forecasts/${slug}`,
-    image: `https://daatan.com/forecasts/${slug}/opengraph-image`,
+    url: `${appUrl}/forecasts/${slug}`,
+    image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     startDate: prediction.publishedAt ?? prediction.createdAt,
     endDate: prediction.resolveByDatetime,
     eventStatus: prediction.status === 'VOID'
@@ -318,24 +328,24 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     organizer: {
       '@type': 'Person',
       name: prediction.author.name || prediction.author.username,
-      url: `https://daatan.com/profile/${prediction.author.username}`,
+      url: `${appUrl}/profile/${prediction.author.username}`,
     },
     performer: {
       '@type': 'Person',
       name: prediction.author.name || prediction.author.username,
-      url: `https://daatan.com/profile/${prediction.author.username}`,
+      url: `${appUrl}/profile/${prediction.author.username}`,
     },
     location: {
       '@type': 'VirtualLocation',
       name: 'DAATAN',
-      url: `https://daatan.com/forecasts/${slug}`,
+      url: `${appUrl}/forecasts/${slug}`,
     },
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
       availability: 'https://schema.org/InStock',
-      url: `https://daatan.com/forecasts/${slug}`,
+      url: `${appUrl}/forecasts/${slug}`,
     },
   } : null
 
@@ -346,20 +356,20 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
       ? {
           '@context': 'https://schema.org',
           '@type': 'ClaimReview',
-          url: `https://daatan.com/forecasts/${slug}`,
+          url: `${appUrl}/forecasts/${slug}`,
           claimReviewed: localizedPrediction.claimText,
           datePublished: prediction.resolvedAt,
           author: {
             '@type': 'Organization',
             name: 'DAATAN',
             alternateName: 'דעתן',
-            url: 'https://daatan.com',
+            url: appUrl,
           },
           creator: {
             '@type': 'Organization',
             name: 'DAATAN',
             alternateName: 'דעתן',
-            url: 'https://daatan.com',
+            url: appUrl,
           },
           reviewRating: {
             '@type': 'Rating',
@@ -374,12 +384,12 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
             author: {
               '@type': 'Person',
               name: prediction.author.name || prediction.author.username,
-              url: `https://daatan.com/profile/${prediction.author.username}`,
+              url: `${appUrl}/profile/${prediction.author.username}`,
             },
             creator: {
               '@type': 'Person',
               name: prediction.author.name || prediction.author.username,
-              url: `https://daatan.com/profile/${prediction.author.username}`,
+              url: `${appUrl}/profile/${prediction.author.username}`,
             },
           },
         }
