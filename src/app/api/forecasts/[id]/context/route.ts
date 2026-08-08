@@ -323,7 +323,13 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         outletId: m.outletId ?? null, outletName: m.outletName ?? null,
                     }]),
                 )
-                const enrichedSources = enrichOracleSources(oracleForecast.sources, searchResults, authorByUrl, identityByUrl)
+                const enrichedSources = enrichOracleSources(
+                  oracleForecast.sources,
+                  searchResults,
+                  authorByUrl,
+                  identityByUrl,
+                  oracleForecast.relevance_bar ?? null,
+                )
 
                 // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate —
                 // the same cutover the news-indexer push path got in v1.60.0 (#1121), previously

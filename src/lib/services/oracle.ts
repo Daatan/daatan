@@ -281,6 +281,12 @@ export interface OracleForecastResponse {
   /** LLM token usage for this call (docs#57 item 3); nullable/omitted until the
    *  retro side that reports it is deployed, or when usage is unknown. */
   token_usage?: OracleTokenUsage | null
+  /** The per-article relevance bar in force for THIS run (retro#393/#394,
+   *  forecast_relevance_bar); 0.0 means no bar was applied, /forecast's
+   *  historical behaviour. Response-level, not per-source — every source in
+   *  this batch was judged under the same bar. Omitted on `/pool/aggregate`,
+   *  which never re-judges anything. */
+  relevance_bar?: number | null
 }
 
 /**

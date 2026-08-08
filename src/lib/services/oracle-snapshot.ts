@@ -95,6 +95,11 @@ export type EnrichedOracleSource = {
   quantitativeEstimate?: number | null
   evidenceWeight?: number | null
   relevanceScore?: number | null
+  // The per-article relevance bar in force for the run that produced this source
+  // (retro#393/#394) — same value across every source in a batch, since it's a
+  // property of the /forecast call, not the article. Persisted on the pool row;
+  // nothing reads it yet (shadow, like authorLean/factSignal).
+  relevanceBar?: number | null
   evidenceClass?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
   // The byline author's OWN directional forecast of the event (retro #308/#309), for the
   // author-scoring lane — deliberately NOT part of the estimate. Null when the author only
@@ -140,6 +145,10 @@ export function enrichOracleSources(
     string,
     { personId: string | null; personName: string | null; outletId: string | null; outletName: string | null }
   > = new Map(),
+  // The response-level `relevance_bar` (retro#393/#394) — the same bar applied
+  // to every source in this batch. Passed separately since it lives on
+  // OracleForecastResponse, not per-OracleSource.
+  relevanceBar: number | null = null,
 ): EnrichedOracleSource[] {
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
@@ -168,6 +177,7 @@ export function enrichOracleSources(
       quantitativeEstimate: s.quantitative_estimate,
       evidenceWeight: s.evidence_weight,
       relevanceScore: s.relevance_score,
+      relevanceBar,
       evidenceClass: s.evidence_class,
       authorLean: s.author_lean,
       authorLeanCertainty: s.author_lean_certainty,
@@ -261,6 +271,7 @@ export type PoolArticleSnapshotRow = Pick<
   | 'quantitativeEstimate'
   | 'evidenceWeight'
   | 'relevanceScore'
+  | 'relevanceBar'
   | 'evidenceClass'
   | 'authorLean'
   | 'authorLeanCertainty'
@@ -297,6 +308,7 @@ export function poolArticleToEnrichedSource(
     quantitativeEstimate: row.quantitativeEstimate,
     evidenceWeight: row.evidenceWeight,
     relevanceScore: row.relevanceScore,
+    relevanceBar: row.relevanceBar,
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
     authorLean: row.authorLean,
     authorLeanCertainty: row.authorLeanCertainty,

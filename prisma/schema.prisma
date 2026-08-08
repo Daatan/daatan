@@ -714,6 +714,17 @@ model EvidencePoolArticle {
   // (Layer C). Never previously captured anywhere in daatan's pipeline; without
   // it a recompute would treat every pooled article as fully on-topic.
   relevanceScore Float? @map("relevance_score")
+  // The per-article relevance bar in force when this row was admitted
+  // (retro#393/#394, ForecastResponse.relevance_bar, PR retro#404) — 0.0 means
+  // no bar was applied, which is /forecast's behaviour today. SHADOW / storage
+  // only, like `authorLean` and `factSignal`: nothing reads this yet. It exists
+  // so that once the bar moves off 0.0, a backtest or recompute can tell which
+  // admission regime produced each row — a property of the row, not derivable
+  // after the fact. Null on rows written before this existed and on the
+  // `/pool/aggregate` recompute path (compute-only, never re-extracts, and the
+  // bar isn't returned there). No backfill: the value was never recorded and
+  // must not be invented.
+  relevanceBar Float? @map("relevance_bar")
   // The article's most common evidence_class among its extracted claims
   // (retro PR #255) — reported_fact | cited_probability | cited_share |
   // reporting | opinion, or null if unclassified. Needed by the credibility

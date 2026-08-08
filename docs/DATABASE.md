@@ -370,6 +370,15 @@ server-side. `relevanceScore` is the gatekeeper's graded topic relevance
 (`SourceSignal.relevance_score`) — its square is Layer C of retro's weight
 formula; never captured anywhere in daatan's pipeline before this, so a naive
 recompute would have treated every pooled article as fully on-topic.
+`relevanceBar` is the per-article relevance bar in force when the row was
+admitted (retro `ForecastResponse.relevance_bar`, #393/#394, PR retro#404) —
+0.0 means no bar was applied, `/forecast`'s behaviour today. Fully shadow /
+additive like `authorLean`/`factSignal`: nothing reads it yet, null on rows
+written before the column existed and on the `/pool/aggregate` recompute path
+(compute-only, and retro doesn't return a bar there), no backfill. It exists
+so that once the bar moves off 0.0, a backtest or recompute can tell which
+admission regime produced each row — a property of the row that can't be
+recovered after the fact once history mixes both regimes.
 `evidenceClass` is the article's most common evidence_class among its
 extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
