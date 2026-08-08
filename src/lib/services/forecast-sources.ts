@@ -32,6 +32,13 @@ export type ContributingSource = {
    *  when the by-url identity lookup has no match (unresolved byline, or an oracle-only
    *  source that was never enriched against news-indexer's identity index). */
   outletName: string | null
+  /** Resolved author identity (news-indexer person.name), paired with `outletName` for
+   *  linking to /authors/[author]/[outlet]. Same provenance/nullability as `outletName`. */
+  personName: string | null
+  /** True when the (personName, outletName) pair has a scored row on the author-shadow
+   *  leaderboard — the same criterion /authors/[author]/[outlet] checks before notFound()
+   *  — so a rendered author link cannot 404. Unset/false → the byline renders unlinked. */
+  authorLinkable?: boolean
 }
 
 /**
@@ -57,15 +64,39 @@ export async function getContributingSources(forecastId: string): Promise<Contri
     }
     const rows = (await resp.json()) as ContributingSource[]
     const metaByUrl = await getArticleMetaByUrl(rows.map((r) => r.url))
-    return rows.map((r) => ({
-      ...r,
-      origin: 'indexer' as const,
-      outletName: metaByUrl.get(r.url)?.outletName ?? null,
-    }))
+    return await markLinkableAuthors(
+      rows.map((r) => ({
+        ...r,
+        origin: 'indexer' as const,
+        outletName: metaByUrl.get(r.url)?.outletName ?? null,
+        personName: metaByUrl.get(r.url)?.personName ?? null,
+      })),
+    )
   } catch (err) {
     log.warn({ err, forecastId }, 'Failed to fetch contributing sources')
     return []
   }
+}
+
+/**
+ * Flag rows whose (personName, outletName) pair has a scored row on the author-shadow
+ * leaderboard — the exact existence criterion /authors/[author]/[outlet] applies before
+ * notFound() — so the panel only links bylines whose profile page actually resolves.
+ * One batched board fetch covers the whole roster (the board IS the row set that page
+ * searches), skipped entirely when no row carries a resolved identity pair — the common
+ * case while the board is sparse (#1213). Fails open: an unreachable Oracle returns an
+ * empty board, so every flag stays unset and bylines just render unlinked.
+ */
+async function markLinkableAuthors(rows: ContributingSource[]): Promise<ContributingSource[]> {
+  if (!rows.some((r) => r.personName && r.outletName)) return rows
+  const { getSourceLeaderboard } = await import('@/lib/services/sourceLeaderboard')
+  const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative')
+  const scored = new Set(authorRows.map((r) => `${r.author}\u0000${r.outletName}`))
+  return rows.map((r) =>
+    r.personName && r.outletName && scored.has(`${r.personName}\u0000${r.outletName}`)
+      ? { ...r, authorLinkable: true }
+      : r,
+  )
 }
 
 /** Article metadata returned by news-indexer's by-URL lookup. */
@@ -149,6 +180,11 @@ export async function getForecastVoters(forecastId: string): Promise<Contributin
       oracleProbability: existing.oracleProbability ?? s.oracleProbability,
       outcome: existing.outcome ?? s.outcome,
       outletName: existing.outletName ?? s.outletName,
+      // The identity pair and its linkability travel together: oracle-origin rows carry
+      // neither (see oracleSnapshotToContributingSources), so the flag computed on the
+      // indexer row always matches the pair that survives this merge.
+      personName: existing.personName ?? s.personName,
+      authorLinkable: existing.authorLinkable || s.authorLinkable,
       origin: 'both',
     })
   }

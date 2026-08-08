@@ -320,6 +320,7 @@ export function oracleSnapshotToContributingSources(oracleSnapshot: unknown): Co
       outcome: null,
       origin: 'oracle',
       outletName: null,
+      personName: null,
     })
   }
   return out
