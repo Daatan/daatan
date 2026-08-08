@@ -118,6 +118,21 @@ describe('enrichOracleSources', () => {
     expect(out[0].outletName).toBeUndefined()
   })
 
+  it('stamps the response-level relevanceBar onto every source, defaulting to null when omitted (retro#393/#394, daatan#1289)', () => {
+    const withBar = enrichOracleSources(
+      [oracleSource(), oracleSource({ url: 'https://x.com/y' })],
+      [searchResult()],
+      new Map(),
+      new Map(),
+      0.7,
+    )
+    expect(withBar[0].relevanceBar).toBe(0.7)
+    expect(withBar[1].relevanceBar).toBe(0.7)
+
+    const withoutBar = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(withoutBar[0].relevanceBar).toBeNull()
+  })
+
   it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracle omits them (F11, daatan#1237)', () => {
     const out = enrichOracleSources(
       [oracleSource({
@@ -234,6 +249,7 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     quantitativeEstimate: 0.62,
     evidenceWeight: 0.6,
     relevanceScore: 0.9,
+    relevanceBar: 0.0,
     evidenceClass: 'reported_fact',
     authorLean: -0.4,
     authorLeanCertainty: 0.7,
@@ -276,6 +292,7 @@ describe('poolArticleToEnrichedSource', () => {
       quantitativeEstimate: 0.62,
       evidenceWeight: 0.6,
       relevanceScore: 0.9,
+      relevanceBar: 0.0,
       evidenceClass: 'reported_fact',
       authorLean: -0.4,
       authorLeanCertainty: 0.7,
@@ -287,6 +304,11 @@ describe('poolArticleToEnrichedSource', () => {
       claimsDetail: null,
       carriedForward: false,
     })
+  })
+
+  it('passes relevanceBar through from the pool row (retro#393/#394, daatan#1289)', () => {
+    expect(poolArticleToEnrichedSource(poolArticle({ relevanceBar: 0.7 }), null).relevanceBar).toBe(0.7)
+    expect(poolArticleToEnrichedSource(poolArticle({ relevanceBar: null }), null).relevanceBar).toBeNull()
   })
 
   it('carries a null author through (pool rows never store one)', () => {

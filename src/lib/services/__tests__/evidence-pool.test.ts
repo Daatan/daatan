@@ -78,6 +78,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   quantitativeEstimate: null,
   evidenceWeight: null,
   relevanceScore: null,
+  relevanceBar: null,
   evidenceClass: null,
   authorLean: null,
   authorLeanCertainty: null,
@@ -165,6 +166,13 @@ describe('addArticlesToPool', () => {
     const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
     expect(call.create).toMatchObject({ relevanceScore: 0.85 })
     expect(call.update).toMatchObject({ relevanceScore: 0.85 })
+  })
+
+  it('persists the shadow relevanceBar, in both create and update (retro#393/#394, daatan#1289)', async () => {
+    await addArticlesToPool('pred-1', [source({ relevanceBar: 0.7 })], 'analyze')
+    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+    expect(call.create).toMatchObject({ relevanceBar: 0.7 })
+    expect(call.update).toMatchObject({ relevanceBar: 0.7 })
   })
 
   it('persists the shadow authorLean/authorLeanCertainty, in both create and update', async () => {
@@ -332,6 +340,7 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
   quantitativeEstimate: null,
   evidenceWeight: 0.6,
   relevanceScore: 0.9,
+  relevanceBar: 0.0,
   evidenceClass: 'reported_fact',
   origin: 'analyze',
   excluded: false,

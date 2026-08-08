@@ -330,7 +330,13 @@ export async function POST(request: NextRequest) {
           outletId: m.outletId ?? null, outletName: m.outletName ?? null,
         }]),
       )
-      const oracleSources = enrichOracleSources(oracleForecast.sources, articles, authorByUrl, identityByUrl)
+      const oracleSources = enrichOracleSources(
+        oracleForecast.sources,
+        articles,
+        authorByUrl,
+        identityByUrl,
+        oracleForecast.relevance_bar ?? null,
+      )
 
       // The Oracle run above is an EXTRACTION step, not the estimate. A push usually
       // carries a single freshly-matched article, and `/forecast` over one article returns
