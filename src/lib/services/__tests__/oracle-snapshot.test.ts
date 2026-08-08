@@ -370,6 +370,18 @@ describe('oracleSnapshotToContributingSources', () => {
     })
   })
 
+  it('maps the per-source settled flag; absent or malformed → null (#1250)', () => {
+    const snap = {
+      sources: [
+        { url: 'https://a.com/x', settled: true },
+        { url: 'https://b.com/y', settled: 'yes' },
+        { url: 'https://c.com/z' },
+      ],
+    }
+    const out = oracleSnapshotToContributingSources(snap)
+    expect(out.map((s) => s.settled)).toEqual([true, null, null])
+  })
+
   it('is defensive: null/non-object/non-array → []', () => {
     expect(oracleSnapshotToContributingSources(null)).toEqual([])
     expect(oracleSnapshotToContributingSources('nope')).toEqual([])

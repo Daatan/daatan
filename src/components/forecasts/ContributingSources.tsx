@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Newspaper, ExternalLink, ChevronDown } from 'lucide-react'
+import { Newspaper, ExternalLink, ChevronDown, Gavel } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { canonicalKey } from '@/lib/utils/canonical-url'
@@ -213,6 +213,20 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     )
   }
 
+  // Settlement-pin marker (#1250): this article reported the outcome as already
+  // decided — it's what made the Oracle discard the pooled estimate for a pin.
+  // Highlighted so a bad pin is self-diagnosing from the page instead of a DB session.
+  const SettledFlag = () => (
+    <span
+      title={t('settledHint')}
+      data-testid="settling-source-flag"
+      className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300"
+    >
+      <Gavel className="w-2.5 h-2.5" aria-hidden="true" />
+      {t('settledBadge')}
+    </span>
+  )
+
   // One article inside an expanded outlet card: stance dot, headline, per-article badge.
   // With a confirmed author profile (#1213) the row gains a byline link — as a sibling of
   // the article <a>, never nested inside it (same invalid-HTML rule as OutletName), so the
@@ -235,6 +249,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
         >
           <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dotColor[side]}`} />
           <span className="text-xs text-gray-300 flex-1 min-w-0 line-clamp-2 group-hover/row:text-gray-200">{title}</span>
+          {s.settled === true && <SettledFlag />}
           <Badge side={side} pct={s.certainty != null ? Math.round(articleProbYes(s) * 100) : null} />
           <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 mt-0.5" />
         </a>
@@ -257,6 +272,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
             {s.personName}
           </Link>
         </span>
+        {s.settled === true && <SettledFlag />}
         <Badge side={side} pct={s.certainty != null ? Math.round(articleProbYes(s) * 100) : null} />
         <a href={s.url} target="_blank" rel="noopener noreferrer" title={hint || undefined}>
           <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 mt-0.5" />
@@ -311,6 +327,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
               </a>
             )}
           </span>
+          {s.settled === true && <SettledFlag />}
           <Badge side={g.side} pct={g.pct} />
           <a href={s.url} target="_blank" rel="noopener noreferrer" title={hint || undefined}>
             <ExternalLink className="w-3 h-3 text-gray-600 shrink-0 group-hover/card:text-gray-300" />
@@ -332,6 +349,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           >
             {g.range.min}–{g.range.max}%
           </span>
+          {g.articles.some((a) => a.settled === true) && <SettledFlag />}
           <Badge side={g.side} pct={g.pct} />
           <ChevronDown className="w-3.5 h-3.5 text-gray-500 shrink-0 transition-transform group-open/card:rotate-180" />
         </summary>

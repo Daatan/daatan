@@ -176,6 +176,8 @@
     "filterByTagTooltip": "עיון בתחזיות עם התגית \"{tag}\"",
     "legendYou": "אתה",
     "legendAI": "בינה מלאכותית",
+    "settledPinNotice": "האורקל קורא את השאלה הזו כשאלה שכבר הוכרעה — המספר הזה הוא נעיצת הכרעה, לא ממוצע משוקלל של המקורות.",
+    "settledPinSources": "מדווח כמוכרע על ידי: {names}",
     "aiInsufficientEvidence": "אין מספיק ראיות",
     "temporalClockAnnotation": "כולל התאמת זמן שנותר — המועד האחרון בעוד {days} ימים",
     "signInToVote": "התחברו כדי להצביע",
@@ -505,6 +507,10 @@
     "stepEstimating": "מעריך הסתברות...",
     "updated": "ההקשר עודכן!",
     "failed": "ניתוח ההקשר נכשל",
+    "settledBadge": "הוכרע",
+    "settledHint": "נעיצת הכרעה — האורקל קורא את השאלה כמוכרעת, ולכן המספר הזה מחליף את האומדן המשוקלל במקום למצע אותו.",
+    "settledNote": "האורקל קורא את השאלה הזו כמוכרעת — האומדן המשוקלל הוחלף בנעיצת הכרעה.",
+    "settledNoteSources": "מדווח כמוכרע על ידי: {names}",
     "lastUpdated": "עדכון אחרון",
     "previousUpdates": "עדכון קודם אחד",
     "previousUpdatesPlural": "{count} עדכונים קודמים"
@@ -529,6 +535,8 @@
     "badgeHint": "{pct}% סיכוי משתמע שזה יקרה — לפי העמדה והוודאות של הכתבה",
     "originOracle": "נותח ב-AI",
     "originIndexer": "באינדקס",
+    "settledBadge": "מכריע",
+    "settledHint": "מאמר זה מדווח שהתוצאה כבר הוכרעה — הוא שהפעיל את נעיצת ההכרעה של האורקל.",
     "originBoth": "שניהם"
   },
   "footer": {

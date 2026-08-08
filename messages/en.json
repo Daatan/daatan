@@ -176,6 +176,8 @@
     "filterByTagTooltip": "Browse forecasts tagged \"{tag}\"",
     "legendYou": "You",
     "legendAI": "AI",
+    "settledPinNotice": "The Oracle reads this question as already decided — this number is a settlement pin, not a pooled average of the sources.",
+    "settledPinSources": "Reported as decided by: {names}",
     "aiInsufficientEvidence": "Insufficient evidence",
     "temporalClockAnnotation": "includes time-remaining adjustment — deadline in {days} days",
     "signInToVote": "Sign in to vote",
@@ -505,6 +507,10 @@
     "stepEstimating": "Estimating probability...",
     "updated": "Context updated!",
     "failed": "Failed to analyze context",
+    "settledBadge": "Settled",
+    "settledHint": "Settlement pin — the Oracle reads this question as already decided, so this number replaces the pooled estimate rather than averaging it.",
+    "settledNote": "The Oracle reads this question as already decided — the pooled estimate was replaced by a settlement pin.",
+    "settledNoteSources": "Reported as decided by: {names}",
     "lastUpdated": "Last updated",
     "previousUpdates": "{count} previous update",
     "previousUpdatesPlural": "{count} previous updates"
@@ -529,6 +535,8 @@
     "badgeHint": "{pct}% implied chance it will happen — from this article's stance and certainty",
     "originOracle": "AI-analysed",
     "originIndexer": "Indexed",
+    "settledBadge": "settling",
+    "settledHint": "This article reports the outcome as already decided — it is what triggered the Oracle's settlement pin.",
     "originBoth": "Both"
   },
   "footer": {

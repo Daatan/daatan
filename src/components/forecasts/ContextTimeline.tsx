@@ -64,6 +64,8 @@ type OracleSnapshotSource = {
   /** Leaderboard credibility weight; ~1.0 is neutral. */
   credibilityWeight: number
   claims: string[]
+  /** This source reported the outcome as already decided — it supports the settlement pin. */
+  settled?: boolean | null
 }
 
 /** Full Oracle payload persisted alongside a context snapshot when the Oracle path is taken. */
@@ -75,6 +77,10 @@ type OracleSnapshot = {
   ciLow: number
   ciHigh: number
   articlesUsed: number
+  /** Settlement pin (#1250): the Oracle read the question as already decided and
+   *  REPLACED the pooled estimate with a pinned constant — a different epistemic
+   *  regime, not a confident average. Surfaced in the UI, never restyled away. */
+  settled?: boolean
   sources: OracleSnapshotSource[]
 }
 
@@ -85,6 +91,8 @@ export type AiEstimate = {
   ciHigh?: number
   /** The Oracle had no evidence bearing on the claim — show "Insufficient evidence". */
   abstained?: boolean
+  /** The estimate is a settlement pin, not a pooled average (see OracleSnapshot.settled). */
+  settled?: boolean
 }
 
 export type Snapshot = {
@@ -126,7 +134,21 @@ const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
     probability: snap.externalProbability,
     ciLow: oracle?.ciLow,
     ciHigh: oracle?.ciHigh,
+    settled: oracle?.settled ?? false,
   }
+}
+
+/** Display name for a settling source — its name, else the URL host (sans www). */
+export function settlingSourceNames(oracle: { sources?: OracleSnapshotSource[] } | null | undefined): string[] {
+  const settlers = (oracle?.sources ?? []).filter((s) => s.settled === true)
+  return settlers.map((s) => {
+    if (s.sourceName) return s.sourceName
+    try {
+      return new URL(s.url).hostname.replace(/^www\./, '')
+    } catch {
+      return s.url
+    }
+  })
 }
 
 export default function ContextTimeline({
@@ -397,6 +419,14 @@ export default function ContextTimeline({
                   >
                     {isOracle ? 'Oracle' : 'LLM estimate'}
                   </span>
+                  {oracle?.settled && (
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                      title={t('settledHint')}
+                    >
+                      {t('settledBadge')}
+                    </span>
+                  )}
                 </div>
                 <p className="text-2xl font-black text-amber-400">
                   {latest.externalProbability}%
@@ -406,6 +436,15 @@ export default function ContextTimeline({
                     </span>
                   )}
                 </p>
+                {oracle?.settled && (() => {
+                  const names = settlingSourceNames(oracle)
+                  return (
+                    <p className="text-xs text-amber-300/90 mt-1 leading-relaxed" data-testid="settled-pin-note">
+                      {t('settledNote')}
+                      {names.length > 0 && ` ${t('settledNoteSources', { names: names.join(', ') })}`}
+                    </p>
+                  )
+                })()}
                 {latest.externalReasoning && (
                   <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                     {latest.externalReasoning}

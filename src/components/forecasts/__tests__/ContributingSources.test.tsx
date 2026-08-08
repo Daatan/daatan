@@ -272,4 +272,47 @@ describe('ContributingSources', () => {
     // The unconfirmed row keeps its plain full-row article anchor.
     expect(screen.getByText('Second').closest('a')).toHaveAttribute('href', 'https://thehill.com/b')
   })
+
+  // Settlement pin (#1250): the sources that reported the outcome as decided are
+  // flagged, so a bad pin is diagnosable from the page.
+  describe('settling-source flag', () => {
+    it('flags a single-article outlet whose article is settled', () => {
+      renderWithIntl(
+        <ContributingSources
+          sources={[
+            src({ url: 'https://rferl.org/1', source: 'RFE/RL', stance: 0.8, settled: true }),
+            src({ url: 'https://reuters.com/2', source: 'Reuters', stance: 0.5, settled: false }),
+          ]}
+        />,
+      )
+      expect(screen.getAllByTestId('settling-source-flag')).toHaveLength(1)
+      expect(screen.getByText(enMessages.sources.settledBadge)).toBeInTheDocument()
+    })
+
+    it('shows no flag when settled is false or absent', () => {
+      renderWithIntl(
+        <ContributingSources
+          sources={[
+            src({ url: 'https://a.com/1', stance: 0.6, settled: false }),
+            src({ url: 'https://b.com/2', stance: -0.6, settled: null }),
+            src({ url: 'https://c.com/3', stance: 0.3 }),
+          ]}
+        />,
+      )
+      expect(screen.queryByTestId('settling-source-flag')).not.toBeInTheDocument()
+    })
+
+    it('flags a multi-article outlet card on its summary and on the settling row', () => {
+      renderWithIntl(
+        <ContributingSources
+          sources={[
+            src({ url: 'https://thehill.com/a', source: 'The Hill', title: 'Decided piece', stance: 0.8, certainty: 0.9, settled: true }),
+            src({ url: 'https://thehill.com/b', source: 'The Hill', title: 'Ordinary piece', stance: 0.4, certainty: 0.5, settled: false }),
+          ]}
+        />,
+      )
+      // One flag on the collapsed summary + one on the settled article's row.
+      expect(screen.getAllByTestId('settling-source-flag')).toHaveLength(2)
+    })
+  })
 })
