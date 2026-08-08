@@ -4,6 +4,10 @@ export interface LLMRequest {
   prompt: string
   schema?: Schema
   temperature?: number
+  /** Lets a caller (e.g. bots/shared.ts's retry wrapper) cancel an in-flight
+   *  provider call. Each provider also applies its own default timeout — this
+   *  narrows that further when the caller has a tighter deadline. */
+  signal?: AbortSignal
 }
 
 export interface LLMResponse {
