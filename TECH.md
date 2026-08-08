@@ -387,13 +387,19 @@ terraform init -backend-config=backend-staging.hcl
 terraform plan  -var="environment=staging"
 terraform apply -var="environment=staging"
 
-# Production
+# Production — run terraform/scripts/check-no-replace.sh first, see terraform/README.md
 terraform init -backend-config=backend-prod.hcl
 terraform plan  -var="environment=prod"
 terraform apply -var="environment=prod"
 ```
 
 **Note:** instance-type changes are ignored in `lifecycle` to prevent accidental recreation.
+
+**Before any apply touching `aws_instance.production`/`aws_instance.staging`:** run
+`terraform/scripts/check-no-replace.sh`, which fails loudly if the plan would replace
+(destroy + recreate) either live instance instead of updating it in place — see
+`terraform/README.md` and daatan#1194 for why (`key_name` is immutable and
+`terraform/*.tfvars` are gitignored, so a local drift is invisible until apply time).
 
 ### Estimated Monthly Costs
 
