@@ -25,6 +25,7 @@ const src = (over: Partial<ContributingSource>): ContributingSource => ({
   oracleProbability: null,
   outcome: null,
   outletName: null,
+  personName: null,
   ...over,
 })
 
@@ -233,5 +234,42 @@ describe('ContributingSources', () => {
     )
     const link = screen.getByText('Some/Outlet').closest('a')
     expect(link).toHaveAttribute('href', '/sources/some%2Foutlet')
+  })
+
+  it('links a confirmed byline on a single-article card to its /authors/[author]/[outlet] profile (#1213)', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[src({ source: 'Reuters', outletName: 'reuters', personName: 'Jane Doe', authorLinkable: true, stance: 0.5 })]}
+      />,
+    )
+    const link = screen.getByText('Jane Doe').closest('a')
+    expect(link).toHaveAttribute('href', '/authors/Jane%20Doe/reuters')
+  })
+
+  it('shows no byline link when the (author, outlet) pair is not confirmed on the leaderboard', () => {
+    // personName resolved but authorLinkable unset → the profile page would 404, so no link
+    // (the byline stays tooltip-only, exactly as before #1213).
+    renderWithIntl(
+      <ContributingSources
+        sources={[src({ source: 'Reuters', outletName: 'reuters', personName: 'Jane Doe', stance: 0.5 })]}
+      />,
+    )
+    expect(screen.queryByText('Jane Doe')).toBeNull()
+  })
+
+  it('links confirmed bylines on expanded multi-article rows, next to the article link', () => {
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://thehill.com/a', source: 'The Hill', outletName: 'the-hill', personName: 'Ann A', authorLinkable: true, title: 'First', stance: 0.5 }),
+          src({ url: 'https://thehill.com/b', source: 'The Hill', outletName: 'the-hill', title: 'Second', stance: 0.4 }),
+        ]}
+      />,
+    )
+    // Confirmed byline → profile link; the article link itself must survive as a sibling.
+    expect(screen.getByText('Ann A').closest('a')).toHaveAttribute('href', '/authors/Ann%20A/the-hill')
+    expect(screen.getByText('First').closest('a')).toHaveAttribute('href', 'https://thehill.com/a')
+    // The unconfirmed row keeps its plain full-row article anchor.
+    expect(screen.getByText('Second').closest('a')).toHaveAttribute('href', 'https://thehill.com/b')
   })
 })

@@ -11,11 +11,28 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 vi.mock('@/lib/services/context', () => ({ getLatestOracleSnapshot: vi.fn() }))
+vi.mock('@/lib/services/sourceLeaderboard', () => ({ getSourceLeaderboard: vi.fn() }))
 
 import { getForecastVoters } from '../forecast-sources'
 import { getLatestOracleSnapshot } from '@/lib/services/context'
+import { getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 
 const mockSnapshot = vi.mocked(getLatestOracleSnapshot)
+const mockLeaderboard = vi.mocked(getSourceLeaderboard)
+
+/** Author-shadow board with the given scored (author, outletName) pairs — the row set the
+ *  linkability check matches against (same criterion as /authors/[author]/[outlet]). */
+function mockScoredAuthors(pairs: Array<{ author: string; outletName: string }>) {
+  mockLeaderboard.mockResolvedValue({
+    view: 'authors',
+    sortBy: 'skillConservative',
+    authorRows: pairs.map((p, i) => ({
+      id: `row-${i}`, author: p.author, outletName: p.outletName,
+      skillConservative: 0.1, brierScore: 0.2, predictions: 3, articles: 5,
+    })),
+    outletRows: [],
+  })
+}
 
 function mockIndexerRows(rows: unknown[]) {
   global.fetch = vi.fn(async () => ({ ok: true, json: async () => rows })) as unknown as typeof fetch
@@ -30,7 +47,10 @@ function mockFetchRouted(indexerRows: unknown[], metaRows: unknown[]) {
   }) as unknown as typeof fetch
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockScoredAuthors([]) // sparse board by default — nothing linkable
+})
 
 describe('getForecastVoters', () => {
   it('returns indexer-only when no Oracle snapshot exists', async () => {
@@ -97,5 +117,57 @@ describe('getForecastVoters', () => {
     expect(out).toHaveLength(1)
     expect(out[0].origin).toBe('both')
     expect(out[0].outletName).toBe('reuters')
+  })
+
+  it('enriches personName and flags authorLinkable when the pair has a scored leaderboard row (#1213)', async () => {
+    mockSnapshot.mockResolvedValue(null)
+    mockScoredAuthors([{ author: 'Jane Doe', outletName: 'reuters' }])
+    mockFetchRouted(
+      [{ url: 'https://reuters.com/x', stance: 0.4 }],
+      [{ requestedUrl: 'https://reuters.com/x', outletName: 'reuters', personName: 'Jane Doe' }],
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out[0].personName).toBe('Jane Doe')
+    expect(out[0].authorLinkable).toBe(true)
+  })
+
+  it('leaves authorLinkable unset when the pair has no scored row — the profile page would 404', async () => {
+    mockSnapshot.mockResolvedValue(null)
+    mockScoredAuthors([{ author: 'Jane Doe', outletName: 'bbc' }]) // scored at a DIFFERENT outlet
+    mockFetchRouted(
+      [{ url: 'https://reuters.com/x', stance: 0.4 }],
+      [{ requestedUrl: 'https://reuters.com/x', outletName: 'reuters', personName: 'Jane Doe' }],
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out[0].personName).toBe('Jane Doe')
+    expect(out[0].authorLinkable).toBeFalsy()
+  })
+
+  it('skips the leaderboard fetch entirely when no row carries a resolved (person, outlet) pair', async () => {
+    mockSnapshot.mockResolvedValue(null)
+    mockFetchRouted(
+      [{ url: 'https://bbc.com/x', stance: -0.3, author: 'Tom' }],
+      [{ requestedUrl: 'https://bbc.com/x', outletName: 'bbc' }], // outlet resolved, person not
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out[0].personName).toBeNull()
+    expect(mockLeaderboard).not.toHaveBeenCalled()
+  })
+
+  it('carries personName + authorLinkable through a both-origin merge', async () => {
+    mockSnapshot.mockResolvedValue({
+      oracleSnapshot: { sources: [{ url: 'https://reuters.com/a', stance: 0.5, certainty: 0.8 }] },
+      createdAt: new Date(),
+    } as never)
+    mockScoredAuthors([{ author: 'Jane Doe', outletName: 'reuters' }])
+    mockFetchRouted(
+      [{ url: 'https://www.reuters.com/a?utm_source=rss', stance: -0.9 }],
+      [{ requestedUrl: 'https://www.reuters.com/a?utm_source=rss', outletName: 'reuters', personName: 'Jane Doe' }],
+    )
+    const out = await getForecastVoters('fc-1')
+    expect(out).toHaveLength(1)
+    expect(out[0].origin).toBe('both')
+    expect(out[0].personName).toBe('Jane Doe')
+    expect(out[0].authorLinkable).toBe(true)
   })
 })
