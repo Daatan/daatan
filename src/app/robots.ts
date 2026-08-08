@@ -20,18 +20,23 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
+      // No trailing slash: Disallow is a prefix match (RFC 9309), and
+      // trailingSlash is unset (defaults false) — the pages below render at
+      // the bare path (e.g. /settings, not /settings/), so a '/settings/'
+      // rule blocks only subpaths and leaks the page itself. The bare form
+      // still covers subpaths too, so this is strictly broader, not looser.
       disallow: [
-        '/admin/',
+        '/admin',
         '/api/',
-        '/settings/',
+        '/settings',
         '/auth/',
-        '/notifications/',
-        '/commitments/',
-        '/create/',
-        '/forecasts/new/',
-        '/forecasts/express/',
-        '/forecasts/*/edit/',
-        '/retroanalysis/',
+        '/notifications',
+        '/commitments',
+        '/create',
+        '/forecasts/new',
+        '/forecasts/express',
+        '/forecasts/*/edit',
+        '/retroanalysis',
         // Internal architecture docs served as static HTML (also carry a
         // noindex meta tag) — not indexable content.
         '/docs/',
