@@ -13,6 +13,9 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+vi.mock('@/env', () => ({ env: { BOT_RUNNER_SECRET: 'cron-sec' } }))
+vi.mock('@/lib/cron-auth', () => ({ secretsMatch: (a: string, b: string) => a === b }))
+
 vi.mock('@/lib/services/tag-ratings', () => ({
   ensurePunditTagRatingsSeeded: vi.fn(),
 }))
@@ -31,7 +34,6 @@ describe('POST /api/admin/pundit-ratings/recalculate', () => {
     const { POST } = await import('@/app/api/admin/pundit-ratings/recalculate/route')
     const res = await POST(
       new NextRequest('http://localhost/api/admin/pundit-ratings/recalculate?tag=not-a-real-tag'),
-      { params: Promise.resolve({}) } as never,
     )
 
     expect(res.status).toBe(404)
@@ -44,7 +46,7 @@ describe('POST /api/admin/pundit-ratings/recalculate', () => {
     vi.mocked(prisma.punditTagRating.count).mockResolvedValue(5)
 
     const { POST } = await import('@/app/api/admin/pundit-ratings/recalculate/route')
-    await POST(new NextRequest('http://localhost/api/admin/pundit-ratings/recalculate'), { params: Promise.resolve({}) } as never)
+    await POST(new NextRequest('http://localhost/api/admin/pundit-ratings/recalculate'))
 
     expect(prisma.tag.findUnique).toHaveBeenCalledWith({ where: { slug: 'israeli-elections-2026' }, select: { id: true } })
     expect(ensurePunditTagRatingsSeeded).toHaveBeenCalledWith('tag-1', 'israeli-elections-2026')
@@ -58,11 +60,28 @@ describe('POST /api/admin/pundit-ratings/recalculate', () => {
     const { POST } = await import('@/app/api/admin/pundit-ratings/recalculate/route')
     const res = await POST(
       new NextRequest('http://localhost/api/admin/pundit-ratings/recalculate?tag=israeli-elections-2026'),
-      { params: Promise.resolve({}) } as never,
     )
     const body = await res.json()
 
     expect(prisma.punditTagRating.deleteMany).toHaveBeenCalledWith({ where: { tagId: 'tag-1' } })
     expect(body).toMatchObject({ tagSlug: 'israeli-elections-2026', updated: 8 })
+  })
+
+  it('runs headlessly via a matching x-cron-secret, without needing an ADMIN session (daatan#1293)', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.tag.findUnique).mockResolvedValue({ id: 'tag-1' } as any)
+    vi.mocked(prisma.punditTagRating.count).mockResolvedValue(3)
+
+    const { POST } = await import('@/app/api/admin/pundit-ratings/recalculate/route')
+    const res = await POST(
+      new NextRequest('http://localhost/api/admin/pundit-ratings/recalculate?tag=israeli-elections-2026', {
+        method: 'POST',
+        headers: { 'x-cron-secret': 'cron-sec' },
+      }),
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toMatchObject({ tagSlug: 'israeli-elections-2026', updated: 3 })
   })
 })
