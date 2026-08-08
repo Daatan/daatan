@@ -124,6 +124,83 @@ describe('SourcesTab', () => {
     expect(screen.getByText('6')).toBeInTheDocument()
   })
 
+  it('renders extraction yield and endorsement columns, including for Telegram rows with a null domain', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 2,
+        enabled: 2,
+        sources: [
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', impact: { matches: 1, forecastsAffected: 1, last30dMatches: 0, lastMatchedAt: null },
+            extraction: { complete: 3, failed: 1, yield: 0.75 },
+            endorsement: { judged: 20, delivered: 5, rate: 0.25, judged30d: 4, delivered30d: 1, lastJudgedAt: '2026-08-01T00:00:00+00:00' } },
+          { type: 'telegram', name: 'Edy Cohen', locator: 'edycohen', language: 'he', enabled: true,
+            domain: null,
+            extraction: { complete: 2, failed: 0, yield: 1 },
+            endorsement: { judged: 8, delivered: 8, rate: 1, judged30d: 2, delivered30d: 2, lastJudgedAt: null } },
+        ],
+        unconfigured: [],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('Phys.org')).toBeInTheDocument())
+    expect(screen.getByText('3/4')).toBeInTheDocument()
+    expect(screen.getByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('25%')).toBeInTheDocument()
+    expect(screen.getByText('20 judged')).toBeInTheDocument()
+    // The Telegram row has domain null but must still show both metrics.
+    expect(screen.getByText('2/2')).toBeInTheDocument()
+    expect(screen.getAllByText('100%')).toHaveLength(2)
+    expect(screen.getByText('8 judged')).toBeInTheDocument()
+  })
+
+  it('shows em dashes for a null yield and a missing endorsement block (ni side not yet deployed)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 1,
+        enabled: 1,
+        sources: [
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', impact: { matches: 1, forecastsAffected: 1, last30dMatches: 0, lastMatchedAt: null },
+            extraction: { complete: 0, failed: 0, yield: null } },
+        ],
+        unconfigured: [],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('Phys.org')).toBeInTheDocument())
+    // Exactly two em dashes: the yield cell and the endorsement cell.
+    expect(screen.getAllByText('—')).toHaveLength(2)
+  })
+
+  it('shows an em dash for an endorsement block with judged=0', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        total: 1,
+        enabled: 1,
+        sources: [
+          { type: 'rss', name: 'Phys.org', locator: 'https://phys.org/rss-feed/', language: 'en', enabled: true,
+            domain: 'phys.org', impact: { matches: 1, forecastsAffected: 1, last30dMatches: 0, lastMatchedAt: null },
+            extraction: { complete: 4, failed: 0, yield: 1 },
+            endorsement: { judged: 0, delivered: 0, rate: null, judged30d: 0, delivered30d: 0, lastJudgedAt: null } },
+        ],
+        unconfigured: [],
+      }),
+    })
+
+    renderWithIntl(<SourcesTab />)
+
+    await waitFor(() => expect(screen.getByText('4/4')).toBeInTheDocument())
+    expect(screen.getAllByText('—')).toHaveLength(1)
+  })
+
   it('surfaces an error when the request fails', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 503, json: () => Promise.resolve({ error: 'News-indexer not configured' }) })
     renderWithIntl(<SourcesTab />)

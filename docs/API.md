@@ -502,7 +502,7 @@ Manually trigger a bot run.
 Fetch recent bot run logs.
 
 ### `GET /api/admin/news-indexer/sources` — Admin
-Proxy to the news-indexer `/sources` list (the configured `sources.yaml` joined to per-source forecast-match impact). Backs the admin **Sources** tab. Returns the news-indexer payload verbatim with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
+Proxy to the news-indexer `/sources` list (the configured `sources.yaml` joined to per-source forecast-match impact). Backs the admin **Sources** tab. On a successful upstream response, each source is enriched with a daatan-computed `extraction: { complete, failed, yield }` block (news-indexer#194) — extraction outcomes from `evidence_pool_articles` folded over the source's `matchKeys` (falling back to the Telegram display name / the domain when the deployed news-indexer doesn't send `matchKeys` yet). `yield` = `complete / (complete + failed)` rounded to 4 decimals, `null` when there are no attempts; `PENDING` rows are ignored. A DB failure degrades to zero counts rather than failing the panel. Everything else in the payload is passed through verbatim with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
 
 ### `GET /api/admin/news-indexer/sources/[name]` — Admin
 Proxy to news-indexer's `GET /outlets/{name}` — one outlet's identity enrichment (Wikipedia URL, Telegram channel, links, notes — null/empty until an admin fills them in) merged with its `sources.yaml` config and forecast-match-derived impact + up to 50 recent publications. Backs the admin Sources detail page (`/admin/sources/[name]`, linked from each row in the Sources tab). Same `503` behavior as above.
