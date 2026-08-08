@@ -223,3 +223,15 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 > used here as a best-effort discovery nudge; Google may ignore or rate-limit other content types.
 > The sitemap remains the authoritative discovery path — resubmit it in Search Console after large
 > backfills (e.g. the English-canonicalization re-slug pass).
+
+## Weekly measurement loop (platform#13)
+
+`.github/workflows/seo-report.yml` (Mondays 06:00 UTC) posts a GSC + Yandex.Webmaster
+snapshot for daatan.com AND elections.daatan.com to the clean Telegram channel:
+7-day totals vs the prior week, tracked election-keyword impressions (list in
+`scripts/seo-report.py`, mirroring Daatan/docs `seo.md` tiers 1–3 — sync manually),
+clicks by page section, sitemap errors/warnings, Yandex indexed counts. Secrets:
+`GSC_SA_KEY` (seo-mcp service account), `YWM_OAUTH_TOKEN`. The GSC API cannot read
+the Page-indexing (coverage) report — the 0-coverage-alerts goal still needs a
+periodic Search Console UI check. CrUX/Core-Web-Vitals is absent until the Chrome
+UX Report API is enabled in the GCP project.

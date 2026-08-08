@@ -49,3 +49,4 @@ coverage/
 *.deb
 
 *.tsbuildinfo
+__pycache__/
