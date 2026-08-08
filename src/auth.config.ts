@@ -58,6 +58,17 @@ export default {
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
+        // The user row no longer exists (hard-deleted since the token was issued).
+        // Clear the identity fields so both withAuth's `!session?.user?.id` check
+        // and middleware's admin-role check treat this as unauthenticated instead
+        // of trusting stale cached claims from before deletion. Lives here (not
+        // only in auth.ts's Node-only override, which also sets `expires`) so the
+        // Edge middleware instance, which shares this base callback, sees it too.
+        if (token.userDeleted) {
+          session.user.id = ''
+          session.user.role = 'USER'
+          return session
+        }
         session.user.id = token.sub
         session.user.role = token.role ?? 'USER'
         session.user.username = token.username ?? undefined
