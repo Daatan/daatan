@@ -63,44 +63,49 @@ export type EnrichedOracleSource = {
   publishedAt: string | null
   author: string | null
   // Resolved cross-platform person identity (news-indexer). Persisted on the evidence-pool row so
-  // elections can attribute a source to a tracked commentator by id/name (Phase 2). Null when
-  // uncurated or when the by-url lookup didn't supply it.
-  personId: string | null
-  personName: string | null
+  // elections can attribute a source to a tracked commentator by id/name (Phase 2). Null when the
+  // by-url lookup resolved to no identity; undefined when the lookup has no entry for this URL at
+  // all (F11, daatan#1237) — the latter must NOT overwrite a previously-resolved identity.
+  personId?: string | null
+  personName?: string | null
   // Resolved outlet identity (news-indexer, exact match against outlet.name). Same provenance
-  // and nullability as personId/personName above.
-  outletId: string | null
-  outletName: string | null
-  settled: boolean | null
+  // and null/undefined distinction as personId/personName above.
+  outletId?: string | null
+  outletName?: string | null
+  // Below: mirrors OracleSource's optionality (oracle.ts). Undefined means the Oracle response
+  // omitted the key — no opinion this run, must NOT overwrite a previously-stored value (F11,
+  // daatan#1237). Null means the response explicitly carried a null — a real signal (e.g.
+  // "unclassified", "author reported facts only") that DOES overwrite.
+  settled?: boolean | null
   // The settlement anchor date (retro #291) — persisted next to `settled` so
   // pool recomputes can re-validate the vote. Strict YYYY-MM-DD from retro.
-  settlementEventDate: string | null
-  quantitativeEstimate: number | null
-  evidenceWeight: number | null
-  relevanceScore: number | null
-  evidenceClass: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
+  settlementEventDate?: string | null
+  quantitativeEstimate?: number | null
+  evidenceWeight?: number | null
+  relevanceScore?: number | null
+  evidenceClass?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
   // The byline author's OWN directional forecast of the event (retro #308/#309), for the
   // author-scoring lane — deliberately NOT part of the estimate. Null when the author only
   // reported facts. Persisted on the pool row; nothing in aggregation reads it (shadow).
-  authorLean: number | null
-  authorLeanCertainty: number | null
+  authorLean?: number | null
+  authorLeanCertainty?: number | null
   // The FACT-lane counterpart of `stance` + its qualifying facets (retro #313), for the
   // estimator lane — deliberately NOT part of the current estimate. `factSignal` is what the
   // reported facts alone imply [-1,1]; `eventActors`/`eventTarget` name the dominant fact's
   // dyad, `isOccurrence` marks event-itself vs precursor, `verified` marks reported vs claimed.
   // All null on pure opinion. Persisted on the pool row; nothing in aggregation reads them (shadow).
-  factSignal: number | null
-  eventActors: string | null
-  eventTarget: string | null
-  isOccurrence: boolean | null
-  verified: boolean | null
+  factSignal?: number | null
+  eventActors?: string | null
+  eventTarget?: string | null
+  isOccurrence?: boolean | null
+  verified?: boolean | null
   // The per-claim layer behind every scalar above (F1/F15, daatan#1235 + retro#364) —
   // each claim's own stance/certainty/class/fact_signal/facets, as retro's fusion
   // consumed them. This is where the inputs to those reductions used to die. Null on
   // rows extracted before it existed (no backfill — the data is gone, not derivable).
   // Persisted verbatim; nothing in aggregation reads it and it is never sent back to
   // `/pool/aggregate` (shadow, like authorLean/factSignal).
-  claimsDetail: OracleClaimDetail[] | null
+  claimsDetail?: OracleClaimDetail[] | null
   // Whether this source's stance is byte-identical to its reading in the immediately-prior
   // evidence snapshot for this prediction — i.e. it was swept into this snapshot by a pool
   // recompute triggered by a DIFFERENT source's new article, not itself re-evaluated. Always
@@ -127,6 +132,7 @@ export function enrichOracleSources(
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
     const article = articleByUrl.get(s.url)
+    const identity = identityByUrl.get(s.url)
     return {
       sourceId: s.source_id,
       sourceName: s.source_name,
@@ -138,24 +144,27 @@ export function enrichOracleSources(
       title: article?.title ?? null,
       publishedAt: article?.publishedDate ?? null,
       author: authorByUrl.get(s.url) ?? null,
-      personId: identityByUrl.get(s.url)?.personId ?? null,
-      personName: identityByUrl.get(s.url)?.personName ?? null,
-      outletId: identityByUrl.get(s.url)?.outletId ?? null,
-      outletName: identityByUrl.get(s.url)?.outletName ?? null,
-      settled: s.settled ?? null,
-      settlementEventDate: s.settlement_event_date ?? null,
-      quantitativeEstimate: s.quantitative_estimate ?? null,
-      evidenceWeight: s.evidence_weight ?? null,
-      relevanceScore: s.relevance_score ?? null,
-      evidenceClass: s.evidence_class ?? null,
-      authorLean: s.author_lean ?? null,
-      authorLeanCertainty: s.author_lean_certainty ?? null,
-      factSignal: s.fact_signal ?? null,
-      eventActors: s.event_actors ?? null,
-      eventTarget: s.event_target ?? null,
-      isOccurrence: s.is_occurrence ?? null,
-      verified: s.verified ?? null,
-      claimsDetail: s.claims_detail ?? null,
+      // `identity` undefined = no lookup entry for this URL this run (F11: stays undefined,
+      // preserves a prior value). `identity` present with a null field = resolved, no identity
+      // (a real signal: still written).
+      personId: identity?.personId,
+      personName: identity?.personName,
+      outletId: identity?.outletId,
+      outletName: identity?.outletName,
+      settled: s.settled,
+      settlementEventDate: s.settlement_event_date,
+      quantitativeEstimate: s.quantitative_estimate,
+      evidenceWeight: s.evidence_weight,
+      relevanceScore: s.relevance_score,
+      evidenceClass: s.evidence_class,
+      authorLean: s.author_lean,
+      authorLeanCertainty: s.author_lean_certainty,
+      factSignal: s.fact_signal,
+      eventActors: s.event_actors,
+      eventTarget: s.event_target,
+      isOccurrence: s.is_occurrence,
+      verified: s.verified,
+      claimsDetail: s.claims_detail,
       carriedForward: false,
     }
   })

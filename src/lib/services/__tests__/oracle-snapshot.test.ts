@@ -12,6 +12,7 @@ import {
   stanceToPercent,
   PUBLISH_PERCENT_MIN,
   PUBLISH_PERCENT_MAX,
+  type EnrichedOracleSource,
 } from '../oracle-snapshot'
 
 const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
@@ -55,9 +56,9 @@ describe('enrichOracleSources', () => {
     expect(out[0].claimsDetail).toEqual(claims_detail)
   })
 
-  it('defaults claimsDetail to null when the Oracle omitted it (older build)', () => {
+  it('leaves claimsDetail undefined when the Oracle omitted it (F11, daatan#1237)', () => {
     const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
-    expect(out[0].claimsDetail).toBeNull()
+    expect(out[0].claimsDetail).toBeUndefined()
   })
 
   it('joins title + date from the input articles and author from the lookup', () => {
@@ -109,12 +110,15 @@ describe('enrichOracleSources', () => {
     })
   })
 
-  it('defaults person/outlet identity to null when identityByUrl is omitted', () => {
+  it('leaves person/outlet identity undefined when identityByUrl has no entry for the URL (F11, daatan#1237)', () => {
     const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
-    expect(out[0]).toMatchObject({ personId: null, personName: null, outletId: null, outletName: null })
+    expect(out[0].personId).toBeUndefined()
+    expect(out[0].personName).toBeUndefined()
+    expect(out[0].outletId).toBeUndefined()
+    expect(out[0].outletName).toBeUndefined()
   })
 
-  it('defaults settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal to null when the Oracle omits them', () => {
+  it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracle omits them (F11, daatan#1237)', () => {
     const out = enrichOracleSources(
       [oracleSource({
         settled: undefined,
@@ -133,20 +137,79 @@ describe('enrichOracleSources', () => {
       [searchResult()],
       new Map(),
     )
-    expect(out[0]).toMatchObject({
-      settled: null,
-      settlementEventDate: null,
-      quantitativeEstimate: null,
-      evidenceWeight: null,
-      relevanceScore: null,
-      authorLean: null,
-      authorLeanCertainty: null,
-      factSignal: null,
-      eventActors: null,
-      eventTarget: null,
-      isOccurrence: null,
-      verified: null,
-    })
+    expect(out[0].settled).toBeUndefined()
+    expect(out[0].settlementEventDate).toBeUndefined()
+    expect(out[0].quantitativeEstimate).toBeUndefined()
+    expect(out[0].evidenceWeight).toBeUndefined()
+    expect(out[0].relevanceScore).toBeUndefined()
+    expect(out[0].authorLean).toBeUndefined()
+    expect(out[0].authorLeanCertainty).toBeUndefined()
+    expect(out[0].factSignal).toBeUndefined()
+    expect(out[0].eventActors).toBeUndefined()
+    expect(out[0].eventTarget).toBeUndefined()
+    expect(out[0].isOccurrence).toBeUndefined()
+    expect(out[0].verified).toBeUndefined()
+  })
+
+  describe('omitted vs explicit-null fields (F11, daatan#1237)', () => {
+    type FieldCase = { enrichedKey: keyof EnrichedOracleSource; oracleKey: keyof OracleSource }
+
+    const FIELD_CASES: FieldCase[] = [
+      { enrichedKey: 'settled', oracleKey: 'settled' },
+      { enrichedKey: 'settlementEventDate', oracleKey: 'settlement_event_date' },
+      { enrichedKey: 'quantitativeEstimate', oracleKey: 'quantitative_estimate' },
+      { enrichedKey: 'evidenceWeight', oracleKey: 'evidence_weight' },
+      { enrichedKey: 'relevanceScore', oracleKey: 'relevance_score' },
+      { enrichedKey: 'evidenceClass', oracleKey: 'evidence_class' },
+      { enrichedKey: 'authorLean', oracleKey: 'author_lean' },
+      { enrichedKey: 'authorLeanCertainty', oracleKey: 'author_lean_certainty' },
+      { enrichedKey: 'factSignal', oracleKey: 'fact_signal' },
+      { enrichedKey: 'eventActors', oracleKey: 'event_actors' },
+      { enrichedKey: 'eventTarget', oracleKey: 'event_target' },
+      { enrichedKey: 'isOccurrence', oracleKey: 'is_occurrence' },
+      { enrichedKey: 'verified', oracleKey: 'verified' },
+    ]
+
+    it.each(FIELD_CASES)(
+      '$enrichedKey: an omitted key stays undefined, does not overwrite a prior stored value',
+      ({ enrichedKey, oracleKey }) => {
+        const override = { [oracleKey]: undefined } as Partial<OracleSource>
+        const out = enrichOracleSources([oracleSource(override)], [searchResult()], new Map())
+        expect(out[0][enrichedKey]).toBeUndefined()
+      },
+    )
+
+    it.each(FIELD_CASES)(
+      '$enrichedKey: an explicit null is preserved — a real signal, does overwrite',
+      ({ enrichedKey, oracleKey }) => {
+        const override = { [oracleKey]: null } as Partial<OracleSource>
+        const out = enrichOracleSources([oracleSource(override)], [searchResult()], new Map())
+        expect(out[0][enrichedKey]).toBeNull()
+      },
+    )
+
+    const IDENTITY_FIELDS: (keyof EnrichedOracleSource)[] = ['personId', 'personName', 'outletId', 'outletName']
+
+    it.each(IDENTITY_FIELDS)(
+      '%s: a missing identityByUrl entry stays undefined, does not overwrite a prior stored value',
+      (field) => {
+        const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+        expect(out[0][field]).toBeUndefined()
+      },
+    )
+
+    it.each(IDENTITY_FIELDS)(
+      '%s: a resolved identity entry with an explicit null is preserved — a real signal, does overwrite',
+      (field) => {
+        const out = enrichOracleSources(
+          [oracleSource()],
+          [searchResult()],
+          new Map(),
+          new Map([['https://reuters.com/a', { personId: null, personName: null, outletId: null, outletName: null }]]),
+        )
+        expect(out[0][field]).toBeNull()
+      },
+    )
   })
 })
 
