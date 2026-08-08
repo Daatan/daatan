@@ -305,6 +305,14 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
       predictionId,
       outcome: outcome as 'correct' | 'wrong',
       resolvedAt: resolvedPrediction.resolvedAt ?? new Date(),
+      // daatan#1234 check #3: the resolver only reached this point by explicitly
+      // acknowledging the pin/estimate disagreement (the gate above) — flag the
+      // record so a calibration fit can annotate or exclude the pair instead of
+      // scoring it as a plain miss.
+      disputed: pinContradiction.contradicts,
+      disputeNote: pinContradiction.contradicts
+        ? `Oracle ${pinContradiction.isSettled ? 'settled' : 'estimated'} this '${pinContradiction.impliedOutcome}' at confidence=${prediction.confidence}; resolver declared '${outcome}'`
+        : undefined,
     })
   }
 

@@ -175,7 +175,7 @@ answering 50%; CI-width-vs-error correlation −0.07).
 | `ci_low`, `ci_high`, `settled_at_final` | the Oracle's interval at that instant (percent) and whether it was a settlement pin. The CI-honesty check is the point — audit F16 predicts these widths carry no risk information. |
 | `p_7d`, `p_30d` (+ `_at`) | the same published number as of 7/30 days before resolution — Brier-by-horizon. Null when the forecast had said nothing that far back. |
 | `clock_snapshots`, `evidence_snapshots` | the denominator for the glide backtest. |
-| `disputed`, `dispute_note` | set when the machine and the human resolver read the question differently (daatan#1234), so a semantics dispute can be excluded from a fit instead of silently poisoning it. |
+| `disputed`, `dispute_note` | set when the resolver knowingly overrode a contradicting settlement pin / extreme AI confidence (daatan#1234 check #3, gated by `resolutionOverrodePin` on the prediction — see `detectPinContradiction`), so the pair can be excluded from a fit instead of silently poisoning it. **Create-only**: `recordCalibration()`'s upsert never touches either column on an existing row — only a future manual admin action should change them once set. |
 
 **Nothing derived is stored.** Brier, log score and calibration bins all follow
 from `p_final` + `outcome`; a derived column that can disagree with its inputs is

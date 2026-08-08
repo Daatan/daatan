@@ -284,7 +284,37 @@ describe('resolvePrediction — calibration record', () => {
     await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
 
     expect(recorded).toHaveBeenCalledWith(
-      expect.objectContaining({ predictionId: 'p1', outcome: 'correct' }),
+      expect.objectContaining({ predictionId: 'p1', outcome: 'correct', disputed: false, disputeNote: undefined }),
+    )
+  })
+
+  // daatan#1234 check #3
+  it('flags the calibration record disputed, with a note, when the resolution overrode a pin', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: true, confidence: 3 }) as never)
+    tx.prediction.update.mockResolvedValue({
+      id: 'p1', status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-08-01T12:00:00Z'),
+    })
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin', resolutionOverrodePin: true })
+
+    expect(recorded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disputed: true,
+        disputeNote: "Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'",
+      }),
+    )
+  })
+
+  it('does not flag the calibration record when the outcome agrees with the pin', async () => {
+    findUnique.mockResolvedValue(prediction({ settled: true, confidence: 3 }) as never)
+    tx.prediction.update.mockResolvedValue({
+      id: 'p1', status: 'RESOLVED_WRONG', resolvedAt: new Date('2026-08-01T12:00:00Z'),
+    })
+
+    await resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin' })
+
+    expect(recorded).toHaveBeenCalledWith(
+      expect.objectContaining({ disputed: false, disputeNote: undefined }),
     )
   })
 

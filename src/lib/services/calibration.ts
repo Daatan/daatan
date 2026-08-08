@@ -111,7 +111,17 @@ export function buildCalibrationRecord(input: CalibrationInputs) {
  * always reconstruct a gap from snapshot history.
  */
 export async function recordCalibration(
-  input: { predictionId: string; outcome: 'correct' | 'wrong'; resolvedAt: Date },
+  input: {
+    predictionId: string
+    outcome: 'correct' | 'wrong'
+    resolvedAt: Date
+    // daatan#1234 check #3: true when THIS resolution knowingly overrode a
+    // contradicting settlement pin / extreme AI confidence (prediction-resolution.ts's
+    // pinContradiction gate). Applied only on create, below — a later re-resolution
+    // must not retroactively flip a dispute flag that already reflects history.
+    disputed?: boolean
+    disputeNote?: string
+  },
   client: PrismaClient | typeof prisma = prisma,
 ): Promise<void> {
   try {
@@ -125,10 +135,10 @@ export async function recordCalibration(
     const data = buildCalibrationRecord({ ...input, snapshots })
     await client.calibrationRecord.upsert({
       where: { predictionId: input.predictionId },
-      create: data,
+      create: { ...data, ...(input.disputed ? { disputed: true, disputeNote: input.disputeNote ?? null } : {}) },
       // Re-resolution (a corrected outcome) should update the record, not fail
-      // on the unique key. `disputed`/`disputeNote` are left alone — they are
-      // set by a human and must survive a recompute.
+      // on the unique key. `disputed`/`disputeNote` are left alone here — once
+      // set at creation, only a future manual admin action should change them.
       update: data,
     })
     log.info(

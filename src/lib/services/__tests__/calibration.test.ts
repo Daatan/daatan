@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { buildCalibrationRecord } from '../calibration'
 
 /**
@@ -125,5 +125,55 @@ describe('buildCalibrationRecord', () => {
     ]
     expect(build(rows).pFinal).toBe(80)
     expect(build([...rows].reverse()).pFinal).toBe(80)
+  })
+})
+
+/**
+ * daatan#1234 check #3 — disputed/disputeNote are create-only: once a
+ * calibration record exists, only a future manual admin action should
+ * change them, so a later re-resolution's upsert must never touch them.
+ */
+describe('recordCalibration — dispute flag', () => {
+  function makeClient() {
+    return {
+      contextSnapshot: { findMany: vi.fn().mockResolvedValue([]) },
+      calibrationRecord: { upsert: vi.fn().mockResolvedValue({}) },
+    }
+  }
+
+  it('sets disputed + disputeNote on create when the resolution overrode a pin', async () => {
+    const { recordCalibration } = await import('../calibration')
+    const client = makeClient()
+
+    await recordCalibration(
+      {
+        predictionId: 'p1',
+        outcome: 'correct',
+        resolvedAt: new Date('2026-08-01T12:00:00Z'),
+        disputed: true,
+        disputeNote: "Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'",
+      },
+      client as never,
+    )
+
+    const call = client.calibrationRecord.upsert.mock.calls[0][0]
+    expect(call.create.disputed).toBe(true)
+    expect(call.create.disputeNote).toBe("Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'")
+    expect(call.update.disputed).toBeUndefined()
+    expect(call.update.disputeNote).toBeUndefined()
+  })
+
+  it('omits disputed/disputeNote from create when there is no dispute', async () => {
+    const { recordCalibration } = await import('../calibration')
+    const client = makeClient()
+
+    await recordCalibration(
+      { predictionId: 'p1', outcome: 'correct', resolvedAt: new Date('2026-08-01T12:00:00Z') },
+      client as never,
+    )
+
+    const call = client.calibrationRecord.upsert.mock.calls[0][0]
+    expect(call.create.disputed).toBeUndefined()
+    expect(call.create.disputeNote).toBeUndefined()
   })
 })
