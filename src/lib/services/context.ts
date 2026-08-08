@@ -17,7 +17,37 @@ const HIGH_CONFIDENCE_THRESHOLD = 80
 const AWAITING_AI_RESOLUTION_LOW = 10
 const AWAITING_AI_RESOLUTION_HIGH = 90
 
-function isAwaitingAiResolution(confidence: number | null): boolean {
+/** Settling votes a settlement pin must carry in its snapshot pool before the
+ *  band or the crossing alert treats it as real (daatan#1248). Mirrors the
+ *  Oracle's own `settlement_min_sources`, re-checked on our side of the wire
+ *  because a pin's confidence is a *constant* (~97), not a level: it clears any
+ *  level band by construction, whether it stands on two syndicated echoes or on
+ *  a certified outcome. Counted from the persisted pool rows, so a pin arriving
+ *  without its snapshot fails closed for band/alert purposes (the sticky
+ *  `Prediction.settled` latch is untouched — that lane is notification-only by
+ *  design, see #1301). */
+const MIN_SETTLING_SOURCES = 2
+
+/** Rows of the persisted Oracle pool that carried a settlement-grade vote.
+ *  Defensive over unvalidated Json, same as `maxPublishedAt` below. */
+function settlingSourceCount(oracleSnapshot: unknown): number {
+  const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
+  if (!Array.isArray(sources)) return 0
+  return sources.filter((s) => (s as { settled?: unknown } | null)?.settled === true).length
+}
+
+/**
+ * A settlement pin and an organic estimate are different epistemic classes
+ * sharing the `confidence` column (daatan#1248): 97 from thirty agreeing
+ * weighted sources is a level; 97 from a pin is `settlement_stance`, a policy
+ * constant. So a pin enters the Awaiting Resolution band as what it is — the
+ * Oracle's claim that the question is decided, admitted when the snapshot
+ * carries at least MIN_SETTLING_SOURCES settling votes — and never via the
+ * level check its constant would trivially clear. Organic estimates keep the
+ * plain level band (the #1185 false-negative fix relies on that shape).
+ */
+function isAwaitingAiResolution(confidence: number | null, pinned = false, settlingSources = 0): boolean {
+  if (pinned) return settlingSources >= MIN_SETTLING_SOURCES
   return confidence !== null && (confidence >= AWAITING_AI_RESOLUTION_HIGH || confidence <= AWAITING_AI_RESOLUTION_LOW)
 }
 
@@ -46,10 +76,19 @@ function notifyIfCrossedHighConfidence(
   prev: PreviousConfidence | null,
   newConfidence: number | null,
   settled = false,
+  settlingSources = 0,
 ): void {
   if (prev === null || newConfidence === null) return
   if (newConfidence < HIGH_CONFIDENCE_THRESHOLD) return
   if (prev.confidence !== null && prev.confidence >= HIGH_CONFIDENCE_THRESHOLD) return
+  // A pin's crossing is manufactured — settlement_stance is above the bar by
+  // construction — so it alerts only when the pin is evidence-backed, under
+  // the same bar the band applies (daatan#1248; the #388 false pin fired this
+  // alert from two adjacent-fact votes).
+  if (settled && settlingSources < MIN_SETTLING_SOURCES) {
+    log.info({ predictionId, settlingSources }, 'high-confidence alert skipped: settlement pin below the settling-sources bar')
+    return
+  }
   notifyHighConfidence(
     { id: predictionId, claimText: prev.claimText, slug: prev.slug },
     newConfidence,
@@ -177,12 +216,18 @@ export async function recordEstimate(input: RecordEstimateInput) {
     evidenceAt = evidencePublishedAt(input.sources, input.oracleSnapshot)
   }
 
+  // Settlement is honored only where the origin may carry it (the same
+  // policy.canSettle the sticky latch obeys) — a clock or creation write
+  // claiming `settled` must not buy its way into the band or the alert.
+  const pinned = policy.canSettle && input.settled === true
+  const settlingSources = pinned ? settlingSourceCount(input.oracleSnapshot) : 0
+
   const estimateFields: Prisma.PredictionUpdateInput = input.insufficientData
     ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
     : input.probability !== null
       ? {
           confidence: input.probability,
-          awaitingAiResolution: isAwaitingAiResolution(input.probability),
+          awaitingAiResolution: isAwaitingAiResolution(input.probability, pinned, settlingSources),
           aiCiLow: input.ciLow ?? null,
           aiCiHigh: input.ciHigh ?? null,
         }
@@ -225,7 +270,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
 
   const [snapshot] = await prisma.$transaction(ops)
   if (willNotify) {
-    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, input.settled)
+    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, settlingSources)
   }
   return snapshot as ContextSnapshot
 }

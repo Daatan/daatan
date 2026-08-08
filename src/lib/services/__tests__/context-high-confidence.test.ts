@@ -88,10 +88,43 @@ describe('high-confidence crossing alert', () => {
     expect(notify).toHaveBeenCalled()
   })
 
-  it('passes the settled flag through', async () => {
+  it('passes the settled flag through when the pin is evidence-backed', async () => {
+    mockPrevious(70)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+    })
+    expect(notify).toHaveBeenCalledWith(expect.anything(), 97, 70, true)
+  })
+
+  it('a settlement pin with a single settling vote does not alert (daatan#1248)', async () => {
+    // The pin's 97 is settlement_stance, a constant above the bar by
+    // construction — an unverifiable pin must not page the channel.
+    mockPrevious(70)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'color', settled: null }] },
+    })
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('a settlement pin without its snapshot does not alert (daatan#1248)', async () => {
     mockPrevious(70)
     await saveNewsIndexerMatch({ ...matchInput(97), settled: true })
-    expect(notify).toHaveBeenCalledWith(expect.anything(), 97, 70, true)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('an organic 97 with settling rows in the pool alerts as unsettled', async () => {
+    // settled=false: the rows' flags alone are not a pin — the gate keys on
+    // the Oracle's settled verdict, not on row inspection.
+    mockPrevious(70)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+    })
+    expect(notify).toHaveBeenCalledWith(expect.anything(), 97, 70, false)
   })
 
   it('fires from saveContextUpdate', async () => {
@@ -133,7 +166,7 @@ describe('high-confidence crossing alert', () => {
     mockPrevious(null)
     await saveOracleSnapshotOnly({
       predictionId: 'pred-1',
-      oracleSnapshot: {},
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
       confidence: 97,
       aiCiLow: 94,
       aiCiHigh: 99,
