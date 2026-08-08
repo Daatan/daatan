@@ -122,6 +122,21 @@ resource "aws_iam_role_policy" "github_actions_cost_report" {
         Resource = "*"
       },
       {
+        # Promotional credit balance, for the runway line in the same report
+        # (#1346). Like Cost Explorer, the Billing API has no resource-level
+        # permissions. Read-only: GetCredits cannot modify anything.
+        #
+        # This grant is the whole point of shipping the IAM change alongside the
+        # workflow: the role has now twice been found one API call short only
+        # after a report shipped and silently measured nothing in CI while
+        # passing a local dry-run (ssm:GetCommandInvocation in #1274,
+        # ce:GetDimensionValues in #1275). Dispatch and read the output before
+        # merging anything that depends on a new action here.
+        Effect   = "Allow"
+        Action   = ["billing:GetCredits"]
+        Resource = "*"
+      },
+      {
         Effect   = "Allow"
         Action   = ["ssm:GetParameter"]
         Resource = "arn:aws:ssm:eu-central-1:${data.aws_caller_identity.current.account_id}:parameter/daatan/prod/secrets/OPENROUTER_API_KEY"
