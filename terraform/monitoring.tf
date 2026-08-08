@@ -68,6 +68,116 @@ resource "aws_cloudwatch_metric_alarm" "billing_200usd" {
   }
 }
 
+# AWS Budgets publishes as the SERVICE principal budgets.amazonaws.com, which the
+# topic's AWS-generated default policy does NOT match — that statement grants
+# Principal {"AWS": "*"} (IAM principals only), so a budget attached to this topic
+# would have its notifications silently dropped, or fail validation outright.
+# `terraform plan` cannot catch this: it never checks SNS publish permission.
+#
+# This resource REPLACES the whole topic policy (aws_sns_topic_policy is not
+# additive), so the default statement is restated verbatim below to keep the
+# existing CloudWatch-alarm publishing working.
+data "aws_iam_policy_document" "billing_alerts" {
+  statement {
+    sid    = "__default_statement_ID"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "SNS:GetTopicAttributes",
+      "SNS:SetTopicAttributes",
+      "SNS:AddPermission",
+      "SNS:RemovePermission",
+      "SNS:DeleteTopic",
+      "SNS:Subscribe",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:Publish",
+    ]
+
+    resources = [aws_sns_topic.billing_alerts.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid    = "AWSBudgetsSNSPublishingPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["budgets.amazonaws.com"]
+    }
+
+    actions   = ["SNS:Publish"]
+    resources = [aws_sns_topic.billing_alerts.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:budgets::${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "billing_alerts" {
+  provider = aws.us_east_1
+  arn      = aws_sns_topic.billing_alerts.arn
+  policy   = data.aws_iam_policy_document.billing_alerts.json
+}
+
+# The three EstimatedCharges alarms above are net of promotional credits: while
+# credits cover the bill, the metric reads $0.00 and the alarms cannot fire, which
+# defeats their own "credits may be expiring" framing. All three have sat in OK
+# since 2026-05-19 on 0.0 datapoints. This budget measures GROSS spend instead
+# (include_credit = false) so burn is visible while credits are still absorbing it.
+#
+# This is a recurring monthly signal, not an exception one: the limit sits below
+# current run-rate, so it is expected to notify every month. Treat it as a "here is
+# the burn" ping. It does NOT warn about credit exhaustion — that needs the credit
+# balance itself, which no AWS budget exposes. Figures and runway: see the finances
+# audit in the private Daatan/docs repo (this repo is public).
+resource "aws_budgets_budget" "gross_spend_monthly" {
+  name         = "daatan-gross-spend-monthly"
+  budget_type  = "COST"
+  limit_amount = "500"
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  cost_types {
+    include_credit = false
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 80
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 100
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+}
+
 # ====================================================================
 # INFRASTRUCTURE ALERTS (eu-central-1)
 # ====================================================================
