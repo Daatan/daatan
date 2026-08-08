@@ -353,6 +353,61 @@ export async function getPoolArticles(predictionId: string): Promise<EvidencePoo
   })
 }
 
+/**
+ * What the recompute path actually consumes (daatan#1263): the fields sent to
+ * `/pool/aggregate`, the `usable` filter's inputs, and everything
+ * `poolArticleToEnrichedSource` copies into the persisted snapshot roster. What it
+ * deliberately leaves behind is the claim-lifecycle bookkeeping — `snippet` (up to
+ * 2000 chars/row, kept only so retries can re-send the original text), `contentHash`,
+ * `status`/`statusReason`, `origin`, timestamps — which a recompute over a large pool
+ * (p95 160 rows, max 359 at filing) was hydrating on every push for no reader.
+ * `author` is also omitted: the snapshot path re-looks it up by URL for freshness
+ * (see resolvePooledEstimate), so the stored column is only read by pool-only paths.
+ */
+const POOL_RECOMPUTE_SELECT = {
+  id: true,
+  url: true,
+  source: true,
+  title: true,
+  publishedDate: true,
+  personId: true,
+  personName: true,
+  outletId: true,
+  outletName: true,
+  stance: true,
+  certainty: true,
+  credibilityWeight: true,
+  claims: true,
+  settled: true,
+  settlementEventDate: true,
+  quantitativeEstimate: true,
+  evidenceWeight: true,
+  relevanceScore: true,
+  evidenceClass: true,
+  authorLean: true,
+  authorLeanCertainty: true,
+  factSignal: true,
+  eventActors: true,
+  eventTarget: true,
+  isOccurrence: true,
+  verified: true,
+  claimsDetail: true,
+  excluded: true,
+} satisfies Prisma.EvidencePoolArticleSelect
+
+export type PoolRecomputeArticle = Prisma.EvidencePoolArticleGetPayload<{
+  select: typeof POOL_RECOMPUTE_SELECT
+}>
+
+/** `getPoolArticles` narrowed to the recompute path's projection — same rows, same order. */
+async function getPoolArticlesForRecompute(predictionId: string): Promise<PoolRecomputeArticle[]> {
+  return prisma.evidencePoolArticle.findMany({
+    where: { predictionId },
+    orderBy: { addedAt: 'desc' },
+    select: POOL_RECOMPUTE_SELECT,
+  })
+}
+
 export interface PublicSourceArticle {
   id: string
   title: string | null
@@ -464,7 +519,7 @@ export interface PoolRecompute {
    * `articlesUsed` whenever the aggregate is sufficient. Callers persist these as the
    * snapshot's `sources` so the stored blob lists exactly the articles behind its number.
    */
-  usableArticles: EvidencePoolArticle[]
+  usableArticles: PoolRecomputeArticle[]
 }
 
 /**
@@ -493,7 +548,7 @@ export async function recomputeFromPool(
   const cfg = getOracleConfig()
   if (!cfg) return null
 
-  const pool = await getPoolArticles(predictionId)
+  const pool = await getPoolArticlesForRecompute(predictionId)
   const excludedCount = pool.filter((a) => a.excluded).length
   const usable = pool.filter(
     (a) =>
