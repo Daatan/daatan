@@ -12,6 +12,21 @@ type Impact = {
   sharedWith?: string | null
 }
 
+type Extraction = {
+  complete: number
+  failed: number
+  yield: number | null
+}
+
+type Endorsement = {
+  judged: number
+  delivered: number
+  rate: number | null
+  judged30d: number
+  delivered30d: number
+  lastJudgedAt: string | null
+}
+
 type Source = {
   type: string
   name: string | null
@@ -21,6 +36,8 @@ type Source = {
   disabledReason?: string | null
   domain?: string | null
   impact?: Impact
+  extraction?: Extraction
+  endorsement?: Endorsement
 }
 
 type Unconfigured = { domain: string } & Impact
@@ -134,6 +151,8 @@ export default function SourcesTab() {
                             {sortImpact ? <ArrowDown className="w-3 h-3" /> : <ArrowUpDown className="w-3 h-3 opacity-60" />}
                           </button>
                         </th>
+                        <th className="px-3 py-2 font-medium">{t('sourcesYield')}</th>
+                        <th className="px-3 py-2 font-medium">{t('sourcesEndorsement')}</th>
                         <th className="px-3 py-2 font-medium">{t('sourcesLocator')}</th>
                       </tr>
                     </thead>
@@ -185,6 +204,34 @@ export default function SourcesTab() {
                                 </span>
                               ) : (
                                 <span className="text-gray-600">{t('sourcesImpactNa')}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {s.extraction && s.extraction.yield !== null ? (
+                                <span className="inline-flex items-baseline gap-1.5">
+                                  <span className="font-medium text-white">
+                                    {s.extraction.complete}/{s.extraction.complete + s.extraction.failed}
+                                  </span>
+                                  <span className={`text-[11px] ${s.extraction.yield >= 0.8 ? 'text-emerald-400' : s.extraction.yield >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>
+                                    {Math.round(s.extraction.yield * 100)}%
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {s.endorsement && s.endorsement.judged > 0 && s.endorsement.rate !== null ? (
+                                <span className="inline-flex items-baseline gap-1.5">
+                                  <span className="font-medium text-white">
+                                    {Math.round(s.endorsement.rate * 100)}%
+                                  </span>
+                                  <span className="text-[11px] text-gray-500">
+                                    {t('sourcesEndorsementJudged', { count: s.endorsement.judged })}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="text-gray-600">—</span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-gray-400 max-w-[22rem] truncate">
