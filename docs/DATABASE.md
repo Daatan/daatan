@@ -91,7 +91,21 @@ The central table (`Prediction`). Field groups:
   `resolveByDatetime`; the two diverging triggers the divergence rule),
   `claimDirection` (ARRIVAL/SURVIVAL/NONE), `claimArchetype` (only DIFFUSE is
   priced), `tauLeadDays`, `classifierVersion/At/Output`. NULL
-  `classifierVersion` = not yet classified (no glide).
+  `classifierVersion` = not yet classified (no glide). The divergence check
+  itself (`isDeadlineDivergent`, `src/lib/utils/deadline-divergence.ts`,
+  daatan#1234) is a pure function shared by the temporal clock's glide-horizon
+  selection and a non-blocking warning banner on the forecast edit form — the
+  clock's server-only `temporal-clock.ts` re-exports the same
+  `DEADLINE_AGREEMENT_TOLERANCE_MS` rather than each defining its own, so the
+  banner and the clock's own behavior can never disagree about what counts as
+  divergent. Three OTHER call sites (`ForecastDetailClient.tsx`'s impossibility
+  check, `commitment.ts`'s lock reason, `backfill-temporal/route.ts`'s dry-run
+  report) each hold an independent copy of the same 72h constant, by design —
+  they predate this module and avoid pulling in `temporal-clock.ts`'s
+  server-only deps for the same reason this module exists. Not consolidated
+  here; worth a follow-up if a fourth copy needing the *same* semantics ever
+  appears (the existing three aren't quite identical to `isDeadlineDivergent`
+  — no "both already past" carve-out).
 - **Alert dedup timestamps**: `deadlinePassedAlertAt`, `teffProvisionalAlertAt`,
   `divergenceAlertAt` (requote cron), `marketDivergenceAlertAt` (market-sync
   cron) — single-shot alerts re-arm by timestamp comparison, not NULL checks.

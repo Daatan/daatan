@@ -271,4 +271,60 @@ describe('EditForecastClient', () => {
     // The "editing in <language>" notice renders.
     expect(screen.getByText(/public English version updates automatically/)).toBeInTheDocument()
   })
+
+  describe('deadline divergence warning (daatan#1234)', () => {
+    it('shows the warning when claimDeadline disagrees with resolveByDatetime beyond tolerance', async () => {
+      mockFetchLoad({
+        ...BASE_PREDICTION,
+        claimDeadline: '2025-12-31T00:00:00.000Z',
+        resolveByDatetime: '2027-10-10T00:00:00.000Z',
+      } as never)
+      renderWithIntl(<EditForecastClient id="pred-1" />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/disagrees with the Resolve By date above/)).toBeInTheDocument()
+      })
+    })
+
+    it('does not show the warning when the dates agree within tolerance', async () => {
+      mockFetchLoad({
+        ...BASE_PREDICTION,
+        claimDeadline: '2027-01-01T00:00:00.000Z',
+        resolveByDatetime: '2027-01-01T00:00:00.000Z',
+      } as never)
+      renderWithIntl(<EditForecastClient id="pred-1" />)
+
+      await waitFor(() => expect(screen.getByDisplayValue('01/01/2027')).toBeInTheDocument())
+      expect(screen.queryByText(/disagrees with the Resolve By date above/)).not.toBeInTheDocument()
+    })
+
+    it('does not show the warning when claimDeadline is null (not yet classified)', async () => {
+      mockFetchLoad({ ...BASE_PREDICTION, claimDeadline: null } as never)
+      renderWithIntl(<EditForecastClient id="pred-1" />)
+
+      await waitFor(() => expect(screen.getByDisplayValue('01/01/2027')).toBeInTheDocument())
+      expect(screen.queryByText(/disagrees with the Resolve By date above/)).not.toBeInTheDocument()
+    })
+
+    it('clears once the resolve date is edited back within tolerance', async () => {
+      mockFetchLoad({
+        ...BASE_PREDICTION,
+        claimDeadline: '2025-12-31T00:00:00.000Z',
+        resolveByDatetime: '2027-10-10T00:00:00.000Z',
+      } as never)
+      renderWithIntl(<EditForecastClient id="pred-1" />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/disagrees with the Resolve By date above/)).toBeInTheDocument()
+      })
+
+      fireEvent.change(screen.getByDisplayValue('10/10/2027'), {
+        target: { value: '31/12/2025' },
+      })
+
+      await waitFor(() => {
+        expect(screen.queryByText(/disagrees with the Resolve By date above/)).not.toBeInTheDocument()
+      })
+    })
+  })
 })

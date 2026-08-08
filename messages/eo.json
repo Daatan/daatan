@@ -178,6 +178,7 @@
     "legendAI": "AI",
     "settledPinNotice": "La Orakolo legas ĉi tiun demandon kiel jam deciditan — ĉi tiu nombro estas decid-fikso, ne kunigita meznombro de la fontoj.",
     "settledPinSources": "Raportas la rezulton kiel jam deciditan: {names}",
+    "deadlineDivergenceWarning": "La teksto de la aserto implicas templimon {claimDeadline}, kiu malkonsentas kun la Solvo-Dato supre. Konsideru akordigi ilin.",
     "aiInsufficientEvidence": "Nesufiĉaj pruvoj",
     "temporalClockAnnotation": "inkluzivas alĝustigon laŭ la restanta tempo — templimo post {days} tagoj",
     "signInToVote": "Ensalutu por voĉdoni",

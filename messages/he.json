@@ -178,6 +178,7 @@
     "legendAI": "בינה מלאכותית",
     "settledPinNotice": "האורקל קורא את השאלה הזו כשאלה שכבר הוכרעה — המספר הזה הוא נעיצת הכרעה, לא ממוצע משוקלל של המקורות.",
     "settledPinSources": "מדווח כמוכרע על ידי: {names}",
+    "deadlineDivergenceWarning": "טקסט הטענה מרמז על מועד אחרון {claimDeadline}, שאינו תואם לתאריך ההכרעה שצוין למעלה. מומלץ ליישר ביניהם.",
     "aiInsufficientEvidence": "אין מספיק ראיות",
     "temporalClockAnnotation": "כולל התאמת זמן שנותר — המועד האחרון בעוד {days} ימים",
     "signInToVote": "התחברו כדי להצביע",
