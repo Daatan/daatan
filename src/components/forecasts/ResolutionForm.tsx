@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2 } from 'lucide-react'
+import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { getEstimate, recordDuration } from '@/lib/forecast-timing'
+import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
 
 const RESEARCH_TIMING_KEY = 'daatan:research-timings'
 const RESEARCH_TIMING_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -32,15 +33,18 @@ interface ResolutionFormProps {
   predictionId: string
   outcomeType: string
   options: Array<{ id: string; text: string }>
+  settled?: boolean
+  confidence?: number | null
   onResolved?: () => void
 }
 
-export function ResolutionForm({ predictionId, outcomeType, options, onResolved }: ResolutionFormProps) {
+export function ResolutionForm({ predictionId, outcomeType, options, settled, confidence, onResolved }: ResolutionFormProps) {
   const { aiResearch } = useCapabilities()
   const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable' | null>(null)
   const [correctOptionId, setCorrectOptionId] = useState<string>('')
   const [evidenceLinks, setEvidenceLinks] = useState<string>('')
   const [resolutionNote, setResolutionNote] = useState('')
+  const [pinAcknowledged, setPinAcknowledged] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
   const [researchStep, setResearchStep] = useState<'searching' | 'analyzing' | null>(null)
@@ -49,6 +53,15 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
   const resolveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const [error, setError] = useState<string | null>(null)
   const [resolved, setResolved] = useState(false)
+
+  const selectOutcome = (next: typeof outcome) => {
+    setOutcome(next)
+    setPinAcknowledged(false)
+  }
+
+  const pinContradiction = outcome
+    ? detectPinContradiction(settled, confidence, outcomeType, outcome)
+    : { contradicts: false, impliedOutcome: null, isSettled: false }
 
   const handleAiResearch = async () => {
     const timings = loadResearchTimings()
@@ -98,6 +111,11 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
       return
     }
 
+    if (pinContradiction.contradicts && !pinAcknowledged) {
+      setError('Please acknowledge the Oracle disagreement before confirming')
+      return
+    }
+
     setIsSubmitting(true)
     setResolveStep('scoring')
 
@@ -127,6 +145,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
           evidenceLinks: links.length > 0 ? links : undefined,
           resolutionNote: resolutionNote.trim() || undefined,
           correctOptionId: isMultipleChoice ? correctOptionId : undefined,
+          resolutionOverrodePin: pinContradiction.contradicts ? pinAcknowledged : undefined,
         }),
       })
 
@@ -195,7 +214,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
         <div role="group" aria-labelledby="outcome-label" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setOutcome('correct')}
+            onClick={() => selectOutcome('correct')}
             className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${outcome === 'correct'
               ? 'border-green-500 bg-teal/10'
               : 'border-navy-600 hover:border-green-300'
@@ -210,7 +229,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
 
           <button
             type="button"
-            onClick={() => setOutcome('wrong')}
+            onClick={() => selectOutcome('wrong')}
             className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${outcome === 'wrong'
               ? 'border-red-500 bg-red-900/20'
               : 'border-navy-600 hover:border-red-300'
@@ -225,7 +244,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
 
           <button
             type="button"
-            onClick={() => setOutcome('void')}
+            onClick={() => selectOutcome('void')}
             className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${outcome === 'void'
               ? 'border-yellow-500 bg-amber-900/20'
               : 'border-navy-600 hover:border-yellow-300'
@@ -240,7 +259,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
 
           <button
             type="button"
-            onClick={() => setOutcome('unresolvable')}
+            onClick={() => selectOutcome('unresolvable')}
             className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${outcome === 'unresolvable'
               ? 'border-gray-400 bg-navy-800'
               : 'border-navy-600 hover:border-gray-300'
@@ -309,6 +328,32 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
         />
       </div>
 
+      {/* Pin-contradiction gate (daatan#1234 check #2): only once an outcome is
+          picked AND it disagrees with the Oracle's current estimate. Doesn't
+          block outcome selection itself — only Confirm, until acknowledged. */}
+      {pinContradiction.contradicts && (
+        <div className="p-4 border border-amber-500/30 rounded-xl bg-navy-700 space-y-3">
+          <div className="flex items-start gap-2 text-sm text-amber-300">
+            <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              {pinContradiction.isSettled
+                ? "The Oracle settled this forecast as an accomplished fact, and its direction disagrees with the outcome you're about to declare."
+                : "The Oracle's current confidence is extreme, and its direction disagrees with the outcome you're about to declare."}
+              {' '}Confirm you&apos;ve reviewed the disagreement before proceeding.
+            </span>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-amber-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={pinAcknowledged}
+              onChange={(e) => setPinAcknowledged(e.target.checked)}
+              className="rounded border-amber-500/50"
+            />
+            I&apos;ve reviewed the Oracle&apos;s estimate and confirm this resolution
+          </label>
+        </div>
+      )}
+
       {error && (
         <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg text-red-400 text-sm">
           {error}
@@ -318,7 +363,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, onResolved 
       <Button
         type="submit"
         loading={isSubmitting}
-        disabled={!outcome}
+        disabled={!outcome || (pinContradiction.contradicts && !pinAcknowledged)}
         fullWidth
         size="lg"
       >

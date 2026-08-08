@@ -6,6 +6,7 @@ import { computeMemberScores, computeMarketScore, MARKET_MEMBER, SENTINEL_MODE }
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordCalibration } from '@/lib/services/calibration'
+import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
 
 const log = createLogger('prediction-resolution')
 
@@ -17,6 +18,7 @@ interface ResolutionOptions {
   evidenceLinks?: string[]
   resolutionNote?: string
   correctOptionId?: string
+  resolutionOverrodePin?: boolean
 }
 
 /**
@@ -34,7 +36,7 @@ interface ResolutionOptions {
  * correctOptionId is missing/invalid for MULTIPLE_CHOICE predictions.
  */
 export async function resolvePrediction(predictionId: string, options: ResolutionOptions) {
-  const { outcome, resolvedById, evidenceLinks, resolutionNote, correctOptionId } = options
+  const { outcome, resolvedById, evidenceLinks, resolutionNote, correctOptionId, resolutionOverrodePin } = options
 
   const prediction = await prisma.prediction.findUnique({
     where: { id: predictionId },
@@ -88,6 +90,18 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     }
   }
 
+  // daatan#1234 check #2: a settlement pin / extreme AI confidence contradicting
+  // this outcome requires explicit resolver acknowledgment. Recomputed here
+  // (not trusted from the client) so a direct API call can't silently bypass
+  // it and poison the future calibration-record marking (check #3).
+  const pinContradiction = detectPinContradiction(prediction.settled, prediction.confidence, prediction.outcomeType, outcome)
+  if (pinContradiction.contradicts && !resolutionOverrodePin) {
+    throw Object.assign(
+      new Error('This outcome contradicts the Oracle\'s current estimate — acknowledge the disagreement to proceed'),
+      { statusCode: 400 },
+    )
+  }
+
   let newStatus: 'RESOLVED_CORRECT' | 'RESOLVED_WRONG' | 'VOID' | 'UNRESOLVABLE'
   if (outcome === 'correct') newStatus = 'RESOLVED_CORRECT'
   else if (outcome === 'wrong') newStatus = 'RESOLVED_WRONG'
@@ -107,6 +121,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
         resolutionOutcome: outcome,
         evidenceLinks: evidenceLinks ?? undefined,
         resolutionNote,
+        resolutionOverrodePin: pinContradiction.contradicts ? true : null,
       },
     })
 

@@ -85,7 +85,11 @@ The central table (`Prediction`). Field groups:
   by itself — only a passed `resolveByDatetime` or an impossibility pin (a
   `claimDeadline` that has passed and agrees with `resolveByDatetime` within
   `DEADLINE_AGREEMENT_TOLERANCE_MS`) blocks new commitments (see
-  `getCommitmentLockReason` in `commitment.ts`).
+  `getCommitmentLockReason` in `commitment.ts`). `resolutionOverrodePin`
+  (daatan#1234 check #2): null unless the pin/extreme `confidence` contradicted
+  the outcome a resolver just declared — then true, since `resolvePrediction`
+  rejects the request otherwise. See `detectPinContradiction` in
+  `src/lib/utils/pin-contradiction.ts`.
 - **Temporal-model metadata** (glide; retro `TEMPORAL_MODEL_PLAN.md`):
   `claimDeadline` (parsed from claim *text* — deliberately distinct from
   `resolveByDatetime`; the two diverging triggers the divergence rule),

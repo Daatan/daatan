@@ -394,6 +394,14 @@ model Prediction {
   evidenceLinks     Json? // Array of evidence URLs
   resolutionNote    String?   @db.Text
 
+  // daatan#1234 check #2: null unless the settlement pin / extreme AI confidence
+  // contradicted the outcome just declared (see detectPinContradiction) — then
+  // true, since resolvePrediction rejects the request outright when the
+  // resolver hasn't explicitly acknowledged the disagreement. Null, not false,
+  // when the gate never fired: "not applicable" and "declined" must stay
+  // distinguishable for the future calibration-record marking (check #3).
+  resolutionOverrodePin Boolean? @map("resolution_overrode_pin")
+
   // Oracle settlement detection: >=2 independent sources reported the outcome as
   // an accomplished fact (retro settlement pin). Sticky — only ever set true by
   // the snapshot writers; human resolution supersedes it. As of PR #1020, does
