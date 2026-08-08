@@ -810,6 +810,23 @@ model EvidencePoolArticle {
   addedAt   DateTime @default(now()) @map("added_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Schema groundwork for daatan#1267 (Phase 1 of a real versioning fix —
+  // deliberately additive-only, NOT wired to any read or write path yet).
+  // `origin` above documents the gap this exists to eventually close:
+  // re-extraction currently overwrites a pool row in place, so a correction
+  // replaces its claims instead of producing a new linked version. Nothing
+  // populates or reads these columns today — addArticlesToPool still upserts
+  // in place and recomputeFromPool still reads the single current row.
+  // supersedesId points at the EvidencePoolArticle this row would replace,
+  // once the write path stops overwriting and starts inserting; self-relation
+  // left unnamed (Prisma default) since only one such relation exists on this
+  // model. version is a plain counter, starting at 1 for every existing and
+  // future row until something increments it.
+  supersedesId String?              @map("supersedes_id")
+  supersedes   EvidencePoolArticle? @relation("EvidencePoolArticleSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy EvidencePoolArticle[] @relation("EvidencePoolArticleSupersedes")
+  version      Int                  @default(1)
+
   // Manual number-rating feedback (daatan#1223)
   ratingPrompts ArticleRatingPrompt[]
 
