@@ -18,6 +18,18 @@ export const PUBLISH_PERCENT_MIN = 1
 export const PUBLISH_PERCENT_MAX = 99
 
 /**
+ * A probability move below this many points, against the current evidence
+ * anchor, carries no new information — used both by the requote cron
+ * (temporal-clock.ts, to skip a near-noise clock write) and by
+ * `recordEstimate` (context.ts, F17/daatan#1236, to decide whether a write
+ * is material enough to become the glide clock's next anchor). One shared
+ * constant so the two thresholds can't drift apart; lives here rather than
+ * in either service to avoid a context.ts <-> temporal-clock.ts import cycle
+ * (temporal-clock.ts already imports from context.ts).
+ */
+export const MATERIAL_CHANGE_PTS = 1
+
+/**
  * Map an aggregated Oracle stance/CI bound in [-1, 1] to a probability percent
  * in [PUBLISH_PERCENT_MIN, PUBLISH_PERCENT_MAX]. Shared by every call site that
  * builds a `ContextSnapshot.oracleSnapshot`

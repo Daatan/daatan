@@ -50,6 +50,7 @@ describe('high-confidence crossing alert', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-1' }] as never)
+    vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null as never)
   })
 
   it('fires when confidence crosses 80 from below', async () => {
@@ -158,6 +159,7 @@ describe('settled persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.$transaction).mockResolvedValue([{ id: 'snap-1' }] as never)
+    vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null as never)
   })
 
   it('saveNewsIndexerMatch writes settled+settledAt when settled', async () => {

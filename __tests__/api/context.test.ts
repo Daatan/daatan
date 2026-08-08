@@ -37,6 +37,7 @@ const {
     contextSnapshot: {
       create: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
     contextTiming: {
       create: vi.fn().mockResolvedValue({}),
@@ -157,6 +158,10 @@ describe('POST /api/forecasts/[id]/context', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // F17 (daatan#1236): recordEstimate reads the current evidence anchor (via
+    // getLatestEvidenceEstimate -> contextSnapshot.findFirst) to tag materialChange.
+    // Default to "no prior anchor" unless a test overrides it.
+    mockPrisma.contextSnapshot.findFirst.mockResolvedValue(null)
   })
 
   it('returns 401 when not authenticated', async () => {

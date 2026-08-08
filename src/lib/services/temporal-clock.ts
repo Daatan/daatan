@@ -5,6 +5,7 @@ import {
   saveClockSnapshot,
   getLatestEvidenceEstimate,
 } from '@/lib/services/context'
+import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
@@ -21,9 +22,6 @@ export const TEMPORAL_ENGINE_VERSION = 'glide-v1'
 /** Never display a literal 0/100 — matches the shipped settlement pin's 97/3 convention. */
 export const PIN_LOW = 3
 export const PIN_HIGH = 97
-
-/** Skip a clock write when the move is this small — avoids near-noise snapshot churn. */
-export const MATERIAL_CHANGE_PTS = 1
 
 /** claimDeadline (LLM-parsed) vs resolveByDatetime (platform-authoritative) must
  *  agree within this window, or both must already be in the past, to hard-pin. */
@@ -239,9 +237,14 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
     return
   }
 
+  // F17 (daatan#1236): anchor to when the evidence was published, not when this
+  // row was written — falls back to createdAt for rows with no parseable
+  // evidence date (all pre-migration rows, and any push whose sources carried
+  // no usable publishedAt).
+  const tLast = anchor.evidenceAt ?? anchor.createdAt
   const result = computeRequote({
     pLast: anchor.externalProbability,
-    tLast: anchor.createdAt,
+    tLast,
     now,
     claimDeadline: c.claimDeadline!,
     resolveByDatetime: c.resolveByDatetime,
@@ -293,7 +296,7 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
       engineVersion: TEMPORAL_ENGINE_VERSION,
       cause: result.cause,
       pLast: anchor.externalProbability,
-      tLast: anchor.createdAt.toISOString(),
+      tLast: tLast.toISOString(),
       tEff: result.tEff.toISOString(),
       c: result.c,
       direction: c.claimDirection,
@@ -407,7 +410,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
         }
         const result = computeRequote({
           pLast: anchor.externalProbability,
-          tLast: anchor.createdAt,
+          tLast: anchor.evidenceAt ?? anchor.createdAt,
           now,
           claimDeadline: c.claimDeadline!,
           resolveByDatetime: c.resolveByDatetime,

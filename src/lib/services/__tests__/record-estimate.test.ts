@@ -27,6 +27,7 @@ import { recordEstimate, saveOracleSnapshotOnly, markOracleAttempted, clearSettl
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const snapshotCreate = vi.mocked(prisma.contextSnapshot.create)
+const findFirst = vi.mocked(prisma.contextSnapshot.findFirst)
 const update = vi.mocked(prisma.prediction.update)
 const deleteTranslations = vi.mocked(prisma.predictionTranslation.deleteMany)
 const transaction = vi.mocked(prisma.$transaction)
@@ -45,6 +46,7 @@ describe('recordEstimate — the single estimate writer', () => {
     vi.clearAllMocks()
     transaction.mockResolvedValue([{ id: 'snap-1' }] as never)
     findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+    findFirst.mockResolvedValue(null as never)
   })
 
   it('stamps origin, kind, and articlesUsed (derived from the oracleSnapshot) on the snapshot', async () => {
@@ -143,6 +145,7 @@ describe('backfill adapters through the funnel', () => {
     vi.clearAllMocks()
     transaction.mockResolvedValue([{ id: 'snap-1' }] as never)
     findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+    findFirst.mockResolvedValue(null as never)
   })
 
   it('saveOracleSnapshotOnly puts the estimate on the snapshot (chart + glide anchor can see it)', async () => {
@@ -168,5 +171,86 @@ describe('backfill adapters through the funnel', () => {
     })
     expect(update).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * F17 (daatan#1236): the glide clock's anchor must not reset on a write that carries
+ * no new information — a push whose only article was gatekeeper-rejected recomputes
+ * an unchanged pool and writes the same probability again. `recordEstimate` tags each
+ * evidence-kind write with `materialChange` (did it move enough from the CURRENT
+ * anchor to count as new information) and `evidenceAt` (when the evidence behind it
+ * was actually published, not when this row was written) — getLatestEvidenceEstimate
+ * then excludes non-material rows from anchor selection.
+ */
+describe('material-change anchor tagging (F17, daatan#1236)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    transaction.mockResolvedValue([{ id: 'snap-1' }] as never)
+    findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+  })
+
+  it('tags materialChange: true when there is no prior anchor (first-ever evidence write)', async () => {
+    findFirst.mockResolvedValue(null as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 60, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: true })
+  })
+
+  it('tags materialChange: false on a rejected-article push — same probability as the current anchor, pool unchanged', async () => {
+    findFirst.mockResolvedValue({ externalProbability: 60, createdAt: new Date('2026-08-01'), evidenceAt: null } as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 60, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: false })
+  })
+
+  it('tags materialChange: true on a genuine update — probability moved by at least MATERIAL_CHANGE_PTS from the anchor', async () => {
+    findFirst.mockResolvedValue({ externalProbability: 60, createdAt: new Date('2026-08-01'), evidenceAt: null } as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 65, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: true })
+  })
+
+  it('leaves materialChange at its safe default (true) for a clock write — anchor selection never reads clock rows anyway', async () => {
+    await recordEstimate({ predictionId: 'pred-1', origin: 'clock', probability: 60, meta: { cause: 'glide' } })
+    expect(snapshotData()).toMatchObject({ materialChange: true })
+  })
+
+  it('leaves evidenceAt null when no source carries a parseable publish date', async () => {
+    findFirst.mockResolvedValue(null as never)
+    await recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 60,
+      sources: [{ url: 'https://x.com/a', publishedDate: null }],
+      oracleSnapshot: { sources: [] },
+    })
+    expect(snapshotData()).toMatchObject({ evidenceAt: null })
+  })
+
+  it('anchors evidenceAt to the newest oracleSnapshot.sources[].publishedAt, not write time — backfill of old evidence stays old', async () => {
+    findFirst.mockResolvedValue(null as never)
+    await saveOracleSnapshotOnly({
+      predictionId: 'pred-1',
+      oracleSnapshot: {
+        sources: [
+          { url: 'https://a.com/1', publishedAt: '2026-01-15T00:00:00.000Z' },
+          { url: 'https://a.com/2', publishedAt: '2026-02-20T00:00:00.000Z' },
+        ],
+      },
+      confidence: 44,
+      aiCiLow: 30,
+      aiCiHigh: 58,
+    })
+    expect(snapshotData().evidenceAt).toEqual(new Date('2026-02-20T00:00:00.000Z'))
+  })
+
+  it('prefers oracleSnapshot.sources[].publishedAt over the narrower push sources[].publishedDate', async () => {
+    findFirst.mockResolvedValue(null as never)
+    await recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 60,
+      sources: [{ url: 'https://push.com/a', publishedDate: '2026-06-01T00:00:00.000Z' }],
+      oracleSnapshot: { sources: [{ url: 'https://pool.com/b', publishedAt: '2026-05-01T00:00:00.000Z' }] },
+    })
+    expect(snapshotData().evidenceAt).toEqual(new Date('2026-05-01T00:00:00.000Z'))
   })
 })

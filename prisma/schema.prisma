@@ -507,6 +507,26 @@ model ContextSnapshot {
   // Provenance for kind='clock': { engineVersion, cause, pLast, tLast, tEff, c, direction }.
   meta Json?
 
+  // F17 (daatan#1236): true when this write's probability moved by at least
+  // MATERIAL_CHANGE_PTS from the current evidence anchor (or there is no prior
+  // anchor yet) — i.e. it carries new information. A push whose only article
+  // was gatekeeper-rejected recomputes the same, unchanged pool and writes the
+  // same probability again; that write still happens (audit trail, no
+  // check-then-act dedup — see saveNewsIndexerMatch), but is excluded from
+  // anchor selection so it can't reset the glide clock's t_last. Default true
+  // so every pre-existing row (and every non-evidence/clock write) stays
+  // anchor-eligible — this column changes nothing about historical behavior.
+  materialChange Boolean @default(true) @map("material_change")
+
+  // F17 (daatan#1236): newest publish time among the sources behind this
+  // estimate (max of oracleSnapshot.sources[].publishedAt, falling back to
+  // sources[].publishedDate), not the time this row was written. Lets the
+  // glide clock anchor to when the evidence actually happened rather than
+  // when it was (re-)computed — a backfill over old articles must not look
+  // fresh to the clock. Null when unavailable/unparseable; callers fall back
+  // to createdAt.
+  evidenceAt DateTime? @map("evidence_at")
+
   createdAt DateTime @default(now())
 
   @@index([predictionId, createdAt])

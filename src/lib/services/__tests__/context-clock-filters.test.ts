@@ -49,15 +49,20 @@ describe('kind=clock exclusion filters', () => {
     expect(call.where).toMatchObject({ kind: { not: 'clock' } })
   })
 
-  it('getLatestEvidenceEstimate excludes clock rows, abstentions, and null probabilities', async () => {
+  it('getLatestEvidenceEstimate excludes clock rows, abstentions, null probabilities, and non-material writes (F17, daatan#1236)', async () => {
     findFirstSnapshot.mockResolvedValue(null)
     await getLatestEvidenceEstimate('pred-1')
-    const call = findFirstSnapshot.mock.calls[0][0] as { where: Record<string, unknown> }
+    const call = findFirstSnapshot.mock.calls[0][0] as {
+      where: Record<string, unknown>
+      select: Record<string, unknown>
+    }
     expect(call.where).toMatchObject({
       externalProbability: { not: null },
       insufficientData: false,
+      materialChange: true,
       kind: { not: 'clock' },
     })
+    expect(call.select).toMatchObject({ externalProbability: true, createdAt: true, evidenceAt: true })
   })
 })
 
