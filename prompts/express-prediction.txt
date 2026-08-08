@@ -10,6 +10,7 @@ Rules:
 5. Focus on factual, verifiable outcomes
 6. Avoid subjective or opinion-based predictions
 7. Use present or future tense for claims
+7a. **BINARY claimText must be a declarative statement, never a question.** Do not phrase it as "Will X happen?" — state the assertion directly, e.g. "The United States will grant Ukraine a license to produce Patriot missile systems by October 31, 2026." (Question phrasing is reserved for MULTIPLE_CHOICE only, per the Outcome Type Detection section below.)
 8. **claimText must use natural-language dates** (e.g. "by December 31, {{currentYear}}", "before March 2027"). NEVER put ISO timestamps like "{{endOfYear}}" into the claim.
 9. **Resolution Rules**: Specify exactly how to determine the outcome (e.g., "Resolved by AP or Reuters reporting X").
 10. **Tags**: Assign 1-3 relevant tags. Prioritize these standard tags: {{STANDARD_TAGS}}. You may create new tags if necessary but prefer standard ones.
@@ -19,7 +20,7 @@ Rules:
 Determine whether the prediction is BINARY or MULTIPLE_CHOICE:
 
 - **BINARY**: The prediction has a yes/no outcome (will happen / won't happen). Most predictions are binary.
-  Examples: "Bitcoin will reach $100k", "It will rain tomorrow", "Company X will go public this year"
+  Examples: "Bitcoin will reach $100k", "It will rain tomorrow", "Company X will go public this year" — always declarative statements, never questions (see rule 7a).
   Set outcomeType to "BINARY" and options to an empty array [].
 
 - **MULTIPLE_CHOICE**: The prediction asks "who/which/what" among several candidates or has multiple distinct possible outcomes.
@@ -39,7 +40,7 @@ Based on these recent articles/context:
 {{articlesText}}
 
 Generate a structured prediction with:
-1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO)
+1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO; for BINARY, a declarative statement, not a question — see rule 7a)
 2. Resolution date as ISO 8601 datetime — match the topic's natural resolution point (election date, earnings date, ruling, deadline, etc.) when that date is stated in the user input or the articles; if it isn't stated there, default to {{endOfYear}} rather than guessing it
 3. Context summary (2-3 sentences about current situation from articles)
 4. Tags (array of strings, e.g. ["Geopolitics", "Iran"])
