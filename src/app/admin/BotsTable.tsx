@@ -1,17 +1,32 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Play, FlaskConical, Power, ChevronDown, ChevronUp, Plus, Pencil, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { CreateBotForm } from './_bots/CreateBotForm'
 import { EditBotModal } from './_bots/EditBotModal'
 import { formatInterval, relativeTime, actionBadge } from './_bots/helpers'
 import type { Bot, BotLog, BotRunSummary } from './_bots/types'
+import { SubmitProgress, type ProgressStep } from '@/components/forecasts/SubmitProgress'
+import { getEstimate, recordDuration, type TimingKey } from '@/lib/forecast-timing'
+
+// "Run now" progress phases (daatan#1139), mirroring runner.ts's RunMetrics
+// stages: RSS/Oracle fetch, hot-topic detection, dedup+LLM generation, stake.
+const BOT_RUN_STEP_KEYS = ['fetch', 'detect', 'generate', 'stake'] as const
+type BotRunStepKey = typeof BOT_RUN_STEP_KEYS[number]
+const BOT_RUN_TIMING_KEY: Record<BotRunStepKey, TimingKey> = {
+  fetch: 'bot-fetch',
+  detect: 'bot-detect',
+  generate: 'bot-generate',
+  stake: 'bot-stake',
+}
 
 export default function BotsTable() {
   const t = useTranslations('admin')
   const [bots, setBots] = useState<Bot[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [runningBots, setRunningBots] = useState<Set<string>>(new Set())
+  const [runSteps, setRunSteps] = useState<Record<string, ProgressStep[]>>({})
+  const runTimers = useRef<Record<string, ReturnType<typeof setTimeout>[]>>({})
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [logs, setLogs] = useState<Record<string, BotLog[]>>({})
   const [loadingLogs, setLoadingLogs] = useState<Set<string>>(new Set())
@@ -20,6 +35,26 @@ export default function BotsTable() {
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [runResult, setRunResult] = useState<BotRunSummary | null>(null)
   const [allTags, setAllTags] = useState<{ id: string; name: string; slug: string }[]>([])
+
+  const botRunSteps = useCallback((activeIndex: number): ProgressStep[] => {
+    const labels: Record<BotRunStepKey, string> = {
+      fetch: t('runStepFetch'),
+      detect: t('runStepDetect'),
+      generate: t('runStepGenerate'),
+      stake: t('runStepStake'),
+    }
+    return BOT_RUN_STEP_KEYS.map((key, i) => ({
+      key,
+      label: labels[key],
+      state: i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'pending',
+    }))
+  }, [t])
+
+  const activeEstimateFor = (botId: string): number => {
+    const active = runSteps[botId]?.find((s) => s.state === 'active')
+    if (!active) return 0
+    return getEstimate(BOT_RUN_TIMING_KEY[active.key as BotRunStepKey])
+  }
 
   const fetchBots = useCallback(async () => {
     setIsLoading(true)
@@ -57,6 +92,23 @@ export default function BotsTable() {
   const runBot = async (botId: string, dryRun: boolean) => {
     setRunningBots((s) => new Set(s).add(botId))
     setRunResult(null)
+
+    // Calibrated step-progress feedback (daatan#1139): the run route stays a
+    // plain blocking request, so step transitions are client-scheduled
+    // setTimeouts against per-device estimates — no server push involved.
+    const estimates = BOT_RUN_STEP_KEYS.map((key) => getEstimate(BOT_RUN_TIMING_KEY[key]))
+    setRunSteps((r) => ({ ...r, [botId]: botRunSteps(0) }))
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let cumulative = 0
+    for (let i = 1; i < BOT_RUN_STEP_KEYS.length; i++) {
+      cumulative += estimates[i - 1]
+      timers.push(setTimeout(() => {
+        setRunSteps((r) => ({ ...r, [botId]: botRunSteps(i) }))
+      }, cumulative))
+    }
+    runTimers.current[botId] = timers
+
+    const runStart = performance.now()
     try {
       const res = await fetch(`/api/admin/bots/${botId}/run${dryRun ? '?dry=true' : ''}`, { method: 'POST' })
       const data = await res.json()
@@ -76,7 +128,21 @@ export default function BotsTable() {
     } catch {
       flash(t('requestFailed'))
     } finally {
+      (runTimers.current[botId] ?? []).forEach(clearTimeout)
+      delete runTimers.current[botId]
+      setRunSteps((r) => { const n = { ...r }; delete n[botId]; return n })
       setRunningBots((s) => { const n = new Set(s); n.delete(botId); return n })
+
+      // No per-phase breakdown comes back from the (still blocking) run
+      // route, so split the observed total across the phases proportional
+      // to their current estimates — self-correcting as each phase's share
+      // of the total drifts toward reality over repeated runs.
+      const totalMs = performance.now() - runStart
+      const sumEstimates = estimates.reduce((a, b) => a + b, 0)
+      BOT_RUN_STEP_KEYS.forEach((key, i) => {
+        const weight = sumEstimates > 0 ? estimates[i] / sumEstimates : 1 / estimates.length
+        recordDuration(BOT_RUN_TIMING_KEY[key], totalMs * weight)
+      })
     }
   }
 
@@ -319,6 +385,10 @@ export default function BotsTable() {
                     </button>
                   </div>
                 </div>
+
+                {isRunning && runSteps[bot.id] && (
+                  <SubmitProgress steps={runSteps[bot.id]} activeEstimateMs={activeEstimateFor(bot.id)} />
+                )}
               </div>
 
               <button onClick={() => toggleLogs(bot.id)}

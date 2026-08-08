@@ -13,6 +13,15 @@ const DEFAULTS = {
   // estimate) get refined fast once real per-forecast durations come in.
   'resolve-scoring': 1200,
   'resolve-updating': 800,
+  // Admin "Run now" bot-run phases (daatan#1139), mirroring runner.ts's
+  // RunMetrics stages: RSS/Oracle fetch, hot-topic detection, dedup+LLM
+  // generation, then staking. The single POST /api/admin/bots/[id]/run call
+  // is not broken into server-timed sub-phases, so these defaults just seed
+  // the client-side split before real elapsed time calibrates them.
+  'bot-fetch': 3000,
+  'bot-detect': 500,
+  'bot-generate': 4000,
+  'bot-stake': 1000,
 } as const
 
 export type TimingKey = keyof typeof DEFAULTS

@@ -4,55 +4,46 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Check, Loader2 } from 'lucide-react'
 
-export type SubmitPhase = 'creating' | 'publishing' | 'done'
+export type StepState = 'done' | 'active' | 'pending'
 
-interface SubmitProgressProps {
-  mode: 'draft' | 'publish'
-  phase: SubmitPhase
-  createEstimateMs: number
-  publishEstimateMs: number
+export interface ProgressStep {
+  key: string
+  label: string
+  state: StepState
 }
 
-type StepState = 'done' | 'active' | 'pending'
+interface SubmitProgressProps {
+  /** Ordered list of steps to render, e.g. one entry per calibrated phase. */
+  steps: ProgressStep[]
+  /** Calibrated estimate (ms) for whichever step is currently 'active', used for the progress bar/countdown. */
+  activeEstimateMs: number
+}
 
 /**
- * Inline step progress shown beneath the submit button while a forecast is
- * being created. Estimates are client-side (calibrated via localStorage) — the
- * server does the real work opaquely, so the bar is a calibrated estimate, not
- * a live server feed. Honest about what blocks: "Checking content…" is the
- * moderation LLM call (the real wait); embedding/translation run in the
- * background after the response and are intentionally not shown here.
+ * Inline step progress shown beneath a submit/run button while a blocking
+ * request is in flight. Estimates are client-side (calibrated via
+ * localStorage) — the server does the real work opaquely, so the bar is a
+ * calibrated estimate, not a live server feed. Generic over the step list so
+ * it can drive forecast creation/resolution and admin bot runs alike (daatan#1139).
  */
-export function SubmitProgress({ mode, phase, createEstimateMs, publishEstimateMs }: SubmitProgressProps) {
+export function SubmitProgress({ steps, activeEstimateMs }: SubmitProgressProps) {
   const t = useTranslations('wizard')
   const [elapsed, setElapsed] = useState(0)
   const startRef = useRef<number>(Date.now())
+  const activeKey = steps.find((s) => s.state === 'active')?.key
 
-  // Restart the elapsed timer whenever the active phase changes.
+  // Restart the elapsed timer whenever the active step changes.
   useEffect(() => {
     startRef.current = Date.now()
     setElapsed(0)
-    if (phase === 'done') return
+    if (!activeKey) return
     const id = setInterval(() => setElapsed(Date.now() - startRef.current), 100)
     return () => clearInterval(id)
-  }, [phase])
+  }, [activeKey])
 
-  const activeEstimate = phase === 'publishing' ? publishEstimateMs : createEstimateMs
-  const overrun = elapsed >= activeEstimate
-  const ratio = overrun ? 0.95 : Math.min(elapsed / activeEstimate, 0.95)
-  const secondsLeft = Math.max(0, Math.ceil((activeEstimate - elapsed) / 1000))
-
-  const steps: { key: string; label: string; state: StepState }[] = [
-    { key: 'check', label: t('checking'), state: phase === 'creating' ? 'active' : 'done' },
-    { key: 'save', label: t('saving'), state: phase === 'creating' ? 'pending' : 'done' },
-  ]
-  if (mode === 'publish') {
-    steps.push({
-      key: 'publish',
-      label: t('publishingStep'),
-      state: phase === 'publishing' ? 'active' : phase === 'done' ? 'done' : 'pending',
-    })
-  }
+  const overrun = elapsed >= activeEstimateMs
+  const ratio = overrun ? 0.95 : Math.min(elapsed / activeEstimateMs, 0.95)
+  const secondsLeft = Math.max(0, Math.ceil((activeEstimateMs - elapsed) / 1000))
 
   return (
     <div className="mt-4 space-y-2" role="status" aria-live="polite">

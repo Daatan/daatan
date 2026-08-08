@@ -24,7 +24,7 @@ import { StepNewsAnchor } from './steps/StepNewsAnchor'
 import { StepPrediction } from './steps/StepPrediction'
 import { StepOutcome } from './steps/StepOutcome'
 import { StepPublish } from './steps/StepPublish'
-import { SubmitProgress, type SubmitPhase } from './SubmitProgress'
+import { SubmitProgress } from './SubmitProgress'
 import { getEstimate, recordDuration } from '@/lib/forecast-timing'
 
 export type PredictionFormData = {
@@ -88,7 +88,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
   const { externalMarkets } = useCapabilities()
   const [currentStep, setCurrentStep] = useState(isExpressFlow ? 2 : 1)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitPhase, setSubmitPhase] = useState<SubmitPhase>('creating')
+  const [submitPhase, setSubmitPhase] = useState<'creating' | 'publishing' | 'done'>('creating')
   const [submitMode, setSubmitMode] = useState<'draft' | 'publish'>('publish')
   const [estimates, setEstimates] = useState({ create: 5000, publish: 1500 })
   const [error, setError] = useState<string | null>(null)
@@ -523,10 +523,18 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
 
       {isSubmitting && currentStep === 4 && (
         <SubmitProgress
-          mode={submitMode}
-          phase={submitPhase}
-          createEstimateMs={estimates.create}
-          publishEstimateMs={estimates.publish}
+          steps={[
+            { key: 'check', label: t('checking'), state: submitPhase === 'creating' ? 'active' : 'done' },
+            { key: 'save', label: t('saving'), state: submitPhase === 'creating' ? 'pending' : 'done' },
+            ...(submitMode === 'publish'
+              ? [{
+                key: 'publish',
+                label: t('publishingStep'),
+                state: submitPhase === 'publishing' ? 'active' as const : submitPhase === 'done' ? 'done' as const : 'pending' as const,
+              }]
+              : []),
+          ]}
+          activeEstimateMs={submitPhase === 'publishing' ? estimates.publish : estimates.create}
         />
       )}
     </div>
