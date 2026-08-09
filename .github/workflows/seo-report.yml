@@ -8,8 +8,10 @@ name: Weekly SEO Report
 #
 # Credentials: GSC_SA_KEY is the same seo-mcp@daatan service account the
 # local MCP tooling uses (added to both GSC properties 2026-08); YWM_OAUTH_TOKEN
-# likewise mirrors the local Yandex.Webmaster token. See scripts/seo-report.py
-# for what is and isn't reachable via the APIs (coverage alerts are not).
+# likewise mirrors the local Yandex.Webmaster token; CRUX_API_KEY is the
+# pagespeed-mcp GCP API key, widened to also allow chromeuxreport.googleapis.com
+# (daatan#1366). See scripts/seo-report.py for what is and isn't reachable via
+# the APIs (coverage alerts are not).
 
 on:
   schedule:
@@ -36,6 +38,7 @@ jobs:
       - name: Run report
         env:
           YWM_OAUTH_TOKEN: ${{ secrets.YWM_OAUTH_TOKEN }}
+          CRUX_API_KEY: ${{ secrets.CRUX_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           echo '${{ secrets.GSC_SA_KEY }}' > /tmp/gsc-sa.json

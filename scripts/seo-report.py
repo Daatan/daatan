@@ -11,10 +11,11 @@ The GSC API cannot read the Page-indexing (coverage) report or its example
 URLs — the 0-coverage-alerts goal still needs a periodic UI check; sitemap
 errors/warnings below are the closest API-visible proxy.
 
-CrUX (real-user Core Web Vitals) is deliberately absent: the API is disabled
-in the GCP project (403) — see platform#13. Add a section once it's enabled.
+CrUX (real-user Core Web Vitals) is origin-level only — both sites are too
+low-traffic for per-page field data. A 404 from the API means "not enough
+real Chrome traffic yet", a normal/expected state, not an error (daatan#1366).
 
-Env: GSC_SA_KEY_FILE, YWM_OAUTH_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
+Env: GSC_SA_KEY_FILE, YWM_OAUTH_TOKEN, CRUX_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
 Keyword list mirrors Daatan/docs seo.md (tiers 1-3) — sync manually when the
 doc changes; the docs repo is private so this public workflow can't fetch it.
 """
@@ -156,6 +157,54 @@ def ywm_block():
         return f"Yandex: API error ({type(e).__name__})"
 
 
+# p75 thresholds per web.dev's Core Web Vitals scale: (good-or-better, needs-improvement-or-better).
+CWV_THRESHOLDS = {
+    "largest_contentful_paint": (2500, 4000, "ms", "LCP"),
+    "interaction_to_next_paint": (200, 500, "ms", "INP"),
+    "cumulative_layout_shift": (0.1, 0.25, "", "CLS"),
+}
+
+
+def crux_rating(value, good, needs_improvement):
+    if value <= good:
+        return "good"
+    if value <= needs_improvement:
+        return "needs improvement"
+    return "poor"
+
+
+def crux_block(host, origin):
+    key = os.environ.get("CRUX_API_KEY")
+    if not key:
+        return f"  {host}: CrUX key not configured"
+    try:
+        resp = requests.post(
+            f"https://chromeuxreport.googleapis.com/v1/records:queryRecord?key={key}",
+            json={"origin": origin},
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return f"  {host}: no CrUX data yet (traffic too low for field data)"
+        resp.raise_for_status()
+        metrics = resp.json()["record"]["metrics"]
+        parts = []
+        for metric_key, (good, needs_improvement, unit, label) in CWV_THRESHOLDS.items():
+            p75 = metrics.get(metric_key, {}).get("percentiles", {}).get("p75")
+            if p75 is None:
+                continue
+            parts.append(f"{label} {p75}{unit} ({crux_rating(p75, good, needs_improvement)})")
+        return f"  {host}: " + (" · ".join(parts) if parts else "record present, no CWV metrics")
+    except Exception as e:
+        return f"  {host}: CrUX error ({type(e).__name__})"
+
+
+def crux_section():
+    lines = ["<b>Core Web Vitals</b> (CrUX, real-user field data)"]
+    for host, site in SITES.items():
+        lines.append(crux_block(host, site.rstrip("/")))
+    return "\n".join(lines)
+
+
 def main():
     svc = gsc_service()
     blocks = ["📈 <b>Weekly SEO report</b>"]
@@ -164,6 +213,7 @@ def main():
             blocks.append(gsc_site_block(svc, host, site))
         except Exception as e:
             blocks.append(f"<b>{host}</b>: GSC error ({type(e).__name__}: {e})")
+    blocks.append(crux_section())
     blocks.append(ywm_block())
     blocks.append("<i>Coverage-alert counts aren't in the API — check the GSC UI. Keywords tracked per docs/seo.md.</i>")
     text = "\n\n".join(blocks)
