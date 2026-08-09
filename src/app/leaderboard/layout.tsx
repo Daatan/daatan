@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { unstable_cache } from 'next/cache'
 import { getLeaderboard } from '@/lib/services/leaderboard'
 import { JsonLd } from '@/components/JsonLd'
+import { getAppUrl } from '@/lib/branding'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build. Route stays dynamic; the DB call below is cached.
@@ -39,7 +40,7 @@ export default async function LeaderboardLayout({ children }: { children: React.
     itemListElement: topUsers.map((u, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `https://daatan.com/profile/${u.username ?? u.id}`,
+      url: `${getAppUrl()}/profile/${u.username ?? u.id}`,
       name: u.name ?? u.username ?? 'Anonymous',
     })),
   }

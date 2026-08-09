@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PredictionsPage } from '@/app/forecasts/PredictionsClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
+import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,23 +23,24 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params
   const meta = META[locale] ?? META.he
+  const appUrl = getAppUrl()
 
   return {
     title: meta.title,
     description: meta.description,
     alternates: {
-      canonical: `https://daatan.com/${locale}/forecasts`,
+      canonical: `${appUrl}/${locale}/forecasts`,
       languages: {
-        'x-default': 'https://daatan.com/forecasts',
-        en: 'https://daatan.com/forecasts',
-        he: 'https://daatan.com/he/forecasts',
-        ru: 'https://daatan.com/ru/forecasts',
+        'x-default': `${appUrl}/forecasts`,
+        en: `${appUrl}/forecasts`,
+        he: `${appUrl}/he/forecasts`,
+        ru: `${appUrl}/ru/forecasts`,
       },
     },
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: `https://daatan.com/${locale}/forecasts`,
+      url: `${appUrl}/${locale}/forecasts`,
     },
   }
 }

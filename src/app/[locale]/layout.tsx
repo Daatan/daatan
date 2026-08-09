@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
 import type { Metadata } from 'next'
+import { getAppUrl } from '@/lib/branding'
 
 /**
  * Locale sub-routes: /he/... and /ru/...
@@ -28,15 +29,16 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale } = await params
+  const appUrl = getAppUrl()
   return {
     // eo is supported for UI purposes but excluded from Google indexing
     ...(locale === 'eo' ? { robots: { index: false, follow: false } } : {}),
     alternates: {
       languages: {
-        'x-default': 'https://daatan.com',
-        en: 'https://daatan.com',
-        he: 'https://daatan.com/he',
-        ru: 'https://daatan.com/ru',
+        'x-default': appUrl,
+        en: appUrl,
+        he: `${appUrl}/he`,
+        ru: `${appUrl}/ru`,
       },
     },
     openGraph: {

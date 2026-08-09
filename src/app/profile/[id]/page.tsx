@@ -7,6 +7,7 @@ import { UserProfileView } from '@/components/profile/UserProfileView'
 import { loadProfileScores, loadProfileTab } from '@/lib/services/profile'
 import type { ProfileTab } from '@/lib/services/profile'
 import { JsonLd } from '@/components/JsonLd'
+import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,12 +42,12 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   return {
     title,
     description,
-    alternates: { canonical: `https://daatan.com/profile/${user.username}` },
+    alternates: { canonical: `${getAppUrl()}/profile/${user.username}` },
     openGraph: {
       title,
       description,
       type: 'profile',
-      url: `https://daatan.com/profile/${user.username}`,
+      url: `${getAppUrl()}/profile/${user.username}`,
     },
     twitter: { card: 'summary_large_image', title, description },
   }
@@ -116,12 +117,13 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
       loadProfileTab({ userId: user.id, isPublic: true, selectedTag, tab, page }),
     ])
 
+    const appUrl = getAppUrl()
     const personJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Person',
       name: user.name,
       identifier: `@${user.username}`,
-      url: `https://daatan.com/profile/${user.username}`,
+      url: `${appUrl}/profile/${user.username}`,
       ...(user.image && { image: user.image }),
       ...(user.website && { sameAs: [user.website] }),
     }
@@ -130,12 +132,12 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://daatan.com' },
+        { '@type': 'ListItem', position: 1, name: 'Home', item: appUrl },
         {
           '@type': 'ListItem',
           position: 2,
           name: user.name ?? user.username,
-          item: `https://daatan.com/profile/${user.username}`,
+          item: `${appUrl}/profile/${user.username}`,
         },
       ],
     }

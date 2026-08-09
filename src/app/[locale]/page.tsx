@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import type { Metadata } from 'next'
 import FeedClient from '@/app/FeedClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
+import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,23 +27,24 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params
   const meta = META[locale] ?? META.he
+  const appUrl = getAppUrl()
 
   return {
     title: meta.title,
     description: meta.description,
     alternates: {
-      canonical: `https://daatan.com/${locale}`,
+      canonical: `${appUrl}/${locale}`,
       languages: {
-        'x-default': 'https://daatan.com',
-        en: 'https://daatan.com',
-        he: 'https://daatan.com/he',
-        ru: 'https://daatan.com/ru',
+        'x-default': appUrl,
+        en: appUrl,
+        he: `${appUrl}/he`,
+        ru: `${appUrl}/ru`,
       },
     },
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: `https://daatan.com/${locale}`,
+      url: `${appUrl}/${locale}`,
       locale,
     },
   }

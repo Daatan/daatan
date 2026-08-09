@@ -2,13 +2,14 @@ import { AlertTriangle } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
 import { isSelfHosted } from '@/lib/edition'
+import { getAppUrl } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const t = await getTranslations({ locale, namespace: 'footer' })
   return {
     title: t('disclaimer'),
-    alternates: { canonical: 'https://daatan.com/disclaimer' },
+    alternates: { canonical: `${getAppUrl()}/disclaimer` },
   }
 }
 

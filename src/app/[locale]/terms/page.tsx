@@ -1,6 +1,7 @@
 import { BookOpen } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
+import { getAppUrl } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -9,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title: t('terms'),
     // Same rationale as the locale privacy page: the rendered content is the
     // English text on every locale, so consolidate canonicals on /terms.
-    alternates: { canonical: 'https://daatan.com/terms' },
+    alternates: { canonical: `${getAppUrl()}/terms` },
   }
 }
 
