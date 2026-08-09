@@ -87,6 +87,21 @@ pass `--apply` to write. Requires `GEMINI_API_KEY` + `DATABASE_URL`. For prod, d
 via the `backfill-english-canonical` admin endpoint / GitHub Actions workflow rather
 than the script.
 
+### Question → statement rephrase (daatan#1359)
+
+`POST /api/admin/forecasts/rephrase-questions` rewrites the handful of legacy claims
+phrased as questions ("Will X happen?") into the statement form used everywhere else.
+The rewrites are a fixed reviewed table in `src/lib/services/rephrase-question-forecasts.ts`,
+not an LLM call — these are live forecasts, so the wording is a reviewed decision and a
+row whose text has drifted since review is reported as `mismatch` and left alone. Pass
+`?dryRun=1` to preview; re-runs report `already` and write nothing.
+
+Changing `claimText` invalidates two derived things, and the endpoint refreshes both:
+the claim embedding (backs the forecast↔article match gate) and the locale translations
+(cached against `prediction_translations.sourceHash`). Slugs are deliberately **not**
+regenerated — `slug` is an independent column, so leaving it alone keeps every inbound
+URL working without needing an alias hop.
+
 ## UI string catalogue (`messages/*.json`)
 
 Separate from the forecast-content translation above: `messages/{en,he,ru,eo}.json` hold the
