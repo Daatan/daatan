@@ -429,6 +429,148 @@ describe('POST /api/news-indexer/context', () => {
     })
   })
 
+  describe('personId/outletId passthrough (daatan#1349)', () => {
+    // Pins the contract: news-indexer sends `personId`/`outletId` (worker/matcher.py) but the
+    // schema didn't declare them, so Zod's `.parse()` silently stripped them as unknown keys —
+    // and the route re-fetched the same identity synchronously via `getArticleMetaByUrl`,
+    // adding up to that lookup's 4s timeout to every push. If the schema regresses to stripping
+    // these again, this suite fails loudly instead of the field just silently vanishing.
+    beforeEach(() => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    })
+
+    const snapshotSources = (): Record<string, unknown>[] =>
+      (vi.mocked(saveNewsIndexerMatch).mock.calls[0][0].oracleSnapshot as unknown as { sources: Record<string, unknown>[] })
+        .sources
+
+    it('accepts personId/outletId inside articles[] and writes them into the snapshot', async () => {
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            {
+              url: 'https://bbc.com/news/x',
+              title: 'Headline',
+              snippet: 's',
+              personId: 'person-1',
+              outletId: 'outlet-1',
+            },
+          ],
+        }),
+      )
+
+      expect(snapshotSources()[0]).toMatchObject({
+        url: 'https://bbc.com/news/x',
+        personId: 'person-1',
+        outletId: 'outlet-1',
+      })
+    })
+
+    it('accepts personId/outletId on the legacy single-article body shape', async () => {
+      await POST(post('test-secret', { ...VALID_BODY, personId: 'person-2', outletId: 'outlet-2' }))
+
+      expect(snapshotSources()[0]).toMatchObject({ personId: 'person-2', outletId: 'outlet-2' })
+    })
+
+    it('does NOT call the by-url lookup when every article already carries identity from the push', async () => {
+      // This is the point of the fix: the payload already identifies the article, so the
+      // synchronous HTTP round-trip (up to a 4s timeout) must not happen at all.
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            {
+              url: 'https://bbc.com/news/x',
+              title: 'Headline',
+              snippet: 's',
+              personId: 'person-1',
+              outletId: 'outlet-1',
+            },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith([])
+    })
+
+    it('falls back to the by-url lookup only for articles the push did not identify', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      const ORACLE_TWO_SOURCES = {
+        ...ORACLE_WITH_SOURCE,
+        articles_used: 2,
+        sources: [
+          ORACLE_WITH_SOURCE.sources[0],
+          {
+            source_id: 'aj',
+            source_name: 'Al Jazeera',
+            url: 'https://aljazeera.com/news/y',
+            stance: -0.3,
+            certainty: 0.6,
+            credibility_weight: 1.0,
+            claims: ['AJ claim'],
+          },
+        ],
+      }
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(
+        new Map([
+          [
+            'https://aljazeera.com/news/y',
+            {
+              requestedUrl: 'https://aljazeera.com/news/y',
+              author: 'AJ Byline',
+              publishedAt: null,
+              title: null,
+              source: null,
+              personId: 'person-looked-up',
+              personName: 'Looked Up Person',
+              outletId: 'outlet-looked-up',
+              outletName: 'Looked Up Outlet',
+            },
+          ],
+        ]) as never,
+      )
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            // Already identified by the push — must be excluded from the lookup.
+            { url: 'https://bbc.com/news/x', title: 'BBC', snippet: 's1', personId: 'person-1' },
+            // NOT identified by the push — must be looked up.
+            { url: 'https://aljazeera.com/news/y', title: 'AJ', snippet: 's2' },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith(['https://aljazeera.com/news/y'])
+
+      const sources = snapshotSources()
+      const bbc = sources.find((s) => s.url === 'https://bbc.com/news/x')
+      const aj = sources.find((s) => s.url === 'https://aljazeera.com/news/y')
+      expect(bbc).toMatchObject({ personId: 'person-1' })
+      expect(aj).toMatchObject({ personId: 'person-looked-up', personName: 'Looked Up Person', outletId: 'outlet-looked-up' })
+    })
+
+    it('does not overwrite a resolvable name with null when only the push-supplied id is known', async () => {
+      // personName/outletName are not in the push payload at all — only ids. A push-identified
+      // article must leave personName/outletName `undefined` (no opinion this run), not `null`
+      // (a real "resolved to nothing" signal) — see the F11 undefined-vs-null convention.
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://bbc.com/news/x', title: 'Headline', snippet: 's', personId: 'person-1' },
+          ],
+        }),
+      )
+
+      const source = snapshotSources()[0]
+      expect(source.personId).toBe('person-1')
+      expect(source.personName).toBeUndefined()
+    })
+  })
+
   describe('the estimate is the pool aggregate, not the single-article run', () => {
     // Two pooled articles, neither of them this push's bbc.com article — so a snapshot
     // built from the pool is visibly the whole evidence set, not just what fired the push.
