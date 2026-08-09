@@ -14,13 +14,13 @@ export async function findFuzzyMatches(query: string): Promise<FuzzyMatches> {
   const [predictions, tags] = await Promise.all([
     prisma.$queryRaw<{ id: string }[]>`
       SELECT id FROM predictions
-      WHERE similarity("claimText", ${query}) > ${SIMILARITY_THRESHOLD}
-      ORDER BY similarity("claimText", ${query}) DESC
+      WHERE word_similarity(${query}, "claimText") > ${SIMILARITY_THRESHOLD}
+      ORDER BY word_similarity(${query}, "claimText") DESC
       LIMIT ${MAX_MATCHES}
     `,
     prisma.$queryRaw<{ name: string }[]>`
       SELECT name FROM tags
-      WHERE similarity(name, ${query}) > ${SIMILARITY_THRESHOLD}
+      WHERE word_similarity(${query}, name) > ${SIMILARITY_THRESHOLD}
     `,
   ])
 
