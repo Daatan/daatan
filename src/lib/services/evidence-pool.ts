@@ -396,6 +396,10 @@ const POOL_RECOMPUTE_SELECT = {
   verified: true,
   claimsDetail: true,
   excluded: true,
+  // Ingest time, not publish time (daatan#1362). `publishedDate` cannot substitute:
+  // a months-old article can be discovered and pooled today, so only this can answer
+  // "are we still finding new evidence for this claim, or has the pool gone stale".
+  addedAt: true,
 } satisfies Prisma.EvidencePoolArticleSelect
 
 export type PoolRecomputeArticle = Prisma.EvidencePoolArticleGetPayload<{
@@ -577,6 +581,23 @@ export async function recomputeFromPool(
           relevance_score: a.relevanceScore,
           evidence_weight: a.evidenceWeight,
           published_date: a.publishedDate,
+          // Ingest timestamp, so retro can report `days_since_last_complete` —
+          // freshness of *coverage* (daatan#1362, follow-up to retro#458 Phase 2).
+          // Distinct from `published_date` (a months-old piece can be pooled today)
+          // and from `age_adjusted_mass` (which weighs the existing pool, and cannot
+          // say whether new evidence is still arriving).
+          //
+          // Every row reaching this payload is COMPLETE: the `usable` filter above
+          // requires stance, certainty, credibility_weight and relevance_score to be
+          // non-null, and those are only ever written by `completeArticleExtraction`
+          // — a PENDING or FAILED row has them null and is filtered out. So `status`
+          // does not need to ride along for the max() over these rows to be a
+          // "last COMPLETE row" figure, which was the open question on the issue.
+          //
+          // Safe to send before retro reads it: `PoolSourceInput` declares no
+          // `model_config`, so Pydantic v2's default `extra='ignore'` drops unknown
+          // keys rather than 422ing. daatan can ship first.
+          added_at: a.addedAt.toISOString(),
           settled: a.settled ?? false,
           // The settlement anchor (retro #291) — lets aggregation-time
           // revalidation re-check this vote instead of trusting the stored bit.
