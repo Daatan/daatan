@@ -101,3 +101,64 @@ export function parseTime24(text: string): string | null {
   if (hours > 23 || minutes > 59) return null
   return `${pad(hours)}:${m[2]}`
 }
+
+/** How far ahead of UTC `timeZone`'s wall clock reads at `utcInstant` (ms; DST-aware). */
+function tzOffsetMs(utcInstant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+    .formatToParts(utcInstant)
+    .reduce<Record<string, string>>((acc, p) => {
+      if (p.type !== 'literal') acc[p.type] = p.value
+      return acc
+    }, {})
+  const asIfUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  )
+  return asIfUtc - utcInstant.getTime()
+}
+
+/**
+ * Snap a resolveByDatetime to 23:59:59.999 of its own calendar day in
+ * `timeZone` (default UTC — the house convention per daatan#1367). Reads the
+ * intended last day from `date` as seen in `timeZone`, so this is idempotent:
+ * normalizing an already-normalized instant returns the same instant.
+ *
+ * Pure — not wired into any write path yet (daatan#1402).
+ */
+export function normalizeResolveByDatetime(date: Date, timeZone = 'UTC'): Date {
+  const dayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((acc, p) => {
+      if (p.type !== 'literal') acc[p.type] = p.value
+      return acc
+    }, {})
+  const year = Number(dayParts.year)
+  const month = Number(dayParts.month) - 1
+  const day = Number(dayParts.day)
+
+  const guess = new Date(Date.UTC(year, month, day, 23, 59, 59, 999))
+  // formatToParts has no sub-second resolution, so look the offset up on a
+  // whole-second instant (the offset itself can't change within that second)
+  // and only then reapply the .999 to the actual guess.
+  const flooredGuess = new Date(Math.floor(guess.getTime() / 1000) * 1000)
+  const offsetMs = tzOffsetMs(flooredGuess, timeZone)
+  return new Date(guess.getTime() - offsetMs)
+}
