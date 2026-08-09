@@ -466,6 +466,43 @@ describe('recomputeFromPool', () => {
     expect(body.sources[0].outlet).toBe('Reuters')
   })
 
+  it('sends added_at (ingest time) alongside published_date, not instead of it', async () => {
+    // daatan#1362. retro computes `days_since_last_complete` from max(added_at) — a
+    // freshness-of-COVERAGE signal ("is new evidence still arriving for this claim?").
+    // published_date cannot stand in: this row was published in January and pooled in
+    // July, and it is the July date that says the pool is still being fed.
+    findMany.mockResolvedValue([
+      poolArticle({ publishedDate: '2026-01-15', addedAt: new Date('2026-07-20T08:30:00Z') }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources[0].added_at).toBe('2026-07-20T08:30:00.000Z')
+    expect(body.sources[0].published_date).toBe('2026-01-15')
+  })
+
+  it('only ever sends added_at for COMPLETE rows — the usable filter is what guarantees it', async () => {
+    // The open question on daatan#1362: does `status` need to ride along so retro can say
+    // "last COMPLETE row"? No. A PENDING/FAILED row has no stance/certainty/credibility/
+    // relevance — only completeArticleExtraction writes those — so the usable filter drops
+    // it before the payload. This pins that: the newest row by addedAt is incomplete, and
+    // its timestamp must NOT reach retro, or days_since_last_complete would read 0 for a
+    // pool whose last actual extraction was weeks ago.
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'pending', stance: null, addedAt: new Date('2026-07-30T00:00:00Z') }),
+      poolArticle({ id: 'complete', addedAt: new Date('2026-07-02T00:00:00Z') }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources).toHaveLength(1)
+    expect(body.sources[0].added_at).toBe('2026-07-02T00:00:00.000Z')
+  })
+
   it('omits question entirely when there is no usable claim text — retro must skip, not guess', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
