@@ -18,6 +18,18 @@ resource "aws_route53_record" "root" {
   records = [aws_eip.production.public_ip]
 }
 
+# Legacy prod subdomain A record, same target as the root domain. Live in Route53
+# since before this repo's Terraform history began (never added via IaC — see
+# docs#79); imported rather than deleted since decommissioning wasn't the call.
+# TTL 60 matches the live record as found, distinct from this file's usual 300.
+resource "aws_route53_record" "prod" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "prod.${var.domain_name}"
+  type    = "A"
+  ttl     = 60
+  records = [aws_eip.production.public_ip]
+}
+
 # API subdomain pointing to production instance
 resource "aws_route53_record" "api" {
   zone_id = data.aws_route53_zone.main.zone_id
