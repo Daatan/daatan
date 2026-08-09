@@ -83,6 +83,14 @@ async function getPrediction(idOrSlug: string) {
           option: { select: { id: true, text: true } },
         },
       },
+      externalMarket: {
+        include: {
+          snapshots: {
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true, probability: true },
+          },
+        },
+      },
       _count: { select: { commitments: true } },
     },
   })
@@ -110,6 +118,20 @@ async function getPrediction(idOrSlug: string) {
       ...c,
       createdAt: c.createdAt.toISOString(),
     })),
+    externalMarket: prediction.externalMarket
+      ? {
+          provider: prediction.externalMarket.provider,
+          slug: prediction.externalMarket.slug,
+          url: prediction.externalMarket.url,
+          question: prediction.externalMarket.question,
+          outcomes: prediction.externalMarket.outcomes,
+          resolved: prediction.externalMarket.resolved,
+          snapshots: prediction.externalMarket.snapshots.map((s) => ({
+            createdAt: s.createdAt.toISOString(),
+            probability: s.probability,
+          })),
+        }
+      : null,
   }
 }
 
