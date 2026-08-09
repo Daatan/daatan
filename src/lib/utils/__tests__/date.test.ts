@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDdmmyyyy, parseDdmmyyyy, parseTime24 } from '../date'
+import { formatDdmmyyyy, normalizeResolveByDatetime, parseDdmmyyyy, parseTime24 } from '../date'
 
 describe('formatDdmmyyyy', () => {
   it('converts YYYY-MM-DD to DD/MM/YYYY', () => {
@@ -63,5 +63,50 @@ describe('parseTime24', () => {
     expect(parseTime24('12')).toBeNull()
     expect(parseTime24('')).toBeNull()
     expect(parseTime24('6:5')).toBeNull() // minutes must be 2 digits
+  })
+})
+
+describe('normalizeResolveByDatetime', () => {
+  it('defaults to UTC, snapping to 23:59:59.999 of the given day', () => {
+    const result = normalizeResolveByDatetime(new Date('2027-12-31T00:00:00Z'))
+    expect(result.toISOString()).toBe('2027-12-31T23:59:59.999Z')
+  })
+
+  it('is idempotent — normalizing an already-normalized UTC instant is a no-op', () => {
+    const once = normalizeResolveByDatetime(new Date('2027-12-31T00:00:00Z'))
+    const twice = normalizeResolveByDatetime(once)
+    expect(twice.toISOString()).toBe(once.toISOString())
+  })
+
+  it('fixes the #1363 regression: "by end of 2027" landing on Jan 1 instead of Dec 31', () => {
+    // cmrjtst1b00bs01mq7ian6u1v was stored as 2028-01-01T22:59:59.999Z (23h late)
+    const wrong = new Date('2028-01-01T22:59:59.999Z')
+    expect(normalizeResolveByDatetime(wrong).toISOString()).toBe('2028-01-01T23:59:59.999Z')
+  })
+
+  it('snaps to end-of-day in Asia/Jerusalem (UTC+2 winter) — matches the 21:59 UTC audit bucket', () => {
+    // 21:59:59 UTC on a winter day *is* 23:59:59 local in Jerusalem already.
+    const result = normalizeResolveByDatetime(new Date('2027-01-15T21:59:59Z'), 'Asia/Jerusalem')
+    expect(result.toISOString()).toBe('2027-01-15T21:59:59.999Z')
+  })
+
+  it('reads the intended day from the timezone wall clock, not the UTC date', () => {
+    // 00:00 UTC on 2027-06-02 is already 04:00 local in Asia/Dubai (UTC+4) —
+    // still June 2nd there, so end-of-day lands on the 2nd, not the 1st.
+    const result = normalizeResolveByDatetime(new Date('2027-06-02T00:00:00Z'), 'Asia/Dubai')
+    expect(result.toISOString()).toBe('2027-06-02T19:59:59.999Z')
+  })
+
+  it('rolls the intended day back a calendar date under a negative UTC offset', () => {
+    // 03:00 UTC on 2027-06-02 is still 2027-06-01 23:00 in America/New_York (EDT, UTC-4 in June).
+    const result = normalizeResolveByDatetime(new Date('2027-06-02T03:00:00Z'), 'America/New_York')
+    expect(result.toISOString()).toBe('2027-06-02T03:59:59.999Z')
+  })
+
+  it('handles the 00:00-group failure mode: midnight no longer excludes the final day', () => {
+    const midnightStart = new Date('2027-03-10T00:00:00Z')
+    const result = normalizeResolveByDatetime(midnightStart, 'UTC')
+    expect(result.getUTCDate()).toBe(10)
+    expect(result.toISOString()).toBe('2027-03-10T23:59:59.999Z')
   })
 })
