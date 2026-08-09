@@ -191,6 +191,11 @@ independent channels, each a no-op until its own env var(s) are set:
 
 IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL changes.
 
+> **DuckDuckGo needs no separate work.** DDG sources its web results from Bing, and has no
+> webmaster console, sitemap submission, or site-verification of its own. Whatever Bing
+> indexes is what DDG serves, so the IndexNow path below covers it. (DuckDuckBot exists but
+> only fetches favicons and instant answers; `robots.txt` already allows it via `User-Agent: *`.)
+
 1. A shared key (`711ada60e0032e070ede0e05de85a79e`) is hosted at `public/711ada60e0032e070ede0e05de85a79e.txt`.
 2. On each event, a POST goes to `https://api.indexnow.org/indexnow` with the URL.
 3. Disabled (no-op) when `INDEXNOW_KEY` is not set.
@@ -200,7 +205,15 @@ IndexNow is a push protocol that notifies Bing and Yandex immediately when a URL
 - [x] `INDEXNOW_KEY` added to `daatan-env-prod` Secrets Manager
 - [x] Key file deployed at `/711ada60e0032e070ede0e05de85a79e.txt`
 - [x] `INDEXNOW_KEY` / `GOOGLE_INDEXING_*` passed through in `docker-compose.prod.yml` / `docker-compose.staging.yml`
-- [ ] Register key in [Bing Webmaster Tools](https://www.bing.com/webmasters) → IndexNow tab
+- [x] Key validated end-to-end against the live IndexNow API (see below) — no Bing Webmaster Tools registration step is required
+
+> **The key file *is* the registration.** IndexNow authenticates a submission by fetching
+> `keyLocation` and comparing its contents to the submitted `key`; there is no separate
+> enrolment that gates submissions. The Bing Webmaster Tools "IndexNow" tab is a reporting
+> view, not a switch. Verified 2026-08-10 — `GET /711ada60e0032e070ede0e05de85a79e.txt`
+> returns `200` with the bare key, and a live submission to `api.indexnow.org` returns `200`
+> (accepted). An earlier revision of this checklist carried an unchecked "register the key in
+> Bing Webmaster Tools" box, which read as an outstanding gap for months; it never was one.
 
 **Env var:** `INDEXNOW_KEY` (optional server-side; see `src/env.ts`)
 
