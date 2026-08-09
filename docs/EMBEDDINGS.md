@@ -75,7 +75,15 @@ LIMIT $limit
 
 ## Backfill
 
-Two backfill paths exist:
+Three backfill paths exist. All three select on `embedding IS NULL`, so none of them will ever revisit a **stale** vector — see the note under "When to re-embed".
+
+### Scheduled sweep (the one that runs on its own)
+
+`GET /api/cron/backfill-embeddings` — auth via the `x-cron-secret` header (`BOT_RUNNER_SECRET`). Embeds up to 20 rows per call. Driven nightly at 02:23 UTC by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/backfill-embeddings.yml).
+
+This is the safety net for the fire-and-forget embed on forecast creation: if that call fails, the forecast saves with no vector and nothing else retries it. The workflow fails loudly when the response reports a non-zero `failed`, because the route answers 200 even when every embed in the batch errored.
+
+Added in #1369. Before that the route existed but had no scheduler — the docstring pointed at an EC2 crontab that does not exist on the box — so nothing swept, and 39 predictions from Feb–May 2026 sat unembedded (#1371).
 
 ### Admin endpoint (online)
 
