@@ -148,8 +148,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=272007598366.dkr.ecr.eu-central-1.amazonaws.com/daatan-app:buildcache
-          cache-to: type=registry,ref=272007598366.dkr.ecr.eu-central-1.amazonaws.com/daatan-app:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
             GIT_COMMIT=${{ github.sha }}
@@ -167,7 +167,7 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/daatan-app:staging-latest-migrations
             ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ steps.app_version.outputs.version }}-migrations
-          cache-from: type=registry,ref=272007598366.dkr.ecr.eu-central-1.amazonaws.com/daatan-app:buildcache
+          cache-from: type=gha
           build-args: |
             NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
             GIT_COMMIT=${{ github.sha }}

@@ -28,7 +28,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./prisma.config.ts
 
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Per-build args — injected after npm ci so that version/commit changes
 # do not invalidate the expensive dependency install layer above.
@@ -42,7 +42,8 @@ COPY . .
 
 # Build Next.js
 RUN npx prisma generate
-RUN npm run build 2>&1 || (echo "Build failed!" && cat .next/build-error.log 2>/dev/null && exit 1)
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build 2>&1 || (echo "Build failed!" && cat .next/build-error.log 2>/dev/null && exit 1)
 
 # Compile seed.ts → seed.js so it can run in the slim production image (tsx is a devDep)
 RUN npx esbuild prisma/seed.ts --bundle --platform=node --outfile=prisma/seed.js --packages=external
