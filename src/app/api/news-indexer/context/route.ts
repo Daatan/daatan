@@ -80,6 +80,13 @@ const articleItemSchema = z.object({
    *  news-indexer side (daatan#1290 / news-indexer#210). Forwarded as `ArticleInput.language`;
    *  inert at the Oracle until retro#417 adds the field. */
   language: z.string().max(16).nullable().optional(),
+  /** Cross-platform person/outlet identity news-indexer already resolved for this article
+   *  (worker/matcher.py). Until daatan#1349 these were silently stripped by `.parse()` — the
+   *  route re-derived the same identity synchronously via `getArticleMetaByUrl` on every push,
+   *  costing up to that lookup's 4s timeout, and losing identity outright when it timed out
+   *  even though the payload had it in hand. See the `personId`/`outletId` preference below. */
+  personId: z.string().nullable().optional(),
+  outletId: z.string().nullable().optional(),
 })
 
 // Accepts two shapes:
@@ -103,6 +110,10 @@ const bodySchema = z
     // plain `text`. news-indexer sends whichever matches the shape it is sending.
     articleText: z.string().nullable().optional(),
     articleLanguage: z.string().max(16).nullable().optional(),
+    // Same identity fields as articleItemSchema, top-level on the legacy single-article body
+    // (worker/matcher.py's non-`articles[]` branch sends them unnested).
+    personId: z.string().nullable().optional(),
+    outletId: z.string().nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
     // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
@@ -155,6 +166,8 @@ export async function POST(request: NextRequest) {
               similarity: body.similarity,
               text: body.articleText ?? null,
               language: body.articleLanguage ?? null,
+              personId: body.personId ?? null,
+              outletId: body.outletId ?? null,
             },
           ]
 
@@ -318,18 +331,49 @@ export async function POST(request: NextRequest) {
     const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? null
 
     if (oracleForecast) {
+      // news-indexer often already resolved an article's person/outlet identity before pushing
+      // (worker/matcher.py) and sends it as `personId`/`outletId` on the article. Prefer that —
+      // it's data we already have — over the by-url lookup below, which exists to fill in what
+      // the push DIDN'T identify (and to fetch `author`, the raw byline text, which the push
+      // never carries at all). This is the fix for daatan#1349: the by-url call used to run
+      // unconditionally, adding up to its 4s timeout to every push and losing identity outright
+      // on a timeout even when the payload had it in hand.
+      const itemsByUrl = new Map(items.map((a) => [a.url, a]))
+      const urlsNeedingLookup = oracleForecast.sources
+        .map((s) => s.url)
+        .filter((url) => {
+          const item = itemsByUrl.get(url)
+          return !item?.personId && !item?.outletId
+        })
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
       // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
       // elections.daatan.com's tracked commentators — can never match a person.
-      const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map((s) => s.url))
+      const articleMeta = await getArticleMetaByUrl(urlsNeedingLookup)
       const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
-      const identityByUrl = new Map(
-        [...articleMeta.entries()].map(([url, m]) => [url, {
-          personId: m.personId ?? null, personName: m.personName ?? null,
-          outletId: m.outletId ?? null, outletName: m.outletName ?? null,
-        }]),
-      )
+      const identityByUrl = new Map<
+        string,
+        { personId?: string | null; personName?: string | null; outletId?: string | null; outletName?: string | null }
+      >()
+      for (const s of oracleForecast.sources) {
+        const item = itemsByUrl.get(s.url)
+        if (item?.personId || item?.outletId) {
+          // The push already carries this article's identity — use it directly. It has no
+          // personName/outletName (news-indexer sends ids only), so those are left `undefined`
+          // rather than `null`: `undefined` means "not resolved this run, don't touch a
+          // previously-stored value" (see EnrichedOracleSource's personName/outletName docs);
+          // `null` would be a false "resolved, no name" signal that could clobber a good one.
+          identityByUrl.set(s.url, { personId: item.personId ?? null, outletId: item.outletId ?? null })
+          continue
+        }
+        const m = articleMeta.get(s.url)
+        if (m) {
+          identityByUrl.set(s.url, {
+            personId: m.personId ?? null, personName: m.personName ?? null,
+            outletId: m.outletId ?? null, outletName: m.outletName ?? null,
+          })
+        }
+      }
       const oracleSources = enrichOracleSources(
         oracleForecast.sources,
         articles,

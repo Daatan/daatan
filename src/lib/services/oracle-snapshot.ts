@@ -143,7 +143,12 @@ export function enrichOracleSources(
   authorByUrl: Map<string, string | null>,
   identityByUrl: Map<
     string,
-    { personId: string | null; personName: string | null; outletId: string | null; outletName: string | null }
+    {
+      personId?: string | null
+      personName?: string | null
+      outletId?: string | null
+      outletName?: string | null
+    }
   > = new Map(),
   // The response-level `relevance_bar` (retro#393/#394) — the same bar applied
   // to every source in this batch. Passed separately since it lives on
