@@ -33,4 +33,16 @@ describe('findFuzzyMatches', () => {
 
         expect(result).toEqual({ predictionIds: [], tagNames: [] })
     })
+
+    it('uses word_similarity, not similarity, against claimText and tag names', async () => {
+        mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+
+        await findFuzzyMatches('netanyau')
+
+        for (const call of mockQueryRaw.mock.calls) {
+            const sql = call[0].join(' ')
+            expect(sql).toContain('word_similarity')
+            expect(sql).not.toMatch(/(?<!word_)similarity\(/)
+        }
+    })
 })
