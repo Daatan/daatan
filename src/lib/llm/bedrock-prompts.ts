@@ -34,7 +34,6 @@ type PromptName =
     | 'bot-config-generation'
     | 'research-query-generation'
     | 'resolution-research'
-    | 'translate'
     | 'topic-extraction'
     | 'guess-chances'
     | 'content-moderation'
@@ -278,17 +277,6 @@ Summary:`,
 
 Article content:
 {{articleContent}}`,
-
-    'translate': `You are a professional translator for {{appName}}, a prediction-market platform. Translate the text below into {{language}}.
-
-Write a natural, fluent translation the way a native {{language}} speaker would phrase it — prioritise idiomatic wording and correct, natural word order over a literal word-for-word rendering, while preserving the exact meaning.
-
-Keep these unchanged: numbers, dates, percentages, currency, URLs, and proper nouns (people, places, organisations, products, tickers). Preserve any leading emoji (e.g. 🤖) and the overall formatting.
-
-Return ONLY the translated text — no explanations, no notes, no surrounding quotation marks.
-
-Text:
-{{text}}`,
 
     'guess-chances': `You are an expert probability analyst for a prediction market.
 Your task is to analyze the current situation and suggest the probability (0-100%) that the following forecast will happen.
