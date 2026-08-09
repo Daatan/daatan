@@ -7,6 +7,7 @@ import { checkContent } from '@/lib/services/moderation'
 import { translatePredictionToAllLocales } from '@/lib/services/translation'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { listForecasts, enrichPredictions, upsertNewsAnchor, verifyUserExists, createForecast } from '@/lib/services/forecast'
+import { findFuzzyMatches } from '@/lib/services/fuzzy-search'
 import { createLogger } from '@/lib/logger'
 import { toError } from '@/lib/utils/error'
 import { withRetry } from '@/lib/utils/retry'
@@ -82,10 +83,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (query.q) {
+      const fuzzy = await findFuzzyMatches(query.q)
       andConditions.push({
         OR: [
           { claimText: { contains: query.q, mode: 'insensitive' } },
           { tags: { some: { name: { contains: query.q, mode: 'insensitive' } } } },
+          ...(fuzzy.predictionIds.length > 0 ? [{ id: { in: fuzzy.predictionIds } }] : []),
+          ...(fuzzy.tagNames.length > 0 ? [{ tags: { some: { name: { in: fuzzy.tagNames } } } }] : []),
         ],
       })
     }
