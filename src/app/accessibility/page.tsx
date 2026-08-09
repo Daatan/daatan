@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Accessibility Statement',
   description: "DAATAN's accessibility statement: our WCAG 2.0 AA / IS 5568 conformance status, known limitations, and how to report an accessibility issue.",
+  alternates: { canonical: '/accessibility' },
 }
 
 const LAST_REVIEWED = 'July 6, 2026'

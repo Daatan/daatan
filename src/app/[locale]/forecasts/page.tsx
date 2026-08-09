@@ -14,6 +14,10 @@ const META: Record<string, { title: string; description: string }> = {
     title: 'Прогнозы | DAATAN',
     description: 'Просматривайте прогнозы и делайте ставки на мировые события.',
   },
+  eo: {
+    title: 'Prognozoj | DAATAN',
+    description: 'Foliumu prognozojn kaj vetu pri mondaj eventoj.',
+  },
 }
 
 export async function generateMetadata({
@@ -22,6 +26,9 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale } = await params
+  // he is the fallback, not eo/ru: it's the original supported locale, and
+  // an unexpected locale value here means ALLOWED_LOCALES (layout.tsx) and
+  // this map have drifted — he is the least-wrong default until that's fixed.
   const meta = META[locale] ?? META.he
   const appUrl = getAppUrl()
 
