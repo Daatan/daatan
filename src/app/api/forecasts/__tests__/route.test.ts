@@ -28,6 +28,10 @@ vi.mock('@/lib/services/translation', () => ({
     TRANSLATABLE_FIELDS: ['claimText', 'detailsText', 'resolutionRules'],
 }))
 
+vi.mock('@/lib/services/fuzzy-search', () => ({
+    findFuzzyMatches: vi.fn().mockResolvedValue({ predictionIds: [], tagNames: [] }),
+}))
+
 import { describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET, POST } from '../route'
@@ -177,6 +181,35 @@ describe('/api/forecasts', () => {
                     OR: [
                         { claimText: { contains: 'turkey', mode: 'insensitive' } },
                         { tags: { some: { name: { contains: 'turkey', mode: 'insensitive' } } } },
+                    ],
+                },
+            ])
+        })
+
+        it('adds trigram-matched predictions and tags to the search OR-clause', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            const { findFuzzyMatches } = await import('@/lib/services/fuzzy-search')
+
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+            vi.mocked(findFuzzyMatches).mockResolvedValueOnce({
+                predictionIds: ['p1', 'p2'],
+                tagNames: ['Politics'],
+            })
+
+            const request = new NextRequest('http://localhost/api/forecasts?q=netanyau')
+            await GET(request)
+
+            expect(findFuzzyMatches).toHaveBeenCalledWith('netanyau')
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.where.AND).toEqual([
+                {
+                    OR: [
+                        { claimText: { contains: 'netanyau', mode: 'insensitive' } },
+                        { tags: { some: { name: { contains: 'netanyau', mode: 'insensitive' } } } },
+                        { id: { in: ['p1', 'p2'] } },
+                        { tags: { some: { name: { in: ['Politics'] } } } },
                     ],
                 },
             ])

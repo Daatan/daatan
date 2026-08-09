@@ -27,6 +27,7 @@ List predictions. Public; optional session for user-context fields.
 | `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE`. `PENDING` ("Awaiting Resolution") also matches still-`ACTIVE` forecasts where `awaitingAiResolution` is true (organic AI estimate >=90% or <=10%; a settlement pin instead needs >=2 settling votes in its snapshot — see `context.ts`, daatan#1248) — status itself doesn't change, so staking stays open until the real deadline |
 | `authorId` | cuid | — | Filter by author |
 | `tags` | string | — | Comma-separated tag names |
+| `q` | string | — | Free-text search over `claimText` and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169) |
 | `page` | number | 1 | |
 | `limit` | number | 20 | max 100 |
 | `sortBy` | enum | `newest` | `newest`, `deadline`, `cu` |
