@@ -633,9 +633,11 @@ output from another). Consumed by `.github/workflows/llm-waste-report.yml` as th
 denominator of the weekly cost-per-usable-article figure (docs#57, #1274).
 
 ### `GET /api/cron/backfill-embeddings`
-Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Returns `{ ok, done, failed, remaining }`. Intended to run nightly.
+Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, done, failed, remaining }` — except when there is nothing to do, which answers `{ ok, done: 0, remaining: 0 }` with **no `failed` key**.
 
-**EC2 crontab:** `30 2 * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/backfill-embeddings`
+Status is always 200 on the authorized paths: per-row embedding errors are caught, counted into `failed`, and never change the status code. A caller that wants to notice failures must inspect the body.
+
+Scheduled by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/backfill-embeddings.yml), nightly at 02:23 UTC (#1369). Not an EC2 crontab — there is no crontab on the prod box; this entry claimed otherwise until #1369, which is why the route went uncalled from its introduction until then.
 
 ### `GET /api/cron/ai-panel`
 LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an

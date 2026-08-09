@@ -17,8 +17,12 @@ const log = createLogger('cron-backfill-embeddings')
  * Idempotent — safe to run multiple times; already-embedded predictions are
  * skipped by the `embedding IS NULL` filter.
  *
- * EC2 crontab (run nightly at 02:30):
- *   30 2 * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/backfill-embeddings
+ * Scheduled by .github/workflows/backfill-embeddings.yml, nightly at 02:23 UTC.
+ * There is no crontab on the EC2 box — this file used to claim there was, which is
+ * why nothing called this route between its introduction and #1369.
+ *
+ * Callers must inspect the body, not the status: per-row embedding errors are caught
+ * and counted into `failed`, so a run where every embed failed still answers 200.
  */
 
 const BATCH_SIZE = 20

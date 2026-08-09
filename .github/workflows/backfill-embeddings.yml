@@ -1,0 +1,98 @@
+name: Backfill Embeddings
+
+# Nightly sweep for /api/cron/backfill-embeddings, which embeds up to 20 predictions
+# that currently have no vector (`embedding IS NULL`) and reports how many remain.
+#
+# WHY THIS EXISTS:
+#   Embedding on forecast creation is fire-and-forget — src/lib/services/forecast.ts
+#   catches the error, logs it, and moves on. A Gemini rate-limit or transient 5xx
+#   therefore saves the forecast with no vector and nothing retries it. Both backfill
+#   paths select on `embedding IS NULL`, so this sweep is the only thing that ever
+#   picks those rows back up; without it a failed embed strands a forecast permanently,
+#   invisible to similar-forecast lookup and to the forecast<->article match gate.
+#   That is how the Feb-May 2026 rows in #1371 stranded. See #1369.
+#
+# WHERE THIS RUNS:
+#   A GitHub Actions runner makes the HTTP request; the EC2 app process does the work
+#   (Gemini embed -> pgvector write). Same mechanism as heartbeat.yml /
+#   external-market-sync.yml — NOT an EC2 crontab, despite what this route's docstring
+#   claimed until #1369. There is no crontab on the prod box at all.
+#
+# FAILURE MODES:
+#   The route answers 200 even when individual embeds fail — per-row errors are caught,
+#   counted into `failed`, and never change the status code. So this workflow inspects
+#   the body rather than trusting the status: a non-zero `failed` fails the job.
+#   `remaining` is only reported, because a backlog draining 20-at-a-time is the
+#   expected steady state, not an error.
+
+on:
+  schedule:
+    - cron: '23 2 * * *'   # nightly at 02:23 UTC (empty window; odd minute by convention)
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    name: Backfill ${{ matrix.env.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env:
+          - name: production
+            url: https://daatan.com
+          - name: staging
+
+    steps:
+      - name: Sweep predictions missing an embedding
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          ENV="${{ matrix.env.name }}"
+          if [ "$ENV" = "staging" ]; then
+            BASE="$STAGING_URL"
+          else
+            BASE="${{ matrix.env.url }}"
+          fi
+
+          if [ -z "$BASE" ]; then
+            # A missing URL is a broken secret, not a reason to skip — silently doing
+            # nothing is the exact failure mode this workflow exists to end.
+            echo "❌ No URL configured for $ENV"
+            exit 1
+          fi
+
+          # The endpoint validates x-cron-secret against env.BOT_RUNNER_SECRET on the
+          # server (src/app/api/cron/backfill-embeddings/route.ts). Up to 20 Gemini
+          # calls run serially, so allow well past the usual 30s.
+          HTTP=$(curl -s -o /tmp/backfill_body.txt -w "%{http_code}" \
+            --max-time 120 \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            "$BASE/api/cron/backfill-embeddings")
+
+          BODY=$(cat /tmp/backfill_body.txt)
+          echo "HTTP $HTTP — $BODY"
+
+          if [ "$HTTP" != "200" ]; then
+            echo "❌ Backfill failed for $ENV (HTTP $HTTP)"
+            exit 1
+          fi
+
+          # The nothing-to-do response is {ok,done,remaining} with no `failed` key,
+          # so default it rather than letting jq emit "null".
+          DONE=$(echo "$BODY" | jq -r '.done // 0')
+          FAILED=$(echo "$BODY" | jq -r '.failed // 0')
+          REMAINING=$(echo "$BODY" | jq -r '.remaining // 0')
+
+          echo "$ENV: embedded $DONE, failed $FAILED, remaining $REMAINING"
+
+          if [ "$FAILED" != "0" ]; then
+            echo "❌ $FAILED embedding(s) failed on $ENV — check the app log for 'cron-backfill-embeddings'"
+            exit 1
+          fi
+
+          if [ "$REMAINING" != "0" ]; then
+            echo "⚠️ $REMAINING prediction(s) still unembedded on $ENV — draining 20/night (#1371)"
+          fi
+
+          echo "✅ Backfill OK for $ENV"
