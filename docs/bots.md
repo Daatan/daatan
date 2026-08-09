@@ -249,7 +249,6 @@ The app picks up the new prompt within 5 minutes (cache TTL).
 | `resolution-research` | `9BJAASRX0U` | `:2` | Auto-resolution | Determine forecast outcome from news context or model knowledge |
 | `suggest-tags` | `4GRPW480KQ` | `:2` | Tag suggestion API | Suggest 1–3 relevant tags for a forecast |
 | `topic-extraction` | `7EKX6FRNE0` | `:2` | Bot runner / RSS | Extract a 5–10 word search query from an article |
-| `translate` | `6I0TDPIMBX` | `:2` | Translation feature | Translate forecast text to a target language |
 | `update-context` | `OX9GBXOT0B` | `:2` | Forecast detail page | Write a neutral 2–3 sentence summary of current news context |
 
 ---

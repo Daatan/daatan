@@ -31,7 +31,7 @@ VALID_ENVS=("staging" "prod")
 # here with no SSM parameter fails at the put-parameter, and a name missing here blocks
 # a promotion that would have worked. `guess-chances` was listed here but has no
 # parameter (nothing in terraform creates it); `panel-estimate` has one but was missing.
-VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "translate" "topic-extraction" "content-moderation" "panel-estimate" "temporal-classifier")
+VALID_PROMPTS=("express-prediction" "extract-prediction" "suggest-tags" "update-context" "dedupe-check" "bot-forecast-generation" "forecast-quality-validation" "bot-vote-decision" "bot-config-generation" "research-query-generation" "resolution-research" "topic-extraction" "content-moderation" "panel-estimate" "temporal-classifier")
 
 if [[ ! " ${VALID_ENVS[*]} " =~ " ${ENV} " ]]; then
   echo "Error: env must be one of: ${VALID_ENVS[*]}"

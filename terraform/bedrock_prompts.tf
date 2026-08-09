@@ -15,7 +15,6 @@ locals {
     "bot-config-generation",
     "research-query-generation",
     "resolution-research",
-    "translate",
     "topic-extraction",
     # AI panel (docs/LASSO.md). Exists nowhere yet, so creating it at PLACEHOLDER
     # is safe: getPromptTemplate() treats PLACEHOLDER as "serve the hardcoded fallback",

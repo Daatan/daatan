@@ -105,7 +105,6 @@ export async function register() {
     'suggest-tags',
     'update-context',
     'dedupe-check',
-    'translate',
     'research-query-generation',
     'resolution-research',
     'forecast-quality-validation',
