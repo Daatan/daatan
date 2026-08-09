@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
-import { Loader2, ExternalLink, ChevronLeft, Plus, X } from 'lucide-react'
+import { Loader2, ExternalLink, ChevronLeft, Plus, X, Search } from 'lucide-react'
 
 type LinkItem = { label: string; url: string }
 
@@ -33,6 +33,8 @@ type Publication = {
 }
 
 type LinkedPerson = { id: string; canonicalName: string }
+
+type WikipediaLookupResult = { title: string; url: string; description: string | null }
 
 type AuthorScoringRow = {
   id: string
@@ -77,6 +79,8 @@ export default function OutletDetailPanel({ name }: Props) {
   const [telegramChannel, setTelegramChannel] = useState('')
   const [notes, setNotes] = useState('')
   const [links, setLinks] = useState<LinkItem[]>([])
+  const [wikipediaLookupLoading, setWikipediaLookupLoading] = useState(false)
+  const [wikipediaResults, setWikipediaResults] = useState<WikipediaLookupResult[] | null>(null)
 
   const endpoint = `/api/admin/news-indexer/sources/${encodeURIComponent(name)}`
 
@@ -133,6 +137,22 @@ export default function OutletDetailPanel({ name }: Props) {
       toast.error(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function lookupWikipedia() {
+    setWikipediaLookupLoading(true)
+    setWikipediaResults(null)
+    try {
+      const res = await fetch(`/api/admin/wikipedia-lookup?q=${encodeURIComponent(name)}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(t('sourcesDetailWikipediaLookupError'))
+      const body: { results: WikipediaLookupResult[] } = await res.json()
+      setWikipediaResults(body.results)
+      if (body.results.length === 0) toast.error(t('sourcesDetailWikipediaLookupNoResults'))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('sourcesDetailWikipediaLookupError'))
+    } finally {
+      setWikipediaLookupLoading(false)
     }
   }
 
@@ -195,12 +215,38 @@ export default function OutletDetailPanel({ name }: Props) {
           <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
             {t('sourcesDetailWikipedia')}
           </label>
-          <input
-            value={wikipediaUrl}
-            onChange={(e) => setWikipediaUrl(e.target.value)}
-            placeholder="https://en.wikipedia.org/wiki/..."
-            className="w-full px-3 py-2 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
-          />
+          <div className="flex gap-2">
+            <input
+              value={wikipediaUrl}
+              onChange={(e) => setWikipediaUrl(e.target.value)}
+              placeholder="https://en.wikipedia.org/wiki/..."
+              className="flex-1 px-3 py-2 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
+            />
+            <button
+              onClick={lookupWikipedia}
+              disabled={wikipediaLookupLoading}
+              className="px-3 py-2 text-sm bg-navy-800 hover:bg-navy-600 disabled:opacity-50 border border-navy-600 rounded-lg text-gray-300 inline-flex items-center gap-1.5 shrink-0"
+            >
+              {wikipediaLookupLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Search className="w-3.5 h-3.5" />}
+              {t('sourcesDetailWikipediaLookup')}
+            </button>
+          </div>
+          {wikipediaResults && wikipediaResults.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {wikipediaResults.map((r) => (
+                <button
+                  key={r.url}
+                  onClick={() => { setWikipediaUrl(r.url); setWikipediaResults(null) }}
+                  className="block w-full text-left px-3 py-1.5 text-sm bg-navy-800 hover:bg-navy-600 border border-navy-600 rounded-lg text-gray-300"
+                >
+                  <span className="text-white">{r.title}</span>
+                  {r.description && <span className="text-gray-500"> — {r.description}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>

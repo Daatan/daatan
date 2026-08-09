@@ -92,6 +92,50 @@ describe('OutletDetailPanel', () => {
     expect(body.wikipedia_url).toBe('https://en.wikipedia.org/wiki/Reuters')
   })
 
+  it('fills the Wikipedia URL from a picked lookup result', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('shadow-score')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ rows: [] }) })
+      if (url.includes('wikipedia-lookup')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            results: [{ title: 'Reuters', url: 'https://en.wikipedia.org/wiki/Reuters', description: 'News agency' }],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(baseDetail) })
+    })
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+    await waitFor(() => expect(screen.getByText('Reuters')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /Look up/ }))
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/wikipedia-lookup?q=Reuters',
+      expect.objectContaining({ cache: 'no-store' }),
+    ))
+
+    const resultButton = await screen.findByRole('button', { name: /Reuters — News agency/ })
+    fireEvent.click(resultButton)
+
+    expect(screen.getByDisplayValue('https://en.wikipedia.org/wiki/Reuters')).toBeInTheDocument()
+  })
+
+  it('shows a toast when the Wikipedia lookup finds nothing', async () => {
+    const { toast } = await import('react-hot-toast')
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('shadow-score')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ rows: [] }) })
+      if (url.includes('wikipedia-lookup')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(baseDetail) })
+    })
+    renderWithIntl(<OutletDetailPanel name="Obscure Outlet" />)
+    await waitFor(() => expect(screen.getByText('Reuters')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /Look up/ }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No Wikipedia article found'))
+  })
+
   it('shows the no-linked-people hint when nobody is linked', async () => {
     mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(baseDetail) })
     renderWithIntl(<OutletDetailPanel name="Reuters" />)

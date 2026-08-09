@@ -514,6 +514,9 @@ Proxy to news-indexer's `PUT /outlets/{name}` — upsert the enrichment fields. 
 ### `DELETE /api/admin/news-indexer/sources/[name]` — Admin
 Proxy to news-indexer's `DELETE /outlets/{name}` — clears an outlet's enrichment row entirely (not exposed in the current UI; available for future use).
 
+### `GET /api/admin/wikipedia-lookup?q=` — Admin
+Direct (not news-indexer-proxied) search against Wikipedia's public REST API (`en.wikipedia.org/w/rest.php/v1/search/page`), top 5 results. Backs the "Look up" button next to the Wikipedia URL field on the outlet detail page (daatan#1218) — picking a result fills the field; the admin still saves via the existing `PUT /api/admin/news-indexer/sources/[name]`. Returns `{ results: [{ title, url, description }] }`. `400` if `q` is missing, `502` on a non-OK Wikipedia response.
+
 ### `POST /api/admin/news-indexer/match` — Admin
 Proxy to the news-indexer `/match` endpoint — re-match a single article URL against active forecasts on demand. Body: `{ articleUrl: string }` (must be a valid URL). Returns the news-indexer response (`{ matches, queued }`) with its status. Responds `503 News-indexer not configured` when `NEWS_INDEXER_URL` / `NEWS_INDEXER_API_KEY` are unset.
 
