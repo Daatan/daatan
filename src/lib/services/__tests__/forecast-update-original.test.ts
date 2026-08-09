@@ -84,6 +84,26 @@ describe('updateForecast — original-language edit', () => {
     expect(tx.prediction.update.mock.calls[0][0].data.claimText).toBe(ENGLISH)
   })
 
+  // Regression: #1368. Both embedding backfills select on `embedding IS NULL`, so a vector
+  // left describing the old wording is never revisited — the direct path has to rebuild it.
+  it('re-embeds after an English claim edit', async () => {
+    mockFindUnique.mockResolvedValue({ originalLanguage: null } as never)
+    await updateForecast('p1', { claimText: ENGLISH })
+    expect(embedAndStoreForecast).toHaveBeenCalledWith('p1', ENGLISH)
+  })
+
+  it('does not re-embed when the edit leaves claimText alone', async () => {
+    mockFindUnique.mockResolvedValue({ originalLanguage: null } as never)
+    await updateForecast('p1', { isPublic: false })
+    expect(embedAndStoreForecast).not.toHaveBeenCalled()
+  })
+
+  it('still returns the updated forecast when re-embedding fails', async () => {
+    mockFindUnique.mockResolvedValue({ originalLanguage: null } as never)
+    vi.mocked(embedAndStoreForecast).mockRejectedValueOnce(new Error('gemini down'))
+    await expect(updateForecast('p1', { claimText: ENGLISH })).resolves.toEqual({ id: 'p1' })
+  })
+
   it('falls back to a direct update when an original-language forecast is rewritten in English', async () => {
     mockFindUnique.mockResolvedValue({ originalLanguage: 'he' } as never)
     mockNormalize.mockResolvedValue({

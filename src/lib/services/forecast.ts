@@ -737,7 +737,7 @@ async function directUpdateForecast(id: string, data: UpdateForecastData) {
     await prisma.predictionTranslation.deleteMany({ where: { predictionId: id } })
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     if (data.options) {
       await tx.predictionOption.deleteMany({ where: { predictionId: id } })
       await tx.predictionOption.createMany({
@@ -757,6 +757,16 @@ async function directUpdateForecast(id: string, data: UpdateForecastData) {
       include: UPDATE_INCLUDE,
     })
   })
+
+  // Both backfills select on `embedding IS NULL`, so a vector left describing the old
+  // wording is never revisited — it has to be rebuilt here or it drifts permanently.
+  if (data.claimText) {
+    await embedAndStoreForecast(id, data.claimText).catch((err) =>
+      log.error({ err, id }, 'embed failed during English edit'),
+    )
+  }
+
+  return result
 }
 
 /**

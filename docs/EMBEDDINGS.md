@@ -88,10 +88,13 @@ Two backfill paths exist:
 ## When to re-embed
 
 - **New forecast created:** automatic (called from the forecast-creation flow)
-- **Forecast claimText/detailsText edited:** not automatic — currently the embedding goes stale. If editing becomes common, hook this into the PATCH route
+- **Forecast claimText edited:** automatic since #1368, on both edit paths — `directUpdateForecast()` for English, `saveOriginalLanguageEdit()` for a forecast authored in another language. Only `claimText` matters here: the vector is built from the claim alone, so editing `detailsText` or `resolutionRules` cannot stale it
 - **Model upgrade:** every existing row needs a re-embed (vector spaces are not portable across models)
+
+> A **stale** embedding is invisible to both backfill paths above — they select on `embedding IS NULL`, and a vector describing the old wording is not null. Nothing sweeps it up, so any new write path that changes `claimText` must re-embed at the call site or the drift is permanent. This is what #1368 fixed for the English edit path.
 
 ## Failure modes
 
-- Gemini 401 / quota errors → forecast still saves; embedding stays NULL → forecast simply won't appear in similarity results until backfilled
+- Gemini 401 / quota errors **on create** → forecast still saves; embedding stays NULL → forecast simply won't appear in similarity results until backfilled
+- Gemini 401 / quota errors **on edit** → the edit still saves, but the *previous* vector survives, so the forecast keeps matching on wording it no longer has. Worse than the create case: not being NULL, it is invisible to both backfills and nothing retries it. The re-embed is deliberately non-fatal (logged, not thrown) so a Gemini outage can't block a claim correction — the trade is that the drift is silent
 - pgvector extension missing → migration fails (P3009). Recovery: see the prod incident in `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` and the resolved runbook for swapping to `pgvector/pgvector:pg16`
