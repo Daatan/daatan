@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: 'Scoring Methodology — How DAATAN Measures Forecasting Skill',
   description:
     'How DAATAN scores forecasts: Brier score, ELO rating, and Glicko-2, plus every other ranking system on the leaderboard — definitions, formulas, and worked examples.',
+  alternates: {
+    canonical: '/methodology',
+    // Matches the hreflang shape sitemap.ts already emits for this route.
+    languages: { 'x-default': '/methodology', en: '/methodology', he: '/he/methodology', ru: '/ru/methodology' },
+  },
 }
 
 const BIG_THREE_ROWS = [
