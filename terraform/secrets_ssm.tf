@@ -56,9 +56,9 @@ resource "aws_ssm_parameter" "app_secrets" {
 # Read + decrypt, scoped to this environment's secret path only. Staging cannot read
 # prod's secrets and vice versa — the boundary that actually matters.
 #
-# Attached via the read-only role lookup (not aws_iam_role.ec2_role): the staging state
-# does not manage an ec2_role, so referencing the managed resource would grant prod only.
-# See terraform/bedrock_invoke.tf for the same reasoning.
+# Attached via the read-only role lookup (not aws_iam_role.ec2_role): the managed
+# resource only resolves to whichever state you're applying from, and this policy needs
+# both. See terraform/bedrock_invoke.tf for the same reasoning.
 resource "aws_iam_role_policy" "app_secrets_read" {
   name = "daatan-app-secrets-read"
   role = data.aws_iam_role.app_ec2_role.id
