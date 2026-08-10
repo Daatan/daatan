@@ -187,6 +187,9 @@ export type OracleClaimDetail = {
   event_target?: string | null
   is_occurrence?: boolean | null
   verified?: boolean | null
+  /** Whether THIS claim's fact ANNOUNCES the event, DENIES it, or is NEITHER
+   *  (retro#354 D2a). Per-claim: `OracleSource.facet` is the dominant claim's only. */
+  facet?: 'announcement' | 'denial' | 'neither' | null
 }
 
 export interface OracleSource {
@@ -247,6 +250,10 @@ export interface OracleSource {
   /** true when the dominant fact is independently reported, false when only claimed
    *  by an interested party. null when `fact_signal` is. */
   verified?: boolean | null
+  /** Whether the dominant fact ANNOUNCES the event happening/happened, DENIES it
+   *  will/did, or is NEITHER (retro#354 D2a) — from the dominant claim. null when
+   *  `fact_signal` is. */
+  facet?: 'announcement' | 'denial' | 'neither' | null
   /** The article's claims with their per-claim fields intact (retro#364) — the layer
    *  every scalar above is a reduction of. Same order as `claims`, except that
    *  `claims` drops empty summaries while this does not. Persisted as-is

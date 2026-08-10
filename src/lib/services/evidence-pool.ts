@@ -77,6 +77,7 @@ export async function addArticlesToPool(
           eventTarget: s.eventTarget,
           isOccurrence: s.isOccurrence,
           verified: s.verified,
+          facet: s.facet,
           // F1/F15 (daatan#1235, retro#364) — the per-claim layer behind every
           // scalar above. `Prisma.DbNull` (not `null`) is how a nullable Json
           // column is written to SQL NULL.
@@ -116,6 +117,7 @@ export async function addArticlesToPool(
           eventTarget: s.eventTarget,
           isOccurrence: s.isOccurrence,
           verified: s.verified,
+          facet: s.facet,
           // F1/F15 — deliberately `undefined` (= leave the column alone), NOT
           // DbNull. A path that re-touches a pool row without carrying per-claim
           // data (a recompute, an older Oracle build, a partial response) must
@@ -394,6 +396,7 @@ const POOL_RECOMPUTE_SELECT = {
   eventTarget: true,
   isOccurrence: true,
   verified: true,
+  facet: true,
   claimsDetail: true,
   excluded: true,
   // Ingest time, not publish time (daatan#1362). `publishedDate` cannot substitute:

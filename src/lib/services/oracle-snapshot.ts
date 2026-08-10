@@ -116,6 +116,11 @@ export type EnrichedOracleSource = {
   eventTarget?: string | null
   isOccurrence?: boolean | null
   verified?: boolean | null
+  // Whether the dominant fact ANNOUNCES the event, DENIES it, or is NEITHER
+  // (retro#354 D2a) — feeds a future check that |factSignal| isn't systematically
+  // symmetric between announcement and denial claims (retro#483). Null when
+  // `factSignal` is. Persisted on the pool row; nothing in aggregation reads it (shadow).
+  facet?: 'announcement' | 'denial' | 'neither' | null
   // The per-claim layer behind every scalar above (F1/F15, daatan#1235 + retro#364) —
   // each claim's own stance/certainty/class/fact_signal/facets, as retro's fusion
   // consumed them. This is where the inputs to those reductions used to die. Null on
@@ -191,6 +196,7 @@ export function enrichOracleSources(
       eventTarget: s.event_target,
       isOccurrence: s.is_occurrence,
       verified: s.verified,
+      facet: s.facet,
       claimsDetail: s.claims_detail,
       carriedForward: false,
     }
@@ -207,6 +213,12 @@ const EVIDENCE_CLASSES: readonly EvidenceClass[] = [
 ]
 function isEvidenceClass(v: unknown): v is EvidenceClass {
   return typeof v === 'string' && (EVIDENCE_CLASSES as readonly string[]).includes(v)
+}
+
+type Facet = NonNullable<EnrichedOracleSource['facet']>
+const FACETS: readonly Facet[] = ['announcement', 'denial', 'neither']
+function isFacet(v: unknown): v is Facet {
+  return typeof v === 'string' && (FACETS as readonly string[]).includes(v)
 }
 
 /**
@@ -285,6 +297,7 @@ export type PoolArticleSnapshotRow = Pick<
   | 'eventTarget'
   | 'isOccurrence'
   | 'verified'
+  | 'facet'
   | 'claimsDetail'
 >
 
@@ -322,6 +335,7 @@ export function poolArticleToEnrichedSource(
     eventTarget: row.eventTarget,
     isOccurrence: row.isOccurrence,
     verified: row.verified,
+    facet: isFacet(row.facet) ? row.facet : null,
     claimsDetail: toClaimsDetail(row.claimsDetail),
     carriedForward,
   }
