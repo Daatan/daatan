@@ -1,0 +1,147 @@
+name: Weekly Cost Report
+#
+# Short weekly pulse on the clean channel, split from docs#75/#90 as
+# daatan#1425. The existing daily report (cost-report.yml) stays as-is on the
+# noisy channel — this is a different tier, not a replacement: less frequent,
+# posted where it's actually meant to be read, and framed as a delta rather
+# than a raw number dump.
+#
+# Content is deliberately small: this week's gross AWS+OpenRouter spend vs.
+# last week, plus an optional one-line note about any cost cut that shipped
+# this week. That note has no automated source (there's no "cost cut"
+# tracking system) — it's a repo variable (vars.COST_REPORT_WEEKLY_NOTE) that
+# gets updated by hand when something ships, and is simply omitted when
+# blank. Building an automated cut-tracker was explicitly out of scope for
+# this pass — see docs#90.
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # Monday 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  cost-report-weekly:
+    name: Send weekly cost report
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Query AWS spend (this week vs last week, gross Usage)
+        id: aws_cost
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          WEEK_AGO=$(date -u -d '7 days ago' +%Y-%m-%d)
+          TWO_WEEKS_AGO=$(date -u -d '14 days ago' +%Y-%m-%d)
+
+          # Two separate queries rather than one DAILY-granularity query split
+          # in Python — keeps each request small and each window's total is
+          # exactly what Cost Explorer computed, not a re-summed approximation.
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${WEEK_AGO},End=${TODAY}" \
+            --granularity MONTHLY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json > /tmp/this_week.json
+
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${TWO_WEEKS_AGO},End=${WEEK_AGO}" \
+            --granularity MONTHLY \
+            --metrics "UnblendedCost" \
+            --output json > /tmp/last_week.json
+
+          python3 -c "
+          import json
+
+          def total(path):
+              d = json.load(open(path))
+              rbt = d.get('ResultsByTime', [])
+              if not rbt:
+                  return 0.0
+              return float(rbt[0]['Total']['UnblendedCost']['Amount'])
+
+          def top_services(path, n=3):
+              d = json.load(open(path))
+              rbt = d.get('ResultsByTime', [])
+              groups = rbt[0].get('Groups', []) if rbt else []
+              rows = sorted(((g['Keys'][0], float(g['Metrics']['UnblendedCost']['Amount'])) for g in groups), key=lambda x: -x[1])
+              return [f'{name}: \${amt:,.2f}' for name, amt in rows[:n] if amt > 0.005]
+
+          this_week = total('/tmp/this_week.json')
+          last_week = total('/tmp/last_week.json')
+          delta = this_week - last_week
+          pct = (delta / last_week * 100) if last_week > 0 else 0.0
+          arrow = '📈' if delta > 0 else ('📉' if delta < 0 else '➡️')
+
+          print(f'this_week={this_week:,.2f}')
+          print(f'last_week={last_week:,.2f}')
+          print(f'delta={delta:+,.2f}')
+          print(f'pct={pct:+.1f}')
+          print(f'arrow={arrow}')
+
+          lines = top_services('/tmp/this_week.json')
+          print('top_services<<COSTEOF')
+          for l in lines:
+              print(l)
+          print('COSTEOF')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Query OpenRouter spend
+        id: openrouter_cost
+        run: |
+          OR_KEY=$(aws ssm get-parameter --region eu-central-1 \
+            --name /daatan/prod/secrets/OPENROUTER_API_KEY \
+            --with-decryption --query Parameter.Value --output text)
+
+          curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer ${OR_KEY}" > /tmp/or_key.json
+
+          python3 -c "
+          import json
+          body = json.load(open('/tmp/or_key.json'))
+          if 'error' in body:
+              print(f'weekly=ERROR: {body[\"error\"].get(\"message\", \"unknown\")}')
+          else:
+              d = body.get('data', {})
+              weekly = d.get('usage_weekly', 0) or 0
+              print(f'weekly={weekly:.2f}')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Post to Telegram
+        env:
+          THIS_WEEK: ${{ steps.aws_cost.outputs.this_week }}
+          LAST_WEEK: ${{ steps.aws_cost.outputs.last_week }}
+          DELTA: ${{ steps.aws_cost.outputs.delta }}
+          PCT: ${{ steps.aws_cost.outputs.pct }}
+          ARROW: ${{ steps.aws_cost.outputs.arrow }}
+          AWS_TOP: ${{ steps.aws_cost.outputs.top_services }}
+          OR_WEEKLY: ${{ steps.openrouter_cost.outputs.weekly }}
+          # Clean channel is production-only signal; fall back to noisy if
+          # unset, matching the routing convention every other prod alert
+          # already uses (reference_telegram_clean_noisy_channels).
+          CHAT_ID: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+          SHIP_NOTE: ${{ vars.COST_REPORT_WEEKLY_NOTE }}
+        run: |
+          AWS_TOP_LINES=$(echo "$AWS_TOP" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+
+          NOTE_LINE=""
+          if [ -n "$SHIP_NOTE" ]; then
+            NOTE_LINE="%0A%0A🚀 ${SHIP_NOTE}"
+          fi
+
+          MSG="📊 <b>Weekly cost pulse</b>%0A%0A<b>This week (gross AWS): \$${THIS_WEEK}</b> ${ARROW} ${DELTA} (${PCT}%25 vs last week's \$${LAST_WEEK})%0A${AWS_TOP_LINES}%0A%0AOpenRouter this week: \$${OR_WEEKLY}${NOTE_LINE}"
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"

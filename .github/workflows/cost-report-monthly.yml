@@ -1,0 +1,175 @@
+name: Monthly Cost Report
+#
+# Full monthly report on the clean channel, split from docs#75/#90 as
+# daatan#1425 — the ongoing version of the one-time finances audit
+# (Daatan/docs planning/finances-2026-08.md). Steady-state cost (credits
+# ignored, since that's the number that matters once the promotional
+# credits run out) + the credit runway + a pointer to the current cut
+# backlog.
+#
+# The credit-runway step is a straight copy of cost-report.yml's (#1346) —
+# same methodology (estimatedAmount, ENABLED+not-expired credits only, fail
+# loud on read errors), kept in sync by hand since GitHub Actions has no
+# clean way to share a step between workflow files without a composite
+# action, and one wasn't worth adding for two callers.
+
+on:
+  schedule:
+    - cron: '0 12 1 * *'   # 1st of month, 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  cost-report-monthly:
+    name: Send monthly cost report
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Query steady-state cost (trailing 30d, gross Usage)
+        id: aws_cost
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          MONTH_AGO=$(date -u -d '30 days ago' +%Y-%m-%d)
+
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${MONTH_AGO},End=${TODAY}" \
+            --granularity MONTHLY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json > /tmp/aws_cost.json
+
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/aws_cost.json'))
+          groups = d['ResultsByTime'][0]['Groups'] if d['ResultsByTime'] else []
+          rows = sorted(((g['Keys'][0], float(g['Metrics']['UnblendedCost']['Amount'])) for g in groups), key=lambda x: -x[1])
+          total = sum(a for _, a in rows)
+          lines = [f'{name}: \${amt:,.2f}' for name, amt in rows[:5] if amt > 0.005]
+          print(f'total={total:,.2f}')
+          print('top_services<<COSTEOF')
+          for l in lines:
+              print(l)
+          print('COSTEOF')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Query credit runway
+        id: credit_runway
+        env:
+          RUNWAY_WARN_DAYS: '30'
+        run: |
+          aws billing get-credits \
+            --region us-east-1 \
+            --account-id "$(aws sts get-caller-identity --query Account --output text)" \
+            --start-date 2020-01-01 \
+            --output json > /tmp/credits.json 2>/tmp/credits.err || true
+
+          WEEK_AGO=$(date -u -d '7 days ago' +%Y-%m-%d)
+          TODAY=$(date -u +%Y-%m-%d)
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${WEEK_AGO},End=${TODAY}" \
+            --granularity DAILY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --output json > /tmp/burn.json 2>/dev/null || true
+
+          python3 -c "
+          import json, os, datetime
+          warn_days = float(os.environ['RUNWAY_WARN_DAYS'])
+
+          def out(k, v):
+              print(f'{k}={v}')
+
+          try:
+              credits = json.load(open('/tmp/credits.json'))['credits']
+          except Exception:
+              err = open('/tmp/credits.err').read().strip()[:200] or 'unparseable response'
+              out('status', 'ERROR')
+              out('line', f'⚠️ credits: READ FAILED ({err})')
+              raise SystemExit(0)
+
+          now = datetime.datetime.now(datetime.timezone.utc)
+          live = 0.0
+          for c in credits:
+              if c.get('creditStatus') != 'ENABLED':
+                  continue
+              try:
+                  if datetime.datetime.fromisoformat(c['endDate']) <= now:
+                      continue
+              except Exception:
+                  pass
+              amt = c.get('estimatedAmount') or c.get('remainingAmount') or {}
+              live += float(amt.get('currencyAmount', 0) or 0)
+
+          try:
+              days = json.load(open('/tmp/burn.json'))['ResultsByTime']
+              totals = [float(d['Total']['UnblendedCost']['Amount']) for d in days]
+              burn = sum(totals) / len(totals) if totals else 0.0
+          except Exception:
+              burn = 0.0
+
+          if live <= 0:
+              out('status', 'EXHAUSTED')
+              out('line', '⚠️ <b>credits: EXHAUSTED</b> — spend is now billed in cash')
+          elif burn <= 0:
+              out('status', 'OK')
+              out('line', f'credits: \${live:,.0f} left (burn rate unavailable)')
+          else:
+              left = live / burn
+              tag = '⚠️ <b>' if left < warn_days else ''
+              end = '</b>' if left < warn_days else ''
+              eta = (now + datetime.timedelta(days=left)).strftime('%Y-%m-%d')
+              out('status', 'WARN' if left < warn_days else 'OK')
+              out('line', f'{tag}credits: \${live:,.0f} left ≈ {left:.0f}d at \${burn:,.0f}/d (~{eta}){end}')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Query OpenRouter spend
+        id: openrouter_cost
+        run: |
+          OR_KEY=$(aws ssm get-parameter --region eu-central-1 \
+            --name /daatan/prod/secrets/OPENROUTER_API_KEY \
+            --with-decryption --query Parameter.Value --output text)
+
+          curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer ${OR_KEY}" > /tmp/or_key.json
+
+          python3 -c "
+          import json
+          body = json.load(open('/tmp/or_key.json'))
+          if 'error' in body:
+              print(f'monthly=ERROR: {body[\"error\"].get(\"message\", \"unknown\")}')
+          else:
+              d = body.get('data', {})
+              monthly = d.get('usage_monthly', 0) or 0
+              print(f'monthly={monthly:.2f}')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Post to Telegram
+        env:
+          AWS_TOTAL: ${{ steps.aws_cost.outputs.total }}
+          AWS_TOP: ${{ steps.aws_cost.outputs.top_services }}
+          CREDIT_LINE: ${{ steps.credit_runway.outputs.line }}
+          OR_MONTHLY: ${{ steps.openrouter_cost.outputs.monthly }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+          BACKLOG_NOTE: ${{ vars.COST_REPORT_MONTHLY_BACKLOG_NOTE }}
+        run: |
+          AWS_TOP_LINES=$(echo "$AWS_TOP" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+          CREDIT_TEXT="${CREDIT_LINE:-⚠️ credits: NO DATA (runway step produced no output)}"
+          BACKLOG_TEXT="${BACKLOG_NOTE:-No open cost cuts on the backlog. Full detail: Daatan/docs planning/finances-2026-08.md}"
+
+          MSG="🗓️ <b>Monthly cost report</b>%0A%0A<b>Steady-state (trailing 30d, gross): \$${AWS_TOTAL}/mo</b>%0A${AWS_TOP_LINES}%0A%0A${CREDIT_TEXT}%0A%0AOpenRouter this month: \$${OR_MONTHLY}%0A%0A📋 ${BACKLOG_TEXT}"
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"
