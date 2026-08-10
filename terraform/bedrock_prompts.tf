@@ -26,7 +26,14 @@ locals {
     "content-moderation",
     "temporal-classifier"
   ]
-  prompt_envs = ["staging", "prod"]
+  # Deliberately var.environment, not a hardcoded ["staging","prod"] pair: the old
+  # hardcoded list made every apply — from either backend — manage BOTH envs' SSM
+  # parameters, so prod and staging state each claimed the same 32 physical resources
+  # (daatan#1142). Scoping to var.environment makes each state own only its own env's
+  # prompts, matching how aws_ssm_parameter.app_secrets is already scoped (secrets_ssm.tf)
+  # — and as a side effect narrows the IAM policy below to grant read access only to this
+  # environment's own prompts instead of both.
+  prompt_envs = [var.environment]
 }
 
 # Allow EC2 to read Bedrock prompts by ARN and SSM prompt params
