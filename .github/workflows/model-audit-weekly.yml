@@ -1,0 +1,169 @@
+name: Weekly Model Audit
+
+#
+# Weekly reminder to reaudit which LLM models are actually in use, so a
+# cheaper/better model doesn't get missed and a silently-flipped-on model
+# doesn't go unnoticed — daatan#1429, split from the same planning
+# conversation as the weekly/monthly cost reports (daatan#1425).
+#
+# A script can't judge "is there a cheaper/better model" (that's real
+# research) so this does the part that can be done honestly: a LIVE model
+# inventory from CloudWatch AWS/Bedrock Invocations (ground truth of what's
+# actually being called — not a stale grep of pinned config) with
+# week-over-week volume deltas, flagging any model that swings >50% or
+# newly appears. This is exactly the kind of surprise that would have
+# caught the Cohere-embeddings pilot silently switching on (2026-08-08)
+# a week earlier than Cost Explorer did.
+#
+# OpenRouter spend is already covered by the existing weekly cost report
+# (negligible, ~$1/mo) — not duplicated here.
+#
+
+on:
+  schedule:
+    - cron: '7 13 * * 1'   # Monday 13:07 UTC — staggered after the 12:00 cost report
+  workflow_dispatch:
+
+jobs:
+  model-audit-weekly:
+    name: Send weekly model audit
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Query Bedrock model invocations (this week vs last week)
+        id: model_stats
+        run: |
+          END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          WEEK_AGO=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          TWO_WEEKS_AGO=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+
+          # Ground truth of what's actually live — discovered from CloudWatch,
+          # not a grep of source pins, which can be stale or wrong about what's
+          # actually deployed.
+          MODELS=$(aws cloudwatch list-metrics \
+            --namespace AWS/Bedrock --metric-name Invocations --region eu-central-1 \
+            --query 'Metrics[].Dimensions[?Name==`ModelId`].Value' --output text \
+            | tr '\t' '\n' | sort -u)
+
+          > /tmp/model_stats.txt
+          for MODEL in $MODELS; do
+            THIS=$(aws cloudwatch get-metric-statistics \
+              --namespace AWS/Bedrock --metric-name Invocations \
+              --dimensions "Name=ModelId,Value=${MODEL}" \
+              --start-time "$WEEK_AGO" --end-time "$END" \
+              --period 604800 --statistics Sum --region eu-central-1 \
+              --query 'Datapoints[0].Sum' --output text)
+            LAST=$(aws cloudwatch get-metric-statistics \
+              --namespace AWS/Bedrock --metric-name Invocations \
+              --dimensions "Name=ModelId,Value=${MODEL}" \
+              --start-time "$TWO_WEEKS_AGO" --end-time "$WEEK_AGO" \
+              --period 604800 --statistics Sum --region eu-central-1 \
+              --query 'Datapoints[0].Sum' --output text)
+            echo "${MODEL}|${THIS}|${LAST}" >> /tmp/model_stats.txt
+          done
+
+          python3 -c "
+          lines = []
+          flags = []
+          with open('/tmp/model_stats.txt') as f:
+              for row in f:
+                  model, this_raw, last_raw = row.strip().split('|')
+                  this_n = 0.0 if this_raw in ('None', '') else float(this_raw)
+                  last_n = 0.0 if last_raw in ('None', '') else float(last_raw)
+                  if this_n == 0 and last_n == 0:
+                      continue  # never called in either window, not worth a line
+                  flag = ''
+                  if last_n == 0 and this_n > 0:
+                      flag = ' ⚠️ new'
+                      flags.append(f'{model}: newly active ({int(this_n)} calls)')
+                  elif last_n > 0:
+                      pct = (this_n - last_n) / last_n * 100
+                      if abs(pct) > 50:
+                          arrow = '\U0001F4C8' if pct > 0 else '\U0001F4C9'
+                          flag = f' {arrow} {abs(pct):.0f}%'
+                          # abs() + the arrow for direction, not a +/- sign: curl's
+                          # x-www-form-urlencoded POST silently decodes a literal '+'
+                          # as a space server-side (caught for real in the weekly
+                          # cost report before it shipped — same trap here).
+                          flags.append(f'{model}: {arrow} {abs(pct):.0f}% vs last week ({int(last_n)}→{int(this_n)})')
+                  lines.append(f'{model}: {int(this_n)} calls{flag}')
+          lines.sort(key=lambda l: l.lower())
+          print('model_lines<<MODELEOF')
+          for l in lines:
+              print(l)
+          print('MODELEOF')
+          print('flag_lines<<FLAGEOF')
+          for f in flags:
+              print(f)
+          print('FLAGEOF')
+          print(f'flag_count={len(flags)}')
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Query Bedrock cost lines (this week, gross Usage)
+        id: bedrock_cost
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          WEEK_AGO=$(date -u -d '7 days ago' +%Y-%m-%d)
+
+          aws ce get-cost-and-usage \
+            --region us-east-1 \
+            --time-period "Start=${WEEK_AGO},End=${TODAY}" \
+            --granularity MONTHLY \
+            --metrics "UnblendedCost" \
+            --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --output json > /tmp/this_week_cost.json
+
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/this_week_cost.json'))
+          groups = d['ResultsByTime'][0].get('Groups', [])
+          rows = [(g['Keys'][0], float(g['Metrics']['UnblendedCost']['Amount'])) for g in groups]
+          # SERVICE dimension splits some Bedrock model billing onto its own
+          # line (e.g. Claude Haiku 4.5) while others stay under the generic
+          # 'Amazon Bedrock' line — surface anything cost-bearing that names
+          # a model or Bedrock itself.
+          bedrock_rows = [(n, a) for n, a in rows if ('bedrock' in n.lower() or 'claude' in n.lower() or 'nova' in n.lower()) and a > 0.005]
+          bedrock_rows.sort(key=lambda x: -x[1])
+          print('bedrock_lines<<BEDROCKEOF')
+          for name, amt in bedrock_rows:
+              print(f'{name}: \${amt:,.2f}')
+          print('BEDROCKEOF')
+          "  >> "$GITHUB_OUTPUT"
+
+      - name: Post to Telegram
+        env:
+          MODEL_LINES: ${{ steps.model_stats.outputs.model_lines }}
+          FLAG_LINES: ${{ steps.model_stats.outputs.flag_lines }}
+          FLAG_COUNT: ${{ steps.model_stats.outputs.flag_count }}
+          BEDROCK_LINES: ${{ steps.bedrock_cost.outputs.bedrock_lines }}
+          # Clean channel is production-only signal; fall back to noisy if
+          # unset, matching every other prod alert's routing convention
+          # (reference_telegram_clean_noisy_channels).
+          CHAT_ID: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MODEL_LINES_ENC=$(echo "$MODEL_LINES" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+          BEDROCK_LINES_ENC=$(echo "$BEDROCK_LINES" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+
+          FLAG_BLOCK=""
+          if [ "$FLAG_COUNT" != "0" ] && [ -n "$FLAG_LINES" ]; then
+            FLAG_LINES_ENC=$(echo "$FLAG_LINES" | sed 's/^/  /' | sed ':a;N;$!ba;s/\n/%0A/g')
+            FLAG_BLOCK="%0A%0A⚠️ <b>Flagged this week</b>%0A${FLAG_LINES_ENC}"
+          fi
+
+          MSG="🔍 <b>Weekly model audit</b>%0A%0A<b>Live Bedrock models (invocations)</b>%0A${MODEL_LINES_ENC}%0A%0A<b>Bedrock cost lines</b>%0A${BEDROCK_LINES_ENC}${FLAG_BLOCK}%0A%0AWorth a manual check against current Bedrock/OpenRouter pricing if anything above looks pricier than it should."
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"
