@@ -68,7 +68,14 @@ jobs:
               rbt = d.get('ResultsByTime', [])
               if not rbt:
                   return 0.0
-              return float(rbt[0]['Total']['UnblendedCost']['Amount'])
+              period = rbt[0]
+              # A grouped query (Type=DIMENSION,Key=SERVICE) leaves Total empty —
+              # CE only populates per-group Metrics in that case. Sum the groups
+              # when present; only trust Total for the ungrouped query.
+              groups = period.get('Groups', [])
+              if groups:
+                  return sum(float(g['Metrics']['UnblendedCost']['Amount']) for g in groups)
+              return float(period['Total']['UnblendedCost']['Amount'])
 
           def top_services(path, n=3):
               d = json.load(open(path))
@@ -83,10 +90,15 @@ jobs:
           pct = (delta / last_week * 100) if last_week > 0 else 0.0
           arrow = '📈' if delta > 0 else ('📉' if delta < 0 else '➡️')
 
+          # abs() + the arrow for direction, not a +/- sign: curl's
+          # application/x-www-form-urlencoded POST silently decodes a literal
+          # '+' as a space server-side, so an unencoded '+61.81' would have
+          # rendered as ' 61.81' in the posted message (caught via a live
+          # dry-run before this shipped).
           print(f'this_week={this_week:,.2f}')
           print(f'last_week={last_week:,.2f}')
-          print(f'delta={delta:+,.2f}')
-          print(f'pct={pct:+.1f}')
+          print(f'delta={abs(delta):,.2f}')
+          print(f'pct={abs(pct):.1f}')
           print(f'arrow={arrow}')
 
           lines = top_services('/tmp/this_week.json')
@@ -138,7 +150,7 @@ jobs:
             NOTE_LINE="%0A%0A🚀 ${SHIP_NOTE}"
           fi
 
-          MSG="📊 <b>Weekly cost pulse</b>%0A%0A<b>This week (gross AWS): \$${THIS_WEEK}</b> ${ARROW} ${DELTA} (${PCT}%25 vs last week's \$${LAST_WEEK})%0A${AWS_TOP_LINES}%0A%0AOpenRouter this week: \$${OR_WEEKLY}${NOTE_LINE}"
+          MSG="📊 <b>Weekly cost pulse</b>%0A%0A<b>This week (gross AWS): \$${THIS_WEEK}</b> ${ARROW} \$${DELTA} (${PCT}%25 vs last week's \$${LAST_WEEK})%0A${AWS_TOP_LINES}%0A%0AOpenRouter this week: \$${OR_WEEKLY}${NOTE_LINE}"
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${CHAT_ID}" \
