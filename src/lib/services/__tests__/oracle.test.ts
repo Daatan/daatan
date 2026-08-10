@@ -415,6 +415,29 @@ describe('getOracleForecast', () => {
     })
   })
 
+  describe('resolution_criteria (retro #353 / daatan#1375)', () => {
+    it('sends resolution_criteria when the claim has resolution rules', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+      await getOracleForecast('Q?', { resolutionRules: 'Only an official government announcement counts.' })
+      const [, init] = fetchMock.mock.calls[0]
+      const body = JSON.parse(init.body as string)
+      expect(body.resolution_criteria).toBe('Only an official government announcement counts.')
+    })
+
+    it('omits resolution_criteria when null, undefined or empty', async () => {
+      // Omitting rather than defaulting is what keeps retro's cache key (retro#510)
+      // separating rules-bearing from rules-less traffic. Sending '' would make every
+      // rules-less caller hash as if it had sent rules.
+      for (const rules of [null, undefined, '']) {
+        fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+        await getOracleForecast('Q?', { resolutionRules: rules })
+      }
+      for (const [, init] of fetchMock.mock.calls) {
+        expect('resolution_criteria' in JSON.parse(init.body as string)).toBe(false)
+      }
+    })
+  })
+
   describe('prediction_id (retro #273 log correlation)', () => {
     it('sends prediction_id when meta.predictionId is set', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
@@ -458,6 +481,16 @@ describe('getOracleProbability', () => {
   it('returns null when the full forecast is unavailable', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
     expect(await getOracleProbability('Q?')).toBeNull()
+  })
+
+  it('forwards resolutionRules through to the request body', async () => {
+    // This wrapper enumerates the ClaimMeta fields it forwards rather than spreading,
+    // so a field added to ClaimMeta reaches getOracleForecast but silently stops here.
+    // bots/voting is the only caller and it needs the rules in the cache key.
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
+    await getOracleProbability('Q?', { source: 'bot-voting' }, { resolutionRules: 'Official announcement only.' })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body as string).resolution_criteria).toBe('Official announcement only.')
   })
 })
 

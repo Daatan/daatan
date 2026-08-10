@@ -287,6 +287,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 claimDeadline: prediction.claimDeadline,
                 claimCreatedAt: prediction.createdAt,
                 claimArchetype: prediction.claimArchetype,
+                resolutionRules: prediction.resolutionRules,
                 // Must stay under ESTIMATION_TIMEOUT_MS: this whole block is raced
                 // against it below, so a longer Oracle budget would just be abandoned
                 // 15s in — with the call still running, uncancelled. The default (30s)

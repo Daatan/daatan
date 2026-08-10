@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
         claimDeadline: true,
         createdAt: true,
         claimArchetype: true,
+        resolutionRules: true,
       },
     })
 
@@ -269,6 +270,7 @@ export async function POST(request: NextRequest) {
         claimDeadline: prediction.claimDeadline,
         claimCreatedAt: prediction.createdAt,
         claimArchetype: prediction.claimArchetype,
+        resolutionRules: prediction.resolutionRules,
       },
       { source: 'news-indexer', predictionId: prediction.id },
     )

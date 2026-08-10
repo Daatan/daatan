@@ -106,16 +106,19 @@ export interface ArticleInput {
   isPrediction?: boolean | null
 }
 
-/** Stored claim temporal metadata, as read off `Prediction`. Optional on every
+/** Stored claim metadata, as read off `Prediction`. Optional on every
  *  Oracle call site — retro's direction guard (#244) is fail-open without it.
  *  `claimCreatedAt`/`claimArchetype` bound the settlement window on retro's
  *  side (a 'scheduled' claim can't be settled by an event predating its own
- *  creation — an earlier instance of the recurring event); fail-open too. */
+ *  creation — an earlier instance of the recurring event); fail-open too.
+ *  `resolutionRules` is not temporal — it tells the extractor what the question
+ *  actually means (retro#353), e.g. that only an official announcement counts. */
 export interface ClaimMeta {
   claimDirection?: ClaimDirection | null
   claimDeadline?: Date | null
   claimCreatedAt?: Date | null
   claimArchetype?: ClaimArchetype | null
+  resolutionRules?: string | null
 }
 
 /** Map to retro's `ForecastRequest.claim_direction` — a strict
@@ -525,6 +528,11 @@ export const getOracleForecast = async (
         ...(claimArchetypeParam(options?.claimArchetype)
           ? { claim_archetype: claimArchetypeParam(options?.claimArchetype) }
           : {}),
+        // What the question actually means (retro #353) — e.g. that only an
+        // official announcement settles it. Omitted when the claim has no rules
+        // rather than defaulted, so retro's cache key (retro#510) separates
+        // rules-bearing from rules-less traffic instead of merging them.
+        ...(options?.resolutionRules ? { resolution_criteria: options.resolutionRules } : {}),
         // Oracle's ArticleInput uses snake_case `published_date`; map from our
         // camelCase `publishedDate` so recency weighting on the Oracle side
         // actually receives the date (otherwise it's dropped and treated as now).
@@ -624,7 +632,12 @@ export const getOracleProbability = async (
 ): Promise<number | null> => {
   const { forecast } = await getOracleForecast(
     question,
-    { timeoutMs: options?.timeoutMs, claimDirection: options?.claimDirection, claimDeadline: options?.claimDeadline },
+    {
+      timeoutMs: options?.timeoutMs,
+      claimDirection: options?.claimDirection,
+      claimDeadline: options?.claimDeadline,
+      resolutionRules: options?.resolutionRules,
+    },
     meta,
   )
   if (!forecast) return null

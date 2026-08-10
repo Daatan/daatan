@@ -94,6 +94,7 @@ const BASE_PREDICTION = {
   claimDeadline: null,
   createdAt: new Date('2026-01-01'),
   claimArchetype: null,
+  resolutionRules: null,
   newsAnchor: null,
 }
 
@@ -189,6 +190,20 @@ describe('POST /api/forecasts/[id]/context', () => {
         expect.anything(),
       )
       expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(15_000)
+    })
+
+    it('forwards the claim\'s resolutionRules to the Oracle (daatan#1375)', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(getForecastForContextUpdate).mockResolvedValue({
+        ...BASE_PREDICTION,
+        resolutionRules: 'Only an official government announcement counts.',
+      } as never)
+
+      const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+      await collectDoneEvent(res)
+
+      const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+      expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
     })
 
     it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {

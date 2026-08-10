@@ -174,6 +174,19 @@ describe('POST /api/news-indexer/context', () => {
     expect(opts?.claimDeadline).toBe(deadline)
   })
 
+  it('forwards the prediction\'s resolutionRules to getOracleForecast (daatan#1375)', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
+      ...ACTIVE_PREDICTION,
+      resolutionRules: 'Only an official government announcement counts.',
+    } as never)
+    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    await POST(post('test-secret'))
+
+    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
+  })
+
   it('threads the trigger article\'s gatekeeper verdict into the Oracle articles (Phase 1.3)', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 

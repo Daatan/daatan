@@ -311,6 +311,14 @@ describe('refreshOracleSnapshot', () => {
     expect(opts.claimDeadline).toBe(deadline)
   })
 
+  it('forwards resolutionRules to getOracleForecast — the re-drive must land on the same cache key as the original ask (daatan#1375)', async () => {
+    mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
+    mockForecast.mockResolvedValue({ forecast: null })
+    await refreshOracleSnapshot({ ...prediction, resolutionRules: 'Official announcement only.' })
+    const [, opts] = mockForecast.mock.calls[0]
+    expect(opts.resolutionRules).toBe('Official announcement only.')
+  })
+
   describe('the estimate is the whole-pool aggregate, not the single run (cut over from shadow-compare)', () => {
     const forecast = {
       mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
