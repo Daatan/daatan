@@ -157,12 +157,16 @@ resource "aws_iam_role_policy" "github_actions_cost_report" {
   })
 }
 
-# CloudWatch (read-only), scoped to the AWS/Bedrock namespace via the
-# cloudwatch:namespace condition key — for the weekly model-usage audit
+# CloudWatch (read-only) — for the weekly model-usage audit
 # (.github/workflows/model-audit-weekly.yml, daatan#1429/#1431). Neither
 # ListMetrics nor GetMetricStatistics support resource-level ARNs (both
-# require Resource="*"), so the namespace condition is the only available
-# least-privilege scoping.
+# require Resource="*"), same as ce:GetCostAndUsage below. A cloudwatch:namespace
+# condition was tried first for least-privilege scoping — the IAM policy
+# simulator confirmed it as "allowed", but live enforcement still returned
+# AccessDenied on ListMetrics (caught via a real workflow_dispatch run, not
+# the simulator): the service does not actually honor that condition key for
+# this action despite AWS's own simulator suggesting otherwise. Dropped —
+# same unconditioned Resource="*" as every other CloudWatch/CE grant here.
 resource "aws_iam_role_policy" "github_actions_model_audit" {
   name = "daatan-github-model-audit"
   role = aws_iam_role.github_actions.id
@@ -174,11 +178,6 @@ resource "aws_iam_role_policy" "github_actions_model_audit" {
         Effect   = "Allow"
         Action   = ["cloudwatch:ListMetrics", "cloudwatch:GetMetricStatistics"]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "cloudwatch:namespace" = "AWS/Bedrock"
-          }
-        }
       }
     ]
   })
