@@ -157,6 +157,33 @@ resource "aws_iam_role_policy" "github_actions_cost_report" {
   })
 }
 
+# CloudWatch (read-only), scoped to the AWS/Bedrock namespace via the
+# cloudwatch:namespace condition key — for the weekly model-usage audit
+# (.github/workflows/model-audit-weekly.yml, daatan#1429/#1431). Neither
+# ListMetrics nor GetMetricStatistics support resource-level ARNs (both
+# require Resource="*"), so the namespace condition is the only available
+# least-privilege scoping.
+resource "aws_iam_role_policy" "github_actions_model_audit" {
+  name = "daatan-github-model-audit"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:ListMetrics", "cloudwatch:GetMetricStatistics"]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" = "AWS/Bedrock"
+          }
+        }
+      }
+    ]
+  })
+}
+
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions OIDC"
   value       = aws_iam_role.github_actions.arn
