@@ -15,13 +15,14 @@
 #   hidden-token cost risk the other four do.
 #
 # WHY A DATA SOURCE, NOT `aws_iam_role.ec2_role`
-#   Proven with `terraform state list` against both backends:
-#     - prod state  (backend-prod.hcl)    owns aws_iam_role.ec2_role  → daatan-ec2-role-prod
-#     - staging state (backend-staging.hcl) owns NO ec2_role at all
-#   `daatan-ec2-role-staging` exists in AWS but is unmanaged. Referencing the managed
-#   resource would therefore grant prod only, silently skipping staging — the opposite
-#   of the staging-first rule. Looking the role up by name grants whichever environment
-#   the config is applied for, and requires no import of the unmanaged staging role.
+#   Both backends now own their own `aws_iam_role.ec2_role` (confirmed via `terraform
+#   state list` 2026-08-09 — staging has owned it since 2026-07-27, closing the
+#   "unmanaged staging role" half of #1142). But `aws_iam_role.ec2_role` still only
+#   resolves to *whichever state you're currently applying from* — referencing the
+#   managed resource here would grant only that one environment, silently skipping the
+#   other, since this policy needs to be applied to both. Looking the role up by name
+#   grants whichever environment the config is applied for, regardless of which
+#   backend's `ec2_role` happens to be in scope.
 #
 #   NOTE: `var.environment` defaults to "prod". Applying this from the staging state
 #   WITHOUT `-var environment=staging` would attach the policy to the *prod* role from
@@ -58,8 +59,8 @@ locals {
   ]
 }
 
-# Read-only lookup. Works for both the Terraform-managed prod role and the unmanaged
-# staging role, and never asserts ownership of either.
+# Read-only lookup. Both roles are Terraform-managed today (each in its own state), but
+# this stays a data source rather than a resource reference — see the comment above.
 data "aws_iam_role" "app_ec2_role" {
   name = "daatan-ec2-role-${var.environment}"
 }
