@@ -35,6 +35,7 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   event_target: 'Iran',
   is_occurrence: false,
   verified: true,
+  facet: 'announcement',
   ...over,
 })
 
@@ -87,6 +88,7 @@ describe('enrichOracleSources', () => {
       eventTarget: 'Iran',
       isOccurrence: false,
       verified: true,
+      facet: 'announcement',
       carriedForward: false,
     })
   })
@@ -148,6 +150,7 @@ describe('enrichOracleSources', () => {
         event_target: undefined,
         is_occurrence: undefined,
         verified: undefined,
+        facet: undefined,
       })],
       [searchResult()],
       new Map(),
@@ -164,6 +167,7 @@ describe('enrichOracleSources', () => {
     expect(out[0].eventTarget).toBeUndefined()
     expect(out[0].isOccurrence).toBeUndefined()
     expect(out[0].verified).toBeUndefined()
+    expect(out[0].facet).toBeUndefined()
   })
 
   describe('omitted vs explicit-null fields (F11, daatan#1237)', () => {
@@ -183,6 +187,7 @@ describe('enrichOracleSources', () => {
       { enrichedKey: 'eventTarget', oracleKey: 'event_target' },
       { enrichedKey: 'isOccurrence', oracleKey: 'is_occurrence' },
       { enrichedKey: 'verified', oracleKey: 'verified' },
+      { enrichedKey: 'facet', oracleKey: 'facet' },
     ]
 
     it.each(FIELD_CASES)(
@@ -258,6 +263,7 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     eventTarget: 'Iran',
     isOccurrence: false,
     verified: true,
+    facet: 'announcement',
     origin: 'news-indexer',
     excluded: false,
     personId: null,
@@ -301,6 +307,7 @@ describe('poolArticleToEnrichedSource', () => {
       eventTarget: 'Iran',
       isOccurrence: false,
       verified: true,
+      facet: 'announcement',
       claimsDetail: null,
       carriedForward: false,
     })
@@ -330,6 +337,12 @@ describe('poolArticleToEnrichedSource', () => {
   it('nulls an unrecognised evidenceClass rather than passing the raw string through', () => {
     expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'garbage' }), null).evidenceClass).toBeNull()
     expect(poolArticleToEnrichedSource(poolArticle({ evidenceClass: 'opinion' }), null).evidenceClass).toBe('opinion')
+  })
+
+  it('nulls an unrecognised facet rather than passing the raw string through', () => {
+    expect(poolArticleToEnrichedSource(poolArticle({ facet: 'garbage' }), null).facet).toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ facet: 'denial' }), null).facet).toBe('denial')
+    expect(poolArticleToEnrichedSource(poolArticle({ facet: null }), null).facet).toBeNull()
   })
 
   // F1/F15 (daatan#1235, retro#364) — claims_detail is an untyped Json column written

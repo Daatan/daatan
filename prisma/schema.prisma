@@ -762,7 +762,10 @@ model EvidencePoolArticle {
   // the DOMINANT (max |fact_signal|) claim for the estimator's future checks:
   // `eventActors`/`eventTarget` name that fact's actor→target dyad (the actor-pair
   // check, #303), `isOccurrence` marks the event ITSELF vs a precursor/escalation,
-  // `verified` marks an independently-reported fact vs an interested party's claim.
+  // `verified` marks an independently-reported fact vs an interested party's claim,
+  // `facet` marks whether that fact ANNOUNCES the event, DENIES it, or is NEITHER
+  // (retro#354 D2a) — feeds a future check that |fact_signal| isn't systematically
+  // symmetric between announcement and denial claims (retro#483).
   // All null when no scored claim carried a fact_signal (e.g. pure opinion).
   // Free-text facets (`eventActors`/`eventTarget`) are unbounded (no VarChar cap)
   // so an over-long LLM value can never fail this shadow write. SHADOW / estimator
@@ -775,6 +778,7 @@ model EvidencePoolArticle {
   eventTarget  String?  @map("event_target")
   isOccurrence Boolean? @map("is_occurrence")
   verified     Boolean?
+  facet        String?  @db.VarChar(16)
 
   // The per-claim layer behind every extracted scalar above (F1/F15, daatan#1235
   // + retro#364). Each element carries one claim's own stance, certainty,
