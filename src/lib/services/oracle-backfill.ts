@@ -48,11 +48,11 @@ export type SuppliedArticle = {
   publishedDate?: string
 }
 
-/** The claim fields every Oracle re-drive needs. `claimDirection`/`claimDeadline`
- *  are load-bearing beyond the direction guard: retro folds exactly those two into
- *  its `forecast_cache` key (`claim_meta`), so a re-ask that omits either lands on a
- *  different key and re-runs the extractor. `createdAt`/`claimArchetype` are NOT in
- *  that key and are safe to vary. */
+/** The claim fields every Oracle re-drive needs. `claimDirection`/`claimDeadline`/
+ *  `resolutionRules` are load-bearing beyond the direction guard: retro folds exactly
+ *  those three into its `forecast_cache` key (`claim_meta`, retro#510), so a re-ask
+ *  that omits any of them lands on a different key and re-runs the extractor.
+ *  `createdAt`/`claimArchetype` are NOT in that key and are safe to vary. */
 export type ReaskPrediction = {
   id: string
   claimText: string
@@ -60,6 +60,7 @@ export type ReaskPrediction = {
   claimDeadline?: Date | null
   createdAt?: Date | null
   claimArchetype?: ClaimArchetype | null
+  resolutionRules?: string | null
 }
 
 /**
@@ -133,6 +134,7 @@ export async function refreshOracleSnapshot(
       claimDeadline: prediction.claimDeadline,
       claimCreatedAt: prediction.createdAt,
       claimArchetype: prediction.claimArchetype,
+      resolutionRules: prediction.resolutionRules,
     },
     { source: 'context-update', predictionId: prediction.id },
   )
