@@ -43,16 +43,16 @@ Configured via Lambda env var `FORWARD_MAPPING` (JSON) and `CATCH_ALL_DESTINATIO
 
 Both Mark and Andrey can send outbound email from their `@daatan.com` addresses using Gmail's "Send mail as" feature via SES SMTP.
 
-**SMTP settings** (from `terraform output`):
+**SMTP settings**:
 
 | Setting | Value |
 |---------|-------|
 | SMTP Server | `email-smtp.eu-central-1.amazonaws.com` |
 | Port | `587` (STARTTLS) |
-| Username | `terraform output smtp_username_andrey` / `smtp_username_mark` |
-| Password | `terraform output smtp_password_andrey` / `smtp_password_mark` |
+| Username / Password (Mark) | `terraform output smtp_username_mark` / `terraform output smtp_password_mark` |
+| Username / Password (Andrey) | not in Terraform outputs — key is rotated out-of-band via `scripts/rotate-ses-smtp-credentials.sh` (see [`docs/EMAIL.md`](./EMAIL.md#creating--rotating-ses-smtp-credentials-for-a-person)); the script writes credentials to a local file, deliver over a secure channel |
 
-**IAM users**: `terraform/iam_smtp.tf` — `ses-smtp-mark-*` and `ses-smtp-andrey-*`, both have `ses:SendRawEmail` on `*`.
+**IAM users**: `terraform/iam_smtp.tf` — `ses-smtp-mark-*` and `ses-smtp-andrey-*`, both have `ses:SendRawEmail` on `*`. Only `smtp_mark`'s access key is Terraform-managed (daatan#1428).
 
 **Setup steps** (Gmail):
 1. Gmail Settings → Accounts and Import → Send mail as → Add another email address
