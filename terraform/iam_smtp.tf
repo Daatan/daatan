@@ -28,12 +28,12 @@ resource "aws_iam_user_policy" "smtp_mark" {
 }
 
 # 2. IAM User for Andrey
+# No aws_iam_access_key resource here (deliberately): the SMTP key is rotated
+# out-of-band via scripts/rotate-ses-smtp-credentials.sh (docs/EMAIL.md), so a
+# Terraform-managed key drifts out of state on every rotation and can never be
+# re-imported (AWS only returns the secret once, at creation) — daatan#1428.
 resource "aws_iam_user" "smtp_andrey" {
   name = "ses-smtp-andrey-${var.environment}"
-}
-
-resource "aws_iam_access_key" "smtp_andrey" {
-  user = aws_iam_user.smtp_andrey.name
 }
 
 resource "aws_iam_user_policy" "smtp_andrey" {
@@ -69,11 +69,3 @@ output "smtp_password_mark" {
   sensitive = true
 }
 
-output "smtp_username_andrey" {
-  value = aws_iam_access_key.smtp_andrey.id
-}
-
-output "smtp_password_andrey" {
-  value     = aws_iam_access_key.smtp_andrey.ses_smtp_password_v4
-  sensitive = true
-}
