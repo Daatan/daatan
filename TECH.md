@@ -479,7 +479,6 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 | `VAPID_PRIVATE_KEY` | Browser push notification private key |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
 | `TELEGRAM_CHAT_ID` | Telegram channel ID for notifications |
-| `CRON_SECRET` | Shared secret for `/api/cron/cleanup` |
 | `STAGING_URL` | Staging URL (used by bot runner workflow) |
 
 ---
@@ -533,14 +532,6 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 | BotConfig | Autonomous bot configuration | personaPrompt, intervalMinutes, autoApprove, tagFilter, voteBias |
 | BotRunLog | Audit log of bot actions | action (CREATED_FORECAST, VOTED, SKIPPED, ERROR), isDryRun, generatedText |
 
-### Legacy Models (Deprecated)
-
-| Model | Purpose |
-|-------|---------|
-| `Forecast` | Old prediction system |
-| `ForecastOption` | Old prediction options |
-| `Vote` | Old voting system |
-
 ### Database Operations
 
 > **All server commands go via AWS SSM** — SSH port 22 is blocked. See `/ssm` skill or DEPLOYMENT.md.
@@ -556,7 +547,7 @@ aws ssm send-command --instance-ids <ID> --document-name AWS-RunShellScript \
 # container") and docs/PRISMA_MIGRATE_DEPLOY_DEPS.md for the full flow; it
 # runs automatically as Phase 5 of the blue-green deploy.
 
-# Check migration status (87 migrations total as of v1.65.x)
+# Check migration status
 docker run --rm --network host \
   -e DATABASE_URL=postgresql://daatan:<PASS>@localhost:5432/daatan \
   daatan-migrations:staging-latest npx prisma migrate status
@@ -654,8 +645,7 @@ Auth pages are rendered without the sidebar: `Sidebar` returns `null` on `/auth/
 
 - **Provider:** Let's Encrypt
 - **Certificate:** Wildcard for daatan.com
-- **Renewal:** Automatic via Certbot (every 12 hours check)
-- **Expiry:** April 17, 2026
+- **Renewal:** Automatic via Certbot (every 12 hours check) — no fixed expiry date to track here, since it auto-renews. `.github/workflows/cert-expiry.yml` watches the served leaf cert daily and alerts Telegram if renewal has actually failed; when TLS breaks, check the *authenticator* (e.g. DNS-01 IAM permissions), not a cached expiry.
 
 To manually renew:
 ```bash
@@ -728,7 +718,7 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 ```bash
 # Production
 curl https://daatan.com/api/health
-# Response: {"status":"ok","version":"1.18.14","commit":"abc1234","timestamp":"..."}
+# Response: {"status":"ok","version":"<current tag>","commit":"<short sha>","timestamp":"..."}
 
 # Staging
 curl https://staging.daatan.com/api/health
