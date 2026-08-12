@@ -28,7 +28,7 @@ Type: ${outcomeType === 'BINARY' ? 'Yes/No (BINARY)' : 'Multiple choice (MULTIPL
 
 Write 1-3 sentences specifying exactly what evidence or conditions would cause this prediction to resolve YES (or for the correct option) vs NO. Be specific and objective. Focus on verifiable facts.`,
     schema: rulesSchema,
-    temperature: 0.3,
+    temperature: 0,
   })
 
   const parsed = JSON.parse(response.text) as { resolutionRules: string }
