@@ -1,6 +1,7 @@
 import { Accessibility } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import type { Metadata } from 'next'
+import { getContactEmail } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'Accessibility Statement',
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 const LAST_REVIEWED = 'July 6, 2026'
 
 export default function AccessibilityPage() {
+  const contactEmail = getContactEmail()
   return (
     <LegalPage title="Accessibility Statement" Icon={Accessibility}>
       <p className="text-sm text-text-subtle">Last reviewed: {LAST_REVIEWED}</p>
@@ -26,7 +28,7 @@ export default function AccessibilityPage() {
         some color-contrast issues, but plenty of the site hasn&apos;t been individually audited yet, and
         pinch-to-zoom is currently disabled on mobile (a trade-off we&apos;re reconsidering). If you hit a
         barrier, please tell us — email our accessibility coordinator at{' '}
-        <a href="mailto:office@daatan.com" className="text-cobalt-light hover:underline">office@daatan.com</a>{' '}
+        <a href={`mailto:${contactEmail}`} className="text-cobalt-light hover:underline">{contactEmail}</a>{' '}
         and we&apos;ll look into it.
       </p>
     </LegalPage>

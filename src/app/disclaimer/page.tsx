@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import type { Metadata } from 'next'
 import { isSelfHosted } from '@/lib/edition'
+import { getContactEmail } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'Disclaimer',
@@ -71,7 +72,7 @@ export default function DisclaimerPage() {
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">8. Questions</h2>
         <p>
-          If you have questions about this disclaimer, contact us at office@daatan.com.
+          If you have questions about this disclaimer, contact us at {getContactEmail()}.
         </p>
       </section>
     </LegalPage>

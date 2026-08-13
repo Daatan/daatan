@@ -1,6 +1,7 @@
 import { BookOpen } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import type { Metadata } from 'next'
+import { getContactEmail } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -67,7 +68,7 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">7. Contact</h2>
         <p>
-          For any legal inquiries, please contact office@daatan.com.
+          For any legal inquiries, please contact {getContactEmail()}.
         </p>
       </section>
     </LegalPage>

@@ -1,7 +1,7 @@
 import { Shield } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
-import { getAppUrl } from '@/lib/branding'
+import { getAppUrl, getContactEmail } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -67,14 +67,14 @@ export default async function PrivacyPage({ params }: { params: Promise<{ locale
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">5. Your Rights</h2>
         <p>
-          You can request to delete your account and associated data at any time by contacting us at office@daatan.com.
+          You can request to delete your account and associated data at any time by contacting us at {getContactEmail()}.
         </p>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">6. Contact Us</h2>
         <p>
-          If you have any questions about this Privacy Policy, please contact us at office@daatan.com.
+          If you have any questions about this Privacy Policy, please contact us at {getContactEmail()}.
         </p>
       </section>
     </LegalPage>

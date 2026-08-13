@@ -1,6 +1,7 @@
 import { Shield } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import type { Metadata } from 'next'
+import { getContactEmail } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
@@ -59,14 +60,14 @@ export default function PrivacyPage() {
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">5. Your Rights</h2>
         <p>
-          You can request to delete your account and associated data at any time by contacting us at office@daatan.com.
+          You can request to delete your account and associated data at any time by contacting us at {getContactEmail()}.
         </p>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">6. Contact Us</h2>
         <p>
-          If you have any questions about this Privacy Policy, please contact us at office@daatan.com.
+          If you have any questions about this Privacy Policy, please contact us at {getContactEmail()}.
         </p>
       </section>
     </LegalPage>

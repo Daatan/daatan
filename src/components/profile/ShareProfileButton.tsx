@@ -7,7 +7,10 @@ export function ShareProfileButton({ username }: { username: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(`https://daatan.com/profile/${username}`)
+    // window.location.origin, not a branding accessor: this is a client
+    // component, and the browser's own origin is already the correct
+    // per-instance URL for both SaaS and self-host.
+    await navigator.clipboard.writeText(`${window.location.origin}/profile/${username}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

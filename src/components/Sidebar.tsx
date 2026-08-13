@@ -44,6 +44,10 @@ type NavItem = {
   external?: boolean
 }
 
+// Separate Next.js app, not part of white-label branding — SaaS-only, hidden
+// on self-host below alongside the other SaaS-only routes.
+const ELECTIONS_URL = 'https://elections.daatan.com'
+
 const navItems: NavItem[] = [
   { href: '/', labelKey: 'feed', icon: Home },
   { href: '/create', labelKey: 'create', icon: PlusCircle },
@@ -53,7 +57,7 @@ const navItems: NavItem[] = [
   { href: '/leaderboard', labelKey: 'leaderboard', icon: Trophy },
   { href: '/profile', labelKey: 'profile', icon: User },
   { href: '/settings', labelKey: 'settings', icon: Settings },
-  { href: 'https://elections.daatan.com', labelKey: 'elections', icon: Vote, external: true },
+  { href: ELECTIONS_URL, labelKey: 'elections', icon: Vote, external: true },
   { href: '/about', labelKey: 'about', icon: Info },
   { href: '/contact', labelKey: 'contact', icon: Mail },
   { href: '/retroanalysis', labelKey: 'retroanalysis', icon: History },
@@ -139,7 +143,7 @@ const Sidebar = () => {
   // SaaS-only marketing/support pages are removed from the self-hosted edition.
   // `selfHosted` comes from the server-resolved CapabilitiesProvider value, so
   // it's stable across SSR + client (no hydration mismatch).
-  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', 'https://elections.daatan.com']
+  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', ELECTIONS_URL]
   const editionNavItems = selfHosted
     ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
     : navItems

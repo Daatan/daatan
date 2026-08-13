@@ -1,12 +1,12 @@
 import { SignJWT, importPKCS8 } from 'jose'
 import { env } from '@/env'
 import { createLogger } from '@/lib/logger'
+import { getAppUrl } from '@/lib/branding'
 
 const log = createLogger('search-indexing')
-const HOST = 'https://daatan.com'
 
 function urlFor(slug: string): string {
-  return `${HOST}/forecasts/${slug}`
+  return `${getAppUrl()}/forecasts/${slug}`
 }
 
 /** IndexNow accepts at most 10,000 URLs per request. */
@@ -53,11 +53,13 @@ export async function notifyIndexNowBulk(urls: string[]): Promise<{ submitted: n
 export function notifyIndexNow(slug: string): void {
   const key = env.INDEXNOW_KEY
   if (!key) return
+  const appUrl = getAppUrl()
+  const host = new URL(appUrl).hostname
   const url = urlFor(slug)
   fetch('https://api.indexnow.org/indexnow', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ host: 'daatan.com', key, keyLocation: `${HOST}/${key}.txt`, urlList: [url] }),
+    body: JSON.stringify({ host, key, keyLocation: `${appUrl}/${key}.txt`, urlList: [url] }),
   })
     .then((res) => {
       if (!res.ok) log.warn({ status: res.status, url }, 'IndexNow ping failed')
