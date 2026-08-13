@@ -522,6 +522,7 @@ const POOL_RECOMPUTE_SELECT = {
   facet: true,
   claimsDetail: true,
   excluded: true,
+  status: true,
   // Ingest time, not publish time (daatan#1362). `publishedDate` cannot substitute:
   // a months-old article can be discovered and pooled today, so only this can answer
   // "are we still finding new evidence for this claim, or has the pool gone stale".
@@ -693,6 +694,7 @@ export async function recomputeFromPool(
   const usable = pool.filter(
     (a) =>
       !a.excluded &&
+      a.status === 'COMPLETE' &&
       a.stance !== null &&
       a.certainty !== null &&
       a.credibilityWeight !== null &&
@@ -721,11 +723,10 @@ export async function recomputeFromPool(
           // say whether new evidence is still arriving).
           //
           // Every row reaching this payload is COMPLETE: the `usable` filter above
-          // requires stance, certainty, credibility_weight and relevance_score to be
-          // non-null, and those are only ever written by `completeArticleExtraction`
-          // — a PENDING or FAILED row has them null and is filtered out. So `status`
-          // does not need to ride along for the max() over these rows to be a
-          // "last COMPLETE row" figure, which was the open question on the issue.
+          // now checks `status === 'COMPLETE'` directly (daatan#1445) rather than
+          // inferring completeness from the four fields being non-null — a legacy
+          // FAILED row can carry stale non-null values from a prior successful
+          // extraction and would otherwise slip through.
           //
           // Safe to send before retro reads it: `PoolSourceInput` declares no
           // `model_config`, so Pydantic v2's default `extra='ignore'` drops unknown
