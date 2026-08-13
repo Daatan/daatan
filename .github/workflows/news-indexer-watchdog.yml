@@ -8,11 +8,13 @@ name: News-Indexer Watchdog
 #   • Runs every 2 hours, on even UTC hours. ALERT-ONLY: posts a 🚨 to BOTH Telegram
 #     channels (clean + noisy) when something looks suspicious, and stays silent
 #     otherwise.
-#   • Only *acute* conditions alert — disk, worker down, no articles in 24h, DLQ,
-#     queue backlog. Each one starts, gets fixed, and stops. Chronic conditions must
-#     not alert here: a stale feed stays true until someone edits sources.yaml, so a
-#     2-hourly alert becomes 12 identical messages a day on the high-signal channel
-#     forever. Stale feeds are reported once a day in the digest instead.
+#   • Only *acute* conditions alert — disk, worker down, no articles in 24h, DLQ
+#     growth, queue backlog. Each one starts, gets fixed, and stops. Chronic conditions
+#     must not alert here: a stale feed stays true until someone edits sources.yaml, so
+#     a 2-hourly alert becomes 12 identical messages a day on the high-signal channel
+#     forever. Stale feeds are reported once a day in the digest instead. A DLQ that
+#     nobody has drained is chronic in exactly the same way — hence it alerts on
+#     *increase* only, and its standing depth lives in the digest.
 #   • Once a day (DIGEST_HOUR, UTC — must be an even hour so an even-hour run hits it)
 #     it also posts a plain health digest to the noisy channel so there's a regular
 #     "all good" heartbeat, including the current stale-feed list.
@@ -29,6 +31,7 @@ on:
 
 env:
   STATS_URL: https://scrapper.daatan.com/stats
+  DLQ_URL: https://scrapper.daatan.com/dlq   # what is stuck and why; /stats only counts
   DISK_ALERT_PCT: '80'     # absolute disk-usage alert threshold
   DISK_DELTA_PCT: '2'      # alert if disk% jumps more than this between runs (now 2h apart)
   QUEUE_DEPTH_ALERT: '500' # main-queue depth that looks backed up
@@ -85,9 +88,12 @@ jobs:
           STALE=$(j '[.sources[]? | select(.stale==true) | .name] | join(", ")')
 
           PREV_DISK=""
+          PREV_DLQ=0
           if [ -f /tmp/niwd-prev.json ]; then
             PREV_DISK=$(jq -r '.disk_pct // empty' /tmp/niwd-prev.json 2>/dev/null || echo "")
+            PREV_DLQ=$(jq -r '.dlq // 0' /tmp/niwd-prev.json 2>/dev/null || echo 0)
           fi
+          [ -n "$PREV_DLQ" ] || PREV_DLQ=0
 
           gt() { awk "BEGIN{exit !(($1) > ($2))}"; }   # float-safe a>b
 
@@ -102,7 +108,28 @@ jobs:
           fi
           [ "$WSTATUS" != "ok" ] && PROBLEMS+=("⚙️ Worker status: ${WSTATUS}")
           [ "$ART_24" -eq 0 ] 2>/dev/null && PROBLEMS+=("📰 No articles indexed in 24h")
-          [ "$DLQ" -gt 0 ] 2>/dev/null && PROBLEMS+=("📮 DLQ depth ${DLQ}")
+
+          # --- DLQ: fetch the *why*, alert only on growth ---
+          # /stats gives a count and nothing else, which is what made "📮 DLQ depth 3"
+          # useless three times over. /dlq names the error types and the last failing URL.
+          # Best-effort: an unreachable or still-empty /dlq degrades to the bare count
+          # rather than suppressing the alert.
+          DLQ_TYPES=""; DLQ_DETAIL=""
+          if [ "$DLQ" -gt 0 ] 2>/dev/null && curl -sf --max-time 12 --retry 1 "$DLQ_URL" -o /tmp/dlq.json; then
+            # @html because error messages and article URLs are third-party text going
+            # into a parse_mode=HTML message — an unescaped '<' silently drops the send.
+            DLQ_TYPES=$(jq -r '[.errors_24h[]? | "\(.error_type) ×\(.count)"] | join(", ") | @html' /tmp/dlq.json 2>/dev/null)
+            DLQ_LAST=$(jq -r '.recent_failures[0] // empty | "\(.url) — \((.error_message // "")[0:140])" | @html' /tmp/dlq.json 2>/dev/null)
+            [ -n "$DLQ_TYPES" ] && DLQ_DETAIL="${DLQ_DETAIL}%0A   ↳ ${DLQ_TYPES}"
+            [ -n "$DLQ_LAST" ] && DLQ_DETAIL="${DLQ_DETAIL}%0A   ↳ ${DLQ_LAST}"
+          fi
+          if [ "$DLQ" -gt 0 ] 2>/dev/null; then
+            if [ "$DLQ" -gt "$PREV_DLQ" ] 2>/dev/null; then
+              PROBLEMS+=("📮 DLQ depth ${DLQ} (was ${PREV_DLQ})${DLQ_DETAIL}")
+            else
+              echo "DLQ steady at ${DLQ} (prev ${PREV_DLQ}) — chronic, not re-alerting; it stays in the daily digest."
+            fi
+          fi
           [ "$QDEPTH" -gt "$QUEUE_DEPTH_ALERT" ] 2>/dev/null && PROBLEMS+=("📮 Queue depth ${QDEPTH} (backed up)")
 
           # Stale feeds are deliberately NOT a PROBLEM. Every condition above is acute —
@@ -114,14 +141,16 @@ jobs:
           # change on its own.
 
           # --- persist state for next run's delta ---
-          echo "{\"disk_pct\": ${DISK_PCT:-null}, \"db_mb\": ${DB_MB:-0}}" > /tmp/niwd-prev.json
+          echo "{\"disk_pct\": ${DISK_PCT:-null}, \"db_mb\": ${DB_MB:-0}, \"dlq\": ${DLQ:-0}}" > /tmp/niwd-prev.json
 
           # --- build the daily digest text (HTML, %0A line breaks) ---
           DISK_LINE="n/a (pending /stats deploy)"
           [ -n "$DISK_PCT" ] && DISK_LINE="${DISK_PCT}% used · ${DISK_FREE} GB free / ${DISK_TOTAL} GB"
           STALE_LINE="none"; [ -n "$STALE" ] && STALE_LINE="$STALE"
+          # A standing DLQ no longer alerts, so the digest is where its detail has to land.
+          DLQ_LINE="$DLQ"; [ -n "$DLQ_TYPES" ] && DLQ_LINE="${DLQ} (${DLQ_TYPES})"
           DIGEST=$(printf '📊 <b>news-indexer health</b>%%0A💾 Disk: %s%%0A🗄️ DB: %s MB%%0A📰 Articles: %s total · %s in 24h%%0A⚙️ Worker: %s · queue %s · DLQ %s%%0A🔗 Matches: %s total · %s in 24h%%0A🕸️ Stale feeds: %s' \
-            "$DISK_LINE" "$DB_MB" "$ART_TOT" "$ART_24" "$WSTATUS" "$QDEPTH" "$DLQ" "$M_TOT" "$M_24" "$STALE_LINE")
+            "$DISK_LINE" "$DB_MB" "$ART_TOT" "$ART_24" "$WSTATUS" "$QDEPTH" "$DLQ_LINE" "$M_TOT" "$M_24" "$STALE_LINE")
           echo "digest_b64=$(printf '%s' "$DIGEST" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
           if [ ${#PROBLEMS[@]} -gt 0 ]; then
