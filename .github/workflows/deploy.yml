@@ -29,16 +29,13 @@ on:
 
 jobs:
   # Build and test (runs on all pushes and PRs)
-  build:
+  test:
     name: Build & Test
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     outputs:
       app_version: ${{ steps.app_version.outputs.version }}
     concurrency:
-      group: build-${{ github.ref }}
+      group: test-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - name: Checkout repository
@@ -66,8 +63,8 @@ jobs:
           SKIP_ENV_VALIDATION: 1
         run: npm test
 
-      # Only needed on PRs: they're the only event where the Docker build below
-      # is skipped, so this is the sole build-correctness check. On push/tag/
+      # Only needed on PRs: they're the only event where the Docker builds below
+      # are skipped, so this is the sole build-correctness check. On push/tag/
       # workflow_dispatch, the Dockerfile runs its own npm ci + build — running
       # it again here first is pure duplicate work (~1.5min/push measured
       # 2026-08-08, daatan#1315). A broken build still fails the job either
@@ -97,23 +94,9 @@ jobs:
       - name: Check env var parity (blue-green-deploy.sh vs docker-compose.prod.yml)
         run: ./scripts/check-env-parity.sh
 
-      # ECR Integration: Build and push Docker image (skip on PRs to save ECR storage)
-      - name: Configure AWS credentials
-        if: github.event_name != 'pull_request'
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-central-1
-
-      - name: Set up Docker Buildx
-        if: github.event_name != 'pull_request'
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to Amazon ECR
-        if: github.event_name != 'pull_request'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
+      # Doesn't touch Docker/AWS, so this can run unconditionally here even
+      # though it's only consumed by the (skip-on-PR) build-app/build-migrations
+      # jobs below — keeping it in one place avoids computing it twice.
       - name: Set app version for build
         if: github.event_name != 'pull_request'
         id: app_version
@@ -126,8 +109,38 @@ jobs:
           echo "version=$APP_VER" >> $GITHUB_OUTPUT
           echo "Using NEXT_PUBLIC_APP_VERSION=$APP_VER"
 
+  # ECR Integration: build and push the app image (skip on PRs to save ECR
+  # storage). Split from the migrations build below so the two ~5min image
+  # builds run in parallel instead of back-to-back (daatan#1393).
+  build-app:
+    name: Build & Push App Image
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-app-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Extract metadata
-        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -138,10 +151,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
             type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ steps.app_version.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.test.outputs.app_version }},enable={{is_default_branch}}
 
       - name: Build and push to ECR
-        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -151,14 +163,44 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ needs.test.outputs.app_version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
 
+  # Runs in parallel with build-app (daatan#1393). Cache is read-only here —
+  # only build-app writes cache-to, so the two jobs don't race on the same
+  # type=gha cache key.
+  build-migrations:
+    name: Build & Push Migrations Image
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-migrations-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build and push migrations image to ECR
-        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -166,10 +208,10 @@ jobs:
           target: migrations
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/daatan-app:staging-latest-migrations
-            ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ steps.app_version.outputs.version }}-migrations
+            ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ needs.test.outputs.app_version }}-migrations
           cache-from: type=gha
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ needs.test.outputs.app_version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
@@ -201,7 +243,7 @@ jobs:
   # Deploy to STAGING (on push to main)
   deploy-staging:
     name: Deploy to Staging
-    needs: build
+    needs: [test, build-app, build-migrations]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -314,7 +356,7 @@ jobs:
         with:
           command-id: ${{ env.COMMAND_ID }}
           health-url: https://staging.daatan.com
-          app-version: ${{ needs.build.outputs.app_version }}
+          app-version: ${{ needs.test.outputs.app_version }}
 
       - name: Get merged PR info
         id: pr_info
@@ -341,7 +383,7 @@ jobs:
           MSG: |-
             ✅ [staging] Deployment successful
 
-            v${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
+            v${{ needs.test.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
 
             <a href="${{ steps.pr_info.outputs.url }}">View changes →</a>
         run: |
@@ -357,7 +399,7 @@ jobs:
           MSG: |-
             ❌ [staging] Deployment failed
 
-            v${{ needs.build.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
+            v${{ needs.test.outputs.app_version }} · ${{ steps.pr_info.outputs.label }}
 
             <a href="${{ steps.pr_info.outputs.url }}">View changes →</a> · <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View logs →</a>
         run: |
@@ -370,7 +412,7 @@ jobs:
   # Deploy to PRODUCTION (on tag push only)
   deploy-production:
     name: Deploy to Production
-    needs: [build, deploy-staging]
+    needs: [test, build-app, build-migrations, deploy-staging]
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -382,7 +424,9 @@ jobs:
       cancel-in-progress: false
     if: |
       always() &&
-      (needs.build.result == 'success') &&
+      (needs.test.result == 'success') &&
+      (needs.build-app.result == 'success') &&
+      (needs.build-migrations.result == 'success') &&
       (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped') &&
       ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
@@ -540,7 +584,7 @@ jobs:
         with:
           command-id: ${{ env.COMMAND_ID }}
           health-url: https://daatan.com
-          app-version: ${{ needs.build.outputs.app_version }}
+          app-version: ${{ needs.test.outputs.app_version }}
 
       - name: Get merged PR info
         id: pr_info
