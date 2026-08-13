@@ -395,6 +395,7 @@ const poolArticle = (over: Partial<Record<string, unknown>> = {}) => ({
   evidenceClass: 'reported_fact',
   origin: 'analyze',
   excluded: false,
+  status: 'COMPLETE',
   author: null,
   outletName: null,
   authorLean: null,
@@ -546,14 +547,28 @@ describe('recomputeFromPool', () => {
   })
 
   it('only ever sends added_at for COMPLETE rows — the usable filter is what guarantees it', async () => {
-    // The open question on daatan#1362: does `status` need to ride along so retro can say
-    // "last COMPLETE row"? No. A PENDING/FAILED row has no stance/certainty/credibility/
-    // relevance — only completeArticleExtraction writes those — so the usable filter drops
-    // it before the payload. This pins that: the newest row by addedAt is incomplete, and
-    // its timestamp must NOT reach retro, or days_since_last_complete would read 0 for a
-    // pool whose last actual extraction was weeks ago.
+    // Pins that the newest row by addedAt is incomplete, and its timestamp must NOT reach
+    // retro, or days_since_last_complete would read 0 for a pool whose last actual
+    // extraction was weeks ago.
     findMany.mockResolvedValue([
       poolArticle({ id: 'pending', stance: null, addedAt: new Date('2026-07-30T00:00:00Z') }),
+      poolArticle({ id: 'complete', addedAt: new Date('2026-07-02T00:00:00Z') }),
+    ] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources).toHaveLength(1)
+    expect(body.sources[0].added_at).toBe('2026-07-02T00:00:00.000Z')
+  })
+
+  it('excludes a FAILED row even when it still carries stale non-null fields from a prior extraction (daatan#1445)', async () => {
+    // A retry that flips a row to FAILED doesn't null out the fields written by its last
+    // successful pass — the usable filter can't infer completeness from those fields being
+    // non-null. It must check `status` directly.
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'stale-failed', status: 'FAILED', addedAt: new Date('2026-07-30T00:00:00Z') }),
       poolArticle({ id: 'complete', addedAt: new Date('2026-07-02T00:00:00Z') }),
     ] as never)
     mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
