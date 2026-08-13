@@ -279,9 +279,18 @@ describe('addArticlesToPool', () => {
 describe('getPoolArticles', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('lists a forecast\'s pool, most recently added first', async () => {
+  it('lists a forecast\'s current-version pool, most recently added first (daatan#1382)', async () => {
     findMany.mockResolvedValue([] as never)
     await getPoolArticles('pred-1')
+    expect(findMany).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', supersededAt: null },
+      orderBy: { addedAt: 'desc' },
+    })
+  })
+
+  it('includes superseded rows when includeSuperseded is true (admin correction-history view)', async () => {
+    findMany.mockResolvedValue([] as never)
+    await getPoolArticles('pred-1', { includeSuperseded: true })
     expect(findMany).toHaveBeenCalledWith({
       where: { predictionId: 'pred-1' },
       orderBy: { addedAt: 'desc' },
@@ -292,11 +301,11 @@ describe('getPoolArticles', () => {
 describe('getPublicArticlesByAuthorOutlet', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('queries by exact author + outletName match, excluding admin-excluded rows', async () => {
+  it('queries by exact author + outletName match, excluding admin-excluded and superseded rows', async () => {
     findMany.mockResolvedValue([] as never)
     await getPublicArticlesByAuthorOutlet('Ben Caspit', 'maariv')
     expect(findMany).toHaveBeenCalledWith({
-      where: { author: 'Ben Caspit', outletName: 'maariv', excluded: false },
+      where: { author: 'Ben Caspit', outletName: 'maariv', excluded: false, supersededAt: null },
       orderBy: { addedAt: 'desc' },
       take: 20,
       select: {
@@ -441,6 +450,17 @@ describe('recomputeFromPool', () => {
       // stance-less (art-4) rows are dropped, so the caller can list precisely the
       // articles the estimate averages.
       usableArticles: [poolArticle(), poolArticle({ id: 'art-2' })],
+    })
+  })
+
+  it('queries only current-version rows, excluding superseded ones (daatan#1382)', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    expect(findMany.mock.calls[0][0]).toMatchObject({
+      where: { predictionId: 'pred-1', supersededAt: null },
     })
   })
 
@@ -645,6 +665,15 @@ describe('pushCredibilityFeedback', () => {
     findMany.mockResolvedValue([] as never)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
     expect(mockOracleFetch).not.toHaveBeenCalled()
+  })
+
+  it('reads only current-version pool rows, so a corrected article is not double-credited (daatan#1382)', async () => {
+    findMany.mockResolvedValue([] as never)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(findMany).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', supersededAt: null },
+      orderBy: { addedAt: 'desc' },
+    })
   })
 
   it('excludes admin-excluded, opinion-class, and sourceless/stanceless articles', async () => {

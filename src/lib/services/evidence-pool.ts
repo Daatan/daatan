@@ -11,6 +11,17 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('evidence-pool')
 
 /**
+ * Filter fragment for "the current row of each version chain" — a superseded
+ * row (`supersededAt` set) is a prior, replaced reading and must not
+ * double-count alongside its replacement in any aggregate, public listing or
+ * outbound push (daatan#1382). See the schema's `supersededAt` doc comment.
+ * Not used by `getPoolThroughput` (deliberately counts every extraction
+ * attempt, superseded or not) or the admin evidence-pool listing (deliberately
+ * shows the full correction history, daatan#1383).
+ */
+const CURRENT_VERSION_ONLY = { supersededAt: null } as const
+
+/**
  * The per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2).
  *
  * All three estimate paths (analyze / news-indexer / backfill) write their extracted
@@ -126,7 +137,7 @@ async function upsertCurrentVersion(
 ): Promise<void> {
   const urlHash = hashUrl(s.url)
   const current = await prisma.evidencePoolArticle.findFirst({
-    where: { predictionId, urlHash, supersededAt: null },
+    where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
   })
   if (!current) {
     await prisma.evidencePoolArticle.create({
@@ -310,7 +321,7 @@ export async function claimArticleForExtraction(
   // still current (the partial unique index only rejects the create while a
   // non-superseded row is present, so this can't come back null in practice).
   const current = await prisma.evidencePoolArticle.findFirst({
-    where: { predictionId, urlHash, supersededAt: null },
+    where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
   })
   if (!current) {
     throw new Error(`evidence_pool: P2002 on (${predictionId}, ${urlHash}) but no current row found`)
@@ -440,10 +451,10 @@ export async function failClaimedArticles(
   if (urls.length === 0) return
   try {
     await prisma.evidencePoolArticle.updateMany({
-      // `supersededAt: null` — a claim's row can be superseded by a concurrent
+      // CURRENT_VERSION_ONLY — a claim's row can be superseded by a concurrent
       // content-changed claim before this release runs (daatan#1381); a
       // no-longer-current row must never be touched by a later cleanup call.
-      where: { predictionId, urlHash: { in: urls.map(hashUrl) }, status: 'PENDING', supersededAt: null },
+      where: { predictionId, urlHash: { in: urls.map(hashUrl) }, status: 'PENDING', ...CURRENT_VERSION_ONLY },
       data: { status: 'FAILED', statusReason: reason.slice(0, 64) },
     })
   } catch (err) {
@@ -452,9 +463,19 @@ export async function failClaimedArticles(
 }
 
 /** List a forecast's pooled articles, most recently added first. Admin visibility only. */
-export async function getPoolArticles(predictionId: string): Promise<EvidencePoolArticle[]> {
+/**
+ * `includeSuperseded` defaults to `false` (current-version-only, daatan#1382) —
+ * that's what every aggregation-adjacent caller wants, since a corrected
+ * article's prior reading is no longer live evidence. The admin evidence-pool
+ * listing opts into `true` to show the correction history a version chain now
+ * makes visible (daatan#1383).
+ */
+export async function getPoolArticles(
+  predictionId: string,
+  { includeSuperseded = false }: { includeSuperseded?: boolean } = {},
+): Promise<EvidencePoolArticle[]> {
   return prisma.evidencePoolArticle.findMany({
-    where: { predictionId },
+    where: { predictionId, ...(includeSuperseded ? {} : CURRENT_VERSION_ONLY) },
     orderBy: { addedAt: 'desc' },
   })
 }
@@ -511,10 +532,14 @@ export type PoolRecomputeArticle = Prisma.EvidencePoolArticleGetPayload<{
   select: typeof POOL_RECOMPUTE_SELECT
 }>
 
-/** `getPoolArticles` narrowed to the recompute path's projection — same rows, same order. */
+/**
+ * `getPoolArticles` narrowed to the recompute path's projection — same rows,
+ * same order. Current-version-only (daatan#1382): a superseded row's stance
+ * is stale evidence and must not double-count alongside its replacement.
+ */
 async function getPoolArticlesForRecompute(predictionId: string): Promise<PoolRecomputeArticle[]> {
   return prisma.evidencePoolArticle.findMany({
-    where: { predictionId },
+    where: { predictionId, ...CURRENT_VERSION_ONLY },
     orderBy: { addedAt: 'desc' },
     select: POOL_RECOMPUTE_SELECT,
   })
@@ -541,6 +566,9 @@ export interface PublicSourceArticle {
  * Public-safe projection only: excludes the Oracle-estimator shadow-lane fields
  * (stance/authorLean/factSignal/etc.) that live on the same row but were never meant for
  * public display.
+ *
+ * Current-version-only (daatan#1382): a corrected article should appear once, as
+ * its latest reading, not once per version.
  */
 export async function getPublicArticlesByAuthorOutlet(
   author: string,
@@ -548,7 +576,7 @@ export async function getPublicArticlesByAuthorOutlet(
   limit = 20,
 ): Promise<PublicSourceArticle[]> {
   const rows = await prisma.evidencePoolArticle.findMany({
-    where: { author, outletName, excluded: false },
+    where: { author, outletName, excluded: false, ...CURRENT_VERSION_ONLY },
     orderBy: { addedAt: 'desc' },
     take: limit,
     select: {
