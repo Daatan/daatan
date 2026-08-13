@@ -45,6 +45,7 @@ export const env = createEnv({
     APP_NAME: z.string().min(1).optional(),
     APP_LOGO_URL: z.string().url().optional(),
     EMAIL_FROM: z.string().min(1).optional(),
+    CONTACT_EMAIL: z.string().min(1).optional(),
 
     // Object storage for uploads (avatars). 's3' (default) preserves current
     // prod behavior; 'local'/'minio' are wired by the storage abstraction
@@ -167,6 +168,7 @@ export const env = createEnv({
     APP_NAME: process.env.APP_NAME,
     APP_LOGO_URL: process.env.APP_LOGO_URL,
     EMAIL_FROM: process.env.EMAIL_FROM,
+    CONTACT_EMAIL: process.env.CONTACT_EMAIL,
     STORAGE_DRIVER: process.env.STORAGE_DRIVER,
     STORAGE_LOCAL_PATH: process.env.STORAGE_LOCAL_PATH,
     S3_ENDPOINT: process.env.S3_ENDPOINT,

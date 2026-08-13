@@ -8,13 +8,17 @@ import { getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
  * itself from admin-editable runtime settings (DB) → APP_NAME env → a neutral
  * default, so a fresh install always boots and the admin sets the real name
  * live in the UI. APP_URL is still required (operationally needed for canonical
- * URLs / OIDC redirects), so a missing value there still fails fast.
+ * URLs / OIDC redirects), so a missing value there still fails fast. Email
+ * accessors (getNoreplyEmail/getContactEmail) inherit that same fail-fast via
+ * getAppUrl() when no explicit EMAIL_FROM/CONTACT_EMAIL is set.
  *
  * Server-only (reads DAATAN_EDITION). Used by metadata, robots, sitemap.
  */
 
 const SAAS_NAME = 'DAATAN'
 const SAAS_URL = 'https://daatan.com'
+const SAAS_NOREPLY_EMAIL = 'Daatan <noreply@daatan.com>'
+const SAAS_CONTACT_EMAIL = 'office@daatan.com'
 const SELF_HOST_DEFAULT_NAME = 'Forecasting'
 
 /** Display name for titles / siteName / prompts. */
@@ -35,6 +39,22 @@ export function getAppUrl(): string {
   // SaaS: always the literal, regardless of NEXTAUTH_URL, so prod + staging
   // metadata stay byte-identical to the previous hardcoded value.
   return SAAS_URL
+}
+
+/** Transactional email "From" header (verification, password reset, notifications). */
+export function getNoreplyEmail(): string {
+  if (isSelfHosted()) {
+    return env.EMAIL_FROM || `noreply@${new URL(getAppUrl()).hostname}`
+  }
+  return SAAS_NOREPLY_EMAIL
+}
+
+/** Contact address shown on legal/about pages. */
+export function getContactEmail(): string {
+  if (isSelfHosted()) {
+    return env.CONTACT_EMAIL || `office@${new URL(getAppUrl()).hostname}`
+  }
+  return SAAS_CONTACT_EMAIL
 }
 
 /** Logo override URL (admin setting → APP_LOGO_URL env), or null for the bundled asset. */

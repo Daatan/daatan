@@ -4,7 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import { VERSION } from '@/lib/version'
 import Link from 'next/link'
 import { isSelfHosted } from '@/lib/edition'
-import { getAppName } from '@/lib/branding'
+import { getAppName, getContactEmail } from '@/lib/branding'
 import { ensureSettingsWarmed, getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
 
 const SELF_HOSTED = isSelfHosted()
@@ -349,8 +349,8 @@ function SaasAboutPage() {
                   Contact form
                 </Link>
                 <span className="text-text-subtle">·</span>
-                <a href="mailto:office@daatan.com" className="text-cobalt-light hover:underline">
-                  office@daatan.com
+                <a href={`mailto:${getContactEmail()}`} className="text-cobalt-light hover:underline">
+                  {getContactEmail()}
                 </a>
               </div>
             </div>

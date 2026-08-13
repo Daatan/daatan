@@ -2,7 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
 import { isSelfHosted } from '@/lib/edition'
-import { getAppUrl } from '@/lib/branding'
+import { getAppUrl, getContactEmail } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -76,7 +76,7 @@ export default async function DisclaimerPage({ params }: { params: Promise<{ loc
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">8. Questions</h2>
         <p>
-          If you have questions about this disclaimer, contact us at office@daatan.com.
+          If you have questions about this disclaimer, contact us at {getContactEmail()}.
         </p>
       </section>
     </LegalPage>

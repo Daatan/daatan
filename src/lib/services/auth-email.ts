@@ -10,11 +10,10 @@ import { randomBytes } from 'crypto'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
+import { getAppName, getAppUrl, getNoreplyEmail } from '@/lib/branding'
 
 const log = createLogger('auth-email')
 
-const APP_URL    = process.env.NEXTAUTH_URL ?? 'https://daatan.com'
-const FROM       = process.env.EMAIL_FROM   ?? 'Daatan <noreply@daatan.com>'
 // APP_ENV, not NEXT_PUBLIC_ENV: staging runs the same promoted Docker image as
 // production, so this must read the runtime instance var — see src/env.ts.
 const isStaging  = process.env.APP_ENV === 'staging'
@@ -85,17 +84,17 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
     return
   }
 
-  const link    = `${APP_URL}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(to)}`
+  const link    = `${getAppUrl()}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(to)}`
   const subject = isStaging ? '[staging] Verify your email' : 'Verify your email'
 
   try {
     await client.emails.send({
-      from: FROM,
+      from: getNoreplyEmail(),
       to,
       subject,
       html: buildAuthEmail({
         title:      'Verify your email address',
-        message:    'Click the button below to verify your email and activate your Daatan account. This link expires in 24 hours.',
+        message:    `Click the button below to verify your email and activate your ${getAppName()} account. This link expires in 24 hours.`,
         buttonText: 'Verify email',
         link,
       }),
@@ -113,12 +112,12 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
     return
   }
 
-  const link    = `${APP_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(to)}`
+  const link    = `${getAppUrl()}/auth/reset-password?token=${token}&email=${encodeURIComponent(to)}`
   const subject = isStaging ? '[staging] Reset your password' : 'Reset your password'
 
   try {
     await client.emails.send({
-      from: FROM,
+      from: getNoreplyEmail(),
       to,
       subject,
       html: buildAuthEmail({
@@ -172,7 +171,7 @@ function buildAuthEmail(params: {
           <hr style="margin:32px 0;border:none;border-top:1px solid #e5e7eb">
           <p style="margin:0;font-size:12px;color:#9ca3af">
             This is a security email from
-            <a href="${APP_URL}" style="color:#6b7280">Daatan</a>.
+            <a href="${getAppUrl()}" style="color:#6b7280">${escapeHtml(getAppName())}</a>.
             If you did not request this, you can safely ignore it.
           </p>
         </td></tr>

@@ -1,7 +1,7 @@
 import { BookOpen } from 'lucide-react'
 import LegalPage from '@/components/LegalPage'
 import { getTranslations } from 'next-intl/server'
-import { getAppUrl } from '@/lib/branding'
+import { getAppUrl, getContactEmail } from '@/lib/branding'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -74,7 +74,7 @@ export default async function TermsPage({ params }: { params: Promise<{ locale: 
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">7. Contact</h2>
         <p>
-          For any legal inquiries, please contact office@daatan.com.
+          For any legal inquiries, please contact {getContactEmail()}.
         </p>
       </section>
     </LegalPage>
