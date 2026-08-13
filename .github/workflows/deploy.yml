@@ -32,9 +32,6 @@ jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     outputs:
       app_version: ${{ steps.app_version.outputs.version }}
     concurrency:
@@ -97,23 +94,6 @@ jobs:
       - name: Check env var parity (blue-green-deploy.sh vs docker-compose.prod.yml)
         run: ./scripts/check-env-parity.sh
 
-      # ECR Integration: Build and push Docker image (skip on PRs to save ECR storage)
-      - name: Configure AWS credentials
-        if: github.event_name != 'pull_request'
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-central-1
-
-      - name: Set up Docker Buildx
-        if: github.event_name != 'pull_request'
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to Amazon ECR
-        if: github.event_name != 'pull_request'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
       - name: Set app version for build
         if: github.event_name != 'pull_request'
         id: app_version
@@ -126,8 +106,41 @@ jobs:
           echo "version=$APP_VER" >> $GITHUB_OUTPUT
           echo "Using NEXT_PUBLIC_APP_VERSION=$APP_VER"
 
+  # Build and push the app image to ECR (skip on PRs to save ECR storage).
+  # Split from the migrations build below (daatan#1393) into its own job so
+  # the two ~5min Docker builds run concurrently instead of back-to-back
+  # (~10-11min sequential, daatan#1315). This is the only one of the pair
+  # with cache-to: two concurrent writers to the same BuildKit cache scope
+  # can race/corrupt it, so build-migrations-image stays cache-from-only.
+  build-app-image:
+    name: Build & Push App Image
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-app-image-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Extract metadata
-        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -138,10 +151,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
             type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ steps.app_version.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.build.outputs.app_version }},enable={{is_default_branch}}
 
       - name: Build and push to ECR
-        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -151,14 +163,45 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ needs.build.outputs.app_version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
 
+  # Build and push the migrations image to ECR, in parallel with
+  # build-app-image above. Read-only on the shared BuildKit cache
+  # (cache-from only, no cache-to) — see the comment on build-app-image
+  # for why only one side of this pair may write it.
+  build-migrations-image:
+    name: Build & Push Migrations Image
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-migrations-image-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build and push migrations image to ECR
-        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -166,10 +209,10 @@ jobs:
           target: migrations
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/daatan-app:staging-latest-migrations
-            ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ steps.app_version.outputs.version }}-migrations
+            ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ needs.build.outputs.app_version }}-migrations
           cache-from: type=gha
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ steps.app_version.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ needs.build.outputs.app_version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
@@ -201,7 +244,7 @@ jobs:
   # Deploy to STAGING (on push to main)
   deploy-staging:
     name: Deploy to Staging
-    needs: build
+    needs: [build, build-app-image, build-migrations-image]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -370,7 +413,7 @@ jobs:
   # Deploy to PRODUCTION (on tag push only)
   deploy-production:
     name: Deploy to Production
-    needs: [build, deploy-staging]
+    needs: [build, build-app-image, build-migrations-image, deploy-staging]
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -383,6 +426,8 @@ jobs:
     if: |
       always() &&
       (needs.build.result == 'success') &&
+      (needs.build-app-image.result == 'success') &&
+      (needs.build-migrations-image.result == 'success') &&
       (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped') &&
       ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
