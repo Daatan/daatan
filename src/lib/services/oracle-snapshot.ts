@@ -51,6 +51,21 @@ export function stanceToPercent(v: number): number {
   return Math.min(PUBLISH_PERCENT_MAX, Math.max(PUBLISH_PERCENT_MIN, percent))
 }
 
+/**
+ * Inverse of {@link stanceToPercent}, for the one lane that has to travel back:
+ * retro's settlement-pin ledger takes `mean`/`ci_low`/`ci_high` in stance space
+ * (`SettlementSnapshotInput`, `ge=-1.0 le=1.0`), and the only pinned value we
+ * persist is the already-converted percent inside `oracleSnapshot`.
+ *
+ * Lossy at the edges by construction: the forward map rounds and clamps to
+ * [PUBLISH_PERCENT_MIN, PUBLISH_PERCENT_MAX], so a stance past ±0.98 comes back
+ * as ±0.98 and everything carries ±0.01 of rounding. The sign survives exactly,
+ * which is what the ledger keys its contradiction check on.
+ */
+export function percentToStance(v: number): number {
+  return v / 50 - 1
+}
+
 /** Scale a stance-space standard deviation onto the same percent scale as {@link stanceToPercent}
  *  (that map's slope is 50, so a spread scales by 50 with no offset). */
 export function stanceStdToPercent(v: number): number {
