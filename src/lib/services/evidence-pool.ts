@@ -11,6 +11,17 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('evidence-pool')
 
 /**
+ * Filter fragment for "the current row of each version chain" — a superseded
+ * row (`supersededAt` set) is a prior, replaced reading and must not
+ * double-count alongside its replacement in any aggregate, public listing or
+ * outbound push (daatan#1382). See the schema's `supersededAt` doc comment.
+ * Not used by `getPoolThroughput` (deliberately counts every extraction
+ * attempt, superseded or not) or the admin evidence-pool listing (deliberately
+ * shows the full correction history, daatan#1383).
+ */
+const CURRENT_VERSION_ONLY = { supersededAt: null } as const
+
+/**
  * The per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2).
  *
  * All three estimate paths (analyze / news-indexer / backfill) write their extracted
@@ -30,112 +41,136 @@ const log = createLogger('evidence-pool')
 export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry'
 
 /**
- * Upsert one batch of extracted sources into a forecast's evidence pool, keyed
- * by (predictionId, urlHash) — same URL-normalization as NewsAnchor, so
- * http/https and trailing-slash variants of the same story collapse to one
- * row. The row IS the extraction cache: re-discovering an already-pooled
- * article updates its signal in place rather than accumulating duplicates.
+ * Write extracted signals onto a batch of already-claimed pool rows, keyed by
+ * the exact row id `claimArticleForExtraction`/`claimArticlesForExtraction`
+ * returned for each URL (`articleIdByUrl`) — never re-derived by
+ * (predictionId, urlHash) here, since after daatan#1381 that pair is no
+ * longer unique (a version chain can have several rows) and re-deriving
+ * "the current row" at write time could land a slow-to-complete extraction
+ * on a row a concurrent, faster correction has since superseded. A source
+ * with no entry in the map (nothing claimed it — shouldn't happen for any
+ * current caller, all of which build the map from the same claim step that
+ * produces `sources`, but defensive rather than a silent no-op) falls back
+ * to a version-aware upsert via `upsertCurrentVersion`.
+ *
  * Never touches `excluded` — an admin's exclusion decision on an article
- * survives every later re-discovery.
+ * survives every later re-discovery. Never touches `contentHash`/`version`/
+ * `supersedesId`/`supersededAt` — those are exclusively `claimArticleForExtraction`'s
+ * to set; this only fills in the extraction OUTCOME onto the row the claim
+ * step already created/selected.
  */
 export async function addArticlesToPool(
   predictionId: string,
   sources: EnrichedOracleSource[],
   origin: PoolOrigin,
+  articleIdByUrl: Map<string, string>,
 ): Promise<void> {
   await Promise.all(
-    sources.map((s) =>
-      prisma.evidencePoolArticle.upsert({
-        where: { predictionId_urlHash: { predictionId, urlHash: hashUrl(s.url) } },
-        create: {
-          predictionId,
-          url: s.url,
-          urlHash: hashUrl(s.url),
-          title: s.title,
-          source: s.sourceName,
-          author: s.author,
-          personId: s.personId,
-          personName: s.personName,
-          outletId: s.outletId,
-          outletName: s.outletName,
-          publishedDate: s.publishedAt,
-          stance: s.stance,
-          certainty: s.certainty,
-          credibilityWeight: s.credibilityWeight,
-          claims: s.claims,
-          settled: s.settled,
-          settlementEventDate: s.settlementEventDate,
-          quantitativeEstimate: s.quantitativeEstimate,
-          evidenceWeight: s.evidenceWeight,
-          relevanceScore: s.relevanceScore,
-          relevanceBar: s.relevanceBar,
-          evidenceClass: s.evidenceClass,
-          authorLean: s.authorLean,
-          authorLeanCertainty: s.authorLeanCertainty,
-          factSignal: s.factSignal,
-          eventActors: s.eventActors,
-          eventTarget: s.eventTarget,
-          isOccurrence: s.isOccurrence,
-          verified: s.verified,
-          facet: s.facet,
-          // F1/F15 (daatan#1235, retro#364) — the per-claim layer behind every
-          // scalar above. `Prisma.DbNull` (not `null`) is how a nullable Json
-          // column is written to SQL NULL.
-          claimsDetail: s.claimsDetail ?? Prisma.DbNull,
-          origin,
-          // No claim step for this row (e.g. the analyze path, which always
-          // calls the extractor fresh rather than gating on content-hash) —
-          // written straight to COMPLETE. See claimArticleForExtraction below
-          // for rows that DO go through the claim lifecycle.
-          status: 'COMPLETE',
-        },
-        update: {
-          url: s.url,
-          title: s.title,
-          source: s.sourceName,
-          author: s.author,
-          personId: s.personId,
-          personName: s.personName,
-          outletId: s.outletId,
-          outletName: s.outletName,
-          publishedDate: s.publishedAt,
-          stance: s.stance,
-          certainty: s.certainty,
-          credibilityWeight: s.credibilityWeight,
-          claims: s.claims,
-          settled: s.settled,
-          settlementEventDate: s.settlementEventDate,
-          quantitativeEstimate: s.quantitativeEstimate,
-          evidenceWeight: s.evidenceWeight,
-          relevanceScore: s.relevanceScore,
-          relevanceBar: s.relevanceBar,
-          evidenceClass: s.evidenceClass,
-          authorLean: s.authorLean,
-          authorLeanCertainty: s.authorLeanCertainty,
-          factSignal: s.factSignal,
-          eventActors: s.eventActors,
-          eventTarget: s.eventTarget,
-          isOccurrence: s.isOccurrence,
-          verified: s.verified,
-          facet: s.facet,
-          // F1/F15 — deliberately `undefined` (= leave the column alone), NOT
-          // DbNull. A path that re-touches a pool row without carrying per-claim
-          // data (a recompute, an older Oracle build, a partial response) must
-          // not erase per-claim data we already hold: it is unrecoverable, since
-          // there is no backfill. This is the daatan#1237 failure mode — "re-
-          // extraction nulls fields the response merely omitted" — which the
-          // scalar fields above still have and this field deliberately does not.
-          claimsDetail: s.claimsDetail ?? undefined,
-          origin,
-          // Flips a PENDING row (claimed by claimArticleForExtraction, then
-          // successfully extracted) to COMPLETE. Deliberately does not touch
-          // contentHash — it's already correct from the claim step.
-          status: 'COMPLETE',
-          statusReason: null,
-        },
-      }),
-    ),
+    sources.map(async (s) => {
+      const signal = {
+        url: s.url,
+        title: s.title,
+        source: s.sourceName,
+        author: s.author,
+        personId: s.personId,
+        personName: s.personName,
+        outletId: s.outletId,
+        outletName: s.outletName,
+        publishedDate: s.publishedAt,
+        stance: s.stance,
+        certainty: s.certainty,
+        credibilityWeight: s.credibilityWeight,
+        claims: s.claims,
+        settled: s.settled,
+        settlementEventDate: s.settlementEventDate,
+        quantitativeEstimate: s.quantitativeEstimate,
+        evidenceWeight: s.evidenceWeight,
+        relevanceScore: s.relevanceScore,
+        relevanceBar: s.relevanceBar,
+        evidenceClass: s.evidenceClass,
+        authorLean: s.authorLean,
+        authorLeanCertainty: s.authorLeanCertainty,
+        factSignal: s.factSignal,
+        eventActors: s.eventActors,
+        eventTarget: s.eventTarget,
+        isOccurrence: s.isOccurrence,
+        verified: s.verified,
+        facet: s.facet,
+        // F1/F15 — deliberately `undefined` (= leave the column alone), NOT
+        // DbNull. A path that re-touches a pool row without carrying per-claim
+        // data (a recompute, an older Oracle build, a partial response) must
+        // not erase per-claim data we already hold: it is unrecoverable, since
+        // there is no backfill. This is the daatan#1237 failure mode — "re-
+        // extraction nulls fields the response merely omitted" — which the
+        // scalar fields above still have and this field deliberately does not.
+        claimsDetail: s.claimsDetail ?? undefined,
+        origin,
+        // Flips a PENDING row (claimed by claimArticleForExtraction, then
+        // successfully extracted) to COMPLETE. Deliberately does not touch
+        // contentHash — it's already correct from the claim step.
+        status: 'COMPLETE' as const,
+        statusReason: null,
+      }
+
+      const id = articleIdByUrl.get(s.url)
+      if (id) {
+        await prisma.evidencePoolArticle.update({ where: { id }, data: signal })
+        return
+      }
+      log.warn({ predictionId, url: s.url, origin }, 'event=evidence_pool_write_no_claim_id')
+      await upsertCurrentVersion(predictionId, s, origin, signal)
+    }),
   )
+}
+
+/**
+ * Version-aware fallback for `addArticlesToPool` when a source has no
+ * claimed row id — mirrors `claimArticleForExtraction`'s versioning
+ * transaction (see its own comment) rather than duplicating the old
+ * upsert-in-place behavior daatan#1381 removed.
+ */
+async function upsertCurrentVersion(
+  predictionId: string,
+  s: EnrichedOracleSource,
+  origin: PoolOrigin,
+  signal: Record<string, unknown>,
+): Promise<void> {
+  const urlHash = hashUrl(s.url)
+  const current = await prisma.evidencePoolArticle.findFirst({
+    where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
+  })
+  if (!current) {
+    await prisma.evidencePoolArticle.create({
+      data: {
+        predictionId,
+        url: s.url,
+        urlHash,
+        origin,
+        status: 'COMPLETE',
+        // `signal.claimsDetail` is `s.claimsDetail ?? undefined` (see addArticlesToPool's
+        // signal above) — undefined on `create()` just omits the column, which defaults
+        // to SQL NULL for this nullable Json column same as an explicit Prisma.DbNull
+        // would. No separate DbNull default needed here.
+        ...signal,
+      },
+    })
+    return
+  }
+  await prisma.$transaction([
+    prisma.evidencePoolArticle.update({ where: { id: current.id }, data: { supersededAt: new Date() } }),
+    prisma.evidencePoolArticle.create({
+      data: {
+        predictionId,
+        url: s.url,
+        urlHash,
+        origin,
+        status: 'COMPLETE',
+        version: current.version + 1,
+        supersedesId: current.id,
+        ...signal,
+      },
+    }),
+  ])
 }
 
 /** hash(title+snippet) — the only fields news-indexer's webhook (and the
@@ -220,32 +255,47 @@ export interface ClaimableArticle {
 
 export type ClaimResult = 'claimed' | 'skip'
 
+/** The row a claim landed on (or already covers), so callers can address
+ *  `addArticlesToPool`'s write at the exact row rather than re-deriving
+ *  "the current row" later — see `addArticlesToPool`'s own comment on why
+ *  that matters once a URL can have more than one row (daatan#1381).
+ *  Populated on `skip` too whenever an existing row was found (the row
+ *  exists whether or not this call's re-claim matched it) — `null` only
+ *  when this call lost a concurrent versioning race and genuinely owns
+ *  nothing (see the content-changed branch below). */
+export interface ClaimOutcome {
+  result: ClaimResult
+  articleId: string | null
+}
+
 /**
  * Atomically claim one (predictionId, url) pair for extraction — the fix for
  * the confirmed news-indexer race (at-least-once webhook delivery let two
  * concurrent pushes both pass a separate findFirst-then-create dedup check
  * before either committed, both call the extractor, both persist a
- * ContextSnapshot). Returns 'claimed' when the caller should proceed to call
- * the extractor for this article; 'skip' when an equivalent, non-stale claim
+ * ContextSnapshot). Returns `result: 'claimed'` when the caller should
+ * proceed to call the extractor for this article (with `articleId` the row
+ * to write the outcome onto); `'skip'` when an equivalent, non-stale claim
  * already covers it (either COMPLETE with the same content, or another
- * request's still-fresh PENDING claim).
+ * request's still-fresh PENDING claim, or a concurrent writer that already
+ * versioned this URL — see the content-changed branch below).
  *
- * Implemented as create-then-conditional-updateMany rather than a single
- * raw-SQL upsert: both are single atomic statements (Postgres serializes
- * concurrent INSERTs on the same unique key, and a conditional UPDATE's WHERE
- * is evaluated under the same row lock), and this stays on the standard
- * Prisma Client API used everywhere else in this codebase.
+ * Implemented as create-then-conditional-updateMany (same-content path) or
+ * create-then-transaction (content-changed path) rather than a single
+ * raw-SQL upsert: all are atomic under Postgres's row/index locking, and
+ * this stays on the standard Prisma Client API used everywhere else in this
+ * codebase.
  */
 export async function claimArticleForExtraction(
   predictionId: string,
   article: ClaimableArticle,
   origin: PoolOrigin,
-): Promise<ClaimResult> {
+): Promise<ClaimOutcome> {
   const urlHash = hashUrl(article.url)
   const contentHash = hashArticleContent(article.title, article.snippet)
 
   try {
-    await prisma.evidencePoolArticle.create({
+    const created = await prisma.evidencePoolArticle.create({
       data: {
         predictionId,
         url: article.url,
@@ -260,25 +310,70 @@ export async function claimArticleForExtraction(
         status: 'PENDING',
         origin,
       },
+      select: { id: true },
     })
-    return 'claimed'
+    return { result: 'claimed', articleId: created.id }
   } catch (err) {
     if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
   }
 
+  // Lost the create — a row for this (predictionId, urlHash) already exists and is
+  // still current (the partial unique index only rejects the create while a
+  // non-superseded row is present, so this can't come back null in practice).
+  const current = await prisma.evidencePoolArticle.findFirst({
+    where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
+  })
+  if (!current) {
+    throw new Error(`evidence_pool: P2002 on (${predictionId}, ${urlHash}) but no current row found`)
+  }
+
+  if (current.contentHash === null || current.contentHash !== contentHash) {
+    // Genuinely new evidence (a live-blog update, or a legacy row from before
+    // contentHash existed) — version it rather than overwriting. Old row first,
+    // then the new head: the partial unique index rejects an insert while the old
+    // row still reads as current, so the order isn't optional.
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        await tx.evidencePoolArticle.update({
+          where: { id: current.id },
+          data: { supersededAt: new Date() },
+        })
+        return tx.evidencePoolArticle.create({
+          data: {
+            predictionId,
+            url: article.url,
+            urlHash,
+            title: article.title,
+            snippet: article.snippet || null,
+            source: article.source,
+            publishedDate: article.publishedAt,
+            contentHash,
+            status: 'PENDING',
+            origin,
+            version: current.version + 1,
+            supersedesId: current.id,
+          },
+          select: { id: true },
+        })
+      })
+      return { result: 'claimed', articleId: created.id }
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
+      // Lost the race to a concurrent claim that already versioned this URL — its
+      // row already carries fresh content; nothing left for this call to do.
+      return { result: 'skip', articleId: null }
+    }
+  }
+
+  // Same content: the existing backoff/staleness re-claim, scoped to this specific
+  // current row (not the (predictionId, urlHash) pair — that's no longer unique).
   const staleCutoff = new Date(Date.now() - PENDING_CLAIM_STALE_MS)
   const failedCutoff = new Date(Date.now() - FAILED_RECLAIM_BACKOFF_MS)
   const transportCutoff = new Date(Date.now() - TRANSPORT_RECLAIM_BACKOFF_MS)
   const { count } = await prisma.evidencePoolArticle.updateMany({
     where: {
-      predictionId,
-      urlHash,
+      id: current.id,
       OR: [
-        // Content changed (or was never fingerprinted) — genuinely new evidence, not a
-        // retry. Re-claims immediately whatever the row's previous outcome was, which is
-        // also what keeps terminal rows revivable.
-        { contentHash: null },
-        { contentHash: { not: contentHash } },
         // Same content, previously FAILED: allowed, but only after a backoff, and never
         // for a terminal reason. Two arms because SQL's `NOT IN` is false for NULL, so a
         // null statusReason has to be matched explicitly — same shape as pool-retry's
@@ -314,16 +409,31 @@ export async function claimArticleForExtraction(
       origin,
     },
   })
-  return count > 0 ? 'claimed' : 'skip'
+  // articleId is `current.id` on BOTH branches here, unlike the lost-race skip above:
+  // the row unambiguously exists whether or not this call's re-claim matched, so a
+  // caller resolving "the pool row for this URL" (daatan#1223's rating-prompt lookup)
+  // gets it either way.
+  return { result: count > 0 ? 'claimed' : 'skip', articleId: current.id }
 }
 
-/** Claim a whole evidence set. Per-article results, same order as `articles`. */
+/** Claim a whole evidence set. Per-article outcomes, same order as `articles`. */
 export async function claimArticlesForExtraction(
   predictionId: string,
   articles: ClaimableArticle[],
   origin: PoolOrigin,
-): Promise<ClaimResult[]> {
+): Promise<ClaimOutcome[]> {
   return Promise.all(articles.map((a) => claimArticleForExtraction(predictionId, a, origin)))
+}
+
+/** Builds the `addArticlesToPool` id map from a claim step's outcomes — same
+ *  order/URLs as the `articles`/`items` array the claim step was called
+ *  with. Skipped/lost-race entries are simply absent from the map. */
+export function articleIdsByUrl(articles: ClaimableArticle[], outcomes: ClaimOutcome[]): Map<string, string> {
+  return new Map(
+    articles
+      .map((a, i): [string, string | null] => [a.url, outcomes[i]?.articleId ?? null])
+      .filter((entry): entry is [string, string] => entry[1] !== null),
+  )
 }
 
 /**
@@ -341,7 +451,10 @@ export async function failClaimedArticles(
   if (urls.length === 0) return
   try {
     await prisma.evidencePoolArticle.updateMany({
-      where: { predictionId, urlHash: { in: urls.map(hashUrl) }, status: 'PENDING' },
+      // CURRENT_VERSION_ONLY — a claim's row can be superseded by a concurrent
+      // content-changed claim before this release runs (daatan#1381); a
+      // no-longer-current row must never be touched by a later cleanup call.
+      where: { predictionId, urlHash: { in: urls.map(hashUrl) }, status: 'PENDING', ...CURRENT_VERSION_ONLY },
       data: { status: 'FAILED', statusReason: reason.slice(0, 64) },
     })
   } catch (err) {
@@ -350,9 +463,19 @@ export async function failClaimedArticles(
 }
 
 /** List a forecast's pooled articles, most recently added first. Admin visibility only. */
-export async function getPoolArticles(predictionId: string): Promise<EvidencePoolArticle[]> {
+/**
+ * `includeSuperseded` defaults to `false` (current-version-only, daatan#1382) —
+ * that's what every aggregation-adjacent caller wants, since a corrected
+ * article's prior reading is no longer live evidence. The admin evidence-pool
+ * listing opts into `true` to show the correction history a version chain now
+ * makes visible (daatan#1383).
+ */
+export async function getPoolArticles(
+  predictionId: string,
+  { includeSuperseded = false }: { includeSuperseded?: boolean } = {},
+): Promise<EvidencePoolArticle[]> {
   return prisma.evidencePoolArticle.findMany({
-    where: { predictionId },
+    where: { predictionId, ...(includeSuperseded ? {} : CURRENT_VERSION_ONLY) },
     orderBy: { addedAt: 'desc' },
   })
 }
@@ -409,10 +532,14 @@ export type PoolRecomputeArticle = Prisma.EvidencePoolArticleGetPayload<{
   select: typeof POOL_RECOMPUTE_SELECT
 }>
 
-/** `getPoolArticles` narrowed to the recompute path's projection — same rows, same order. */
+/**
+ * `getPoolArticles` narrowed to the recompute path's projection — same rows,
+ * same order. Current-version-only (daatan#1382): a superseded row's stance
+ * is stale evidence and must not double-count alongside its replacement.
+ */
 async function getPoolArticlesForRecompute(predictionId: string): Promise<PoolRecomputeArticle[]> {
   return prisma.evidencePoolArticle.findMany({
-    where: { predictionId },
+    where: { predictionId, ...CURRENT_VERSION_ONLY },
     orderBy: { addedAt: 'desc' },
     select: POOL_RECOMPUTE_SELECT,
   })
@@ -439,6 +566,9 @@ export interface PublicSourceArticle {
  * Public-safe projection only: excludes the Oracle-estimator shadow-lane fields
  * (stance/authorLean/factSignal/etc.) that live on the same row but were never meant for
  * public display.
+ *
+ * Current-version-only (daatan#1382): a corrected article should appear once, as
+ * its latest reading, not once per version.
  */
 export async function getPublicArticlesByAuthorOutlet(
   author: string,
@@ -446,7 +576,7 @@ export async function getPublicArticlesByAuthorOutlet(
   limit = 20,
 ): Promise<PublicSourceArticle[]> {
   const rows = await prisma.evidencePoolArticle.findMany({
-    where: { author, outletName, excluded: false },
+    where: { author, outletName, excluded: false, ...CURRENT_VERSION_ONLY },
     orderBy: { addedAt: 'desc' },
     take: limit,
     select: {

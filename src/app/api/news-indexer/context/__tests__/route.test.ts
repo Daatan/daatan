@@ -11,7 +11,7 @@ import type { EvidencePoolArticle } from '@prisma/client'
 vi.mock('@/env', () => ({ env: { NEWS_INDEXER_SECRET: 'test-secret' } }))
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { prediction: { findUnique: vi.fn() }, evidencePoolArticle: { findUnique: vi.fn() } },
+  prisma: { prediction: { findUnique: vi.fn() } },
 }))
 
 // `isTransportNullReason` is taken from the REAL module, not stubbed: it encodes
@@ -25,7 +25,11 @@ vi.mock('@/lib/services/oracle-backfill', () => ({ scheduleOracleReask: vi.fn() 
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
-vi.mock('@/lib/services/evidence-pool', () => ({
+vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
+  // `articleIdsByUrl` is taken from the REAL module — it's a pure function whose
+  // contract (skip a URL whose outcome carries a null articleId) the route depends
+  // on, and a hand-copied stub here would keep passing after that contract changed.
+  ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   addArticlesToPool: vi.fn(),
   recomputeFromPool: vi.fn(),
   claimArticlesForExtraction: vi.fn(),
@@ -113,7 +117,6 @@ describe('POST /api/news-indexer/context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(ACTIVE_PREDICTION as never)
-    vi.mocked(prisma.evidencePoolArticle.findUnique).mockResolvedValue(null as never)
     vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: true, contextSnapshotId: 'snap-1' })
     vi.mocked(getArticleMetaByUrl).mockResolvedValue(new Map())
     vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
@@ -125,7 +128,7 @@ describe('POST /api/news-indexer/context', () => {
     vi.mocked(getLatestOracleSnapshot).mockResolvedValue(null as never)
     // Default: the claim gate always admits the push (existing tests exercise
     // the "something new" path); the skip-when-unchanged path has its own tests below.
-    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed'])
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'claimed', articleId: 'row-1' }])
     vi.mocked(failClaimedArticles).mockResolvedValue(undefined)
   })
 
@@ -265,8 +268,10 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('threads the trigger pool row into the notify call so rating buttons attach (daatan#1223)', async () => {
+    // The claim step already resolved the trigger article's row id (daatan#1381) — no
+    // separate findUnique lookup exists anymore, so the id comes straight off the claim.
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'claimed', articleId: 'epa-1' }])
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
-    vi.mocked(prisma.evidencePoolArticle.findUnique).mockResolvedValue({ id: 'epa-1' } as EvidencePoolArticle)
 
     await POST(post('test-secret'))
     expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toEqual({
@@ -276,10 +281,26 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('passes a null rating arg when the trigger pool row could not be resolved', async () => {
-    // The beforeEach default: evidencePoolArticle.findUnique resolves null.
+    // A lost versioning race (daatan#1381) — result 'skip' with a null articleId. On its
+    // own that article would take the early "all unchanged" return, so pair it with a
+    // second, genuinely-claimed article to reach the notify block at all; the trigger is
+    // the one that lost the race, which is exactly what's under test here.
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-bbc' },
+      { result: 'skip', articleId: null },
+    ])
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
-    await POST(post('test-secret'))
+    await POST(
+      post('test-secret', {
+        predictionId: 'pred-1',
+        triggerArticleUrl: 'https://aljazeera.com/news/y',
+        articles: [
+          { url: 'https://bbc.com/news/x', title: 'BBC', snippet: 's1', source: 'bbc.com', similarity: 0.5 },
+          { url: 'https://aljazeera.com/news/y', title: 'AJ', snippet: 's2', source: 'aljazeera.com', similarity: 0.7 },
+        ],
+      }),
+    )
     expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toBeNull()
   })
 
@@ -316,7 +337,10 @@ describe('POST /api/news-indexer/context', () => {
     // Both articles are newly claimed — matches the 2-article request below.
     // The beforeEach default (a single 'claimed') is for the single-article
     // VALID_BODY most other tests send.
-    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
     const ORACLE_TWO_SOURCES = {
       ...ORACLE_WITH_SOURCE,
       articles_used: 2,
@@ -369,7 +393,10 @@ describe('POST /api/news-indexer/context', () => {
     // source_accuracy and the public by-source panel — so echoing the neighbour's numbers here
     // credits one author with another's claim. Only reachable at PUSH_EVIDENCE_COUNT > 1, which
     // production runs (8).
-    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
     vi.mocked(getOracleForecast).mockResolvedValue({
       // Only the BBC (non-trigger) article comes back; the AJ trigger is absent.
       forecast: { ...ORACLE_WITH_SOURCE, articles_used: 1, sources: [ORACLE_WITH_SOURCE.sources[0]] },
@@ -507,7 +534,10 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('falls back to the by-url lookup only for articles the push did not identify', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       const ORACLE_TWO_SOURCES = {
         ...ORACLE_WITH_SOURCE,
         articles_used: 2,
@@ -715,7 +745,7 @@ describe('POST /api/news-indexer/context', () => {
 
       await POST(post('test-secret'))
 
-      expect(addArticlesToPool).toHaveBeenCalledWith('pred-1', expect.any(Array), 'news-indexer')
+      expect(addArticlesToPool).toHaveBeenCalledWith('pred-1', expect.any(Array), 'news-indexer', expect.any(Map))
       expect(order).toEqual(['add', 'recompute'])
     })
 
@@ -806,7 +836,7 @@ describe('POST /api/news-indexer/context', () => {
 
   describe('extraction claim gate (evidence-pool.ts) — fixes the confirmed near-instant duplicate-write race', () => {
     it('skips the Oracle call entirely when every article is already claimed/unchanged', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'skip', articleId: 'row-1' }])
 
       const res = await POST(post('test-secret'))
       expect(res.status).toBe(200)
@@ -819,7 +849,10 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('proceeds to call the Oracle when at least one article in a multi-article push is newly claimed', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'skip', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       const res = await POST(post('test-secret'))
@@ -828,7 +861,10 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted (daatan#1172)', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'skip', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(
@@ -912,7 +948,10 @@ describe('POST /api/news-indexer/context', () => {
       // daatan#1278. This used to be a schema `.max()`, which rejected the WHOLE request — so one
       // over-long article killed an 8-article push, including the seven that were fine, over a
       // field whose entire contract is "absent means fetch it yourself".
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
@@ -1003,7 +1042,10 @@ describe('POST /api/news-indexer/context', () => {
       // 24h, so the entry always expired unread. The re-ask must carry the set that was
       // actually SENT (the claimed subset), because retro keys its cache on the sorted
       // URL set: a set that merely overlaps is a different key and re-runs the extractor.
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'skip', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
 
       await POST(
@@ -1065,7 +1107,10 @@ describe('POST /api/news-indexer/context', () => {
       // `failClaimedArticles` only touches PENDING rows — and a concurrent request's
       // fresh, still-extracting claim is exactly that. So a null here marked another
       // in-flight request's article FAILED underneath it.
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'skip', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
@@ -1105,7 +1150,10 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('scopes the omitted-claims release to what THIS run claimed — a skipped article stays with its owner', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'skip', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(

@@ -821,27 +821,38 @@ model EvidencePoolArticle {
   addedAt   DateTime @default(now()) @map("added_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Schema groundwork for daatan#1267 (Phase 1 of a real versioning fix —
-  // deliberately additive-only, NOT wired to any read or write path yet).
-  // `origin` above documents the gap this exists to eventually close:
-  // re-extraction currently overwrites a pool row in place, so a correction
-  // replaces its claims instead of producing a new linked version. Nothing
-  // populates or reads these columns today — addArticlesToPool still upserts
-  // in place and recomputeFromPool still reads the single current row.
-  // supersedesId points at the EvidencePoolArticle this row would replace,
-  // once the write path stops overwriting and starts inserting; self-relation
-  // left unnamed (Prisma default) since only one such relation exists on this
-  // model. version is a plain counter, starting at 1 for every existing and
-  // future row until something increments it.
+  // Version chain for a real versioning fix (daatan#1267/#1352 Phase 2,
+  // write path landed daatan#1381). `origin` above used to document the gap
+  // this closes: re-extraction used to overwrite a pool row in place, so a
+  // correction replaced its claims instead of producing a new linked
+  // version — claimArticleForExtraction now inserts a new row instead.
+  // supersedesId is a BACKWARD pointer: a new correction row carries
+  // supersedesId = the row it replaced, so the ORIGINAL row in a chain has
+  // supersedesId = null. version is a plain counter starting at 1.
+  // supersededAt is the head/not-head marker: null means this row is still
+  // current, a timestamp means it was replaced (and records when) — see the
+  // migration for why this needs its own column rather than reusing
+  // supersedesId (a predicate can't express "no other row supersedes me"
+  // from one row's own columns). Readers that aggregate or display "the
+  // pool" must filter to `supersededAt: null` (evidence-pool.ts's
+  // CURRENT_VERSION_ONLY) or a superseded row double-counts alongside its
+  // replacement.
   supersedesId String?              @map("supersedes_id")
   supersedes   EvidencePoolArticle? @relation("EvidencePoolArticleSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
   supersededBy EvidencePoolArticle[] @relation("EvidencePoolArticleSupersedes")
   version      Int                  @default(1)
+  supersededAt DateTime?            @map("superseded_at")
 
   // Manual number-rating feedback (daatan#1223)
   ratingPrompts ArticleRatingPrompt[]
 
-  @@unique([predictionId, urlHash])
+  // NOT `@@unique([predictionId, urlHash])` — a version chain needs multiple
+  // historical rows per URL. Real uniqueness (exactly one non-superseded row
+  // per (predictionId, urlHash)) is enforced by a partial unique index the
+  // Prisma DSL can't express; see the 20260811120000 migration. This plain
+  // index just supports the query planner for that filter.
+  @@index([predictionId, supersededAt])
+  @@index([supersedesId])
   @@index([predictionId])
   @@map("evidence_pool_articles")
 }

@@ -14,6 +14,7 @@ import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
 import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
 import {
   addArticlesToPool,
+  articleIdsByUrl,
   claimArticlesForExtraction,
   failClaimedArticles,
   type PoolOrigin,
@@ -103,18 +104,16 @@ export async function refreshOracleSnapshot(
   // extract. Backfill targets forecasts with NO oracle snapshot yet, so this
   // rarely fires on a first pass, but it does protect a re-run over the same
   // candidate from redundantly re-calling the Oracle.
-  const claimResults = await claimArticlesForExtraction(
-    prediction.id,
-    searchResults.map((r) => ({
-      url: r.url,
-      title: r.title,
-      snippet: r.snippet,
-      source: r.source ?? null,
-      publishedAt: r.publishedDate ?? null,
-    })),
-    origin,
-  )
-  if (!claimResults.some((r) => r === 'claimed')) {
+  const claimableResults = searchResults.map((r) => ({
+    url: r.url,
+    title: r.title,
+    snippet: r.snippet,
+    source: r.source ?? null,
+    publishedAt: r.publishedDate ?? null,
+  }))
+  const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, origin)
+  const claimedArticleIdByUrl = articleIdsByUrl(claimableResults, claimResults)
+  if (!claimResults.some((r) => r.result === 'claimed')) {
     return { status: 'unchanged' }
   }
 
@@ -122,7 +121,7 @@ export async function refreshOracleSnapshot(
   // comment in the news-indexer context route (daatan#1172). `searchResults`
   // (full, unfiltered) stays available below for enrichOracleSources's
   // URL-keyed metadata lookup.
-  const articlesToScore = searchResults.filter((_, i) => claimResults[i] === 'claimed')
+  const articlesToScore = searchResults.filter((_, i) => claimResults[i].result === 'claimed')
 
   // No try/catch — `getOracleForecast` never throws; the `extractor_error` branch that
   // used to sit here was dead code. Same removal as the news-indexer route (daatan#1231).
@@ -148,7 +147,7 @@ export async function refreshOracleSnapshot(
     // still-PENDING claims.
     await failClaimedArticles(
       prediction.id,
-      searchResults.filter((_, i) => claimResults[i] === 'claimed').map((r) => r.url),
+      searchResults.filter((_, i) => claimResults[i].result === 'claimed').map((r) => r.url),
       failureClass ?? 'oracle_null',
     )
     if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
@@ -171,13 +170,13 @@ export async function refreshOracleSnapshot(
   // this run's articles and its result actually drives the snapshot. Backfill is a background
   // job with no request timeout, so awaiting the compute-only aggregate costs nothing; on any
   // failure `resolvePooledEstimate` falls back to this single run.
-  await addArticlesToPool(prediction.id, sources, origin)
+  await addArticlesToPool(prediction.id, sources, origin, claimedArticleIdByUrl)
   // Release this run's claims the Oracle omitted (gatekeeper-rejected), or they rot as
   // PENDING forever — same lifecycle close as the news-indexer route; the PENDING filter
   // inside failClaimedArticles is the set-difference against what the pool write completed.
   await failClaimedArticles(
     prediction.id,
-    searchResults.filter((_, i) => claimResults[i] === 'claimed').map((r) => r.url),
+    searchResults.filter((_, i) => claimResults[i].result === 'claimed').map((r) => r.url),
     'oracle_omitted',
   )
   const resolved = await resolvePooledEstimate(

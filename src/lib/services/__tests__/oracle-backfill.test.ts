@@ -46,7 +46,10 @@ vi.mock('@/lib/services/context', () => ({
   saveOracleSnapshotOnly: (...a: unknown[]) => mockSave(...a),
   markOracleAttempted: (...a: unknown[]) => mockMark(...a),
 }))
-vi.mock('@/lib/services/evidence-pool', () => ({
+vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
+  // `articleIdsByUrl` is taken from the REAL module — see the route tests' identical
+  // mock for why a hand-copied stub here would be the wrong thing.
+  ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   addArticlesToPool: (...a: unknown[]) => mockAddToPool(...a),
   claimArticlesForExtraction: (...a: unknown[]) => mockClaim(...a),
   failClaimedArticles: (...a: unknown[]) => mockFailClaimed(...a),
@@ -81,7 +84,7 @@ beforeEach(() => {
   }))
   // Default: the claim gate always admits the run (existing tests exercise the
   // "something new" path); the skip-when-unchanged path has its own tests below.
-  mockClaim.mockResolvedValue(['claimed'])
+  mockClaim.mockResolvedValue([{ result: 'claimed', articleId: 'row-1' }])
   mockFailClaimed.mockResolvedValue(undefined)
   mockPredictionFind.mockResolvedValue({ status: 'ACTIVE' })
 })
@@ -99,6 +102,12 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
+    // Every test in this block calls with the 2-article `supplied` set — the outer
+    // beforeEach's single-entry default would leave claimResults[1] undefined.
+    mockClaim.mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
   })
 
   afterEach(async () => {
@@ -186,7 +195,11 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
     // Per-article, not a fixed array: the re-ask sends a SHORTER list, and a canned
     // 2-element verdict would silently mis-align with it.
     mockClaim.mockImplementation(async (_id: string, arts: { url: string }[]) =>
-      arts.map((a) => (a.url === 'https://a.com/1' ? 'skip' : 'claimed')),
+      arts.map((a, i) =>
+        a.url === 'https://a.com/1'
+          ? { result: 'skip', articleId: `row-${i}` }
+          : { result: 'claimed', articleId: `row-${i}` },
+      ),
     )
     mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_network' })
 
@@ -362,7 +375,7 @@ describe('refreshOracleSnapshot', () => {
 
       await refreshOracleSnapshot(prediction)
 
-      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.any(Array), 'backfill')
+      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.any(Array), 'backfill', expect.any(Map))
       expect(order).toEqual(['add', 'resolve'])
     })
 
@@ -434,7 +447,7 @@ describe('refreshOracleSnapshot', () => {
   describe('extraction claim gate (evidence-pool.ts)', () => {
     it('reports status: unchanged and skips the Oracle call when every searched article is already claimed/unchanged', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
-      mockClaim.mockResolvedValue(['skip'])
+      mockClaim.mockResolvedValue([{ result: 'skip', articleId: 'row-1' }])
 
       const r = await refreshOracleSnapshot(prediction)
 
@@ -505,7 +518,7 @@ describe('refreshOracleSnapshot', () => {
       expect(mockSearch).not.toHaveBeenCalled()
       expect(mockBuildQuery).not.toHaveBeenCalled()
       expect(mockClaim).toHaveBeenCalledWith('p1', [expect.objectContaining({ url: 'https://a.com/1' })], 'retry')
-      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.anything(), 'retry')
+      expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.anything(), 'retry', expect.any(Map))
     })
 
     it('with supplied articles, an Oracle null releases the claims but writes NO empty marker', async () => {
@@ -528,7 +541,10 @@ describe('refreshOracleSnapshot', () => {
         { url: 'https://a.com/1', title: 't', snippet: 's' },
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },
       ])
-      mockClaim.mockResolvedValue(['skip', 'claimed'])
+      mockClaim.mockResolvedValue([
+        { result: 'skip', articleId: 'row-1' },
+        { result: 'claimed', articleId: 'row-2' },
+      ])
       mockForecast.mockResolvedValue({
         forecast: {
           mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
@@ -548,7 +564,10 @@ describe('refreshOracleSnapshot', () => {
         { url: 'https://a.com/1', title: 't', snippet: 's' },
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },
       ])
-      mockClaim.mockResolvedValue(['skip', 'claimed'])
+      mockClaim.mockResolvedValue([
+        { result: 'skip', articleId: 'row-1' },
+        { result: 'claimed', articleId: 'row-2' },
+      ])
       mockForecast.mockResolvedValue({
         forecast: {
           mean: 0.2, std: 0.1, ci_low: 0.0, ci_high: 0.4, articles_used: 1, settled: false,
