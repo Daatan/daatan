@@ -1,17 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const prisma = {
     evidencePoolArticle: {
-      upsert: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
       create: vi.fn(),
       updateMany: vi.fn(),
     },
-  },
-}))
+  }
+  // Array form (upsertCurrentVersion) resolves each already-started promise; callback
+  // form (claimArticleForExtraction's versioning branch) runs against this same mocked
+  // `evidencePoolArticle` — both match how the real transaction executes its statements
+  // against one client, just without real isolation.
+  return {
+    prisma: {
+      ...prisma,
+      $transaction: vi.fn((arg: unknown) =>
+        Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: typeof prisma) => Promise<unknown>)(prisma),
+      ),
+    },
+  }
+})
 vi.mock('@/lib/services/oracleClient', () => ({
   getOracleConfig: vi.fn(() => ({ baseUrl: 'http://oracle', key: 'k' })),
   oracleFetch: vi.fn(),
@@ -29,6 +40,7 @@ import { REASK_DELAY_MS } from '@/lib/services/oracle-backfill'
 import { Prisma } from '@prisma/client'
 import {
   addArticlesToPool,
+  articleIdsByUrl,
   getPoolArticles,
   getPublicArticlesByAuthorOutlet,
   setArticleExcluded,
@@ -41,7 +53,6 @@ import {
 } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 
-const upsert = vi.mocked(prisma.evidencePoolArticle.upsert)
 const findMany = vi.mocked(prisma.evidencePoolArticle.findMany)
 const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
 const update = vi.mocked(prisma.evidencePoolArticle.update)
@@ -92,27 +103,24 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   ...over,
 })
 
+/** A single-URL claim-id map, as `articleIdsByUrl`/callers would build it —
+ *  `addArticlesToPool` always writes via `update({ where: { id } })` when
+ *  the map has an entry, which is the normal case for every real caller. */
+const idFor = (url: string, id = 'row-1'): Map<string, string> => new Map([[url, id]])
+
 describe('addArticlesToPool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    upsert.mockResolvedValue({} as never)
+    update.mockResolvedValue({} as never)
   })
 
-  it('upserts keyed by (predictionId, urlHash) with the extracted signal', async () => {
-    await addArticlesToPool('pred-1', [source()], 'analyze')
+  it('updates the claimed row by id with the extracted signal', async () => {
+    await addArticlesToPool('pred-1', [source()], 'analyze', idFor('https://reuters.com/a'))
 
-    expect(upsert).toHaveBeenCalledTimes(1)
-    const call = upsert.mock.calls[0][0] as {
-      where: { predictionId_urlHash: { predictionId: string; urlHash: string } }
-      create: Record<string, unknown>
-      update: Record<string, unknown>
-    }
-    expect(call.where.predictionId_urlHash).toEqual({
-      predictionId: 'pred-1',
-      urlHash: hashUrl('https://reuters.com/a'),
-    })
-    expect(call.create).toMatchObject({
-      predictionId: 'pred-1',
+    expect(update).toHaveBeenCalledTimes(1)
+    const call = update.mock.calls[0][0] as { where: { id: string }; data: Record<string, unknown> }
+    expect(call.where).toEqual({ id: 'row-1' })
+    expect(call.data).toMatchObject({
       url: 'https://reuters.com/a',
       stance: 0.5,
       certainty: 0.8,
@@ -125,69 +133,112 @@ describe('addArticlesToPool', () => {
       'pred-1',
       [source({ author: 'בן כספית', personId: 'p-9', personName: 'Ben Caspit' })],
       'news-indexer',
+      idFor('https://reuters.com/a'),
     )
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    const identity = { author: 'בן כספית', personId: 'p-9', personName: 'Ben Caspit' }
-    expect(call.create).toMatchObject(identity)
-    expect(call.update).toMatchObject(identity)
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ author: 'בן כספית', personId: 'p-9', personName: 'Ben Caspit' })
   })
 
   it('never writes `excluded` (an admin exclusion decision must survive re-discovery)', async () => {
-    await addArticlesToPool('pred-1', [source()], 'news-indexer')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).not.toHaveProperty('excluded')
-    expect(call.update).not.toHaveProperty('excluded')
+    await addArticlesToPool('pred-1', [source()], 'news-indexer', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).not.toHaveProperty('excluded')
   })
 
-  it('upserts each article in the batch independently', async () => {
+  it('updates each article in the batch independently, by its own claimed id', async () => {
     await addArticlesToPool(
       'pred-1',
       [source({ url: 'https://a.com/1' }), source({ url: 'https://b.com/2' })],
       'backfill',
+      new Map([
+        ['https://a.com/1', 'row-a'],
+        ['https://b.com/2', 'row-b'],
+      ]),
     )
-    expect(upsert).toHaveBeenCalledTimes(2)
+    expect(update).toHaveBeenCalledTimes(2)
+    const ids = update.mock.calls.map((c) => (c[0] as { where: { id: string } }).where.id)
+    expect(ids.sort()).toEqual(['row-a', 'row-b'])
+  })
+
+  it('falls back to a version-aware upsert when a source has no claimed id', async () => {
+    // Defensive path — no current caller should hit this, since all of them build the
+    // map from the same claim step that produced `sources`, but a source silently
+    // absent from the map must not be dropped on the floor.
+    findFirst.mockResolvedValue(null)
+    create.mockResolvedValue({} as never)
+    await addArticlesToPool('pred-1', [source()], 'analyze', new Map())
+    expect(update).not.toHaveBeenCalled()
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', urlHash: hashUrl('https://reuters.com/a'), supersededAt: null },
+    })
+    expect(create).toHaveBeenCalledTimes(1)
+    const call = create.mock.calls[0][0] as { data: Record<string, unknown> }
+    // Omitted (not DbNull) — Prisma treats an absent key on `create()` as SQL NULL for
+    // this nullable Json column, same end state, no separate default needed.
+    expect(call.data.claimsDetail).toBeUndefined()
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ predictionId: 'pred-1', url: 'https://reuters.com/a', origin: 'analyze' }),
+      'event=evidence_pool_write_no_claim_id',
+    )
+  })
+
+  it('falls back to superseding the current row when a source has no claimed id but one already exists', async () => {
+    const current = { id: 'existing-1', version: 1 }
+    findFirst.mockResolvedValue(current as never)
+    update.mockResolvedValue({} as never)
+    create.mockResolvedValue({} as never)
+    await addArticlesToPool('pred-1', [source()], 'analyze', new Map())
+    expect(update).toHaveBeenCalledWith({ where: { id: 'existing-1' }, data: { supersededAt: expect.any(Date) } })
+    const createCall = create.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(createCall.data).toMatchObject({ version: 2, supersedesId: 'existing-1' })
   })
 
   it('passes settled/quantitativeEstimate straight through', async () => {
-    await addArticlesToPool('pred-1', [source({ settled: true, quantitativeEstimate: 0.22 })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown> }
-    expect(call.create).toMatchObject({ settled: true, quantitativeEstimate: 0.22 })
+    await addArticlesToPool(
+      'pred-1',
+      [source({ settled: true, quantitativeEstimate: 0.22 })],
+      'analyze',
+      idFor('https://reuters.com/a'),
+    )
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ settled: true, quantitativeEstimate: 0.22 })
   })
 
-  it('passes evidenceWeight straight through, in both create and update', async () => {
-    await addArticlesToPool('pred-1', [source({ evidenceWeight: 4.0 })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject({ evidenceWeight: 4.0 })
-    expect(call.update).toMatchObject({ evidenceWeight: 4.0 })
+  it('passes evidenceWeight straight through', async () => {
+    await addArticlesToPool('pred-1', [source({ evidenceWeight: 4.0 })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ evidenceWeight: 4.0 })
   })
 
-  it('passes relevanceScore straight through, in both create and update', async () => {
-    await addArticlesToPool('pred-1', [source({ relevanceScore: 0.85 })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject({ relevanceScore: 0.85 })
-    expect(call.update).toMatchObject({ relevanceScore: 0.85 })
+  it('passes relevanceScore straight through', async () => {
+    await addArticlesToPool('pred-1', [source({ relevanceScore: 0.85 })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ relevanceScore: 0.85 })
   })
 
-  it('persists the shadow relevanceBar, in both create and update (retro#393/#394, daatan#1289)', async () => {
-    await addArticlesToPool('pred-1', [source({ relevanceBar: 0.7 })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject({ relevanceBar: 0.7 })
-    expect(call.update).toMatchObject({ relevanceBar: 0.7 })
+  it('persists the shadow relevanceBar (retro#393/#394, daatan#1289)', async () => {
+    await addArticlesToPool('pred-1', [source({ relevanceBar: 0.7 })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ relevanceBar: 0.7 })
   })
 
-  it('persists the shadow authorLean/authorLeanCertainty, in both create and update', async () => {
+  it('persists the shadow authorLean/authorLeanCertainty', async () => {
     // Author-scoring lane (retro #308/#309) — written to the pool row but never read by any
-    // estimate. Verifies the un-fusing shadow column is actually persisted, both branches.
-    await addArticlesToPool('pred-1', [source({ authorLean: -0.6, authorLeanCertainty: 0.4 })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
-    expect(call.update).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
+    // estimate. Verifies the un-fusing shadow column is actually persisted.
+    await addArticlesToPool(
+      'pred-1',
+      [source({ authorLean: -0.6, authorLeanCertainty: 0.4 })],
+      'analyze',
+      idFor('https://reuters.com/a'),
+    )
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
   })
 
-  it('persists the shadow factSignal + facets, in both create and update', async () => {
+  it('persists the shadow factSignal + facets', async () => {
     // Estimator lane (retro #313) — the fact-lane counterpart of stance, written to the pool
     // row but never read by any estimate and never sent to /pool/aggregate. Verifies all five
-    // shadow columns are actually persisted, both branches.
+    // shadow columns are actually persisted.
     const facts = {
       factSignal: 0.3,
       eventActors: 'Israel',
@@ -195,13 +246,12 @@ describe('addArticlesToPool', () => {
       isOccurrence: false,
       verified: true,
     }
-    await addArticlesToPool('pred-1', [source(facts)], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject(facts)
-    expect(call.update).toMatchObject(facts)
+    await addArticlesToPool('pred-1', [source(facts)], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject(facts)
   })
 
-  it('persists claimsDetail — the per-claim layer — in both create and update', async () => {
+  it('persists claimsDetail — the per-claim layer', async () => {
     // F1/F15 (daatan#1235, retro#364). Every other extracted column on this row is a
     // REDUCTION; this is the layer they reduce from, and it is where the inputs used
     // to die. Storage only — nothing reads it, and it is never sent to /pool/aggregate.
@@ -209,17 +259,9 @@ describe('addArticlesToPool', () => {
       { claim: 'The vote was scheduled.', quote: 'The speaker set a date.', stance: 0.6, certainty: 0.8, evidence_class: 'reported_fact' as const, fact_signal: 0.2, is_occurrence: false, verified: true },
       { claim: 'A minister denied it.', stance: -0.4, certainty: 0.5, evidence_class: 'opinion' as const },
     ]
-    await addArticlesToPool('pred-1', [source({ claimsDetail })], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown>; update: Record<string, unknown> }
-    expect(call.create).toMatchObject({ claimsDetail })
-    expect(call.update).toMatchObject({ claimsDetail })
-  })
-
-  it('writes SQL NULL on create when no per-claim data was supplied', async () => {
-    // A nullable Json column needs Prisma.DbNull, not `null`, to reach SQL NULL.
-    await addArticlesToPool('pred-1', [source()], 'analyze')
-    const call = upsert.mock.calls[0][0] as { create: Record<string, unknown> }
-    expect(call.create.claimsDetail).toBe(Prisma.DbNull)
+    await addArticlesToPool('pred-1', [source({ claimsDetail })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ claimsDetail })
   })
 
   it('never NULLS stored claimsDetail on an update that merely omits it', async () => {
@@ -227,10 +269,10 @@ describe('addArticlesToPool', () => {
     // carries no per-claim data (a recompute, an older Oracle build, a partial
     // response) must leave what we already hold alone. `undefined` tells Prisma to
     // skip the column; there is no backfill, so an erased row is gone for good.
-    await addArticlesToPool('pred-1', [source()], 'analyze')
-    const call = upsert.mock.calls[0][0] as { update: Record<string, unknown> }
-    expect(call.update.claimsDetail).toBeUndefined()
-    expect('claimsDetail' in call.update).toBe(true) // present-but-undefined, i.e. skipped
+    await addArticlesToPool('pred-1', [source()], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data.claimsDetail).toBeUndefined()
+    expect('claimsDetail' in call.data).toBe(true) // present-but-undefined, i.e. skipped
   })
 })
 
@@ -748,12 +790,22 @@ const article = (over: Partial<{ url: string; title: string; snippet: string; so
 describe('claimArticleForExtraction', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  /** The row `findFirst` resolves after a P2002. Defaults to matching `article()`'s
+   *  contentHash (the same-content branch); pass `contentHash: 'stale-hash'` or `null`
+   *  to exercise the content-changed branch instead. */
+  const currentRow = (over: Partial<{ id: string; version: number; contentHash: string | null }> = {}) => ({
+    id: 'current-1',
+    version: 1,
+    contentHash: hashArticleContent('Headline', 'A snippet'),
+    ...over,
+  })
+
   it('claims via a plain create when no row exists yet for (predictionId, urlHash)', async () => {
-    create.mockResolvedValue({} as never)
+    create.mockResolvedValue({ id: 'new-1' } as never)
 
     const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
 
-    expect(result).toBe('claimed')
+    expect(result).toEqual({ result: 'claimed', articleId: 'new-1' })
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         predictionId: 'pred-1',
@@ -763,174 +815,261 @@ describe('claimArticleForExtraction', () => {
         status: 'PENDING',
         origin: 'news-indexer',
       }),
+      select: { id: true },
     })
+    expect(findFirst).not.toHaveBeenCalled()
     expect(updateMany).not.toHaveBeenCalled()
   })
 
-  it('falls back to a conditional updateMany on a unique-constraint conflict, and claims when it matches (content changed)', async () => {
+  it('throws if a P2002 lands but no current (non-superseded) row can be found', async () => {
+    // Shouldn't happen in practice — the partial unique index only rejects the create
+    // while a non-superseded row exists — but a silent null here would be worse than a
+    // loud failure.
     create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
-
-    const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-
-    expect(result).toBe('claimed')
-    expect(updateMany).toHaveBeenCalledTimes(1)
-    const call = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
-    expect(call.where).toMatchObject({ predictionId: 'pred-1', urlHash: hashUrl('https://reuters.com/a') })
-    expect(call.data).toMatchObject({ status: 'PENDING', statusReason: null, contentHash: hashArticleContent('Headline', 'A snippet') })
-  })
-
-  it('skips when the conditional updateMany matches nothing (same content, still COMPLETE or a fresh in-flight PENDING claim)', async () => {
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 0 })
-
-    const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-    expect(result).toBe('skip')
-  })
-
-  it("the updateMany's WHERE admits changed content, a backed-off non-terminal FAILED row, and a stale PENDING claim", async () => {
-    // The FAILED arm used to be a bare `{ status: 'FAILED' }` — no age gate, no reason
-    // filter. news-indexer re-pushes the same set every poll cycle while its 5-minute
-    // cooldown rolls, so an always-null article looped FAILED → PENDING → FAILED, burning
-    // a full Oracle run (fetch + gatekeeper + extractor) each time (daatan#1232). The
-    // schema's own comment, "eligible for retry once stale", was stricter than the code.
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
-
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-
-    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
-    expect(call.where.OR).toEqual(
-      expect.arrayContaining([
-        { contentHash: null },
-        { contentHash: { not: hashArticleContent('Headline', 'A snippet') } },
-        {
-          status: 'FAILED',
-          statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] },
-          updatedAt: { lt: expect.any(Date) },
-        },
-        { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
-        { status: 'PENDING', updatedAt: { lt: expect.any(Date) } },
-      ]),
+    findFirst.mockResolvedValue(null)
+    await expect(claimArticleForExtraction('pred-1', article(), 'news-indexer')).rejects.toThrow(
+      /no current row found/,
     )
-    // And the ungated arm is GONE — its presence is the bug.
-    expect(call.where.OR).not.toContainEqual({ status: 'FAILED' })
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', urlHash: hashUrl('https://reuters.com/a'), supersededAt: null },
+    })
   })
 
-  it('gates FAILED re-claims at 24h — the same budget the sweep spends on the same row', async () => {
-    // Not an arbitrary number: pool-retry's RETRY_MIN_AGE_MS. Before this the organic path
-    // was ~288× cheaper to trigger than the sweep it was silently competing with.
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
+  describe('content changed on the current row', () => {
+    it('supersedes the old row and inserts a new version, in that order', async () => {
+      create.mockImplementationOnce(() => {
+        throw uniqueViolation()
+      })
+      findFirst.mockResolvedValue(currentRow({ contentHash: 'stale-hash' }) as never)
+      update.mockResolvedValueOnce({} as never)
+      create.mockResolvedValueOnce({ id: 'new-2' } as never)
 
-    const before = Date.now()
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-    const after = Date.now()
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
 
-    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
-    const failedArm = call.where.OR.find(
-      (a) => a.status === 'FAILED' && a.statusReason === null,
-    ) as { updatedAt: { lt: Date } }
-    // The cutoff is `Date.now() - BACKOFF` evaluated INSIDE the call, so it is bounded by the
-    // clock either side of the call and by nothing tighter. Asserting `>= before - BACKOFF` with
-    // only `before` captured is a race that passes solely when both reads land in the same
-    // millisecond — true on a fast runner, false on a real machine, so it failed 3/3 locally
-    // while CI stayed green.
-    const cutoff = failedArm.updatedAt.lt.getTime()
-    const BACKOFF = 24 * 60 * 60 * 1000
-    expect(cutoff).toBeGreaterThanOrEqual(before - BACKOFF)
-    expect(cutoff).toBeLessThanOrEqual(after - BACKOFF)
+      expect(result).toEqual({ result: 'claimed', articleId: 'new-2' })
+      // The partial unique index rejects an insert while the old row still reads as
+      // current, so the supersede-then-insert ORDER is not optional.
+      expect(update.mock.invocationCallOrder[0]).toBeLessThan(create.mock.invocationCallOrder[1])
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'current-1' },
+        data: { supersededAt: expect.any(Date) },
+      })
+      expect(create).toHaveBeenNthCalledWith(2, {
+        data: expect.objectContaining({
+          predictionId: 'pred-1',
+          version: 2,
+          supersedesId: 'current-1',
+          status: 'PENDING',
+        }),
+        select: { id: true },
+      })
+    })
+
+    it('treats a legacy row with no contentHash at all as changed', async () => {
+      create.mockImplementationOnce(() => {
+        throw uniqueViolation()
+      })
+      findFirst.mockResolvedValue(currentRow({ contentHash: null }) as never)
+      create.mockResolvedValueOnce({ id: 'new-3' } as never)
+
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      expect(result).toEqual({ result: 'claimed', articleId: 'new-3' })
+    })
+
+    it('skips when a concurrent writer already versioned this URL first', async () => {
+      create.mockImplementationOnce(() => {
+        throw uniqueViolation()
+      })
+      findFirst.mockResolvedValue(currentRow({ contentHash: 'stale-hash' }) as never)
+      create.mockImplementationOnce(() => {
+        throw uniqueViolation()
+      })
+
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      expect(result).toEqual({ result: 'skip', articleId: null })
+    })
+
+    it('re-throws a non-P2002 error from the versioning transaction', async () => {
+      create.mockImplementationOnce(() => {
+        throw uniqueViolation()
+      })
+      findFirst.mockResolvedValue(currentRow({ contentHash: 'stale-hash' }) as never)
+      create.mockImplementationOnce(() => {
+        throw new Error('connection reset')
+      })
+
+      await expect(claimArticleForExtraction('pred-1', article(), 'news-indexer')).rejects.toThrow(
+        'connection reset',
+      )
+    })
   })
 
-  it('lets a row that failed on the WIRE be re-claimed in a minute, not a day', async () => {
-    // daatan#1261/#1262. The 24h backoff is priced against an article that always nulls
-    // — it assumes the last run told us something ABOUT the article. A client timeout
-    // tells us nothing about it: retro does not cancel, so the run finished and sits in
-    // `forecast_cache` for an hour. Charging a wire event 24h of silence is what made
-    // #1262 impossible by construction — a 1h cache against a 24h floor can never overlap.
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
+  describe('same content on the current row', () => {
+    beforeEach(() => {
+      create.mockRejectedValue(uniqueViolation())
+      findFirst.mockResolvedValue(currentRow() as never)
+    })
 
-    const before = Date.now()
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-    const after = Date.now()
+    it('claims when the conditional updateMany matches (a stale/backed-off row)', async () => {
+      updateMany.mockResolvedValue({ count: 1 })
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      expect(result).toEqual({ result: 'claimed', articleId: 'current-1' })
+      expect(updateMany).toHaveBeenCalledTimes(1)
+      const call = updateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> }
+      expect(call.where).toMatchObject({ id: 'current-1' })
+      expect(call.data).toMatchObject({
+        status: 'PENDING',
+        statusReason: null,
+        contentHash: hashArticleContent('Headline', 'A snippet'),
+      })
+    })
 
-    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
-    const transportArm = call.where.OR.find(
-      (a) =>
-        a.status === 'FAILED' &&
-        typeof a.statusReason === 'object' &&
-        a.statusReason !== null &&
-        'in' in (a.statusReason as object),
-    ) as { statusReason: { in: string[] }; updatedAt: { lt: Date } } | undefined
-    expect(transportArm).toBeDefined()
+    it('skips when the conditional updateMany matches nothing (still COMPLETE, or a fresh in-flight PENDING claim)', async () => {
+      updateMany.mockResolvedValue({ count: 0 })
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      // The row exists whether or not this re-claim matched — a caller resolving "the
+      // pool row for this URL" gets it either way.
+      expect(result).toEqual({ result: 'skip', articleId: 'current-1' })
+    })
 
-    // The set is the transport classes and ONLY them — a verdict class in here would
-    // hand `oracle_abstain` the fast lane, which is the exact waste the 24h gate exists
-    // to stop. Read off the real constant so widening it fails this test rather than
-    // silently passing.
-    expect(transportArm!.statusReason.in).toEqual([...TRANSPORT_NULL_REASONS])
-    expect(transportArm!.statusReason.in).not.toContain('oracle_abstain')
-    expect(transportArm!.statusReason.in).not.toContain('oracle_omitted')
+    it("the updateMany's WHERE admits a backed-off non-terminal FAILED row and a stale PENDING claim, scoped to the current row's id", async () => {
+      // The FAILED arm used to be a bare `{ status: 'FAILED' }` — no age gate, no reason
+      // filter. news-indexer re-pushes the same set every poll cycle while its 5-minute
+      // cooldown rolls, so an always-null article looped FAILED → PENDING → FAILED, burning
+      // a full Oracle run (fetch + gatekeeper + extractor) each time (daatan#1232). The
+      // schema's own comment, "eligible for retry once stale", was stricter than the code.
+      updateMany.mockResolvedValue({ count: 1 })
 
-    // Bounded both sides — the cutoff is `Date.now() - BACKOFF` read INSIDE the call, so
-    // a one-sided assertion only passes when both clock reads land in the same
-    // millisecond (the daatan#1257 flake).
-    const cutoff = transportArm!.updatedAt.lt.getTime()
-    const TRANSPORT_BACKOFF = 60 * 1000
-    expect(cutoff).toBeGreaterThanOrEqual(before - TRANSPORT_BACKOFF)
-    expect(cutoff).toBeLessThanOrEqual(after - TRANSPORT_BACKOFF)
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
 
-    // And it really is the SHORT lane: strictly more recent than the 24h arm, i.e. it
-    // widens the window rather than being a differently-worded copy of it.
-    const failedArm = call.where.OR.find(
-      (a) => a.status === 'FAILED' && a.statusReason === null,
-    ) as { updatedAt: { lt: Date } }
-    expect(cutoff).toBeGreaterThan(failedArm.updatedAt.lt.getTime())
-  })
+      const call = updateMany.mock.calls[0][0] as { where: { id: string; OR: Record<string, unknown>[] } }
+      expect(call.where.id).toBe('current-1')
+      expect(call.where.OR).toEqual(
+        expect.arrayContaining([
+          {
+            status: 'FAILED',
+            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] },
+            updatedAt: { lt: expect.any(Date) },
+          },
+          { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
+          { status: 'PENDING', updatedAt: { lt: expect.any(Date) } },
+        ]),
+      )
+      // And the ungated arm is GONE — its presence is the bug.
+      expect(call.where.OR).not.toContainEqual({ status: 'FAILED' })
+    })
 
-  it('re-ask delay clears the transport backoff, so our own recovery is never refused', async () => {
-    // The failure mode daatan#1262 names: "the re-ask must not look like a fresh organic
-    // push, or it will be refused as `unchanged` before it ever reaches retro". The gate
-    // and the scheduler are two halves of one policy, and only their ORDER makes it work.
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
+    it('gates FAILED re-claims at 24h — the same budget the sweep spends on the same row', async () => {
+      // Not an arbitrary number: pool-retry's RETRY_MIN_AGE_MS. Before this the organic path
+      // was ~288× cheaper to trigger than the sweep it was silently competing with.
+      updateMany.mockResolvedValue({ count: 1 })
 
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      const before = Date.now()
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      const after = Date.now()
 
-    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
-    const transportArm = call.where.OR.find(
-      (a) => a.status === 'FAILED' && typeof a.statusReason === 'object' && a.statusReason !== null && 'in' in (a.statusReason as object),
-    ) as { updatedAt: { lt: Date } }
-    const backoffMs = Date.now() - transportArm.updatedAt.lt.getTime()
-    expect(REASK_DELAY_MS).toBeGreaterThan(backoffMs)
-    // …and still far inside retro's `cache_ttl_seconds = 3600`, which is the window the
-    // recovered forecast actually lives in.
-    expect(REASK_DELAY_MS).toBeLessThan(3600 * 1000)
-  })
+      const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+      const failedArm = call.where.OR.find(
+        (a) => a.status === 'FAILED' && a.statusReason === null,
+      ) as { updatedAt: { lt: Date } }
+      // The cutoff is `Date.now() - BACKOFF` evaluated INSIDE the call, so it is bounded by the
+      // clock either side of the call and by nothing tighter. Asserting `>= before - BACKOFF` with
+      // only `before` captured is a race that passes solely when both reads land in the same
+      // millisecond — true on a fast runner, false on a real machine, so it failed 3/3 locally
+      // while CI stayed green.
+      const cutoff = failedArm.updatedAt.lt.getTime()
+      const BACKOFF = 24 * 60 * 60 * 1000
+      expect(cutoff).toBeGreaterThanOrEqual(before - BACKOFF)
+      expect(cutoff).toBeLessThanOrEqual(after - BACKOFF)
+    })
 
-  it('never re-claims a terminal row on unchanged content, but a content change still revives it', async () => {
-    // "Terminal" used to be true of the SWEEP and false of every organic re-push:
-    // pool-retry excluded oracle_omitted/oracle_null_final, the claim gate did not. Both
-    // now agree. The contentHash arms are deliberately left un-gated, preserving the
-    // documented escape hatch — a re-push with genuinely changed content still revives
-    // a terminal row, because that is new evidence rather than a retry.
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
+    it('lets a row that failed on the WIRE be re-claimed in a minute, not a day', async () => {
+      // daatan#1261/#1262. The 24h backoff is priced against an article that always nulls
+      // — it assumes the last run told us something ABOUT the article. A client timeout
+      // tells us nothing about it: retro does not cancel, so the run finished and sits in
+      // `forecast_cache` for an hour. Charging a wire event 24h of silence is what made
+      // #1262 impossible by construction — a 1h cache against a 24h floor can never overlap.
+      updateMany.mockResolvedValue({ count: 1 })
 
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      const before = Date.now()
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      const after = Date.now()
 
-    const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
-    const failedArms = call.where.OR.filter((a) => a.status === 'FAILED')
-    // Every FAILED arm is both age-gated and terminal-aware.
-    for (const arm of failedArms) {
-      expect(arm).toHaveProperty('updatedAt')
-      expect('statusReason' in arm).toBe(true)
-    }
-    // The revival route is unconditional on status.
-    expect(call.where.OR).toContainEqual({ contentHash: null })
-    expect(call.where.OR).toContainEqual({
-      contentHash: { not: hashArticleContent('Headline', 'A snippet') },
+      const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+      const transportArm = call.where.OR.find(
+        (a) =>
+          a.status === 'FAILED' &&
+          typeof a.statusReason === 'object' &&
+          a.statusReason !== null &&
+          'in' in (a.statusReason as object),
+      ) as { statusReason: { in: string[] }; updatedAt: { lt: Date } } | undefined
+      expect(transportArm).toBeDefined()
+
+      // The set is the transport classes and ONLY them — a verdict class in here would
+      // hand `oracle_abstain` the fast lane, which is the exact waste the 24h gate exists
+      // to stop. Read off the real constant so widening it fails this test rather than
+      // silently passing.
+      expect(transportArm!.statusReason.in).toEqual([...TRANSPORT_NULL_REASONS])
+      expect(transportArm!.statusReason.in).not.toContain('oracle_abstain')
+      expect(transportArm!.statusReason.in).not.toContain('oracle_omitted')
+
+      // Bounded both sides — the cutoff is `Date.now() - BACKOFF` read INSIDE the call, so
+      // a one-sided assertion only passes when both clock reads land in the same
+      // millisecond (the daatan#1257 flake).
+      const cutoff = transportArm!.updatedAt.lt.getTime()
+      const TRANSPORT_BACKOFF = 60 * 1000
+      expect(cutoff).toBeGreaterThanOrEqual(before - TRANSPORT_BACKOFF)
+      expect(cutoff).toBeLessThanOrEqual(after - TRANSPORT_BACKOFF)
+
+      // And it really is the SHORT lane: strictly more recent than the 24h arm, i.e. it
+      // widens the window rather than being a differently-worded copy of it.
+      const failedArm = call.where.OR.find(
+        (a) => a.status === 'FAILED' && a.statusReason === null,
+      ) as { updatedAt: { lt: Date } }
+      expect(cutoff).toBeGreaterThan(failedArm.updatedAt.lt.getTime())
+    })
+
+    it('re-ask delay clears the transport backoff, so our own recovery is never refused', async () => {
+      // The failure mode daatan#1262 names: "the re-ask must not look like a fresh organic
+      // push, or it will be refused as `unchanged` before it ever reaches retro". The gate
+      // and the scheduler are two halves of one policy, and only their ORDER makes it work.
+      updateMany.mockResolvedValue({ count: 1 })
+
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+      const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+      const transportArm = call.where.OR.find(
+        (a) => a.status === 'FAILED' && typeof a.statusReason === 'object' && a.statusReason !== null && 'in' in (a.statusReason as object),
+      ) as { updatedAt: { lt: Date } }
+      const backoffMs = Date.now() - transportArm.updatedAt.lt.getTime()
+      expect(REASK_DELAY_MS).toBeGreaterThan(backoffMs)
+      // …and still far inside retro's `cache_ttl_seconds = 3600`, which is the window the
+      // recovered forecast actually lives in.
+      expect(REASK_DELAY_MS).toBeLessThan(3600 * 1000)
+    })
+
+    it('never re-claims a terminal row — every FAILED arm is both age-gated and reason-aware', async () => {
+      // "Terminal" used to be true of the SWEEP and false of every organic re-push:
+      // pool-retry excluded oracle_omitted/oracle_null_final, the claim gate did not. Both
+      // now agree. (A content change still revives a terminal row — that path is the
+      // "content changed" branch above, and is deliberately unconditional on status.)
+      updateMany.mockResolvedValue({ count: 1 })
+
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+
+      const call = updateMany.mock.calls[0][0] as { where: { OR: Record<string, unknown>[] } }
+      const failedArms = call.where.OR.filter((a) => a.status === 'FAILED')
+      for (const arm of failedArms) {
+        expect(arm).toHaveProperty('updatedAt')
+        expect('statusReason' in arm).toBe(true)
+      }
+    })
+
+    it('stores the snippet on the re-claim path too, not just on first insert', async () => {
+      updateMany.mockResolvedValue({ count: 1 })
+      await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      const call = updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+      expect(call.data.snippet).toBe('A snippet')
     })
   })
 
@@ -939,7 +1078,7 @@ describe('claimArticleForExtraction', () => {
     // that already failed. For a Telegram row whose only content IS the snippet, that made
     // the second null near-deterministic and `oracle_null_final` a self-fulfilling
     // prophecy rather than a genuine re-test (daatan#1232).
-    create.mockResolvedValue({} as never)
+    create.mockResolvedValue({ id: 'new-1' } as never)
 
     await claimArticleForExtraction('pred-1', article(), 'news-indexer')
 
@@ -948,20 +1087,10 @@ describe('claimArticleForExtraction', () => {
     )
   })
 
-  it('stores the snippet on the re-claim path too, not just on first insert', async () => {
-    create.mockRejectedValue(uniqueViolation())
-    updateMany.mockResolvedValue({ count: 1 })
-
-    await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-
-    const call = updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
-    expect(call.data.snippet).toBe('A snippet')
-  })
-
   it('normalizes an empty snippet to null rather than storing an empty string', async () => {
     // So "we never had a snippet" and "the snippet was empty" read the same downstream —
     // pool-retry falls back to title-only on null, which is the pre-existing behaviour.
-    create.mockResolvedValue({} as never)
+    create.mockResolvedValue({ id: 'new-1' } as never)
 
     await claimArticleForExtraction('pred-1', article({ snippet: '' }), 'news-indexer')
 
@@ -980,11 +1109,16 @@ describe('claimArticleForExtraction', () => {
 describe('claimArticlesForExtraction', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('claims each article independently and returns per-article results in order', async () => {
+  it('claims each article independently and returns per-article outcomes in order', async () => {
     create
-      .mockResolvedValueOnce({} as never) // first: new row, claimed
+      .mockResolvedValueOnce({ id: 'row-1' } as never) // first: new row, claimed
       .mockRejectedValueOnce(uniqueViolation()) // second: conflict, falls to updateMany
-    updateMany.mockResolvedValueOnce({ count: 0 }) // second: skip
+    findFirst.mockResolvedValueOnce({
+      id: 'row-2',
+      version: 1,
+      contentHash: hashArticleContent('Headline', 'A snippet'),
+    } as never)
+    updateMany.mockResolvedValueOnce({ count: 0 }) // second: same content, nothing matched — skip
 
     const results = await claimArticlesForExtraction(
       'pred-1',
@@ -992,7 +1126,32 @@ describe('claimArticlesForExtraction', () => {
       'news-indexer',
     )
 
-    expect(results).toEqual(['claimed', 'skip'])
+    expect(results).toEqual([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'skip', articleId: 'row-2' },
+    ])
+  })
+})
+
+describe('articleIdsByUrl', () => {
+  it('maps each article URL to its claimed row id', () => {
+    const articles = [article({ url: 'https://a.com/1' }), article({ url: 'https://b.com/2' })]
+    const outcomes = [
+      { result: 'claimed' as const, articleId: 'row-1' },
+      { result: 'skip' as const, articleId: 'row-2' },
+    ]
+    expect(articleIdsByUrl(articles, outcomes)).toEqual(
+      new Map([
+        ['https://a.com/1', 'row-1'],
+        ['https://b.com/2', 'row-2'],
+      ]),
+    )
+  })
+
+  it('omits a URL whose outcome lost the versioning race (articleId null)', () => {
+    const articles = [article({ url: 'https://a.com/1' })]
+    const outcomes = [{ result: 'skip' as const, articleId: null }]
+    expect(articleIdsByUrl(articles, outcomes)).toEqual(new Map())
   })
 })
 
@@ -1009,6 +1168,7 @@ describe('failClaimedArticles', () => {
         predictionId: 'pred-1',
         urlHash: { in: [hashUrl('https://a.com/1'), hashUrl('https://b.com/2')] },
         status: 'PENDING',
+        supersededAt: null,
       },
       data: { status: 'FAILED', statusReason: 'extractor_error' },
     })

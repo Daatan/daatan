@@ -10,7 +10,7 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
-import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
+import { addArticlesToPool, articleIdsByUrl, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate, type SingleRunEstimate } from '@/lib/services/pooled-estimate'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
@@ -182,18 +182,16 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
         // text isn't stable run-to-run. The 1h cooldown above rate-limits how
         // OFTEN this fires, not whether re-extracting unchanged content is ever
         // worth it — it isn't.
-        const claimResults = await claimArticlesForExtraction(
-            prediction.id,
-            searchResults.map((r) => ({
-                url: r.url,
-                title: r.title,
-                snippet: r.snippet,
-                source: r.source ?? null,
-                publishedAt: r.publishedDate ?? null,
-            })),
-            'analyze',
-        )
-        const articlesToScore = searchResults.filter((_, i) => claimResults[i] === 'claimed')
+        const claimableResults = searchResults.map((r) => ({
+            url: r.url,
+            title: r.title,
+            snippet: r.snippet,
+            source: r.source ?? null,
+            publishedAt: r.publishedDate ?? null,
+        }))
+        const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, 'analyze')
+        const claimedArticleIdByUrl = articleIdsByUrl(claimableResults, claimResults)
+        const articlesToScore = searchResults.filter((_, i) => claimResults[i].result === 'claimed')
 
         // Shared mapping from a resolved pool/single-run estimate to the route's
         // response shape — used both when this run extracted new articles and
@@ -339,7 +337,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 // persisted estimate + snapshot sources. `/pool/aggregate` is compute-only (no
                 // search, no LLM), so awaiting it inside the ESTIMATION_TIMEOUT_MS budget is cheap;
                 // on any failure resolvePooledEstimate falls back to this single run.
-                await addArticlesToPool(prediction.id, enrichedSources, 'analyze')
+                await addArticlesToPool(prediction.id, enrichedSources, 'analyze', claimedArticleIdByUrl)
                 const resolved = await resolvePooledEstimate(
                     prediction.id,
                     {

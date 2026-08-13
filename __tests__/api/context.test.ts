@@ -25,7 +25,7 @@ const {
   // 'claimed' response keeps the claim gate (daatan#1172) a no-op for tests
   // that predate it — they're exercising the Oracle/LLM/persistence paths,
   // not the gate itself.
-  mockClaimArticlesForExtraction: vi.fn().mockResolvedValue(['claimed']),
+  mockClaimArticlesForExtraction: vi.fn().mockResolvedValue([{ result: 'claimed', articleId: 'row-1' }]),
   mockAddArticlesToPool: vi.fn().mockResolvedValue(undefined),
   mockPrisma: {
     prediction: {
@@ -56,7 +56,10 @@ vi.mock('@/lib/services/oracle', () => ({
   recordOracleFallback: (...args: unknown[]) => mockRecordOracleFallback(...args),
 }))
 
-vi.mock('@/lib/services/evidence-pool', () => ({
+vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
+  // `articleIdsByUrl` is taken from the REAL module — see the route unit tests'
+  // identical mock for why a hand-copied stub here would be the wrong thing.
+  ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   claimArticlesForExtraction: (...args: unknown[]) => mockClaimArticlesForExtraction(...args),
   addArticlesToPool: (...args: unknown[]) => mockAddArticlesToPool(...args),
 }))

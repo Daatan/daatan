@@ -10,13 +10,13 @@ import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import {
   addArticlesToPool,
+  articleIdsByUrl,
   claimArticlesForExtraction,
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate } from '@/lib/services/pooled-estimate'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
-import { hashUrl } from '@/lib/utils/hash'
 
 const log = createLogger('news-indexer-context')
 
@@ -221,18 +221,19 @@ export async function POST(request: NextRequest) {
     // either already-extracted-with-identical-content or claimed by another
     // still-fresh in-flight request, there is nothing new to extract — skip
     // the Oracle call entirely rather than paying for a redundant/racy run.
-    const claimResults = await claimArticlesForExtraction(
-      prediction.id,
-      items.map((a) => ({
-        url: a.url,
-        title: a.title,
-        snippet: a.snippet,
-        source: a.source ?? null,
-        publishedAt: a.publishedAt ?? null,
-      })),
-      'news-indexer',
-    )
-    if (!claimResults.some((r) => r === 'claimed')) {
+    const claimableItems = items.map((a) => ({
+      url: a.url,
+      title: a.title,
+      snippet: a.snippet,
+      source: a.source ?? null,
+      publishedAt: a.publishedAt ?? null,
+    }))
+    const claimResults = await claimArticlesForExtraction(prediction.id, claimableItems, 'news-indexer')
+    // Built once here (not lazily near addArticlesToPool below) so the trigger's id is
+    // available immediately after the claim step for evidencePoolArticleId, matching
+    // the id addArticlesToPool itself writes onto rather than a separate re-fetch.
+    const claimedArticleIdByUrl = articleIdsByUrl(claimableItems, claimResults)
+    if (!claimResults.some((r) => r.result === 'claimed')) {
       log.info(
         { predictionId: prediction.id, articles: items.length },
         'news-indexer: all articles already claimed/unchanged, skipping oracle call',
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
     // ~30 re-discoveries in 2 days). `articles` stays available below for
     // enrichOracleSources's URL-keyed metadata lookup, which is fine to run
     // over the full set.
-    const articlesToScore = articles.filter((_, i) => claimResults[i] === 'claimed')
+    const articlesToScore = articles.filter((_, i) => claimResults[i].result === 'claimed')
 
     // No try/catch: `getOracleForecast` never throws — it classifies every failure and
     // returns. The `extractor_error` branch that used to sit here was unreachable (its
@@ -395,16 +396,13 @@ export async function POST(request: NextRequest) {
       // Pass the authors already fetched for this push so overlapping pool URLs aren't re-queried.
       let resolved: ResolvedPoolEstimate | null = null
       try {
-        await addArticlesToPool(prediction.id, oracleSources, 'news-indexer')
-        // addArticlesToPool discards the written rows' ids — re-fetch the trigger
-        // article's row by its unique key (daatan#1223's rating-prompt message needs
-        // the id to hang the feedback relation off; a lookup miss just means no
-        // rating prompt gets sent for this push, not a hard failure).
-        const triggerPoolArticle = await prisma.evidencePoolArticle.findUnique({
-          where: { predictionId_urlHash: { predictionId: prediction.id, urlHash: hashUrl(triggerUrl) } },
-          select: { id: true },
-        })
-        evidencePoolArticleId = triggerPoolArticle?.id ?? null
+        await addArticlesToPool(prediction.id, oracleSources, 'news-indexer', claimedArticleIdByUrl)
+        // The claim step already resolved the trigger article's row id — no re-fetch
+        // needed (and `findUnique` on (predictionId, urlHash) is no longer possible
+        // post-daatan#1381, that pair isn't unique anymore). `undefined` (claim not
+        // made, e.g. this run was a no-op skip) reads the same as a lookup miss:
+        // daatan#1223's rating prompt just doesn't get sent for this push.
+        evidencePoolArticleId = claimedArticleIdByUrl.get(triggerUrl) ?? null
         // The pool write above flips this run's extracted claims to COMPLETE. Anything
         // this run claimed that the Oracle omitted from its sources (gatekeeper-rejected,
         // most commonly) would otherwise stay PENDING forever: news-indexer dedups its
@@ -414,7 +412,7 @@ export async function POST(request: NextRequest) {
         // to this run's own claims so a concurrent run's fresh in-flight claim survives.
         await failClaimedArticles(
           prediction.id,
-          items.filter((_, i) => claimResults[i] === 'claimed').map((a) => a.url),
+          items.filter((_, i) => claimResults[i].result === 'claimed').map((a) => a.url),
           'oracle_omitted',
         )
         resolved = await resolvePooledEstimate(
@@ -560,7 +558,7 @@ export async function POST(request: NextRequest) {
       // request would then complete against a row this one had already marked FAILED.
       await failClaimedArticles(
         prediction.id,
-        items.filter((_, i) => claimResults[i] === 'claimed').map((a) => a.url),
+        items.filter((_, i) => claimResults[i].result === 'claimed').map((a) => a.url),
         failureClass ?? 'oracle_null',
       )
       // A transport class means we hung up, not that the articles said nothing —
@@ -575,7 +573,7 @@ export async function POST(request: NextRequest) {
         scheduleOracleReask(
           prediction,
           items
-            .filter((_, i) => claimResults[i] === 'claimed')
+            .filter((_, i) => claimResults[i].result === 'claimed')
             .map((a) => ({
               url: a.url,
               title: a.title,

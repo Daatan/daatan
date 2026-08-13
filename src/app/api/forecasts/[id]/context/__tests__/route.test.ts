@@ -49,7 +49,10 @@ vi.mock('@/lib/services/oracle', () => ({
   INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
 }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn().mockResolvedValue(new Map()) }))
-vi.mock('@/lib/services/evidence-pool', () => ({
+vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
+  // `articleIdsByUrl` is taken from the REAL module — see the news-indexer route test's
+  // identical mock for why a hand-copied stub here would be the wrong thing.
+  ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   addArticlesToPool: vi.fn(),
   claimArticlesForExtraction: vi.fn(),
 }))
@@ -145,7 +148,10 @@ describe('POST /api/forecasts/[id]/context', () => {
     vi.mocked(listContextSnapshots).mockResolvedValue([] as never)
     // Default: everything searched is newly claimed — existing (pre-fix)
     // behavior for a route that previously had no gate at all.
-    vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
     vi.mocked(getOracleForecast).mockResolvedValue({
       forecast: ORACLE_FORECAST_ONE_SOURCE,
       logId: 'log-1',
@@ -160,7 +166,10 @@ describe('POST /api/forecasts/[id]/context', () => {
 
   describe('extraction claim gate (daatan#1172)', () => {
     it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+        { result: 'skip', articleId: 'row-1' },
+        { result: 'claimed', articleId: 'row-2' },
+      ])
 
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
@@ -179,7 +188,10 @@ describe('POST /api/forecasts/[id]/context', () => {
       // Oracle call must fit inside it. The service default is 30s — sized for the
       // background push/sweep paths — and inheriting it here would mean the race abandons
       // a call that is still running: the same timeout inversion, one hop further in.
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
 
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
@@ -193,7 +205,10 @@ describe('POST /api/forecasts/[id]/context', () => {
     })
 
     it('forwards the claim\'s resolutionRules to the Oracle (daatan#1375)', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['claimed', 'claimed'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
       vi.mocked(getForecastForContextUpdate).mockResolvedValue({
         ...BASE_PREDICTION,
         resolutionRules: 'Only an official government announcement counts.',
@@ -207,7 +222,10 @@ describe('POST /api/forecasts/[id]/context', () => {
     })
 
     it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'skip'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+        { result: 'skip', articleId: 'row-1' },
+        { result: 'skip', articleId: 'row-2' },
+      ])
 
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       const done = await collectDoneEvent(res)
@@ -231,7 +249,10 @@ describe('POST /api/forecasts/[id]/context', () => {
     })
 
     it('does not fabricate a number when nothing is new AND the pool itself cannot be read', async () => {
-      vi.mocked(claimArticlesForExtraction).mockResolvedValue(['skip', 'skip'])
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+        { result: 'skip', articleId: 'row-1' },
+        { result: 'skip', articleId: 'row-2' },
+      ])
       vi.mocked(resolvePooledEstimate).mockResolvedValue({
         mean: 0, std: 0, ciLow: 0, ciHigh: 0, settled: false, articlesUsed: 0,
         snapshotSources: [], estimateSource: 'single-run', insufficientData: false,
