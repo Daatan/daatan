@@ -63,7 +63,7 @@ export async function suggestTags(claim: string, details?: string) {
     const result = await llmService.generateContent({
       prompt,
       schema: suggestTagsSchema,
-      temperature: 0.1,
+      temperature: 0,
     })
 
     try {
@@ -87,7 +87,7 @@ export async function extractPrediction(text: string) {
     const result = await llmService.generateContent({
       prompt,
       schema: predictionSchema,
-      temperature: 0.1,
+      temperature: 0,
     })
 
     try {

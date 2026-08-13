@@ -570,14 +570,19 @@ export function notifyDailySummary(stats: {
 }
 
 /**
- * A news-indexer push landed a new Oracle read. ONE fresh message per push:
- * the probability move leads, then the triggering article (link + short
- * extract), every per-article number in a monospace table, the forecast link —
- * and the 1-5 rating buttons (daatan#1223) attached when the trigger's
- * evidence-pool row is known. Deliberately freshly sent, not edited in place:
- * an edit never resurfaces in the channel feed, and a rating tap must map 1:1
- * to exactly the numbers shown (which is why this function also persists the
- * ArticleRatingPrompt row the webhook resolves taps against).
+ * A news-indexer push landed a new Oracle read. Fires PER SOURCE ARTICLE, to the
+ * NOISY channel — not to be confused with news-indexer's own hourly "N new
+ * articles per source" digest, which is a separate repo/mechanism entirely
+ * (news-indexer/src/news_indexer/worker/digest.py + notifier.py). ONE fresh
+ * message per push: the probability move leads, then the triggering article
+ * (link + short extract), every per-article number in a monospace table, the
+ * forecast link — and the 1-5 rating buttons (daatan#1223) attached when the
+ * trigger's evidence-pool row is known, which let a channel member RATE these
+ * numbers (docs/TELEGRAM_NOTIFICATIONS.md#manual-number-rating-feedback-daatan1223,
+ * public explainer at /help/rating-numbers). Deliberately freshly sent, not
+ * edited in place: an edit never resurfaces in the channel feed, and a rating
+ * tap must map 1:1 to exactly the numbers shown (which is why this function
+ * also persists the ArticleRatingPrompt row the webhook resolves taps against).
  *
  * Only called for a push that actually changed something: a re-delivered push
  * that dedups to nothing (see context.ts's `saveNewsIndexerMatch`) is the
