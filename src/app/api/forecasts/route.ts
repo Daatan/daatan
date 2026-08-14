@@ -11,6 +11,8 @@ import { findFuzzyMatches } from '@/lib/services/fuzzy-search'
 import { createLogger } from '@/lib/logger'
 import { toError } from '@/lib/utils/error'
 import { withRetry } from '@/lib/utils/retry'
+import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
+import { formatDisplayDate } from '@/lib/utils/date'
 
 const log = createLogger('api-forecasts')
 
@@ -162,8 +164,22 @@ export const POST = withAuth(async (request, user) => {
     return apiError('User not found. Please sign out and sign back in.', 403)
   }
 
-  if (new Date(data.resolveByDatetime) <= new Date()) {
+  const resolveByDatetime = new Date(data.resolveByDatetime)
+  if (resolveByDatetime <= new Date()) {
     return apiError('Resolution date must be in the future', 400)
+  }
+
+  // Catches #1363/the Somaliland pair at creation time: block when the claim
+  // text names an explicit date and it disagrees with the stored deadline.
+  // Skips silently when the claim has no explicit date phrase (or an
+  // ambiguous one like "end of summer") — see extractDatesFromText.ts.
+  const claimDeadlineMismatch = findClaimTextDeadlineMismatch(data.claimText, resolveByDatetime)
+  if (claimDeadlineMismatch) {
+    return apiError(
+      `Claim text says ${formatDisplayDate(claimDeadlineMismatch)} but the resolution deadline is set to ` +
+      `${formatDisplayDate(resolveByDatetime)} — fix the claim text or the deadline so they agree`,
+      400,
+    )
   }
 
   const moderationResult = await checkContent(`${data.claimText}\n\n${data.detailsText || ''}`, 'forecast')

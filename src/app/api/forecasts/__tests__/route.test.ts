@@ -437,6 +437,111 @@ describe('/api/forecasts', () => {
             expect(data.tags[1].name).toBe('Technology')
         })
 
+        // daatan#1404: claim text vs resolveByDatetime cross-check
+        it('rejects creation when the claim text date disagrees with resolveByDatetime (Somaliland-pair shape)', async () => {
+            mockAuth.mockResolvedValue({
+                user: { id: 'user1', email: 'user@example.com', role: 'USER' },
+            } as any)
+
+            const body = {
+                claimText: 'The US will officially recognise Somaliland by the end of 2027.',
+                resolveByDatetime: '2028-01-01T22:59:59.999Z',
+                outcomeType: 'BINARY',
+                resolutionRules: 'Resolves YES if the event occurs as described.',
+            }
+
+            const request = new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            })
+
+            const response = await POST(request, { params: {} } as any)
+            const data = await response.json()
+
+            expect(response.status).toBe(400)
+            expect(data.error).toMatch(/2027/)
+            expect(data.error).toMatch(/2028/)
+        })
+
+        it('rejects creation when the claim text date disagrees with resolveByDatetime (#1363 shape)', async () => {
+            mockAuth.mockResolvedValue({
+                user: { id: 'user1', email: 'user@example.com', role: 'USER' },
+            } as any)
+
+            const body = {
+                claimText: 'Rockets or drones are launched directly from Israel to Iran, or from Iran to Israel, by 31 August 2026.',
+                resolveByDatetime: '2026-12-31T23:59:59Z',
+                outcomeType: 'BINARY',
+                resolutionRules: 'Resolves YES if the event occurs as described.',
+            }
+
+            const request = new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            })
+
+            const response = await POST(request, { params: {} } as any)
+            expect(response.status).toBe(400)
+        })
+
+        it('allows creation when the claim text date agrees with resolveByDatetime', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            mockAuth.mockResolvedValue({
+                user: { id: 'user1', email: 'user@example.com', role: 'USER' },
+            } as any)
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user1', rs: 100 } as any)
+
+            const newForecast = { id: 'fc-agree', claimText: 'Agreeing dates', status: 'DRAFT' }
+            vi.mocked(prisma.prediction.create).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findUnique).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+
+            const body = {
+                claimText: 'Rockets or drones are launched directly from Israel to Iran, or from Iran to Israel, by 31 August 2026.',
+                resolveByDatetime: '2026-08-31T23:59:59Z',
+                outcomeType: 'BINARY',
+                resolutionRules: 'Resolves YES if the event occurs as described.',
+            }
+
+            const request = new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            })
+
+            const response = await POST(request, { params: {} } as any)
+            expect(response.status).toBe(201)
+        })
+
+        it('allows creation when claim text has no explicit date phrase', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            mockAuth.mockResolvedValue({
+                user: { id: 'user1', email: 'user@example.com', role: 'USER' },
+            } as any)
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user1', rs: 100 } as any)
+
+            const newForecast = { id: 'fc-no-date', claimText: 'Candidate X will win 50% of voters', status: 'DRAFT' }
+            vi.mocked(prisma.prediction.create).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findUnique).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+
+            const body = {
+                claimText: 'Candidate X will win 50% of voters',
+                resolveByDatetime: '2026-12-31T23:59:59Z',
+                outcomeType: 'BINARY',
+                resolutionRules: 'Resolves YES if the event occurs as described.',
+            }
+
+            const request = new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            })
+
+            const response = await POST(request, { params: {} } as any)
+            expect(response.status).toBe(201)
+        })
+
         // TEST-5: background translation failure path
         it('returns 201 and the created forecast even when background translation throws', async () => {
             const { prisma } = await import('@/lib/prisma')
