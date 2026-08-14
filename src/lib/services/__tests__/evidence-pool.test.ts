@@ -9,6 +9,9 @@ vi.mock('@/lib/prisma', () => {
       create: vi.fn(),
       updateMany: vi.fn(),
     },
+    contextSnapshot: {
+      findFirst: vi.fn(),
+    },
   }
   // Array form (upsertCurrentVersion) resolves each already-started promise; callback
   // form (claimArticleForExtraction's versioning branch) runs against this same mocked
@@ -58,6 +61,7 @@ const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
 const update = vi.mocked(prisma.evidencePoolArticle.update)
 const create = vi.mocked(prisma.evidencePoolArticle.create)
 const updateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
+const snapshotFindFirst = vi.mocked(prisma.contextSnapshot.findFirst)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
 const mockOracleFetch = vi.mocked(oracleFetch)
 
@@ -667,6 +671,7 @@ describe('pushCredibilityFeedback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
+    snapshotFindFirst.mockResolvedValue(null as never)
   })
 
   it('does nothing when the Oracle is not configured', async () => {
@@ -771,6 +776,80 @@ describe('pushCredibilityFeedback', () => {
       credibility_weight: 1.0,
       evidence_weight: 0.6,
     })
+  })
+
+  // daatan#1451: retro's settlement-pin ledger records nothing without this field,
+  // and its `mean` is bounded [-1, 1] — sending the stored percent is a 422.
+  it('sends settlement_snapshot converted from percent to stance space', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    snapshotFindFirst.mockResolvedValue({
+      oracleSnapshot: { mean: 97, ciLow: 91, ciHigh: 99, settled: true },
+    } as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', false, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.settlement_snapshot.settled).toBe(true)
+    expect(body.settlement_snapshot.mean).toBeCloseTo(0.94, 10)
+    expect(body.settlement_snapshot.ci_low).toBeCloseTo(0.82, 10)
+    expect(body.settlement_snapshot.ci_high).toBeCloseTo(0.98, 10)
+  })
+
+  it('reads the pin from the latest settled non-clock snapshot at or before resolution', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    expect(snapshotFindFirst).toHaveBeenCalledWith({
+      where: {
+        predictionId: 'pred-1',
+        kind: { not: 'clock' },
+        insufficientData: false,
+        createdAt: { lte: resolvedAt },
+        oracleSnapshot: { path: ['settled'], equals: true },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { oracleSnapshot: true },
+    })
+  })
+
+  it('omits settlement_snapshot entirely when the claim was never pinned', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect('settlement_snapshot' in body).toBe(false)
+  })
+
+  it('still pushes a pinned claim whose pool holds nothing usable', async () => {
+    findMany.mockResolvedValue([] as never)
+    snapshotFindFirst.mockResolvedValue({
+      oracleSnapshot: { mean: 3, ciLow: 1, ciHigh: 9, settled: true },
+    } as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 0 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.sources).toHaveLength(0)
+    expect(body.settlement_snapshot.mean).toBeCloseTo(-0.94, 10)
   })
 
   it('logs the ingest result on success', async () => {

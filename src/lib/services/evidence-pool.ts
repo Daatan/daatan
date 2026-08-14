@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
-import { toClaimsDetail, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
+import { percentToStance, toClaimsDetail, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
 import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { claimArchetypeParam, claimDirectionParam, TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
@@ -800,6 +800,55 @@ interface IngestResolutionApiResponse {
   author_signals_recorded?: number
 }
 
+/** retro's `SettlementSnapshotInput` wire shape — stance space [-1, 1], not percent. */
+type SettlementSnapshotPayload = {
+  settled: true
+  mean: number
+  ci_low: number
+  ci_high: number
+}
+
+/**
+ * The settlement pin as it stood while the claim was still open: the most
+ * recent settled, non-clock `oracleSnapshot` written at or before `resolvedAt`.
+ *
+ * Deliberately not simply the latest snapshot — evidence writes can land after
+ * a resolution, and the ledger is a post-mortem of what the pin *published*,
+ * not of what the pool looks like now.
+ *
+ * Returns null when the claim was never pinned; the caller then omits the field
+ * and retro records nothing for it (`record_settlement_pin` returns False on a
+ * missing snapshot, which is the correct outcome for an unpinned claim).
+ */
+async function getSettlementPinSnapshot(
+  predictionId: string,
+  resolvedAt: Date,
+): Promise<SettlementSnapshotPayload | null> {
+  const row = await prisma.contextSnapshot.findFirst({
+    where: {
+      predictionId,
+      kind: { not: 'clock' },
+      insufficientData: false,
+      createdAt: { lte: resolvedAt },
+      oracleSnapshot: { path: ['settled'], equals: true },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { oracleSnapshot: true },
+  })
+  if (!row) return null
+
+  const snap = row.oracleSnapshot as Record<string, unknown>
+  const { mean, ciLow, ciHigh } = snap
+  if (typeof mean !== 'number' || typeof ciLow !== 'number' || typeof ciHigh !== 'number') return null
+
+  return {
+    settled: true,
+    mean: percentToStance(mean),
+    ci_low: percentToStance(ciLow),
+    ci_high: percentToStance(ciHigh),
+  }
+}
+
 /**
  * Credibility feedback loop, step 2 (retro docs/ORACLE_VARIABLES.md §9):
  * push one resolved forecast's per-source stances to retro's
@@ -818,13 +867,25 @@ interface IngestResolutionApiResponse {
  * failure as a reported fact being wrong) and anything missing the fields
  * retro's `ResolutionSourceInput` requires. Skips the call entirely when
  * nothing usable remains — an empty-sources ingest would just be noise in
- * retro's accumulating store.
+ * retro's accumulating store. "Nothing" now includes the settlement snapshot:
+ * a pinned claim whose pool holds no usable rows still has a pin worth
+ * recording, so it must not be skipped.
  *
  * Also carries the author-scoring lane (`author_signals`): every
  * non-excluded row with an `author_lean`, INCLUDING opinion-class — that
  * lane scores the author's own lean, and opinion is precisely where it
  * lives. Retro replays these per (byline author, outlet) into its shadow
  * author board (`GET /leaderboard/author-shadow`).
+ *
+ * Carries a third lane when the claim was settlement-pinned:
+ * `settlement_snapshot`, the pin as it stood at forecast time, which is the
+ * sole input to retro's settlement-pin ledger (retro#361 Phase 1 / retro#455).
+ * Omitting it is why that ledger recorded nothing between its ship date and
+ * daatan#1451 — the writer is unreachable without this field, not merely
+ * under-fed. Note the scale change: `oracleSnapshot` holds percent, retro wants
+ * stance, and its `mean` is bounded `[-1, 1]`, so an unconverted percent is a
+ * 422 rather than a silent mis-record — but on a fire-and-forget call a 422 is
+ * still just a warning line.
  *
  * Fire-and-forget: callers must `.catch()` the returned promise themselves,
  * matching `addArticlesToPool`'s own convention — this never blocks or alters
@@ -843,7 +904,8 @@ export async function pushCredibilityFeedback(
     (a) => !a.excluded && a.evidenceClass !== 'opinion' && a.source !== null && a.stance !== null,
   )
   const authorSignals = pool.filter((a) => !a.excluded && a.authorLean !== null)
-  if (usable.length === 0 && authorSignals.length === 0) return
+  const settlementSnapshot = await getSettlementPinSnapshot(predictionId, resolvedAt)
+  if (usable.length === 0 && authorSignals.length === 0 && settlementSnapshot === null) return
 
   let res: Response
   try {
@@ -868,6 +930,7 @@ export async function pushCredibilityFeedback(
           author_lean_certainty: a.authorLeanCertainty,
           evidence_class: a.evidenceClass,
         })),
+        ...(settlementSnapshot ? { settlement_snapshot: settlementSnapshot } : {}),
       }),
       timeoutMs: 10_000,
     })
@@ -888,6 +951,7 @@ export async function pushCredibilityFeedback(
       poolSize: pool.length,
       usableSize: usable.length,
       authorSignalsSize: authorSignals.length,
+      settlementPinned: settlementSnapshot !== null,
       alreadyIngested: body.already_ingested,
       sourcesRecorded: body.sources_recorded,
       authorSignalsRecorded: body.author_signals_recorded,
