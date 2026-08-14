@@ -123,6 +123,17 @@ Calibrated probability estimates for binary forecast questions come from the **T
     *   `getOracleProbability(question)` → `number | null` in `[0, 1]`. Thin wrapper around `getOracleForecast` for callers that only need the scaled probability.
     *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version starts with `0.1`.
 
+### Funnel diagnostics: `outcomeCounts`
+
+Every `/forecast` response carries retro's per-article stage histogram (`outcome_counts` — `gate_rejected`, `gate_error`, `empty_text`, `extract_error`, `unhandled_error`, `ok`, …). `getOracleForecast` hoists it onto its result as `outcomeCounts` and emits it at **INFO** on all four post-response paths (success, abstain, placeholder, no-usable-articles), alongside `predictionId` and `source`, so a thin pool's cause is queryable in CloudWatch:
+
+```
+fields @timestamp, predictionId, source, reason, outcomeCounts
+| filter module = 'oracle' and ispresent(outcomeCounts)
+```
+
+`reason` only summarises ("the extractor produced nothing"); the histogram is what separates "the gatekeeper rejected all 8" from "6 fetches came back empty and 2 errored". It is response-level, not per-source — it counts articles that never became a source at all, which is exactly the population no per-source field or `EvidencePoolArticle` row can describe, so it is deliberately not persisted on either. An absent or `{}` histogram is reported as `null` rather than an empty object: `{}` is indistinguishable from a retro build too old to send the field, so it must not read as a measurement (daatan#1457).
+
 ### Persistence & UI surfacing
 
 When the Oracle path produces a probability for `POST /api/forecasts/[id]/context`, the full payload is persisted on the `ContextSnapshot.oracleSnapshot` JSON column (camelCased: `{ mean, std, ciLow, ciHigh, articlesUsed, sources: [...] }`, all top-level values 0–100 percent — uniform across historical rows since the 2026-07-08 normalization). Persistence — from this path and every other estimate writer (news-indexer push, backfill, requote clock, creation) — goes through the single `recordEstimate` funnel in `src/lib/services/context.ts`, which stamps `origin`/`articlesUsed` on the snapshot and keeps `Prediction.confidence`/`aiCiLow`/`aiCiHigh` consistent (see [docs/DATABASE.md](./DATABASE.md)). The forecast detail page consumes this snapshot to render a translucent 95% CI band on the speedometer around the AI tick, inline CI text in the "AI estimate" block (e.g. `64% (95% CI: 52–76%)`), and an "Oracle sources" sub-section that chips each source with a credibility-weight dot (green ≥ 0.75, amber 0.4–0.75, grey < 0.4) and a `YES` / `NO` / `—` stance badge. LLM-fallback snapshots have `oracleSnapshot = null` and the UI gracefully hides the Oracle-only affordances.
