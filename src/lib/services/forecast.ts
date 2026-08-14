@@ -636,9 +636,23 @@ export async function getForecastById(idOrSlug: string) {
       newsAnchor: true,
       tags: { select: { id: true, name: true, slug: true } },
       options: { orderBy: { displayOrder: 'asc' } },
+      // `select`, not `include` — Commitment carries a dozen scoring-only scalars
+      // (rsSnapshot, probability, brierScore, peerScore, aiScore, eloChange, the
+      // AI-panel FK, ...) that `include` would otherwise pull for every commitment
+      // on every page load. Nothing on the detail page reads them. Keep this list in
+      // sync with actual readers: ProbabilityChart.tsx (createdAt/cuCommitted/
+      // binaryChoice/option.id), ForecastDetailClient.tsx (option.id for the MC
+      // distribution, user.id for the author-already-voted check) and
+      // CommitmentsHistory.tsx (id as React key, cuCommitted, binaryChoice, rsChange,
+      // full user for the voter row, option.text for the MC direction label).
       commitments: {
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
+          createdAt: true,
+          cuCommitted: true,
+          binaryChoice: true,
+          rsChange: true,
           user: { select: { id: true, name: true, username: true, image: true } },
           option: { select: { id: true, text: true } },
         },
