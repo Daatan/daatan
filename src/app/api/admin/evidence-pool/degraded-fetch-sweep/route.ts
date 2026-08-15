@@ -6,7 +6,9 @@ import {
   degradedFetchWhere,
   sweepDegradedFetchRows,
   buildDegradedFetchDiffReport,
+  type DegradedFetchWhereOptions,
 } from '@/lib/services/degraded-fetch-backfill'
+import { CONFIRMED_DEGRADED_URL_HASHES } from '@/lib/services/confirmed-degraded-urls'
 
 const MAX_PER_CALL = 10
 
@@ -15,16 +17,27 @@ function parseLimit(request: NextRequest): number {
 }
 
 /**
- * Read-only preview (daatan#1446 Step 2/3 machinery): counts rows/predictions
- * currently matching `degradedFetchWhere()` — the broader, unconfirmed superset of
- * the 17:41 comment's 432-row confirmed population (see the filter's own doc comment
- * for why it isn't the row-level join itself). Never calls the Oracle; safe to hit
- * any time to see how the candidate set is trending as more rows age past the cutoff
- * or get re-extracted by other paths.
+ * Both GET and POST scope to the confirmed url_hash allowlist by default — the
+ * row-level population the 17:41 log join proved degraded (402 rows), not the
+ * 1,605-row domain superset the original filter shape selects. `?filter=domains`
+ * keeps the superset reachable for preview/comparison; the sweep itself always
+ * runs on the allowlist.
  */
-export const GET = withAuth(async () => {
+function parseWhereOptions(request: NextRequest): DegradedFetchWhereOptions {
+  const filter = new URL(request.url).searchParams.get('filter')
+  return filter === 'domains' ? {} : { urlHashAllowlist: CONFIRMED_DEGRADED_URL_HASHES }
+}
+
+/**
+ * Read-only preview (daatan#1446 Step 2/3 machinery): counts rows/predictions
+ * currently matching the sweep's filter — by default the confirmed url_hash
+ * allowlist (see parseWhereOptions); `?filter=domains` shows the legacy domain
+ * superset for comparison. Never calls the Oracle; safe to hit any time to see
+ * how the candidate set is trending as rows get re-extracted.
+ */
+export const GET = withAuth(async (request: NextRequest) => {
   try {
-    const where = degradedFetchWhere()
+    const where = degradedFetchWhere(parseWhereOptions(request))
     const [rows, groups] = await Promise.all([
       prisma.evidencePoolArticle.count({ where }),
       prisma.evidencePoolArticle.groupBy({ by: ['predictionId'], where, _count: { _all: true } }),
@@ -49,7 +62,9 @@ export const GET = withAuth(async () => {
  */
 export const POST = withAuth(async (request: NextRequest) => {
   try {
-    const result = await sweepDegradedFetchRows(parseLimit(request))
+    const result = await sweepDegradedFetchRows(parseLimit(request), {
+      urlHashAllowlist: CONFIRMED_DEGRADED_URL_HASHES,
+    })
     return NextResponse.json({ ...result, report: buildDegradedFetchDiffReport(result.diffs) })
   } catch (error) {
     return handleRouteError(error, 'Degraded-fetch sweep failed')

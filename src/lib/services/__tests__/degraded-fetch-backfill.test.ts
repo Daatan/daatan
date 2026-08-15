@@ -25,6 +25,7 @@ import {
   buildDegradedFetchDiffReport,
   type PredictionSnapshotPair,
 } from '../degraded-fetch-backfill'
+import { CONFIRMED_DEGRADED_URL_HASHES } from '../confirmed-degraded-urls'
 
 const mockGroupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
 const mockRows = vi.mocked(prisma.evidencePoolArticle.findMany)
@@ -75,8 +76,26 @@ describe('degradedFetchWhere', () => {
 
   it('accepts a custom cutoff', () => {
     const cutoff = new Date('2020-01-01T00:00:00Z')
-    const where = degradedFetchWhere(cutoff)
+    const where = degradedFetchWhere({ cutoff })
     expect(where.updatedAt).toEqual({ lt: cutoff })
+  })
+
+  it('a urlHashAllowlist replaces the domain filter entirely', () => {
+    const where = degradedFetchWhere({ urlHashAllowlist: ['h1', 'h2'] })
+    expect(where).toEqual({
+      status: 'COMPLETE',
+      updatedAt: { lt: CONFIRMED_DEGRADED_CUTOFF },
+      urlHash: { in: ['h1', 'h2'] },
+    })
+    expect(where.OR).toBeUndefined()
+  })
+
+  it('the generated allowlist is non-empty, deduped, and all sha256-shaped', () => {
+    expect(CONFIRMED_DEGRADED_URL_HASHES.length).toBeGreaterThan(200)
+    expect(new Set(CONFIRMED_DEGRADED_URL_HASHES).size).toBe(CONFIRMED_DEGRADED_URL_HASHES.length)
+    for (const h of CONFIRMED_DEGRADED_URL_HASHES) {
+      expect(h).toMatch(/^[0-9a-f]{64}$/)
+    }
   })
 
   it('the domain list is exactly the 11 domains the issue was scoped to', () => {
