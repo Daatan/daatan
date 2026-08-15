@@ -7,8 +7,15 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// One shared logger object rather than a fresh one per createLogger() call, so
+// the outcome_counts tests below can assert what was actually emitted. oracle.ts
+// calls createLogger once at module load, so this is the very object it holds.
+const { mockLog } = vi.hoisted(() => ({
+  mockLog: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  createLogger: () => mockLog,
 }))
 
 vi.mock('@/env', () => ({
@@ -358,6 +365,98 @@ describe('getOracleForecast', () => {
       }
       fetchMock.mockRejectedValueOnce(timeoutErr)
       expect((await getOracleForecast('Q?')).failureClass).toBeDefined()
+    })
+  })
+
+  describe('outcome_counts — per-article stage histogram (daatan#1457)', () => {
+    // retro has always sent this; daatan parsed it nowhere, so nothing recorded
+    // WHICH stage killed an article when a pool came back thin.
+    const counts = { ok: 2, gate_rejected: 6, empty_text: 1, extract_error: 1 }
+
+    beforeEach(() => {
+      mockLog.info.mockClear()
+    })
+
+    /** The payload of the single `log.info` the call emitted. */
+    const lastInfoPayload = () => mockLog.info.mock.calls.at(-1)?.[0] as Record<string, unknown>
+
+    it('surfaces the histogram on a successful forecast', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, outcome_counts: counts }),
+      })
+
+      const result = await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      expect(result.forecast?.outcome_counts).toEqual(counts)
+      expect(result.outcomeCounts).toEqual(counts)
+      // Yield is only computable when a success also reports the histogram: this
+      // forecast stood on 2 of 10 candidates, which is the interesting case.
+      expect(lastInfoPayload()).toMatchObject({ outcomeCounts: counts, predictionId: 'pred-1', source: 'news-indexer' })
+    })
+
+    it.each([
+      ['abstain', { mean: 0, articles_used: 0, insufficient_data: true, reason: 'no_usable_predictions' }],
+      ['placeholder', { placeholder: true, reason: 'no_search_results' }],
+      ['no usable articles', { mean: 0, articles_used: 0, reason: 'all_fetches_failed' }],
+    ])('surfaces the histogram on the %s path, where forecast is null', async (_label, overrides) => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, ...overrides, outcome_counts: counts }),
+      })
+
+      const result = await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      expect(result.forecast).toBeNull()
+      // The whole point: these are the runs whose yield needs explaining, and
+      // `forecast` is null on all of them, so the histogram has to ride on the
+      // result rather than only inside the (discarded) response.
+      expect(result.outcomeCounts).toEqual(counts)
+    })
+
+    it.each([
+      ['abstain', { mean: 0, articles_used: 0, insufficient_data: true, reason: 'no_usable_predictions' }],
+      ['placeholder', { placeholder: true, reason: 'no_search_results' }],
+      ['no usable articles', { mean: 0, articles_used: 0, reason: 'all_fetches_failed' }],
+    ])('logs the %s path at INFO, not DEBUG — prod never emits debug', async (_label, overrides) => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, ...overrides, outcome_counts: counts }),
+      })
+
+      await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      // A debug-only histogram is parsed and then dropped on the one deployment
+      // that needs it: pino runs at level `info` in production.
+      expect(mockLog.info).toHaveBeenCalledTimes(1)
+      expect(lastInfoPayload()).toMatchObject({ outcomeCounts: counts, predictionId: 'pred-1' })
+    })
+
+    it.each([
+      ['omitted', undefined],
+      ['empty', {}],
+    ])('reports an %s histogram as null rather than an empty object', async (_label, outcome_counts) => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ...fullPayload, ...(outcome_counts ? { outcome_counts } : {}) }),
+      })
+
+      // `{}` is not "zero articles at every stage" — it's indistinguishable from
+      // a retro build too old to send the field, so it must not read as data.
+      const result = await getOracleForecast('Q?')
+      expect(result.outcomeCounts).toBeNull()
+      expect(lastInfoPayload().outcomeCounts).toBeNull()
+    })
+
+    it('leaves the histogram null when the request never reached retro', async () => {
+      const timeoutErr = new Error('aborted')
+      timeoutErr.name = 'TimeoutError'
+      fetchMock.mockRejectedValueOnce(timeoutErr)
+
+      const result = await getOracleForecast('Q?')
+      expect(result.failureClass).toBe('oracle_timeout')
+      expect(result.outcomeCounts ?? null).toBeNull()
     })
   })
 

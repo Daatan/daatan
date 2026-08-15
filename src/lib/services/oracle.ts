@@ -297,6 +297,23 @@ export interface OracleForecastResponse {
    *  this batch was judged under the same bar. Omitted on `/pool/aggregate`,
    *  which never re-judges anything. */
   relevance_bar?: number | null
+  /**
+   * Per-article outcome histogram for THIS run: which pipeline stage each
+   * candidate article ended at. retro populates it on both the empty and the
+   * success path (`ForecastResponse.outcome_counts`); keys are stage labels —
+   * `gate_rejected`, `gate_error`, `empty_text`, `extract_error`,
+   * `unhandled_error`, `ok`, … — and retro is free to add more, so treat this
+   * as an open-ended map rather than a closed enum.
+   *
+   * This is the response-level answer to "why is the pool thin?" that
+   * `reason` only summarises: `reason: 'no_usable_predictions'` says the
+   * extractor produced nothing, but only the histogram distinguishes "the
+   * gatekeeper rejected all 8" from "6 fetches came back empty and the other
+   * 2 errored". Response-level, not per-source: it counts articles that never
+   * became a source at all, which is exactly the population no per-source
+   * field can describe.
+   */
+  outcome_counts?: Record<string, number> | null
 }
 
 /**
@@ -420,6 +437,31 @@ export interface OracleForecastResult {
    *  back. Callers stamp it onto the evidence-pool row so the cause survives where
    *  the retry sweep can see it. See {@link OracleFailureClass}. */
   failureClass?: OracleFailureClass
+  /**
+   * The run's per-article stage histogram, hoisted off the response so it
+   * survives the null paths too (daatan#1457). `forecast` is null on exactly
+   * the runs whose yield you most want to explain, so leaving this reachable
+   * only via `forecast.outcome_counts` would keep it invisible in every case
+   * that matters. Null when retro sent none (older builds, transport failures,
+   * `oracle_unconfigured`) or when it sent an empty histogram.
+   */
+  outcomeCounts?: Record<string, number> | null
+}
+
+/**
+ * Normalise a response's `outcome_counts` for logging: an absent or empty
+ * histogram becomes null so the log line carries no `outcomeCounts` key at all
+ * rather than a `{}` that reads like "zero articles at every stage".
+ *
+ * retro sends `{}` for real on the paths that never got as far as looking at an
+ * article (no search results, a forecast-cache hit predating the field), and an
+ * empty object is indistinguishable from a build too old to send one — neither
+ * is a measurement, so neither should occupy a field.
+ */
+function outcomeCountsOf(data: OracleForecastResponse): Record<string, number> | null {
+  const counts = data.outcome_counts
+  if (!counts || Object.keys(counts).length === 0) return null
+  return counts
 }
 
 /**
@@ -575,40 +617,53 @@ export const getOracleForecast = async (
 
     const data: OracleForecastResponse = await res.json()
     const searchEngine = data.provider ?? data.provider_chain?.join(', ') ?? null
+    // Which stage each candidate article died at (daatan#1457). Emitted on every
+    // path below at INFO, not DEBUG: prod's pino level is `info`, so a debug-only
+    // histogram would be a field we parse and then throw away on exactly the
+    // deployment that needs it.
+    const outcomeCounts = outcomeCountsOf(data)
+    // Without these the histogram is unattributable: a CloudWatch line saying
+    // "6 gate_rejected" is only actionable if you can tell which claim, and via
+    // which workflow, produced it.
+    const logCtx = { predictionId: meta.predictionId ?? null, source: meta.source }
 
     // The Oracle deliberately abstained: it ran but the evidence didn't bear on
     // the claim (off-topic, all-hedged, or too thin). Signal this distinctly so
     // the caller can show "insufficient evidence" instead of guessing a number.
     if (data.insufficient_data) {
-      log.debug({ reason: data.reason, articlesUsed: data.articles_used }, 'Oracle abstained — insufficient evidence')
+      log.info({ ...logCtx, reason: data.reason, articlesUsed: data.articles_used, outcomeCounts }, 'Oracle abstained — insufficient evidence')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
-      return { forecast: null, logId, insufficientData: true, failureClass: 'oracle_abstain' }
+      return { forecast: null, logId, insufficientData: true, failureClass: 'oracle_abstain', outcomeCounts }
     }
 
     if (data.placeholder) {
-      log.debug('Oracle returned placeholder response — no real forecast available')
+      log.info({ ...logCtx, reason: data.reason, outcomeCounts }, 'Oracle returned placeholder response — no real forecast available')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
-      return { forecast: null, logId, failureClass: 'oracle_placeholder' }
+      return { forecast: null, logId, failureClass: 'oracle_placeholder', outcomeCounts }
     }
 
     if (typeof data.mean !== 'number' || data.articles_used === 0) {
-      log.debug({ articlesUsed: data.articles_used, reason: data.reason }, 'Oracle returned no usable articles')
+      log.info({ ...logCtx, articlesUsed: data.articles_used, reason: data.reason, outcomeCounts }, 'Oracle returned no usable articles')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
-      return { forecast: null, logId, failureClass: 'oracle_no_articles' }
+      return { forecast: null, logId, failureClass: 'oracle_no_articles', outcomeCounts }
     }
 
     log.info(
       {
+        ...logCtx,
         question: question.slice(0, 80),
         mean: data.mean,
         articlesUsed: data.articles_used,
         sources: data.sources.length,
         durationMs: Date.now() - t0,
+        // Also on the success path: yield is ok/total, and a forecast built on
+        // 2 of 20 candidates is the interesting case, not just an empty one.
+        outcomeCounts,
       },
       'Oracle forecast',
     )
     const logId = await logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, tokenUsage: data.token_usage })
-    return { forecast: data, logId }
+    return { forecast: data, logId, outcomeCounts }
   } catch (err) {
     log.warn({ err, durationMs: Date.now() - t0 }, 'Oracle request failed')
     // 12s client budget against retro's own 90s — an unknown share of what the pool
