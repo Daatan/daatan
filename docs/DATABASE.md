@@ -703,3 +703,22 @@ anchor time).
    ([DATABASE_COLLATION.md](./DATABASE_COLLATION.md)).
 6. **`embedding` columns don't exist for Prisma** — raw SQL only, and
    `pgvector` must be present in the image.
+7. **Rolled-back rows in `_prisma_migrations` are historical, not pending**
+   (traced 2026-08-15, daatan#1435). Prod carries two rows with
+   `finished_at IS NULL AND rolled_back_at IS NOT NULL`:
+   `20260225000000_add_context_snapshots` (failed 2026-03-06, `42P07` — the
+   table already existed from an earlier route) and
+   `20260430000000_add_prediction_embedding` (failed 2026-05-03 — the postgres
+   image predated pgvector). Both were resolved with
+   `prisma migrate resolve --rolled-back`, and **both have a later successful
+   row for the same name**: `context_snapshots` via `resolve --applied`
+   (`finished_at` set, `applied_steps_count = 0`), `prediction_embedding` by a
+   genuine re-run after the pgvector image swap (its SQL is `IF NOT EXISTS`
+   idempotent, `applied_steps_count = 1`). Prisma keys on the **latest** row
+   per migration name, so nothing is pending and nothing will retry — deploys
+   are unaffected. Staging shows the same shape (plus four failed attempts of
+   `20260408000000_update_bot_model_preference` before its fifth succeeded).
+   When diagnosing a migration failure: a failed row **with** a successful
+   sibling row is settled history — only a failed row with **no** successful
+   sibling blocks `migrate deploy`. Check with:
+   `select migration_name, finished_at is not null as ok, rolled_back_at is not null as rb from _prisma_migrations where migration_name = '<name>' order by started_at;`
