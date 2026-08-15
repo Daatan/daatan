@@ -45,14 +45,29 @@ export const CONFIRMED_DEGRADED_CUTOFF = new Date('2026-08-12T00:00:00.000Z')
  * being on one of these domains). A human should spot-check the count lands in the
  * hundreds, not the ~1,600 the issue's original (pre-join) upper bound used.
  */
-export function degradedFetchWhere(cutoff: Date = CONFIRMED_DEGRADED_CUTOFF): Prisma.EvidencePoolArticleWhereInput {
+export interface DegradedFetchWhereOptions {
+  cutoff?: Date
+  /** hashUrl() values of the row-level confirmed population (daatan#1446 log join).
+   *  When present, replaces the domain filter entirely: the domain shape is the
+   *  unconfirmed superset (1,605 rows), the allowlist is the confirmed set (402). */
+  urlHashAllowlist?: readonly string[]
+}
+
+export function degradedFetchWhere(
+  options: DegradedFetchWhereOptions = {},
+): Prisma.EvidencePoolArticleWhereInput {
+  const { cutoff = CONFIRMED_DEGRADED_CUTOFF, urlHashAllowlist } = options
   return {
     status: 'COMPLETE',
     updatedAt: { lt: cutoff },
-    OR: [
-      { source: { in: [...DEGRADED_FETCH_DOMAINS] } },
-      { outletName: { in: [...DEGRADED_FETCH_DOMAINS] } },
-    ],
+    ...(urlHashAllowlist
+      ? { urlHash: { in: [...urlHashAllowlist] } }
+      : {
+          OR: [
+            { source: { in: [...DEGRADED_FETCH_DOMAINS] } },
+            { outletName: { in: [...DEGRADED_FETCH_DOMAINS] } },
+          ],
+        }),
   }
 }
 
@@ -127,8 +142,11 @@ export interface DegradedFetchSweepResult {
  * live forecasts is a follow-up product decision, not this PR — see the route/tests
  * this ships alongside. Building it does not run it.
  */
-export async function sweepDegradedFetchRows(limit: number): Promise<DegradedFetchSweepResult> {
-  const where = degradedFetchWhere()
+export async function sweepDegradedFetchRows(
+  limit: number,
+  whereOptions: DegradedFetchWhereOptions = {},
+): Promise<DegradedFetchSweepResult> {
+  const where = degradedFetchWhere(whereOptions)
 
   const groups = await prisma.evidencePoolArticle.groupBy({
     by: ['predictionId'],
