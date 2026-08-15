@@ -4,14 +4,17 @@
  * GENERATED FILE — do not hand-edit. Regenerate with:
  *   npx tsx scripts/generate-confirmed-degraded-urls.ts <urls.txt>
  *
- * Derivation (2026-08-15 re-run of the issue's 2026-08-13 17:41 log join):
- * oracle_log.txt `article_fetch` events on the 11 DEGRADED_FETCH_DOMAINS,
- * joined row-level against evidence_pool_articles (status=COMPLETE,
- * updated_at < CONFIRMED_DEGRADED_CUTOFF). A URL is confirmed degraded iff it
- * never once fetched real text (every event `using=fallback`) or its first
- * real-text fetch postdates the row's updated_at. 287 raw URLs ->
- * 287 distinct hashUrl() values covering 402 pool rows (the
- * 17:41 comment's 432 was against the wider pre-filter population of 1,692).
+ * Derivation (2026-08-15, second pass — flap correction): oracle_log.txt
+ * `article_fetch` events on the 11 DEGRADED_FETCH_DOMAINS, joined row-level
+ * against evidence_pool_articles (status=COMPLETE,
+ * updated_at < CONFIRMED_DEGRADED_CUTOFF). A URL is confirmed degraded iff
+ * for at least one of its pool rows, the fetch event immediately preceding
+ * that row's updated_at (always within ~10s) used `using=fallback`. This
+ * per-row rule supersedes the first pass's "never fetched real text or first
+ * real-text fetch postdates updated_at" — thehill.com's fetch health FLAPPED
+ * (real -> fallback -> real), which that rule misread as recovered, dropping
+ * 9 URLs whose rows were written inside fallback windows. 296 raw
+ * URLs -> 296 distinct hashUrl() values covering 425 pool rows.
  */
 export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '00d3894039de0b0aa379160fe02d669e6d5ef0ad64dddab0976ebf091ac10428',
@@ -46,6 +49,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '1972257fcf2d0bbcafb4ea9fc315c19e6589b463b898494fc1150e687adbdb8d',
   '1a1bbf19e76f5b79296de619788c69e9469e8c52759bbbaf505b2029566dc027',
   '1a2f0f8c24c54a5d9dab4213e248e5f3d23b8b3f4d33a05f6059efc927722dc7',
+  '1a9339e98e3ee54c4f0d20c191a7959764242df3beb6ccb3b2eba4d003e66693',
   '1ae2515023590394b0aa6482cfccc7efab98f7b6838c3ff571063f71486c8017',
   '1bb83bb1cadb51a83a26cab97a59ea5d1ceca2315b33a2df39c8f73bef0c2a59',
   '1c0880669c972fb07717acdad8b27491ac88808ca85a491b9d4c596b1da1cb6f',
@@ -53,6 +57,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '1dccd5e1bb5e1078c738fff30e68cd43eba65d5e021def8ef3a288b54ae6844f',
   '208b0bb464bb48ddf0660842c3b66345851e3dd2d3aeca77e4b28d467d5de9bd',
   '215cb7e6afaffa5961d98dfe349d54feb50a7f73a81ce41adb079dd1a71a5aec',
+  '21802a2eb9cd4775039784b6dfa1481330e5f86472a06fc18cd8d72a5e917e77',
   '221fedcb495e70c7083fe56b63045c7a6ecc8469a74edb5e688be6d1f4afdcc0',
   '22466b7878a0da3b6e8a32d6b4d220ff470014a80bd4c5493152ca669ad4dfa4',
   '22d36709a00d646d0fb3d235605bcb67153da51cef4d75ce1f5f4bdf9771b41f',
@@ -61,6 +66,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '265f4c4b951cf9a9d8641848b0eb441858791165638124aaac6864bec2f03e7a',
   '26f40f69d85ae1a09a7f2c3f0f6f15aa79d43712c22b7655c231b7332e0fa227',
   '2940f2cd6355581ca588dc95d4c8a333c76b55a27e7239cacfde844f7b7c7300',
+  '29ca86b364c2e85598a3ca3badb3eb61246e1ba7603de8191b236d81e1165c4b',
   '2a94b998b9c962c2f46b5f0a3acb6d20de086f947a17b0cb67024eb9369432da',
   '2ad46dae8495c485b8a5b2e150a801de49a0b24fd7cd2c1480c90771c40e1062',
   '2c827ff9fe5cbfc299599e7d8823bfdc72e852d025dbc967e3f1054d5c8af5c5',
@@ -117,6 +123,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '581ea1d4010e606b2c482e2cfbf523d1383a6c87f2c89b0e0baebde421271bbc',
   '587a762b69a29d10edb79a7d9543417aa9f28e639aeaa1dc46ee441c4e7b9668',
   '5941da5fae8074a5ff97a7919f399218ef9b398ea17e8e17b794add972fd53c7',
+  '59537bd3c053fc2147785e0e801185b7bac6510daf0abe54ba6d0c7475d8c4d3',
   '5983c8f8a5bf4077a701d25c7e4bffc6949895d9c424e0f08d12b1f5227c5b38',
   '59d5cd0048ee6deef6519460847ce45c02f9599a9659c9ecea4f4ddc4e7e6884',
   '5c36e9fc59c2bf465eaed3ce429753e6548b16ff387d46fe73bdd262b961528d',
@@ -125,6 +132,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '5e820079864a58d1a91165d7ae7ffb1dcae5452fde8f8993a0b618519f4f582e',
   '5f5626b96af007e472589d091676b9d0f980abeac00358808ee4e55b64e94ec9',
   '5fb1211cface239d24f96d335c05445a72acf3e15511f64780b8ef6d766e8ad9',
+  '60b7a45fdcca646167aea28f7a945229c46c3e2092c2644d88b153578572d8a8',
   '6130938abb421cd4e5f2ba1cb58a086d68ea3a80de851ce0fb421965bb07ad6d',
   '618e93f8dc3542b5ecb5d072bbdf450a17e6b0d619d42a677d6605435b8c519c',
   '626c52ca020e16bd820e85da5b94a1bceec7a011adae99d703056131b5b7e015',
@@ -155,6 +163,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '79bae7db01ca0d6384a543e39d22283b9af7e6d92deda76fe6b0f284adeae92a',
   '79c8b3a8ef92695b18beff84fcc94a0ce166c0221af3863ea320341208f7ed68',
   '7a493048460ff04751418419c7de4c9b189d9e05a997bd7584f13312c8098504',
+  '7e76a0b0930a181c7ce8a68b57172a85f3becefddc85e49514ccebdcbd4b0d42',
   '7ebf7053e80b15d76bdb319e8c7e05045e77221e364e9accdbfcc85ad0cf2aba',
   '7f095351bc3a5e8a571572e82fdab1c56a256cc844c799186bb03b4fd4e930c4',
   '7fbd5a84df008e64228d64f5be95e6906635000ccbe58e95f135c69614dfd721',
@@ -190,6 +199,7 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   '9c7a8a1e69e00a7388037ed24d9eaa0e76afee2f39da13e6c1543dc0a9f07c41',
   '9d3fc9a7d687b0064878c5c19535686611fd1cd7c2d3ca20d1db1ff87757f73d',
   '9d903fb18db05ec185d210dbd2a29c39b236dc0d4c8ba954b7db85533128f6be',
+  '9ece6c99188570b584b0e333deeb000dfe242cac6dda0e291956681ca742e522',
   '9f183dd386dd21e1e2f70a4af8522e715576287e7c2f2c189ef186547fcc0c1a',
   '9fa756719105f416d22253eb3d3775fff412c6452e3e8c2c98f68f8d1dead556',
   'a07b063f11799703631633c1659b77e2c1751921e37f3ad63739f30f3c78091c',
@@ -290,10 +300,12 @@ export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
   'f5d2949e2a64e454c6b7e3e3fa51624f1a11e58d31fb68ac0067a66cd0d9d0eb',
   'f72a5a45406ec884621fadc389332923113688042a8eae3f3daad8879bcf6048',
   'f73df77821377ba2c0ab1568a3a3e30a577614597aba548a24387ec07c28d2a3',
+  'f746e1f0a756be0ace45200e44b7e62c60e35f8d64ff2e436ee8cc15d4f593f0',
   'f755cb18c9ac509b4192771420d36562e97843c2322f2c6b30332dc047478594',
   'f80a2d4dca6e5a966ac2588c68c914b846c3409852fbe6195d4f45fd561942d4',
   'f87904ae35874895777ea7cbc1b6f7c3b2fd627624b480085e1ea95ed55a526e',
   'f8c14a0bf6254c59c9b25670e8c24c047d51b563b47f1d75f55322e5ccad036e',
+  'fb3d9178408b3a723d38a5b8d750f36a55df0c297d501dfa8339dbd0d951ae1f',
   'fbcecc80ed53ba8f96dedd397d8cfbd791a8e04e83d8dc35b97024f7a19ffe2f',
   'fc16fde3d8255d1aeb8e3c4f6ec80f4e0831069d80a7e56447e7c1480b956e47',
   'fe3b029af8382cb38a25366788545417f368e2972a891a2200f0457cacb2be85',
