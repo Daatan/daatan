@@ -32,14 +32,17 @@ const header = `/**
  * GENERATED FILE — do not hand-edit. Regenerate with:
  *   npx tsx scripts/generate-confirmed-degraded-urls.ts <urls.txt>
  *
- * Derivation (2026-08-15 re-run of the issue's 2026-08-13 17:41 log join):
- * oracle_log.txt \`article_fetch\` events on the 11 DEGRADED_FETCH_DOMAINS,
- * joined row-level against evidence_pool_articles (status=COMPLETE,
- * updated_at < CONFIRMED_DEGRADED_CUTOFF). A URL is confirmed degraded iff it
- * never once fetched real text (every event \`using=fallback\`) or its first
- * real-text fetch postdates the row's updated_at. ${urls.length} raw URLs ->
- * ${hashes.length} distinct hashUrl() values covering 402 pool rows (the
- * 17:41 comment's 432 was against the wider pre-filter population of 1,692).
+ * Derivation (2026-08-15, second pass — flap correction): oracle_log.txt
+ * \`article_fetch\` events on the 11 DEGRADED_FETCH_DOMAINS, joined row-level
+ * against evidence_pool_articles (status=COMPLETE,
+ * updated_at < CONFIRMED_DEGRADED_CUTOFF). A URL is confirmed degraded iff
+ * for at least one of its pool rows, the fetch event immediately preceding
+ * that row's updated_at (always within ~10s) used \`using=fallback\`. This
+ * per-row rule supersedes the first pass's "never fetched real text or first
+ * real-text fetch postdates updated_at" — thehill.com's fetch health FLAPPED
+ * (real -> fallback -> real), which that rule misread as recovered, dropping
+ * 9 URLs whose rows were written inside fallback windows. ${urls.length} raw
+ * URLs -> ${hashes.length} distinct hashUrl() values covering 425 pool rows.
  */
 export const CONFIRMED_DEGRADED_URL_HASHES: readonly string[] = [
 `
