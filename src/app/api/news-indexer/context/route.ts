@@ -335,19 +335,15 @@ export async function POST(request: NextRequest) {
 
     if (oracleForecast) {
       // news-indexer often already resolved an article's person/outlet identity before pushing
-      // (worker/matcher.py) and sends it as `personId`/`outletId` on the article. Prefer that —
-      // it's data we already have — over the by-url lookup below, which exists to fill in what
-      // the push DIDN'T identify (and to fetch `author`, the raw byline text, which the push
-      // never carries at all). This is the fix for daatan#1349: the by-url call used to run
-      // unconditionally, adding up to its 4s timeout to every push and losing identity outright
-      // on a timeout even when the payload had it in hand.
+      // (worker/matcher.py) and sends it as `personId`/`outletId` on the article — ids ONLY,
+      // never personName/outletName, and never `author` (the raw byline). So the by-url lookup
+      // runs unconditionally again (daatan#1463): #1361 skipped it for push-identified articles,
+      // which guaranteed NULL names/author on every such pool row forever, since nothing else
+      // ever fills them. What survives from #1349/#1361 is id PRECEDENCE: a push-supplied id
+      // wins over the lookup's — news-indexer's resolution is authoritative — and a lookup name
+      // is only attached when it belongs to the id that won.
       const itemsByUrl = new Map(items.map((a) => [a.url, a]))
-      const urlsNeedingLookup = oracleForecast.sources
-        .map((s) => s.url)
-        .filter((url) => {
-          const item = itemsByUrl.get(url)
-          return !item?.personId && !item?.outletId
-        })
+      const urlsNeedingLookup = oracleForecast.sources.map((s) => s.url)
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
       // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
@@ -360,22 +356,25 @@ export async function POST(request: NextRequest) {
       >()
       for (const s of oracleForecast.sources) {
         const item = itemsByUrl.get(s.url)
-        if (item?.personId || item?.outletId) {
-          // The push already carries this article's identity — use it directly. It has no
-          // personName/outletName (news-indexer sends ids only), so those are left `undefined`
-          // rather than `null`: `undefined` means "not resolved this run, don't touch a
-          // previously-stored value" (see EnrichedOracleSource's personName/outletName docs);
-          // `null` would be a false "resolved, no name" signal that could clobber a good one.
-          identityByUrl.set(s.url, { personId: item.personId ?? null, outletId: item.outletId ?? null })
-          continue
-        }
         const m = articleMeta.get(s.url)
-        if (m) {
-          identityByUrl.set(s.url, {
-            personId: m.personId ?? null, personName: m.personName ?? null,
-            outletId: m.outletId ?? null, outletName: m.outletName ?? null,
-          })
-        }
+        // Neither end resolved anything: no entry, every identity field stays `undefined`
+        // ("not resolved this run, don't touch a previously-stored value" — see
+        // EnrichedOracleSource's personName/outletName docs).
+        if (!item?.personId && !item?.outletId && !m) continue
+        const personId = item?.personId ?? m?.personId ?? null
+        const outletId = item?.outletId ?? m?.outletId ?? null
+        identityByUrl.set(s.url, {
+          personId,
+          // A lookup name is taken only when the push supplied no id for that dimension, or the
+          // lookup resolved the SAME id — never stapled onto a different push-supplied id.
+          // `undefined` when unavailable (preserve-stored), `null` only when the lookup
+          // explicitly resolved the id to no name.
+          personName:
+            m && (!item?.personId || m.personId === personId) ? m.personName ?? null : undefined,
+          outletId,
+          outletName:
+            m && (!item?.outletId || m.outletId === outletId) ? m.outletName ?? null : undefined,
+        })
       }
       const oracleSources = enrichOracleSources(
         oracleForecast.sources,
