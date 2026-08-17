@@ -49,26 +49,37 @@ jobs:
           # Ground truth of what's actually live — discovered from CloudWatch,
           # not a grep of source pins, which can be stale or wrong about what's
           # actually deployed.
-          MODELS=$(aws cloudwatch list-metrics \
-            --namespace AWS/Bedrock --metric-name Invocations --region eu-central-1 \
-            --query 'Metrics[].Dimensions[?Name==`ModelId`].Value' --output text \
-            | tr '\t' '\n' | sort -u)
+          #
+          # Sweep every region we invoke Bedrock from, not just the one the OIDC
+          # session defaults to. Prod pins EXTRACTOR_MODEL to a `us.` inference
+          # profile, so the largest workload in the stack bills in us-east-1 and
+          # was invisible here while this queried eu-central-1 alone — the cost
+          # step below reported its spend against an inventory that never listed
+          # it (#1468).
+          REGIONS="eu-central-1 us-east-1"
 
           > /tmp/model_stats.txt
-          for MODEL in $MODELS; do
-            THIS=$(aws cloudwatch get-metric-statistics \
-              --namespace AWS/Bedrock --metric-name Invocations \
-              --dimensions "Name=ModelId,Value=${MODEL}" \
-              --start-time "$WEEK_AGO" --end-time "$END" \
-              --period 604800 --statistics Sum --region eu-central-1 \
-              --query 'Datapoints[0].Sum' --output text)
-            LAST=$(aws cloudwatch get-metric-statistics \
-              --namespace AWS/Bedrock --metric-name Invocations \
-              --dimensions "Name=ModelId,Value=${MODEL}" \
-              --start-time "$TWO_WEEKS_AGO" --end-time "$WEEK_AGO" \
-              --period 604800 --statistics Sum --region eu-central-1 \
-              --query 'Datapoints[0].Sum' --output text)
-            echo "${MODEL}|${THIS}|${LAST}" >> /tmp/model_stats.txt
+          for REGION in $REGIONS; do
+            MODELS=$(aws cloudwatch list-metrics \
+              --namespace AWS/Bedrock --metric-name Invocations --region "$REGION" \
+              --query 'Metrics[].Dimensions[?Name==`ModelId`].Value' --output text \
+              | tr '\t' '\n' | sort -u)
+
+            for MODEL in $MODELS; do
+              THIS=$(aws cloudwatch get-metric-statistics \
+                --namespace AWS/Bedrock --metric-name Invocations \
+                --dimensions "Name=ModelId,Value=${MODEL}" \
+                --start-time "$WEEK_AGO" --end-time "$END" \
+                --period 604800 --statistics Sum --region "$REGION" \
+                --query 'Datapoints[0].Sum' --output text)
+              LAST=$(aws cloudwatch get-metric-statistics \
+                --namespace AWS/Bedrock --metric-name Invocations \
+                --dimensions "Name=ModelId,Value=${MODEL}" \
+                --start-time "$TWO_WEEKS_AGO" --end-time "$WEEK_AGO" \
+                --period 604800 --statistics Sum --region "$REGION" \
+                --query 'Datapoints[0].Sum' --output text)
+              echo "${REGION}|${MODEL}|${THIS}|${LAST}" >> /tmp/model_stats.txt
+            done
           done
 
           python3 -c "
@@ -76,15 +87,19 @@ jobs:
           flags = []
           with open('/tmp/model_stats.txt') as f:
               for row in f:
-                  model, this_raw, last_raw = row.strip().split('|')
+                  region, model, this_raw, last_raw = row.strip().split('|')
                   this_n = 0.0 if this_raw in ('None', '') else float(this_raw)
                   last_n = 0.0 if last_raw in ('None', '') else float(last_raw)
                   if this_n == 0 and last_n == 0:
                       continue  # never called in either window, not worth a line
+                  # Region is part of the identity: the same model id can be live
+                  # in two regions with unrelated volumes, and a workload silently
+                  # moving region is exactly what this audit exists to surface.
+                  label = f'{model} @{region}'
                   flag = ''
                   if last_n == 0 and this_n > 0:
                       flag = ' ⚠️ new'
-                      flags.append(f'{model}: newly active ({int(this_n)} calls)')
+                      flags.append(f'{label}: newly active ({int(this_n)} calls)')
                   elif last_n > 0:
                       pct = (this_n - last_n) / last_n * 100
                       if abs(pct) > 50:
@@ -94,8 +109,8 @@ jobs:
                           # x-www-form-urlencoded POST silently decodes a literal '+'
                           # as a space server-side (caught for real in the weekly
                           # cost report before it shipped — same trap here).
-                          flags.append(f'{model}: {arrow} {abs(pct):.0f}% vs last week ({int(last_n)}→{int(this_n)})')
-                  lines.append(f'{model}: {int(this_n)} calls{flag}')
+                          flags.append(f'{label}: {arrow} {abs(pct):.0f}% vs last week ({int(last_n)}→{int(this_n)})')
+                  lines.append(f'{label}: {int(this_n)} calls{flag}')
           lines.sort(key=lambda l: l.lower())
           print('model_lines<<MODELEOF')
           for l in lines:
