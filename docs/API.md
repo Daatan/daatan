@@ -191,7 +191,7 @@ The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMac
 ---
 
 ### `POST /api/forecasts/[id]/research` — Auth
-AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracle → 3-way parallel local fallback), optionally generates better queries via LLM if initial results are sparse, then asks an LLM to suggest a resolution outcome and evidence links. Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
+AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracle → 3-way parallel local fallback; the window extends 3 days past the deadline to catch post-event confirmation coverage), always adds LLM-generated targeted queries on top — raw-claim searches tend to surface roundups whose snippets omit the specific entity (daatan#1467) — then asks an LLM to suggest a resolution outcome and evidence links. Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
 
 **Response**
 

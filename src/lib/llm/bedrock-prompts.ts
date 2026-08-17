@@ -130,13 +130,13 @@ Instructions:
 3. In your reasoning, explicitly list which sources or facts (from context or your own knowledge) you are using to reach your conclusion.
 4. For BINARY predictions:
    - If the claim is clearly true (the event happened as stated), use 'correct'.
-   - If the claim is clearly false (the event did not happen), use 'wrong'.
+   - Use 'wrong' ONLY when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen). A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
    - Only use 'unresolvable' if you genuinely have no reliable information for the period.
 5. For MULTIPLE_CHOICE predictions:
    - If one option clearly occurred, use 'correct' AND provide correctOptionId.
    - If no option clearly matches, use 'unresolvable'.
 6. Use 'void' only if the event was cancelled or the claim cannot be judged fairly by its own rules.
-7. Do NOT default to 'unresolvable' simply because the news context is empty or irrelevant — use your knowledge.
+7. Do NOT default to 'unresolvable' simply because the news context is empty or irrelevant — use your knowledge. However, if neither the context nor your own knowledge confirms or affirmatively contradicts the claim, return 'unresolvable' rather than guessing.
 
 Return your findings in JSON format.`,
 

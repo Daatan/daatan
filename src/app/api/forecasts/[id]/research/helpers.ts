@@ -32,20 +32,3 @@ export function dedup(items: SearchResult[]): SearchResult[] {
         return true
     })
 }
-
-/**
- * Returns true if at least `minMatches` results contain one of the given terms
- * in their title or snippet (case-insensitive). Used to detect irrelevant results.
- */
-export function hasRelevantResults(results: SearchResult[], terms: string[], minMatches = 2): boolean {
-    const lowerTerms = terms.map(t => t.toLowerCase())
-    let matches = 0
-    for (const r of results) {
-        const hay = `${r.title} ${r.snippet}`.toLowerCase()
-        if (lowerTerms.some(t => hay.includes(t))) {
-            matches++
-            if (matches >= minMatches) return true
-        }
-    }
-    return false
-}

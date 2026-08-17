@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractKeyTerms, hasRelevantResults } from '../helpers'
-import type { SearchResult } from '@/lib/services/oracleSearch'
+import { extractKeyTerms } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // extractKeyTerms
@@ -47,67 +46,5 @@ describe('extractKeyTerms', () => {
     const words = result.split(' ')
     // "AI" (2 chars) should be filtered
     expect(words.every(w => w.length > 2)).toBe(true)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// hasRelevantResults
-// ---------------------------------------------------------------------------
-
-const makeResult = (title: string, snippet = ''): SearchResult => ({
-  title,
-  url: 'https://example.com',
-  snippet,
-  source: 'example.com',
-})
-
-describe('hasRelevantResults', () => {
-  it('returns true when enough results mention one of the terms', () => {
-    const results = [
-      makeResult('Israeli Shekel hits 30-year high'),
-      makeResult('Shekel strengthens against dollar'),
-      makeResult('Unrelated layoff news'),
-    ]
-    expect(hasRelevantResults(results, ['shekel', 'ils'], 2)).toBe(true)
-  })
-
-  it('returns false when fewer than minMatches results mention any term', () => {
-    const results = [
-      makeResult('Iranian conflict tracker'),
-      makeResult('US tariff court ruling'),
-      makeResult('Philippine peso trading'),
-    ]
-    expect(hasRelevantResults(results, ['shekel', 'ils'], 2)).toBe(false)
-  })
-
-  it('matches terms in the snippet as well as the title', () => {
-    const results = [
-      makeResult('Currency markets update', 'The shekel traded at a new high today'),
-      makeResult('Currency round-up', 'ILS continues its impressive run'),
-    ]
-    expect(hasRelevantResults(results, ['shekel', 'ils'], 2)).toBe(true)
-  })
-
-  it('is case-insensitive', () => {
-    const results = [
-      makeResult('SHEKEL SURGES'),
-      makeResult('Shekel at record level'),
-    ]
-    expect(hasRelevantResults(results, ['shekel'], 2)).toBe(true)
-  })
-
-  it('defaults minMatches to 2', () => {
-    const results = [makeResult('Shekel rises')]
-    // Only 1 match, default minMatches=2 → false
-    expect(hasRelevantResults(results, ['shekel'])).toBe(false)
-  })
-
-  it('returns false for an empty results array', () => {
-    expect(hasRelevantResults([], ['shekel'])).toBe(false)
-  })
-
-  it('returns false for an empty terms array', () => {
-    const results = [makeResult('Shekel rises')]
-    expect(hasRelevantResults(results, [], 1)).toBe(false)
   })
 })
