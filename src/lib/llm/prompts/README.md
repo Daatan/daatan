@@ -16,7 +16,7 @@ All prompt templates are managed in **AWS Bedrock Prompt Management** (eu-centra
 | `forecast-quality-validation` | `MZU2SJWY74` | `:2` | Bot runner | Validate a bot-generated forecast before publishing |
 | `guess-chances` | fallback only | — | Express flow | Suggest probability (0–100%) for a forecast based on news context |
 | `research-query-generation` | `GQK8IGH3H9` | `:2` | Auto-resolution | Generate web search queries to find resolution evidence |
-| `resolution-research` | `9BJAASRX0U` | `:2` | Auto-resolution | Determine forecast outcome from news context or model knowledge |
+| `resolution-research` | `9BJAASRX0U` | `:4` | Auto-resolution | Determine forecast outcome from news context or model knowledge |
 | `suggest-tags` | `4GRPW480KQ` | `:2` | Tag suggestion API | Suggest 1–3 relevant tags for a forecast |
 | `topic-extraction` | `7EKX6FRNE0` | `:2` | Bot runner / RSS | Extract a 5–10 word search query from an article |
 | `translate` | `6I0TDPIMBX` | `:2` | Translation feature | Translate forecast text to a target language |
