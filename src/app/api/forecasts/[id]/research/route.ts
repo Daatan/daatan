@@ -7,12 +7,18 @@ import { searchArticlesMultilingual } from '@/lib/utils/multilingualSearch'
 import { llmService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { queryGenerationSchema, researchSchema } from '@/lib/llm/schemas'
-import { extractKeyTerms, dedup, hasRelevantResults } from './helpers'
+import { extractKeyTerms, dedup } from './helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiResearchEnabled } from '@/lib/capabilities'
 
 const RESEARCH_LIMIT = 10
 const RESEARCH_WINDOW = 60 * 60_000 // 1 hour
+// Resolution research runs after the fact: confirmation coverage (hands-ons,
+// day-after reports) often lands just past the deadline, so search a few days
+// beyond it (daatan#1467).
+const SEARCH_GRACE_MS = 3 * 24 * 60 * 60_000
+const PRIMARY_RESULTS_CAP = 10
+const TOTAL_RESULTS_CAP = 15
 
 export const POST = withAuth(async (request: NextRequest, user, { params }) => {
     if (!aiResearchEnabled()) {
@@ -30,7 +36,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
         const forecastStart = prediction.publishedAt || prediction.createdAt
         const forecastEnd = prediction.resolveByDatetime
         const now = new Date()
-        const searchDateTo = forecastEnd < now ? forecastEnd : now
+        const graceEnd = new Date(forecastEnd.getTime() + SEARCH_GRACE_MS)
+        const searchDateTo = graceEnd < now ? graceEnd : now
         const forecastStartStr = forecastStart.toISOString().split('T')[0]
         const forecastEndStr = forecastEnd.toISOString().split('T')[0]
 
@@ -67,42 +74,37 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
             results = dedup([...simplified, ...dated, ...broad])
         }
 
-        results = results.slice(0, 12)
+        results = results.slice(0, PRIMARY_RESULTS_CAP)
 
-        // Extract meaningful nouns from the claim to check result relevance
-        const claimNouns = prediction.claimText
-            .split(/\s+/)
-            .filter(w => w.length > 4 && /^[A-Z]/.test(w))   // rough heuristic: capitalised words
-            .map(w => w.replace(/[^\w]/g, ''))
+        // 2. Always run LLM-generated targeted queries on top of the raw-claim
+        //    searches. Raw-claim searches tend to surface generic roundups whose
+        //    snippets omit the specific entity, and an LLM judging from those can
+        //    mistake absence of mention for absence of the event (daatan#1467).
+        //    Targeted results are appended after the primary ones, with slots
+        //    reserved for them via the lower primary cap.
+        try {
+            const template = await getPromptTemplate('research-query-generation')
+            const prompt = fillPrompt(template, {
+                claimText: prediction.claimText,
+                forecastStartStr,
+                forecastEndStr,
+            })
 
-        // 2. Fallback: if results are few OR none mention the claim's key entities,
-        //    ask the LLM to generate better-targeted search queries.
-        const needsFallback = results.length < 3 || !hasRelevantResults(results, claimNouns)
-        if (needsFallback) {
-            try {
-                const template = await getPromptTemplate('research-query-generation')
-                const prompt = fillPrompt(template, {
-                    claimText: prediction.claimText,
-                    forecastStartStr,
-                    forecastEndStr,
-                })
-
-                const qRes = await llmService.generateContent({
-                    prompt,
-                    schema: queryGenerationSchema,
-                    temperature: 0,
-                })
-                const { queries } = JSON.parse(qRes.text) as { queries: string[] }
-                const fallbackResults = await Promise.all(
-                    queries.slice(0, 3).map(q =>
-                        searchArticlesMultilingual(q, 5, { dateFrom: forecastStart, dateTo: searchDateTo }, { source: 'research', userId: user.id })
-                            .catch(() => [] as SearchResult[])
-                    )
+            const qRes = await llmService.generateContent({
+                prompt,
+                schema: queryGenerationSchema,
+                temperature: 0,
+            })
+            const { queries } = JSON.parse(qRes.text) as { queries: string[] }
+            const targetedResults = await Promise.all(
+                queries.slice(0, 3).map(q =>
+                    searchArticlesMultilingual(q, 5, { dateFrom: forecastStart, dateTo: searchDateTo }, { source: 'research', userId: user.id })
+                        .catch(() => [] as SearchResult[])
                 )
-                results = dedup([...results, ...fallbackResults.flat()]).slice(0, 12)
-            } catch {
-                // fallback search failed — continue with what we have
-            }
+            )
+            results = dedup([...results, ...targetedResults.flat()]).slice(0, TOTAL_RESULTS_CAP)
+        } catch {
+            // targeted search failed — continue with what we have
         }
 
         const context = results.length > 0
