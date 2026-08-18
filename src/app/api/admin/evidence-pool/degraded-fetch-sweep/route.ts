@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
+import { secretsMatch } from '@/lib/cron-auth'
 import { prisma } from '@/lib/prisma'
 import {
   degradedFetchWhere,
@@ -53,14 +55,16 @@ export const GET = withAuth(async (request: NextRequest) => {
  * plus the before/after movement report (`buildDegradedFetchDiffReport`), sorted by
  * how far each affected prediction's AI estimate moved.
  *
- * **Deliberately no `x-cron-secret` path** — unlike evidence-pool/retry, this isn't
- * meant to run headlessly on a schedule. Per the issue: "a large swing on a live
- * forecast is a product decision, not cleanup." An ADMIN calls this by hand, reads
- * the report, and decides whether the results should stand. Bounded per call
- * (?limit=N predictions, default 3, max 10) for the same pacing reason as the retry
- * sweep — each prediction is one full Oracle analysis.
+ * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header — same
+ * pattern as evidence-pool/retry. This route originally had **no** secret path on
+ * purpose ("a large swing on a live forecast is a product decision, not cleanup");
+ * reversed 2026-08-16 (#1446) so the one-shot sweep can be driven from an operator
+ * session instead of a browser console. The judgment stays human either way: every
+ * response carries the movement report, reviewed on the issue before results stand.
+ * Bounded per call (?limit=N predictions, default 3, max 10) for the same pacing
+ * reason as the retry sweep — each prediction is one full Oracle analysis.
  */
-export const POST = withAuth(async (request: NextRequest) => {
+async function runSweep(request: NextRequest) {
   try {
     const result = await sweepDegradedFetchRows(parseLimit(request), {
       urlHashAllowlist: CONFIRMED_DEGRADED_URL_HASHES,
@@ -69,4 +73,14 @@ export const POST = withAuth(async (request: NextRequest) => {
   } catch (error) {
     return handleRouteError(error, 'Degraded-fetch sweep failed')
   }
-}, { roles: ['ADMIN'] })
+}
+
+const authedPost = withAuth(runSweep, { roles: ['ADMIN'] })
+
+export async function POST(request: NextRequest) {
+  const secret = request.headers.get('x-cron-secret')
+  if (secret && env.BOT_RUNNER_SECRET && secretsMatch(secret, env.BOT_RUNNER_SECRET)) {
+    return runSweep(request)
+  }
+  return authedPost(request, { params: Promise.resolve({}) })
+}
