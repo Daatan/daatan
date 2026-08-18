@@ -4,7 +4,7 @@ Vector embeddings power the "similar forecasts" lookup on the forecast detail pa
 
 ## Stack
 
-- **Model:** `gemini-embedding-2`, served via the Gemini REST API
+- **Model:** `gemini-embedding-2`, served via Vertex AI, with the Gemini Developer API as fallback
 - **Dimensionality:** `768` (set via `outputDimensionality=768` request parameter; the model natively emits 3072 dims)
 - **Storage:** PostgreSQL with the `pgvector` extension, `vector(768)` column on `predictions`
 - **Index:** HNSW with cosine operator (`vector_cosine_ops`)
@@ -12,17 +12,31 @@ Vector embeddings power the "similar forecasts" lookup on the forecast detail pa
 
 ## Generation
 
-`src/lib/services/embedding.ts` calls Gemini's `embedContent` endpoint:
+`src/lib/services/embedding.ts` calls `embedContent`, on Vertex AI when the service
+account is provisioned (daatan#1472) and on the Developer API otherwise:
 
 ```
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent
+POST https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}
+       /publishers/google/models/gemini-embedding-2:embedContent     ← Bearer, preferred
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=
 ```
 
-Request body includes `outputDimensionality: 768`. The 768-dim output matches the column definition; do not change one without the other (changing dims requires re-running the migration with a new column type and full backfill).
+Same model and same body on both — the only differences are the host and Bearer auth
+instead of `?key=`, plus the `model` field which Vertex takes from the URL. Vertex is
+preferred because Google is forcing the Developer API from Postpay to **Prepay** by
+**2026-09-14**, introducing a prepaid balance that can hit zero; Vertex bills as an
+ordinary GCP service. See [LLM_ARCHITECTURE.md](LLM_ARCHITECTURE.md).
+
+Request body includes `outputDimensionality: 768`. The 768-dim output matches the column definition; do not change one without the other (changing dims requires re-running the migration with a new column type and full backfill). A response of any other length is rejected before it can reach the column.
 
 The text being embedded is the prediction's `claimText` plus `detailsText` if present.
 
-Required env: `GEMINI_API_KEY`.
+Required env: `GEMINI_API_KEY`, and/or all three of `GOOGLE_VERTEX_PROJECT_ID` /
+`GOOGLE_VERTEX_CLIENT_EMAIL` / `GOOGLE_VERTEX_PRIVATE_KEY`.
+
+**A Vertex failure is invisible to callers**: the Developer API silently rescues it, so
+embeddings keep working. The one signal is the `vertex-embed-failed` error log — grep for
+it after provisioning the service account, before assuming the Vertex path works.
 
 ## Schema
 
