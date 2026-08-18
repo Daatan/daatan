@@ -1,7 +1,10 @@
-import { SignJWT, importPKCS8 } from 'jose'
 import { env } from '@/env'
 import { createLogger } from '@/lib/logger'
 import { getAppUrl } from '@/lib/branding'
+import { googleAccessToken } from '@/lib/services/google-auth'
+
+/** The Indexing API's own scope — deliberately narrower than cloud-platform. */
+const INDEXING_SCOPE = 'https://www.googleapis.com/auth/indexing'
 
 const log = createLogger('search-indexing')
 
@@ -68,32 +71,6 @@ export function notifyIndexNow(slug: string): void {
     .catch((err) => log.warn({ err, url }, 'IndexNow ping error'))
 }
 
-async function googleAccessToken(clientEmail: string, privateKeyPem: string): Promise<string> {
-  // SA keys are PKCS8 PEM; env transport often escapes newlines as literal "\n".
-  const key = await importPKCS8(privateKeyPem.replace(/\\n/g, '\n'), 'RS256')
-  const now = Math.floor(Date.now() / 1000)
-  const assertion = await new SignJWT({ scope: 'https://www.googleapis.com/auth/indexing' })
-    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .setIssuer(clientEmail)
-    .setSubject(clientEmail)
-    .setAudience('https://oauth2.googleapis.com/token')
-    .setIssuedAt(now)
-    .setExpirationTime(now + 3600)
-    .sign(key)
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }),
-  })
-  if (!res.ok) throw new Error(`token endpoint ${res.status}`)
-  const json = (await res.json()) as { access_token?: string }
-  if (!json.access_token) throw new Error('token endpoint returned no access_token')
-  return json.access_token
-}
 
 /**
  * Ping the Google Indexing API for a forecast URL. No-op unless both service-account
@@ -108,7 +85,7 @@ export function notifyGoogle(slug: string): void {
   const url = urlFor(slug)
   void (async () => {
     try {
-      const token = await googleAccessToken(clientEmail, privateKey)
+      const token = await googleAccessToken(clientEmail, privateKey, INDEXING_SCOPE)
       const res = await fetch('https://indexing.googleapis.com/v3/urlNotifications:publish', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

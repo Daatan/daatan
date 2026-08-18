@@ -8,20 +8,26 @@ The application uses a **Resilient LLM Service** that abstracts the underlying A
 
 The main `llmService` tries providers in this order; each leg is **registered only when it's configured**, so a call is never single-provider in practice. The fallbacks are deliberately cross-vendor — a Google/Gemini outage takes down neither the Oracle (AWS Bedrock) nor the OpenRouter free Llama leg.
 
-1.  **Primary**: **Google Gemini** (`gemini-2.5-flash`)
-    *   Fast, cost-effective, high quality. Requires `GEMINI_API_KEY` (skipped in CI/test where it's unset).
+1.  **Primary**: **Gemini via Vertex AI** (`gemini-2.5-flash`) — #1472
+    *   Same model and the same schemas as the leg below; only the **billing surface** differs. Google is forcing the Gemini *Developer* API from Postpay to **Prepay** (deadline **2026-09-14**), which introduces a prepaid balance that can hit zero and stop extraction. Vertex (`aiplatform.googleapis.com`) stays on GCP Postpay and draws the credits billing account directly, so there is no balance to keep funded.
+    *   Registered only when all of `GOOGLE_VERTEX_PROJECT_ID`, `GOOGLE_VERTEX_CLIENT_EMAIL` and `GOOGLE_VERTEX_PRIVATE_KEY` are set (`GOOGLE_VERTEX_LOCATION` defaults to `global`). All-or-nothing: a half-configured service account would register a leg that fails every call and burns a retry before falling through.
+    *   **REST, not an SDK** (`src/lib/llm/providers/vertex.ts`). Vertex accepts the identical `responseMimeType`/`responseSchema` generation config, so every existing `Schema` in `llm/schemas/`, `llm/gemini.ts`, moderation, the bots and the temporal classifier carries over untouched — the migration needs **no** `@google/generative-ai` → Vertex-SDK swap across call sites. Auth is a service-account JWT exchanged for a `cloud-platform` access token by `src/lib/services/google-auth.ts`, the same mechanism `indexnow.ts` has used for the Indexing API all along (tokens cached per email+scope; the exchange is two round-trips and an RSA signature, far too expensive per call).
 
-2.  **Fallback 1**: **Oracle `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
+2.  **Fallback 0**: **Google Gemini, Developer API** (`gemini-2.5-flash`)
+    *   The original key-based leg. Requires `GEMINI_API_KEY` (skipped in CI/test where it's unset).
+    *   Deliberately kept *behind* Vertex rather than replaced: if the Vertex SA is misconfigured or its quota is exhausted, this leg still serves. It can be removed once Vertex is proven in production — at which point `GEMINI_API_KEY` goes with it.
+
+3.  **Fallback 1**: **Oracle `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
     *   Calls the retro Oracle's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.
     *   Registered whenever the Oracle is configured (`ORACLE_URL` + `ORACLE_API_KEY`) — a no-op otherwise (e.g. self-host installs that don't reach Daatan's Oracle).
     *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON).
 
-3.  **Fallback 2**: **OpenRouter**
+4.  **Fallback 2**: **OpenRouter**
     *   Registered whenever a key is configured (admin setting → env), for **both** editions.
     *   **SaaS**: added only as a last-resort backstop, so it uses the free **non-Google** model `meta-llama/llama-3.3-70b-instruct:free` (an OpenRouter *Gemini* model would still hit Google's backend and die in the same outage).
     *   **Self-host**: runs as a primary user-facing provider on the admin-chosen `getOpenRouterModel()`.
 
-4.  **Fallback 3**: **Ollama** (hosting `qwen2.5:7b`)
+5.  **Fallback 3**: **Ollama** (hosting `qwen2.5:7b`)
     *   Self-hosted, private, no per-token cost. **Registered only when `OLLAMA_BASE_URL` is explicitly set** — the old implicit `localhost:11434` default was dropped so hosts that don't run Ollama (e.g. prod) don't carry a dead provider slot that fails on every fallback.
 
 **Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above.
