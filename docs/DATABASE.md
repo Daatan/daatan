@@ -483,7 +483,13 @@ news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexe
 `docs/MATCHING_ARCHITECTURE.md`) — an exact match against news-indexer's own `person`/`outlet`
 tables. All nullable; `author`/`personId`/`personName` were historically backfilled
 (2026-07-15: 88% author, 24% person coverage), `outletId`/`outletName` (#1131) are
-forward-populated only. Both elections consumers now attribute by id first: the elections
+forward-populated only — and in practice have never been populated on pool rows
+(0% coverage as of 2026-08-17; whether they should ride the push payload is part of
+news-indexer#302). Data gotcha for coverage stats: rows added 2026-08-09 →
+2026-08-16 20:20Z carried `personId` with **NULL `personName`** (the daatan#1463
+enrichment regression, fixed in v1.65.178); their names were backfilled 2026-08-17
+(220/220, self-join on the table's own healthy id→name pairs), but their `author`
+stays NULL — that window's bylines were unrecoverable daatan-side. Both elections consumers now attribute by id first: the elections
 app (#50/#51) and daatan's `/elections` matrix (#1147) read usable pool rows and match
 `personId` before falling back to the `TRACKED_SOURCES`/`CURATED_ELECTION_AUTHORS` alias
 tables, which survive only for byline-only identities news-indexer can't resolve yet.
