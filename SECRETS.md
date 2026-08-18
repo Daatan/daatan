@@ -22,7 +22,11 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `NEXTAUTH_URL` | ✅ | — | Canonical site URL for NextAuth |
 | `GOOGLE_CLIENT_ID` | ✅ | — | Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | ✅ | — | Google OAuth |
-| `GEMINI_API_KEY` | ✅ | — | Primary LLM provider |
+| `GEMINI_API_KEY` | ✅ | — | Gemini Developer API key — the *fallback* Google LLM leg (see the Vertex rows below) |
+| `GOOGLE_VERTEX_PROJECT_ID` | ✅ | — | Primary LLM provider: Gemini via Vertex AI (#1472). GCP project that owns the Vertex quota |
+| `GOOGLE_VERTEX_LOCATION` | ✅ | — | Vertex location; omit to default to `global` |
+| `GOOGLE_VERTEX_CLIENT_EMAIL` | ✅ | — | Vertex service-account email (needs the `Vertex AI User` role) |
+| `GOOGLE_VERTEX_PRIVATE_KEY` | ✅ | — | Vertex service-account private key (PEM; `\n`-escaped newlines are un-escaped at load) |
 | `OPENROUTER_API_KEY` | ✅ | — | LLM provider used by bots |
 | `SERPER_API_KEY` | ✅ | — | Serper.dev — Express Forecast web search |
 | `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping |
@@ -44,6 +48,8 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `VAPID_PRIVATE_KEY` | ✅ | — | Web Push signing key (runtime-only) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | ✅ | Web Push subscription key. **GitHub secret only** — `NEXT_PUBLIC_*` is substituted into the bundle at build, so a copy in the Secrets Manager bundle would be silently ignored at runtime (see the VAPID section below) |
 | `AWS_ROLE_ARN` | — | ✅ | OIDC role the `deploy.yml` workflow assumes to reach ECR + SSM |
+
+The three mandatory `GOOGLE_VERTEX_*` vars are **all-or-nothing**: set all three or none. A partial set registers a Vertex leg that fails every call and burns a retry before the chain falls through to the Developer-API key. See [docs/LLM_ARCHITECTURE.md](docs/LLM_ARCHITECTURE.md).
 
 If this table drifts from reality, the canonical cross-check is `scripts/blue-green-deploy.sh` (`ENV_ARGS`) and `docker-compose.{prod,staging}.yml`, which are gated by CI via `scripts/check-env-parity.sh`.
 

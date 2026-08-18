@@ -1,4 +1,5 @@
 import { GeminiProvider } from './providers/gemini'
+import { VertexProvider } from './providers/vertex'
 import { OllamaProvider } from './providers/ollama'
 import { OpenRouterProvider } from './providers/openrouter'
 import { OracleProvider } from './providers/oracle'
@@ -13,6 +14,22 @@ const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
+
+/** One model name for both Google legs — they must not silently diverge. */
+const GEMINI_MODEL = 'gemini-2.5-flash'
+
+/**
+ * Vertex credentials, or null when the service account isn't provisioned.
+ * All-or-nothing on purpose: a half-configured SA would register a leg that fails
+ * every call, which the chain would dutifully retry before falling through.
+ */
+function vertexConfig(): { projectId: string; location: string; clientEmail: string; privateKey: string } | null {
+  const projectId = process.env.GOOGLE_VERTEX_PROJECT_ID
+  const clientEmail = process.env.GOOGLE_VERTEX_CLIENT_EMAIL
+  const privateKey = process.env.GOOGLE_VERTEX_PRIVATE_KEY
+  if (!projectId || !clientEmail || !privateKey) return null
+  return { projectId, clientEmail, privateKey, location: process.env.GOOGLE_VERTEX_LOCATION || 'global' }
+}
 
 // The Oracle fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
 // from Google), so it can serve precisely when Gemini/Google is unavailable. We
@@ -34,14 +51,25 @@ const OPENROUTER_FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
 function buildProviders(): LLMProvider[] {
   const providers: LLMProvider[] = []
 
-  // Primary: direct Gemini. In CI/test we often have no key, so skip it and rely
-  // on the fallbacks below.
+  // Primary: Gemini via Vertex (#1472), when its service account is provisioned.
+  // Same model, same schemas — only the billing surface differs, and Vertex has no
+  // prepaid balance that can hit zero. Registered AHEAD of the Developer-API leg
+  // rather than replacing it: if Vertex is misconfigured or its quota is exhausted,
+  // the existing key-based leg is right behind it and the chain still serves. Once
+  // this is proven in prod, GEMINI_API_KEY and the leg below can go.
+  const vertex = vertexConfig()
+  if (vertex) {
+    providers.push(new VertexProvider({ ...vertex, modelName: GEMINI_MODEL }))
+  }
+
+  // Direct Gemini (Developer API, key-based). In CI/test we often have no key, so
+  // skip it and rely on the fallbacks below.
   if (geminiApiKey) {
-    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: 'gemini-2.5-flash' }))
-  } else {
+    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: GEMINI_MODEL }))
+  } else if (!vertex) {
     log.warn(
-      'GEMINI_API_KEY is not set; Gemini provider will be disabled. ' +
-      'Only fallback providers will be used.',
+      'Neither GOOGLE_VERTEX_* nor GEMINI_API_KEY is set; both Google legs will be ' +
+      'disabled. Only fallback providers will be used.',
     )
   }
 

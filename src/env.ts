@@ -96,6 +96,15 @@ export const env = createEnv({
     
     // AI / Analytics
     GEMINI_API_KEY: z.string().min(1).optional(),
+    // Gemini via Vertex AI (#1472). All four must be set to enable; the Vertex leg
+    // is simply not registered otherwise, so this is inert until provisioned and
+    // GEMINI_API_KEY keeps serving. Vertex stays on GCP Postpay and draws the
+    // credits billing account directly, which is what removes the prepaid-balance
+    // outage mode the Developer API's forced Prepay migration introduces.
+    GOOGLE_VERTEX_PROJECT_ID: z.string().min(1).optional(),
+    GOOGLE_VERTEX_LOCATION: z.string().min(1).default('global'),
+    GOOGLE_VERTEX_CLIENT_EMAIL: z.string().email().optional(),
+    GOOGLE_VERTEX_PRIVATE_KEY: z.string().min(1).optional(),
     // LLM providers for the self-host edition. Configuring ANY of these turns on
     // AI features (Express, Guess, etc.) — the key is the opt-in. OpenRouter is
     // the easy default (one key, many models). OLLAMA_BASE_URL = a local LLM.
@@ -186,6 +195,10 @@ export const env = createEnv({
     NEXTAUTH_DEBUG: process.env.NEXTAUTH_DEBUG,
     APP_ENV: process.env.APP_ENV,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GOOGLE_VERTEX_PROJECT_ID: process.env.GOOGLE_VERTEX_PROJECT_ID,
+    GOOGLE_VERTEX_LOCATION: process.env.GOOGLE_VERTEX_LOCATION,
+    GOOGLE_VERTEX_CLIENT_EMAIL: process.env.GOOGLE_VERTEX_CLIENT_EMAIL,
+    GOOGLE_VERTEX_PRIVATE_KEY: process.env.GOOGLE_VERTEX_PRIVATE_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
     OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
