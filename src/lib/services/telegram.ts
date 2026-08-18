@@ -227,6 +227,80 @@ export function notifySearchHealthDigest(report: {
   sendChannelNotification(msg, critical ? 'clean' : 'noisy')
 }
 
+/**
+ * One condition the evidence pipeline is currently failing (daatan#1478).
+ * Every variant is a DELTA against the same population's own baseline — see
+ * `evidence-health.ts` for why an absolute failure rate can't be alerted on.
+ */
+export type EvidenceHealthIssue =
+  | { kind: 'source_failure_rate'; source: string; recentPct: number; baselinePct: number; recentRows: number }
+  | { kind: 'source_silent'; source: string; baselineRows: number }
+  | { kind: 'forecast_no_evidence'; predictionId: string; claimText: string; slug: string | null }
+  | { kind: 'overall_failure_rate'; recentPct: number; baselinePct: number }
+  | { kind: 'overall_volume_collapse'; recentPerDay: number; baselinePerDay: number }
+
+/** Keeps a first run (or a genuine pipeline-wide failure) inside Telegram's message limit. */
+const EVIDENCE_HEALTH_MAX_LINES = 12
+
+function evidenceHealthLine(i: EvidenceHealthIssue): string {
+  switch (i.kind) {
+    case 'source_failure_rate':
+      return `• <b>${escapeHtml(i.source)}</b>: failures ${i.baselinePct}% → <b>${i.recentPct}%</b> (${i.recentRows} rows)`
+    case 'source_silent':
+      return `• <b>${escapeHtml(i.source)}</b>: silent — 0 rows this week, ${i.baselineRows} in the baseline`
+    case 'forecast_no_evidence': {
+      const url = forecastUrl({ id: i.predictionId, claimText: i.claimText, slug: i.slug })
+      return `• no usable evidence: <a href="${url}">${escapeHtml(truncate(i.claimText, 90))}</a>`
+    }
+    case 'overall_failure_rate':
+      return `• <b>overall failure share</b>: ${i.baselinePct}% → <b>${i.recentPct}%</b>`
+    case 'overall_volume_collapse':
+      return `• <b>ingestion volume</b>: ${i.baselinePerDay}/day → <b>${i.recentPerDay}/day</b>`
+  }
+}
+
+/**
+ * The evidence pipeline's counterpart to `notifySearchHealthDigest` — one grouped
+ * message per check listing what newly broke, sent only when something did.
+ *
+ * No `canNotify` cooldown here, deliberately: dedup is the DB-persisted fire/re-arm
+ * state in `evidence-health.ts`, and these conditions last for days, so an
+ * in-memory cooldown would both re-page after every deploy and swallow a genuinely
+ * different digest that happened to land inside the window.
+ */
+export function notifyEvidenceHealthDigest(report: {
+  issues: EvidenceHealthIssue[]
+  recentDays: number
+  baselineDays: number
+  recentRows: number
+  recentFailedPct: number | null
+  baselineFailedPct: number | null
+  suppressed: number
+}): void {
+  if (isDevEnv()) return
+  if (report.issues.length === 0) return
+
+  // A pipeline-wide move is page-worthy; per-source drift and individual empty
+  // pools are operational. Same split as the search-health digest.
+  const critical = report.issues.some(
+    (i) => i.kind === 'overall_failure_rate' || i.kind === 'overall_volume_collapse',
+  )
+
+  const lines = report.issues.slice(0, EVIDENCE_HEALTH_MAX_LINES).map(evidenceHealthLine)
+  const overflow = report.issues.length - lines.length
+
+  const msg = [
+    critical ? `🚨 <b>Evidence pipeline degraded</b>` : `⚠️ <b>Evidence pipeline health</b>`,
+    `Failed share: <b>${report.recentFailedPct ?? '?'}%</b> over ${report.recentDays}d ` +
+      `(${report.recentRows} rows) vs <b>${report.baselineFailedPct ?? '?'}%</b> baseline (${report.baselineDays}d)`,
+    ...lines,
+    overflow > 0 ? `…and ${overflow} more` : '',
+    report.suppressed > 0 ? `(${report.suppressed} already-known condition(s) still open)` : '',
+  ].filter(Boolean).join('\n')
+
+  sendChannelNotification(msg, critical ? 'clean' : 'noisy')
+}
+
 // ============================================
 // Event-specific notification helpers
 // ============================================

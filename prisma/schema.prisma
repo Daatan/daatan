@@ -905,6 +905,19 @@ model ArticleRatingPrompt {
   @@map("article_rating_prompts")
 }
 
+// Fire/re-arm state for the evidence-health digest (daatan#1478). One row per
+// condition that is CURRENTLY firing; see the 20260818120000 migration for why
+// this can't be telegram.ts's in-memory canNotify() (it resets on every deploy,
+// and these conditions persist for days). Reconciled wholesale on each run:
+// keys absent from the run's active set are deleted, which re-arms them.
+model EvidenceHealthAlert {
+  id      String   @id @default(cuid())
+  key     String   @unique @db.VarChar(200)
+  firedAt DateTime @default(now()) @map("fired_at")
+
+  @@map("evidence_health_alerts")
+}
+
 // Human-in-the-loop rating of one ArticleRatingPrompt — a 1-5 verdict plus which
 // specific number was wrong (daatan#1223). One row per (prompt, rater): a user can
 // change their mind by tapping another button, which just updates their own row.

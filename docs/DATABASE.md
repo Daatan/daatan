@@ -569,6 +569,22 @@ scores the author's own lean; opinion is the signal). Retro replays it per
 (`GET /leaderboard/author-shadow`) — also shadow-only, nothing feeds back
 into forecasts.
 
+### Pipeline alerting — `evidence_health_alerts` (#1478)
+
+One row per condition the evidence pipeline is **currently** failing, keyed by a
+stable string (`source-silent:bbc.co.uk`, `forecast-empty:<predictionId>`,
+`overall-failure`). It is fire/re-arm state, not a log: `checkEvidenceHealth()`
+claims a condition by inserting its key — only the run that wins the insert
+notifies, so overlapping runs can't double-page — and deletes the keys whose
+condition no longer holds, which is what lets the same source page again the next
+time it breaks. Empty table = pipeline currently clean.
+
+Why a table and not `telegram.ts`'s in-memory `canNotify()`: these conditions
+persist for days or weeks, and an in-memory cooldown resets on every deploy, so a
+source that has been silent since last Tuesday would re-page after each release.
+Same idiom as `predictions.market_divergence_alert_at`, moved off the row because a
+source-level or pipeline-level condition has no row of its own to hang off.
+
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
 Cached Polymarket/Kalshi markets that forecasts link to (many-to-one).

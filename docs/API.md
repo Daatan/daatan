@@ -636,6 +636,23 @@ range (rejected rather than clamped, so a caller can never divide spend for one 
 output from another). Consumed by `.github/workflows/llm-waste-report.yml` as the
 denominator of the weekly cost-per-usable-article figure (docs#57, #1274).
 
+### `GET /api/cron/evidence-health`
+Fail-loud health check for the evidence pipeline (#1478). Compares a 7-day window
+against the preceding 28 days and fires one grouped Telegram digest for whatever
+*newly* broke: a source whose failure rate worsened by ≥20pp against its own baseline,
+a source that went silent while the rest kept flowing, an ACTIVE forecast whose pool
+holds no `COMPLETE`-with-a-stance row, or a pipeline-wide move in failed share (≥15pp)
+or ingestion volume (<35% of the baseline rate). Auth: `x-cron-secret` header
+(`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the check itself fails, so a run that
+couldn't read the data never reports a clean pipeline. Returns
+`{ ok, recentDays, baselineDays, recentRows, recentFailedPct, baselineFailedPct, suppressed, fired[] }`
+where `fired` holds the alert keys claimed on this run. Dedup/re-arm state is the
+`evidence_health_alerts` table, so a condition pages once and stays quiet across
+deploys until it clears. Driven daily by `.github/workflows/evidence-health.yml`.
+
+**Alerts on delta, never on an absolute rate:** 47.2% of all pool rows are `FAILED`
+and that is by design — a wide net discards a lot. Only a *change* carries information.
+
 ### `GET /api/cron/backfill-embeddings`
 Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, done, failed, remaining }` — except when there is nothing to do, which answers `{ ok, done: 0, remaining: 0 }` with **no `failed` key**.
 
