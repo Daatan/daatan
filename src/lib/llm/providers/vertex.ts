@@ -24,12 +24,16 @@ const VERTEX_TIMEOUT_MS = 30_000
 /** Vertex is authorised by ordinary GCP scope, not a per-API scope. */
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
-export interface VertexConfig {
+/** Where a Vertex call goes and who it authenticates as, without a model. */
+export interface VertexEnv {
   projectId: string
   /** `global` avoids pinning a region and is what Gemini models serve from by default. */
   location: string
   clientEmail: string
   privateKey: string
+}
+
+export interface VertexConfig extends VertexEnv {
   modelName: string
 }
 
@@ -42,17 +46,37 @@ interface VertexResponse {
   }
 }
 
-function endpointFor(config: VertexConfig): string {
+/**
+ * Vertex credentials from the environment, or null when the service account isn't
+ * provisioned. All-or-nothing on purpose: a half-configured SA would produce calls
+ * that fail every time, which callers would dutifully retry before falling through.
+ * Lives here rather than in `llm/index.ts` because the embedding path needs it too.
+ */
+export function vertexEnv(): VertexEnv | null {
+  const projectId = process.env.GOOGLE_VERTEX_PROJECT_ID
+  const clientEmail = process.env.GOOGLE_VERTEX_CLIENT_EMAIL
+  const privateKey = process.env.GOOGLE_VERTEX_PRIVATE_KEY
+  if (!projectId || !clientEmail || !privateKey) return null
+  return { projectId, clientEmail, privateKey, location: process.env.GOOGLE_VERTEX_LOCATION || 'global' }
+}
+
+/** e.g. `…/publishers/google/models/gemini-2.5-flash:generateContent`. */
+export function vertexEndpoint(env: VertexEnv, modelName: string, method: string): string {
   // The regional host is required for regional locations; `global` is served from
   // the unprefixed host, and prefixing it 404s.
   const host =
-    config.location === 'global'
+    env.location === 'global'
       ? 'aiplatform.googleapis.com'
-      : `${config.location}-aiplatform.googleapis.com`
+      : `${env.location}-aiplatform.googleapis.com`
   return (
-    `https://${host}/v1/projects/${config.projectId}` +
-    `/locations/${config.location}/publishers/google/models/${config.modelName}:generateContent`
+    `https://${host}/v1/projects/${env.projectId}` +
+    `/locations/${env.location}/publishers/google/models/${modelName}:${method}`
   )
+}
+
+/** Bearer token for any Vertex call. Cached per service account by google-auth. */
+export function vertexAccessToken(env: VertexEnv): Promise<string> {
+  return googleAccessToken(env.clientEmail, env.privateKey, CLOUD_PLATFORM_SCOPE)
 }
 
 export class VertexProvider implements LLMProvider {
@@ -80,14 +104,10 @@ export class VertexProvider implements LLMProvider {
     else request.signal?.addEventListener('abort', onCallerAbort)
 
     try {
-      const token = await googleAccessToken(
-        this.config.clientEmail,
-        this.config.privateKey,
-        CLOUD_PLATFORM_SCOPE,
-      )
+      const token = await vertexAccessToken(this.config)
       // fetch rejects on an already-aborted signal, so an abort landing during the
       // exchange fails here rather than reaching Vertex.
-      const res = await fetch(endpointFor(this.config), {
+      const res = await fetch(vertexEndpoint(this.config, this.config.modelName, 'generateContent'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

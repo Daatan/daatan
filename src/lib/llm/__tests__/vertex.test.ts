@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('@/lib/services/google-auth', () => ({
   googleAccessToken: vi.fn(async () => 'ya29.test-token'),
 }))
 
 import { googleAccessToken } from '@/lib/services/google-auth'
-import { VertexProvider } from '@/lib/llm/providers/vertex'
+import { VertexProvider, vertexEnv } from '@/lib/llm/providers/vertex'
 
 const CONFIG = {
   projectId: 'daatan-654644841675',
@@ -167,5 +167,64 @@ describe('VertexProvider', () => {
     await expect(
       new VertexProvider(CONFIG).generateContent({ prompt: 'q', signal: controller.signal }),
     ).rejects.toThrow('aborted')
+  })
+})
+
+describe('vertexEnv', () => {
+  const KEYS = [
+    'GOOGLE_VERTEX_PROJECT_ID',
+    'GOOGLE_VERTEX_CLIENT_EMAIL',
+    'GOOGLE_VERTEX_PRIVATE_KEY',
+    'GOOGLE_VERTEX_LOCATION',
+  ] as const
+  const saved: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    for (const k of KEYS) {
+      saved[k] = process.env[k]
+      delete process.env[k]
+    }
+  })
+
+  afterEach(() => {
+    for (const k of KEYS) {
+      if (saved[k] === undefined) delete process.env[k]
+      else process.env[k] = saved[k]
+    }
+  })
+
+  function setAll() {
+    process.env.GOOGLE_VERTEX_PROJECT_ID = CONFIG.projectId
+    process.env.GOOGLE_VERTEX_CLIENT_EMAIL = CONFIG.clientEmail
+    process.env.GOOGLE_VERTEX_PRIVATE_KEY = CONFIG.privateKey
+  }
+
+  it('is null when nothing is configured', () => {
+    expect(vertexEnv()).toBeNull()
+  })
+
+  it.each(['GOOGLE_VERTEX_PROJECT_ID', 'GOOGLE_VERTEX_CLIENT_EMAIL', 'GOOGLE_VERTEX_PRIVATE_KEY'])(
+    'is null when only %s is missing — a partial SA must not register a leg that fails every call',
+    (missing) => {
+      setAll()
+      delete process.env[missing]
+      expect(vertexEnv()).toBeNull()
+    },
+  )
+
+  it('defaults the location to `global` when unset', () => {
+    setAll()
+    expect(vertexEnv()).toEqual({
+      projectId: CONFIG.projectId,
+      clientEmail: CONFIG.clientEmail,
+      privateKey: CONFIG.privateKey,
+      location: 'global',
+    })
+  })
+
+  it('honours an explicit location', () => {
+    setAll()
+    process.env.GOOGLE_VERTEX_LOCATION = 'europe-west4'
+    expect(vertexEnv()?.location).toBe('europe-west4')
   })
 })
