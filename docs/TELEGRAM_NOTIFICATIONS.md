@@ -135,6 +135,7 @@ Handled by the same webhook as `/rollback` (`src/app/api/telegram/rollback/route
 | Oracle forecast unavailable | 🚨 | clean | 5 min (global) | `GET /api/cron/oracle-health` |
 | Security event (403/401) | 🛡️ | clean | 5 min per `pathname:status` | `src/lib/api-middleware.ts` |
 | Search provider health digest | ⚠️/🚨 | noisy / **clean when critical** | 5 min (global, one key) | `GET /api/cron/search-health` (hourly) + `GET /api/health/search` |
+| Evidence pipeline health digest | ⚠️/🚨 | noisy / **clean when pipeline-wide** | **no cooldown** — dedup is the DB-persisted `evidence_health_alerts` table: one page per condition, re-armed only when that condition clears (an in-memory cooldown would re-page after every deploy, since these conditions last for days) | `GET /api/cron/evidence-health` (daily) → `checkEvidenceHealth()` in `src/lib/services/evidence-health.ts` — fires per source whose failure rate worsened ≥20pp against **its own** 28-day baseline, per source that went silent while the rest kept flowing, per ACTIVE forecast with no usable evidence, and once for a pipeline-wide move in failed share or ingestion volume |
 | Server error | 🚨 | noisy | 5 min per `route:ErrorType` | `src/lib/api-middleware.ts` |
 | Dead link / 404 | 🔗 | noisy | 5 min per `pathname` | API routes on not-found |
 | LLM chain failure | 🤖 | noisy | 5 min per provider-chain | `src/lib/llm/service.ts` — fires **only when the whole fallback chain fails**; a single provider failing that a fallback then rescues is logged, not paged |
@@ -157,6 +158,8 @@ else
 So staging/next **never** post to the clean channel, and an un-provisioned `TELEGRAM_CLEAN_CHAT_ID` degrades safely to noisy. The search-health digest is the one dynamic case: it routes to **clean** only when critical (no usable providers), otherwise noisy.
 
 **Search health is grouped:** instead of one "credits low" message per provider, `notifySearchHealthDigest()` emits a **single** message per check listing every exhausted/low provider (`🚨 All search providers failed` header when none are usable, `⚠️ Search provider health` otherwise). This replaced the previous per-provider fan-out (`notifySearchCreditsLow` / `notifyAllSearchProvidersFailed`, still exported for back-compat but no longer called by the crons).
+
+**Evidence health is grouped and delta-based:** `notifyEvidenceHealthDigest()` emits a **single** message per daily check listing only what *newly* broke, headed with the failed share for both windows (`32% over 7d (1,941 rows) vs 51% baseline (28d)`) so no number is ever read out of context. It routes to **clean** only when the move is pipeline-wide (overall failed share or ingestion volume), matching the search-health split. Alerting is on the **delta**, never on the absolute rate: 47.2% of pool rows are `FAILED` by design — a wide net is supposed to discard a lot, so only a change in how much it discards is a signal.
 
 **Rate limiting:** Error notifications use a 5-minute in-memory cooldown. Cooldown resets on process restart.
 

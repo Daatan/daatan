@@ -1,0 +1,68 @@
+name: Evidence Pipeline Health
+
+# The "notify on fail" half of daatan#1478. Calls GET /api/cron/evidence-health,
+# which compares the evidence pipeline against its OWN recent baseline (7d vs the
+# preceding 28d) and posts one grouped Telegram digest for whatever newly broke —
+# a source departing from its usual failure rate, a source that went silent while
+# the rest keep flowing, an ACTIVE forecast whose pool holds nothing usable, or a
+# pipeline-wide move in failure share or ingestion volume.
+#
+# Runs against PRODUCTION: staging's pool is too thin for a baseline to mean
+# anything, and staging never posts to the clean channel anyway.
+#
+# Daily is the right cadence — the windows are 7 and 28 days, so an hourly run
+# would ask the same question 24 times and answer it identically. Dedup is
+# DB-persisted (evidence_health_alerts), so a condition pages once and stays quiet
+# until it clears, across deploys.
+#
+# The step fails the run on a non-200: a health check that silently stops running
+# is the failure mode this whole issue exists to end.
+
+on:
+  schedule:
+    - cron: '23 10 * * *'   # daily 10:23 UTC — after the heartbeat, clear of the backups
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to check
+        type: choice
+        options: [production, staging]
+        default: production
+
+jobs:
+  evidence-health:
+    name: Check evidence pipeline health
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Run evidence health check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          # Empty on schedule events — the daily run checks production.
+          TARGET: ${{ inputs.target || 'production' }}
+        run: |
+          if [ "$TARGET" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
+
+          echo "Checking evidence pipeline health at $BASE"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE/api/cron/evidence-health" \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            --max-time 120)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "Response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Evidence health check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
