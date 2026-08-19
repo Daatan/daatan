@@ -21,6 +21,7 @@ import {
   Share2,
   PenLine,
   Gavel,
+  FileQuestion,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useTranslations, useLocale } from 'next-intl'
@@ -70,6 +71,7 @@ export default function ForecastDetailClient({
   lastUpdatedISO = null,
   aiPanelSeries = [],
   showAiPanel = false,
+  usableEvidenceCount = null,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
@@ -91,6 +93,10 @@ export default function ForecastDetailClient({
     points: { createdAt: string; probability: number }[]
   }[]
   showAiPanel?: boolean
+  /** Pool rows the aggregate could use right now (daatan#1475). Zero means a published
+   *  number has no inspectable evidence behind it; null means the caller didn't compute
+   *  it, in which case the page says nothing — silence is the fail-open direction here. */
+  usableEvidenceCount?: number | null
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -602,6 +608,25 @@ export default function ForecastDetailClient({
                         </span>
                       )}
                     </p>
+                  </div>
+                )}
+
+                {/* Unevidenced number (daatan#1475): a published confidence whose pool
+                    holds nothing the aggregate can read — every extraction failed, was
+                    excluded, or came back incomplete. Measured at filing: 9 ACTIVE
+                    forecasts, 2 of them in the extreme band. Say so rather than hide the
+                    number: suppressing it would render identically to an abstention,
+                    which is a different state (the write layer distinguishes "abstained"
+                    from "never had evidence" since daatan#1473, and collapsing them here
+                    would undo that at the last mile). Not shown when the run abstained —
+                    that case already hides the needle above. */}
+                {!aiAbstained && aiVal != null && usableEvidenceCount === 0 && (
+                  <div
+                    className="mt-4 w-full flex items-start gap-2 text-left text-xs text-gray-400 bg-navy-800/60 border border-navy-600 rounded-lg px-3 py-2"
+                    data-testid="unevidenced-notice"
+                  >
+                    <FileQuestion className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p>{t('aiUnevidencedNotice')}</p>
                   </div>
                 )}
 

@@ -94,6 +94,9 @@ describe('resolvePooledEstimate', () => {
     expect(out.snapshotSources.map((s) => s.url)).toEqual(['https://reuters.com/p', 'https://guardian.com/p'])
     expect(out.snapshotSources[0]).toMatchObject({ sourceName: 'reuters.com', claims: ['pooled claim'] })
     expect(out.poolSize).toBe(3)
+    // Both halves travel: 2 of 3 rows were readable, and the Telegram header quotes both
+    // rather than implying the number rests on all three (daatan#1475).
+    expect(out.usableSize).toBe(2)
     expect(out.singleRunMean).toBe(0.5)
   })
 
@@ -139,6 +142,7 @@ describe('resolvePooledEstimate', () => {
     expect(out.mean).toBe(0.5)
     expect(out.snapshotSources).toBe(FALLBACK_SOURCES)
     expect(out.poolSize).toBeNull()
+    expect(out.usableSize).toBeNull() // no pool was read, so nothing is known about its composition
     expect(mockMeta).not.toHaveBeenCalled() // no author lookup on the fallback path
   })
 
@@ -154,6 +158,7 @@ describe('resolvePooledEstimate', () => {
     expect(out.reason).toBe('all_articles_off_topic')
     expect(out.snapshotSources).toEqual([]) // no voters on an abstention
     expect(out.poolSize).toBe(3)
+    expect(out.usableSize).toBe(2) // known even on an abstention: the pool was read, just not usable
     expect(mockMeta).not.toHaveBeenCalled() // no author lookup — there are no sources to enrich
   })
 

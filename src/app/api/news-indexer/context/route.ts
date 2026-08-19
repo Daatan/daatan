@@ -293,8 +293,10 @@ export async function POST(request: NextRequest) {
     // addArticlesToPool writes it) — daatan#1223's rating-prompt message hangs off it.
     let evidencePoolArticleId: string | null = null
     // How many articles the whole evidence pool aggregates (null on the single-run
-    // fallback) — header context for the Telegram notification.
+    // fallback) — header context for the Telegram notification, quoted as "usable of
+    // pooled" since the raw count overstates real evidence ~2× (daatan#1475).
     let poolSize: number | null = null
+    let usableSize: number | null = null
 
     // Per-article enrichment from the Oracle, keyed by url, so news-indexer can map
     // each article in the set back to its own forecast_match row.
@@ -450,6 +452,7 @@ export async function POST(request: NextRequest) {
         insufficientData: false,
         reason: null,
         poolSize: null,
+        usableSize: null,
         singleRunMean: oracleForecast.mean,
       }
 
@@ -496,6 +499,7 @@ export async function POST(request: NextRequest) {
         ciLow = stanceToPercent(est.ciLow)
         ciHigh = stanceToPercent(est.ciHigh)
         poolSize = est.poolSize
+        usableSize = est.usableSize
 
         const { stored, contextSnapshotId: snapshotId } = await saveNewsIndexerMatch({
           predictionId: prediction.id,
@@ -619,7 +623,7 @@ export async function POST(request: NextRequest) {
           evidenceClass: triggerEnrich?.evidenceClass ?? null,
           credibilityWeight: triggerEnrich?.credibilityWeight ?? null,
         },
-        { similarity: triggerSimilarity, articleCount: items.length, poolSize },
+        { similarity: triggerSimilarity, articleCount: items.length, poolSize, usableSize },
         { probability, previous: prediction.confidence, ciLow, ciHigh },
         // Rating buttons (daatan#1223) attach directly to the notification; skipped when the
         // trigger article's pool row couldn't be resolved — nothing to hang the feedback off.

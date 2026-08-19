@@ -564,6 +564,29 @@ the signature of a run that would have yanked the old estimate.
 Consequently `excluded` is now **enforced on every path**: excluded rows are dropped before
 the aggregate, so an admin's exclusion genuinely moves the number.
 
+**"Usable" has one definition** (`isUsablePoolRow` / `USABLE_POOL_ROW_WHERE` in
+`evidence-pool.ts`, daatan#1475): a current-version row that is not `excluded`, is `COMPLETE`,
+and carries all four of `stance`, `certainty`, `credibilityWeight`, `relevanceScore`. Anything
+missing one of them is unreadable to the aggregate. It used to be written twice — the
+in-memory filter in `recomputeFromPool()` required all four, the `forecast-empty` health
+query required only a stance — so a pool of half-extracted rows read as *covered* by the alert
+built to catch exactly that. Both now import the same predicate, `evidence-pool-usable.test.ts`
+pins them against one field list, and `countUsableEvidence()` exposes it as a live count.
+
+Volume and *usable* volume are not the same number and are no longer quoted as one: 46% of all
+`evidence_pool_articles` rows are FAILED (2026-08-18), so a pool of 22 may hold 9 readable
+rows. The Telegram match header says `N new / U of P usable in pool`, falling back to the bare
+`N new / P in pool` when composition is unknown (the single-run path). `ResolvedPoolEstimate`
+carries `usableSize` alongside `poolSize` for this.
+
+**A published number with an empty pool says so.** 9 ACTIVE forecasts display a confidence
+while `countUsableEvidence()` returns 0 (2026-08-18) — every article ever gathered for the
+claim failed extraction or was set aside, and the number is a survivor of an earlier, healthier
+pool. The forecast page annotates it (`forecast.aiUnevidencedNotice`) instead of hiding it: the
+estimate is *unverifiable*, not known to be wrong, and suppressing it would render identically
+to an abstention — a different state the write layer deliberately distinguishes (daatan#1473).
+An abstention takes precedence; the notice is shown only when a number is actually displayed.
+
 `oracleSnapshot.sources` lists the **whole usable pool** on the pool path — the exact rows
 `recomputeFromPool()` posted, mapped by `poolArticleToEnrichedSource()` — so
 `sources.length === articlesUsed` and the stored snapshot lists precisely the articles its
@@ -599,7 +622,8 @@ into forecasts.
 
 One row per condition the evidence pipeline is **currently** failing, keyed by a
 stable string (`source-silent:bbc.co.uk`, `forecast-empty:<predictionId>`,
-`overall-failure`). It is fire/re-arm state, not a log: `checkEvidenceHealth()`
+`overall-failure`). `forecast-empty` fires on the shared usable-row definition above, so it
+asks the same question the aggregate does. It is fire/re-arm state, not a log: `checkEvidenceHealth()`
 claims a condition by inserting its key — only the run that wins the insert
 notifies, so overlapping runs can't double-page — and deletes the keys whose
 condition no longer holds, which is what lets the same source page again the next

@@ -177,6 +177,7 @@
     "legendYou": "Vi",
     "legendAI": "AI",
     "settledPinNotice": "La Orakolo legas ĉi tiun demandon kiel jam deciditan — ĉi tiu nombro estas decid-fikso, ne kunigita meznombro de la fontoj.",
+    "aiUnevidencedNotice": "La provizo malantaŭ ĉi tiu nombro nun enhavas neniun uzeblan pruvon — ĉiu artikolo kolektita por ĉi tiu aserto malsukcesis en ekstraktado aŭ estis flankenmetita. La takso restas ĝis alvenos freŝa pruvo, sed nenio ĉi tie subtenas ĝin.",
     "settledPinSources": "Raportas la rezulton kiel jam deciditan: {names}",
     "deadlineDivergenceWarning": "La teksto de la aserto implicas templimon {claimDeadline}, kiu malkonsentas kun la Solvo-Dato supre. Konsideru akordigi ilin.",
     "aiInsufficientEvidence": "Nesufiĉaj pruvoj",

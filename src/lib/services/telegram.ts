@@ -679,7 +679,7 @@ export async function notifyNewsArticleMatched(
     evidenceClass?: string | null
     credibilityWeight?: number | null
   },
-  match: { similarity: number; articleCount?: number; poolSize?: number | null },
+  match: { similarity: number; articleCount?: number; poolSize?: number | null; usableSize?: number | null },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
   rating?: { evidencePoolArticleId: string; contextSnapshotId: string | null } | null,
 ): Promise<void> {
@@ -691,10 +691,17 @@ export async function notifyNewsArticleMatched(
   // articles this push carried, and — when the estimate came from the pool path — how many
   // articles the whole evidence pool aggregates. One weak article barely moving a 22-article
   // pool is expected behavior, and this is what makes that legible.
+  //
+  // The pool count is quoted as "usable of pooled" (daatan#1475): 46% of all pool rows are
+  // FAILED, so the raw number overstates real evidence by roughly 2× — a forecast that reads
+  // as 150-article-strong can have almost nothing behind its number. Falls back to the bare
+  // count only when a caller supplies no usable figure.
   const articleCount = match.articleCount ?? 1
   const volumeLabel =
     match.poolSize != null
-      ? ` · ${articleCount} new / ${match.poolSize} in pool`
+      ? match.usableSize != null
+        ? ` · ${articleCount} new / ${match.usableSize} of ${match.poolSize} usable in pool`
+        : ` · ${articleCount} new / ${match.poolSize} in pool`
       : articleCount > 1
         ? ` · ${articleCount} articles`
         : ''
