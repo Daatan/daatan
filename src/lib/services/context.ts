@@ -552,11 +552,25 @@ export async function getLatestOracleSnapshot(predictionId: string) {
  * here so it can't reset the glide clock. Deliberately NOT Prediction.confidence
  * — the clock overwrites that daily, so anchoring on it would compound the
  * glide against itself.
+ *
+ * Returns the anchor's CI for exactly that reason (daatan#1489): the band used to
+ * be glided from Prediction.aiCiLow/aiCiHigh, which is the very compounding this
+ * docstring warns about, one field over. The band now anchors here with the point.
  */
-export async function getLatestEvidenceEstimate(
-  predictionId: string,
-): Promise<{ externalProbability: number; createdAt: Date; evidenceAt: Date | null } | null> {
-  return prisma.contextSnapshot.findFirst({
+export interface EvidenceAnchor {
+  externalProbability: number
+  createdAt: Date
+  evidenceAt: Date | null
+  /** The band the pool published alongside `externalProbability`, percent 0-100.
+   *  Read from oracleSnapshot (ContextSnapshot has no CI column) so the glide can
+   *  anchor the band the same way it anchors the point — daatan#1489. Null on the
+   *  rare legacy snapshot whose oracleSnapshot predates these keys. */
+  ciLow: number | null
+  ciHigh: number | null
+}
+
+export async function getLatestEvidenceEstimate(predictionId: string): Promise<EvidenceAnchor | null> {
+  const snap = await prisma.contextSnapshot.findFirst({
     where: {
       predictionId,
       externalProbability: { not: null },
@@ -565,8 +579,17 @@ export async function getLatestEvidenceEstimate(
       ...NOT_CLOCK,
     },
     orderBy: { createdAt: 'desc' },
-    select: { externalProbability: true, createdAt: true, evidenceAt: true },
-  }) as Promise<{ externalProbability: number; createdAt: Date; evidenceAt: Date | null } | null>
+    select: { externalProbability: true, createdAt: true, evidenceAt: true, oracleSnapshot: true },
+  })
+  if (snap === null) return null
+  const oracle = snap.oracleSnapshot as { ciLow?: unknown; ciHigh?: unknown } | null
+  return {
+    externalProbability: snap.externalProbability as number,
+    createdAt: snap.createdAt,
+    evidenceAt: snap.evidenceAt,
+    ciLow: typeof oracle?.ciLow === 'number' ? oracle.ciLow : null,
+    ciHigh: typeof oracle?.ciHigh === 'number' ? oracle.ciHigh : null,
+  }
 }
 
 /**

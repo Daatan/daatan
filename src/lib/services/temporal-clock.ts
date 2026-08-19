@@ -130,6 +130,37 @@ export function glideValue(v: number, c: number, direction: 'ARRIVAL' | 'SURVIVA
   return Math.round(clamp(result * 100, 0, 100))
 }
 
+/**
+ * The band for a requote, glided from the ANCHOR's CI with the same absolute
+ * progress factor `c` the point estimate uses.
+ *
+ * It must not be glided from Prediction.aiCiLow/aiCiHigh: `c` measures progress
+ * from the anchor, not from the previous tick, so re-applying it to a value the
+ * previous tick already glided compounds it. The point never had this bug (it is
+ * always re-derived from `anchor.externalProbability`), so band and point drifted
+ * apart until the point sat outside its own interval — 5 ACTIVE forecasts, one
+ * showing 18% with a [0, 0] band whose anchor was [12, 93] (daatan#1489).
+ *
+ * `glideValue` is strictly increasing in v (f'(x) = c(1-x)^(c-1) > 0), so anchoring
+ * both bounds and the point on one `c` preserves low <= p <= high *by construction*.
+ * The final clamp is only needed because the point clamps to [PIN_LOW, PIN_HIGH]
+ * while the bounds clamp to [0, 100]: at full decay an ARRIVAL point floors at
+ * PIN_LOW while its bounds keep going to 0.
+ */
+export function glideBand(
+  anchor: { ciLow: number | null; ciHigh: number | null },
+  c: number,
+  direction: 'ARRIVAL' | 'SURVIVAL',
+  p: number,
+): { aiCiLow: number | null; aiCiHigh: number | null } {
+  const low = anchor.ciLow !== null ? glideValue(anchor.ciLow, c, direction) : null
+  const high = anchor.ciHigh !== null ? glideValue(anchor.ciHigh, c, direction) : null
+  return {
+    aiCiLow: low === null ? null : Math.min(low, p),
+    aiCiHigh: high === null ? null : Math.max(high, p),
+  }
+}
+
 export interface RequoteSummary {
   examined: number
   glided: number
@@ -171,6 +202,8 @@ interface RequoteCandidate {
   slug: string | null
   claimText: string
   confidence: number | null
+  /** Stored band. Read ONLY to detect the pre-fix corrupted state — never glided
+   *  from; the band is anchored via glideBand (daatan#1489). */
   aiCiLow: number | null
   aiCiHigh: number | null
   claimDeadline: Date | null
@@ -282,7 +315,17 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
   const hasNoPrior = c.confidence === null
   const prevConfidence = c.confidence ?? result.p
   const delta = Math.abs(result.p - prevConfidence)
-  if (delta < MATERIAL_CHANGE_PTS && !(isPin && hasNoPrior)) {
+  // daatan#1489 self-heal: a row whose stored point sits outside its stored band is
+  // carrying a band compounded by the pre-fix glide. Its point is typically stable, so
+  // the material-change gate would skip it forever and the nonsense band would never be
+  // rewritten. Let exactly one write through to re-anchor it; glideBand then restores
+  // low <= p <= high, so this stops firing on the next tick.
+  const bandCorrupt =
+    c.confidence !== null &&
+    c.aiCiLow !== null &&
+    c.aiCiHigh !== null &&
+    (c.confidence < c.aiCiLow || c.confidence > c.aiCiHigh)
+  if (delta < MATERIAL_CHANGE_PTS && !(isPin && hasNoPrior) && !bandCorrupt) {
     summary.unchanged++
     return
   }
@@ -291,8 +334,7 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
   await saveClockSnapshot({
     predictionId: c.id,
     probability: result.p,
-    aiCiLow: c.aiCiLow !== null ? glideValue(c.aiCiLow, result.c, direction) : null,
-    aiCiHigh: c.aiCiHigh !== null ? glideValue(c.aiCiHigh, result.c, direction) : null,
+    ...glideBand(anchor, result.c, direction, result.p),
     meta: {
       engineVersion: TEMPORAL_ENGINE_VERSION,
       cause: result.cause,
