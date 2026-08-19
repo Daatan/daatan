@@ -81,4 +81,35 @@ describe('ForecastDetailClient — SSR substantive content (anti soft-404)', () 
     // The toggle starts collapsed, but the text must still be in the HTML.
     expect(screen.getByText(/zero precipitation/)).toBeInTheDocument()
   })
+
+  // Googlebot's renderer blocks /api/* per robots.txt, so the mount-time refetch
+  // always fails under WRS. Swapping the SSR content for the error screen is what
+  // got live forecast pages classified Soft 404 (daatan#1497).
+  it('keeps SSR content when the refetch is blocked (daatan#1497)', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    await act(async () => {
+      render(wrap(<ForecastDetailClient initialData={makePrediction() as never} />))
+    })
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('It will not rain in Ramat-Gan on February 26, 2026.')
+    expect(body).not.toContain('Failed to load prediction')
+  })
+
+  it('keeps SSR content when the refetch returns a server error', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    await act(async () => {
+      render(wrap(<ForecastDetailClient initialData={makePrediction() as never} />))
+    })
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('It will not rain in Ramat-Gan on February 26, 2026.')
+    expect(body).not.toContain('Failed to load prediction')
+  })
+
+  it('still shows the error screen when there is no initialData to fall back to', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    await act(async () => {
+      render(wrap(<ForecastDetailClient />))
+    })
+    expect(document.body.textContent ?? '').toContain('Failed to load prediction')
+  })
 })

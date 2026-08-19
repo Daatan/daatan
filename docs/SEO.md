@@ -105,7 +105,7 @@ near-identical across thousands of pages, Google's thin-content heuristic files 
 **"Soft 404"** (HTTP 200 but treated as an error) and drops them from the index, which also
 lowers the whole domain's crawl rate.
 
-Two anti-patterns previously starved the pre-render; both are fixed:
+These anti-patterns previously starved (or destroyed) the pre-render; all are fixed:
 
 - **`isMounted` date gates** — dates rendered `''` on the server and only filled after
   hydration. They now render via the hydration-safe `formatDisplayDate` /
@@ -122,6 +122,13 @@ Two anti-patterns previously starved the pre-render; both are fixed:
   `notFound()` for this case instead of rendering a thin `noindex` page at HTTP 200 (the
   locale route was missing this check until 2026-07-28 — confirmed via GSC's Page Indexing
   report showing the "Soft 404" bucket).
+- **Mount-time refetch clobbering SSR content on failure** — `ForecastDetailClient` refetches
+  `/api/forecasts/[id]` after hydration, but `robots.txt` disallows `/api/`, so under
+  Googlebot's renderer that fetch always fails — and the error screen ("Failed to load
+  prediction") replaced the fully-rendered SSR content. Confirmed live via GSC "Test Live
+  URL" 2026-08-19: healthy pages rendered as the error page and were filed as Soft 404
+  (daatan#1497). A failed refetch now keeps the SSR-seeded content; the error screen only
+  shows when there was no `initialData` (pure client-side entry).
 
 Additionally, `ForecastDetailClient` renders a **server-side facts line** under the `<h1>`
 (English/canonical locale): author · opened/resolves dates · forecaster count · community

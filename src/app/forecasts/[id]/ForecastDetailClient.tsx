@@ -199,7 +199,12 @@ export default function ForecastDetailClient({
         const data = await response.json()
         setPrediction(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('somethingWentWrong'))
+        // A failed refetch must not replace SSR-seeded content with the error screen:
+        // Googlebot's renderer blocks /api/* per robots.txt, and the resulting error
+        // page is what got these URLs classified Soft 404 (daatan#1497).
+        if (!initialData) {
+          setError(err instanceof Error ? err.message : t('somethingWentWrong'))
+        }
       } finally {
         setIsLoading(false)
       }
