@@ -252,6 +252,12 @@ remediation (`POST /api/admin/evidence-pool/remediate`, daatan#1493) therefore n
 re-claim arm. That choice is what makes the run reversible: every prior reading
 survives as a superseded version, and a bad remediation is undone by dropping the
 new head and clearing `supersededAt` on its `supersedesId` parent, in that order.
+**That order is enforced, not advisory** — clearing the parent first leaves two rows
+reading as current, and the partial unique index rejects it outright with
+`evidence_pool_articles_current_url_key` on `(predictionId, url_hash)` (verified
+against a real chain on staging, 2026-08-19). So a revert attempted backwards fails
+loudly and changes nothing, rather than half-applying; but it also means the delete
+genuinely has to come first, or the revert simply will not run.
 The corollary is a rule about *when* it is legitimate — re-extraction can only
 repair a verdict if the extractor's INPUT can differ (a fixed prompt, a new guard, a
 body that fetches this time). On byte-identical input with an unchanged extractor,
