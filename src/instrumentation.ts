@@ -54,8 +54,15 @@ export async function register() {
 
   if (process.env.NODE_ENV !== 'production') return
 
+  // Google LLM + embeddings reach production through Vertex, not the Developer
+  // API (#1472) — GEMINI_API_KEY is no longer supplied to the SaaS containers, so
+  // checking for it here would warn on every boot forever. All three Vertex vars
+  // are listed because `vertexEnv()` is all-or-nothing: a partial set disables the
+  // leg just as completely as an empty one, and silently.
   const required: Array<{ key: string; feature: string }> = [
-    { key: 'GEMINI_API_KEY', feature: 'LLM / bot-runner' },
+    { key: 'GOOGLE_VERTEX_PROJECT_ID', feature: 'LLM / embeddings / bot-runner' },
+    { key: 'GOOGLE_VERTEX_CLIENT_EMAIL', feature: 'LLM / embeddings / bot-runner' },
+    { key: 'GOOGLE_VERTEX_PRIVATE_KEY', feature: 'LLM / embeddings / bot-runner' },
     { key: 'VAPID_PRIVATE_KEY', feature: 'browser push notifications' },
   ]
 

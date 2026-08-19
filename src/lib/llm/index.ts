@@ -42,8 +42,11 @@ function buildProviders(): LLMProvider[] {
   // Same model, same schemas — only the billing surface differs, and Vertex has no
   // prepaid balance that can hit zero. Registered AHEAD of the Developer-API leg
   // rather than replacing it: if Vertex is misconfigured or its quota is exhausted,
-  // the existing key-based leg is right behind it and the chain still serves. Once
-  // this is proven in prod, GEMINI_API_KEY and the leg below can go.
+  // the key-based leg below is right behind it and the chain still serves. Daatan's
+  // own SaaS containers no longer carry GEMINI_API_KEY (#1472), so in production
+  // that leg does not register at all and the chain falls through to Oracle/Bedrock
+  // — a different vendor, which is the more useful fallback anyway. The leg stays in
+  // the code for the self-host edition, where a Developer API key is the easy path.
   const vertex = vertexEnv()
   if (vertex) {
     providers.push(new VertexProvider({ ...vertex, modelName: GEMINI_MODEL }))

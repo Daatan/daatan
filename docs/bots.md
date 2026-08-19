@@ -267,7 +267,7 @@ Sensitive credentials and infrastructure endpoints. Never stored in the DB or SS
 | `NEXTAUTH_SECRET` | `.env` / Docker | NextAuth JWT signing key |
 | `NEXTAUTH_URL` | `.env` / Docker | Public app URL |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `.env` / Docker | Google OAuth |
-| `GEMINI_API_KEY` | `.env` / Docker | Primary LLM (Gemini) |
+| `GOOGLE_VERTEX_PROJECT_ID` / `_CLIENT_EMAIL` / `_PRIVATE_KEY` | `.env` / Docker | Primary LLM (Gemini via Vertex AI) |
 | `OPENROUTER_API_KEY` | `.env` / Docker | Bot LLM (OpenRouter) |
 | `OLLAMA_BASE_URL` | `.env` / Docker | Fallback LLM |
 | `BOT_RUNNER_SECRET` | `.env` / Docker + GitHub Actions | Shared secret for `/api/bots/run` |

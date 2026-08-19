@@ -11,7 +11,8 @@
  * Dry-run by default (prints what it would do). Pass --apply to write.
  * Run with: npx tsx scripts/backfill-english-canonical.ts [--apply]
  *
- * Requires GEMINI_API_KEY and DATABASE_URL in environment.
+ * Requires DATABASE_URL, plus credentials for the Google LLM leg — `GOOGLE_VERTEX_*`
+ * in production, `GEMINI_API_KEY` on self-host.
  */
 
 import { config } from 'dotenv'

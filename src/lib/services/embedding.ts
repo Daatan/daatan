@@ -84,8 +84,15 @@ async function embedViaDeveloperApi(text: string): Promise<number[] | null> {
  * and also when Vertex fails, so a misconfigured SA degrades to today's behaviour
  * instead of leaving forecasts unembedded. That rescue is invisible to callers by
  * design, so the `vertex-embed-failed` log line below is the only signal that the
- * Vertex path is broken; it is what to grep for after provisioning. The fallback
- * goes away with GEMINI_API_KEY once Vertex is proven in production.
+ * Vertex path is broken; it is what to grep for.
+ *
+ * Since #1472 Daatan's own SaaS containers no longer carry GEMINI_API_KEY, so in
+ * production the rescue is inert: a Vertex failure now means the forecast goes
+ * unembedded rather than being embedded by the other platform. That is deliberate
+ * — the two platforms return bit-identical vectors for the same text (measured on
+ * prod over 20 real claims, 2026-08-19), so the rescue was never a correctness
+ * risk, but a silent second billing surface is worth more than it saves. The leg
+ * stays for the self-host edition, which has no service account and no Vertex.
  */
 export async function embedText(text: string): Promise<number[] | null> {
   const env = vertexEnv()

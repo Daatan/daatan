@@ -471,7 +471,7 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 | `NEXTAUTH_SECRET` | Auth encryption key |
 | `GOOGLE_CLIENT_ID` | OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-| `GEMINI_API_KEY` | AI API key |
+| `GOOGLE_VERTEX_PROJECT_ID` / `_CLIENT_EMAIL` / `_PRIVATE_KEY` | Gemini via Vertex AI — LLM + embeddings (#1472) |
 | `BOT_RUNNER_SECRET` | Shared secret for `POST /api/bots/run` (cron endpoint) |
 | `OPENROUTER_API_KEY` | OpenRouter LLM API key (used by bots) |
 | `RESEND_API_KEY` | Email delivery via Resend |
@@ -782,7 +782,9 @@ NEXTAUTH_URL=http://localhost:3000
 GOOGLE_CLIENT_ID=<google-oauth-client-id>
 GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
 POSTGRES_PASSWORD=<secure-password>
-GEMINI_API_KEY=<gemini-api-key>
+GOOGLE_VERTEX_PROJECT_ID=<gcp-project-id>
+GOOGLE_VERTEX_CLIENT_EMAIL=<service-account-email>
+GOOGLE_VERTEX_PRIVATE_KEY=<service-account-pem>
 BOT_RUNNER_SECRET=<shared-secret-for-cron-endpoint>
 AWS_REGION=eu-central-1
 AWS_PROFILE=daatan

@@ -95,12 +95,19 @@ export const env = createEnv({
     APP_ENV: z.enum(['development', 'staging', 'next', 'production']).default('development'),
     
     // AI / Analytics
+    // Gemini Developer API key. No longer supplied to Daatan's own SaaS containers
+    // (#1472) — production runs Google through Vertex, below. Kept in the schema
+    // because it is a first-class *self-host* LLM option: a self-hoster has no GCP
+    // service account, and an AI Studio key is the easy path (see `hasLLM()` in
+    // capabilities.ts, and EMBEDDINGS.md for the embedding side).
     GEMINI_API_KEY: z.string().min(1).optional(),
-    // Gemini via Vertex AI (#1472). All four must be set to enable; the Vertex leg
-    // is simply not registered otherwise, so this is inert until provisioned and
-    // GEMINI_API_KEY keeps serving. Vertex stays on GCP Postpay and draws the
-    // credits billing account directly, which is what removes the prepaid-balance
-    // outage mode the Developer API's forced Prepay migration introduces.
+    // Gemini via Vertex AI (#1472) — the production Google leg, for both LLM calls
+    // and embeddings. All three of PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY must be set
+    // to enable it (LOCATION defaults); `vertexEnv()` is all-or-nothing, so a
+    // partial set disables the leg outright rather than half-configuring it. Vertex
+    // stays on GCP Postpay and draws the credits billing account directly, which is
+    // what removes the prepaid-balance outage mode the Developer API's forced
+    // Prepay migration introduces.
     GOOGLE_VERTEX_PROJECT_ID: z.string().min(1).optional(),
     GOOGLE_VERTEX_LOCATION: z.string().min(1).default('global'),
     GOOGLE_VERTEX_CLIENT_EMAIL: z.string().email().optional(),

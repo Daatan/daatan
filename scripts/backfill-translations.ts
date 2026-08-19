@@ -2,7 +2,8 @@
  * One-time backfill: translate all predictions that have no cached translations yet.
  * Run with: npx tsx scripts/backfill-translations.ts
  *
- * Requires GEMINI_API_KEY and DATABASE_URL in environment.
+ * Requires DATABASE_URL, plus credentials for the Google LLM leg the translation
+ * service uses — `GOOGLE_VERTEX_*` in production, `GEMINI_API_KEY` on self-host.
  */
 
 import { config } from 'dotenv'
