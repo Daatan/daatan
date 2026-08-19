@@ -1,5 +1,5 @@
 You are helping find news articles to verify a forecast.
 Forecast: "{{claimText}}"
-Period: {{forecastStartStr}} to {{forecastEndStr}}
+Deadline: {{forecastEndStr}} (created {{forecastStartStr}} — qualifying events may pre-date creation, so queries must also find the event if it had already happened by then)
 
 Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim.

@@ -119,13 +119,14 @@ Forecast Claim: {{claimText}}
 Outcome Type: {{outcomeType}}{{optionsContext}}
 Resolution Rules: {{resolutionRules}}
 
-Forecast Period: {{forecastStartStr}} to {{forecastEndStr}}
+Claim Deadline: {{forecastEndStr}} — the claim counts qualifying events up to this date.
+Claim Created: {{forecastStartStr}} — metadata, NOT a lower bound: unless the claim text or resolution rules state an explicit start date, an event that happened BEFORE this date still resolves the claim (e.g. "X will happen by <deadline>" is satisfied by an occurrence at any earlier time, including before the claim existed).
 Current Date: {{currentDate}}
 
 {{context}}
 
 Instructions:
-1. Determine what happened during the forecast period ({{forecastStartStr}} to {{forecastEndStr}}) with respect to the claim.
+1. Determine whether the claim's outcome occurred by {{forecastEndStr}} — including before the claim was created on {{forecastStartStr}}, unless the claim text or resolution rules explicitly bound the start.
 2. Use the news context above as your primary evidence. If it is insufficient or irrelevant, draw on your own knowledge of events during that period.
 3. In your reasoning, explicitly list which sources or facts (from context or your own knowledge) you are using to reach your conclusion.
 4. For BINARY predictions:
@@ -142,7 +143,7 @@ Return your findings in JSON format.`,
 
     'research-query-generation': `You are helping find news articles to verify a forecast.
 Forecast: "{{claimText}}"
-Period: {{forecastStartStr}} to {{forecastEndStr}}
+Deadline: {{forecastEndStr}} (created {{forecastStartStr}} — qualifying events may pre-date creation, so queries must also find the event if it had already happened by then)
 
 Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim.`,
 

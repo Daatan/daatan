@@ -138,8 +138,8 @@ describe('POST /api/forecasts/[id]/research', () => {
 
     await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
 
-    // dated + broad + simplified + 1 targeted query
-    expect(searchArticlesMultilingual).toHaveBeenCalledTimes(4)
+    // dated + broad + simplified + 1 targeted query × 2 legs (current + pre-creation)
+    expect(searchArticlesMultilingual).toHaveBeenCalledTimes(5)
   })
 
   it('the simplified query strips stopwords and includes the resolution year', async () => {
@@ -155,17 +155,37 @@ describe('POST /api/forecasts/[id]/research', () => {
     expect(simplifiedQuery).toContain('2026')
   })
 
-  it('passes date range to dated and simplified searches', async () => {
+  it('caps searches at the deadline but never floors them at creation (daatan#1511)', async () => {
+    // The creation-date floor hid a resolving event that happened six days before
+    // the claim existed (Brent $100): the claim window has no lower bound unless
+    // the claim text states one, so searches must not invent one.
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue(basePrediction as never)
 
     await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
 
     const calls = vi.mocked(searchArticlesMultilingual).mock.calls
-    // calls[0] = dated, calls[2] = simplified — both receive dateFrom/dateTo
-    expect(calls[0][2]).toMatchObject({ dateFrom: expect.any(Date), dateTo: expect.any(Date) })
-    expect(calls[2][2]).toMatchObject({ dateFrom: expect.any(Date), dateTo: expect.any(Date) })
+    // calls[0] = dated, calls[2] = simplified — deadline-capped, no lower bound
+    expect(calls[0][2]).toMatchObject({ dateTo: expect.any(Date) })
+    expect(calls[0][2]!.dateFrom).toBeUndefined()
+    expect(calls[2][2]).toMatchObject({ dateTo: expect.any(Date) })
+    expect(calls[2][2]!.dateFrom).toBeUndefined()
     // calls[1] = broad — no date options
     expect(calls[1][2]).toBeUndefined()
+  })
+
+  it('runs a pre-creation leg per targeted query — the born-true detector (daatan#1511)', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(basePrediction as never)
+
+    await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+
+    const calls = vi.mocked(searchArticlesMultilingual).mock.calls
+    // calls[3] = targeted current leg, calls[4] = targeted pre-creation leg
+    const targeted = calls.slice(3)
+    expect(targeted).toHaveLength(2)
+    expect(targeted[0][2]!.dateFrom).toBeUndefined()
+    // The pre-creation leg's window ends at the claim's publishedAt/createdAt, so a
+    // strictly historical window reaches the date-honoring SERP providers (retro#559).
+    expect(targeted[1][2]!.dateTo!.getTime()).toBe(new Date('2026-01-01').getTime())
   })
 
   it('extends the search window a few days past an expired deadline', async () => {
@@ -212,8 +232,8 @@ describe('POST /api/forecasts/[id]/research', () => {
 
     await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
 
-    // 3 initial + 1 targeted search; LLM called for query gen + evaluation
-    expect(searchArticlesMultilingual).toHaveBeenCalledTimes(4)
+    // 3 initial + 1 targeted query × 2 legs; LLM called for query gen + evaluation
+    expect(searchArticlesMultilingual).toHaveBeenCalledTimes(5)
     expect(generateContentMock).toHaveBeenCalledTimes(2)
   })
 
