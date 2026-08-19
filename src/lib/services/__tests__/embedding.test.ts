@@ -203,11 +203,28 @@ describe('embedAndStoreForecast', () => {
     expect(prisma.$executeRaw).toHaveBeenCalledOnce()
   })
 
-  it('does not call $executeRaw if embedding fails', async () => {
+  /**
+   * Throwing rather than returning is the contract the backfill routes depend on:
+   * both wrap this in try/catch and increment `done` on success, so a silent
+   * return was counted as a stored embedding while the row stayed NULL.
+   */
+  it('throws and does not call $executeRaw if embedding fails', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('fail'))
 
-    await embedAndStoreForecast('pred-1', 'claim text')
+    await expect(embedAndStoreForecast('pred-1', 'claim text')).rejects.toThrow(
+      /No embedding returned for prediction pred-1/
+    )
+    expect(prisma.$executeRaw).not.toHaveBeenCalled()
+  })
 
+  it('throws and does not call $executeRaw when the vector has non-finite values', async () => {
+    const withNaN = [...FAKE_768]
+    withNaN[0] = NaN // JSON-serialises to null, so it survives the 768-length check
+    vi.mocked(fetch).mockResolvedValue(embedResponse(withNaN))
+
+    await expect(embedAndStoreForecast('pred-1', 'claim text')).rejects.toThrow(
+      /non-finite values/
+    )
     expect(prisma.$executeRaw).not.toHaveBeenCalled()
   })
 })
