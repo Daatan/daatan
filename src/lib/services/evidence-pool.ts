@@ -640,6 +640,69 @@ interface PoolAggregateApiResponse {
  * callers convert with `stanceToPercent`/`stanceStdToPercent` exactly as they do for
  * a single-run forecast.
  */
+/**
+ * "A pool row the aggregate can actually use" — the one definition (daatan#1475).
+ *
+ * It existed twice and the two disagreed: `recomputeFromPool` filtered on all six
+ * conditions below, while the evidence-health alert asked only for COMPLETE-with-a-stance.
+ * A forecast could therefore clear the alert's bar and still aggregate to nothing, which is
+ * precisely the class that issue is about — 9 ACTIVE forecasts publishing a confidence with
+ * no usable evidence behind it. The guard, the alert and the aggregate now read the same
+ * predicate, so they cannot drift apart again.
+ *
+ * `excluded` is a human's call and rides at the front: an admin exclusion must genuinely
+ * remove a row everywhere. The four `!== null` checks are not belt-and-braces — retro's
+ * `/pool/aggregate` needs every one of them, so a row missing any is indistinguishable
+ * from a failure downstream however cleanly its extraction finished.
+ *
+ * Kept beside {@link USABLE_POOL_ROW_WHERE}, which is the same predicate as SQL. The two
+ * MUST move together; `evidence-pool-usable.test.ts` pins both against one field list.
+ */
+export function isUsablePoolRow(a: {
+  excluded: boolean
+  status: string
+  stance: number | null
+  certainty: number | null
+  credibilityWeight: number | null
+  relevanceScore: number | null
+}): boolean {
+  return (
+    !a.excluded &&
+    a.status === 'COMPLETE' &&
+    a.stance !== null &&
+    a.certainty !== null &&
+    a.credibilityWeight !== null &&
+    a.relevanceScore !== null
+  )
+}
+
+/** {@link isUsablePoolRow} as a Prisma filter, over current-version rows only. */
+export const USABLE_POOL_ROW_WHERE = {
+  ...CURRENT_VERSION_ONLY,
+  excluded: false,
+  status: 'COMPLETE',
+  stance: { not: null },
+  certainty: { not: null },
+  credibilityWeight: { not: null },
+  relevanceScore: { not: null },
+} as const satisfies Prisma.EvidencePoolArticleWhereInput
+
+/**
+ * How many rows of a forecast's pool the aggregate could use right now.
+ *
+ * Zero means the published confidence — if there is one — has nothing behind it that a
+ * reader could inspect: every extraction in the pool failed, was excluded, or came back
+ * incomplete. The forecast page says so rather than presenting the number unqualified
+ * (daatan#1475). Deliberately a live count, not a persisted flag: it self-corrects the
+ * moment one extraction succeeds, and needs no backfill for the forecasts already in
+ * this state.
+ */
+export async function countUsableEvidence(predictionId: string): Promise<number> {
+  return prisma.evidencePoolArticle.count({
+    where: { predictionId, ...USABLE_POOL_ROW_WHERE },
+  })
+}
+
 export interface PoolRecompute {
   mean: number
   std: number
@@ -691,15 +754,7 @@ export async function recomputeFromPool(
 
   const pool = await getPoolArticlesForRecompute(predictionId)
   const excludedCount = pool.filter((a) => a.excluded).length
-  const usable = pool.filter(
-    (a) =>
-      !a.excluded &&
-      a.status === 'COMPLETE' &&
-      a.stance !== null &&
-      a.certainty !== null &&
-      a.credibilityWeight !== null &&
-      a.relevanceScore !== null,
-  )
+  const usable = pool.filter(isUsablePoolRow)
   const incompleteCount = pool.length - excludedCount - usable.length
   if (usable.length === 0) return null
 

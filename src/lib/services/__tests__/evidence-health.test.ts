@@ -10,6 +10,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { checkEvidenceHealth, alertKey } from '@/lib/services/evidence-health'
+import { USABLE_POOL_ROW_WHERE, isUsablePoolRow } from '@/lib/services/evidence-pool'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
 
 const groupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
@@ -137,11 +138,36 @@ describe('checkEvidenceHealth', () => {
       claimText: 'Israel strikes Iran by October',
       slug: 'israel-iran',
     })
-    // A COMPLETE row *without* a stance never reaches the coverage set, so it
-    // cannot mask an empty pool here.
+    // The alert asks the same question the aggregate does — a half-extracted row
+    // (COMPLETE but missing certainty, credibility or relevance) is not evidence and
+    // must not mask an empty pool. Pinned to the shared filter rather than restated
+    // here, so the two cannot drift apart again (daatan#1475).
     expect(groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ stance: { not: null } }) }),
+      expect.objectContaining({
+        by: ['predictionId'],
+        where: expect.objectContaining({ ...USABLE_POOL_ROW_WHERE }),
+      }),
     )
+  })
+
+  it('counts a forecast as empty when its only rows are half-extracted', async () => {
+    // The regression this collapse fixes: the old alert asked for a stance and nothing
+    // else, so a pool of stance-only rows read as covered while the aggregate saw none.
+    stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, HEALTHY_BASELINE, [])
+    findActive.mockResolvedValue([{ id: 'p-half', claimText: 'half extracted', slug: 'half' }] as never)
+
+    const { fired } = await checkEvidenceHealth()
+
+    expect(fired).toContainEqual({
+      kind: 'forecast_no_evidence',
+      predictionId: 'p-half',
+      claimText: 'half extracted',
+      slug: 'half',
+    })
+    expect(isUsablePoolRow({
+      excluded: false, status: 'COMPLETE', stance: 0.4,
+      certainty: null, credibilityWeight: 1, relevanceScore: 0.6,
+    })).toBe(false)
   })
 
   it('does not re-fire a condition already alerted on, and counts it as suppressed', async () => {

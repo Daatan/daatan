@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
+import { USABLE_POOL_ROW_WHERE } from '@/lib/services/evidence-pool'
 
 const log = createLogger('evidence-health')
 
@@ -128,9 +129,13 @@ async function windowStats(from: Date, to: Date | null): Promise<WindowStats> {
 /**
  * ACTIVE forecasts whose pool holds nothing aggregation can read (daatan#1475).
  *
- * "COMPLETE" alone is not the bar: `recomputeFromPool` needs a stance, so a
- * COMPLETE row without one is indistinguishable from a failure downstream — the
- * same definition `getPoolThroughput`'s `usable` uses.
+ * "COMPLETE" alone is not the bar, and neither is COMPLETE-with-a-stance, which is what
+ * this check originally asked for: `/pool/aggregate` also needs certainty, credibility
+ * weight and relevance, and drops excluded rows. A forecast could therefore clear this
+ * alert and still aggregate to nothing — the alert would stay silent on exactly the
+ * forecasts it exists to catch. It now shares `isUsablePoolRow`'s definition with the
+ * aggregate and the forecast page's guard (`USABLE_POOL_ROW_WHERE`), so the three cannot
+ * drift apart.
  */
 async function forecastsWithoutEvidence(): Promise<EvidenceHealthIssue[]> {
   const active = await prisma.prediction.findMany({
@@ -143,9 +148,7 @@ async function forecastsWithoutEvidence(): Promise<EvidenceHealthIssue[]> {
     by: ['predictionId'],
     where: {
       predictionId: { in: active.map((p) => p.id) },
-      status: 'COMPLETE',
-      stance: { not: null },
-      supersededAt: null,
+      ...USABLE_POOL_ROW_WHERE,
     },
     _count: { _all: true },
   })

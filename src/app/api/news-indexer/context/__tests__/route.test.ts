@@ -821,6 +821,16 @@ describe('POST /api/news-indexer/context', () => {
       expect(snap.sources[0]).toMatchObject({ sourceName: 'reuters.com', claims: ['pooled claim'] })
     })
 
+    it('tells Telegram how much of the pool was readable, not just how big it is (daatan#1475)', async () => {
+      // 3 rows pooled, 2 usable — the header must not imply the number rests on all three.
+      vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
+
+      await POST(post('test-secret'))
+
+      const [, , match] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
+      expect(match).toMatchObject({ poolSize: 3, usableSize: 2 })
+    })
+
     it('re-looks-up authors for the pooled URLs and writes them into the snapshot', async () => {
       vi.mocked(recomputeFromPool).mockResolvedValue(POOL)
       vi.mocked(getArticleMetaByUrl).mockImplementation(

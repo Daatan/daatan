@@ -10,6 +10,7 @@ import type { Comment } from '@/components/comments/CommentThread'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { getForecastVoters } from '@/lib/services/forecast-sources'
+import { countUsableEvidence } from '@/lib/services/evidence-pool'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import { communityProbability } from '@/lib/forecast-math'
 import { forecastFaqJsonLd, latestProbabilityUpdateISO, type ForecastSeoCopy } from '@/lib/forecast-seo-schema'
@@ -275,14 +276,25 @@ export default async function ForecastDetailPage({ params }: Props) {
         ?.showAiPanel ?? false
     : false
 
-  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory, panelSeries] =
-    await Promise.all([
-      getInitialComments(prediction.id),
-      getInitialContextSnapshots(prediction.id),
-      getForecastVoters(prediction.id),
-      getProbabilityHistory(prediction.id),
-      showAiPanel ? getPanelSeries(prediction.id) : Promise.resolve([]),
-    ])
+  const [
+    initialComments,
+    initialContextSnapshots,
+    initialContributingSources,
+    probabilityHistory,
+    panelSeries,
+    usableEvidenceCount,
+  ] = await Promise.all([
+    getInitialComments(prediction.id),
+    getInitialContextSnapshots(prediction.id),
+    getForecastVoters(prediction.id),
+    getProbabilityHistory(prediction.id),
+    showAiPanel ? getPanelSeries(prediction.id) : Promise.resolve([]),
+    // daatan#1475: how many pool rows the aggregate could use right now. Zero means the
+    // published number has nothing behind it a reader could inspect — the gauge says so
+    // rather than presenting it unqualified. A live count, so it clears itself the moment
+    // one extraction succeeds.
+    countUsableEvidence(prediction.id),
+  ])
   // Chart series: includes kind='clock' glide requotes (unlike the event
   // timeline above) so the daily time-decay adjustment shows as movement.
   const initialProbabilityHistory = probabilityHistory.map((s) => ({
@@ -458,6 +470,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         lastUpdatedISO={lastUpdatedISO}
         aiPanelSeries={panelSeries}
         showAiPanel={showAiPanel}
+        usableEvidenceCount={usableEvidenceCount}
       />
     </>
   )

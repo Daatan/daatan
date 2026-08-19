@@ -42,6 +42,13 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
   reason: string | null
   /** Diagnostics for the caller's log line. `poolSize` is null when no pool read happened. */
   poolSize: number | null
+  /**
+   * Of those `poolSize` rows, how many the aggregate could actually use — the rest failed
+   * extraction, were excluded, or came back incomplete. Null when no pool read happened.
+   * Quoted alongside `poolSize` wherever a pool size is shown to a human: 46% of all pool
+   * rows are FAILED, so the raw count overstates real evidence by roughly 2× (daatan#1475).
+   */
+  usableSize: number | null
   singleRunMean: number
 }
 
@@ -105,6 +112,7 @@ export async function resolvePooledEstimate(
       insufficientData: true,
       reason: pool.reason,
       poolSize: pool.poolSize,
+      usableSize: pool.usableSize,
       singleRunMean: singleRun.mean,
     }
   }
@@ -117,6 +125,7 @@ export async function resolvePooledEstimate(
       insufficientData: false,
       reason: null,
       poolSize: null,
+      usableSize: null,
       singleRunMean: singleRun.mean,
     }
   }
@@ -149,6 +158,7 @@ export async function resolvePooledEstimate(
     insufficientData: false,
     reason: null,
     poolSize: pool.poolSize,
+    usableSize: pool.usableSize,
     singleRunMean: singleRun.mean,
   }
 }

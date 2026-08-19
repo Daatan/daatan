@@ -177,6 +177,7 @@
     "legendYou": "You",
     "legendAI": "AI",
     "settledPinNotice": "The Oracle reads this question as already decided — this number is a settlement pin, not a pooled average of the sources.",
+    "aiUnevidencedNotice": "The pool behind this number currently holds no usable evidence — every article gathered for this claim failed extraction or was set aside. The estimate stands until fresh evidence lands, but nothing here backs it.",
     "settledPinSources": "Reported as decided by: {names}",
     "deadlineDivergenceWarning": "The claim text implies a deadline of {claimDeadline}, which disagrees with the Resolve By date above. Consider aligning them.",
     "aiInsufficientEvidence": "Insufficient evidence",

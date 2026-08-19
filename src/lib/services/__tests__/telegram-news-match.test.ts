@@ -194,6 +194,41 @@ describe('notifyNewsArticleMatched', () => {
     expect(sentMessage()).not.toContain('articles')
   })
 
+  it('says how much of the pool was actually readable, not just how big it is (daatan#1475)', async () => {
+    // 46% of pool rows are FAILED in production, so a bare "22 in pool" reads as roughly
+    // twice the evidence the number was computed from. The header quotes both.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+      { similarity: 0.368, articleCount: 3, poolSize: 22, usableSize: 9 },
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('· 3 new / 9 of 22 usable in pool')
+  })
+
+  it('falls back to the bare pool size when usability was not resolved', async () => {
+    // The single-run path reports no pool composition at all; it must not print
+    // "null of 22".
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+      { similarity: 0.368, articleCount: 3, poolSize: 22, usableSize: null },
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('· 3 new / 22 in pool')
+  })
+
+  it('reports an all-unreadable pool as zero rather than hiding it', async () => {
+    // The forecast this whole issue is about: a pool that exists and holds nothing.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+      { similarity: 0.368, articleCount: 1, poolSize: 14, usableSize: 0 },
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('· 1 new / 0 of 14 usable in pool')
+  })
+
   it('attaches the 1-5 rating buttons and persists the prompt row keyed on the sent message (daatan#1223)', async () => {
     await notifyNewsArticleMatched(
       PREDICTION,
