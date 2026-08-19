@@ -38,7 +38,7 @@ const CURRENT_VERSION_ONLY = { supersededAt: null } as const
  * 'retry' marks rows whose latest signal came from the pool-retry sweep
  * (pool-retry.ts) re-driving a stuck FAILED/stale-PENDING claim through extraction.
  */
-export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry'
+export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry' | 'remediate'
 
 /**
  * Write extracted signals onto a batch of already-claimed pool rows, keyed by

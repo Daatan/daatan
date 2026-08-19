@@ -209,7 +209,7 @@ of the same URL collapse to one row. Started as a write-only foundation layer
 (2026-07-09, retro `docs/ORACLE_VARIABLES.md` §6 part 2); since v1.60.0 it is
 the source of truth the estimate is recomputed from (see below), and since
 2026-07-16 also what the elections consumers render (elections app #50/#51,
-daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill` write
+daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill`/`remediate` write
 their per-source signal here (`addArticlesToPool` in
 `src/lib/services/evidence-pool.ts`) alongside their existing
 `ContextSnapshot`/`Prediction` writes. The row IS the extraction
@@ -241,6 +241,22 @@ reads the existing pool aggregate directly instead of extracting or falling
 back to an ungrounded LLM guess. Elections' display-only trailing-median
 smoothing (`combined-chart.ts`) remains in place as defense-in-depth, but the
 underlying instability is now addressed at the source.
+
+**`remediate` is the one origin that deliberately defeats the content-hash gate.**
+The fix above makes unchanged content a no-op, which is correct for every organic
+path — but it also means a row extracted by an *older, wronger* extractor can never
+be re-read, since its content hasn't changed and never will. The backward
+remediation (`POST /api/admin/evidence-pool/remediate`, daatan#1493) therefore nulls
+`contentHash` on its target rows before re-driving them, which routes them down
+`claimArticleForExtraction`'s supersede-and-insert arm instead of its in-place
+re-claim arm. That choice is what makes the run reversible: every prior reading
+survives as a superseded version, and a bad remediation is undone by dropping the
+new head and clearing `supersededAt` on its `supersedesId` parent, in that order.
+The corollary is a rule about *when* it is legitimate — re-extraction can only
+repair a verdict if the extractor's INPUT can differ (a fixed prompt, a new guard, a
+body that fetches this time). On byte-identical input with an unchanged extractor,
+any movement is sampling variance, and remediating it launders noise into the
+published number.
 
 Rows move through a claim lifecycle: `claimArticleForExtraction` inserts/claims
 a row as `PENDING` (a claim older than 10 min counts as abandoned and can be
