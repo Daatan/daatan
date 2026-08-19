@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeRequote,
+  glideBand,
   glideValue,
   PIN_LOW,
   PIN_HIGH,
@@ -310,5 +311,65 @@ describe('glideValue', () => {
     const low = glideValue(40, 0.5, 'ARRIVAL')
     const high = glideValue(80, 0.5, 'ARRIVAL')
     expect(low).toBeLessThanOrEqual(high)
+  })
+})
+
+describe('glideBand (daatan#1489)', () => {
+  const ARRIVAL = 'ARRIVAL' as const
+  const SURVIVAL = 'SURVIVAL' as const
+
+  it('keeps the point inside its own band on the worst prod case', () => {
+    // cloud-mythos: anchor p=53 with band [12, 93] was published as 18% against a
+    // stored band of [0, 0] — the point sat outside an interval asserting it impossible.
+    const c = 0.2626
+    const p = glideValue(53, c, ARRIVAL)
+    const { aiCiLow, aiCiHigh } = glideBand({ ciLow: 12, ciHigh: 93 }, c, ARRIVAL, p)
+
+    expect(p).toBe(18)
+    expect(aiCiLow!).toBeLessThanOrEqual(p)
+    expect(aiCiHigh!).toBeGreaterThanOrEqual(p)
+    expect(aiCiHigh!).toBeGreaterThan(0) // the [0, 0] collapse must not come back
+  })
+
+  it('does not compound — the bug was re-gliding an already-glided band', () => {
+    const anchor = { ciLow: 12, ciHigh: 93 }
+    // The old path: each tick glided the PREVIOUS tick's band with an absolute `c`.
+    let compounded = anchor.ciHigh
+    for (const c of [0.8, 0.6, 0.4, 0.26]) compounded = glideValue(compounded, c, ARRIVAL)
+
+    const p = glideValue(53, 0.26, ARRIVAL)
+    const anchored = glideBand(anchor, 0.26, ARRIVAL, p)
+
+    expect(compounded).toBeLessThan(p) // the whole band had fallen below the point
+    expect(anchored.aiCiHigh!).toBeGreaterThan(compounded)
+    expect(anchored.aiCiHigh!).toBeGreaterThanOrEqual(p)
+  })
+
+  it('holds low <= p <= high across the entire decay, both directions', () => {
+    for (const direction of [ARRIVAL, SURVIVAL]) {
+      for (let i = 0; i <= 20; i++) {
+        const c = i / 20
+        const raw = glideValue(60, c, direction)
+        const p = Math.min(Math.max(raw, PIN_LOW), PIN_HIGH)
+        const { aiCiLow, aiCiHigh } = glideBand({ ciLow: 45, ciHigh: 82 }, c, direction, p)
+        expect(aiCiLow!).toBeLessThanOrEqual(p)
+        expect(aiCiHigh!).toBeGreaterThanOrEqual(p)
+      }
+    }
+  })
+
+  it('clamps around the point where [PIN_LOW, PIN_HIGH] and [0, 100] disagree', () => {
+    // At full decay an ARRIVAL point floors at PIN_LOW while both bounds reach 0.
+    expect(glideBand({ ciLow: 12, ciHigh: 93 }, 0, ARRIVAL, PIN_LOW)).toEqual({
+      aiCiLow: 0,
+      aiCiHigh: PIN_LOW,
+    })
+  })
+
+  it('passes nulls through for a legacy anchor with no stored band', () => {
+    expect(glideBand({ ciLow: null, ciHigh: null }, 0.5, ARRIVAL, 40)).toEqual({
+      aiCiLow: null,
+      aiCiHigh: null,
+    })
   })
 })
