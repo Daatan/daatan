@@ -121,8 +121,11 @@ export type EnrichedOracleSource = {
   // reported facts. Persisted on the pool row; nothing in aggregation reads it (shadow).
   authorLean?: number | null
   authorLeanCertainty?: number | null
-  // The FACT-lane counterpart of `stance` + its qualifying facets (retro #313), for the
-  // estimator lane — deliberately NOT part of the current estimate. `factSignal` is what the
+  // The FACT-lane counterpart of `stance` + its qualifying facets (retro #313) — a DIAGNOSTIC
+  // lane, deliberately not part of the estimate and not a pricing lane in waiting: the cutover
+  // framing was retired by decision (retro#533, `Daatan/docs/decisions.md`). It earns its keep
+  // on retro's side (extraction-time stance caps, recomputed there) and here as the audit
+  // surface behind a pool row. `factSignal` is what the
   // reported facts alone imply [-1,1]; `eventActors`/`eventTarget` name the dominant fact's
   // dyad, `isOccurrence` marks event-itself vs precursor, `verified` marks reported vs claimed.
   // All null on pure opinion. Persisted on the pool row; nothing in aggregation reads them (shadow).
@@ -132,8 +135,7 @@ export type EnrichedOracleSource = {
   isOccurrence?: boolean | null
   verified?: boolean | null
   // Whether the dominant fact ANNOUNCES the event, DENIES it, or is NEITHER
-  // (retro#354 D2a) — feeds a future check that |factSignal| isn't systematically
-  // symmetric between announcement and denial claims (retro#483). Null when
+  // (retro#354 D2a) — input to a possible future magnitude check (retro#483). Null when
   // `factSignal` is. Persisted on the pool row; nothing in aggregation reads it (shadow).
   facet?: 'announcement' | 'denial' | 'neither' | null
   // The per-claim layer behind every scalar above (F1/F15, daatan#1235 + retro#364) —

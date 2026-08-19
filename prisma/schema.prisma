@@ -758,14 +758,19 @@ model EvidencePoolArticle {
   // work): what the REPORTED FACTS alone imply about the event, separated from
   // author assertion/framing. `factSignal` ∈ [-1,1] — claim-weighted MEAN over
   // the article's fact-bearing claims (the SAME reduction as `stance`, so the
-  // offline fact-lane backtest compares mean-to-mean); the four facets qualify
-  // the DOMINANT (max |fact_signal|) claim for the estimator's future checks:
+  // same reduction as `stance`); the four facets qualify
+  // the DOMINANT (max |fact_signal|) claim:
   // `eventActors`/`eventTarget` name that fact's actor→target dyad (the actor-pair
   // check, #303), `isOccurrence` marks the event ITSELF vs a precursor/escalation,
   // `verified` marks an independently-reported fact vs an interested party's claim,
   // `facet` marks whether that fact ANNOUNCES the event, DENIES it, or is NEITHER
-  // (retro#354 D2a) — feeds a future check that |fact_signal| isn't systematically
-  // symmetric between announcement and denial claims (retro#483).
+  // (retro#354 D2a) — input to a possible future magnitude check (retro#483).
+  // DIAGNOSTIC lane, not a pricing lane in waiting: the estimator cutover these
+  // columns were written for is RETIRED (retro#533, 2026-08-15 — corr(stance,
+  // fact_signal) 0.905 on precursor rows; `Daatan/docs/decisions.md`). Nothing in
+  // daatan reading them is the steady state, not a waiting room; they earn their
+  // keep on retro's side (extraction-time caps, recomputed there — never read back
+  // from here) and here as the per-claim audit surface.
   // All null when no scored claim carried a fact_signal (e.g. pure opinion).
   // Free-text facets (`eventActors`/`eventTarget`) are unbounded (no VarChar cap)
   // so an over-long LLM value can never fail this shadow write. SHADOW / estimator
