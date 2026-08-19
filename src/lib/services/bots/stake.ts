@@ -6,6 +6,7 @@
  * the caller can log and bail.
  */
 import { prisma } from '@/lib/prisma'
+import { createLogger } from '@/lib/logger'
 import { embedAndStoreForecast } from '@/lib/services/embedding'
 import {
   createCommitment,
@@ -13,6 +14,8 @@ import {
   type CommitmentPrediction,
 } from '@/lib/services/commitment'
 import { type BotWithUser, randomInt } from './shared'
+
+const log = createLogger('bot-stake')
 
 type PredictionCreateData = Parameters<typeof prisma.prediction.create>[0]['data']
 
@@ -62,8 +65,12 @@ export async function createAndStake(
     )
   }
 
-  // Fire-and-forget: store embedding for similar-forecast search
-  embedAndStoreForecast(prediction.id, predictionCreateData.claimText).catch(() => {/* non-critical */})
+  // Fire-and-forget: store embedding for similar-forecast search. Non-critical —
+  // a bot forecast without an embedding just misses similar-forecast matching —
+  // but log it rather than swallowing, so a Vertex outage isn't invisible here.
+  embedAndStoreForecast(prediction.id, predictionCreateData.claimText).catch((err) =>
+    log.error({ err, id: prediction.id }, 'embed failed for bot forecast (non-critical)'),
+  )
 
   return { prediction, stakeAmount }
 }

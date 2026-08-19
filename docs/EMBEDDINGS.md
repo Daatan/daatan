@@ -42,6 +42,14 @@ values (2026-08-19): cosine 1.000000 on every sample, and the components were
 written by either path are interchangeable and **no re-embedding was needed** when
 production cut over to Vertex.
 
+**`embedAndStoreForecast()` throws when it stores nothing** — on a null vector and on
+non-finite values alike. It used to return silently on both, which meant the two backfill
+routes (`/api/cron/backfill-embeddings`, `/api/admin/backfill-embeddings`) counted a skipped
+row as `done`: a run that wrote nothing answered `{done: 20, failed: 0}`, indistinguishable
+from a good one. Only `remaining` gave it away, and the admin route doesn't return that.
+Every caller already had a `.catch()` or try/catch, so the fire-and-forget ones simply gained
+the error log they should always have had.
+
 **A Vertex failure is invisible to callers.** On self-host the Developer API silently
 rescues it and embeddings keep working. On daatan.com there is no key to rescue with, so a
 Vertex failure means the forecast is left *unembedded* instead. Either way the one signal

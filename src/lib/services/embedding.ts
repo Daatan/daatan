@@ -106,12 +106,31 @@ export async function embedText(text: string): Promise<number[] | null> {
   return embedViaDeveloperApi(text)
 }
 
+/**
+ * Embed `claimText` and write it to the prediction's vector column.
+ *
+ * **Throws when nothing was stored.** It used to `return` silently on both failure
+ * modes, which made it impossible for a caller to tell a stored embedding from a
+ * skipped one — and every caller counts: the cron and admin backfills both wrap
+ * this in try/catch and increment `done`, so a silent skip was reported as a
+ * success while the row stayed NULL. `POST /api/cron/backfill-embeddings` would
+ * answer `{done: 20, failed: 0}` having written nothing at all.
+ *
+ * That went from unlikely to plausible with #1472: production no longer carries
+ * `GEMINI_API_KEY`, so there is no Developer-API rescue behind Vertex. A Vertex
+ * outage now means `embedText()` returns null on every call, and the nightly cron
+ * would have reported a clean run indefinitely.
+ *
+ * Every existing caller already has a `.catch()` or a try/catch — the fire-and-
+ * forget ones simply gain the error log they should always have had.
+ */
 export async function embedAndStoreForecast(id: string, claimText: string): Promise<void> {
   const embedding = await embedText(claimText)
-  if (!embedding) return
+  if (!embedding) {
+    throw new Error(`No embedding returned for prediction ${id} — nothing stored`)
+  }
   if (!embedding.every(Number.isFinite)) {
-    log.warn({ id }, 'Embedding contains non-finite values — skipping store')
-    return
+    throw new Error(`Embedding for prediction ${id} contains non-finite values — nothing stored`)
   }
   const vectorStr = `[${embedding.join(',')}]`
   await prisma.$executeRaw(
