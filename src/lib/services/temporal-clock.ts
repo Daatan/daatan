@@ -4,6 +4,7 @@ import { createLogger } from '@/lib/logger'
 import {
   saveClockSnapshot,
   getLatestEvidenceEstimate,
+  getSettlementPinProbability,
 } from '@/lib/services/context'
 import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
@@ -14,6 +15,7 @@ import {
   notifyProvisionalImpossibility,
   notifyDeadlineDivergence,
   notifyRequoteSummary,
+  notifySettledDrift,
 } from '@/lib/services/telegram'
 
 const log = createLogger('temporal-clock')
@@ -39,6 +41,15 @@ const SELF_HEAL_BATCH_SIZE = 5
 
 /** #1185 sweep: leave same-day human resolutions alone before alerting. */
 const PENDING_DEADLINE_GRACE_MS = 12 * 3600_000
+
+/** How far a latched forecast's published probability may sit from the value its
+ *  settlement pin published before the pair stops telling one story (daatan#1490).
+ *  Below 10pt the number and the badge still agree in substance — a pin at 97 next
+ *  to 92 reads as the same claim. At 10pt and beyond the page asserts an accomplished
+ *  fact beside a number that visibly no longer does, and one of the two is wrong.
+ *  Measured against the population that motivated the issue: the drifts were 5, 12,
+ *  15, 22, 28, 32 and (post-A6) 42, so this catches every case except the 5. */
+const SETTLED_DRIFT_PTS = 10
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
@@ -178,6 +189,9 @@ export interface RequoteSummary {
   deadlineAlerts: number
   provisionalAlerts: number
   pendingDeadlineAlerts: number
+  /** Latched forecasts whose published number has drifted off their settlement
+   *  pin far enough to be re-verified rather than believed (daatan#1490). */
+  settledDriftAlerts: number
   errors: number
   deltas: number[]
 }
@@ -197,6 +211,7 @@ function emptySummary(): RequoteSummary {
     deadlineAlerts: 0,
     provisionalAlerts: 0,
     pendingDeadlineAlerts: 0,
+    settledDriftAlerts: 0,
     errors: 0,
     deltas: [],
   }
@@ -420,6 +435,77 @@ async function alertPendingPastDeadline(now: Date, summary: RequoteSummary): Pro
   }
 }
 
+/**
+ * daatan#1490. `settled` is the strongest claim the system makes about a forecast,
+ * and it is sticky: the writers only ever set it true, and the single admin
+ * one-click is the only way back. The probability underneath it is not sticky — it
+ * keeps being re-derived from evidence — so the two drift apart, and all seven
+ * latched ACTIVE forecasts were pinned at 97 while showing 55–97.
+ *
+ * Of the three options on the issue this implements (2): drift forces
+ * re-verification. Not (1), auto-clear — that removes the badge and leaves a
+ * forecast that was once settled looking identical to one that never was, deciding
+ * nothing. Not (3), let the pin hold the probability — the A6 remediation moved two
+ * of these *further* from their pins onto numbers that reproduce their own pools to
+ * within 0.4pp, so on this population the pin is the stale artefact and freezing the
+ * number to it would publish what the evidence contradicts.
+ *
+ * Re-verification here means the queue a human actually works from: the forecast
+ * goes back into Awaiting Resolution (`/api/forecasts?awaitingAiResolution`) and
+ * pages once. That flag is otherwise recomputed on every estimate write from the
+ * current number alone, so a latched forecast silently drops OUT of the queue as it
+ * drifts — which is exactly how these seven became invisible.
+ */
+async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promise<void> {
+  // Guarded against the column not being there yet. blue-green-deploy.sh Phase 5 runs
+  // `prisma migrate deploy` before the swap and aborts on failure, so ordinarily the
+  // column lands ahead of this code — but the cron also runs against environments that
+  // were not deployed that way (a restored DB, a hand-rolled container), and there an
+  // unguarded throw would take the whole requote down with it. Degrades to one counted
+  // error per run, which shows up in the summary rather than passing for a clean run.
+  let latched: { id: string; slug: string | null; claimText: string; confidence: number | null; settledDriftAlertAt: Date | null }[]
+  try {
+    latched = await prisma.prediction.findMany({
+      where: { status: 'ACTIVE', settled: true, confidence: { not: null } },
+      select: { id: true, slug: true, claimText: true, confidence: true, settledDriftAlertAt: true },
+    })
+  } catch (err) {
+    summary.errors++
+    log.warn({ err }, 'settled-drift sweep query failed — is the #1490 migration applied?')
+    return
+  }
+
+  for (const p of latched) {
+    try {
+      const pin = await getSettlementPinProbability(p.id)
+      // No snapshot carries the pin (pre-#1053 latch, or a backfilled one). Nothing
+      // to compare against, and inventing a baseline from the current number would
+      // define the drift away.
+      if (pin === null) continue
+
+      const drift = Math.abs(pin - (p.confidence as number))
+      if (drift < SETTLED_DRIFT_PTS) {
+        // Re-arm: the gap closed, so a later re-crossing pages again.
+        if (p.settledDriftAlertAt !== null) {
+          await prisma.prediction.update({ where: { id: p.id }, data: { settledDriftAlertAt: null } })
+        }
+        continue
+      }
+      if (p.settledDriftAlertAt !== null) continue // already firing, already queued
+
+      await prisma.prediction.update({
+        where: { id: p.id },
+        data: { awaitingAiResolution: true, settledDriftAlertAt: now },
+      })
+      notifySettledDrift({ id: p.id, claimText: p.claimText, slug: p.slug }, pin, p.confidence as number)
+      summary.settledDriftAlerts++
+    } catch (err) {
+      summary.errors++
+      log.warn({ predictionId: p.id, err }, 'settled-drift re-verification failed')
+    }
+  }
+}
+
 export interface RunRequoteOptions {
   /** Lowercase archetype names allowed to glide this run (e.g. ['diffuse']). Empty = no-op. */
   archetypes: string[]
@@ -439,7 +525,12 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
   const summary = emptySummary()
 
   if (opts.archetypes.length === 0) {
-    if (!opts.dryRun) await alertPendingPastDeadline(now, summary)
+    // Both sweeps are population-wide and have nothing to do with archetypes, so an
+    // empty allowlist disables the glide and nothing else.
+    if (!opts.dryRun) {
+      await alertPendingPastDeadline(now, summary)
+      await reverifyDriftedSettled(now, summary)
+    }
     return summary
   }
 
@@ -515,6 +606,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
 
   if (!opts.dryRun) {
     await alertPendingPastDeadline(now, summary)
+    await reverifyDriftedSettled(now, summary)
   }
 
   const moved = summary.glided + summary.pinned + summary.provisionalPins
@@ -528,6 +620,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       skippedUnlatchedPin: summary.skippedUnlatchedPin,
       selfHealed: summary.selfHealed,
       pendingDeadlineAlerts: summary.pendingDeadlineAlerts,
+      settledDriftAlerts: summary.settledDriftAlerts,
       errors: summary.errors,
       deltaP50: median(summary.deltas),
       deltaMax: summary.deltas.length ? Math.max(...summary.deltas) : 0,

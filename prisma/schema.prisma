@@ -424,6 +424,13 @@ model Prediction {
   // once it closes so a later re-crossing fires again (see checkMarketDivergence).
   marketDivergenceAlertAt DateTime? @map("market_divergence_alert_at")
 
+  // Same fire/re-arm idiom for the settled-drift re-verification sweep
+  // (daatan#1490): set when a latched forecast's published probability first
+  // walks SETTLED_DRIFT_PTS away from the value its settlement pin published,
+  // cleared once the gap closes. Deliberately not settledAt — recordEstimate
+  // re-stamps that on every settled write, so it dates the last one, not the pin.
+  settledDriftAlertAt DateTime? @map("settled_drift_alert_at")
+
   // The running Telegram notification for this forecast's news-article matches
   // (daatan#1215). NULL = no notification sent yet. Latest-state, not a log:
   // notifyNewsArticleMatched edits this message in place on a later match

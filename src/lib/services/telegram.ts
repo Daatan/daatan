@@ -881,6 +881,31 @@ export function notifyDeadlinePassedQuietly(
  * flag — a PENDING pred outside that band is invisible to both. Single-shot
  * (deduped via deadlinePassedAlertAt in temporal-clock.ts).
  */
+/**
+ * A latched forecast whose published number has walked away from the value its
+ * settlement pin published (daatan#1490). Clean channel: it is a decision, not a
+ * reading — either the number is wrong and the forecast should be resolved, or the
+ * pin was wrong and the latch should be cleared. Nothing else releases the latch;
+ * the admin one-click is the only path back.
+ */
+export function notifySettledDrift(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  pin: number,
+  current: number,
+): void {
+  if (isDevEnv()) return
+
+  const delta = Math.round(current - pin)
+  const msg = [
+    `⚖️ <b>Settled forecast has drifted from its pin</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Pinned at ${Math.round(pin)}%, now ${Math.round(current)}% (${delta > 0 ? '+' : ''}${delta}pt). Flagged back into Awaiting Resolution — resolve it, or clear the settled latch if the pin was a false positive.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
 export function notifyPendingPastDeadline(
   prediction: { id: string; claimText: string; slug?: string | null },
   deadline: Date,
