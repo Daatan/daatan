@@ -21,9 +21,20 @@ vi.mock('@/lib/services/telegram', () => ({
   notifyHighConfidence: vi.fn(),
 }))
 
+const { logError } = vi.hoisted(() => ({ logError: vi.fn() }))
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: logError }),
+}))
+
 import { prisma } from '@/lib/prisma'
 import { notifyHighConfidence } from '@/lib/services/telegram'
-import { recordEstimate, saveOracleSnapshotOnly, markOracleAttempted, clearSettledLatch } from '@/lib/services/context'
+import {
+  recordEstimate,
+  saveOracleSnapshotOnly,
+  markOracleAttempted,
+  clearSettledLatch,
+  latestEvidenceAssertsSettlement,
+} from '@/lib/services/context'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const snapshotCreate = vi.mocked(prisma.contextSnapshot.create)
@@ -121,6 +132,32 @@ describe('recordEstimate — the single estimate writer', () => {
     expect(updateData()).not.toHaveProperty('settled')
   })
 
+  // daatan#1498: the invariant this guards is that `settled: true` in the update data
+  // and `settled === true` on the returned row are the same fact. Production says
+  // otherwise on 1,036 snapshots and nobody can say why, so the writer now says so itself.
+  it('reports a settlement latch that was asked for and did not stick', async () => {
+    transaction.mockResolvedValue([{ id: 'snap-1' }, { settled: false }] as never)
+
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 97, settled: true })
+
+    expect(logError).toHaveBeenCalledTimes(1)
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({ predictionId: 'pred-1', origin: 'news-indexer', snapshotId: 'snap-1' }),
+      expect.stringContaining('settlement latch did not stick'),
+    )
+  })
+
+  it('stays quiet when the latch sticks, and when no latch was asked for', async () => {
+    transaction.mockResolvedValue([{ id: 'snap-1' }, { settled: true }] as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 97, settled: true })
+
+    // an origin that cannot settle never asked, so a false row is not a discrepancy
+    transaction.mockResolvedValue([{ id: 'snap-2' }, { settled: false }] as never)
+    await recordEstimate({ predictionId: 'pred-2', origin: 'clock', probability: 97, settled: true })
+
+    expect(logError).not.toHaveBeenCalled()
+  })
+
   it('invalidates detailsText translations only for the analyze origin', async () => {
     await recordEstimate({ predictionId: 'pred-1', origin: 'analyze', probability: 60, summary: 'S' })
     expect(deleteTranslations).toHaveBeenCalledTimes(1)
@@ -137,11 +174,21 @@ describe('clearSettledLatch — the only way back from a settled=true latch', ()
   })
 
   it('clears settled and settledAt directly (not via recordEstimate, which can only set true)', async () => {
-    await clearSettledLatch('pred-1', 'admin-user-1')
+    const now = new Date('2026-08-20T10:30:00.000Z')
+    await clearSettledLatch('pred-1', 'admin-user-1', now)
     expect(update).toHaveBeenCalledWith({
       where: { id: 'pred-1' },
-      data: { settled: false, settledAt: null },
+      data: { settled: false, settledAt: null, settledClearedAt: now, settledClearedBy: 'admin-user-1' },
     })
+  })
+
+  // Without this the clear erased its own tracks — a cleared row and a row that never
+  // latched were byte-identical, which is what made #1498 unfalsifiable from the data.
+  it('records who cleared it and when, so a cleared latch is distinguishable from one that never fired', async () => {
+    await clearSettledLatch('pred-1', 'admin-user-1')
+    const data = (update.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    expect(data.settledClearedBy).toBe('admin-user-1')
+    expect(data.settledClearedAt).toBeInstanceOf(Date)
   })
 })
 
@@ -257,5 +304,56 @@ describe('material-change anchor tagging (F17, daatan#1236)', () => {
       oracleSnapshot: { sources: [{ url: 'https://pool.com/b', publishedAt: '2026-05-01T00:00:00.000Z' }] },
     })
     expect(snapshotData().evidenceAt).toEqual(new Date('2026-05-01T00:00:00.000Z'))
+  })
+})
+
+describe('latestEvidenceAssertsSettlement — is the pin the thing we are publishing right now?', () => {
+  const ASSERTED_AT = new Date('2026-08-15T22:24:00.000Z')
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // Two queries, one question: the newest evidence snapshot and the newest one that
+  // asserts settlement have to be the SAME row. `some: {settled:true}` alone would
+  // match a forecast whose pin was superseded days ago by ordinary evidence.
+  it('reports the assertion when the newest evidence snapshot is the asserting one', async () => {
+    findFirst
+      .mockResolvedValueOnce({ id: 'snap-9', createdAt: ASSERTED_AT, externalProbability: 97 } as never)
+      .mockResolvedValueOnce({ id: 'snap-9' } as never)
+
+    await expect(latestEvidenceAssertsSettlement('pred-1')).resolves.toEqual({
+      assertedAt: ASSERTED_AT,
+      probability: 97,
+    })
+  })
+
+  it('reports nothing once newer evidence has superseded the assertion', async () => {
+    findFirst
+      .mockResolvedValueOnce({ id: 'snap-12', createdAt: new Date(), externalProbability: 62 } as never)
+      .mockResolvedValueOnce({ id: 'snap-9' } as never)
+
+    await expect(latestEvidenceAssertsSettlement('pred-1')).resolves.toBeNull()
+  })
+
+  it('reports nothing when no snapshot ever asserted settlement', async () => {
+    findFirst
+      .mockResolvedValueOnce({ id: 'snap-12', createdAt: new Date(), externalProbability: 62 } as never)
+      .mockResolvedValueOnce(null as never)
+
+    await expect(latestEvidenceAssertsSettlement('pred-1')).resolves.toBeNull()
+  })
+
+  it('ignores clock snapshots and abstentions on both sides of the comparison', async () => {
+    findFirst
+      .mockResolvedValueOnce({ id: 'snap-9', createdAt: ASSERTED_AT, externalProbability: 97 } as never)
+      .mockResolvedValueOnce({ id: 'snap-9' } as never)
+
+    await latestEvidenceAssertsSettlement('pred-1')
+
+    for (const call of findFirst.mock.calls) {
+      const where = (call[0] as { where: Record<string, unknown> }).where
+      expect(where).toMatchObject({ insufficientData: false, kind: { not: 'clock' } })
+    }
   })
 })

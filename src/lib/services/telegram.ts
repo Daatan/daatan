@@ -906,6 +906,30 @@ export function notifySettledDrift(
   sendChannelNotification(msg, 'clean')
 }
 
+/**
+ * The mirror of `notifySettledDrift` (daatan#1498): the evidence says settled, the
+ * latch does not. Pages once per open condition — the sweep re-arms it when the
+ * evidence stops asserting settlement.
+ */
+export function notifyUnlatchedPin(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  probability: number | null,
+  assertedAt: Date,
+): void {
+  if (isDevEnv()) return
+
+  const shown = probability !== null ? `${Math.round(probability)}%` : 'no number'
+  const when = assertedAt.toISOString().slice(0, 16).replace('T', ' ')
+  const msg = [
+    `⚠️ <b>Settlement asserted without a latch</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `The latest evidence run (${when}Z) reports the outcome as settled at ${shown}, but the forecast's settled latch is not set — so it carries no settled badge and the drift sweep, which selects on the latch, cannot see it. Flagged back into Awaiting Resolution: resolve it, or treat the assertion as the false positive it usually is.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
 export function notifyPendingPastDeadline(
   prediction: { id: string; claimText: string; slug?: string | null },
   deadline: Date,
