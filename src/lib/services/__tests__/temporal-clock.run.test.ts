@@ -13,6 +13,7 @@ vi.mock('@/lib/services/context', () => ({
   saveClockSnapshot: vi.fn(),
   getLatestEvidenceEstimate: vi.fn(),
   getSettlementPinProbability: vi.fn(),
+  latestEvidenceAssertsSettlement: vi.fn(),
 }))
 
 vi.mock('@/lib/services/temporal-classifier', () => ({
@@ -27,10 +28,16 @@ vi.mock('@/lib/services/telegram', () => ({
   notifyRequoteSummary: vi.fn(),
   notifyHighConfidence: vi.fn(),
   notifySettledDrift: vi.fn(),
+  notifyUnlatchedPin: vi.fn(),
 }))
 
 import { prisma } from '@/lib/prisma'
-import { saveClockSnapshot, getLatestEvidenceEstimate, getSettlementPinProbability } from '@/lib/services/context'
+import {
+  saveClockSnapshot,
+  getLatestEvidenceEstimate,
+  getSettlementPinProbability,
+  latestEvidenceAssertsSettlement,
+} from '@/lib/services/context'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
@@ -40,6 +47,7 @@ import {
   notifyRequoteSummary,
   notifyHighConfidence,
   notifySettledDrift,
+  notifyUnlatchedPin,
 } from '@/lib/services/telegram'
 import { runRequote } from '@/lib/services/temporal-clock'
 
@@ -56,6 +64,8 @@ const summaryAlert = vi.mocked(notifyRequoteSummary)
 const highConfidenceAlert = vi.mocked(notifyHighConfidence)
 const settledDriftAlert = vi.mocked(notifySettledDrift)
 const getPin = vi.mocked(getSettlementPinProbability)
+const unlatchedPinAlert = vi.mocked(notifyUnlatchedPin)
+const assertsSettlement = vi.mocked(latestEvidenceAssertsSettlement)
 
 const NOW = new Date('2026-06-01T06:00:00.000Z')
 
@@ -84,12 +94,13 @@ describe('runRequote', () => {
     saveClock.mockResolvedValue(undefined)
     classify.mockResolvedValue(null)
     getPin.mockResolvedValue(null)
+    assertsSettlement.mockResolvedValue(null)
   })
 
   it('no-ops the glide machinery on an empty archetype allowlist — only the sweeps run', async () => {
     const summary = await runRequote({ archetypes: [], now: NOW })
     expect(summary.examined).toBe(0)
-    expect(findMany).toHaveBeenCalledTimes(2) // #1185 stuck-PENDING + #1490 settled-drift, nothing else
+    expect(findMany).toHaveBeenCalledTimes(3) // #1185 stuck-PENDING + #1490 settled-drift + #1498 unlatched-pin, nothing else
     expect(classify).not.toHaveBeenCalled()
     expect(getAnchor).not.toHaveBeenCalled()
     expect(saveClock).not.toHaveBeenCalled()
@@ -540,6 +551,120 @@ describe('runRequote', () => {
 
       expect(summary.errors).toBe(1)
       expect(summary.settledDriftAlerts).toBe(1)
+    })
+  })
+
+  describe('settlement asserted while the latch is unset (#1498)', () => {
+    const unlatched = (overrides: Record<string, unknown> = {}) => ({
+      id: 'pred-unlatched-1',
+      slug: 'unlatched-slug',
+      claimText: 'The two sides will sign a formal agreement',
+      unlatchedPinAlertAt: null,
+      ...overrides,
+    })
+
+    const ASSERTED_AT = new Date('2026-05-31T22:24:00.000Z')
+
+    const runSweep = async (rows: unknown[]) => {
+      findMany.mockResolvedValueOnce([]) // #1185 stuck-PENDING sweep
+      findMany.mockResolvedValueOnce([]) // #1490 settled-drift sweep
+      findMany.mockResolvedValueOnce(rows as never) // #1498 unlatched-pin sweep
+      return runRequote({ archetypes: [], now: NOW })
+    }
+
+    it('flags it back into Awaiting Resolution and pages once', async () => {
+      assertsSettlement.mockResolvedValue({ assertedAt: ASSERTED_AT, probability: 97 })
+
+      const summary = await runSweep([unlatched()])
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'pred-unlatched-1' },
+        data: { awaitingAiResolution: true, unlatchedPinAlertAt: NOW },
+      })
+      expect(unlatchedPinAlert).toHaveBeenCalledTimes(1)
+      expect(unlatchedPinAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'pred-unlatched-1' }),
+        97,
+        ASSERTED_AT,
+      )
+      expect(summary.unlatchedPinAlerts).toBe(1)
+    })
+
+    it('never sets the latch itself — the assertion is usually the false positive', async () => {
+      assertsSettlement.mockResolvedValue({ assertedAt: ASSERTED_AT, probability: 97 })
+
+      await runSweep([unlatched()])
+
+      const data = (update.mock.calls[0][0] as { data: Record<string, unknown> }).data
+      expect(data).not.toHaveProperty('settled')
+      expect(data).not.toHaveProperty('settledAt')
+    })
+
+    it('ignores a forecast whose latest evidence has moved on', async () => {
+      // An older snapshot asserted settlement — that is what the findMany `some` filter
+      // matches — but the newest one does not, so the pin is no longer what we publish.
+      assertsSettlement.mockResolvedValue(null)
+
+      const summary = await runSweep([unlatched()])
+
+      expect(update).not.toHaveBeenCalled()
+      expect(unlatchedPinAlert).not.toHaveBeenCalled()
+      expect(summary.unlatchedPinAlerts).toBe(0)
+    })
+
+    it('does not re-page while the same assertion is still standing', async () => {
+      assertsSettlement.mockResolvedValue({ assertedAt: ASSERTED_AT, probability: 97 })
+
+      const summary = await runSweep([
+        unlatched({ unlatchedPinAlertAt: new Date('2026-05-30T00:00:00.000Z') }),
+      ])
+
+      expect(unlatchedPinAlert).not.toHaveBeenCalled()
+      expect(update).not.toHaveBeenCalled()
+      expect(summary.unlatchedPinAlerts).toBe(0)
+    })
+
+    it('re-arms once the evidence stops asserting settlement, so a recurrence pages again', async () => {
+      assertsSettlement.mockResolvedValue(null)
+
+      await runSweep([unlatched({ unlatchedPinAlertAt: new Date('2026-05-30T00:00:00.000Z') })])
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'pred-unlatched-1' },
+        data: { unlatchedPinAlertAt: null },
+      })
+      expect(unlatchedPinAlert).not.toHaveBeenCalled()
+    })
+
+    it('pages without a number when the asserting snapshot carries no probability', async () => {
+      assertsSettlement.mockResolvedValue({ assertedAt: ASSERTED_AT, probability: null })
+
+      const summary = await runSweep([unlatched()])
+
+      expect(unlatchedPinAlert).toHaveBeenCalledWith(expect.anything(), null, ASSERTED_AT)
+      expect(summary.unlatchedPinAlerts).toBe(1)
+    })
+
+    it('counts a failed write as an error instead of aborting the sweep', async () => {
+      assertsSettlement.mockResolvedValue({ assertedAt: ASSERTED_AT, probability: 97 })
+      update.mockRejectedValueOnce(new Error('db down'))
+
+      const summary = await runSweep([unlatched(), unlatched({ id: 'pred-unlatched-2' })])
+
+      expect(summary.errors).toBe(1)
+      expect(summary.unlatchedPinAlerts).toBe(1)
+    })
+
+    it('survives the sweep query failing on an un-migrated database', async () => {
+      findMany.mockResolvedValueOnce([]) // #1185 stuck-PENDING sweep
+      findMany.mockResolvedValueOnce([]) // #1490 settled-drift sweep
+      findMany.mockRejectedValueOnce(new Error('column "unlatched_pin_alert_at" does not exist'))
+
+      const summary = await runRequote({ archetypes: [], now: NOW })
+
+      expect(summary.errors).toBe(1)
+      expect(summary.unlatchedPinAlerts).toBe(0)
+      expect(unlatchedPinAlert).not.toHaveBeenCalled()
     })
   })
 })

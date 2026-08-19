@@ -264,6 +264,10 @@ export async function recordEstimate(input: RecordEstimateInput) {
   // claiming `settled` must not buy its way into the band or the alert.
   const pinned = policy.canSettle && input.settled === true
   const settlingSources = pinned ? settlingSourceCount(input.oracleSnapshot) : 0
+  // Deliberately the *truthy* test, not `pinned`'s strict one: this mirrors the
+  // condition the latch spread below actually uses, so the post-write check can
+  // never disagree with the write it is checking (daatan#1498).
+  const latchWrite = Boolean(policy.canSettle && input.settled)
 
   // An abstention leaves the published estimate alone unless its reason condemns it
   // (daatan#1473) — `{}` here is the same "this run produced no number" no-op the
@@ -314,7 +318,9 @@ export async function recordEstimate(input: RecordEstimateInput) {
       },
     }),
   ]
+  let predictionOpIndex = -1
   if (Object.keys(predictionData).length > 0) {
+    predictionOpIndex = ops.length
     ops.push(prisma.prediction.update({ where: { id: input.predictionId }, data: predictionData }))
   }
   if (policy.touchesUserContext) {
@@ -325,7 +331,26 @@ export async function recordEstimate(input: RecordEstimateInput) {
     }))
   }
 
-  const [snapshot] = await prisma.$transaction(ops)
+  const results = await prisma.$transaction(ops)
+  const snapshot = results[0]
+  // The latch and `confidence` ride the SAME update, in the same transaction as the
+  // snapshot — so a settlement-asserting write that leaves `settled` false means the
+  // two diverged inside one statement, which the source says cannot happen. It did:
+  // 24 predictions hold 1,036 settlement-asserting snapshots with the latch unset,
+  // and no log line from that era survived to say how (daatan#1498). The update
+  // already returns the row it wrote, so checking it costs nothing and turns the next
+  // occurrence into a dated, attributable record instead of archaeology.
+  if (latchWrite && (results[predictionOpIndex] as { settled?: boolean } | undefined)?.settled !== true) {
+    log.error(
+      {
+        predictionId: input.predictionId,
+        origin: input.origin,
+        probability: input.probability,
+        snapshotId: (snapshot as ContextSnapshot).id,
+      },
+      'settlement latch did not stick: asked for settled=true and the row came back false (daatan#1498)',
+    )
+  }
   if (willNotify) {
     notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, settlingSources)
   }
@@ -340,10 +365,15 @@ export async function recordEstimate(input: RecordEstimateInput) {
  * clock's glide candidates (`CANDIDATE_WHERE: settled: false`) on its next
  * daily run; does not itself trigger a re-estimate.
  */
-export async function clearSettledLatch(predictionId: string, clearedBy: string): Promise<void> {
+export async function clearSettledLatch(predictionId: string, clearedBy: string, now = new Date()): Promise<void> {
   await prisma.prediction.update({
     where: { id: predictionId },
-    data: { settled: false, settledAt: null },
+    // `settledAt` keeps its meaning — the last settled *write*, hence nulled here —
+    // but the clear itself is now recorded (daatan#1498). Without these two columns a
+    // cleared forecast is byte-identical to one that never latched, which is why
+    // "did the latch fire and get cleared, or never fire?" could not be answered for
+    // 24 predictions from the data alone.
+    data: { settled: false, settledAt: null, settledClearedAt: now, settledClearedBy: clearedBy },
   })
   log.info({ predictionId, clearedBy }, 'settled latch cleared')
 }
@@ -622,6 +652,44 @@ export async function getSettlementPinProbability(predictionId: string): Promise
     select: { externalProbability: true },
   })
   return snap?.externalProbability ?? null
+}
+
+/**
+ * Non-null when the forecast's CURRENT evidence position asserts settlement: the
+ * newest non-clock, non-abstaining snapshot is itself the one carrying
+ * `oracleSnapshot.settled`. Paired with `Prediction.settled === false` that is the
+ * live half of daatan#1498 — the pipeline says "decided" while the row says
+ * otherwise, so the forecast shows no settled badge, stays a glide candidate, and is
+ * invisible to #1490's sweep, which selects on the latch.
+ *
+ * Deliberately "the newest snapshot happens to assert" rather than "the newest
+ * assertion", which is what `getSettlementPinProbability` above answers. A forecast
+ * that asserted settlement in July and has published unsettled numbers ever since is
+ * not in an anomalous state — it moved on, and re-raising it would page for history.
+ * Identity comparison rather than timestamps: two snapshots can share a `createdAt`.
+ */
+export async function latestEvidenceAssertsSettlement(
+  predictionId: string,
+): Promise<{ assertedAt: Date; probability: number | null } | null> {
+  const [latest, pin] = await Promise.all([
+    prisma.contextSnapshot.findFirst({
+      where: { predictionId, insufficientData: false, ...NOT_CLOCK },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, externalProbability: true },
+    }),
+    prisma.contextSnapshot.findFirst({
+      where: {
+        predictionId,
+        insufficientData: false,
+        oracleSnapshot: { path: ['settled'], equals: true },
+        ...NOT_CLOCK,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    }),
+  ])
+  if (latest === null || pin === null || latest.id !== pin.id) return null
+  return { assertedAt: latest.createdAt, probability: latest.externalProbability }
 }
 
 /**

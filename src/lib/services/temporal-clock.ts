@@ -5,6 +5,7 @@ import {
   saveClockSnapshot,
   getLatestEvidenceEstimate,
   getSettlementPinProbability,
+  latestEvidenceAssertsSettlement,
 } from '@/lib/services/context'
 import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
@@ -16,6 +17,7 @@ import {
   notifyDeadlineDivergence,
   notifyRequoteSummary,
   notifySettledDrift,
+  notifyUnlatchedPin,
 } from '@/lib/services/telegram'
 
 const log = createLogger('temporal-clock')
@@ -192,6 +194,10 @@ export interface RequoteSummary {
   /** Latched forecasts whose published number has drifted off their settlement
    *  pin far enough to be re-verified rather than believed (daatan#1490). */
   settledDriftAlerts: number
+  /** The mirror: forecasts whose latest evidence asserts settlement while the latch
+   *  is false (daatan#1498). Nothing else looks for this state — #1490's sweep
+   *  selects on the latch, so it structurally cannot see them. */
+  unlatchedPinAlerts: number
   errors: number
   deltas: number[]
 }
@@ -212,6 +218,7 @@ function emptySummary(): RequoteSummary {
     provisionalAlerts: 0,
     pendingDeadlineAlerts: 0,
     settledDriftAlerts: 0,
+    unlatchedPinAlerts: 0,
     errors: 0,
     deltas: [],
   }
@@ -506,6 +513,80 @@ async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promi
   }
 }
 
+/**
+ * The mirror sweep (daatan#1498): the evidence asserts settlement, the latch is false.
+ *
+ * `reverifyDriftedSettled` above asks "is a latched forecast still worth believing".
+ * This asks the opposite and structurally harder question — nothing else can, because
+ * every other consumer of settlement selects on `Prediction.settled`, which is exactly
+ * the field that is wrong here. So the state is invisible by construction: no settled
+ * badge, still a glide candidate, absent from the drift sweep, and the published number
+ * sits inside its own band so the #1489 check passes it too. One forecast spent 3.6 days
+ * publishing 97 against a pool of 62 in precisely this state, and it took a manual
+ * population-wide recompute to find it.
+ *
+ * It does NOT set the latch. Auto-latching is the obvious move and it is wrong twice
+ * over: re-aggregating the pool of the forecast that motivated the issue returned
+ * `settled: false`, so the assertion is usually the transient and latching would pin a
+ * false positive behind a manual-only release; and where the latch was cleared on
+ * purpose, re-latching would silently overrule the operator. Fresh evidence decides —
+ * this only makes sure a human is looking, via the same Awaiting Resolution queue #1490
+ * uses.
+ */
+async function alertUnlatchedPins(now: Date, summary: RequoteSummary): Promise<void> {
+  // Narrowed by relation first (~24 rows population-wide) so the per-candidate currency
+  // check runs over a handful, not over every ACTIVE forecast. Guarded for the same
+  // reason as the sweep above.
+  let candidates: { id: string; slug: string | null; claimText: string; unlatchedPinAlertAt: Date | null }[]
+  try {
+    candidates = await prisma.prediction.findMany({
+      where: {
+        status: 'ACTIVE',
+        settled: false,
+        contextSnapshots: {
+          some: {
+            kind: { not: 'clock' },
+            insufficientData: false,
+            oracleSnapshot: { path: ['settled'], equals: true },
+          },
+        },
+      },
+      select: { id: true, slug: true, claimText: true, unlatchedPinAlertAt: true },
+    })
+  } catch (err) {
+    summary.errors++
+    log.warn({ err }, 'unlatched-pin sweep query failed — is the #1498 migration applied?')
+    return
+  }
+
+  for (const p of candidates) {
+    try {
+      // Having asserted settlement at some point is not the anomaly — most of these
+      // have published unsettled numbers since and simply moved on. The anomaly is the
+      // assertion being the forecast's current position.
+      const asserted = await latestEvidenceAssertsSettlement(p.id)
+      if (asserted === null) {
+        // Re-arm: the evidence stopped asserting it, so a recurrence pages again.
+        if (p.unlatchedPinAlertAt !== null) {
+          await prisma.prediction.update({ where: { id: p.id }, data: { unlatchedPinAlertAt: null } })
+        }
+        continue
+      }
+      if (p.unlatchedPinAlertAt !== null) continue // already firing, already queued
+
+      await prisma.prediction.update({
+        where: { id: p.id },
+        data: { awaitingAiResolution: true, unlatchedPinAlertAt: now },
+      })
+      notifyUnlatchedPin({ id: p.id, claimText: p.claimText, slug: p.slug }, asserted.probability, asserted.assertedAt)
+      summary.unlatchedPinAlerts++
+    } catch (err) {
+      summary.errors++
+      log.warn({ predictionId: p.id, err }, 'unlatched-pin alert failed')
+    }
+  }
+}
+
 export interface RunRequoteOptions {
   /** Lowercase archetype names allowed to glide this run (e.g. ['diffuse']). Empty = no-op. */
   archetypes: string[]
@@ -530,6 +611,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
     if (!opts.dryRun) {
       await alertPendingPastDeadline(now, summary)
       await reverifyDriftedSettled(now, summary)
+      await alertUnlatchedPins(now, summary)
     }
     return summary
   }
@@ -607,6 +689,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
   if (!opts.dryRun) {
     await alertPendingPastDeadline(now, summary)
     await reverifyDriftedSettled(now, summary)
+    await alertUnlatchedPins(now, summary)
   }
 
   const moved = summary.glided + summary.pinned + summary.provisionalPins
@@ -621,6 +704,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       selfHealed: summary.selfHealed,
       pendingDeadlineAlerts: summary.pendingDeadlineAlerts,
       settledDriftAlerts: summary.settledDriftAlerts,
+      unlatchedPinAlerts: summary.unlatchedPinAlerts,
       errors: summary.errors,
       deltaP50: median(summary.deltas),
       deltaMax: summary.deltas.length ? Math.max(...summary.deltas) : 0,

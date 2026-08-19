@@ -407,8 +407,14 @@ model Prediction {
   // the snapshot writers; human resolution supersedes it. As of PR #1020, does
   // NOT block new commitments by itself — see getCommitmentLockReason in
   // src/lib/services/commitment.ts.
-  settled   Boolean   @default(false)
-  settledAt DateTime? @map("settled_at")
+  settled          Boolean   @default(false)
+  settledAt        DateTime? @map("settled_at")
+  // Audit for the one path that can un-set the latch (daatan#1498). The admin
+  // one-click nulls `settled_at` along with the flag, which left a cleared forecast
+  // indistinguishable from one that never latched — the exact ambiguity that made
+  // the root cause unfalsifiable from the data. The clear now records itself.
+  settledClearedAt DateTime? @map("settled_cleared_at")
+  settledClearedBy String?   @map("settled_cleared_by")
 
   // Single-shot alert dedup for the requote cron (retro
   // docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0). temporal-clock.ts re-fires when
@@ -430,6 +436,9 @@ model Prediction {
   // cleared once the gap closes. Deliberately not settledAt — recordEstimate
   // re-stamps that on every settled write, so it dates the last one, not the pin.
   settledDriftAlertAt DateTime? @map("settled_drift_alert_at")
+  // Mirror of the above (daatan#1498): the latest evidence snapshot asserts
+  // settlement while `settled` is false. Same fire/re-arm idiom.
+  unlatchedPinAlertAt DateTime? @map("unlatched_pin_alert_at")
 
   // The running Telegram notification for this forecast's news-article matches
   // (daatan#1215). NULL = no notification sent yet. Latest-state, not a log:
