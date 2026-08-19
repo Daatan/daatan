@@ -12,6 +12,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/services/context', () => ({
   saveClockSnapshot: vi.fn(),
   getLatestEvidenceEstimate: vi.fn(),
+  getSettlementPinProbability: vi.fn(),
 }))
 
 vi.mock('@/lib/services/temporal-classifier', () => ({
@@ -25,10 +26,11 @@ vi.mock('@/lib/services/telegram', () => ({
   notifyDeadlineDivergence: vi.fn(),
   notifyRequoteSummary: vi.fn(),
   notifyHighConfidence: vi.fn(),
+  notifySettledDrift: vi.fn(),
 }))
 
 import { prisma } from '@/lib/prisma'
-import { saveClockSnapshot, getLatestEvidenceEstimate } from '@/lib/services/context'
+import { saveClockSnapshot, getLatestEvidenceEstimate, getSettlementPinProbability } from '@/lib/services/context'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
@@ -37,6 +39,7 @@ import {
   notifyDeadlineDivergence,
   notifyRequoteSummary,
   notifyHighConfidence,
+  notifySettledDrift,
 } from '@/lib/services/telegram'
 import { runRequote } from '@/lib/services/temporal-clock'
 
@@ -51,6 +54,8 @@ const provisionalAlert = vi.mocked(notifyProvisionalImpossibility)
 const divergenceAlert = vi.mocked(notifyDeadlineDivergence)
 const summaryAlert = vi.mocked(notifyRequoteSummary)
 const highConfidenceAlert = vi.mocked(notifyHighConfidence)
+const settledDriftAlert = vi.mocked(notifySettledDrift)
+const getPin = vi.mocked(getSettlementPinProbability)
 
 const NOW = new Date('2026-06-01T06:00:00.000Z')
 
@@ -78,12 +83,13 @@ describe('runRequote', () => {
     update.mockResolvedValue({} as never)
     saveClock.mockResolvedValue(undefined)
     classify.mockResolvedValue(null)
+    getPin.mockResolvedValue(null)
   })
 
-  it('no-ops the glide machinery on an empty archetype allowlist — only the #1185 sweep runs', async () => {
+  it('no-ops the glide machinery on an empty archetype allowlist — only the sweeps run', async () => {
     const summary = await runRequote({ archetypes: [], now: NOW })
     expect(summary.examined).toBe(0)
-    expect(findMany).toHaveBeenCalledTimes(1) // the sweep query, nothing else
+    expect(findMany).toHaveBeenCalledTimes(2) // #1185 stuck-PENDING + #1490 settled-drift, nothing else
     expect(classify).not.toHaveBeenCalled()
     expect(getAnchor).not.toHaveBeenCalled()
     expect(saveClock).not.toHaveBeenCalled()
@@ -449,6 +455,91 @@ describe('runRequote', () => {
       expect(summary.skippedUnlatchedPin).toBe(0)
       expect(saveClock).toHaveBeenCalledTimes(1)
       expect(summary.glided).toBe(1)
+    })
+  })
+  // daatan#1490. Driven through the empty-allowlist path: the glide is irrelevant here
+  // and that path runs exactly two findMany queries — the #1185 stuck-PENDING sweep,
+  // then this one — so the second mock is unambiguously the settled-drift population.
+  describe('settled forecasts that have drifted off their pin', () => {
+    const latched = (overrides: Record<string, unknown> = {}) => ({
+      id: 'pred-settled-1',
+      slug: 'settled-slug',
+      claimText: 'The treaty has been signed',
+      confidence: 65,
+      settledDriftAlertAt: null,
+      ...overrides,
+    })
+
+    const runSweep = async (rows: unknown[]) => {
+      findMany.mockResolvedValueOnce([]) // #1185 stuck-PENDING sweep
+      findMany.mockResolvedValueOnce(rows as never) // settled-drift sweep
+      return runRequote({ archetypes: [], now: NOW })
+    }
+
+    it('queues it for re-verification and pages once', async () => {
+      getPin.mockResolvedValue(97)
+
+      const summary = await runSweep([latched()])
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'pred-settled-1' },
+        data: { awaitingAiResolution: true, settledDriftAlertAt: NOW },
+      })
+      expect(settledDriftAlert).toHaveBeenCalledTimes(1)
+      expect(settledDriftAlert).toHaveBeenCalledWith(expect.objectContaining({ id: 'pred-settled-1' }), 97, 65)
+      expect(summary.settledDriftAlerts).toBe(1)
+    })
+
+    it('leaves a drift under the threshold alone — 97 next to 92 still tells one story', async () => {
+      getPin.mockResolvedValue(97)
+
+      const summary = await runSweep([latched({ confidence: 92 })])
+
+      expect(update).not.toHaveBeenCalled()
+      expect(settledDriftAlert).not.toHaveBeenCalled()
+      expect(summary.settledDriftAlerts).toBe(0)
+    })
+
+    it('does not re-page while the same gap is still open', async () => {
+      getPin.mockResolvedValue(97)
+
+      const summary = await runSweep([latched({ settledDriftAlertAt: new Date('2026-05-30T00:00:00.000Z') })])
+
+      expect(settledDriftAlert).not.toHaveBeenCalled()
+      expect(update).not.toHaveBeenCalled()
+      expect(summary.settledDriftAlerts).toBe(0)
+    })
+
+    it('re-arms once the gap closes, so a later re-crossing pages again', async () => {
+      getPin.mockResolvedValue(97)
+
+      await runSweep([latched({ confidence: 95, settledDriftAlertAt: new Date('2026-05-30T00:00:00.000Z') })])
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'pred-settled-1' },
+        data: { settledDriftAlertAt: null },
+      })
+      expect(settledDriftAlert).not.toHaveBeenCalled()
+    })
+
+    it('skips a forecast whose pin was never recorded in a snapshot', async () => {
+      getPin.mockResolvedValue(null)
+
+      const summary = await runSweep([latched({ confidence: 20 })])
+
+      expect(update).not.toHaveBeenCalled()
+      expect(settledDriftAlert).not.toHaveBeenCalled()
+      expect(summary.settledDriftAlerts).toBe(0)
+    })
+
+    it('counts a failed write as an error instead of aborting the sweep', async () => {
+      getPin.mockResolvedValue(97)
+      update.mockRejectedValueOnce(new Error('db down'))
+
+      const summary = await runSweep([latched(), latched({ id: 'pred-settled-2' })])
+
+      expect(summary.errors).toBe(1)
+      expect(summary.settledDriftAlerts).toBe(1)
     })
   })
 })

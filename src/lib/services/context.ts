@@ -600,6 +600,31 @@ export async function getLatestEvidenceEstimate(predictionId: string): Promise<E
 }
 
 /**
+ * The probability the settlement pin published: `externalProbability` of the most
+ * recent non-clock snapshot asserting settlement.
+ *
+ * Neither field on the prediction row can stand in for it. `Prediction.confidence`
+ * is the *current* number, which is the thing being compared against. `settledAt`
+ * is not the pin's date either — `recordEstimate` re-stamps it on every settled
+ * write, so it marks the last one (daatan#1498). The pin's value is only ever
+ * recorded inside the snapshot that carried it.
+ */
+export async function getSettlementPinProbability(predictionId: string): Promise<number | null> {
+  const snap = await prisma.contextSnapshot.findFirst({
+    where: {
+      predictionId,
+      externalProbability: { not: null },
+      insufficientData: false,
+      oracleSnapshot: { path: ['settled'], equals: true },
+      ...NOT_CLOCK,
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { externalProbability: true },
+  })
+  return snap?.externalProbability ?? null
+}
+
+/**
  * The full AI-probability series for the history chart: every snapshot that
  * carries an estimate, INCLUDING kind='clock' glide requotes. This is the one
  * reader that deliberately crosses the NOT_CLOCK line — the timeline hides

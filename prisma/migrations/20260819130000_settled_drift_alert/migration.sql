@@ -1,0 +1,11 @@
+-- Fire/re-arm state for the settled-drift re-verification sweep (daatan#1490).
+--
+-- A latched forecast whose published probability has walked away from the value
+-- its settlement pin published is either a wrong latch or a wrong number, and a
+-- reader cannot tell which. The requote cron now flags those back into the
+-- Awaiting Resolution queue and pages once.
+--
+-- Same idiom as market_divergence_alert_at rather than deadline_passed_alert_at:
+-- set when the gap first crosses the threshold, cleared once it closes, so a
+-- forecast that drifts, is corrected, and drifts again pages both times.
+ALTER TABLE "predictions" ADD COLUMN "settled_drift_alert_at" TIMESTAMP(3);
