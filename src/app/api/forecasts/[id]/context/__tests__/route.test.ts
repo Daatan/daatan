@@ -248,6 +248,26 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(saved.externalProbability).toBe(70) // stanceToPercent(0.4) from the mocked pool result
     })
 
+    it('threads the abstention reason and pool size into the write layer (daatan#1473)', async () => {
+      // The analyze path is the one that wiped a 115-article, verifier-approved 97% — and the
+      // one that persisted nothing about WHY it abstained, so "why did analyze abstain on a
+      // rich pool?" could not be answered from the data at all.
+      vi.mocked(resolvePooledEstimate).mockResolvedValue({
+        mean: 0, std: 0, ciLow: 0, ciHigh: 0, settled: false, articlesUsed: 0,
+        snapshotSources: [], estimateSource: 'pool-insufficient', insufficientData: true,
+        reason: 'all_articles_off_topic', poolSize: 115, singleRunMean: 0,
+      } as never)
+
+      const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+      await collectDoneEvent(res)
+
+      const saved = vi.mocked(saveContextUpdate).mock.calls[0][0]
+      expect(saved.insufficientData).toBe(true)
+      expect(saved.externalProbability).toBeNull()
+      expect(saved.insufficientReason).toBe('all_articles_off_topic')
+      expect(saved.poolSize).toBe(115)
+    })
+
     it('does not fabricate a number when nothing is new AND the pool itself cannot be read', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'skip', articleId: 'row-1' },

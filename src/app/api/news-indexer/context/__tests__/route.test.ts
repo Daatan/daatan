@@ -917,6 +917,10 @@ describe('POST /api/news-indexer/context', () => {
           ciLow: null,
           ciHigh: null,
           insufficientData: true,
+          // daatan#1473: the reason is what decides whether this abstention may clear the
+          // published estimate, and it is persisted so the abstention stays diagnosable.
+          insufficientReason: 'all_articles_off_topic',
+          poolSize: 3,
           oracleSnapshot: expect.objectContaining({ insufficient: true, reason: 'all_articles_off_topic' }),
         }),
       )
@@ -941,6 +945,64 @@ describe('POST /api/news-indexer/context', () => {
 
       expect(addArticlesToPool).not.toHaveBeenCalled()
       expect(recomputeFromPool).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('scored — the explicit "did this push get scored?" flag (daatan#1461)', () => {
+    // news-indexer INFERS this from the payload shape: a `skipped` key, or every one of
+    // stance/certainty/claim/probability/previousProbability/relevance null meaning "unscored,
+    // retry" (news-indexer#293). The inference is a heuristic over six fields that a genuine,
+    // recorded verdict can satisfy in full — an abstention on a forecast with no prior
+    // confidence, whose trigger article the Oracle dropped, is all-null and gets retried
+    // anyway. The field says it outright instead.
+    it('is true when the Oracle produced an estimate and it was stored', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+      const body = await (await POST(post('test-secret'))).json()
+
+      expect(body.scored).toBe(true)
+      expect(body.probability).not.toBeNull()
+    })
+
+    it('is true on an ABSTENTION — the all-null payload that used to read as "unscored"', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(recomputeFromPool).mockResolvedValue({
+        mean: 0, std: 0, ciLow: 0, ciHigh: 0, articlesUsed: 0, settled: false,
+        insufficientData: true, reason: 'all_articles_off_topic',
+        poolSize: 3, usableSize: 0, excludedCount: 0, incompleteCount: 3, usableArticles: [],
+      })
+
+      const body = await (await POST(post('test-secret'))).json()
+
+      // No number was published, which is the half of the shape ni keys on — yet the push
+      // WAS scored, and re-pushing the same articles would produce the same abstention.
+      expect(body.probability).toBeNull()
+      expect(body.scored).toBe(true)
+    })
+
+    it('is false when the Oracle returned nothing — the case that IS worth retrying', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+
+      const body = await (await POST(post('test-secret'))).json()
+
+      expect(body.scored).toBe(false)
+    })
+
+    it('is false when the write dedupped to nothing stored', async () => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false, contextSnapshotId: 'snap-1' })
+
+      const body = await (await POST(post('test-secret'))).json()
+
+      expect(body.scored).toBe(false)
+    })
+
+    it('is false on the claim-gate short-circuit, alongside the existing `skipped` key', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'skip', articleId: 'row-1' }])
+
+      const body = await (await POST(post('test-secret'))).json()
+
+      expect(body).toMatchObject({ skipped: 'unchanged', scored: false })
     })
   })
 

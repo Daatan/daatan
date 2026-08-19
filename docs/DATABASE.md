@@ -139,14 +139,28 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | `kind` | pricing semantics: `evidence` (default) vs `clock` (daily glide requote). Clock rows are excluded from the public timeline, the glide anchor, and push dedup (`NOT_CLOCK` filters) |
 | `articlesUsed` | Oracle evidence volume; null on legacy/LLM-fallback/clock rows |
 | `oracleSnapshot` | full Oracle payload (see scale table above); null on the LLM-fallback path |
-| `insufficientData` | the run abstained — UI shows "Insufficient evidence"; the funnel also clears the prediction's cache trio |
-| `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}` |
+| `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
+| `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}` |
 | `summary` / `externalReasoning` | analyze-run LLM summary / writer reasoning marker |
 
 Funnel invariants: `confidence` and `aiCiLow/aiCiHigh` on the prediction move
-**atomically** (written together, cleared together on abstention, both
-untouched when a run yields no number); the settled latch and all
-notifications are decided by the per-origin policy table in `context.ts`.
+**atomically** (written together, cleared together, or both untouched — never one
+without the other); the settled latch and all notifications are decided by the
+per-origin policy table in `context.ts`.
+
+**An abstention does not clear the published estimate** (daatan#1473). It says *this run*
+found no usable evidence; it is not a verdict on the number already published, which came
+out of a pool that only ever grows. One `analyze` run wiped a 115-article,
+settlement-verifier-approved 97% and left the forecast blank for ~23 h with no self-heal.
+`recordEstimate` therefore branches on the abstention's **reason**, not on the bare
+`insufficientData` boolean: only a reason listed in `CLEARING_ABSTAIN_REASONS` clears the
+needle, the band and `awaitingAiResolution` together; every other reason — including an
+unknown one — takes the same no-op the "run produced no number" case takes. That set is
+empty today and exists for a pool-*staleness* abstention (retro#416's valve), which would be
+a verdict on the prior number; discriminating by pool *size* instead would make that valve
+inert on exactly its target population. The abstention is still recorded on the snapshot
+(`insufficientData: true`, plus `meta.abstain = {reason, poolSize}` — previously logged
+only), which is what the UI reads.
 Known bypass: bot creation (`bots/stake.ts`) still writes predictions directly.
 
 Supporting tables: `context_timings` (per-analyze phase latencies),
@@ -532,13 +546,16 @@ and the two "no pool number" cases are deliberately different:
   of them carries zero aggregation weight — blocked by credibility, zeroed by relevance, or
   both; the Oracle used to answer such a pool with equal weights instead). Thin-but-on-topic
   pools are still NOT insufficient — `defer_on_thin_evidence` is off, so they get their CI
-  inflated instead. Treat the reason as an opaque string: it is the Oracle's to extend. The run records an **abstention** — `confidence`/CI null, the
-  snapshot flagged `insufficientData: true`, no notification, excluded from the glide anchor
-  and history chart (both filter `insufficientData: false`) — rather than fall back to a
-  single run over the *same* off-topic articles, which would reintroduce a garbage number.
-  The UI renders it as "insufficient evidence" (ContextTimeline). A forecast with any prior
-  on-topic evidence can't reach this state: those rows keep their relevance in the
-  accumulating pool, so only a forecast whose *entire* pool is off-topic abstains.
+  inflated instead. Treat the reason as an opaque string: it is the Oracle's to extend. The run records an **abstention** — no number persisted, the
+  snapshot flagged `insufficientData: true` and carrying `meta.abstain = {reason, poolSize}`,
+  no notification, excluded from the glide anchor and history chart (both filter
+  `insufficientData: false`) — rather than fall back to a single run over the *same*
+  off-topic articles, which would reintroduce a garbage number. Any confidence/CI already
+  published **survives** it (daatan#1473, above). The UI renders the abstention as
+  "insufficient evidence" (ContextTimeline). A forecast with any prior on-topic evidence
+  shouldn't be able to reach this state at all — those rows keep their relevance in the
+  accumulating pool — which is exactly why an abstention on one is treated as the
+  untrustworthy side of the contradiction.
 
 Each run logs which path won and the single-run mean (`estimateSource` ∈
 {`pool`,`single-run`,`pool-insufficient`}, `singleRunMean`/`singleRunDelta`) — a large gap is

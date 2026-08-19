@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
         probability: null,
         sources: [],
         skipped: 'unchanged',
+        scored: false,
       })
     }
 
@@ -461,9 +462,11 @@ export async function POST(request: NextRequest) {
 
       if (est.insufficientData) {
         // The whole pool is off-topic — abstain rather than persist a number built from
-        // articles the Oracle judged irrelevant. Nulls confidence/CI; `probability` stays
-        // null so the notify block below is skipped. (A forecast with any prior on-topic
-        // evidence can't reach here: those rows keep their relevance in the accumulating pool.)
+        // articles the Oracle judged irrelevant. `probability` stays null so the notify
+        // block below is skipped. Any confidence/CI already published survives (daatan#1473):
+        // a forecast with prior on-topic evidence shouldn't be able to reach here at all —
+        // those rows keep their relevance in the accumulating pool — so an abstention on one
+        // is a contradiction, and the published number is the side to trust.
         const { stored } = await saveNewsIndexerMatch({
           predictionId: prediction.id,
           sources: matchSources,
@@ -471,6 +474,8 @@ export async function POST(request: NextRequest) {
           ciLow: null,
           ciHigh: null,
           insufficientData: true,
+          insufficientReason: est.reason,
+          poolSize: est.poolSize,
           oracleSnapshot: { sources: [], insufficient: true, reason: est.reason },
         })
         wasStored = stored
@@ -626,6 +631,13 @@ export async function POST(request: NextRequest) {
     // single-article contract); `sources` carries the whole set for the multi push.
     return NextResponse.json({
       ok: true,
+      // daatan#1461: say outright whether the Oracle leg ran AND its result was recorded,
+      // instead of making news-indexer infer it from an all-null payload (news-indexer#293).
+      // True on both recorded outcomes — an estimate and an abstention — because both are a
+      // verdict this push produced; false only when nothing was written: the Oracle returned
+      // null (transport/timeout, worth a retry) or every article was already claimed. The
+      // null-shape inference stays valid for older daatan versions, so this is additive.
+      scored: wasStored,
       stance: triggerEnrich?.stance ?? null,
       certainty: triggerEnrich?.certainty ?? null,
       claim: triggerEnrich?.claim ?? null,

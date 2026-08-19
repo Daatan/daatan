@@ -86,14 +86,19 @@ describe('recordEstimate — the single estimate writer', () => {
     expect(update).not.toHaveBeenCalled()
   })
 
-  it('clears needle, band and the awaiting flag together on abstention', async () => {
+  it('touches neither needle nor band on an abstention either (daatan#1473)', async () => {
+    // An abstention is a verdict on THIS run's evidence, not on the number already
+    // published — so it takes the same no-op as any run that produced no number. Only a
+    // reason listed in CLEARING_ABSTAIN_REASONS clears; see
+    // context-abstention-preserves-estimate.test.ts for both branches.
     await recordEstimate({ predictionId: 'pred-1', origin: 'analyze', probability: null, insufficientData: true, summary: 'S' })
-    expect(updateData()).toMatchObject({
-      confidence: null,
-      aiCiLow: null,
-      aiCiHigh: null,
-      awaitingAiResolution: false,
-    })
+    const data = updateData()
+    expect(data).not.toHaveProperty('confidence')
+    expect(data).not.toHaveProperty('aiCiLow')
+    expect(data).not.toHaveProperty('aiCiHigh')
+    expect(data).not.toHaveProperty('awaitingAiResolution')
+    // the analyze origin still owns the user-facing context, abstention or not
+    expect(data).toMatchObject({ detailsText: 'S' })
     expect(notify).not.toHaveBeenCalled()
   })
 

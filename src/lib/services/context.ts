@@ -135,9 +135,17 @@ export interface RecordEstimateInput {
   probability: number | null
   ciLow?: number | null
   ciHigh?: number | null
-  /** The run abstained: records the snapshot as an abstention and clears the
-   *  prediction's stale estimate (needle + band together). */
+  /** The run abstained: records the snapshot as an abstention. Whether the
+   *  prediction's published needle + band are cleared or left standing is decided
+   *  from `insufficientReason` — see `CLEARING_ABSTAIN_REASONS` (daatan#1473). */
   insufficientData?: boolean
+  /** Why the run abstained (`all_articles_off_topic`, `no_usable_weight`,
+   *  `oracle_abstain`, …). Drives the clear-vs-preserve decision above, and is
+   *  persisted on the snapshot so the abstention stays diagnosable afterwards. */
+  insufficientReason?: string | null
+  /** How many pool rows the abstaining aggregate saw. Diagnostics only — persisted
+   *  beside `insufficientReason`, read by nothing. */
+  poolSize?: number | null
   /** Oracle settlement detection; honored only where the origin policy allows. */
   settled?: boolean
   summary?: string
@@ -185,14 +193,49 @@ function evidencePublishedAt(sources: unknown, oracleSnapshot: unknown): Date | 
 }
 
 /**
+ * Abstention reasons that CLEAR the published estimate instead of leaving it standing.
+ *
+ * An abstention says *this run* found no usable evidence. It is not a verdict on the
+ * number already published: that number came out of a pool which only ever grows, so a
+ * forecast holding a real estimate cannot honestly become "every article off-topic" a
+ * moment later. Nulling `confidence`/`aiCiLow`/`aiCiHigh` on it destroys valid data —
+ * daatan#1473, where one `analyze` run wiped a 115-article, settlement-verifier-approved
+ * 97% and left the forecast showing no estimate at all for ~23 h, with no self-heal until
+ * some later pool write happened to touch the row.
+ *
+ * The default is therefore PRESERVE: the abstention is recorded as a snapshot (which is
+ * what the UI reads — `ContextSnapshot.insufficientData`, `ForecastDetailClient`), and the
+ * prediction's needle + band are left exactly as any other run that produced no number
+ * leaves them.
+ *
+ * This set is the declared exception: an abstention that IS a verdict on the prior
+ * estimate — a pool-staleness abstention (retro#416's valve), where "the evidence behind
+ * that number has decayed" means the number must go. No such reason exists today, hence
+ * the empty set. The tempting alternative — clear whenever the pool looks thin — would
+ * make that valve inert on exactly its target population (a large pool carrying a prior
+ * confidence), which is why the discrimination is by reason and not by size. Unknown
+ * reasons fall through to preserve on purpose: destroying a published number on a reason
+ * we do not recognise is the wrong default.
+ *
+ * Exported so the policy test can pin both branches — adding a reason here must make it
+ * clear, and the set must stay empty until a reason of that kind actually ships.
+ */
+export const CLEARING_ABSTAIN_REASONS = new Set<string>()
+
+function abstentionClearsEstimate(reason: string | null | undefined): boolean {
+  return reason != null && CLEARING_ABSTAIN_REASONS.has(reason)
+}
+
+/**
  * Persist one AI-estimate write — any origin — as a ContextSnapshot plus a
  * consistent Prediction update, in a single transaction.
  *
  * Invariants (uniform across origins, unlike the five pre-funnel writers):
  * - the snapshot always carries `origin`, `articlesUsed`, and its probability;
  * - `confidence` and `aiCiLow/aiCiHigh` move atomically — both written (with
- *   `awaitingAiResolution` recomputed), both cleared on abstention, or both
- *   left alone when the run produced no number;
+ *   `awaitingAiResolution` recomputed), both cleared on an abstention whose reason
+ *   says the prior number is itself unsupportable, or both left alone (the ordinary
+ *   abstention, and any run that produced no number);
  * - the settled latch and all notifications are decided here, per origin policy.
  */
 export async function recordEstimate(input: RecordEstimateInput) {
@@ -222,8 +265,14 @@ export async function recordEstimate(input: RecordEstimateInput) {
   const pinned = policy.canSettle && input.settled === true
   const settlingSources = pinned ? settlingSourceCount(input.oracleSnapshot) : 0
 
+  // An abstention leaves the published estimate alone unless its reason condemns it
+  // (daatan#1473) — `{}` here is the same "this run produced no number" no-op the
+  // `probability === null` branch below takes, so needle, band and awaitingAiResolution
+  // all stay consistent with each other rather than being half-cleared.
   const estimateFields: Prisma.PredictionUpdateInput = input.insufficientData
-    ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
+    ? abstentionClearsEstimate(input.insufficientReason)
+      ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
+      : {}
     : input.probability !== null
       ? {
           confidence: input.probability,
@@ -238,6 +287,14 @@ export async function recordEstimate(input: RecordEstimateInput) {
     ...(policy.touchesUserContext ? { detailsText: input.summary ?? '', contextUpdatedAt: now } : {}),
   }
 
+  // Abstention diagnostics (daatan#1473): every abstain path already produced a reason
+  // and a pool size and then only LOGGED them, so "why did analyze abstain on a
+  // 115-article pool?" could not be answered from the data at all. `meta` is otherwise
+  // clock-only and read by nothing, so recording them here costs no migration.
+  const abstainMeta: Prisma.InputJsonValue | undefined = input.insufficientData
+    ? { abstain: { reason: input.insufficientReason ?? null, poolSize: input.poolSize ?? null } }
+    : undefined
+
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.contextSnapshot.create({
       data: {
@@ -250,7 +307,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
         externalReasoning: input.externalReasoning ?? null,
         oracleSnapshot: input.oracleSnapshot ?? undefined,
         insufficientData: input.insufficientData ?? false,
-        meta: input.meta ?? undefined,
+        meta: input.meta ?? abstainMeta ?? undefined,
         articlesUsed: articlesUsedOf(input.oracleSnapshot),
         materialChange,
         evidenceAt,
@@ -359,9 +416,14 @@ export interface SaveContextUpdateInput {
   aiCiLow: number | null
   aiCiHigh: number | null
   /** The Oracle abstained — no evidence bears on the claim. Records the snapshot
-   *  as an abstention and CLEARS the prediction's stale AI estimate so the gauge
-   *  shows "Insufficient evidence" rather than the last (now-unsupported) number. */
+   *  as an abstention; the prediction's last published number is LEFT STANDING unless
+   *  `insufficientReason` condemns it (daatan#1473 — see `CLEARING_ABSTAIN_REASONS`).
+   *  The gauge shows "Insufficient evidence" off the snapshot either way. */
   insufficientData?: boolean
+  /** Why the run abstained — persisted, and the clear-vs-preserve switch above. */
+  insufficientReason?: string | null
+  /** Pool rows behind the abstaining aggregate; diagnostics only. */
+  poolSize?: number | null
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   now: Date
@@ -377,6 +439,8 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
     ciLow: input.aiCiLow,
     ciHigh: input.aiCiHigh,
     insufficientData: input.insufficientData,
+    insufficientReason: input.insufficientReason,
+    poolSize: input.poolSize,
     settled: input.settled,
     summary: input.summary,
     sources: input.sources,
@@ -390,8 +454,9 @@ export interface SaveNewsIndexerMatchInput {
   predictionId: string
   /** The evidence set fed to the Oracle: [{ url, title, source, publishedDate }, ...]. */
   sources: Prisma.InputJsonValue
-  /** Null on an abstention (`insufficientData`) — the whole pool was off-topic, so there is
-   *  no estimate to persist; `recordEstimate` nulls confidence/CI in that case. */
+  /** Null on an abstention (`insufficientData`) — the whole pool was off-topic, so this run
+   *  has no estimate to persist. The prediction's existing confidence/CI survive it
+   *  (daatan#1473); only a condemning `insufficientReason` clears them. */
   externalProbability: number | null
   ciLow: number | null
   ciHigh: number | null
@@ -399,8 +464,13 @@ export interface SaveNewsIndexerMatchInput {
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   /** The pool aggregated but found no usable signal (off-topic). Records an abstention:
-   *  confidence/CI null, snapshot flagged, no notification, excluded from glide/chart. */
+   *  snapshot flagged, no notification, excluded from glide/chart — and the prediction's
+   *  published confidence/CI left alone (daatan#1473). */
   insufficientData?: boolean
+  /** Why the pool abstained (`all_articles_off_topic`, `no_usable_weight`, …). */
+  insufficientReason?: string | null
+  /** Pool rows behind the abstaining aggregate; diagnostics only. */
+  poolSize?: number | null
 }
 
 /** externalReasoning marker identifying snapshots written by the news-indexer push path. */
@@ -440,6 +510,8 @@ export async function saveNewsIndexerMatch(
     ciHigh: input.ciHigh,
     settled: input.settled,
     insufficientData: input.insufficientData,
+    insufficientReason: input.insufficientReason,
+    poolSize: input.poolSize,
     sources: input.sources,
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
@@ -537,8 +609,13 @@ export interface SaveOracleSnapshotInput {
   aiCiHigh: number | null
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
-  /** The pool aggregated but found no usable signal (off-topic) — records an abstention. */
+  /** The pool aggregated but found no usable signal (off-topic) — records an abstention,
+   *  leaving any published confidence/CI standing (daatan#1473). */
   insufficientData?: boolean
+  /** Why the pool abstained (`all_articles_off_topic`, `no_usable_weight`, …). */
+  insufficientReason?: string | null
+  /** Pool rows behind the abstaining aggregate; diagnostics only. */
+  poolSize?: number | null
 }
 
 /**
@@ -558,6 +635,8 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     ciHigh: input.aiCiHigh,
     settled: input.settled,
     insufficientData: input.insufficientData,
+    insufficientReason: input.insufficientReason,
+    poolSize: input.poolSize,
     externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
     oracleSnapshot: input.oracleSnapshot,
   })
