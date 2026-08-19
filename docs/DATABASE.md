@@ -413,12 +413,21 @@ populates (news-indexer #1131).
 **fact-lane** counterpart of `stance` (retro `SourceSignal.fact_signal`, #313):
 `factSignal` ∈ [-1,1] is what the **reported facts alone** imply about the event,
 un-fused from author assertion/framing — a claim-weighted MEAN over the article's
-fact-bearing claims (the SAME reduction as `stance`, so the offline fact-lane
-backtest compares mean-to-mean). The four facets qualify the **dominant**
-(max |fact_signal|) claim for the estimator's future checks: `eventActors`→
+fact-bearing claims (the SAME reduction as `stance`). The four facets qualify
+the **dominant** (max |fact_signal|) claim: `eventActors`→
 `eventTarget` name that fact's actor/target dyad (the actor-pair check, #303),
 `isOccurrence` marks the event ITSELF vs a precursor/precondition/escalation,
 `verified` marks an independently-reported fact vs an interested party's claim.
+**These are stored for a diagnostic lane, not for a pending re-pricing** (retro#533,
+2026-08-15, `Daatan/docs/decisions.md`): the estimator-cutover framing they were
+originally written for is RETIRED — corr(stance, fact_signal) measured 0.905 on
+precursor rows (n=2,645), so the offline paired-Brier gate could never accumulate
+discriminating data. Nothing in daatan reads these columns, and that is now the
+steady state rather than a waiting room. Their value is on the retro side, where the
+same fields (recomputed at extraction time, NOT read back from here) key the
+precursor cap and the decider-intent stance cap, and here, where they are the
+per-claim audit surface for reviewing a pool row. Re-opening bar: ≥30 resolved
+predictions with lane divergence >0.1, in `decisions.md`.
 `carriedForward` (daatan#1166/#1167, `oracle-snapshot.ts`/`pooled-estimate.ts`)
 is true when a pooled source's stance for this recompute is UNCHANGED from the
 immediately-prior snapshot's stance at the same URL — i.e. this source wasn't
