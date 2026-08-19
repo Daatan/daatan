@@ -171,6 +171,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             predictionCiHigh: number | null
             oracleSnapshotData: Prisma.InputJsonValue | null
             insufficientData?: boolean
+            /** Why this run abstained — persisted by recordEstimate, and the switch that
+             *  decides whether the abstention clears the published estimate (daatan#1473). */
+            insufficientReason?: string | null
+            poolSize?: number | null
             settled?: boolean
         }
 
@@ -205,6 +209,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     predictionCiHigh: null,
                     oracleSnapshotData: null,
                     insufficientData: true,
+                    insufficientReason: resolved.reason,
+                    poolSize: resolved.poolSize,
                 }
             }
             const prob = stanceToPercent(resolved.mean)
@@ -307,6 +313,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     predictionCiHigh: null,
                     oracleSnapshotData: null,
                     insufficientData: true,
+                    // No pool was read on this leg — the Oracle itself declined, which is the
+                    // `oracle_abstain` failure class it reports on its own call log.
+                    insufficientReason: 'oracle_abstain',
+                    poolSize: null,
                 }
             }
             if (oracleForecast !== null) {
@@ -454,6 +464,11 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     let predictionCiHigh: number | null = null
                     let oracleSnapshotData: Prisma.InputJsonValue | null = null
                     let insufficientData = false
+                    // Why, and over how big a pool (daatan#1473) — recorded on the snapshot so
+                    // an abstention is diagnosable afterwards, and read by recordEstimate to
+                    // decide whether it may clear the published estimate.
+                    let insufficientReason: string | null = null
+                    let abstainPoolSize: number | null = null
                     let settled = false
 
                     if (estimationResult === null) {
@@ -468,6 +483,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         predictionCiHigh = estimationResult.predictionCiHigh
                         oracleSnapshotData = estimationResult.oracleSnapshotData
                         insufficientData = estimationResult.insufficientData ?? false
+                        insufficientReason = estimationResult.insufficientReason ?? null
+                        abstainPoolSize = estimationResult.poolSize ?? null
                         settled = estimationResult.settled ?? false
                     }
 
@@ -491,6 +508,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         aiCiLow: predictionCiLow,
                         aiCiHigh: predictionCiHigh,
                         insufficientData,
+                        insufficientReason,
+                        poolSize: abstainPoolSize,
                         settled,
                         now,
                     })

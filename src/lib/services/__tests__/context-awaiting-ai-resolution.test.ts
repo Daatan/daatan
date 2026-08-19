@@ -101,7 +101,11 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
       expect(updatedData().awaitingAiResolution).toBe(true)
     })
 
-    it('forces the flag false on an abstained (insufficientData) run', async () => {
+    it('leaves the flag untouched on an abstained (insufficientData) run', async () => {
+      // daatan#1473: an ordinary abstention no longer clears the published estimate, so it
+      // no longer forces this flag either — needle, band and flag move together or not at
+      // all. The clear-on-condemning-reason branch is pinned in
+      // context-abstention-preserves-estimate.test.ts.
       await saveContextUpdate({
         predictionId: 'pred-1',
         summary: 'summary',
@@ -115,7 +119,8 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
         insufficientData: true,
         now: new Date('2026-07-08T00:00:00Z'),
       })
-      expect(updatedData().awaitingAiResolution).toBe(false)
+      expect(updatedData().awaitingAiResolution).toBeUndefined()
+      expect(updatedData().confidence).toBeUndefined()
     })
 
     it('leaves the flag untouched when this run produced no confidence (e.g. a timeout)', async () => {

@@ -520,6 +520,9 @@ model ContextSnapshot {
   // overwrite policy. Null when unknown (legacy, LLM-fallback, clock rows).
   articlesUsed Int? @map("articles_used")
   // Provenance for kind='clock': { engineVersion, cause, pLast, tLast, tEff, c, direction }.
+  // On an abstention (any kind): { abstain: { reason, poolSize } } — why the run declined and
+  // over how big a pool (daatan#1473). Both were previously produced and only logged, so an
+  // abstention could not be diagnosed after the fact.
   meta Json?
 
   // F17 (daatan#1236): true when this write's probability moved by at least

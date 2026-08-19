@@ -439,6 +439,11 @@ describe('refreshOracleSnapshot', () => {
       expect(saved.confidence).toBeNull() // no number persisted
       expect(saved.aiCiLow).toBeNull()
       expect(saved.insufficientData).toBe(true)
+      // daatan#1473: the reason rides along, so the write layer can tell an abstention that
+      // condemns the published estimate from one that is only about this run's own evidence —
+      // and so the abstention is diagnosable afterwards instead of living in a log line.
+      expect(saved.insufficientReason).toBe('all_articles_off_topic')
+      expect(saved.poolSize).toBe(4)
       // a non-null oracleSnapshot marker still converges the backfill
       expect(saved.oracleSnapshot).toMatchObject({ insufficient: true, reason: 'all_articles_off_topic' })
     })

@@ -199,8 +199,10 @@ export async function refreshOracleSnapshot(
   )
 
   // The whole pool is off-topic — abstain rather than persist a number built from articles
-  // the Oracle judged irrelevant. Records confidence/CI null + insufficientData; the non-null
-  // oracleSnapshot marker still converges the backfill (this forecast now HAS a snapshot).
+  // the Oracle judged irrelevant. Records an abstention snapshot; the non-null oracleSnapshot
+  // marker still converges the backfill (this forecast now HAS a snapshot). Any confidence/CI
+  // already published survives it — the reason decides, and none of the pool's reasons
+  // condemn a prior estimate (daatan#1473).
   if (resolved.insufficientData) {
     await saveOracleSnapshotOnly({
       predictionId: prediction.id,
@@ -209,6 +211,8 @@ export async function refreshOracleSnapshot(
       aiCiLow: null,
       aiCiHigh: null,
       insufficientData: true,
+      insufficientReason: resolved.reason,
+      poolSize: resolved.poolSize,
     })
     log.info(
       { predictionId: prediction.id, estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize },
