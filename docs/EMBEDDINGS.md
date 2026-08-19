@@ -4,7 +4,7 @@ Vector embeddings power the "similar forecasts" lookup on the forecast detail pa
 
 ## Stack
 
-- **Model:** `gemini-embedding-2`, served via Vertex AI, with the Gemini Developer API as fallback
+- **Model:** `gemini-embedding-2`, served via Vertex AI (Developer API fallback is self-host only — see below)
 - **Dimensionality:** `768` (set via `outputDimensionality=768` request parameter; the model natively emits 3072 dims)
 - **Storage:** PostgreSQL with the `pgvector` extension, `vector(768)` column on `predictions`
 - **Index:** HNSW with cosine operator (`vector_cosine_ops`)
@@ -31,12 +31,21 @@ Request body includes `outputDimensionality: 768`. The 768-dim output matches th
 
 The text being embedded is the prediction's `claimText` plus `detailsText` if present.
 
-Required env: `GEMINI_API_KEY`, and/or all three of `GOOGLE_VERTEX_PROJECT_ID` /
-`GOOGLE_VERTEX_CLIENT_EMAIL` / `GOOGLE_VERTEX_PRIVATE_KEY`.
+Required env: all three of `GOOGLE_VERTEX_PROJECT_ID` / `GOOGLE_VERTEX_CLIENT_EMAIL` /
+`GOOGLE_VERTEX_PRIVATE_KEY` — or, on **self-host**, `GEMINI_API_KEY` instead (a
+self-hoster has no GCP service account). Daatan's own prod and staging bundles no longer
+carry `GEMINI_API_KEY` at all (#1472).
 
-**A Vertex failure is invisible to callers**: the Developer API silently rescues it, so
-embeddings keep working. The one signal is the `vertex-embed-failed` error log — grep for
-it after provisioning the service account, before assuming the Vertex path works.
+**The two platforms return the same vectors.** Measured on prod over 20 real `claimText`
+values (2026-08-19): cosine 1.000000 on every sample, and the components were
+*bit-identical* (max |delta| = 0), against a cross-text control of 0.763. So vectors
+written by either path are interchangeable and **no re-embedding was needed** when
+production cut over to Vertex.
+
+**A Vertex failure is invisible to callers.** On self-host the Developer API silently
+rescues it and embeddings keep working. On daatan.com there is no key to rescue with, so a
+Vertex failure means the forecast is left *unembedded* instead. Either way the one signal
+is the `vertex-embed-failed` error log — grep for it before assuming the Vertex path works.
 
 ## Schema
 

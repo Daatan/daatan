@@ -13,9 +13,10 @@ The main `llmService` tries providers in this order; each leg is **registered on
     *   Registered only when all of `GOOGLE_VERTEX_PROJECT_ID`, `GOOGLE_VERTEX_CLIENT_EMAIL` and `GOOGLE_VERTEX_PRIVATE_KEY` are set (`GOOGLE_VERTEX_LOCATION` defaults to `global`). All-or-nothing: a half-configured service account would register a leg that fails every call and burns a retry before falling through.
     *   **REST, not an SDK** (`src/lib/llm/providers/vertex.ts`). Vertex accepts the identical `responseMimeType`/`responseSchema` generation config, so every existing `Schema` in `llm/schemas/`, `llm/gemini.ts`, moderation, the bots and the temporal classifier carries over untouched — the migration needs **no** `@google/generative-ai` → Vertex-SDK swap across call sites. Auth is a service-account JWT exchanged for a `cloud-platform` access token by `src/lib/services/google-auth.ts`, the same mechanism `indexnow.ts` has used for the Indexing API all along (tokens cached per email+scope; the exchange is two round-trips and an RSA signature, far too expensive per call).
 
-2.  **Fallback 0**: **Google Gemini, Developer API** (`gemini-2.5-flash`)
+2.  **Fallback 0**: **Google Gemini, Developer API** (`gemini-2.5-flash`) — *self-host only*
     *   The original key-based leg. Requires `GEMINI_API_KEY` (skipped in CI/test where it's unset).
-    *   Deliberately kept *behind* Vertex rather than replaced: if the Vertex SA is misconfigured or its quota is exhausted, this leg still serves. It can be removed once Vertex is proven in production — at which point `GEMINI_API_KEY` goes with it.
+    *   **Not registered on daatan.com since #1472**: Vertex was verified in production (v1.65.192) and `GEMINI_API_KEY` was then removed from the prod and staging bundles, so the SaaS chain now falls from Vertex straight through to the Oracle/Bedrock leg — a *different vendor*, which is the more useful fallback anyway. The key was the last thing tying the SaaS to the Developer API's forced-Prepay balance.
+    *   The leg stays in the code for the **self-host** edition, where an AI Studio key is the easy path and a GCP service account is not available. See [SELF_HOSTING.md](SELF_HOSTING.md).
 
 3.  **Fallback 1**: **Oracle `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
     *   Calls the retro Oracle's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.

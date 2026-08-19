@@ -22,7 +22,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `NEXTAUTH_URL` | ✅ | — | Canonical site URL for NextAuth |
 | `GOOGLE_CLIENT_ID` | ✅ | — | Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | ✅ | — | Google OAuth |
-| `GEMINI_API_KEY` | ✅ | — | Gemini Developer API key — the *fallback* Google LLM leg (see the Vertex rows below) |
+| `GEMINI_API_KEY` | — | — | **Removed from both bundles (#1472).** Gemini Developer API key. Production runs Google through the Vertex rows below; the key remains a *self-host* option only, so nothing supplies it to daatan.com |
 | `GOOGLE_VERTEX_PROJECT_ID` | ✅ | — | Primary LLM provider: Gemini via Vertex AI (#1472). GCP project that owns the Vertex quota |
 | `GOOGLE_VERTEX_LOCATION` | ✅ | — | Vertex location; omit to default to `global` |
 | `GOOGLE_VERTEX_CLIENT_EMAIL` | ✅ | — | Vertex service-account email (needs the `Vertex AI User` role) |
@@ -99,7 +99,7 @@ ls -la ~/app/.env
 - `NEXTAUTH_SECRET`: Every 90 days
 - `GOOGLE_CLIENT_SECRET`: When compromised or annually
 - `POSTGRES_PASSWORD`: Every 180 days
-- `GEMINI_API_KEY`: When compromised or annually
+- `GOOGLE_VERTEX_PRIVATE_KEY`: When compromised or annually (mint a new service-account key, then delete the old one in IAM)
 
 **Rotation process:**
 1. Generate new secret

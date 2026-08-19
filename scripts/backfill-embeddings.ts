@@ -2,32 +2,41 @@
  * One-time backfill: embed all predictions that have no embedding yet.
  * Run with: npx tsx scripts/backfill-embeddings.ts
  *
- * Requires GEMINI_API_KEY and DATABASE_URL in environment.
+ * Requires DATABASE_URL, plus whatever `embedText()` needs to reach Google —
+ * `GOOGLE_VERTEX_PROJECT_ID`/`_CLIENT_EMAIL`/`_PRIVATE_KEY` in production, or
+ * `GEMINI_API_KEY` on a self-host install (see docs/EMBEDDINGS.md).
+ *
+ * This delegates to `src/lib/services/embedding.ts` rather than calling Google
+ * itself. It used to hold its own `@google/generative-ai` client keyed on
+ * GEMINI_API_KEY — which by #1472 was both the last Developer-API caller outside
+ * the service *and* silently wrong: it still asked for `text-embedding-004`, so
+ * every row it wrote landed in the same cosine-searched `vector(768)` column as
+ * the app's `gemini-embedding-2` vectors and could not be compared against them.
+ *
+ * `POST /api/cron/backfill-embeddings` and `/api/admin/backfill-embeddings` do the
+ * same job from inside the app; prefer them unless you need to run against a
+ * database the app isn't serving.
  */
 
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 config({ path: '.env' })
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
-const EMBEDDING_MODEL = 'text-embedding-004'
 const BATCH_SIZE = 20
 const DELAY_MS = 500 // stay well under quota
 
 async function main() {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is required')
+  // Imported lazily so dotenv has already populated the environment the
+  // embedding service reads its credentials from at module load.
+  const { embedText } = await import('../src/lib/services/embedding')
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const adapter = new PrismaPg(pool)
   const prisma = new PrismaClient({ adapter } as any)
-
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL })
 
   const total = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(*) FROM predictions WHERE embedding IS NULL
@@ -54,8 +63,12 @@ async function main() {
     for (const row of rows) {
       if (failedIds.has(row.id)) continue
       try {
-        const result = await model.embedContent(row.claimText)
-        const vectorStr = `[${result.embedding.values.join(',')}]`
+        // embedText() returns null on a handled failure rather than throwing, and
+        // the row would stay NULL — so treat null as failed too, or the outer loop
+        // re-selects it forever.
+        const embedding = await embedText(row.claimText)
+        if (!embedding) throw new Error('embedText returned no vector')
+        const vectorStr = `[${embedding.join(',')}]`
         await prisma.$executeRaw(
           Prisma.sql`UPDATE predictions SET embedding = ${Prisma.raw(`'${vectorStr}'::vector`)} WHERE id = ${row.id}`
         )
