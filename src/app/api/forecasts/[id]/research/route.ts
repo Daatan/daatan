@@ -49,8 +49,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
 
         // 1. Try oracle first (shares provider fallback chain + quota with oracle forecasts).
         //    If oracle returns ≥ 3 results, skip the 3-way local parallel search.
+        //    No dateFrom: the claim window has no lower bound unless the claim text
+        //    states one — flooring searches at the creation date hid a resolving event
+        //    that happened six days before the claim existed (daatan#1511, Brent $100).
         const oracleResults = await oracleSearch(prediction.claimText, 12, {
-            dateFrom: forecastStart,
             dateTo: searchDateTo,
         }, { source: 'research', userId: user.id, predictionId: prediction.id })
 
@@ -59,16 +61,16 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
             results = oracleResults
         } else {
             // Fallback: three parallel local searches
-            //    a) Date-scoped with raw claim text
+            //    a) Deadline-capped with raw claim text
             //    b) Broad (no date) with raw claim text — catches older or wider coverage
-            //    c) Date-scoped with simplified key-term query — targets the actual topic
+            //    c) Deadline-capped with simplified key-term query — targets the actual topic
             const researchMeta = { source: 'research' as const, userId: user.id }
             const [dated, broad, simplified] = await Promise.all([
-                searchArticlesMultilingual(prediction.claimText, 6, { dateFrom: forecastStart, dateTo: searchDateTo }, researchMeta)
+                searchArticlesMultilingual(prediction.claimText, 6, { dateTo: searchDateTo }, researchMeta)
                     .catch(() => [] as SearchResult[]),
                 searchArticlesMultilingual(prediction.claimText, 4, undefined, researchMeta)
                     .catch(() => [] as SearchResult[]),
-                searchArticlesMultilingual(simplifiedQuery, 6, { dateFrom: forecastStart, dateTo: searchDateTo }, researchMeta)
+                searchArticlesMultilingual(simplifiedQuery, 6, { dateTo: searchDateTo }, researchMeta)
                     .catch(() => [] as SearchResult[]),
             ])
             results = dedup([...simplified, ...dated, ...broad])
@@ -96,11 +98,20 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
                 temperature: 0,
             })
             const { queries } = JSON.parse(qRes.text) as { queries: string[] }
+            // Each targeted query runs twice: once over the whole window up to the
+            // deadline, and once strictly BEFORE the claim's creation date. The
+            // pre-creation leg is the born-true detector (daatan#1511): the first-in-
+            // chain news-indexer only holds recent articles, so a strictly historical
+            // window filters its hits to zero (retro#559) and the query falls through
+            // to the SERP providers that can actually search that far back.
+            const targetedMeta = { source: 'research' as const, userId: user.id }
             const targetedResults = await Promise.all(
-                queries.slice(0, 3).map(q =>
-                    searchArticlesMultilingual(q, 5, { dateFrom: forecastStart, dateTo: searchDateTo }, { source: 'research', userId: user.id })
-                        .catch(() => [] as SearchResult[])
-                )
+                queries.slice(0, 3).flatMap(q => [
+                    searchArticlesMultilingual(q, 5, { dateTo: searchDateTo }, targetedMeta)
+                        .catch(() => [] as SearchResult[]),
+                    searchArticlesMultilingual(q, 3, { dateTo: forecastStart }, targetedMeta)
+                        .catch(() => [] as SearchResult[]),
+                ])
             )
             results = dedup([...results, ...targetedResults.flat()]).slice(0, TOTAL_RESULTS_CAP)
         } catch {
