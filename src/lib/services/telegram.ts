@@ -972,12 +972,17 @@ export function notifyRequoteSummary(s: {
   pinned: number
   maxDeltaPts: number
   divergences: number
+  /** Candidates the clock declined to glide because their anchor asserts settlement
+   *  while the latch is false (daatan#1498). A data-integrity count, not activity —
+   *  so it gets its own line rather than being folded into the counters above. */
+  unlatchedPins?: number
 }): void {
   if (isDevEnv()) return
 
   const msg = [
     `🕐 <b>Requote summary</b>`,
     `Glided: ${s.glided} · Pinned: ${s.pinned} · Max Δ: ${s.maxDeltaPts}pt${s.divergences ? ` · Divergences: ${s.divergences}` : ''}`,
+    ...(s.unlatchedPins ? [`⚠️ Settlement pins without a latch: ${s.unlatchedPins} — skipped, not glided (#1498)`] : []),
   ].join('\n')
 
   sendChannelNotification(msg, 'noisy')

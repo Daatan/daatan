@@ -169,6 +169,10 @@ export interface RequoteSummary {
   unchanged: number
   skippedNoAnchor: number
   skippedTeffBeforeAnchor: number
+  /** Candidates whose anchor asserts settlement while `Prediction.settled` is false
+   *  — the latch gap of daatan#1498. Not a normal skip: it is an invariant violation
+   *  the clock declines to act on, and the only place anything looks for it. */
+  skippedUnlatchedPin: number
   selfHealed: number
   divergenceAlerts: number
   deadlineAlerts: number
@@ -187,6 +191,7 @@ function emptySummary(): RequoteSummary {
     unchanged: 0,
     skippedNoAnchor: 0,
     skippedTeffBeforeAnchor: 0,
+    skippedUnlatchedPin: 0,
     selfHealed: 0,
     divergenceAlerts: 0,
     deadlineAlerts: 0,
@@ -250,6 +255,24 @@ function dueForAlert(alertAt: Date | null, deadline: Date): boolean {
   return alertAt === null || alertAt.getTime() < deadline.getTime()
 }
 
+/**
+ * The clock never touches a settled forecast — `CANDIDATE_WHERE` enforces that with
+ * `settled: false`, which is correct only as long as a settlement-asserting write
+ * actually latches `Prediction.settled`. It does not always: 19 ACTIVE forecasts carry
+ * 771 snapshots asserting `settled` with the latch unset (daatan#1498, cause still
+ * unexplained). Those forecasts fall through into the candidate set, and the glide then
+ * anchors on the settlement pin and decays it — turning a transient pin into the origin
+ * of a decay curve, which is strictly worse than leaving it alone.
+ *
+ * So enforce the same rule one layer in, on the anchor rather than the row. Declining to
+ * glide leaves the published number where it is; correcting it is a pool question, not a
+ * clock one. The deadline alert above still fires, so a skipped forecast past its
+ * deadline is not silent — only its glide is withheld.
+ */
+function anchorIsUnlatchedPin(anchor: { settled: boolean }): boolean {
+  return anchor.settled
+}
+
 async function processCandidate(c: RequoteCandidate, now: Date, summary: RequoteSummary): Promise<void> {
   const anchor = await getLatestEvidenceEstimate(c.id)
   const deadlinePassed = c.claimDeadline !== null && c.claimDeadline.getTime() <= now.getTime()
@@ -268,6 +291,15 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
 
   if (!anchor) {
     summary.skippedNoAnchor++
+    return
+  }
+
+  if (anchorIsUnlatchedPin(anchor)) {
+    log.warn(
+      { predictionId: c.id, slug: c.slug, anchorProbability: anchor.externalProbability },
+      'requote skipped: anchor asserts settlement but Prediction.settled is false (daatan#1498)',
+    )
+    summary.skippedUnlatchedPin++
     return
   }
 
@@ -451,6 +483,10 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
           summary.skippedNoAnchor++
           continue
         }
+        if (anchorIsUnlatchedPin(anchor)) {
+          summary.skippedUnlatchedPin++
+          continue
+        }
         const result = computeRequote({
           pLast: anchor.externalProbability,
           tLast: anchor.evidenceAt ?? anchor.createdAt,
@@ -489,6 +525,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       pinned: summary.pinned,
       provisionalPins: summary.provisionalPins,
       unchanged: summary.unchanged,
+      skippedUnlatchedPin: summary.skippedUnlatchedPin,
       selfHealed: summary.selfHealed,
       pendingDeadlineAlerts: summary.pendingDeadlineAlerts,
       errors: summary.errors,
@@ -498,12 +535,16 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
     'requote.done',
   )
 
-  if (!opts.dryRun && moved > 0) {
+  // `unlatchedPins` also arms the summary: a run that only skipped invariant
+  // violations moved nothing, and staying silent about it is how daatan#1498 went
+  // unnoticed from July to a manual sweep in August.
+  if (!opts.dryRun && (moved > 0 || summary.skippedUnlatchedPin > 0)) {
     notifyRequoteSummary({
       glided: summary.glided,
       pinned: summary.pinned,
       maxDeltaPts: summary.deltas.length ? Math.max(...summary.deltas) : 0,
       divergences: summary.divergenceAlerts,
+      unlatchedPins: summary.skippedUnlatchedPin,
     })
   }
 
