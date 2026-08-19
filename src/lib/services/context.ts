@@ -567,6 +567,12 @@ export interface EvidenceAnchor {
    *  rare legacy snapshot whose oracleSnapshot predates these keys. */
   ciLow: number | null
   ciHigh: number | null
+  /** Did the pool that produced this anchor assert settlement? Only the clock reads
+   *  it (daatan#1498). A settlement-asserting snapshot is supposed to have latched
+   *  `Prediction.settled`, which takes the forecast out of the clock's candidate set
+   *  entirely — so seeing this true on a candidate means the latch is missing, and
+   *  the clock would otherwise glide a settlement pin as if it were an estimate. */
+  settled: boolean
 }
 
 export async function getLatestEvidenceEstimate(predictionId: string): Promise<EvidenceAnchor | null> {
@@ -582,13 +588,14 @@ export async function getLatestEvidenceEstimate(predictionId: string): Promise<E
     select: { externalProbability: true, createdAt: true, evidenceAt: true, oracleSnapshot: true },
   })
   if (snap === null) return null
-  const oracle = snap.oracleSnapshot as { ciLow?: unknown; ciHigh?: unknown } | null
+  const oracle = snap.oracleSnapshot as { ciLow?: unknown; ciHigh?: unknown; settled?: unknown } | null
   return {
     externalProbability: snap.externalProbability as number,
     createdAt: snap.createdAt,
     evidenceAt: snap.evidenceAt,
     ciLow: typeof oracle?.ciLow === 'number' ? oracle.ciLow : null,
     ciHigh: typeof oracle?.ciHigh === 'number' ? oracle.ciHigh : null,
+    settled: oracle?.settled === true,
   }
 }
 

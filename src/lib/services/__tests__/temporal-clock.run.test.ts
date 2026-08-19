@@ -92,7 +92,7 @@ describe('runRequote', () => {
   it('anchors on the latest evidence estimate, never on Prediction.confidence directly', async () => {
     findMany.mockResolvedValueOnce([]) // self-heal pass
     findMany.mockResolvedValueOnce([row({ confidence: 999 })] as never) // candidate pass — deliberately wrong if used
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-06-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-06-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -110,6 +110,7 @@ describe('runRequote', () => {
       externalProbability: 53,
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
       evidenceAt: null,
+      settled: false,
       ciLow: 12,
       ciHigh: 93,
     })
@@ -132,6 +133,7 @@ describe('runRequote', () => {
       externalProbability: 65,
       createdAt: new Date(NOW.getTime() - 1000),
       evidenceAt: null,
+      settled: false,
       ciLow: 50,
       ciHigh: 80,
     })
@@ -160,7 +162,7 @@ describe('runRequote', () => {
     findMany.mockResolvedValueOnce([])
     // t_last very close to `now` so c stays close to 1 → p stays ~= 65.
     findMany.mockResolvedValueOnce([row({ confidence: 65 })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date(NOW.getTime() - 1000), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date(NOW.getTime() - 1000), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -179,7 +181,7 @@ describe('runRequote', () => {
       claimDeadline: new Date('2026-05-01T00:00:00.000Z'),
       resolveByDatetime: new Date('2026-05-01T00:00:00.000Z'),
     })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-04-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-04-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -195,7 +197,7 @@ describe('runRequote', () => {
     findMany.mockResolvedValueOnce([])
     // Deadline still in the future → cause 'glide', not a pin.
     findMany.mockResolvedValueOnce([row({ confidence: null })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date(NOW.getTime() - 1000), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date(NOW.getTime() - 1000), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -207,7 +209,7 @@ describe('runRequote', () => {
     findMany.mockResolvedValueOnce([])
     findMany.mockResolvedValueOnce([row({ confidence: 30, claimDirection: 'SURVIVAL' })] as never)
     // Survival glides UP — anchored far in the past so c is near 0, pushing well past 80.
-    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45 })
+    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45, settled: false })
 
     await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -222,7 +224,7 @@ describe('runRequote', () => {
     const deadline = new Date('2026-05-01T00:00:00.000Z') // already passed relative to NOW
     findMany.mockResolvedValue([]) // self-heal, both runs
     findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row({ claimDeadline: deadline })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-04-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-04-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const first = await runRequote({ archetypes: ['diffuse'], now: NOW })
     expect(first.deadlineAlerts).toBe(1)
@@ -244,7 +246,7 @@ describe('runRequote', () => {
     findMany.mockResolvedValueOnce([
       row({ claimDeadline: deadline, resolveByDatetime: deadline, tauLeadDays: 45 }),
     ] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -261,7 +263,7 @@ describe('runRequote', () => {
         resolveByDatetime: new Date('2026-07-15T00:00:00.000Z'),
       }),
     ] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-05-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80 })
+    getAnchor.mockResolvedValue({ externalProbability: 65, createdAt: new Date('2026-05-01T00:00:00.000Z'), evidenceAt: null , ciLow: 50, ciHigh: 80, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
 
@@ -272,7 +274,7 @@ describe('runRequote', () => {
   it('dryRun computes but writes nothing and sends no alerts', async () => {
     const deadline = new Date('2026-05-01T00:00:00.000Z')
     findMany.mockResolvedValueOnce([row({ claimDeadline: deadline })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45 })
+    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45, settled: false })
 
     const summary = await runRequote({ archetypes: ['diffuse'], now: NOW, dryRun: true })
 
@@ -312,7 +314,7 @@ describe('runRequote', () => {
   it('sends a fleet summary digest only when something moved, and never in dryRun', async () => {
     findMany.mockResolvedValueOnce([])
     findMany.mockResolvedValueOnce([row({ confidence: 30, claimDirection: 'SURVIVAL' })] as never)
-    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45 })
+    getAnchor.mockResolvedValue({ externalProbability: 30, createdAt: new Date('2026-01-01T00:00:00.000Z'), evidenceAt: null , ciLow: 15, ciHigh: 45, settled: false })
 
     await runRequote({ archetypes: ['diffuse'], now: NOW })
     expect(summaryAlert).toHaveBeenCalledTimes(1)
@@ -381,6 +383,72 @@ describe('runRequote', () => {
 
       expect(pendingAlert).toHaveBeenCalledTimes(1)
       expect(summary.pendingDeadlineAlerts).toBe(1)
+    })
+  })
+  // daatan#1498: `CANDIDATE_WHERE { settled: false }` is supposed to keep the clock off a
+  // settled forecast, but that only holds while a settlement-asserting write actually
+  // latches Prediction.settled. In prod, 771 snapshots across 19 ACTIVE forecasts assert
+  // settlement with the latch unset — those fall into the candidate set and the glide then
+  // anchors on the pin and decays it. The guard re-applies the same rule to the anchor.
+  describe('anchor asserts settlement while the latch is false', () => {
+    const settledAnchor = (overrides: Record<string, unknown> = {}) => ({
+      externalProbability: 97,
+      createdAt: new Date('2026-05-15T22:24:00.000Z'),
+      evidenceAt: null,
+      ciLow: 91,
+      ciHigh: 99,
+      settled: true,
+      ...overrides,
+    })
+
+    it('declines to glide it, and counts the violation', async () => {
+      findMany.mockResolvedValueOnce([]) // self-heal pass
+      findMany.mockResolvedValueOnce([row()] as never) // candidate pass
+      getAnchor.mockResolvedValue(settledAnchor())
+
+      const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+      expect(saveClock).not.toHaveBeenCalled()
+      expect(summary.skippedUnlatchedPin).toBe(1)
+      expect(summary.glided).toBe(0)
+      expect(summary.unchanged).toBe(0)
+    })
+
+    it('still fires the literal-deadline alert — only the glide is withheld', async () => {
+      const past = new Date('2026-05-01T00:00:00.000Z')
+      findMany.mockResolvedValueOnce([])
+      findMany.mockResolvedValueOnce([row({ claimDeadline: past, resolveByDatetime: past })] as never)
+      getAnchor.mockResolvedValue(settledAnchor())
+
+      const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+      expect(deadlineAlert).toHaveBeenCalledTimes(1)
+      expect(summary.deadlineAlerts).toBe(1)
+      expect(summary.skippedUnlatchedPin).toBe(1)
+      expect(saveClock).not.toHaveBeenCalled()
+    })
+
+    it('reports the run even though nothing moved — silence is how this went unnoticed', async () => {
+      findMany.mockResolvedValueOnce([])
+      findMany.mockResolvedValueOnce([row()] as never)
+      getAnchor.mockResolvedValue(settledAnchor())
+
+      await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+      expect(summaryAlert).toHaveBeenCalledTimes(1)
+      expect(summaryAlert).toHaveBeenCalledWith(expect.objectContaining({ glided: 0, unlatchedPins: 1 }))
+    })
+
+    it('leaves an ordinary anchor alone — the guard keys on the assertion, not on being a candidate', async () => {
+      findMany.mockResolvedValueOnce([])
+      findMany.mockResolvedValueOnce([row()] as never)
+      getAnchor.mockResolvedValue(settledAnchor({ externalProbability: 65, settled: false }))
+
+      const summary = await runRequote({ archetypes: ['diffuse'], now: NOW })
+
+      expect(summary.skippedUnlatchedPin).toBe(0)
+      expect(saveClock).toHaveBeenCalledTimes(1)
+      expect(summary.glided).toBe(1)
     })
   })
 })
