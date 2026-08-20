@@ -15,7 +15,12 @@ resource "aws_ecr_repository" "daatan_app" {
   }
 }
 
-# Lifecycle policy to keep only recent images
+# Lifecycle policy to keep only recent images.
+# NOTE: CI pushes version tags WITHOUT a "v" prefix (e.g. 1.65.199, 1.65.199-migrations,
+# sha-<short>, staging-latest, pr-<n>). A previous "tagPrefixList = [\"v\"]" rule therefore
+# matched nothing and the repo grew to 4,384 images / 1.3 TB (2026-08-20). Buildx pushes an
+# image index whose untagged child manifests are never expired while the index lives, so the
+# only rule that actually bounds storage is the tagStatus = "any" count rule below.
 resource "aws_ecr_lifecycle_policy" "daatan_app_policy" {
   repository = aws_ecr_repository.daatan_app.name
 
@@ -23,29 +28,36 @@ resource "aws_ecr_lifecycle_policy" "daatan_app_policy" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 10 tagged images"
+        description  = "Expire PR preview images after 14 days"
         selection = {
           tagStatus     = "tagged"
-          tagPrefixList = ["v"]
-          countType     = "imageCountMoreThan"
-          countNumber   = 10
+          tagPrefixList = ["pr-"]
+          countType     = "sinceImagePushed"
+          countUnit     = "days"
+          countNumber   = 14
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       },
       {
         rulePriority = 2
-        description  = "Remove untagged images after 7 days"
+        description  = "Remove untagged images after 1 day"
         selection = {
           tagStatus   = "untagged"
           countType   = "sinceImagePushed"
           countUnit   = "days"
-          countNumber = 7
+          countNumber = 1
         }
-        action = {
-          type = "expire"
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 3
+        description  = "Keep last 60 images overall (~20 releases x app+migrations)"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 60
         }
+        action = { type = "expire" }
       }
     ]
   })
