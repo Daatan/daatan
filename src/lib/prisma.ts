@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { env } from '@/env'
+import { logPrismaErrorEvent } from '@/lib/prisma-log'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -15,10 +16,18 @@ const createPrismaClient = (): PrismaClient => {
   const { PrismaPg } = require('@prisma/adapter-pg') as typeof import('@prisma/adapter-pg') // eslint-disable-line
   const pool = new Pool({ connectionString: env.DATABASE_URL })
   const adapter = new PrismaPg(pool)
-  return new PrismaClient({
+  // 'error' is event-emitted (not stdout) so the expected P2002 claim
+  // collisions from evidence-pool.ts can be dropped before they hit the log —
+  // see prisma-log.ts and daatan#1502. query/warn keep their stdout behavior.
+  const client = new PrismaClient<Prisma.PrismaClientOptions, 'error'>({
     adapter,
-    log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log:
+      env.NODE_ENV === 'development'
+        ? ['query', 'warn', { emit: 'event', level: 'error' }]
+        : [{ emit: 'event', level: 'error' }],
   })
+  client.$on('error', logPrismaErrorEvent)
+  return client
 }
 
 // Use cached client in development to prevent hot-reload connection exhaustion
