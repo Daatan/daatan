@@ -103,7 +103,7 @@ const NOT_CLOCK: Prisma.ContextSnapshotWhereInput = { kind: { not: 'clock' } }
 
 // ─── recordEstimate: the single estimate writer (retro docs/ORACLE_VARIABLES.md §6) ───
 
-export type EstimateOrigin = 'creation' | 'analyze' | 'news-indexer' | 'backfill' | 'clock'
+export type EstimateOrigin = 'creation' | 'analyze' | 'news-indexer' | 'backfill' | 'republish' | 'clock'
 
 /** Per-origin behavior. Reproduces the pre-funnel writers exactly; the point is
  *  that the differences are now declared in one table instead of five functions. */
@@ -123,6 +123,11 @@ const ORIGIN_POLICY: Record<EstimateOrigin, OriginPolicy> = {
   analyze: { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: true },
   'news-indexer': { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: false },
   backfill: { kind: 'evidence', notifyOnCrossing: true, canSettle: true, touchesUserContext: false },
+  // The admin re-publish tool (daatan#1508). `canSettle: false` is load-bearing: an
+  // operator tool must never pin a forecast — if the pool genuinely settles, the
+  // ordinary push path will latch it. `kind: 'evidence'` so the write anchors the
+  // temporal clock, which is half the point of re-publishing over a stale anchor.
+  republish: { kind: 'evidence', notifyOnCrossing: true, canSettle: false, touchesUserContext: false },
   clock: { kind: 'clock', notifyOnCrossing: false, canSettle: false, touchesUserContext: false },
 }
 

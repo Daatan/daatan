@@ -118,6 +118,10 @@ describe('recordEstimate — the single estimate writer', () => {
     expect(notify).toHaveBeenCalledTimes(1)
 
     notify.mockClear()
+    await recordEstimate({ predictionId: 'pred-1', origin: 'republish', probability: 85 })
+    expect(notify).toHaveBeenCalledTimes(1)
+
+    notify.mockClear()
     await recordEstimate({ predictionId: 'pred-2', origin: 'clock', probability: 85 })
     await recordEstimate({ predictionId: 'pred-3', origin: 'creation', probability: 85 })
     expect(notify).not.toHaveBeenCalled()
@@ -129,6 +133,12 @@ describe('recordEstimate — the single estimate writer', () => {
 
     update.mockClear()
     await recordEstimate({ predictionId: 'pred-2', origin: 'clock', probability: 97, settled: true })
+    expect(updateData()).not.toHaveProperty('settled')
+
+    // republish is an operator tool — it must never be able to pin a forecast
+    // (daatan#1508); if the pool genuinely settles, the ordinary push path latches it.
+    update.mockClear()
+    await recordEstimate({ predictionId: 'pred-3', origin: 'republish', probability: 97, settled: true })
     expect(updateData()).not.toHaveProperty('settled')
   })
 

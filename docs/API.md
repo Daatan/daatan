@@ -446,6 +446,11 @@ Re-extract the named forecasts' strongest evidence rows against the *current* ex
 
 Each batch has its rows' `contentHash` nulled first, which is load-bearing rather than incidental — with the stored hash in place the claim gate takes its same-content arm and re-claims the row *in place*, overwriting the reading being remediated; nulled, it supersedes-and-inserts, so every prior reading survives as a superseded version and the run is reversible. A non-zero `unchanged` tally in the response means a batch's claim gate refused, i.e. the mechanism failed rather than the extraction returning nothing. Deliberately **not** scheduled: the plan's human-review gate — previewing the swings and approving them — sits in front of this route, not inside it.
 
+### `POST /api/admin/forecasts/republish` — Admin or `x-cron-secret`
+Re-publish the named forecasts' estimates from the evidence pool they **already** have ([daatan#1508](https://github.com/Daatan/daatan/issues/1508)): one compute-only Oracle `/pool/aggregate` per forecast (`resolvePooledEstimate`), written through `recordEstimate` under the `republish` origin — no search, no extractor, no LLM, and the pool itself is never mutated. **Body** `{ forecastIds: string[], mode?: 'dry-run' | 'apply' }`. **`mode` defaults to `dry-run`**, which computes every would-be number and writes nothing. Max 50 ids per call.
+
+The `republish` origin's policy is the point: `kind: 'evidence'` so an apply re-anchors the temporal clock (stopping a glide decaying from a stale anchor), and `canSettle: false` so an operator run can never latch `Prediction.settled` — if the pool genuinely settles, the ordinary push path pins it. A re-publish that reproduces the published number is reported `unchanged` (still written, but non-material, so the glide clock is unmoved). Per-forecast failures (`not_found`, `not_active`, `empty_pool`, `pool_unreadable`, the pool's own insufficiency reason) never abort the batch; response is `{ mode, ok, unchanged, failed, forecasts: [{ predictionId, claimText, status, reason, poolSize, usableSize, confidenceBefore, confidenceAfter }] }`.
+
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).
 
