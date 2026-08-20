@@ -652,7 +652,13 @@ against the preceding 28 days and fires one grouped Telegram digest for whatever
 *newly* broke: a source whose failure rate worsened by ≥20pp against its own baseline,
 a source that went silent while the rest kept flowing, an ACTIVE forecast whose pool
 holds no `COMPLETE`-with-a-stance row, or a pipeline-wide move in failed share (≥15pp)
-or ingestion volume (<35% of the baseline rate). Auth: `x-cron-secret` header
+or ingestion volume (<35% of the baseline rate). Also watches the TruthMachine batch
+loop's external heartbeat (retro#556): the newest `Daatan/retro` commit touching
+`data/progress.json` — the `atlas:`/`progress:` commits only the batch loop pushes —
+must be under 12h old (a healthy loop commits every few minutes), else a
+`batch-heartbeat-stale` page fires on the clean channel; an unreachable GitHub API
+fires the weaker `batch-heartbeat-unreachable` (noisy) instead, never a false
+"loop dead". Auth: `x-cron-secret` header
 (`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the check itself fails, so a run that
 couldn't read the data never reports a clean pipeline. Returns
 `{ ok, recentDays, baselineDays, recentRows, recentFailedPct, baselineFailedPct, suppressed, fired[] }`

@@ -229,8 +229,11 @@ export function notifySearchHealthDigest(report: {
 
 /**
  * One condition the evidence pipeline is currently failing (daatan#1478).
- * Every variant is a DELTA against the same population's own baseline — see
- * `evidence-health.ts` for why an absolute failure rate can't be alerted on.
+ * The pool variants are each a DELTA against the same population's own baseline —
+ * see `evidence-health.ts` for why an absolute failure rate can't be alerted on.
+ * The `batch_heartbeat_*` pair is the exception: it watches an external liveness
+ * signal (the TruthMachine batch loop's atlas commits, retro#556), where absolute
+ * staleness IS the condition.
  */
 export type EvidenceHealthIssue =
   | { kind: 'source_failure_rate'; source: string; recentPct: number; baselinePct: number; recentRows: number }
@@ -241,6 +244,10 @@ export type EvidenceHealthIssue =
   // Not a delta: any 402 at all means the shared OpenRouter account is out of
   // credits and every panel member on that route is down (daatan#1504).
   | { kind: 'panel_payment_failure'; count: number; lastSeenAt: Date; lastModel: string }
+  // Not a delta either: an external liveness signal — the TruthMachine batch
+  // loop's atlas commits (retro#556) — where absolute staleness IS the condition.
+  | { kind: 'batch_heartbeat_stale'; hoursSince: number; thresholdHours: number; lastCommitAt: string }
+  | { kind: 'batch_heartbeat_unreachable'; detail: string }
 
 /** Keeps a first run (or a genuine pipeline-wide failure) inside Telegram's message limit. */
 const EVIDENCE_HEALTH_MAX_LINES = 12
@@ -264,6 +271,14 @@ function evidenceHealthLine(i: EvidenceHealthIssue): string {
         `• <b>AI panel</b>: ${i.count} × HTTP 402 from OpenRouter — credits exhausted, ` +
         `all OpenRouter members down (last ${i.lastSeenAt.toISOString().slice(0, 16)}Z, ${escapeHtml(i.lastModel)})`
       )
+    case 'batch_heartbeat_stale':
+      return (
+        `• <b>TruthMachine batch loop</b>: no atlas commit for <b>${i.hoursSince}h</b> ` +
+        `(threshold ${i.thresholdHours}h, last ${escapeHtml(i.lastCommitAt)}) — ` +
+        `check the batch tree on the Oracle box (retro#556)`
+      )
+    case 'batch_heartbeat_unreachable':
+      return `• <b>TruthMachine batch loop</b>: heartbeat unreadable — ${escapeHtml(i.detail)} (GitHub API problem, not proof the loop is down)`
   }
 }
 
@@ -291,12 +306,16 @@ export function notifyEvidenceHealthDigest(report: {
   // A pipeline-wide move is page-worthy; per-source drift and individual empty
   // pools are operational. Same split as the search-health digest. A 402 burst is
   // total panel outage (every OpenRouter member fails together), so it sits on the
-  // page-worthy side — still the digest, not a pager (daatan#1504).
+  // page-worthy side — still the digest, not a pager (daatan#1504). A dead batch
+  // loop joins it too: it ran stale code for six weeks once with nobody noticing
+  // (retro#553/#556). An UNREACHABLE heartbeat stays noisy — a GitHub API blip is
+  // not a production incident.
   const critical = report.issues.some(
     (i) =>
       i.kind === 'overall_failure_rate' ||
       i.kind === 'overall_volume_collapse' ||
-      i.kind === 'panel_payment_failure',
+      i.kind === 'panel_payment_failure' ||
+      i.kind === 'batch_heartbeat_stale',
   )
 
   const lines = report.issues.slice(0, EVIDENCE_HEALTH_MAX_LINES).map(evidenceHealthLine)
