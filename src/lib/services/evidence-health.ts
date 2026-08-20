@@ -86,6 +86,33 @@ export const PANEL_402_LOOKBACK_HOURS = 26
 /** Alert keys are VarChar(200); `source` is VarChar(200) on its own. */
 const MAX_KEY_SOURCE_LEN = 150
 
+/**
+ * TruthMachine batch-loop liveness (retro#556).
+ *
+ * The batch tree on the Oracle box ran stale code twice (six weeks once) with
+ * zero detection; retro PR#555 makes a failed sync refuse the cycle, but that is
+ * only visible in `pipeline_log.txt` on the box. The loop's one externally
+ * visible heartbeat is the `atlas:` / `progress:` commits it pushes to
+ * `Daatan/retro` `main` — every batch touches `data/progress.json`, and nothing
+ * else ever commits that path. "Newest commit touching that path is too old" is
+ * therefore the outermost liveness signal: it catches a crashed loop, a wedged
+ * `.git/index.lock`, and PR#555's stale-code refusal (which stops commits
+ * entirely) alike. retro itself has no alerting surface, which is why the check
+ * lives here.
+ */
+export const BATCH_HEARTBEAT_REPO = 'Daatan/retro'
+export const BATCH_HEARTBEAT_PATH = 'data/progress.json'
+/**
+ * A healthy loop commits every few minutes (measured 2026-08-20: 30 commits in
+ * ~35 min), so any hours-scale threshold is >100× the normal gap; the binding
+ * constraint is instead this check's own daily sampling. 12h keeps ordinary
+ * quiet stretches (API-quota pauses, empty ingest batches) far below the bar
+ * while still flagging a dead loop on the next daily run — worst case ~36h
+ * after death, against the 2 days and 6 weeks the last two incidents lasted.
+ */
+export const BATCH_HEARTBEAT_STALE_HOURS = 12
+const BATCH_HEARTBEAT_TIMEOUT_MS = 10_000
+
 interface Counts {
   total: number
   failed: number
@@ -201,6 +228,54 @@ async function panelPaymentBurst(now: Date): Promise<EvidenceHealthIssue[]> {
   ]
 }
 
+/**
+ * Newest commit touching the batch loop's progress file, via the public GitHub
+ * API (the repo is public; one unauthenticated call per daily run is nowhere
+ * near the 60/hr/IP limit).
+ *
+ * Never throws, unlike the DB checks: `checkEvidenceHealth`'s throw-on-failure
+ * contract exists so a run that can't read the pool doesn't report a clean
+ * pipeline, but a GitHub blip must neither kill the DB checks nor masquerade as
+ * "batch loop dead". An unreachable heartbeat is its own, explicitly weaker
+ * condition — fired as `batch_heartbeat_unreachable` so a broken URL or a
+ * repo-visibility change can't silence this check forever.
+ */
+async function batchLoopHeartbeat(now: Date): Promise<EvidenceHealthIssue[]> {
+  const url =
+    `https://api.github.com/repos/${BATCH_HEARTBEAT_REPO}/commits` +
+    `?path=${encodeURIComponent(BATCH_HEARTBEAT_PATH)}&per_page=1`
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(BATCH_HEARTBEAT_TIMEOUT_MS),
+    })
+    if (!res.ok) {
+      return [{ kind: 'batch_heartbeat_unreachable', detail: `HTTP ${res.status}` }]
+    }
+    const commits = (await res.json()) as Array<{ commit?: { committer?: { date?: string } } }>
+    const dateStr = commits[0]?.commit?.committer?.date
+    const lastCommitAt = dateStr ? new Date(dateStr) : null
+    if (!lastCommitAt || Number.isNaN(lastCommitAt.getTime())) {
+      return [{ kind: 'batch_heartbeat_unreachable', detail: 'no commit date in response' }]
+    }
+    const hoursSince = (now.getTime() - lastCommitAt.getTime()) / (60 * 60 * 1000)
+    if (hoursSince >= BATCH_HEARTBEAT_STALE_HOURS) {
+      return [
+        {
+          kind: 'batch_heartbeat_stale',
+          hoursSince: Math.round(hoursSince),
+          thresholdHours: BATCH_HEARTBEAT_STALE_HOURS,
+          lastCommitAt: lastCommitAt.toISOString(),
+        },
+      ]
+    }
+    return []
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    return [{ kind: 'batch_heartbeat_unreachable', detail: detail.slice(0, 120) }]
+  }
+}
+
 export function alertKey(issue: EvidenceHealthIssue): string {
   switch (issue.kind) {
     case 'source_failure_rate':
@@ -215,6 +290,10 @@ export function alertKey(issue: EvidenceHealthIssue): string {
       return 'overall-volume'
     case 'panel_payment_failure':
       return 'panel-payment'
+    case 'batch_heartbeat_stale':
+      return 'batch-heartbeat-stale'
+    case 'batch_heartbeat_unreachable':
+      return 'batch-heartbeat-unreachable'
   }
 }
 
@@ -265,11 +344,12 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
   const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000)
   const baselineFrom = new Date(recentFrom.getTime() - BASELINE_DAYS * 24 * 60 * 60 * 1000)
 
-  const [recent, baseline, emptyForecasts, panelPayment] = await Promise.all([
+  const [recent, baseline, emptyForecasts, panelPayment, heartbeatIssues] = await Promise.all([
     windowStats(recentFrom, null),
     windowStats(baselineFrom, recentFrom),
     forecastsWithoutEvidence(),
     panelPaymentBurst(now),
+    batchLoopHeartbeat(now),
   ])
 
   const issues: EvidenceHealthIssue[] = []
@@ -328,6 +408,7 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
 
   issues.push(...emptyForecasts)
   issues.push(...panelPayment)
+  issues.push(...heartbeatIssues)
 
   const claimed = await reconcileAlerts(issues.map(alertKey))
   const fired = issues.filter((i) => claimed.has(alertKey(i)))

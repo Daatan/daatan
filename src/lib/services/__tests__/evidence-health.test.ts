@@ -10,7 +10,14 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
-import { checkEvidenceHealth, alertKey, PANEL_402_LOOKBACK_HOURS } from '@/lib/services/evidence-health'
+import {
+  checkEvidenceHealth,
+  alertKey,
+  PANEL_402_LOOKBACK_HOURS,
+  BATCH_HEARTBEAT_REPO,
+  BATCH_HEARTBEAT_PATH,
+  BATCH_HEARTBEAT_STALE_HOURS,
+} from '@/lib/services/evidence-health'
 import { USABLE_POOL_ROW_WHERE, isUsablePoolRow } from '@/lib/services/evidence-pool'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
 
@@ -18,6 +25,20 @@ const groupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
 const findActive = vi.mocked(prisma.prediction.findMany)
 const alerts = vi.mocked(prisma.evidenceHealthAlert)
 const panel402 = vi.mocked(prisma.panelPaymentFailure.findMany)
+
+// The batch-heartbeat check (retro#556) reads the GitHub commits API; every test
+// gets a fresh heartbeat by default so the pool checks are exercised undisturbed.
+const fetchMock = vi.fn()
+vi.stubGlobal('fetch', fetchMock)
+
+function heartbeatResponse(ageHours: number) {
+  const date = new Date(Date.now() - ageHours * 60 * 60 * 1000).toISOString()
+  return {
+    ok: true,
+    status: 200,
+    json: async () => [{ commit: { committer: { date } } }],
+  }
+}
 
 /** total/failed per source → the `groupBy(['source','status'])` rows Prisma returns. */
 type SourceFixture = Record<string, { total: number; failed: number }>
@@ -66,6 +87,7 @@ describe('checkEvidenceHealth', () => {
     alerts.createMany.mockResolvedValue({ count: 1 } as never)
     alerts.deleteMany.mockResolvedValue({ count: 0 } as never)
     panel402.mockResolvedValue([] as never)
+    fetchMock.mockResolvedValue(heartbeatResponse(1))
   })
 
   it('fires on a source whose failure rate departs from its own baseline, and only that source', async () => {
@@ -122,6 +144,7 @@ describe('checkEvidenceHealth', () => {
     alerts.findMany.mockResolvedValue([] as never)
     alerts.createMany.mockResolvedValue({ count: 1 } as never)
     panel402.mockResolvedValue([] as never)
+    fetchMock.mockResolvedValue(heartbeatResponse(1))
     stubPool({ 'ynet.co.il': { total: 400, failed: 20 } }, HEALTHY_BASELINE) // 25% → 5%
     const improved = await checkEvidenceHealth()
     expect(improved.fired.some((i) => i.kind === 'overall_failure_rate')).toBe(false)
@@ -275,6 +298,91 @@ describe('checkEvidenceHealth', () => {
     await expect(checkEvidenceHealth()).rejects.toThrow('connection terminated')
     expect(alerts.deleteMany).not.toHaveBeenCalled()
   })
+
+  describe('batch-loop heartbeat (retro#556)', () => {
+    beforeEach(() => {
+      stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, { 'ynet.co.il': { total: 400, failed: 100 } })
+    })
+
+    it('asks GitHub for the newest commit touching the batch loop progress file', async () => {
+      await checkEvidenceHealth()
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${BATCH_HEARTBEAT_REPO}/commits?path=${encodeURIComponent(
+          BATCH_HEARTBEAT_PATH,
+        )}&per_page=1`,
+        expect.objectContaining({ headers: { Accept: 'application/vnd.github+json' } }),
+      )
+    })
+
+    it('fires when the newest atlas commit is older than the threshold', async () => {
+      fetchMock.mockResolvedValue(heartbeatResponse(BATCH_HEARTBEAT_STALE_HOURS + 1))
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([
+        {
+          kind: 'batch_heartbeat_stale',
+          hoursSince: BATCH_HEARTBEAT_STALE_HOURS + 1,
+          thresholdHours: BATCH_HEARTBEAT_STALE_HOURS,
+          lastCommitAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        },
+      ])
+    })
+
+    it('stays silent while the loop keeps committing', async () => {
+      fetchMock.mockResolvedValue(heartbeatResponse(2))
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([])
+    })
+
+    it('reports unreachable — never a false "loop dead" — when the GitHub API errors', async () => {
+      fetchMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND api.github.com'))
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([
+        { kind: 'batch_heartbeat_unreachable', detail: 'getaddrinfo ENOTFOUND api.github.com' },
+      ])
+      // The failed fetch did not kill the run: the reconcile still executed.
+      expect(alerts.createMany).toHaveBeenCalledWith({
+        data: [{ key: 'batch-heartbeat-unreachable' }],
+        skipDuplicates: true,
+      })
+    })
+
+    it('reports unreachable on a non-200 response', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([{ kind: 'batch_heartbeat_unreachable', detail: 'HTTP 403' }])
+    })
+
+    it('reports unreachable when the response holds no commits', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([
+        { kind: 'batch_heartbeat_unreachable', detail: 'no commit date in response' },
+      ])
+    })
+
+    it('re-arms once commits resume: a latched stale key is released on a fresh heartbeat', async () => {
+      fetchMock.mockResolvedValue(heartbeatResponse(1))
+      alerts.findMany.mockResolvedValue([{ key: 'batch-heartbeat-stale' }] as never)
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([])
+      expect(alerts.deleteMany).toHaveBeenCalledWith({
+        where: { key: { in: ['batch-heartbeat-stale'] } },
+      })
+    })
+  })
 })
 
 describe('alertKey', () => {
@@ -295,6 +403,11 @@ describe('alertKey', () => {
         { kind: 'panel_payment_failure', count: 572, lastSeenAt: new Date(), lastModel: 'qwen/qwen3' },
         'panel-payment',
       ],
+      [
+        { kind: 'batch_heartbeat_stale', hoursSince: 26, thresholdHours: 12, lastCommitAt: '2026-08-19T10:00:00.000Z' },
+        'batch-heartbeat-stale',
+      ],
+      [{ kind: 'batch_heartbeat_unreachable', detail: 'HTTP 502' }, 'batch-heartbeat-unreachable'],
     ]
     for (const [issue, key] of cases) expect(alertKey(issue)).toBe(key)
   })

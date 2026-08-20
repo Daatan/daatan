@@ -647,7 +647,8 @@ into forecasts.
 
 One row per condition the evidence pipeline is **currently** failing, keyed by a
 stable string (`source-silent:bbc.co.uk`, `forecast-empty:<predictionId>`,
-`overall-failure`). `forecast-empty` fires on the shared usable-row definition above, so it
+`overall-failure`, `batch-heartbeat-stale` / `batch-heartbeat-unreachable` — the
+TruthMachine batch-loop liveness pair, retro#556). `forecast-empty` fires on the shared usable-row definition above, so it
 asks the same question the aggregate does. It is fire/re-arm state, not a log: `checkEvidenceHealth()`
 claims a condition by inserting its key — only the run that wins the insert
 notifies, so overlapping runs can't double-page — and deletes the keys whose
