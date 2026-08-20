@@ -238,6 +238,9 @@ export type EvidenceHealthIssue =
   | { kind: 'forecast_no_evidence'; predictionId: string; claimText: string; slug: string | null }
   | { kind: 'overall_failure_rate'; recentPct: number; baselinePct: number }
   | { kind: 'overall_volume_collapse'; recentPerDay: number; baselinePerDay: number }
+  // Not a delta: any 402 at all means the shared OpenRouter account is out of
+  // credits and every panel member on that route is down (daatan#1504).
+  | { kind: 'panel_payment_failure'; count: number; lastSeenAt: Date; lastModel: string }
 
 /** Keeps a first run (or a genuine pipeline-wide failure) inside Telegram's message limit. */
 const EVIDENCE_HEALTH_MAX_LINES = 12
@@ -256,6 +259,11 @@ function evidenceHealthLine(i: EvidenceHealthIssue): string {
       return `• <b>overall failure share</b>: ${i.baselinePct}% → <b>${i.recentPct}%</b>`
     case 'overall_volume_collapse':
       return `• <b>ingestion volume</b>: ${i.baselinePerDay}/day → <b>${i.recentPerDay}/day</b>`
+    case 'panel_payment_failure':
+      return (
+        `• <b>AI panel</b>: ${i.count} × HTTP 402 from OpenRouter — credits exhausted, ` +
+        `all OpenRouter members down (last ${i.lastSeenAt.toISOString().slice(0, 16)}Z, ${escapeHtml(i.lastModel)})`
+      )
   }
 }
 
@@ -281,9 +289,14 @@ export function notifyEvidenceHealthDigest(report: {
   if (report.issues.length === 0) return
 
   // A pipeline-wide move is page-worthy; per-source drift and individual empty
-  // pools are operational. Same split as the search-health digest.
+  // pools are operational. Same split as the search-health digest. A 402 burst is
+  // total panel outage (every OpenRouter member fails together), so it sits on the
+  // page-worthy side — still the digest, not a pager (daatan#1504).
   const critical = report.issues.some(
-    (i) => i.kind === 'overall_failure_rate' || i.kind === 'overall_volume_collapse',
+    (i) =>
+      i.kind === 'overall_failure_rate' ||
+      i.kind === 'overall_volume_collapse' ||
+      i.kind === 'panel_payment_failure',
   )
 
   const lines = report.issues.slice(0, EVIDENCE_HEALTH_MAX_LINES).map(evidenceHealthLine)

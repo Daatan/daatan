@@ -28,6 +28,9 @@ vi.mock('@/lib/llm/panel/client', async (importOriginal) => ({
   logMemberFailure: vi.fn(),
 }))
 
+// The 402 recorder writes through Prisma; here only the hook-up matters (daatan#1504).
+vi.mock('@/lib/services/panel-failures', () => ({ recordPanelPaymentFailure: vi.fn() }))
+
 // Retrieval is network; the pure helpers (fingerprint, articles block) stay real so
 // hashes and prompts in these tests match production byte-for-byte.
 vi.mock('@/lib/llm/panel/context', async (importOriginal) => ({
@@ -39,7 +42,8 @@ vi.mock('@/lib/llm/panel/context', async (importOriginal) => ({
 import { prisma } from '@/lib/prisma'
 import { getPromptTemplate } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
-import { callPanelMember, PanelAuthError } from '@/lib/llm/panel/client'
+import { callPanelMember, PanelAuthError, PanelPaymentError } from '@/lib/llm/panel/client'
+import { recordPanelPaymentFailure } from '@/lib/services/panel-failures'
 import {
   buildPanelPrompt,
   computeInputHash,
@@ -300,6 +304,34 @@ describe('runPanelForPrediction', () => {
     }
     // Every row still names exactly the model that produced it.
     expect(written.estimates.create).toHaveLength(PANEL_MEMBERS.length)
+  })
+
+  it('records a 402 for the evidence-health digest, while the member still just abstains', async () => {
+    const [first, ...rest] = PANEL_MEMBERS
+    callMember.mockImplementation(async (member) => {
+      if (member.model === first.model) throw new PanelPaymentError('Insufficient credits')
+      return ok(60)
+    })
+
+    const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
+
+    // The burst is written down for the digest (daatan#1504)…
+    expect(recordPanelPaymentFailure).toHaveBeenCalledWith(first.model)
+    // …but sweep behaviour is unchanged: an abstention, no latch, siblings unaffected.
+    expect(result.status).toBe('written')
+    expect(result.estimated).toBe(rest.length)
+  })
+
+  it('a non-402 failure records nothing — the counter only ever means credit exhaustion', async () => {
+    const [first] = PANEL_MEMBERS
+    callMember.mockImplementation(async (member) => {
+      if (member.model === first.model) throw new Error('provider exploded')
+      return ok(60)
+    })
+
+    await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
+
+    expect(recordPanelPaymentFailure).not.toHaveBeenCalled()
   })
 
   it('writes nothing when every member fails, so the next tick retries', async () => {

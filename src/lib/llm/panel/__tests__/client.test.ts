@@ -11,7 +11,7 @@ vi.mock('@aws-sdk/client-bedrock-runtime', () => ({
   },
 }))
 
-import { callPanelMember, PanelAuthError } from '../client'
+import { callPanelMember, PanelAuthError, PanelPaymentError } from '../client'
 import type { PanelMember } from '../roster'
 
 const MEMBER: PanelMember = {
@@ -119,6 +119,18 @@ describe('auth failures are their own type', () => {
   it('throws PanelAuthError on 403', async () => {
     fetchMock.mockResolvedValue(respond(403, 'forbidden', false))
     await expect(callPanelMember(MEMBER, 'p', 'sk-x')).rejects.toBeInstanceOf(PanelAuthError)
+  })
+
+  // Regression: 2026-08-19 05:06–05:12Z, 572 × 402 = total panel outage (daatan#1491).
+  it('throws PanelPaymentError on 402 — credit exhaustion, not a credential problem', async () => {
+    fetchMock.mockResolvedValue(
+      respond(402, { error: { message: 'Insufficient credits', code: 402 } }, false),
+    )
+    const err = await callPanelMember(MEMBER, 'p', 'sk-x').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(PanelPaymentError)
+    // Not an auth error: a top-up fixes it without a deploy, so the sweep must not latch.
+    expect(err).not.toBeInstanceOf(PanelAuthError)
+    expect((err as Error).message).toContain('402')
   })
 
   it('a 500 is a plain Error — retryable, not a credential problem', async () => {

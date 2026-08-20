@@ -74,6 +74,15 @@ const MIN_OVERALL_BASELINE_ROWS = 300
  */
 const VOLUME_COLLAPSE_RATIO = 0.35
 
+/**
+ * How far back the panel-402 check looks (daatan#1504). The digest runs daily, so
+ * "since the last run" is 24h plus slack for cron drift; a burst is "active" while
+ * its last 402 is inside this window and re-arms once it ages out. All four
+ * OpenRouter panel members fail together on credit exhaustion, so any 402s at all
+ * ≈ total panel outage — no threshold beyond "any".
+ */
+export const PANEL_402_LOOKBACK_HOURS = 26
+
 /** Alert keys are VarChar(200); `source` is VarChar(200) on its own. */
 const MAX_KEY_SOURCE_LEN = 150
 
@@ -164,6 +173,34 @@ async function forecastsWithoutEvidence(): Promise<EvidenceHealthIssue[]> {
     }))
 }
 
+/**
+ * AI-panel 402 burst since the last digest run (daatan#1504, decided on daatan#1491).
+ *
+ * The sweep records OpenRouter payment failures per UTC day in
+ * `panel_payment_failures` (`recordPanelPaymentFailure`); this reads every row whose
+ * last occurrence falls inside the lookback window and reports them as ONE issue —
+ * the condition is "the shared account is out of credits", not anything per-model or
+ * per-forecast. A day row straddling the window boundary contributes its whole day's
+ * count; over-counting a boundary is harmless where any nonzero count is an outage.
+ */
+async function panelPaymentBurst(now: Date): Promise<EvidenceHealthIssue[]> {
+  const since = new Date(now.getTime() - PANEL_402_LOOKBACK_HOURS * 60 * 60 * 1000)
+  const rows = await prisma.panelPaymentFailure.findMany({
+    where: { lastSeenAt: { gt: since } },
+  })
+  if (rows.length === 0) return []
+
+  const latest = rows.reduce((a, b) => (a.lastSeenAt > b.lastSeenAt ? a : b))
+  return [
+    {
+      kind: 'panel_payment_failure',
+      count: rows.reduce((n, r) => n + r.count, 0),
+      lastSeenAt: latest.lastSeenAt,
+      lastModel: latest.lastModel,
+    },
+  ]
+}
+
 export function alertKey(issue: EvidenceHealthIssue): string {
   switch (issue.kind) {
     case 'source_failure_rate':
@@ -176,6 +213,8 @@ export function alertKey(issue: EvidenceHealthIssue): string {
       return 'overall-failure'
     case 'overall_volume_collapse':
       return 'overall-volume'
+    case 'panel_payment_failure':
+      return 'panel-payment'
   }
 }
 
@@ -226,10 +265,11 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
   const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000)
   const baselineFrom = new Date(recentFrom.getTime() - BASELINE_DAYS * 24 * 60 * 60 * 1000)
 
-  const [recent, baseline, emptyForecasts] = await Promise.all([
+  const [recent, baseline, emptyForecasts, panelPayment] = await Promise.all([
     windowStats(recentFrom, null),
     windowStats(baselineFrom, recentFrom),
     forecastsWithoutEvidence(),
+    panelPaymentBurst(now),
   ])
 
   const issues: EvidenceHealthIssue[] = []
@@ -287,6 +327,7 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
   }
 
   issues.push(...emptyForecasts)
+  issues.push(...panelPayment)
 
   const claimed = await reconcileAlerts(issues.map(alertKey))
   const fired = issues.filter((i) => claimed.has(alertKey(i)))

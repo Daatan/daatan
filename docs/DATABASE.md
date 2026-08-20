@@ -660,6 +660,19 @@ source that has been silent since last Tuesday would re-page after each release.
 Same idiom as `predictions.market_divergence_alert_at`, moved off the row because a
 source-level or pipeline-level condition has no row of its own to hang off.
 
+### AI-panel 402 counter — `panel_payment_failures` (#1504)
+
+One row per UTC day the panel saw `402 Insufficient credits` from OpenRouter:
+`count`, `last_seen_at`, and `last_model` (the member that saw it last). Written
+fire-and-forget by `recordPanelPaymentFailure()` (`src/lib/services/panel-failures.ts`)
+from the sweep's failure path — a recording failure warns and is swallowed, never
+delaying a panel call. This is the raw record, not alert state: the 402s only
+surfaced in app logs, which the DB-driven digest can't read. `checkEvidenceHealth()`
+fires one `panel-payment` digest line when any row's `last_seen_at` falls inside its
+26h lookback (all OpenRouter members fail together on credit exhaustion, so any
+nonzero count ≈ total panel outage); dedup lives in `evidence_health_alerts` above,
+under the key `panel-payment`. Rows are tiny (one per bad day) and are kept.
+
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
 Cached Polymarket/Kalshi markets that forecasts link to (many-to-one).

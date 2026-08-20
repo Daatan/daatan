@@ -942,6 +942,23 @@ model EvidenceHealthAlert {
   @@map("evidence_health_alerts")
 }
 
+// Per-UTC-day counter of AI-panel OpenRouter 402 (payment) failures (daatan#1504).
+// The 402s only surfaced in app logs, which the DB-driven evidence-health digest
+// can't read — so the sweep records them here at the call site and the digest
+// alerts when any landed inside its lookback window. All four OpenRouter panel
+// members fail together on credit exhaustion (2026-08-19: 572 × 402 in six
+// minutes = total panel outage, daatan#1491), so a count per day plus the last
+// occurrence is all the digest needs. One row per bad day; empty table = no
+// recent payment failures.
+model PanelPaymentFailure {
+  day        String   @id @db.VarChar(10) // UTC calendar day, "YYYY-MM-DD"
+  count      Int
+  lastSeenAt DateTime @map("last_seen_at")
+  lastModel  String   @map("last_model") @db.VarChar(200)
+
+  @@map("panel_payment_failures")
+}
+
 // Human-in-the-loop rating of one ArticleRatingPrompt — a 1-5 verdict plus which
 // specific number was wrong (daatan#1223). One row per (prompt, rater): a user can
 // change their mind by tapping another button, which just updates their own row.
