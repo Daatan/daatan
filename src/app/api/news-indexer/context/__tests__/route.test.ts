@@ -474,9 +474,10 @@ describe('POST /api/news-indexer/context', () => {
     // the schema didn't declare them, so Zod's `.parse()` silently stripped them as unknown
     // keys — if the schema regresses to stripping these again, this suite fails loudly instead
     // of the field just silently vanishing. (2) The push carries ids ONLY — never names or
-    // `author` — so the by-url lookup must run for EVERY source URL (daatan#1463: skipping it
+    // `author`, so the by-url lookup must run for every such URL (daatan#1463: skipping it
     // for push-identified articles left names/author permanently NULL); push ids still win
     // over the lookup's, and a lookup name is never attached to a different push-supplied id.
+    // A NEWER news-indexer does send names — that path is the news-indexer#302 suite below.
     beforeEach(() => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
@@ -721,6 +722,226 @@ describe('POST /api/news-indexer/context', () => {
       expect(source.outletId).toBe('outlet-push')
       expect(source.personId).toBe('person-looked-up')
       expect(source.personName).toBe('Looked Up Person')
+    })
+  })
+
+  describe('push-supplied personName/outletName/author (news-indexer#302)', () => {
+    // news-indexer already resolved the identity it pushed the ids for, so since ni#302 it
+    // sends the NAMES alongside them. Presence — not truthiness — is the discriminator:
+    // `author === undefined` means an older news-indexer that never sent these fields and the
+    // by-url lookup still has to run; `null` means it resolved no byline and is authoritative.
+    // Collapsing the two would re-derive by DB round-trip exactly what we were just handed,
+    // which is the per-push latency daatan#1463 had to give back to fix the NULL-names bug.
+    beforeEach(() => {
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    })
+
+    const snapshotSources = (): Record<string, unknown>[] =>
+      (vi.mocked(saveNewsIndexerMatch).mock.calls[0][0].oracleSnapshot as unknown as { sources: Record<string, unknown>[] })
+        .sources
+
+    it('takes names and byline from the push and skips the lookup entirely', async () => {
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            {
+              url: 'https://bbc.com/news/x',
+              title: 'Headline',
+              snippet: 's',
+              personId: 'person-1',
+              personName: 'Person One',
+              outletId: 'outlet-1',
+              outletName: 'Outlet One',
+              author: 'BBC Byline',
+            },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith([])
+      expect(snapshotSources()[0]).toMatchObject({
+        personId: 'person-1',
+        personName: 'Person One',
+        outletId: 'outlet-1',
+        outletName: 'Outlet One',
+        author: 'BBC Byline',
+      })
+    })
+
+    it('honours an explicit null byline instead of looking one up', async () => {
+      // news-indexer resolved no byline for this article. That is an answer, not a gap:
+      // re-running the lookup could only return the same NULL from the same row.
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(
+        new Map([
+          [
+            'https://bbc.com/news/x',
+            {
+              requestedUrl: 'https://bbc.com/news/x',
+              author: 'Should Not Be Used',
+              publishedAt: null,
+              title: null,
+              source: null,
+              personId: 'person-looked-up',
+              personName: 'Looked Up Person',
+            },
+          ],
+        ]) as never,
+      )
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            { url: 'https://bbc.com/news/x', title: 'Headline', snippet: 's', author: null },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith([])
+      expect(snapshotSources()[0].author).toBeNull()
+    })
+
+    it('looks up only the urls the push did not cover', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+        { result: 'claimed', articleId: 'row-1' },
+        { result: 'claimed', articleId: 'row-2' },
+      ])
+      vi.mocked(getOracleForecast).mockResolvedValue({
+        forecast: {
+          ...ORACLE_WITH_SOURCE,
+          articles_used: 2,
+          sources: [
+            ORACLE_WITH_SOURCE.sources[0],
+            {
+              source_id: 'aj',
+              source_name: 'Al Jazeera',
+              url: 'https://aljazeera.com/news/y',
+              stance: -0.3,
+              certainty: 0.6,
+              credibility_weight: 1.0,
+              claims: ['AJ claim'],
+            },
+          ],
+        },
+        logId: null,
+      } as never)
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(
+        new Map([
+          [
+            'https://aljazeera.com/news/y',
+            {
+              requestedUrl: 'https://aljazeera.com/news/y',
+              author: 'AJ Byline',
+              publishedAt: null,
+              title: null,
+              source: null,
+              personId: 'person-looked-up',
+              personName: 'Looked Up Person',
+            },
+          ],
+        ]) as never,
+      )
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            // Carries its own identity — nothing left to look up.
+            {
+              url: 'https://bbc.com/news/x',
+              title: 'BBC',
+              snippet: 's1',
+              personId: 'person-1',
+              personName: 'Person One',
+              author: 'BBC Byline',
+            },
+            // Older-shaped item (no `author` key at all) — still needs the lookup.
+            { url: 'https://aljazeera.com/news/y', title: 'AJ', snippet: 's2' },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith(['https://aljazeera.com/news/y'])
+
+      const sources = snapshotSources()
+      expect(sources.find((s) => s.url === 'https://bbc.com/news/x')).toMatchObject({
+        personId: 'person-1',
+        personName: 'Person One',
+        author: 'BBC Byline',
+      })
+      expect(sources.find((s) => s.url === 'https://aljazeera.com/news/y')).toMatchObject({
+        personId: 'person-looked-up',
+        personName: 'Looked Up Person',
+        author: 'AJ Byline',
+      })
+    })
+
+    it('ignores a pushed name whose id the push did not supply', async () => {
+      // A name without its id cannot be attached to anything: the id that wins here is the
+      // lookup's, so the lookup's name is the one that describes it.
+      vi.mocked(getArticleMetaByUrl).mockResolvedValue(
+        new Map([
+          [
+            'https://bbc.com/news/x',
+            {
+              requestedUrl: 'https://bbc.com/news/x',
+              author: 'BBC Byline',
+              publishedAt: null,
+              title: null,
+              source: null,
+              personId: 'person-looked-up',
+              personName: 'Looked Up Person',
+            },
+          ],
+        ]) as never,
+      )
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            // `personName` with no `personId`, and no `author` key, so the lookup still runs.
+            { url: 'https://bbc.com/news/x', title: 'Headline', snippet: 's', personName: 'Orphan Name' },
+          ],
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith(['https://bbc.com/news/x'])
+      expect(snapshotSources()[0]).toMatchObject({
+        personId: 'person-looked-up',
+        personName: 'Looked Up Person',
+      })
+    })
+
+    it('carries the names through the legacy single-article body shape', async () => {
+      await POST(
+        post('test-secret', {
+          ...VALID_BODY,
+          personId: 'person-2',
+          personName: 'Person Two',
+          outletId: 'outlet-2',
+          outletName: 'Outlet Two',
+          author: 'Legacy Byline',
+        }),
+      )
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith([])
+      expect(snapshotSources()[0]).toMatchObject({
+        personId: 'person-2',
+        personName: 'Person Two',
+        outletId: 'outlet-2',
+        outletName: 'Outlet Two',
+        author: 'Legacy Byline',
+      })
+    })
+
+    it('still looks up a legacy body that carries no identity fields', async () => {
+      // The normalization must not turn "absent" into `null` on its way to items[] — that
+      // would read as an authoritative "no byline" and permanently skip the lookup.
+      await POST(post('test-secret', VALID_BODY))
+
+      expect(getArticleMetaByUrl).toHaveBeenCalledWith(['https://bbc.com/news/x'])
     })
   })
 

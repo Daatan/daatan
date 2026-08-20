@@ -87,6 +87,14 @@ const articleItemSchema = z.object({
    *  even though the payload had it in hand. See the `personId`/`outletId` preference below. */
   personId: z.string().nullable().optional(),
   outletId: z.string().nullable().optional(),
+  /** Display names + the raw byline for the identity above (news-indexer#302). An id alone
+   *  cannot fill a name column, which is why the by-url lookup had to run on every push
+   *  (daatan#1463/#1464) at up to its 4s timeout. Presence is the discriminator: `undefined`
+   *  means an older news-indexer that never sent them, so that URL still needs the lookup;
+   *  `null` means news-indexer resolved no such name and is authoritative. */
+  personName: z.string().nullable().optional(),
+  outletName: z.string().nullable().optional(),
+  author: z.string().nullable().optional(),
 })
 
 // Accepts two shapes:
@@ -114,6 +122,9 @@ const bodySchema = z
     // (worker/matcher.py's non-`articles[]` branch sends them unnested).
     personId: z.string().nullable().optional(),
     outletId: z.string().nullable().optional(),
+    personName: z.string().nullable().optional(),
+    outletName: z.string().nullable().optional(),
+    author: z.string().nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
     // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
@@ -169,6 +180,11 @@ export async function POST(request: NextRequest) {
               language: body.articleLanguage ?? null,
               personId: body.personId ?? null,
               outletId: body.outletId ?? null,
+              // `??` would collapse "not sent" into null and defeat the presence check below,
+              // so these pass through untouched.
+              personName: body.personName,
+              outletName: body.outletName,
+              author: body.author,
             },
           ]
 
@@ -337,22 +353,37 @@ export async function POST(request: NextRequest) {
     const triggerEnrich = enrichedSources.find((s) => s.url === triggerUrl) ?? null
 
     if (oracleForecast) {
-      // news-indexer often already resolved an article's person/outlet identity before pushing
-      // (worker/matcher.py) and sends it as `personId`/`outletId` on the article — ids ONLY,
-      // never personName/outletName, and never `author` (the raw byline). So the by-url lookup
-      // runs unconditionally again (daatan#1463): #1361 skipped it for push-identified articles,
-      // which guaranteed NULL names/author on every such pool row forever, since nothing else
-      // ever fills them. What survives from #1349/#1361 is id PRECEDENCE: a push-supplied id
-      // wins over the lookup's — news-indexer's resolution is authoritative — and a lookup name
-      // is only attached when it belongs to the id that won.
+      // news-indexer resolves an article's person/outlet identity before pushing
+      // (worker/matcher.py) and sends `personId`/`outletId` — and, since news-indexer#302,
+      // `personName`/`outletName`/`author` alongside them. Before that it sent ids ONLY, so the
+      // by-url lookup had to run unconditionally (daatan#1463): #1361 skipped it for
+      // push-identified articles, which guaranteed NULL names/author on every such pool row
+      // forever, since nothing else ever fills them.
+      //
+      // Now the lookup is needed only for URLs the push did not cover. Presence — not
+      // truthiness — is the discriminator: `author === undefined` means an older news-indexer
+      // that never sent these fields, while `null` means it resolved no byline and is
+      // authoritative. Collapsing the two would silently re-derive what we were just handed.
+      //
+      // What survives from #1349/#1361 is id PRECEDENCE: a push-supplied id wins over the
+      // lookup's — news-indexer's resolution is authoritative — and a lookup name is only
+      // attached when it belongs to the id that won.
       const itemsByUrl = new Map(items.map((a) => [a.url, a]))
-      const urlsNeedingLookup = oracleForecast.sources.map((s) => s.url)
+      const urlsNeedingLookup = oracleForecast.sources
+        .map((s) => s.url)
+        .filter((url) => itemsByUrl.get(url)?.author === undefined)
       // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
       // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
       // elections.daatan.com's tracked commentators — can never match a person.
       const articleMeta = await getArticleMetaByUrl(urlsNeedingLookup)
-      const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
+      // Push-supplied byline wins; the lookup fills only what the push did not carry.
+      const authorByUrl = new Map<string, string | null>(
+        [...articleMeta.entries()].map(([url, m]) => [url, m.author]),
+      )
+      for (const a of items) {
+        if (a.author !== undefined) authorByUrl.set(a.url, a.author)
+      }
       const identityByUrl = new Map<
         string,
         { personId?: string | null; personName?: string | null; outletId?: string | null; outletName?: string | null }
@@ -366,6 +397,12 @@ export async function POST(request: NextRequest) {
         if (!item?.personId && !item?.outletId && !m) continue
         const personId = item?.personId ?? m?.personId ?? null
         const outletId = item?.outletId ?? m?.outletId ?? null
+        // When the push supplied the id that won, its own name for that id is authoritative
+        // and no lookup name is consulted (news-indexer#302).
+        const pushedPersonName =
+          item?.personId && item.personName !== undefined ? item.personName : undefined
+        const pushedOutletName =
+          item?.outletId && item.outletName !== undefined ? item.outletName : undefined
         identityByUrl.set(s.url, {
           personId,
           // A lookup name is taken only when the push supplied no id for that dimension, or the
@@ -373,10 +410,18 @@ export async function POST(request: NextRequest) {
           // `undefined` when unavailable (preserve-stored), `null` only when the lookup
           // explicitly resolved the id to no name.
           personName:
-            m && (!item?.personId || m.personId === personId) ? m.personName ?? null : undefined,
+            pushedPersonName !== undefined
+              ? pushedPersonName
+              : m && (!item?.personId || m.personId === personId)
+                ? m.personName ?? null
+                : undefined,
           outletId,
           outletName:
-            m && (!item?.outletId || m.outletId === outletId) ? m.outletName ?? null : undefined,
+            pushedOutletName !== undefined
+              ? pushedOutletName
+              : m && (!item?.outletId || m.outletId === outletId)
+                ? m.outletName ?? null
+                : undefined,
         })
       }
       const oracleSources = enrichOracleSources(
