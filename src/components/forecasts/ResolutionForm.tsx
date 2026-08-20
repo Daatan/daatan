@@ -53,10 +53,17 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
   const resolveTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const [error, setError] = useState<string | null>(null)
   const [resolved, setResolved] = useState(false)
+  const aiPrefill = useRef<{ outcome: typeof outcome; note: string } | null>(null)
 
   const selectOutcome = (next: typeof outcome) => {
     setOutcome(next)
     setPinAcknowledged(false)
+    // daatan#1479: an AI note must not survive a human flip to a different
+    // outcome — clear it unless the human already edited it.
+    const ai = aiPrefill.current
+    if (ai && next !== ai.outcome && resolutionNote === ai.note) {
+      setResolutionNote('')
+    }
   }
 
   const pinContradiction = outcome
@@ -89,6 +96,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       setOutcome(data.outcome)
       setEvidenceLinks((data.evidenceLinks ?? []).join('\n'))
       setResolutionNote(data.reasoning)
+      aiPrefill.current = { outcome: data.outcome, note: data.reasoning }
       if (data.correctOptionId) {
         setCorrectOptionId(data.correctOptionId)
       }

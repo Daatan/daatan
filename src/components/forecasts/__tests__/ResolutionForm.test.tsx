@@ -224,6 +224,72 @@ describe('ResolutionForm', () => {
     expect(Number(localStorage.getItem('daatan:timing:resolve-updating'))).toBe(720)
   })
 
+  // daatan#1479
+  describe('stale AI note on a human-flipped outcome', () => {
+    const runAiResearch = async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          outcome: 'wrong',
+          reasoning: 'The claim cannot be resolved from available evidence.',
+          evidenceLinks: [],
+        }),
+      })
+      fireEvent.click(screen.getByText('AI Assist'))
+      await waitFor(() => {
+        expect(screen.getByText('AI Assist')).toBeInTheDocument()
+      })
+    }
+
+    it('clears the untouched AI note when the human flips the outcome', async () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+      await runAiResearch()
+
+      const noteTextarea = document.getElementById('note') as HTMLTextAreaElement
+      expect(noteTextarea.value).toBe('The claim cannot be resolved from available evidence.')
+
+      fireEvent.click(screen.getByText('Correct'))
+      expect(noteTextarea.value).toBe('')
+    })
+
+    it('keeps the AI note when the human re-selects the AI-suggested outcome', async () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+      await runAiResearch()
+
+      fireEvent.click(screen.getByText('Wrong'))
+      const noteTextarea = document.getElementById('note') as HTMLTextAreaElement
+      expect(noteTextarea.value).toBe('The claim cannot be resolved from available evidence.')
+    })
+
+    it('keeps a human-edited note when the outcome is flipped', async () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+      await runAiResearch()
+
+      const noteTextarea = document.getElementById('note') as HTMLTextAreaElement
+      fireEvent.change(noteTextarea, { target: { value: 'My own reasoning.' } })
+
+      fireEvent.click(screen.getByText('Correct'))
+      expect(noteTextarea.value).toBe('My own reasoning.')
+    })
+
+    it('does not submit the stale AI note after a flip', async () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+      await runAiResearch()
+
+      fireEvent.click(screen.getByText('Correct'))
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      const submitButton = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+      fireEvent.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+        const callBody = JSON.parse(mockFetch.mock.calls[1][1].body)
+        expect(callBody.outcome).toBe('correct')
+        expect(callBody.resolutionNote).toBeUndefined()
+      })
+    })
+  })
+
   // daatan#1234 check #2
   describe('pin-acknowledgment gate', () => {
     it('does not show the banner when the outcome agrees with the pin', () => {
