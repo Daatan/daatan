@@ -5,7 +5,8 @@ import { createLogger } from '@/lib/logger'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { getOpenRouterKey } from '@/lib/services/settings'
 import { warmAwsSecrets } from '@/lib/aws/secrets'
-import { callPanelMember, logMemberFailure, PanelAuthError } from '@/lib/llm/panel/client'
+import { callPanelMember, logMemberFailure, PanelAuthError, PanelPaymentError } from '@/lib/llm/panel/client'
+import { recordPanelPaymentFailure } from '@/lib/services/panel-failures'
 import {
   PANEL_MEMBERS,
   GROUNDED_PANEL_MEMBERS,
@@ -218,6 +219,12 @@ async function callMembers(
           ctx.sawOpenRouterAuthError = true
           log.error({ err }, 'OpenRouter rejected the API key — disabling those members')
           continue
+        }
+        if (err instanceof PanelPaymentError) {
+          // Credit exhaustion is invisible to the DB-driven evidence-health digest
+          // unless someone writes it down (daatan#1504). Fire-and-forget: recording
+          // must never delay or break the sweep. The member still abstains below.
+          recordPanelPaymentFailure(member.model)
         }
         logMemberFailure(member.model, predictionId, err)
         // A failure is an ABSTENTION, never a substitution. We do not retry with a

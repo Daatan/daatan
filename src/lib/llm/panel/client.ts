@@ -74,6 +74,23 @@ export class PanelAuthError extends Error {
   }
 }
 
+/**
+ * OpenRouter refused payment (`402 Insufficient credits`).
+ *
+ * Like `PanelAuthError` this is a property of the shared account, not of the member —
+ * all OpenRouter members fail together (2026-08-19: 572 × 402 in six minutes = total
+ * panel outage, daatan#1491). Deliberately NOT latched the way an auth error is:
+ * credits can be topped up mid-sweep and a top-up needs no deploy, so the next call
+ * is allowed to try again. The type exists so the sweep can record the burst for the
+ * evidence-health digest (daatan#1504); the member itself still just abstains.
+ */
+export class PanelPaymentError extends Error {
+  constructor(detail: string) {
+    super(`OpenRouter refused payment (HTTP 402): ${detail}`)
+    this.name = 'PanelPaymentError'
+  }
+}
+
 export interface PanelCallResult {
   /** 0–100, or null when the member abstained. */
   probability: number | null
@@ -192,6 +209,11 @@ async function callOpenRouterMember(
       // sweep can stop instead of retrying it once per member per forecast.
       if (response.status === 401 || response.status === 403) {
         throw new PanelAuthError(response.status, body.slice(0, 200))
+      }
+      // Credit exhaustion is account-wide too, but recoverable without a deploy —
+      // its own type so the caller can record it for the evidence-health digest.
+      if (response.status === 402) {
+        throw new PanelPaymentError(body.slice(0, 200))
       }
       throw new Error(`OpenRouter ${response.status} for ${member.model}: ${body.slice(0, 200)}`)
     }

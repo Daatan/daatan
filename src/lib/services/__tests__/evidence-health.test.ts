@@ -5,17 +5,19 @@ vi.mock('@/lib/prisma', () => ({
     evidencePoolArticle: { groupBy: vi.fn() },
     prediction: { findMany: vi.fn() },
     evidenceHealthAlert: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
+    panelPaymentFailure: { findMany: vi.fn() },
   },
 }))
 
 import { prisma } from '@/lib/prisma'
-import { checkEvidenceHealth, alertKey } from '@/lib/services/evidence-health'
+import { checkEvidenceHealth, alertKey, PANEL_402_LOOKBACK_HOURS } from '@/lib/services/evidence-health'
 import { USABLE_POOL_ROW_WHERE, isUsablePoolRow } from '@/lib/services/evidence-pool'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
 
 const groupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
 const findActive = vi.mocked(prisma.prediction.findMany)
 const alerts = vi.mocked(prisma.evidenceHealthAlert)
+const panel402 = vi.mocked(prisma.panelPaymentFailure.findMany)
 
 /** total/failed per source → the `groupBy(['source','status'])` rows Prisma returns. */
 type SourceFixture = Record<string, { total: number; failed: number }>
@@ -63,6 +65,7 @@ describe('checkEvidenceHealth', () => {
     alerts.findMany.mockResolvedValue([] as never)
     alerts.createMany.mockResolvedValue({ count: 1 } as never)
     alerts.deleteMany.mockResolvedValue({ count: 0 } as never)
+    panel402.mockResolvedValue([] as never)
   })
 
   it('fires on a source whose failure rate departs from its own baseline, and only that source', async () => {
@@ -118,6 +121,7 @@ describe('checkEvidenceHealth', () => {
     findActive.mockResolvedValue([] as never)
     alerts.findMany.mockResolvedValue([] as never)
     alerts.createMany.mockResolvedValue({ count: 1 } as never)
+    panel402.mockResolvedValue([] as never)
     stubPool({ 'ynet.co.il': { total: 400, failed: 20 } }, HEALTHY_BASELINE) // 25% → 5%
     const improved = await checkEvidenceHealth()
     expect(improved.fired.some((i) => i.kind === 'overall_failure_rate')).toBe(false)
@@ -211,6 +215,60 @@ describe('checkEvidenceHealth', () => {
     expect(suppressed).toBe(3)
   })
 
+  it('fires one panel-payment alert on a recorded 402 burst, summing rows across the day boundary', async () => {
+    stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, HEALTHY_BASELINE)
+    const lastSeen = new Date('2026-08-19T05:12:00Z')
+    panel402.mockResolvedValue([
+      { day: '2026-08-18', count: 3, lastSeenAt: new Date('2026-08-18T23:58:00Z'), lastModel: 'x-ai/grok-4' },
+      { day: '2026-08-19', count: 572, lastSeenAt: lastSeen, lastModel: 'qwen/qwen3-235b-a22b-2507' },
+    ] as never)
+
+    const { fired } = await checkEvidenceHealth(new Date('2026-08-19T06:00:00Z'))
+
+    expect(fired.filter((i) => i.kind === 'panel_payment_failure')).toEqual([
+      {
+        kind: 'panel_payment_failure',
+        count: 575,
+        lastSeenAt: lastSeen,
+        lastModel: 'qwen/qwen3-235b-a22b-2507',
+      },
+    ])
+  })
+
+  it('looks back one digest cadence plus slack, so an aged-out burst cannot re-fire', async () => {
+    stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, HEALTHY_BASELINE)
+    const now = new Date('2026-08-20T05:00:00Z')
+
+    const { fired } = await checkEvidenceHealth(now)
+
+    expect(fired.some((i) => i.kind === 'panel_payment_failure')).toBe(false)
+    expect(panel402).toHaveBeenCalledWith({
+      where: {
+        lastSeenAt: { gt: new Date(now.getTime() - PANEL_402_LOOKBACK_HOURS * 60 * 60 * 1000) },
+      },
+    })
+  })
+
+  it('suppresses an ongoing 402 burst already alerted on, and releases the key once it clears', async () => {
+    // Recent mirrors the baseline exactly, so the ONLY active condition is the burst.
+    stubPool(HEALTHY_BASELINE, HEALTHY_BASELINE)
+    alerts.findMany.mockResolvedValue([{ key: 'panel-payment' }] as never)
+    panel402.mockResolvedValue([
+      { day: '2026-08-19', count: 572, lastSeenAt: new Date(), lastModel: 'qwen/qwen3-235b-a22b-2507' },
+    ] as never)
+
+    const ongoing = await checkEvidenceHealth()
+    expect(ongoing.fired.some((i) => i.kind === 'panel_payment_failure')).toBe(false)
+    expect(ongoing.suppressed).toBe(1)
+    expect(alerts.deleteMany).not.toHaveBeenCalled()
+
+    // Burst aged out of the window: the key is released, arming the next exhaustion.
+    panel402.mockResolvedValue([] as never)
+    const cleared = await checkEvidenceHealth()
+    expect(cleared.suppressed).toBe(0)
+    expect(alerts.deleteMany).toHaveBeenCalledWith({ where: { key: { in: ['panel-payment'] } } })
+  })
+
   it('propagates a query failure instead of reporting a clean pipeline', async () => {
     groupBy.mockRejectedValue(new Error('connection terminated') as never)
 
@@ -233,6 +291,10 @@ describe('alertKey', () => {
       ],
       [{ kind: 'overall_failure_rate', recentPct: 60, baselinePct: 40 }, 'overall-failure'],
       [{ kind: 'overall_volume_collapse', recentPerDay: 3, baselinePerDay: 40 }, 'overall-volume'],
+      [
+        { kind: 'panel_payment_failure', count: 572, lastSeenAt: new Date(), lastModel: 'qwen/qwen3' },
+        'panel-payment',
+      ],
     ]
     for (const [issue, key] of cases) expect(alertKey(issue)).toBe(key)
   })
