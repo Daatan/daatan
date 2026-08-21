@@ -22,7 +22,17 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   const { id } = await params
   const user = await prisma.user.findFirst({
     where: { OR: [{ id }, { username: id }] },
-    select: { name: true, username: true, isPublic: true },
+    select: {
+      name: true,
+      username: true,
+      isPublic: true,
+      _count: {
+        select: {
+          predictions: { where: { isPublic: true } },
+          commitments: { where: { prediction: { isPublic: true } } },
+        },
+      },
+    },
   })
 
   if (!user) {
@@ -36,6 +46,7 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
     }
   }
 
+  const hasContent = user._count.predictions > 0 || user._count.commitments > 0
   const title = `${user.name} (@${user.username}) - DAATAN Profile`
   const description = `Check out ${user.name}'s prediction track record on DAATAN.`
 
@@ -50,6 +61,7 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
       url: `${getAppUrl()}/profile/${user.username}`,
     },
     twitter: { card: 'summary_large_image', title, description },
+    ...(!hasContent ? { robots: { index: false, follow: true } } : {}),
   }
 }
 

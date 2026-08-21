@@ -97,6 +97,26 @@ still get indexed on its own merits — it just stops being actively submitted t
 thin, and re-enters the sitemap automatically once it gains a commitment, real detail text, or
 resolves.
 
+### Empty profiles: excluded from the sitemap and noindexed
+
+The same thin-content bar applies to `/profile/[username]`. The sitemap query
+(`src/app/sitemap.ts`) only selects public users with at least one **public** prediction or a
+commitment on a public prediction — matching exactly what `loadProfileTab`'s `publicFilter`
+(`src/lib/services/profile.ts`) renders on the page itself, so a profile never gets a sitemap
+entry (or an indexable `generateMetadata`) for activity the public view wouldn't show anyway.
+A profile with none of that is just a name and an empty activity feed, the profile-page
+equivalent of a bare, untouched forecast. `generateMetadata` in
+`src/app/profile/[id]/page.tsx` backs this up with `robots: { index: false, follow: true }` on
+the same condition (via a filtered `_count`), so a profile reached by direct link (not via the
+sitemap) still isn't indexed while empty. Both re-enter automatically — sitemap inclusion and
+the `index: true` default — the moment the user has a public prediction or a commitment on one.
+
+## Auth-gated pages are noindexed
+
+`/create` requires a session and redirects anonymous visitors, so it has nothing for Google to
+rank and no reason to appear in search results. `src/app/create/page.tsx` sets
+`robots: { index: false, follow: false }` in its `metadata` export.
+
 ## Server-rendered content (Soft 404 prevention)
 
 A forecast page must carry **substantive, unique text in its initial SSR HTML** — not
