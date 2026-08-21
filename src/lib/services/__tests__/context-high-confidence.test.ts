@@ -37,6 +37,10 @@ function mockPrevious(confidence: number | null) {
   } as never)
 }
 
+/** A pool that backs a settlement claim under the daatan#1525 bar: two settling
+ *  votes out of two rows, i.e. unanimous. */
+const settledPool = { mean: 97, sources: [{ settled: true }, { settled: true }] }
+
 const matchInput = (probability: number) => ({
   predictionId: 'pred-1',
   sources: [],
@@ -197,7 +201,7 @@ describe('settled persistence', () => {
 
   it('saveNewsIndexerMatch writes settled+settledAt when settled', async () => {
     mockPrevious(70)
-    await saveNewsIndexerMatch({ ...matchInput(97), settled: true })
+    await saveNewsIndexerMatch({ ...matchInput(97), oracleSnapshot: settledPool, settled: true })
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ settled: true, settledAt: expect.any(Date) }),
@@ -217,7 +221,7 @@ describe('settled persistence', () => {
     mockPrevious(null)
     await saveOracleSnapshotOnly({
       predictionId: 'pred-1',
-      oracleSnapshot: {},
+      oracleSnapshot: settledPool,
       confidence: 97,
       aiCiLow: 94,
       aiCiHigh: 99,
@@ -238,7 +242,7 @@ describe('settled persistence', () => {
       sources: [],
       externalProbability: 97,
       externalReasoning: null,
-      oracleSnapshot: null,
+      oracleSnapshot: settledPool,
       confidence: 97,
       aiCiLow: 94,
       aiCiHigh: 99,

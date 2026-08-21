@@ -21,9 +21,9 @@ vi.mock('@/lib/services/telegram', () => ({
   notifyHighConfidence: vi.fn(),
 }))
 
-const { logError } = vi.hoisted(() => ({ logError: vi.fn() }))
+const { logError, logInfo } = vi.hoisted(() => ({ logError: vi.fn(), logInfo: vi.fn() }))
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: logError }),
+  createLogger: () => ({ info: logInfo, warn: vi.fn(), debug: vi.fn(), error: logError }),
 }))
 
 import { prisma } from '@/lib/prisma'
@@ -43,6 +43,15 @@ const update = vi.mocked(prisma.prediction.update)
 const deleteTranslations = vi.mocked(prisma.predictionTranslation.deleteMany)
 const transaction = vi.mocked(prisma.$transaction)
 const notify = vi.mocked(notifyHighConfidence)
+
+/** A pool that backs a settlement claim under the daatan#1525 bar. `settling` votes
+ *  out of `total` rows; defaults are unanimous, which always clears the bar. */
+function settledPool(settling = 2, total = settling) {
+  return {
+    mean: 97,
+    sources: Array.from({ length: total }, (_, i) => ({ settled: i < settling })),
+  }
+}
 
 function snapshotData(): Record<string, unknown> {
   return (snapshotCreate.mock.calls[0][0] as { data: Record<string, unknown> }).data
@@ -128,7 +137,13 @@ describe('recordEstimate — the single estimate writer', () => {
   })
 
   it('honors the settled latch only where the origin policy allows it', async () => {
-    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 97, settled: true })
+    await recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 97,
+      settled: true,
+      oracleSnapshot: settledPool(),
+    })
     expect(updateData()).toMatchObject({ settled: true })
 
     update.mockClear()
@@ -148,7 +163,13 @@ describe('recordEstimate — the single estimate writer', () => {
   it('reports a settlement latch that was asked for and did not stick', async () => {
     transaction.mockResolvedValue([{ id: 'snap-1' }, { settled: false }] as never)
 
-    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 97, settled: true })
+    await recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 97,
+      settled: true,
+      oracleSnapshot: settledPool(),
+    })
 
     expect(logError).toHaveBeenCalledTimes(1)
     expect(logError).toHaveBeenCalledWith(
@@ -159,7 +180,13 @@ describe('recordEstimate — the single estimate writer', () => {
 
   it('stays quiet when the latch sticks, and when no latch was asked for', async () => {
     transaction.mockResolvedValue([{ id: 'snap-1' }, { settled: true }] as never)
-    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 97, settled: true })
+    await recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 97,
+      settled: true,
+      oracleSnapshot: settledPool(),
+    })
 
     // an origin that cannot settle never asked, so a false row is not a discrepancy
     transaction.mockResolvedValue([{ id: 'snap-2' }, { settled: false }] as never)
@@ -365,5 +392,93 @@ describe('latestEvidenceAssertsSettlement — is the pin the thing we are publis
       const where = (call[0] as { where: Record<string, unknown> }).where
       expect(where).toMatchObject({ insufficientData: false, kind: { not: 'clock' } })
     }
+  })
+})
+
+describe('the settlement bar — a pin must be backed by its pool (#1525)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    transaction.mockResolvedValue([{ id: 'snap-1' }, { settled: true }] as never)
+    findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+    findFirst.mockResolvedValue(null as never)
+  })
+
+  const pin = (oracleSnapshot: unknown) =>
+    recordEstimate({
+      predictionId: 'pred-1',
+      origin: 'news-indexer',
+      probability: 97,
+      settled: true,
+      oracleSnapshot: oracleSnapshot as never,
+    })
+
+  it('latches a unanimous pool, however small — 2 of 2 is the strongest evidence there is', async () => {
+    await pin(settledPool(2, 2))
+    expect(updateData()).toMatchObject({ settled: true })
+  })
+
+  it('latches 3 of 5', async () => {
+    await pin(settledPool(3, 5))
+    expect(updateData()).toMatchObject({ settled: true })
+  })
+
+  // The case that motivated the change: raising the bare count would have rejected
+  // 2-of-2 above while still admitting these, because count tracks pool size.
+  it('refuses 2 of 97 and 3 of 123 — a settlement claim 2% of the pool supports', async () => {
+    await pin(settledPool(2, 97))
+    expect(updateData()).not.toHaveProperty('settled')
+
+    update.mockClear()
+    await pin(settledPool(3, 123))
+    expect(updateData()).not.toHaveProperty('settled')
+  })
+
+  it('refuses 1 of 1 — unanimous, but the count floor is what stops a share test there', async () => {
+    await pin(settledPool(1, 1))
+    expect(updateData()).not.toHaveProperty('settled')
+  })
+
+  it('fails closed when the pin arrives without a pool at all', async () => {
+    await pin({})
+    expect(updateData()).not.toHaveProperty('settled')
+
+    update.mockClear()
+    await pin(undefined)
+    expect(updateData()).not.toHaveProperty('settled')
+  })
+
+  it('keeps the estimate a rejected pin came with — only the latch is withheld', async () => {
+    await pin(settledPool(2, 97))
+    expect(updateData()).toMatchObject({ confidence: 97 })
+    expect(snapshotData()).toMatchObject({ externalProbability: 97 })
+  })
+
+  it('holds a rejected pin out of the Awaiting Resolution band as well', async () => {
+    await pin(settledPool(2, 97))
+    // 97 clears AWAITING_AI_RESOLUTION_HIGH on level, but a pin is admitted on its
+    // backing or not at all (#1248) — its confidence is a constant, not a level.
+    expect(updateData()).toMatchObject({ awaitingAiResolution: false })
+  })
+
+  it('sends no settled-line alert for a rejected pin', async () => {
+    findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+    await pin(settledPool(2, 97))
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('logs the rejection with both counts, so the rate is visible immediately', async () => {
+    await pin(settledPool(2, 97))
+    expect(logInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ predictionId: 'pred-1', settling: 2, total: 97, backed: false }),
+      expect.stringContaining('settlement pin rejected'),
+    )
+  })
+
+  it('says nothing when the pool does back the claim', async () => {
+    await pin(settledPool(4, 4))
+    expect(logInfo).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('settlement pin rejected'),
+    )
   })
 })
