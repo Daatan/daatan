@@ -212,13 +212,9 @@ resource "aws_budgets_budget" "net_spend_monthly" {
     subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
   }
 
-  notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 100
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "FORECASTED"
-    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
-  }
+  # No FORECASTED alert here on purpose: AWS forecasts a net budget from gross
+  # usage (observed 2026-08-21: $0 actual, ~$220 forecast), so it would sit in
+  # ALARM every month while credits still cover everything.
 }
 
 # ====================================================================
