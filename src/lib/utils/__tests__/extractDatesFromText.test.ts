@@ -81,6 +81,51 @@ describe('extractDatesFromClaimText', () => {
     const dates = extractDatesFromClaimText('BEFORE 31 august 2026 this must happen.')
     expect(dates).toHaveLength(1)
   })
+
+  // Regression fixtures for daatan#1541: "before <exact date>" names the day
+  // AFTER the deadline (the deadline is the day before), unlike "by <exact
+  // date>" where the named date IS the deadline.
+  it('extracts "before <Month> <Day>, <Year>" as the day before the named date', () => {
+    const dates = extractDatesFromClaimText('Resolves YES if Iran conducts a nuclear test before January 1, 2027.')
+    expect(dates).toHaveLength(1)
+    expect(dates[0].getUTCFullYear()).toBe(2026)
+    expect(dates[0].getUTCMonth()).toBe(11) // December
+    expect(dates[0].getUTCDate()).toBe(31)
+  })
+
+  it('extracts "before <Day> <Month> <Year>" as the day before the named date', () => {
+    const dates = extractDatesFromClaimText('Must happen before 1 January 2027.')
+    expect(dates[0].getUTCFullYear()).toBe(2026)
+    expect(dates[0].getUTCMonth()).toBe(11)
+    expect(dates[0].getUTCDate()).toBe(31)
+  })
+
+  it('extracts "before <ISO date>" as the day before the named date', () => {
+    const dates = extractDatesFromClaimText('Must happen before 2027-01-01.')
+    expect(dates[0].getUTCFullYear()).toBe(2026)
+    expect(dates[0].getUTCMonth()).toBe(11)
+    expect(dates[0].getUTCDate()).toBe(31)
+  })
+
+  it('a bare ISO date with no trigger word is still treated like "by" (unchanged)', () => {
+    const dates = extractDatesFromClaimText('Resolves on 2026-08-31.')
+    expect(dates[0].getUTCMonth()).toBe(7)
+    expect(dates[0].getUTCDate()).toBe(31)
+  })
+
+  it('"before" rolls over a year boundary correctly', () => {
+    const dates = extractDatesFromClaimText('Must happen before January 1, 2026.')
+    expect(dates[0].getUTCFullYear()).toBe(2025)
+    expect(dates[0].getUTCMonth()).toBe(11)
+    expect(dates[0].getUTCDate()).toBe(31)
+  })
+
+  it('"by <exact date>" is unaffected — the named date IS the deadline', () => {
+    const dates = extractDatesFromClaimText('Must happen by January 1, 2027.')
+    expect(dates[0].getUTCFullYear()).toBe(2027)
+    expect(dates[0].getUTCMonth()).toBe(0)
+    expect(dates[0].getUTCDate()).toBe(1)
+  })
 })
 
 describe('findClaimTextDeadlineMismatch', () => {
@@ -130,5 +175,20 @@ describe('findClaimTextDeadlineMismatch', () => {
       resolveByDatetime,
     )
     expect(mismatch).toBeNull()
+  })
+
+  it('daatan#1541 repro: "before January 1, 2027" agrees with a Dec 31, 2026 deadline (was a false-positive block)', () => {
+    const resolveByDatetime = new Date('2026-12-31T23:59:59Z')
+    const mismatch = findClaimTextDeadlineMismatch(
+      'Resolves YES if Iran conducts a nuclear test before January 1, 2027. Otherwise, resolved as No.',
+      resolveByDatetime,
+    )
+    expect(mismatch).toBeNull()
+  })
+
+  it('"before <date>" still correctly flags a genuine mismatch', () => {
+    const resolveByDatetime = new Date('2026-06-30T23:59:59Z')
+    const mismatch = findClaimTextDeadlineMismatch('Must happen before January 1, 2027.', resolveByDatetime)
+    expect(mismatch).not.toBeNull()
   })
 })

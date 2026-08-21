@@ -28,31 +28,45 @@ const MONTH_NAMES = [
 
 const MONTH_PATTERN = `(${MONTH_NAMES.join('|')})`
 
-// "2026-08-31" — unambiguous on its own, no leading trigger word required.
-const ISO_DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/g
+// "2026-08-31" (no trigger word, treated like "by"), "before 2027-01-01"
+// (trigger captured so the day-before adjustment below applies to it too).
+const ISO_DATE_RE = /\b(?:(by|before)\s+)?(\d{4})-(\d{2})-(\d{2})\b/gi
 
 // "by the end of 2026", "before end of 2027" — deliberately requires the
 // year to immediately follow "end of"; "end of summer 2026" has "summer" in
-// between and correctly does NOT match.
+// between and correctly does NOT match. Already end-anchored on Dec 31, so
+// "before end of <year>" needs no day-before adjustment the way "before
+// <exact date>" does below.
 const END_OF_YEAR_RE = /\b(?:by|before)\s+(?:the\s+)?end\s+of\s+(\d{4})\b/gi
 
 // "by August 31, 2026", "before August 31 2026", "by Aug 31st, 2026"
 const MONTH_DAY_YEAR_RE = new RegExp(
-  `\\b(?:by|before)\\s+${MONTH_PATTERN}\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`,
+  `\\b(by|before)\\s+${MONTH_PATTERN}\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b`,
   'gi',
 )
 
 // "by 31 August 2026", "before 1st December 2026"
 const DAY_MONTH_YEAR_RE = new RegExp(
-  `\\b(?:by|before)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH_PATTERN}\\s+(\\d{4})\\b`,
+  `\\b(by|before)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s+${MONTH_PATTERN}\\s+(\\d{4})\\b`,
   'gi',
 )
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 /** UTC end-of-day instant for (year, monthIndex 0-11, day), or null if the combo isn't a real calendar date. */
 function endOfUtcDay(year: number, monthIndex: number, day: number): Date | null {
   const d = new Date(Date.UTC(year, monthIndex, day, 23, 59, 59, 999))
   if (d.getUTCFullYear() !== year || d.getUTCMonth() !== monthIndex || d.getUTCDate() !== day) return null
   return d
+}
+
+/**
+ * "By <date>" means the deadline IS that date; "before <date>" means the day
+ * before it (ms arithmetic, so it rolls over months/years correctly). A
+ * missing/undefined trigger (the bare-ISO-date case) is treated like "by".
+ */
+function boundaryForTrigger(trigger: string | undefined, namedDate: Date): Date {
+  return trigger?.toLowerCase() === 'before' ? new Date(namedDate.getTime() - ONE_DAY_MS) : namedDate
 }
 
 /**
@@ -64,8 +78,8 @@ export function extractDatesFromClaimText(text: string): Date[] {
   const dates: Date[] = []
 
   for (const m of text.matchAll(ISO_DATE_RE)) {
-    const d = endOfUtcDay(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-    if (d) dates.push(d)
+    const d = endOfUtcDay(Number(m[2]), Number(m[3]) - 1, Number(m[4]))
+    if (d) dates.push(boundaryForTrigger(m[1], d))
   }
 
   for (const m of text.matchAll(END_OF_YEAR_RE)) {
@@ -74,13 +88,13 @@ export function extractDatesFromClaimText(text: string): Date[] {
   }
 
   for (const m of text.matchAll(MONTH_DAY_YEAR_RE)) {
-    const d = endOfUtcDay(Number(m[3]), MONTH_NAMES.indexOf(m[1].toLowerCase()), Number(m[2]))
-    if (d) dates.push(d)
+    const d = endOfUtcDay(Number(m[4]), MONTH_NAMES.indexOf(m[2].toLowerCase()), Number(m[3]))
+    if (d) dates.push(boundaryForTrigger(m[1], d))
   }
 
   for (const m of text.matchAll(DAY_MONTH_YEAR_RE)) {
-    const d = endOfUtcDay(Number(m[3]), MONTH_NAMES.indexOf(m[2].toLowerCase()), Number(m[1]))
-    if (d) dates.push(d)
+    const d = endOfUtcDay(Number(m[4]), MONTH_NAMES.indexOf(m[3].toLowerCase()), Number(m[2]))
+    if (d) dates.push(boundaryForTrigger(m[1], d))
   }
 
   return dates
