@@ -35,7 +35,14 @@ const fetchSitemapData = unstable_cache(
         distinct: ['predictionId', 'language'],
       }),
       prisma.user.findMany({
-        where: { isPublic: true, username: { not: null } },
+        where: {
+          isPublic: true,
+          username: { not: null },
+          OR: [
+            { predictions: { some: { isPublic: true } } },
+            { commitments: { some: { prediction: { isPublic: true } } } },
+          ],
+        },
         select: { username: true, updatedAt: true },
       }),
       prisma.tag.findMany({
