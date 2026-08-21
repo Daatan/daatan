@@ -14,60 +14,6 @@ resource "aws_sns_topic_subscription" "billing_alerts_email" {
   endpoint  = "komapc@gmail.com"
 }
 
-resource "aws_cloudwatch_metric_alarm" "billing_50usd" {
-  provider            = aws.us_east_1
-  alarm_name          = "billing-alert-50usd"
-  alarm_description   = "AWS spend exceeded $50 — credits may be expiring"
-  metric_name         = "EstimatedCharges"
-  namespace           = "AWS/Billing"
-  statistic           = "Maximum"
-  period              = 86400
-  evaluation_periods  = 1
-  threshold           = 50
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.billing_alerts.arn]
-
-  dimensions = {
-    Currency = "USD"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "billing_150usd" {
-  provider            = aws.us_east_1
-  alarm_name          = "billing-alert-150usd"
-  alarm_description   = "AWS spend exceeded $150 — action required"
-  metric_name         = "EstimatedCharges"
-  namespace           = "AWS/Billing"
-  statistic           = "Maximum"
-  period              = 86400
-  evaluation_periods  = 1
-  threshold           = 150
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.billing_alerts.arn]
-
-  dimensions = {
-    Currency = "USD"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "billing_200usd" {
-  provider            = aws.us_east_1
-  alarm_name          = "billing-alert-200usd"
-  alarm_description   = "AWS spend exceeded $200 — credits exhausted or nearly gone"
-  metric_name         = "EstimatedCharges"
-  namespace           = "AWS/Billing"
-  statistic           = "Maximum"
-  period              = 86400
-  evaluation_periods  = 1
-  threshold           = 200
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.billing_alerts.arn]
-
-  dimensions = {
-    Currency = "USD"
-  }
-}
-
 # AWS Budgets publishes as the SERVICE principal budgets.amazonaws.com, which the
 # topic's AWS-generated default policy does NOT match — that statement grants
 # Principal {"AWS": "*"} (IAM principals only), so a budget attached to this topic
@@ -133,6 +79,12 @@ data "aws_iam_policy_document" "billing_alerts" {
   }
 }
 
+# The former EstimatedCharges alarms ($50/$150/$200, net of credits) were removed
+# 2026-08-21: while credits cover the bill they sat in OK on 0.0 datapoints forever,
+# and once credits end (~Dec 2026 at ~$15/day) they would fire on roughly day 3,
+# 10 and 13 of EVERY month — noise, not signal. Both questions they tried to ask are
+# answered by the budgets below: net_spend_monthly says "credits stopped covering",
+# gross_spend_monthly says "burn is above plan".
 resource "aws_sns_topic_policy" "billing_alerts" {
   provider = aws.us_east_1
   arn      = aws_sns_topic.billing_alerts.arn
@@ -151,11 +103,13 @@ resource "aws_sns_topic_policy" "billing_alerts" {
 #    it. The limit is set at the post-Translate, post-cleanup target run-rate, i.e.
 #    deliberately a bit below today's actuals: it goes quiet only once the planned
 #    savings land, and the FORECASTED alert speaks early in the month if they don't.
-# 2. net_spend_monthly — "has real cash started flowing?" Measures NET spend
-#    (credits applied). While credits cover the bill it reads $0 and stays silent;
-#    the 1% ACTUAL threshold fires on the first ~$0.50 of real charges — the day
-#    credits stop covering. No AWS budget exposes the credit balance itself, so this
-#    is the closest thing to a credit-exhaustion alarm. Figures and runway: see the
+# 2. net_spend_monthly — "has real cash started flowing, and is it on plan?"
+#    Measures NET spend (credits applied). While credits cover the bill it reads $0
+#    and stays silent; the 1% ACTUAL threshold fires on the first few dollars of
+#    real charges — the day credits stop covering. No AWS budget exposes the credit
+#    balance itself, so this is the closest thing to a credit-exhaustion alarm.
+#    Once credits are gone net == gross, so the limit matches the gross guard and
+#    the 100% ACTUAL alert becomes the "the bill overran the plan" signal. Figures and runway: see the
 #    finances audit in the private Daatan/docs repo (this repo is public).
 resource "aws_budgets_budget" "gross_spend_monthly" {
   name         = "daatan-gross-spend-monthly"
@@ -196,7 +150,7 @@ resource "aws_budgets_budget" "gross_spend_monthly" {
 resource "aws_budgets_budget" "net_spend_monthly" {
   name         = "daatan-net-spend-monthly"
   budget_type  = "COST"
-  limit_amount = "50"
+  limit_amount = "300"
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
@@ -207,6 +161,14 @@ resource "aws_budgets_budget" "net_spend_monthly" {
   notification {
     comparison_operator       = "GREATER_THAN"
     threshold                 = 1
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 100
     threshold_type            = "PERCENTAGE"
     notification_type         = "ACTUAL"
     subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
