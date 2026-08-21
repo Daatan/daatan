@@ -142,18 +142,25 @@ resource "aws_sns_topic_policy" "billing_alerts" {
 # The three EstimatedCharges alarms above are net of promotional credits: while
 # credits cover the bill, the metric reads $0.00 and the alarms cannot fire, which
 # defeats their own "credits may be expiring" framing. All three have sat in OK
-# since 2026-05-19 on 0.0 datapoints. This budget measures GROSS spend instead
-# (include_credit = false) so burn is visible while credits are still absorbing it.
+# since 2026-05-19 on 0.0 datapoints.
 #
-# This is a recurring monthly signal, not an exception one: the limit sits below
-# current run-rate, so it is expected to notify every month. Treat it as a "here is
-# the burn" ping. It does NOT warn about credit exhaustion — that needs the credit
-# balance itself, which no AWS budget exposes. Figures and runway: see the finances
-# audit in the private Daatan/docs repo (this repo is public).
+# Two budgets, two questions (Daatan/platform#20, 2026-08-21):
+#
+# 1. gross_spend_monthly — "is burn where we expect it?" Measures GROSS spend
+#    (include_credit = false) so burn is visible while credits are still absorbing
+#    it. The limit is set at the post-Translate, post-cleanup target run-rate, i.e.
+#    deliberately a bit below today's actuals: it goes quiet only once the planned
+#    savings land, and the FORECASTED alert speaks early in the month if they don't.
+# 2. net_spend_monthly — "has real cash started flowing?" Measures NET spend
+#    (credits applied). While credits cover the bill it reads $0 and stays silent;
+#    the 1% ACTUAL threshold fires on the first ~$0.50 of real charges — the day
+#    credits stop covering. No AWS budget exposes the credit balance itself, so this
+#    is the closest thing to a credit-exhaustion alarm. Figures and runway: see the
+#    finances audit in the private Daatan/docs repo (this repo is public).
 resource "aws_budgets_budget" "gross_spend_monthly" {
   name         = "daatan-gross-spend-monthly"
   budget_type  = "COST"
-  limit_amount = "500"
+  limit_amount = "300"
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
@@ -174,6 +181,42 @@ resource "aws_budgets_budget" "gross_spend_monthly" {
     threshold                 = 100
     threshold_type            = "PERCENTAGE"
     notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 100
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "FORECASTED"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+}
+
+resource "aws_budgets_budget" "net_spend_monthly" {
+  name         = "daatan-net-spend-monthly"
+  budget_type  = "COST"
+  limit_amount = "50"
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  cost_types {
+    include_credit = true
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 1
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "ACTUAL"
+    subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
+  }
+
+  notification {
+    comparison_operator       = "GREATER_THAN"
+    threshold                 = 100
+    threshold_type            = "PERCENTAGE"
+    notification_type         = "FORECASTED"
     subscriber_sns_topic_arns = [aws_sns_topic.billing_alerts.arn]
   }
 }
