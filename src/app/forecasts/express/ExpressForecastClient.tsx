@@ -39,6 +39,14 @@ export interface GeneratedPrediction {
     url: string
     title: string
   }>
+  externalMarketId?: string | null
+  market?: {
+    provider: string
+    providerLabel: string
+    question: string
+    url: string
+    probability: number | null
+  } | null
   ungroundedYears?: string[]
   localized?: {
     language: string
@@ -294,6 +302,7 @@ export default function ExpressForecastClient({
           claimText: generated.claimText,
           detailsText: generated.detailsText,
           articles,
+          marketProbability: generated.market?.probability ?? undefined,
         }),
       })
 
@@ -341,7 +350,8 @@ export default function ExpressForecastClient({
           tags: finalData.tags,
           newsAnchorUrl: finalData.newsAnchor?.url || undefined,
           newsAnchorTitle: finalData.newsAnchor?.title || undefined,
-          source: finalData.newsAnchor ? undefined : 'manual',
+          source: (finalData.newsAnchor || finalData.externalMarketId) ? undefined : 'manual',
+          externalMarketId: finalData.externalMarketId || undefined,
           isPublic,
           confidence: finalData.probabilitySuggestion || undefined,
         }),
@@ -914,6 +924,29 @@ export default function ExpressForecastClient({
               </div>
             )}
 
+            {/* Linked market */}
+            {generated.market && (
+              <div>
+                <h3 className="text-sm font-bold text-text-secondary mb-2">{t('marketLinked')}</h3>
+                <a
+                  href={generated.market.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-4 p-4 border border-emerald-500/30 bg-emerald-500/10 rounded-xl hover:border-emerald-400 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-white mb-1">{generated.market.question}</p>
+                    <p className="text-sm text-gray-500">{generated.market.providerLabel}</p>
+                  </div>
+                  {generated.market.probability != null && (
+                    <div className="text-2xl font-black text-emerald-400 shrink-0">
+                      {generated.market.probability}%
+                    </div>
+                  )}
+                </a>
+              </div>
+            )}
+
             {/* News Anchor */}
             {generated.newsAnchor ? (
               <div>
@@ -930,7 +963,7 @@ export default function ExpressForecastClient({
                   )}
                 </a>
               </div>
-            ) : (
+            ) : generated.market ? null : (
               <div>
                 <h3 className="text-sm font-bold text-text-secondary mb-2">{t('sourceLabel')}</h3>
                 <div className="p-4 border border-purple-500/30 bg-purple-500/10 rounded-xl">

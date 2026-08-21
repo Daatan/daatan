@@ -18,6 +18,7 @@ const guessSchema = z.object({
     source: z.string(),
     snippet: z.string(),
   })),
+  marketProbability: z.number().min(0).max(100).nullish(),
 })
 
 export const POST = withAuth(async (request, user) => {
@@ -32,7 +33,7 @@ export const POST = withAuth(async (request, user) => {
 
   try {
     const body = await request.json()
-    const { claimText, detailsText, articles } = guessSchema.parse(body)
+    const { claimText, detailsText, articles, marketProbability } = guessSchema.parse(body)
 
     const t0 = Date.now()
     // Interactive: a user is waiting on this while drafting a claim, and the LLM
@@ -51,7 +52,7 @@ export const POST = withAuth(async (request, user) => {
       })
     }
 
-    const result = await guessChances(claimText, detailsText, articles)
+    const result = await guessChances(claimText, detailsText, articles, marketProbability)
     return NextResponse.json(result)
   } catch (error) {
     return handleRouteError(error, 'Failed to guess chances')

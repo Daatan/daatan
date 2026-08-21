@@ -106,7 +106,8 @@ export function buildMarketSearchQuery(claimText: string, entities: string[] = [
   return out.join(' ')
 }
 
-const PROVIDER_LABEL: Record<ProviderId, string> = {
+/** Human-readable provider names, shared by every caller that displays a linked market. */
+export const PROVIDER_LABEL: Record<ProviderId, string> = {
   POLYMARKET: 'Polymarket',
   KALSHI: 'Kalshi',
 }
@@ -769,6 +770,16 @@ export async function resolveMarketByUrl(url: string): Promise<ExternalMarket | 
     return null
   }
   return upsertMarket(market)
+}
+
+/** Most recent cached YES price (0-100) for a market, or null if none synced yet. */
+export async function getLatestMarketPrice(marketId: string): Promise<number | null> {
+  const snapshot = await prisma.externalMarketPriceSnapshot.findFirst({
+    where: { marketId },
+    orderBy: { createdAt: 'desc' },
+    select: { probability: true },
+  })
+  return snapshot?.probability ?? null
 }
 
 /**

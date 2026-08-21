@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { apiError } from '@/lib/api-error'
 import { z } from 'zod'
-import { getProviderForUrl, resolveMarketByUrl } from '@/lib/services/external-markets'
+import { getProviderForUrl, resolveMarketByUrl, PROVIDER_LABEL } from '@/lib/services/external-markets'
 import { externalMarketsEnabled } from '@/lib/capabilities'
 import { createLogger } from '@/lib/logger'
 
@@ -11,11 +11,6 @@ const log = createLogger('forecasts-import-market')
 export const dynamic = 'force-dynamic'
 
 const importSchema = z.object({ url: z.string().min(1) })
-
-const PROVIDER_LABEL: Record<string, string> = {
-  POLYMARKET: 'Polymarket',
-  KALSHI: 'Kalshi',
-}
 
 /**
  * POST /api/forecasts/import-market  body: { url }

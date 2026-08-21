@@ -5,6 +5,7 @@ vi.mock('@/auth', () => ({ auth: mockAuth }))
 vi.mock('@/lib/services/external-markets', () => ({
   getProviderForUrl: vi.fn(),
   resolveMarketByUrl: vi.fn(),
+  PROVIDER_LABEL: { POLYMARKET: 'Polymarket', KALSHI: 'Kalshi' },
 }))
 
 import { describe, it, expect, beforeEach } from 'vitest'
