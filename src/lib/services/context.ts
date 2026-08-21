@@ -28,6 +28,16 @@ const AWAITING_AI_RESOLUTION_HIGH = 90
  *  design, see #1301). */
 const MIN_SETTLING_SOURCES = 2
 
+/** The other half of the bar (daatan#1525). A bare count is confounded with pool
+ *  size: measured on prod, `settling = 2` covers both 2-of-2 (unanimous) and
+ *  2-of-97 (2% agreement), and the count floor rises with the pool, so raising the
+ *  integer mostly rejects SMALL pools — including the unanimous ones, which are the
+ *  strongest evidence the pipeline produces. Requiring a share instead rejects
+ *  2-of-97 and keeps 2-of-2; the count floor above is what stops a pure share test
+ *  clearing on a 1-of-1 pool. Integer arithmetic on purpose — `settling * 4 >= total`
+ *  is `settling / total >= 0.25` without the float. */
+const MIN_SETTLING_SHARE_DENOM = 4
+
 /** Rows of the persisted Oracle pool that carried a settlement-grade vote.
  *  Defensive over unvalidated Json, same as `maxPublishedAt` below. */
 function settlingSourceCount(oracleSnapshot: unknown): number {
@@ -36,18 +46,47 @@ function settlingSourceCount(oracleSnapshot: unknown): number {
   return sources.filter((s) => (s as { settled?: unknown } | null)?.settled === true).length
 }
 
+/** Pool rows behind an estimate, settling or not — the denominator of the share. */
+function sourceCount(oracleSnapshot: unknown): number {
+  const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
+  return Array.isArray(sources) ? sources.length : 0
+}
+
+/**
+ * Does this snapshot's pool actually back the Oracle's settlement claim?
+ *
+ * One predicate for all three consumers — latch, band and crossing alert — because
+ * they used to disagree (daatan#1525). The latch, which excludes a forecast from the
+ * temporal clock's glide candidates, shows a settled badge and can only be undone by
+ * a human, had NO bar at all, while the two lighter consumers both applied
+ * MIN_SETTLING_SOURCES. 195 assertions carrying fewer than two settling votes were
+ * written on prod (107 with zero) — every one of them free to latch while the alert
+ * that would have reported it was suppressed as too weak.
+ *
+ * Fails closed on a pin that arrives without its snapshot: no pool, no backing.
+ */
+function settlementBacking(oracleSnapshot: unknown): { settling: number; total: number; backed: boolean } {
+  const settling = settlingSourceCount(oracleSnapshot)
+  const total = sourceCount(oracleSnapshot)
+  return {
+    settling,
+    total,
+    backed: settling >= MIN_SETTLING_SOURCES && settling * MIN_SETTLING_SHARE_DENOM >= total,
+  }
+}
+
 /**
  * A settlement pin and an organic estimate are different epistemic classes
  * sharing the `confidence` column (daatan#1248): 97 from thirty agreeing
  * weighted sources is a level; 97 from a pin is `settlement_stance`, a policy
  * constant. So a pin enters the Awaiting Resolution band as what it is — the
- * Oracle's claim that the question is decided, admitted when the snapshot
- * carries at least MIN_SETTLING_SOURCES settling votes — and never via the
- * level check its constant would trivially clear. Organic estimates keep the
- * plain level band (the #1185 false-negative fix relies on that shape).
+ * Oracle's claim that the question is decided, admitted only when the snapshot's
+ * pool actually backs it (`settlementBacking`) — and never via the level check its
+ * constant would trivially clear. Organic estimates keep the plain level band (the
+ * #1185 false-negative fix relies on that shape).
  */
-function isAwaitingAiResolution(confidence: number | null, pinned = false, settlingSources = 0): boolean {
-  if (pinned) return settlingSources >= MIN_SETTLING_SOURCES
+function isAwaitingAiResolution(confidence: number | null, pinned = false, backed = false): boolean {
+  if (pinned) return backed
   return confidence !== null && (confidence >= AWAITING_AI_RESOLUTION_HIGH || confidence <= AWAITING_AI_RESOLUTION_LOW)
 }
 
@@ -76,7 +115,7 @@ function notifyIfCrossedHighConfidence(
   prev: PreviousConfidence | null,
   newConfidence: number | null,
   settled = false,
-  settlingSources = 0,
+  backed = false,
 ): void {
   if (prev === null || newConfidence === null) return
   if (newConfidence < HIGH_CONFIDENCE_THRESHOLD) return
@@ -85,8 +124,8 @@ function notifyIfCrossedHighConfidence(
   // construction — so it alerts only when the pin is evidence-backed, under
   // the same bar the band applies (daatan#1248; the #388 false pin fired this
   // alert from two adjacent-fact votes).
-  if (settled && settlingSources < MIN_SETTLING_SOURCES) {
-    log.info({ predictionId, settlingSources }, 'high-confidence alert skipped: settlement pin below the settling-sources bar')
+  if (settled && !backed) {
+    log.info({ predictionId }, 'high-confidence alert skipped: settlement pin below the settling-source bar')
     return
   }
   notifyHighConfidence(
@@ -268,11 +307,21 @@ export async function recordEstimate(input: RecordEstimateInput) {
   // policy.canSettle the sticky latch obeys) — a clock or creation write
   // claiming `settled` must not buy its way into the band or the alert.
   const pinned = policy.canSettle && input.settled === true
-  const settlingSources = pinned ? settlingSourceCount(input.oracleSnapshot) : 0
+  const backing = pinned
+    ? settlementBacking(input.oracleSnapshot)
+    : { settling: 0, total: 0, backed: false }
+  if (pinned && !backing.backed) {
+    // Visible from day one rather than inferred later: this is the rate at which the
+    // Oracle claims settlement on a pool that does not carry it (daatan#1525).
+    log.info(
+      { predictionId: input.predictionId, origin: input.origin, ...backing },
+      'settlement pin rejected: pool does not back the claim, latch not written',
+    )
+  }
   // Deliberately the *truthy* test, not `pinned`'s strict one: this mirrors the
   // condition the latch spread below actually uses, so the post-write check can
   // never disagree with the write it is checking (daatan#1498).
-  const latchWrite = Boolean(policy.canSettle && input.settled)
+  const latchWrite = pinned && backing.backed
 
   // An abstention leaves the published estimate alone unless its reason condemns it
   // (daatan#1473) — `{}` here is the same "this run produced no number" no-op the
@@ -285,14 +334,14 @@ export async function recordEstimate(input: RecordEstimateInput) {
     : input.probability !== null
       ? {
           confidence: input.probability,
-          awaitingAiResolution: isAwaitingAiResolution(input.probability, pinned, settlingSources),
+          awaitingAiResolution: isAwaitingAiResolution(input.probability, pinned, backing.backed),
           aiCiLow: input.ciLow ?? null,
           aiCiHigh: input.ciHigh ?? null,
         }
       : {}
   const predictionData: Prisma.PredictionUpdateInput = {
     ...estimateFields,
-    ...(policy.canSettle && input.settled ? { settled: true, settledAt: now } : {}),
+    ...(latchWrite ? { settled: true, settledAt: now } : {}),
     ...(policy.touchesUserContext ? { detailsText: input.summary ?? '', contextUpdatedAt: now } : {}),
   }
 
@@ -357,7 +406,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
     )
   }
   if (willNotify) {
-    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, settlingSources)
+    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, backing.backed)
   }
   return snapshot as ContextSnapshot
 }
