@@ -966,12 +966,17 @@ describe('claimArticleForExtraction', () => {
   beforeEach(() => vi.clearAllMocks())
 
   /** The row `findFirst` resolves after a P2002. Defaults to matching `article()`'s
-   *  contentHash (the same-content branch); pass `contentHash: 'stale-hash'` or `null`
-   *  to exercise the content-changed branch instead. */
-  const currentRow = (over: Partial<{ id: string; version: number; contentHash: string | null }> = {}) => ({
+   *  contentHash (the same-content branch) with `status: 'COMPLETE'`; pass
+   *  `contentHash: 'stale-hash'` or `null` to exercise the content-changed branch
+   *  instead, or `status` to exercise `skip_pending` (PENDING/FAILED) vs `skip_complete`
+   *  (COMPLETE) on the same-content branch. */
+  const currentRow = (
+    over: Partial<{ id: string; version: number; contentHash: string | null; status: string }> = {},
+  ) => ({
     id: 'current-1',
     version: 1,
     contentHash: hashArticleContent('Headline', 'A snippet'),
+    status: 'COMPLETE',
     ...over,
   })
 
@@ -1051,7 +1056,7 @@ describe('claimArticleForExtraction', () => {
       expect(result).toEqual({ result: 'claimed', articleId: 'new-3' })
     })
 
-    it('skips when a concurrent writer already versioned this URL first', async () => {
+    it('skips as skip_pending when a concurrent writer already versioned this URL first', async () => {
       create.mockImplementationOnce(() => {
         throw uniqueViolation()
       })
@@ -1061,7 +1066,9 @@ describe('claimArticleForExtraction', () => {
       })
 
       const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
-      expect(result).toEqual({ result: 'skip', articleId: null })
+      // The concurrent writer's extraction may still be in flight (news-indexer#354) —
+      // a caller cannot yet assume the evidence is captured, unlike skip_complete.
+      expect(result).toEqual({ result: 'skip_pending', articleId: null })
     })
 
     it('re-throws a non-P2002 error from the versioning transaction', async () => {
@@ -1099,12 +1106,28 @@ describe('claimArticleForExtraction', () => {
       })
     })
 
-    it('skips when the conditional updateMany matches nothing (still COMPLETE, or a fresh in-flight PENDING claim)', async () => {
+    it('skips as skip_complete when the conditional updateMany matches nothing and the row is COMPLETE', async () => {
       updateMany.mockResolvedValue({ count: 0 })
+      findFirst.mockResolvedValue(currentRow({ status: 'COMPLETE' }) as never)
       const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
       // The row exists whether or not this re-claim matched — a caller resolving "the
-      // pool row for this URL" gets it either way.
-      expect(result).toEqual({ result: 'skip', articleId: 'current-1' })
+      // pool row for this URL" gets it either way. A genuinely finished extraction
+      // (news-indexer#354) — retrying can never learn anything new, unlike skip_pending.
+      expect(result).toEqual({ result: 'skip_complete', articleId: 'current-1' })
+    })
+
+    it('skips as skip_pending when the conditional updateMany matches nothing and the row is still resolving (PENDING, not yet stale)', async () => {
+      updateMany.mockResolvedValue({ count: 0 })
+      findFirst.mockResolvedValue(currentRow({ status: 'PENDING' }) as never)
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      expect(result).toEqual({ result: 'skip_pending', articleId: 'current-1' })
+    })
+
+    it('skips as skip_pending when the conditional updateMany matches nothing and the row is FAILED but still in backoff', async () => {
+      updateMany.mockResolvedValue({ count: 0 })
+      findFirst.mockResolvedValue(currentRow({ status: 'FAILED' }) as never)
+      const result = await claimArticleForExtraction('pred-1', article(), 'news-indexer')
+      expect(result).toEqual({ result: 'skip_pending', articleId: 'current-1' })
     })
 
     it("the updateMany's WHERE admits a backed-off non-terminal FAILED row and a stale PENDING claim, scoped to the current row's id", async () => {
@@ -1292,8 +1315,9 @@ describe('claimArticlesForExtraction', () => {
       id: 'row-2',
       version: 1,
       contentHash: hashArticleContent('Headline', 'A snippet'),
+      status: 'COMPLETE',
     } as never)
-    updateMany.mockResolvedValueOnce({ count: 0 }) // second: same content, nothing matched — skip
+    updateMany.mockResolvedValueOnce({ count: 0 }) // second: same content, COMPLETE, nothing matched — skip_complete
 
     const results = await claimArticlesForExtraction(
       'pred-1',
@@ -1303,7 +1327,7 @@ describe('claimArticlesForExtraction', () => {
 
     expect(results).toEqual([
       { result: 'claimed', articleId: 'row-1' },
-      { result: 'skip', articleId: 'row-2' },
+      { result: 'skip_complete', articleId: 'row-2' },
     ])
   })
 })
@@ -1313,7 +1337,7 @@ describe('articleIdsByUrl', () => {
     const articles = [article({ url: 'https://a.com/1' }), article({ url: 'https://b.com/2' })]
     const outcomes = [
       { result: 'claimed' as const, articleId: 'row-1' },
-      { result: 'skip' as const, articleId: 'row-2' },
+      { result: 'skip_complete' as const, articleId: 'row-2' },
     ]
     expect(articleIdsByUrl(articles, outcomes)).toEqual(
       new Map([
@@ -1325,7 +1349,7 @@ describe('articleIdsByUrl', () => {
 
   it('omits a URL whose outcome lost the versioning race (articleId null)', () => {
     const articles = [article({ url: 'https://a.com/1' })]
-    const outcomes = [{ result: 'skip' as const, articleId: null }]
+    const outcomes = [{ result: 'skip_pending' as const, articleId: null }]
     expect(articleIdsByUrl(articles, outcomes)).toEqual(new Map())
   })
 })

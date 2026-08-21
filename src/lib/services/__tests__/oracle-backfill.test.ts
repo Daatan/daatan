@@ -197,7 +197,7 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
     mockClaim.mockImplementation(async (_id: string, arts: { url: string }[]) =>
       arts.map((a, i) =>
         a.url === 'https://a.com/1'
-          ? { result: 'skip', articleId: `row-${i}` }
+          ? { result: 'skip_complete', articleId: `row-${i}` }
           : { result: 'claimed', articleId: `row-${i}` },
       ),
     )
@@ -452,7 +452,7 @@ describe('refreshOracleSnapshot', () => {
   describe('extraction claim gate (evidence-pool.ts)', () => {
     it('reports status: unchanged and skips the Oracle call when every searched article is already claimed/unchanged', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
-      mockClaim.mockResolvedValue([{ result: 'skip', articleId: 'row-1' }])
+      mockClaim.mockResolvedValue([{ result: 'skip_complete', articleId: 'row-1' }])
 
       const r = await refreshOracleSnapshot(prediction)
 
@@ -547,7 +547,7 @@ describe('refreshOracleSnapshot', () => {
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },
       ])
       mockClaim.mockResolvedValue([
-        { result: 'skip', articleId: 'row-1' },
+        { result: 'skip_complete', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
       ])
       mockForecast.mockResolvedValue({
@@ -570,7 +570,7 @@ describe('refreshOracleSnapshot', () => {
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },
       ])
       mockClaim.mockResolvedValue([
-        { result: 'skip', articleId: 'row-1' },
+        { result: 'skip_complete', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
       ])
       mockForecast.mockResolvedValue({

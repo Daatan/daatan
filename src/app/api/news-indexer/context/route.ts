@@ -250,8 +250,13 @@ export async function POST(request: NextRequest) {
     // the id addArticlesToPool itself writes onto rather than a separate re-fetch.
     const claimedArticleIdByUrl = articleIdsByUrl(claimableItems, claimResults)
     if (!claimResults.some((r) => r.result === 'claimed')) {
+      // news-indexer#354: `already_complete` (every skipped item is a finished, identical
+      // extraction — retrying can never learn anything new) vs `in_flight` (at least one
+      // item is still resolving elsewhere — worth a later retry). A caller that can't tell
+      // these apart burns a retry budget on evidence that was never actually missing.
+      const skipReason = claimResults.some((r) => r.result === 'skip_pending') ? 'in_flight' : 'already_complete'
       log.info(
-        { predictionId: prediction.id, articles: items.length },
+        { predictionId: prediction.id, articles: items.length, skipReason },
         'news-indexer: all articles already claimed/unchanged, skipping oracle call',
       )
       return NextResponse.json({
@@ -261,7 +266,7 @@ export async function POST(request: NextRequest) {
         claim: null,
         probability: null,
         sources: [],
-        skipped: 'unchanged',
+        skipped: skipReason,
         scored: false,
       })
     }

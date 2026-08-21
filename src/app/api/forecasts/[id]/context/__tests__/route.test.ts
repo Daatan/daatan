@@ -167,7 +167,7 @@ describe('POST /api/forecasts/[id]/context', () => {
   describe('extraction claim gate (daatan#1172)', () => {
     it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
-        { result: 'skip', articleId: 'row-1' },
+        { result: 'skip_complete', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
       ])
 
@@ -223,8 +223,8 @@ describe('POST /api/forecasts/[id]/context', () => {
 
     it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
-        { result: 'skip', articleId: 'row-1' },
-        { result: 'skip', articleId: 'row-2' },
+        { result: 'skip_complete', articleId: 'row-1' },
+        { result: 'skip_complete', articleId: 'row-2' },
       ])
 
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
@@ -270,8 +270,8 @@ describe('POST /api/forecasts/[id]/context', () => {
 
     it('does not fabricate a number when nothing is new AND the pool itself cannot be read', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
-        { result: 'skip', articleId: 'row-1' },
-        { result: 'skip', articleId: 'row-2' },
+        { result: 'skip_complete', articleId: 'row-1' },
+        { result: 'skip_complete', articleId: 'row-2' },
       ])
       vi.mocked(resolvePooledEstimate).mockResolvedValue({
         mean: 0, std: 0, ciLow: 0, ciHigh: 0, settled: false, articlesUsed: 0,
