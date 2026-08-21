@@ -262,9 +262,13 @@ resource "aws_cloudwatch_metric_alarm" "staging_ec2_status_check" {
   evaluation_periods  = 2
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.infra_alerts.arn]
-  ok_actions          = [aws_sns_topic.infra_alerts.arn]
+  # notBreaching (prod/oracle use breaching): staging is stopped on a schedule
+  # every night and weekend (staging_schedule.tf, #1526), and a stopped
+  # instance publishes no StatusCheckFailed datapoints — "breaching" would
+  # page at every scheduled stop and clear at every start.
+  treat_missing_data = "notBreaching"
+  alarm_actions      = [aws_sns_topic.infra_alerts.arn]
+  ok_actions         = [aws_sns_topic.infra_alerts.arn]
 
   dimensions = {
     InstanceId = aws_instance.staging.id

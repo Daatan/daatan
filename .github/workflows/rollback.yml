@@ -108,17 +108,36 @@ jobs:
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
       - name: Check Instance SSM Health
+        # Staging sleeps 20:00–06:00 UTC + weekends (terraform/staging_schedule.tf,
+        # #1526): wake it and wait for SSM. Production is never started from CI —
+        # if it is not Online that is an incident, not a schedule.
         run: |
-          PING_STATUS=$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=${{ steps.instance.outputs.instance_id }}" \
-            --query "InstanceInformationList[0].PingStatus" \
-            --output text)
-
-          echo "Instance ${{ steps.instance.outputs.instance_id }} PingStatus: $PING_STATUS"
-          if [[ "$PING_STATUS" != "Online" ]]; then
-            echo "ERROR: Instance is $PING_STATUS. SSM command will fail."
-            exit 1
+          INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
+          if [ "${{ inputs.environment }}" != "production" ]; then
+            STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+              --query "Reservations[0].Instances[0].State.Name" --output text)
+            echo "Instance $INSTANCE_ID state: $STATE"
+            if [[ "$STATE" == "stopped" ]]; then
+              echo "Staging is asleep — starting it"
+              aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
+            elif [[ "$STATE" == "stopping" ]]; then
+              aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID"
+              aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
+            fi
           fi
+
+          for i in $(seq 1 30); do
+            PING_STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text)
+            echo "Instance $INSTANCE_ID PingStatus: $PING_STATUS ($i/30)"
+            [[ "$PING_STATUS" == "Online" ]] && exit 0
+            [ "${{ inputs.environment }}" = "production" ] && break
+            sleep 10
+          done
+          echo "ERROR: Instance is $PING_STATUS. SSM command will fail."
+          exit 1
 
       - name: Send rollback command via SSM
         env:
