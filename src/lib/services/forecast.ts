@@ -7,6 +7,7 @@ import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { createLogger } from '@/lib/logger'
+import { auditResolveByDatetime } from '@/lib/services/deadline-normalisation'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordEstimate } from '@/lib/services/context'
 import {
@@ -346,6 +347,8 @@ export async function createForecast(input: CreateForecastInput) {
   }
 
   if (!prediction) throw new Error('Failed to generate a unique URL slug after multiple attempts')
+
+  auditResolveByDatetime('create', new Date(input.resolveByDatetime), { predictionId: prediction.id, authorId: input.authorId })
 
   // The creation draft goes through the estimate funnel like every other AI
   // number (retro docs/ORACLE_VARIABLES.md §6): it lands as an origin='creation'
@@ -837,6 +840,7 @@ export async function updateForecast(id: string, data: UpdateForecastData) {
     where: { id },
     select: { originalLanguage: true },
   })
+  if (data.resolveByDatetime) auditResolveByDatetime('update', new Date(data.resolveByDatetime), { predictionId: id })
 
   // Non-English forecast edited by its author in the original language → the submitted
   // claim text is e.g. Hebrew, not the English canonical. Re-derive English on save.

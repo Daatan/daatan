@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { embedAndStoreForecast } from '@/lib/services/embedding'
+import { auditResolveByDatetime } from '@/lib/services/deadline-normalisation'
 import {
   createCommitment,
   emitCreateCommitmentSideEffects,
@@ -34,6 +35,8 @@ export async function createAndStake(
 
   let prediction: { id: string }
   let stakeAmount: number | null = null
+
+  auditResolveByDatetime('bot-create', new Date(predictionCreateData.resolveByDatetime), { authorId: bot.userId })
 
   if (bot.requireApprovalForForecasts) {
     prediction = await prisma.$transaction(async (tx) => {
