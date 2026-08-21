@@ -20,26 +20,10 @@ resource "aws_secretsmanager_secret_version" "env_vars" {
   }
 }
 
-# Secret for GitHub Deploy Key (SSH Private Key)
-resource "aws_secretsmanager_secret" "deploy_key" {
-  name        = "daatan-deploy-key-${var.environment}"
-  description = "SSH Private Key for cloning GitHub repository in ${var.environment}"
-
-  recovery_window_in_days = var.environment == "prod" ? 30 : 0
-
-  tags = {
-    Name = "daatan-deploy-key-${var.environment}"
-  }
-}
-
-resource "aws_secretsmanager_secret_version" "deploy_key" {
-  secret_id     = aws_secretsmanager_secret.deploy_key.id
-  secret_string = "Please update this manually in AWS Console with real PRIVATE KEY"
-
-  lifecycle {
-    ignore_changes = [secret_string] # Prevent Terraform from overwriting manual updates
-  }
-}
+# `daatan-deploy-key-<env>` (SSH deploy key) was removed 2026-08-21 (Daatan/docs#122):
+# ec2.tf user_data clones over HTTPS with `daatan-github-token`, CI deploys via
+# OIDC + SSM, and CloudTrail showed zero GetSecretValue on either key in 90 days.
+# The secrets were `state rm`'d and scheduled for deletion with a 30-day window.
 
 # GitHub Token for HTTPS clone (replaces SSH deploy key approach)
 # Store a GitHub PAT with repo read access in AWS Console after applying

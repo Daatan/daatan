@@ -10,7 +10,7 @@ isolation you already have, and would make the genuinely-shared values worse.
 | Kind | Where | Why |
 |---|---|---|
 | App secrets, rotated independently | **SSM SecureString** `/daatan/<env>/secrets/<NAME>` | free, KMS-encrypted, IAM-scopable per path, rotates without a redeploy |
-| Bootstrap secrets (DB password, deploy keys) | Secrets Manager `daatan-env-<env>`, `daatan-deploy-key-<env>` | needed before the app runs, injected at container start |
+| Bootstrap secrets (DB password, GitHub token for the clone) | Secrets Manager `daatan-env-<env>`, `daatan-github-token` | needed before the app runs, injected at container start |
 | Shared across services | one parameter, **referenced** — never copied | one rotation, one place |
 | Prompt ARNs | SSM String `/daatan/<env>/prompts/<name>` | not secret |
 
@@ -92,7 +92,7 @@ through — SSM being down must never take the app down.
 
 | Role | Scope |
 |---|---|
-| `daatan-ec2-role-<env>` | `daatan-env-<env>`, `daatan-deploy-key-<env>`, `daatan-github-token`, and `/daatan/<env>/secrets/*` |
+| `daatan-ec2-role-<env>` | `daatan-env-<env>`, `daatan-github-token`, and `/daatan/<env>/secrets/*` |
 | `truthmachine-ec2-role` (retro) | `daatan/*`, `openclaw/*` — **wildcards, wider than it needs** |
 | `news-indexer-ec2-role` | `news-indexer-env`, `daatan-github-token*` |
 | `openclaw-ec2-role` | `openclaw/*` |
