@@ -962,6 +962,15 @@ export async function pushCredibilityFeedback(
   const settlementSnapshot = await getSettlementPinSnapshot(predictionId, resolvedAt)
   if (usable.length === 0 && authorSignals.length === 0 && settlementSnapshot === null) return
 
+  // Fourth lane (retro#356): the claim's temporal archetype, so retro can
+  // condition a resolved base rate on it — the target its shadow hazard prior
+  // drifts a `diffuse` by-deadline claim toward. Fetched here rather than
+  // threaded through the caller because this is the only consumer.
+  const prediction = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { claimArchetype: true },
+  })
+
   let res: Response
   try {
     res = await oracleFetch(cfg, '/leaderboard/ingest', {
@@ -986,6 +995,17 @@ export async function pushCredibilityFeedback(
           evidence_class: a.evidenceClass,
         })),
         ...(settlementSnapshot ? { settlement_snapshot: settlementSnapshot } : {}),
+        // Same mapper the /pool/aggregate push already uses (line ~820), not a
+        // hand-rolled toLowerCase(): it encodes retro's strict lowercase
+        // Literal AND the omit-when-unclassified contract in one place. That
+        // distinction is load-bearing here — retro treats an ABSENT archetype
+        // as unconditioned and counts it toward no archetype's base rate,
+        // whereas `"none"` is a real enum member meaning "classified as not
+        // temporally shaped". Collapsing the two would file every unclassified
+        // claim under a real class and quietly poison the rate.
+        ...(claimArchetypeParam(prediction?.claimArchetype)
+          ? { claim_archetype: claimArchetypeParam(prediction?.claimArchetype) }
+          : {}),
       }),
       timeoutMs: 10_000,
     })

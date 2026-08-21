@@ -12,6 +12,9 @@ vi.mock('@/lib/prisma', () => {
     contextSnapshot: {
       findFirst: vi.fn(),
     },
+    prediction: {
+      findUnique: vi.fn(),
+    },
   }
   // Array form (upsertCurrentVersion) resolves each already-started promise; callback
   // form (claimArticleForExtraction's versioning branch) runs against this same mocked
@@ -62,6 +65,7 @@ const update = vi.mocked(prisma.evidencePoolArticle.update)
 const create = vi.mocked(prisma.evidencePoolArticle.create)
 const updateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
 const snapshotFindFirst = vi.mocked(prisma.contextSnapshot.findFirst)
+const predictionFindUnique = vi.mocked(prisma.prediction.findUnique)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
 const mockOracleFetch = vi.mocked(oracleFetch)
 
@@ -672,6 +676,7 @@ describe('pushCredibilityFeedback', () => {
     vi.clearAllMocks()
     mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
     snapshotFindFirst.mockResolvedValue(null as never)
+    predictionFindUnique.mockResolvedValue(null as never)
   })
 
   it('does nothing when the Oracle is not configured', async () => {
@@ -776,6 +781,53 @@ describe('pushCredibilityFeedback', () => {
       credibility_weight: 1.0,
       evidence_weight: 0.6,
     })
+  })
+
+  // retro#356: retro conditions its shadow-hazard base rate on this. Its
+  // Literal is lowercase where daatan's enum is uppercase, and on a
+  // fire-and-forget call a 422 would only ever be a warning line.
+  it('sends claim_archetype lowercased for retro’s Literal', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: 'DIFFUSE' } as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.claim_archetype).toBe('diffuse')
+  })
+
+  // "unclassified" and "classified as NONE" are different facts: retro counts an
+  // absent archetype toward no base rate at all, while 'none' is a real class.
+  it('omits claim_archetype entirely when the claim is unclassified', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: null } as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect('claim_archetype' in body).toBe(false)
+  })
+
+  it('sends the NONE archetype as a real class, not as an omission', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: 'NONE' } as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.claim_archetype).toBe('none')
   })
 
   // daatan#1451: retro's settlement-pin ledger records nothing without this field,
