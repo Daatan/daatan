@@ -12,17 +12,20 @@ Current Date: {{currentDate}}
 {{context}}
 
 Instructions:
-1. Determine whether the claim's outcome occurred by {{forecastEndStr}} — including before the claim was created on {{forecastStartStr}}, unless the claim text or resolution rules explicitly bound the start.
-2. Use the news context above as your primary evidence. If it is insufficient or irrelevant, draw on your own knowledge of events during that period.
-3. In your reasoning, explicitly list which sources or facts (from context or your own knowledge) you are using to reach your conclusion.
-4. For BINARY predictions:
+1. Read the Resolution Rules first and restate their operative test in your reasoning: what exactly must have happened, by when, and according to which sources. Where the rules are more specific than the generic guidance below, the rules govern.
+2. If the Resolution Rules contain an explicit default clause (e.g. "Otherwise, it will resolve as 'No'"), that clause decides every case the rules' positive condition does not confirm. Apply the default — do NOT return 'unresolvable' for a case the rules already decide.
+3. Determine whether the claim's outcome occurred by {{forecastEndStr}} — including before the claim was created on {{forecastStartStr}}, unless the claim text or resolution rules explicitly bound the start.
+4. Use the context above as your primary evidence. A "Curated evidence pool" section, when present, lists evidence already extracted for this exact claim — rows marked SETTLEMENT ASSERTED report the resolving event itself and are the strongest signal. If the context is insufficient or irrelevant, draw on your own knowledge of events during that period.
+5. In your reasoning, explicitly list the decisive sources or facts (from context or your own knowledge), each with its date and URL where available.
+6. For claims about measured quantities (territory, prices, vote shares, counts): when reputable trackers disagree on the direction or the margin is within measurement noise, the claim is NOT confirmed — apply the rules' default clause if one exists; conflicting measurements are non-confirmation, not grounds for 'unresolvable'.
+7. For BINARY predictions:
    - If the claim is clearly true (the event happened as stated), use 'correct'.
-   - Use 'wrong' ONLY when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen). A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
-   - Only use 'unresolvable' if you genuinely have no reliable information for the period.
-5. For MULTIPLE_CHOICE predictions:
+   - Use 'wrong' when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen), OR when the resolution rules' default clause resolves an unconfirmed case to 'No'. A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
+   - Only use 'unresolvable' if you genuinely have no reliable information for the period AND no default clause decides the case.
+8. For MULTIPLE_CHOICE predictions:
    - If one option clearly occurred, use 'correct' AND provide correctOptionId.
    - If no option clearly matches, use 'unresolvable'.
-6. Use 'void' only if the event was cancelled or the claim cannot be judged fairly by its own rules.
-7. Do NOT default to 'unresolvable' simply because the news context is empty or irrelevant — use your knowledge. However, if neither the context nor your own knowledge confirms or affirmatively contradicts the claim, return 'unresolvable' rather than guessing.
+9. Use 'void' only if the event was cancelled or the claim cannot be judged fairly by its own rules.
+10. Do NOT default to 'unresolvable' simply because the news context is empty or irrelevant — use your knowledge. However, if neither the context, your own knowledge, nor a rules default clause decides the claim, return 'unresolvable' rather than guessing.
 
 Return your findings in JSON format.

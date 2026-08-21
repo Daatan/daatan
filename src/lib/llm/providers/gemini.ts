@@ -21,7 +21,7 @@ export class GeminiProvider implements LLMProvider {
 
   async generateContent(request: LLMRequest): Promise<LLMResponse> {
     const model = this.genAI.getGenerativeModel({
-      model: this.modelName,
+      model: request.model ?? this.modelName,
       generationConfig: {
         responseMimeType: request.schema ? 'application/json' : 'text/plain',
         responseSchema: request.schema,

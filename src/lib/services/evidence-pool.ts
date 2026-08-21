@@ -481,6 +481,42 @@ export async function getPoolArticles(
 }
 
 /**
+ * Top pool rows for the resolution-research LLM context: the pool is the
+ * Oracle's curated, stance-scored evidence for exactly this claim — better
+ * grounded than fresh search snippets, and the only place settlement
+ * assertions live. Settled rows first (they assert the resolving event
+ * itself), then by evidence weight. Looser than USABLE_POOL_ROW_WHERE on
+ * purpose: a pre-relevanceScore row with a stance is still evidence a
+ * resolver should see, even though aggregation skips it.
+ */
+export async function getPoolArticlesForResearch(predictionId: string, limit = 12) {
+  return prisma.evidencePoolArticle.findMany({
+    where: {
+      predictionId,
+      ...CURRENT_VERSION_ONLY,
+      excluded: false,
+      status: 'COMPLETE',
+      stance: { not: null },
+    },
+    orderBy: [
+      { settled: { sort: 'desc', nulls: 'last' } },
+      { evidenceWeight: { sort: 'desc', nulls: 'last' } },
+    ],
+    take: limit,
+    select: {
+      url: true,
+      title: true,
+      source: true,
+      publishedDate: true,
+      stance: true,
+      settled: true,
+      settlementEventDate: true,
+      evidenceClass: true,
+    },
+  })
+}
+
+/**
  * What the recompute path actually consumes (daatan#1263): the fields sent to
  * `/pool/aggregate`, the `usable` filter's inputs, and everything
  * `poolArticleToEnrichedSource` copies into the persisted snapshot roster. What it

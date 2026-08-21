@@ -107,7 +107,7 @@ export class VertexProvider implements LLMProvider {
       const token = await vertexAccessToken(this.config)
       // fetch rejects on an already-aborted signal, so an abort landing during the
       // exchange fails here rather than reaching Vertex.
-      const res = await fetch(vertexEndpoint(this.config, this.config.modelName, 'generateContent'), {
+      const res = await fetch(vertexEndpoint(this.config, request.model ?? this.config.modelName, 'generateContent'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
