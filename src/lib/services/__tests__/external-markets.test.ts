@@ -33,6 +33,7 @@ import {
   kalshiProvider,
   getProviderForUrl,
   resolveMarketByUrl,
+  getLatestMarketPrice,
   syncLinkedMarkets,
   suggestMarkets,
   suggestMarketsForClaim,
@@ -349,6 +350,26 @@ describe('resolveMarketByUrl', () => {
     expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
       data: { marketId: 'm1', probability: 68 },
     })
+  })
+})
+
+describe('getLatestMarketPrice', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns the most recent snapshot probability', async () => {
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue({ probability: 62 } as never)
+
+    expect(await getLatestMarketPrice('m1')).toBe(62)
+    expect(prisma.externalMarketPriceSnapshot.findFirst).toHaveBeenCalledWith({
+      where: { marketId: 'm1' },
+      orderBy: { createdAt: 'desc' },
+      select: { probability: true },
+    })
+  })
+
+  it('returns null when no snapshot exists yet', async () => {
+    vi.mocked(prisma.externalMarketPriceSnapshot.findFirst).mockResolvedValue(null)
+    expect(await getLatestMarketPrice('m1')).toBeNull()
   })
 })
 

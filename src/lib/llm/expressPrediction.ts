@@ -12,6 +12,7 @@ import { createLogger } from '@/lib/logger'
 import { STANDARD_TAGS } from '@/lib/constants'
 import { checkContent } from '../services/moderation'
 import { localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
+import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 
 const log = createLogger('express-prediction')
 
@@ -97,6 +98,18 @@ export const guessChancesSchema: Schema = {
   required: ["probability", "reasoning"],
 }
 
+/** A market linked via a pasted Polymarket/Kalshi URL — the express-flow counterpart
+ *  to the wizard's step-1 import, surfaced to the client for display + re-use in the
+ *  interactive "Guess Chances" call (see guess/route.ts). */
+export interface LinkedMarketInfo {
+  provider: string
+  providerLabel: string
+  question: string
+  url: string
+  /** Cached YES price (0-100), or null if no snapshot exists yet. */
+  probability: number | null
+}
+
 export interface ExpressPredictionResult {
   claimText: string
   resolveByDatetime: string
@@ -119,6 +132,8 @@ export interface ExpressPredictionResult {
     url: string
     title: string
   }>
+  externalMarketId: string | null
+  market: LinkedMarketInfo | null
   // Future years the model asserted (in the claim or resolution date) that appear
   // nowhere in the user's input or the source articles — the signature of a
   // hallucinated scheduled-event date (#1086). The review screen warns on these.
@@ -284,7 +299,7 @@ export async function generateExpressPrediction(
       `${userInput}\n${articlesText}`,
       now,
     )
-    return { ...prediction, newsAnchor: null, additionalLinks: [], ungroundedYears, localized }
+    return { ...prediction, newsAnchor: null, additionalLinks: [], externalMarketId: null, market: null, ungroundedYears, localized }
   }
 
   // Honor a source URL pasted anywhere in the input, not only when the entire
@@ -292,11 +307,64 @@ export async function generateExpressPrediction(
   // framing text), that link IS the forecast's news anchor by definition — we
   // never let a search-engine result silently replace it.
   const detectedUrl = extractFirstUrl(userInput)
+  const marketProvider = detectedUrl ? getProviderForUrl(detectedUrl) : null
 
   let searchResults: SearchResult[]
   let primaryArticle: SearchResult | null = null
+  let externalMarketId: string | null = null
+  let market: LinkedMarketInfo | null = null
+  let marketPriorLine: string | null = null
 
-  if (detectedUrl) {
+  if (detectedUrl && marketProvider) {
+    // A Polymarket/Kalshi URL: the market itself (not its webpage) is the anchor —
+    // link it and feed its live price into the prompt as an explicit prior,
+    // alongside ordinary news search on the market's question (never in place of it).
+    const url = detectedUrl
+    const contextText = userInput.replace(url, '').trim()
+    const providerLabel = PROVIDER_LABEL[marketProvider.id] ?? marketProvider.id
+    onProgress?.('searching', { message: `Loading ${providerLabel} market...` })
+
+    const resolved = await resolveMarketByUrl(url)
+    if (resolved) {
+      externalMarketId = resolved.id
+      const probability = await getLatestMarketPrice(resolved.id)
+      market = {
+        provider: resolved.provider,
+        providerLabel,
+        question: resolved.question,
+        url: resolved.url,
+        probability,
+      }
+      if (probability !== null) {
+        marketPriorLine = `${providerLabel} currently prices this at ${probability}% likely (YES).`
+      }
+
+      onProgress?.('searching', { message: `Finding news context for: "${resolved.question}"` })
+      let related: SearchResult[]
+      try {
+        related = (await oracleSearch(resolved.question, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
+      } catch {
+        related = []
+      }
+      searchResults = related.slice(0, DEFAULT_MAX_ARTICLES)
+      // primaryArticle stays null — the market is the anchor, not a news article.
+    } else {
+      // Resolution failed (market closed/unlisted/API hiccup) — fall back to
+      // treating it like any other pasted link, same as the non-market branch below.
+      log.warn({ url }, 'Market URL detected but could not be resolved; treating as a plain link')
+      const domain = extractDomainFromUrl(url)
+      primaryArticle = { title: domain, url, snippet: contextText, source: domain }
+      const relatedQuery = contextText ? await buildSearchQuery(contextText) : url
+      let related: SearchResult[]
+      try {
+        related = (await oracleSearch(relatedQuery, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
+      } catch {
+        related = []
+      }
+      related = related.filter(r => r.url !== url)
+      searchResults = [primaryArticle, ...related.slice(0, 4)]
+    }
+  } else if (detectedUrl) {
     const url = detectedUrl
     // Whatever the user typed besides the URL is their own claim/framing text.
     const contextText = userInput.replace(url, '').trim()
@@ -406,7 +474,11 @@ export async function generateExpressPrediction(
   })
 
   // Step 2: Prepare articles for LLM
-  const articlesText = searchResults
+  const marketPriorBlock = marketPriorLine
+    ? `[Market Prior]\n${marketPriorLine} Treat this as one signal among the sources below, not a substitute for reading them.\n\n`
+    : ''
+
+  const articlesText = marketPriorBlock + searchResults
     .map((article, i) => {
       // For the primary fetched article, include more content
       const snippet = (article === primaryArticle && article.snippet.length > 200)
@@ -511,6 +583,11 @@ URL: ${article.url}
     linkPool = searchResults.filter(
       (a, i) => a !== primaryArticle && (!hasRelevanceJudgment || relevantIdx.has(i)),
     )
+  } else if (market) {
+    // Market flow: the linked market is the anchor (surfaced via `market`, not
+    // `newsAnchor`) — every search result is supporting context, never the anchor.
+    anchorArticle = null
+    linkPool = searchResults.filter((_, i) => !hasRelevanceJudgment || relevantIdx.has(i))
   } else if (!hasRelevanceJudgment) {
     // No judgment available — fall back to prior behavior (most relevant = first result).
     anchorArticle = searchResults[0] ?? null
@@ -558,6 +635,8 @@ URL: ${article.url}
       }
       : null,
     additionalLinks,
+    externalMarketId,
+    market,
     ungroundedYears: findUngroundedYears(
       prediction.claimText,
       prediction.resolveByDatetime,
@@ -574,9 +653,16 @@ URL: ${article.url}
 export async function guessChances(
   claimText: string,
   detailsText: string,
-  articles: Array<{ title: string; source: string; snippet: string }>
+  articles: Array<{ title: string; source: string; snippet: string }>,
+  marketProbability?: number | null,
 ): Promise<{ probability: number; reasoning: string }> {
-  const articlesText = articles
+  // Explicit prior alongside the articles, never in place of them — same
+  // "one signal among the sources" framing generateExpressPrediction uses.
+  const marketPriorBlock = marketProbability != null
+    ? `[Market Prior]\nA linked prediction market currently prices this at ${marketProbability}% likely (YES). Treat this as one signal among the sources below, not a substitute for reading them.\n\n`
+    : ''
+
+  const articlesText = marketPriorBlock + articles
     .map((article, i) => `
 [Article ${i + 1}]
 Title: ${article.title}

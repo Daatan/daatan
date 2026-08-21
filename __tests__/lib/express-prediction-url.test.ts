@@ -36,6 +36,16 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
   fillPrompt: vi.fn().mockImplementation((t, v) => t + ' ' + Object.values(v).join(' ')),
 }))
 
+const mockGetProviderForUrl = vi.fn()
+const mockResolveMarketByUrl = vi.fn()
+const mockGetLatestMarketPrice = vi.fn()
+vi.mock('@/lib/services/external-markets', () => ({
+  getProviderForUrl: (...args: unknown[]) => mockGetProviderForUrl(...args),
+  resolveMarketByUrl: (...args: unknown[]) => mockResolveMarketByUrl(...args),
+  getLatestMarketPrice: (...args: unknown[]) => mockGetLatestMarketPrice(...args),
+  PROVIDER_LABEL: { POLYMARKET: 'Polymarket', KALSHI: 'Kalshi' },
+}))
+
 import { generateExpressPrediction, extractDomainFromUrl } from '@/lib/llm/expressPrediction'
 import type { SearchResult } from '@/lib/services/oracleSearch'
 
@@ -104,6 +114,10 @@ describe('extractDomainFromUrl', () => {
 describe('generateExpressPrediction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: no test besides "market URL flow" cares about market detection —
+    // mockReturnValue/mockResolvedValue set in one test otherwise leak forward
+    // (clearAllMocks resets call history, not implementations).
+    mockGetProviderForUrl.mockReturnValue(null)
   })
 
   afterEach(() => {
@@ -298,6 +312,83 @@ describe('generateExpressPrediction', () => {
       await generateExpressPrediction(testUrl)
 
       expect(mockOracleSearch).toHaveBeenCalledWith('Bitcoin rally 2026', 15, undefined, { source: 'express-creation' })
+    })
+  })
+
+  describe('market URL flow', () => {
+    const marketUrl = 'https://polymarket.com/event/will-x-happen'
+    const mockMarket = {
+      id: 'market-cuid-1',
+      provider: 'POLYMARKET',
+      question: 'Will X happen by 2027?',
+      url: marketUrl,
+    }
+
+    it('links the market, skips article scraping, and searches news on the market question', async () => {
+      mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
+      mockResolveMarketByUrl.mockResolvedValue(mockMarket)
+      mockGetLatestMarketPrice.mockResolvedValue(62)
+      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
+
+      const result = await generateExpressPrediction(marketUrl)
+
+      expect(mockResolveMarketByUrl).toHaveBeenCalledWith(marketUrl)
+      expect(mockFetchUrlContent).not.toHaveBeenCalled()
+      expect(mockOracleSearch).toHaveBeenCalledWith(mockMarket.question, 15, undefined, { source: 'express-creation' })
+      expect(result.externalMarketId).toBe('market-cuid-1')
+      expect(result.market).toEqual({
+        provider: 'POLYMARKET',
+        providerLabel: 'Polymarket',
+        question: mockMarket.question,
+        url: marketUrl,
+        probability: 62,
+      })
+      // The market is the anchor, not a news article — but related news is still
+      // surfaced as additional context links.
+      expect(result.newsAnchor).toBeNull()
+      expect(result.additionalLinks.length).toBeGreaterThan(0)
+    })
+
+    it('feeds the market price into the prediction prompt as an explicit prior', async () => {
+      mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
+      mockResolveMarketByUrl.mockResolvedValue(mockMarket)
+      mockGetLatestMarketPrice.mockResolvedValue(62)
+      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
+
+      await generateExpressPrediction(marketUrl)
+
+      const predictionCall = mockGenerateContent.mock.calls[0][0]
+      expect(predictionCall.prompt).toContain('Polymarket currently prices this at 62% likely (YES)')
+    })
+
+    it('falls back to plain-link handling when the market cannot be resolved', async () => {
+      mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
+      mockResolveMarketByUrl.mockResolvedValue(null)
+      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
+
+      const result = await generateExpressPrediction(marketUrl)
+
+      expect(mockGetLatestMarketPrice).not.toHaveBeenCalled()
+      expect(result.externalMarketId).toBeNull()
+      expect(result.market).toBeNull()
+      expect(result.newsAnchor!.url).toBe(marketUrl)
+    })
+
+    it('omits the market-prior line when no price snapshot exists yet', async () => {
+      mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
+      mockResolveMarketByUrl.mockResolvedValue(mockMarket)
+      mockGetLatestMarketPrice.mockResolvedValue(null)
+      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
+
+      const result = await generateExpressPrediction(marketUrl)
+
+      expect(result.market!.probability).toBeNull()
+      const predictionCall = mockGenerateContent.mock.calls[0][0]
+      expect(predictionCall.prompt).not.toContain('Market Prior')
     })
   })
 
