@@ -245,8 +245,8 @@ The app picks up the new prompt within 5 minutes (cache TTL).
 | `express-prediction` | `0BXFPNKYL4` | `:3` | `/api/forecasts/express` | Convert a user's casual text into a structured prediction |
 | `extract-prediction` | `P3QR7PR50J` | `:2` | Forecast import tools | Extract a structured prediction from arbitrary article text |
 | `forecast-quality-validation` | `MZU2SJWY74` | `:2` | Bot runner | Validate a bot-generated forecast before publishing |
-| `research-query-generation` | `GQK8IGH3H9` | `:2` | Auto-resolution | Generate web search queries to find evidence for resolution |
-| `resolution-research` | `9BJAASRX0U` | `:2` | Auto-resolution | Determine forecast outcome from news context or model knowledge |
+| `research-query-generation` | `GQK8IGH3H9` | `:3` | Auto-resolution | Generate web search queries to find evidence for resolution |
+| `resolution-research` | `9BJAASRX0U` | `:6` | Auto-resolution | Determine forecast outcome from news context, the curated evidence pool, or model knowledge |
 | `suggest-tags` | `4GRPW480KQ` | `:2` | Tag suggestion API | Suggest 1–3 relevant tags for a forecast |
 | `topic-extraction` | `7EKX6FRNE0` | `:2` | Bot runner / RSS | Extract a 5–10 word search query from an article |
 | `update-context` | `OX9GBXOT0B` | `:2` | Forecast detail page | Write a neutral 2–3 sentence summary of current news context |

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getForecastForResearch } from '@/lib/services/forecast'
+import { getPoolArticlesForResearch } from '@/lib/services/evidence-pool'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { searchArticlesMultilingual } from '@/lib/utils/multilingualSearch'
 import { llmService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { queryGenerationSchema, researchSchema } from '@/lib/llm/schemas'
-import { extractKeyTerms, dedup } from './helpers'
+import { extractKeyTerms, dedup, composeResearchResults } from './helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { aiResearchEnabled } from '@/lib/capabilities'
 
@@ -18,7 +19,18 @@ const RESEARCH_WINDOW = 60 * 60_000 // 1 hour
 // beyond it (daatan#1467).
 const SEARCH_GRACE_MS = 3 * 24 * 60 * 60_000
 const PRIMARY_RESULTS_CAP = 10
-const TOTAL_RESULTS_CAP = 15
+// Reserved slots for the pre-creation (born-true) leg: with a flat
+// append-then-cap the deadline legs filled the cap and at most one
+// pre-creation snippet survived (daatan#1515) — the assistant never saw the
+// evidence the #1511 leg was built to find.
+const PRE_CREATION_RESULTS_CAP = 5
+const TOTAL_RESULTS_CAP = 20
+// The verdict call runs on the strongest Gemini tier: resolution research is
+// low-volume (rate-limited per user) and is exactly the multi-source
+// rules-reasoning task where the pro tier beats flash. Query generation stays
+// on the chain default. Non-Google fallback legs ignore the override.
+const RESEARCH_VERDICT_MODEL = 'gemini-2.5-pro'
+const POOL_CONTEXT_LIMIT = 12
 
 export const POST = withAuth(async (request: NextRequest, user, { params }) => {
     if (!aiResearchEnabled()) {
@@ -82,8 +94,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
         //    searches. Raw-claim searches tend to surface generic roundups whose
         //    snippets omit the specific entity, and an LLM judging from those can
         //    mistake absence of mention for absence of the event (daatan#1467).
-        //    Targeted results are appended after the primary ones, with slots
-        //    reserved for them via the lower primary cap.
+        //    Composition reserves slots per leg — see composeResearchResults.
         try {
             const template = await getPromptTemplate('research-query-generation')
             const prompt = fillPrompt(template, {
@@ -105,15 +116,22 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
             // window filters its hits to zero (retro#559) and the query falls through
             // to the SERP providers that can actually search that far back.
             const targetedMeta = { source: 'research' as const, userId: user.id }
-            const targetedResults = await Promise.all(
-                queries.slice(0, 3).flatMap(q => [
+            const perQuery = await Promise.all(
+                queries.slice(0, 3).map(q => Promise.all([
                     searchArticlesMultilingual(q, 5, { dateTo: searchDateTo }, targetedMeta)
                         .catch(() => [] as SearchResult[]),
                     searchArticlesMultilingual(q, 3, { dateTo: forecastStart }, targetedMeta)
                         .catch(() => [] as SearchResult[]),
-                ])
+                ]))
             )
-            results = dedup([...results, ...targetedResults.flat()]).slice(0, TOTAL_RESULTS_CAP)
+            // Compose with reserved slots per leg (daatan#1515) instead of a
+            // flat append-then-cap that starved the pre-creation leg.
+            results = composeResearchResults(
+                results,
+                perQuery.flatMap(([, pre]) => pre),
+                perQuery.flatMap(([deadline]) => deadline),
+                { preCreation: PRE_CREATION_RESULTS_CAP, total: TOTAL_RESULTS_CAP },
+            )
         } catch {
             // targeted search failed — continue with what we have
         }
@@ -122,6 +140,22 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
             ? results.map(r =>
                 `Title: ${r.title}\nSource: ${r.source}${r.publishedDate ? ` (${r.publishedDate})` : ''}\nSnippet: ${r.snippet}\nURL: ${r.url}`
               ).join('\n\n')
+            : ''
+
+        // The Oracle's own evidence pool: stance-scored evidence extracted for
+        // exactly this claim, including any settlement assertions — the
+        // resolution assistant previously never saw it and judged from fresh
+        // search snippets alone.
+        const poolRows = await getPoolArticlesForResearch(prediction.id, POOL_CONTEXT_LIMIT)
+            .catch(() => [])
+        const poolContext = poolRows.length > 0
+            ? `Curated evidence pool (${poolRows.length} highest-weight articles extracted for this exact claim; stance is in [-1, 1], +1 = supports the claim):\n`
+              + poolRows.map(r =>
+                  `- ${r.publishedDate ?? 'undated'} | ${r.source ?? 'unknown source'} | "${r.title ?? r.url}" | stance ${r.stance}`
+                  + (r.evidenceClass ? ` | ${r.evidenceClass}` : '')
+                  + (r.settled ? ` | SETTLEMENT ASSERTED${r.settlementEventDate ? ` on ${r.settlementEventDate}` : ''}` : '')
+                  + ` | ${r.url}`
+                ).join('\n')
             : ''
 
         // Include options in the prompt if MULTIPLE_CHOICE
@@ -142,15 +176,20 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
             forecastStartStr,
             forecastEndStr,
             currentDate: now.toISOString().split('T')[0],
-            context: context
-                ? `News Context (${results.length} articles found for the forecast period):\n${context}`
-                : 'Note: Automated news search returned no results. Rely on your training knowledge for the forecast period.'
+            context: [
+                poolContext,
+                context
+                    ? `News Context (${results.length} articles found for the forecast period):\n${context}`
+                    : '',
+            ].filter(Boolean).join('\n\n')
+                || 'Note: Automated news search returned no results. Rely on your training knowledge for the forecast period.'
         })
 
         const response = await llmService.generateContent({
             prompt,
             schema: researchSchema,
-            temperature: 0
+            temperature: 0,
+            model: RESEARCH_VERDICT_MODEL,
         })
 
         const llmMs = Date.now() - llmStart

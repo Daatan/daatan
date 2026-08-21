@@ -21,6 +21,7 @@ vi.mock('@/lib/api-middleware', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     prediction: { findUnique: vi.fn() },
+    evidencePoolArticle: { findMany: vi.fn() },
   },
 }))
 
@@ -115,6 +116,8 @@ describe('POST /api/forecasts/[id]/research', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetRateLimitStore()
+    // No curated pool by default — pool-specific tests override this
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([])
     // Main oracle returns null → falls through to three parallel searches
     vi.mocked(oracleSearch).mockResolvedValue(null)
     // Default: searches return relevant shekel articles
@@ -341,6 +344,49 @@ describe('POST /api/forecasts/[id]/research', () => {
 
     const response = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
     expect(response.status).toBe(200)
+  })
+
+  it('includes the curated evidence pool in the LLM context, settlement rows flagged', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(basePrediction as never)
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
+      {
+        url: 'https://reuters.com/deal-signed', title: 'Agreement formally signed', source: 'reuters.com',
+        publishedDate: '2026-01-05', stance: 0.9, settled: true, settlementEventDate: '2026-01-04',
+        evidenceClass: 'reported_fact',
+      },
+      {
+        url: 'https://example.com/analysis', title: 'Deal still uncertain, analysts say', source: 'example.com',
+        publishedDate: '2026-01-02', stance: -0.2, settled: null, settlementEventDate: null,
+        evidenceClass: 'reporting',
+      },
+    ] as never)
+
+    await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+
+    const promptArg = evalPrompt()
+    expect(promptArg).toContain('Curated evidence pool')
+    expect(promptArg).toContain('Agreement formally signed')
+    expect(promptArg).toContain('SETTLEMENT ASSERTED on 2026-01-04')
+    expect(promptArg).toContain('Deal still uncertain, analysts say')
+  })
+
+  it('survives a pool lookup failure and still answers from search context', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(basePrediction as never)
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockRejectedValue(new Error('db down'))
+
+    const response = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+    expect(response.status).toBe(200)
+  })
+
+  it('runs the verdict on the pro-tier model and query generation on the chain default', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(basePrediction as never)
+
+    await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+
+    const queryGenCall = generateContentMock.mock.calls.find(c => isQueryGenPrompt(c[0].prompt))
+    const verdictCall = generateContentMock.mock.calls.find(c => !isQueryGenPrompt(c[0].prompt))
+    expect(queryGenCall![0].model).toBeUndefined()
+    expect(verdictCall![0].model).toBe('gemini-2.5-pro')
   })
 
   it('returns 200 with LLM result when all three initial searches fail', async () => {
