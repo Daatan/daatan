@@ -253,7 +253,16 @@ export interface ClaimableArticle {
   publishedAt: string | null
 }
 
-export type ClaimResult = 'claimed' | 'skip'
+/**
+ * `skip_complete` — an existing row already carries this exact content, fully extracted
+ * (`COMPLETE`). Retrying this article for this forecast can never learn anything new; a
+ * caller that retries anyway (news-indexer#354) burns an LLM judgment and a retry slot on
+ * evidence that was never missing. `skip_pending` — the existing row is still resolving
+ * (a fresh `PENDING` claim from a concurrent request, a `FAILED` row still in backoff, or a
+ * concurrent content-changed claim this call lost the race to) — genuinely worth a later
+ * retry, unlike `skip_complete`.
+ */
+export type ClaimResult = 'claimed' | 'skip_complete' | 'skip_pending'
 
 /** The row a claim landed on (or already covers), so callers can address
  *  `addArticlesToPool`'s write at the exact row rather than re-deriving
@@ -360,8 +369,10 @@ export async function claimArticleForExtraction(
     } catch (err) {
       if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
       // Lost the race to a concurrent claim that already versioned this URL — its
-      // row already carries fresh content; nothing left for this call to do.
-      return { result: 'skip', articleId: null }
+      // row already carries fresh content; nothing left for this call to do. That
+      // concurrent extraction may still be in flight, so this is `skip_pending`, not
+      // `skip_complete` — a caller cannot yet assume the evidence is captured.
+      return { result: 'skip_pending', articleId: null }
     }
   }
 
@@ -413,7 +424,16 @@ export async function claimArticleForExtraction(
   // the row unambiguously exists whether or not this call's re-claim matched, so a
   // caller resolving "the pool row for this URL" (daatan#1223's rating-prompt lookup)
   // gets it either way.
-  return { result: count > 0 ? 'claimed' : 'skip', articleId: current.id }
+  //
+  // `count === 0` means none of the re-claim OR arms matched — `current.status` at
+  // fetch time (above `current.status === 'COMPLETE'` check, not affected by the
+  // updateMany that just ran) says why: COMPLETE is a genuinely finished extraction,
+  // nothing to retry (news-indexer#354); anything else reaching here (FAILED still in
+  // backoff, PENDING not yet stale) is still resolving and worth a later retry.
+  return {
+    result: count > 0 ? 'claimed' : current.status === 'COMPLETE' ? 'skip_complete' : 'skip_pending',
+    articleId: current.id,
+  }
 }
 
 /** Claim a whole evidence set. Per-article outcomes, same order as `articles`. */
