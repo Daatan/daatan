@@ -99,6 +99,15 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
           "ec2:DescribeInstances"
         ]
         Resource = "*"
+      },
+      {
+        # deploy.yml / rollback.yml wake staging when a run lands inside its
+        # scheduled sleep window (staging_schedule.tf, #1526). Start only,
+        # staging only — prod is never started/stopped from CI.
+        Sid      = "WakeStaging"
+        Effect   = "Allow"
+        Action   = ["ec2:StartInstances"]
+        Resource = aws_instance.staging.arn
       }
     ]
   })

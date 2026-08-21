@@ -110,7 +110,7 @@ integration   (parallel with build, on all pushes and PRs — runs
 ### `deploy-staging` job
 
 1. Configure AWS credentials (OIDC)
-2. Check EC2 SSM health (`Environment=staging` instance)
+2. Wake staging if asleep (see [Staging sleep schedule](#staging-sleep-schedule)) and wait for SSM `Online`
 3. SSM command to server:
    - Download deploy scripts from GitHub
    - Pull `staging-latest` app image from ECR
@@ -254,6 +254,28 @@ build — the standalone runner is the only place this bites.
 
 - **Access**: AWS SSM only — port 22 is closed on both instances
 - **SSL**: Each instance has its own Let's Encrypt certificate via `certbot/dns-route53`
+
+### Staging sleep schedule
+
+Staging is **stopped 20:00–06:00 UTC on weekdays and all weekend** by two EventBridge
+Scheduler schedules (`terraform/staging_schedule.tf`, #1526) — it idles at ~2% CPU and this
+saves ~60% of its compute. The EIP stays attached, so `staging.daatan.com` never changes.
+
+What this means in practice:
+
+- **Merges outside the window still deploy.** `deploy-staging` (and `rollback.yml` for
+  staging) starts the instance if it is `stopped` and waits up to 5 min for the SSM agent
+  to report `Online` before sending commands — roughly 90 s extra. A `v*` tag release at
+  night wakes staging the same way, since `deploy-production` depends on `deploy-staging`.
+- The box stays up after a wake-up until the next scheduled stop (20:00 UTC) — there is no
+  "stop again after deploy".
+- `watchdog.yml` skips its staging probes during the window (until 06:15 UTC to allow for
+  boot); the `staging-ec2-status-check-failed` alarm treats missing data as OK for the
+  same reason. Production probing and alarms are unchanged.
+- Need staging outside hours? `aws ec2 start-instances --instance-ids i-0406d237ca5d92cdf`
+  (or just trigger a staging deploy). To pause the schedule without a TF change:
+  `aws scheduler update-schedule --name daatan-staging-stop --state DISABLED ...` — but
+  prefer a TF change so the state does not drift.
 
 ---
 

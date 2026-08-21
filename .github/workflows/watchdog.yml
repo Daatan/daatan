@@ -35,8 +35,27 @@ jobs:
             base_url: https://staging.daatan.com
 
     steps:
+      # Staging is stopped by schedule 20:00–06:00 UTC Mon–Fri and all weekend
+      # (terraform/staging_schedule.tf, #1526); probing it then is a guaranteed
+      # failure, not a signal. The window here is slightly wider than the
+      # schedule (until 06:15) so the box has time to boot after the 06:00 start.
+      # Production is always probed.
+      - name: Skip staging during its sleep window
+        id: sleep_window
+        run: |
+          SKIP=false
+          if [ "${{ matrix.env.name }}" = "staging" ]; then
+            H=$((10#$(date -u +%H))); M=$((10#$(date -u +%M))); D=$(date -u +%u)
+            if [ "$D" -ge 6 ] || [ "$H" -ge 20 ] || [ "$H" -lt 6 ] || { [ "$H" -eq 6 ] && [ "$M" -lt 15 ]; }; then
+              SKIP=true
+              echo "Staging is in its scheduled sleep window ($(date -u +'%a %H:%M') UTC) — skipping"
+            fi
+          fi
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
       - name: Check pages
         id: checks
+        if: steps.sleep_window.outputs.skip != 'true'
         run: |
           BASE="${{ matrix.env.base_url }}"
           FAILED=()

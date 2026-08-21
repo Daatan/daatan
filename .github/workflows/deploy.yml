@@ -274,23 +274,39 @@ jobs:
           SOURCE=$(echo "$MSG" | grep -oP 'from [^/]+/\K[\w/._-]+' | head -1 || echo "")
           echo "name=${SOURCE:-main}" >> $GITHUB_OUTPUT
 
-      - name: Check Instance SSM Health
+      - name: Wake staging if asleep and wait for SSM
+        # Staging sleeps 20:00–06:00 UTC + weekends (terraform/staging_schedule.tf,
+        # #1526). Start it if stopped, then wait for the SSM agent to report
+        # Online before sending commands. A running box passes straight through.
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
 
-          PING_STATUS=$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-            --query "InstanceInformationList[0].PingStatus" \
-            --output text)
-
-          echo "Instance $INSTANCE_ID PingStatus: $PING_STATUS"
-          if [[ "$PING_STATUS" != "Online" ]]; then
-            echo "❌ Error: Instance is $PING_STATUS. SSM command will fail. Please check or reboot the instance."
-            exit 1
+          STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].State.Name" --output text)
+          echo "Instance $INSTANCE_ID state: $STATE"
+          if [[ "$STATE" == "stopped" ]]; then
+            echo "⏰ Staging is asleep — starting it"
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
+          elif [[ "$STATE" == "stopping" ]]; then
+            echo "⏳ Staging is stopping — waiting, then starting"
+            aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID"
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
           fi
+
+          for i in $(seq 1 30); do
+            PING_STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text)
+            echo "SSM PingStatus: $PING_STATUS ($i/30)"
+            [[ "$PING_STATUS" == "Online" ]] && exit 0
+            sleep 10
+          done
+          echo "❌ Error: staging SSM agent not Online after 5 min. Please check or reboot the instance."
+          exit 1
 
       - name: Deploy to Staging (SSM)
         env:
