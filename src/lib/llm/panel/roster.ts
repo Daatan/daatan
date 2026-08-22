@@ -89,8 +89,10 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     providerOrder: ['deepinfra/fp4'],
   },
 
-  // google-vertex/eu keeps claim text in the EU, matching where the rest of the
-  // stack runs (eu-central-1).
+  // google-vertex/eu pins this member's calls to the EU for routing diversity from
+  // the other Vertex/Gemini legs. This is NOT a stack-wide residency guarantee —
+  // extraction and settlement verification (the calls that actually carry article/
+  // claim text) run on Bedrock in us-east-1 (retro#548).
   {
     model: 'google/gemini-2.5-flash',
     mode: 'ungrounded',
