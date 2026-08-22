@@ -24,6 +24,10 @@ on:
         description: Report would-be proposals without writing
         type: boolean
         default: false
+      limit:
+        description: Max pairs this run (route default 40, cap 200)
+        type: string
+        default: ''
 
 jobs:
   relation-typer:
@@ -38,10 +42,13 @@ jobs:
           BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
           TARGET: ${{ inputs.target || 'production' }}
           DRY_RUN: ${{ inputs.dryRun && '1' || '0' }}
+          LIMIT: ${{ inputs.limit }}
         run: |
           if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
           if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
-          QS=""; if [ "$DRY_RUN" = "1" ]; then QS="?dryRun=1"; fi
+          QS="?x=1"
+          if [ "$DRY_RUN" = "1" ]; then QS="$QS&dryRun=1"; fi
+          if [ -n "$LIMIT" ]; then QS="$QS&limit=$LIMIT"; fi
 
           echo "Running relation typer at $BASE$QS"
           RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE/api/cron/relation-typer$QS" \
