@@ -8,6 +8,7 @@ vi.mock('@/lib/prisma', () => {
       update: vi.fn(),
       create: vi.fn(),
       updateMany: vi.fn(),
+      count: vi.fn(),
     },
     contextSnapshot: {
       findFirst: vi.fn(),
@@ -56,6 +57,7 @@ import {
   claimArticlesForExtraction,
   failClaimedArticles,
   hashArticleContent,
+  retireLegacyNullRows,
 } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 
@@ -64,6 +66,7 @@ const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
 const update = vi.mocked(prisma.evidencePoolArticle.update)
 const create = vi.mocked(prisma.evidencePoolArticle.create)
 const updateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
+const count = vi.mocked(prisma.evidencePoolArticle.count)
 const snapshotFindFirst = vi.mocked(prisma.contextSnapshot.findFirst)
 const predictionFindUnique = vi.mocked(prisma.prediction.findUnique)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
@@ -1221,7 +1224,7 @@ describe('claimArticleForExtraction', () => {
         expect.arrayContaining([
           {
             status: 'FAILED',
-            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final'] },
+            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy'] },
             updatedAt: { lt: expect.any(Date) },
           },
           { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
@@ -1457,5 +1460,32 @@ describe('failClaimedArticles', () => {
     updateMany.mockRejectedValue(new Error('db down'))
     await expect(failClaimedArticles('pred-1', ['https://a.com/1'], 'extractor_error')).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()
+  })
+})
+
+describe('retireLegacyNullRows', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('dry-run (apply=false) only counts the legacy oracle_null set and writes nothing', async () => {
+    count.mockResolvedValue(124)
+
+    const result = await retireLegacyNullRows(false)
+
+    expect(result).toEqual({ matched: 124 })
+    expect(count).toHaveBeenCalledWith({ where: { status: 'FAILED', statusReason: 'oracle_null' } })
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('apply=true stamps the matched rows retired_legacy and returns the write count', async () => {
+    updateMany.mockResolvedValue({ count: 124 })
+
+    const result = await retireLegacyNullRows(true)
+
+    expect(result).toEqual({ matched: 124 })
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { status: 'FAILED', statusReason: 'oracle_null' },
+      data: { statusReason: 'retired_legacy' },
+    })
+    expect(count).not.toHaveBeenCalled()
   })
 })

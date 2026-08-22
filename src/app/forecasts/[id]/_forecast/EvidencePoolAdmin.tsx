@@ -17,6 +17,12 @@ type PoolArticle = {
   version: number
   supersedesId: string | null
   supersededAt: string | null
+  status: 'PENDING' | 'COMPLETE' | 'FAILED'
+}
+
+const STATUS_BADGE: Record<Exclude<PoolArticle['status'], 'COMPLETE'>, string> = {
+  FAILED: 'bg-red-500/15 text-red-400',
+  PENDING: 'bg-amber-500/15 text-amber-400',
 }
 
 /** One version chain: the current head (supersededAt === null) plus its
@@ -85,6 +91,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [articles, setArticles] = useState<PoolArticle[] | null>(null)
+  const [poolCounts, setPoolCounts] = useState<{ poolSize: number; usableSize: number } | null>(null)
   const [expandedChains, setExpandedChains] = useState<Set<string>>(new Set())
 
   if (session?.user?.role !== 'ADMIN') return null
@@ -100,6 +107,11 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
       if (!res.ok) throw new Error('Failed to load evidence pool')
       const data = await res.json()
       setArticles(data.articles ?? [])
+      setPoolCounts(
+        typeof data.poolSize === 'number' && typeof data.usableSize === 'number'
+          ? { poolSize: data.poolSize, usableSize: data.usableSize }
+          : null,
+      )
     } catch {
       toast.error('Failed to load evidence pool')
       setArticles([])
@@ -169,6 +181,12 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
       <p className="text-[11px] text-gray-500 mb-3">
         Every article extracted for this forecast so far. Excluding an article here doesn&apos;t
         change the live estimate yet — it records the decision ahead of the pool cutover.
+        {poolCounts && (
+          <span className="block mt-1 text-gray-400">
+            <span className="font-semibold text-cyan-400">{poolCounts.usableSize}</span> usable /{' '}
+            {poolCounts.poolSize} total
+          </span>
+        )}
       </p>
 
       {loading && (
@@ -206,6 +224,13 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
                       >
                         <span className="truncate">{head.title || head.url}</span>
                         <ExternalLink className="w-3 h-3 shrink-0" />
+                        {head.status !== 'COMPLETE' && (
+                          <span
+                            className={`shrink-0 px-1 py-px rounded text-[9px] font-semibold uppercase tracking-wide ${STATUS_BADGE[head.status]}`}
+                          >
+                            {head.status}
+                          </span>
+                        )}
                       </a>
                       <span className="block text-[10px] text-gray-500">
                         {head.source || 'unknown source'}

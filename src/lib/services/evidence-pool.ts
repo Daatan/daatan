@@ -243,7 +243,18 @@ const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
  * hatch documented in pool-retry.ts, and only closing the loop that had no new information
  * in it.
  */
-export const TERMINAL_POOL_REASONS: readonly string[] = ['oracle_omitted', 'oracle_null_final']
+export const TERMINAL_POOL_REASONS: readonly string[] = ['oracle_omitted', 'oracle_null_final', 'retired_legacy']
+
+/**
+ * The pre-#1231 conflated `oracle_null` string (daatan#1522) — permanent zombies, not
+ * just old rows. `statusReason: 'oracle_null'` isn't in TERMINAL_POOL_REASONS, so these
+ * rows match retryableWhere's `notIn` arm forever, AND pool-retry.ts's
+ * ATTRIBUTABLE_NULL_REASONS deliberately excludes the literal string (six conflated
+ * causes, so "attributable" can't be claimed) — so they can never earn the two-strike
+ * finalization that would otherwise terminate them either. Stamping them
+ * `retired_legacy` (see {@link retireLegacyNullRows}) is the only way out.
+ */
+export const LEGACY_NULL_REASON = 'oracle_null'
 
 export interface ClaimableArticle {
   url: string
@@ -677,6 +688,22 @@ export async function setArticleExcluded(
     where: { id: articleId },
     data: { excluded },
   })
+}
+
+/**
+ * One-off admin action (daatan#1522): stamp every `oracle_null`-legacy row terminal.
+ * `apply: false` (the default call-site convention — see the remediate/retry routes)
+ * only counts the target set; `apply: true` performs the update. Unbounded by design —
+ * the WHERE clause itself is the bound (exactly the pre-#1231 rows), not a batch size.
+ */
+export async function retireLegacyNullRows(apply: boolean): Promise<{ matched: number }> {
+  const where = { status: 'FAILED' as const, statusReason: LEGACY_NULL_REASON }
+  if (!apply) return { matched: await prisma.evidencePoolArticle.count({ where }) }
+  const { count } = await prisma.evidencePoolArticle.updateMany({
+    where,
+    data: { statusReason: 'retired_legacy' },
+  })
+  return { matched: count }
 }
 
 interface PoolAggregateApiResponse {
