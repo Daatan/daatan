@@ -181,7 +181,7 @@ const Sidebar = () => {
     navLinks.push({ href: '#', labelKey: 'signIn', label: c('signIn'), icon: LogIn })
   }
 
-  if (pathname.startsWith('/auth/')) return null
+  if (pathname.startsWith('/auth/') || pathname.startsWith('/oracle-v2')) return null
 
   return (
     <>
