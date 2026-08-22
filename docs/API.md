@@ -676,8 +676,10 @@ row yet, asks the LLM for the relation — `alias` / `nested` / `threshold` /
 `complement` / `exclusive` / `implies` / `independent` — with its direction and
 the justifying spans, and writes `PROPOSED` rows via `proposeRelation()` for
 post-moderation (a `REJECTED` pair is never re-proposed). Structure only; no
-published number moves. `independent` verdicts and verdicts under confidence
-0.6 are not stored and get re-asked on a later run. Auth: `x-cron-secret`
+published number moves. `independent` verdicts are stored as auto-confirmed
+`none` ledger rows so the pair is never re-asked; verdicts under confidence
+0.6 are not stored and get re-asked on a later run. Pairs are typed 8-wide;
+nginx gives this route a 620 s budget (like `/api/cron/ai-panel`). Auth: `x-cron-secret`
 (`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the run throws. Query:
 `?dryRun=1` (return would-be `proposals`, write nothing — the acceptance check
 against the hand-labelled 08-21 pairs runs through this), `?limit=N` (≤ 200,

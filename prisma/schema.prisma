@@ -1774,6 +1774,7 @@ enum QuestionRelationKind {
   COMPLEMENT // P(from) + P(to) = 1 — symmetric
   IMPLIES // from ⇒ to
   CONDITIONAL // from is an antecedent of to; `sign` says raises / lowers
+  NONE // typer looked, found no constraint — a ledger row, never a graph edge
 }
 
 enum QuestionRelationOrigin {
