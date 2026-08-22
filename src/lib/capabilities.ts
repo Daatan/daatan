@@ -1,6 +1,7 @@
 import { env } from '@/env'
 import { isSelfHosted } from '@/lib/edition'
 import { getOpenRouterKey } from '@/lib/services/settings'
+import { getOracleApiKey } from '@/lib/services/oracleClient'
 
 /**
  * Optional add-on capabilities. The SaaS edition has them always on (daatan.com
@@ -24,7 +25,7 @@ function hasLLM(): boolean {
 
 /** A web/news search backend is configured (the Oracle). */
 function hasSearch(): boolean {
-  return !!(env.ORACLE_URL && env.ORACLE_API_KEY)
+  return !!(env.ORACLE_URL && getOracleApiKey())
 }
 
 /**

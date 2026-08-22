@@ -11,7 +11,7 @@ isolation you already have, and would make the genuinely-shared values worse.
 |---|---|---|
 | App secrets, rotated independently | **SSM SecureString** `/daatan/<env>/secrets/<NAME>` | free, KMS-encrypted, IAM-scopable per path, rotates without a redeploy |
 | Bootstrap secrets (DB password, GitHub token for the clone) | Secrets Manager `daatan-env-<env>`, `daatan-github-token` | needed before the app runs, injected at container start |
-| Shared across services | one parameter, **referenced** — never copied | one rotation, one place |
+| Shared across services | **SSM SecureString** `/daatan/shared/secrets/<NAME>`, one parameter, **referenced** — never copied | one rotation, one place |
 | Prompt ARNs | SSM String `/daatan/<env>/prompts/<name>` | not secret |
 
 ## Rotating an app secret
@@ -103,19 +103,20 @@ Staging cannot read prod. That is the boundary that matters and it holds. (Until
 
 ## Known problems, not yet fixed
 
-- **Shared secrets are copied, not referenced.** `daatan/news-indexer-secret`'s own
-  description says to set the same value in `daatan-env-prod`, `daatan-env-staging` *and*
-  `news-indexer-env`. `openclaw/oracle-api-key` is "shared between oracle-api.service and
-  the daatan app", but daatan's role cannot read `openclaw/*` — so daatan holds a copy.
-  Each should become one parameter, read by both roles. (docs#122: `ORACLE_API_KEY`
-  unified at `/daatan/shared/secrets/ORACLE_API_KEY`, read by both retro and daatan's
-  `src/lib/aws/secrets.ts` — the copy-per-blob problem for `news-indexer-secret` and
-  `openclaw/telegram-bot-token-daatan` is not fixed by this pass, only moved: their
-  canonical human-facing copies now live at `/daatan/shared/secrets/NEWS_INDEXER_SECRET`
-  and `/daatan/shared/secrets/TELEGRAM_BOT_TOKEN_DAATAN` respectively, but the app still
-  reads both as plain env vars baked into the `daatan-env-*`/`news-indexer-env` blobs at
-  deploy time — refill those blobs from the new SSM parameters, not from Secrets Manager,
-  going forward.)
+- **Shared secrets are copied, not referenced** — except `ORACLE_API_KEY` (docs#122
+  group 3, fixed): it was "shared between oracle-api.service and the daatan app", but
+  daatan's role couldn't read `openclaw/*`, so daatan held a copy that could drift from
+  retro's. Now one parameter, `/daatan/shared/secrets/ORACLE_API_KEY`, read by both
+  retro (`pipeline/src/tm/duel_report.py`) and daatan (`src/lib/aws/secrets.ts` via
+  `getOracleApiKey()`) — see the IAM read grant in `terraform/secrets_ssm.tf`. Still
+  copied, not fixed by this pass: `daatan/news-indexer-secret`'s own description says
+  to set the same value in `daatan-env-prod`, `daatan-env-staging` *and*
+  `news-indexer-env`; and `openclaw/telegram-bot-token-daatan`'s human-facing copy now
+  lives at `/daatan/shared/secrets/TELEGRAM_BOT_TOKEN_DAATAN` (docs#122 group 1) but the
+  app still reads it as a plain env var baked into the `daatan-env-*`/`news-indexer-env`
+  blobs at deploy time — refill those blobs from the new SSM parameters, not from
+  Secrets Manager, going forward, or migrate the read path the same way `ORACLE_API_KEY`
+  was.
 - **`truthmachine-ec2-role` has `daatan/*` and `openclaw/*` wildcards.** It can read
   `openclaw/github-pat` and `openclaw/gcp-service-account-key`, which the Oracle does not
   use. Narrow to the paths it reads. Its role is not managed by Terraform at all.

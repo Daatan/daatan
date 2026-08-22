@@ -15,6 +15,7 @@ vi.mock('@aws-sdk/client-ssm', () => ({
 
 import {
   AWS_SECRET_NAMES,
+  SHARED_SECRET_NAMES,
   getAwsSecret,
   warmAwsSecrets,
   __resetAwsSecretsCache,
@@ -35,6 +36,10 @@ function param(name: string, value: string) {
   return { Name: `/daatan/staging/secrets/${name}`, Value: value }
 }
 
+function sharedParam(name: string, value: string) {
+  return { Name: `/daatan/shared/secrets/${name}`, Value: value }
+}
+
 describe('warmAwsSecrets', () => {
   it('requests every declared secret, decrypted, in one call', async () => {
     send.mockResolvedValue({ Parameters: [] })
@@ -43,7 +48,27 @@ describe('warmAwsSecrets', () => {
 
     const { input } = send.mock.calls[0][0]
     expect(input.WithDecryption).toBe(true)
-    expect(input.Names).toEqual(AWS_SECRET_NAMES.map((n) => `/daatan/staging/secrets/${n}`))
+    expect(input.Names).toEqual([
+      ...AWS_SECRET_NAMES.map((n) => `/daatan/staging/secrets/${n}`),
+      ...SHARED_SECRET_NAMES.map((n) => `/daatan/shared/secrets/${n}`),
+    ])
+  })
+
+  it('reads a shared secret off the env-independent /daatan/shared/secrets/ path', async () => {
+    send.mockResolvedValue({ Parameters: [sharedParam('ORACLE_API_KEY', 'oracle-secret')] })
+
+    await warmAwsSecrets()
+
+    expect(getAwsSecret('ORACLE_API_KEY')).toBe('oracle-secret')
+  })
+
+  it("a shared secret's path does not vary with APP_ENV", async () => {
+    process.env.APP_ENV = 'production'
+    send.mockResolvedValue({ Parameters: [] })
+
+    await warmAwsSecrets()
+
+    expect(send.mock.calls[0][0].input.Names).toContain('/daatan/shared/secrets/ORACLE_API_KEY')
   })
 
   it('caches a fetched value for sync reads', async () => {

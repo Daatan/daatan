@@ -27,7 +27,19 @@ const CACHE_TTL_MS = 5 * 60 * 1000
  *   need managed rotation. See docs/SECRETS.md.
  */
 export const AWS_SECRET_NAMES = ['OPENROUTER_API_KEY'] as const
-export type AwsSecretName = (typeof AWS_SECRET_NAMES)[number]
+
+/**
+ * Secrets read by both environments off ONE parameter at `/daatan/shared/secrets/<NAME>`
+ * — for values like the Oracle API key that retro's `oracle-api.service` and daatan's app
+ * must agree on byte-for-byte. Per-env copies would just reintroduce the "shared secret
+ * copied into two places, drifts silently" problem docs/SECRETS.md flags.
+ */
+export const SHARED_SECRET_NAMES = ['ORACLE_API_KEY'] as const
+
+export type AwsSecretName = (typeof AWS_SECRET_NAMES)[number] | (typeof SHARED_SECRET_NAMES)[number]
+
+const ALL_SECRET_NAMES: readonly AwsSecretName[] = [...AWS_SECRET_NAMES, ...SHARED_SECRET_NAMES]
+const SHARED_NAME_SET: ReadonlySet<string> = new Set(SHARED_SECRET_NAMES)
 
 /** Terraform creates each parameter at this sentinel; treat it as "not configured". */
 const PLACEHOLDER = 'PLACEHOLDER'
@@ -39,7 +51,7 @@ let inFlight: Promise<void> | null = null
 const ssm = new SSMClient({ region: REGION })
 
 function pathOf(name: AwsSecretName): string {
-  return `/daatan/${appEnvSlug()}/secrets/${name}`
+  return SHARED_NAME_SET.has(name) ? `/daatan/shared/secrets/${name}` : `/daatan/${appEnvSlug()}/secrets/${name}`
 }
 
 /**
@@ -60,7 +72,7 @@ export async function warmAwsSecrets(force = false): Promise<void> {
     try {
       const res = await ssm.send(
         new GetParametersCommand({
-          Names: AWS_SECRET_NAMES.map(pathOf),
+          Names: ALL_SECRET_NAMES.map(pathOf),
           WithDecryption: true,
         }),
       )
