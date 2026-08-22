@@ -5,7 +5,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() }),
 }))
 
-import { auditResolveByDatetime } from '../deadline-normalisation'
+import { auditResolveByDatetime, auditClaimDeadlineMismatch } from '../deadline-normalisation'
 
 beforeEach(() => warn.mockClear())
 
@@ -39,5 +39,27 @@ describe('auditResolveByDatetime', () => {
   it('ignores invalid dates', () => {
     expect(auditResolveByDatetime('create', new Date('nope'))).toBe(false)
     expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('auditClaimDeadlineMismatch', () => {
+  it('is silent when the claim has no explicit date, or agrees with resolveByDatetime', () => {
+    expect(auditClaimDeadlineMismatch('Candidate X will win the election.', new Date('2026-12-31T23:59:59Z'))).toBe(false)
+    expect(auditClaimDeadlineMismatch('Must happen by 31 August 2026.', new Date('2026-08-31T23:59:59Z'))).toBe(false)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('warns, without blocking, on a claim/deadline mismatch (daatan#1546)', () => {
+    const claimText = 'Somaliland will be internationally recognized by the end of 2027.'
+    const resolveByDatetime = new Date('2028-01-01T22:59:59.999Z')
+    expect(auditClaimDeadlineMismatch(claimText, resolveByDatetime, { predictionId: 'p1' })).toBe(true)
+    expect(warn).toHaveBeenCalledTimes(1)
+    const [fields, msg] = warn.mock.calls[0]
+    expect(fields).toMatchObject({
+      predictionId: 'p1',
+      path: 'update',
+      resolveByDatetime: '2028-01-01T22:59:59.999Z',
+    })
+    expect(msg).toMatch(/log-only/)
   })
 })

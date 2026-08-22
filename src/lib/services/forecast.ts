@@ -7,7 +7,7 @@ import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { createLogger } from '@/lib/logger'
-import { auditResolveByDatetime } from '@/lib/services/deadline-normalisation'
+import { auditResolveByDatetime, auditClaimDeadlineMismatch } from '@/lib/services/deadline-normalisation'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordEstimate } from '@/lib/services/context'
 import {
@@ -838,9 +838,18 @@ async function saveOriginalLanguageEdit(
 export async function updateForecast(id: string, data: UpdateForecastData) {
   const existing = await prisma.prediction.findUnique({
     where: { id },
-    select: { originalLanguage: true },
+    select: { originalLanguage: true, claimText: true, resolveByDatetime: true },
   })
   if (data.resolveByDatetime) auditResolveByDatetime('update', new Date(data.resolveByDatetime), { predictionId: id })
+
+  // Either field can change independently in a PATCH — use the effective (post-edit)
+  // value for whichever side isn't in this payload, so editing just one side of an
+  // already-consistent pair still catches a freshly introduced mismatch (daatan#1546).
+  if (existing && (data.claimText !== undefined || data.resolveByDatetime !== undefined)) {
+    const effectiveClaimText = data.claimText ?? existing.claimText
+    const effectiveResolveBy = data.resolveByDatetime ? new Date(data.resolveByDatetime) : existing.resolveByDatetime
+    auditClaimDeadlineMismatch(effectiveClaimText, effectiveResolveBy, { predictionId: id })
+  }
 
   // Non-English forecast edited by its author in the original language → the submitted
   // claim text is e.g. Hebrew, not the English canonical. Re-derive English on save.
