@@ -36,7 +36,7 @@ describe('toProposal', () => {
   it('types a negation pair as COMPLEMENT with the evidence attached', () => {
     const p = toProposal(pair, verdict({}))
     expect(p).toMatchObject({ fromPredictionId: 'a', toPredictionId: 'b', kind: 'COMPLEMENT', createdBy: 'MODEL', cosine: 0.91, sharedTag: true })
-    expect(p?.typerOutput).toMatchObject({ version: 'v1', relation: 'complement', aId: 'a', bId: 'b' })
+    expect(p?.typerOutput).toMatchObject({ version: 'v2', relation: 'complement', aId: 'a', bId: 'b' })
   })
 
   it('orients directed kinds by the verdict — b_to_a flips from/to', () => {
