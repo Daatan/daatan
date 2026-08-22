@@ -667,6 +667,81 @@ describe('recomputeFromPool', () => {
     await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
+
+  // daatan#1507 — log-only shadow check: the pool already shows the event happened
+  // before the claim was created (the Brent-crude case, daatan#1474 swing review #4).
+  describe('already-occurred-at-creation audit (daatan#1507)', () => {
+    const claimCreatedAt = new Date('2026-07-29T00:00:00Z')
+    const warnedAlreadyOccurred = () =>
+      mockLogger.warn.mock.calls.some((call) =>
+        String(call[1]).includes('already_occurred_at_creation'),
+      )
+
+    it('warns when >= 5 usable rows at stance >= 0.7 all predate claim creation', async () => {
+      findMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
+        ) as never,
+      )
+      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+      await recomputeFromPool('pred-1', null, null, claimCreatedAt)
+
+      expect(warnedAlreadyOccurred()).toBe(true)
+    })
+
+    it('does not warn below the row-count threshold', async () => {
+      findMany.mockResolvedValue(
+        Array.from({ length: 4 }, (_, i) =>
+          poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
+        ) as never,
+      )
+      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+      await recomputeFromPool('pred-1', null, null, claimCreatedAt)
+
+      expect(warnedAlreadyOccurred()).toBe(false)
+    })
+
+    it('does not warn when the strong rows are AFTER claim creation, not before', async () => {
+      findMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-08-05' }),
+        ) as never,
+      )
+      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+      await recomputeFromPool('pred-1', null, null, claimCreatedAt)
+
+      expect(warnedAlreadyOccurred()).toBe(false)
+    })
+
+    it('does not warn when claimCreatedAt is unknown — nothing to compare against', async () => {
+      findMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
+        ) as never,
+      )
+      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+      await recomputeFromPool('pred-1', null, null, null)
+
+      expect(warnedAlreadyOccurred()).toBe(false)
+    })
+
+    it('never blocks or changes the returned aggregate — log-only', async () => {
+      findMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
+        ) as never,
+      )
+      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+      const out = await recomputeFromPool('pred-1', null, null, claimCreatedAt)
+
+      expect(out?.mean).toBe(AGGREGATE.mean)
+    })
+  })
 })
 
 describe('pushCredibilityFeedback', () => {
