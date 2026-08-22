@@ -18,6 +18,7 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
     // The bot system is SaaS-only — hidden in the self-hosted edition.
     { id: 'bots', label: t('tabBots'), adminOnly: true, selfHostedHidden: true },
     { id: 'oracle', label: t('tabOracle'), adminOnly: true },
+    { id: 'oracle-v2', label: t('tabOracleV2'), adminOnly: true },
     { id: 'sources', label: t('tabSources'), adminOnly: true },
     { id: 'ratings', label: t('tabRatings'), adminOnly: true },
     // Edits news-indexer's author-identity tables through an ADMIN-gated proxy
