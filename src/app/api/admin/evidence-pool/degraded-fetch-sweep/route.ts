@@ -34,15 +34,22 @@ function parseWhereOptions(request: NextRequest): DegradedFetchWhereOptions {
  * allowlist (see parseWhereOptions); `?filter=domains` shows the legacy domain
  * superset for comparison. Never calls the Oracle; safe to hit any time to see
  * how the candidate set is trending as rows get re-extracted.
+ *
+ * `rows` splits into `reachable` (null contentHash — actually re-extractable) and
+ * `gated` (non-null — the sweep re-sends each row's OWN stored title+snippet, so a
+ * non-null hash re-hashes to itself and no-ops every time). Without this split,
+ * `rows` overstates what the sweep can move: daatan#1466 measured 137 of a
+ * 140-row residual as permanently gated, with the preview giving no hint of it.
  */
 export const GET = withAuth(async (request: NextRequest) => {
   try {
     const where = degradedFetchWhere(parseWhereOptions(request))
-    const [rows, groups] = await Promise.all([
+    const [rows, reachable, groups] = await Promise.all([
       prisma.evidencePoolArticle.count({ where }),
+      prisma.evidencePoolArticle.count({ where: { ...where, contentHash: null } }),
       prisma.evidencePoolArticle.groupBy({ by: ['predictionId'], where, _count: { _all: true } }),
     ])
-    return NextResponse.json({ rows, predictions: groups.length })
+    return NextResponse.json({ rows, reachable, gated: rows - reachable, predictions: groups.length })
   } catch (error) {
     return handleRouteError(error, 'Degraded-fetch sweep preview failed')
   }

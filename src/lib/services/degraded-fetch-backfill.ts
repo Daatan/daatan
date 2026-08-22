@@ -122,6 +122,11 @@ export interface DegradedFetchSweepResult {
   failed: number
   /** Retryable rows still matching the filter — the sweep's convergence gauge. */
   remaining: number
+  /** Of `remaining`, how many have a non-null contentHash (daatan#1466). This sweep
+   *  re-sends each row's OWN stored title+snippet, so a non-null hash re-hashes to
+   *  itself and gates as `unchanged` every time — these rows are a hard floor, not
+   *  slow-but-reachable progress. Only null-contentHash rows can actually move. */
+  gated: number
   /** Before/after ContextSnapshot pair per prediction the sweep actually ran, for
    *  {@link buildDegradedFetchDiffReport}. */
   diffs: PredictionSnapshotPair[]
@@ -162,6 +167,14 @@ export async function sweepDegradedFetchRows(
     .sort((a, b) => (backlogById.get(b.id) ?? 0) - (backlogById.get(a.id) ?? 0))
     .slice(0, limit)
 
+  const remainingBefore = await prisma.evidencePoolArticle.count({
+    where: { ...where, prediction: { status: 'ACTIVE' } },
+  })
+  const gatedBefore = await prisma.evidencePoolArticle.count({
+    where: { ...where, prediction: { status: 'ACTIVE' }, contentHash: { not: null } },
+  })
+  log.info({ remainingBefore, gatedBefore }, 'degraded-fetch-backfill.candidates')
+
   const results: DegradedFetchSweepResult = {
     processed: 0,
     rowsRetried: 0,
@@ -171,6 +184,7 @@ export async function sweepDegradedFetchRows(
     insufficient: 0,
     failed: 0,
     remaining: 0,
+    gated: 0,
     diffs: [],
   }
 
@@ -211,6 +225,12 @@ export async function sweepDegradedFetchRows(
   results.remaining = await prisma.evidencePoolArticle.count({
     where: { ...where, prediction: { status: 'ACTIVE' } },
   })
+  results.gated = await prisma.evidencePoolArticle.count({
+    where: { ...where, prediction: { status: 'ACTIVE' }, contentHash: { not: null } },
+  })
+  if (results.remaining === remainingBefore) {
+    log.warn({ ...results, remainingBefore }, 'degraded-fetch-backfill.no_forward_progress')
+  }
   log.info(results, 'degraded-fetch-backfill.done')
   return results
 }
