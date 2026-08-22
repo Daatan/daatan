@@ -11,12 +11,8 @@ name: Relation Typer
 # Daily: new pairs appear at the rate forecasts are created, a handful a day.
 
 on:
-  # Schedule PAUSED 2026-08-22: typer v1 scored 4/8 exact kind+direction on the
-  # hand-labelled pairs (retro#574) — IMPLIES direction is systematically
-  # inverted. A wrong-kind PROPOSED row blocks the pair from being re-typed, so
-  # no write-runs until typer v2 passes the dry run. Re-enable:
-  # schedule:
-  #   - cron: '37 11 * * *'   # daily 11:37 UTC — after evidence-health
+  schedule:
+    - cron: '37 11 * * *'   # daily 11:37 UTC — after evidence-health
   workflow_dispatch:
     inputs:
       target:
@@ -37,7 +33,7 @@ jobs:
   relation-typer:
     name: Type candidate forecast pairs
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Run relation typer
