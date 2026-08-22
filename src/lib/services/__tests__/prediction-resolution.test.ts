@@ -232,6 +232,15 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     expect(data).toMatchObject({ status: 'RESOLVED_CORRECT', resolutionOutcome: 'correct' })
   })
 
+  it('clears awaitingAiResolution on resolution — a terminal row is never still "awaiting" (daatan#1492)', async () => {
+    findUnique.mockResolvedValue(prediction() as never)
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
+
+    const data = tx.prediction.update.mock.calls[0][0].data
+    expect(data.awaitingAiResolution).toBe(false)
+  })
+
   it('MULTIPLE_CHOICE resolutions write no member scores — sentinels are BINARY-only', async () => {
     // On MC the per-commitment outcome is "did this user's option win", a different
     // question from the BINARY "did the claim resolve true" every other row answers.

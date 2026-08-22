@@ -122,6 +122,10 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
         evidenceLinks: evidenceLinks ?? undefined,
         resolutionNote,
         resolutionOverrodePin: pinContradiction.contradicts ? true : null,
+        // A resolved prediction is terminal — nothing should still read it as
+        // awaiting AI resolution (daatan#1492 finding #2: 6 RESOLVED rows kept
+        // the flag set because this update never cleared it).
+        awaitingAiResolution: false,
       },
     })
 
