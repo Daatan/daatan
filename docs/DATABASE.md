@@ -368,7 +368,13 @@ terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`.
 row: those mean the Oracle received the articles, ran, and produced nothing anyway.
 `oracle_timeout` / `oracle_network` / `oracle_http` / `oracle_unconfigured` /
 `oracle_placeholder` are facts about the wire, not the evidence, and legacy
-`oracle_null` conflates all six so its cause is unknown. Both strikes are checked:
+`oracle_null` (pre-#1231, before the six causes were split out) conflates all six
+so its cause is unknown — it can never earn the two-strike `oracle_null_final`
+finalization real split-cause rows get, and until daatan#1522 it wasn't in
+`TERMINAL_POOL_REASONS` either, so these rows retried forever. `retire-legacy-null`
+(`POST /api/admin/evidence-pool/retire-legacy-null`, one-off, not scheduled) stamps
+them `retired_legacy` — a new entry in `TERMINAL_POOL_REASONS` — to close that gap.
+Both strikes are checked:
 the row's prior reason AND this run's failure class. This matters because one sweep
 call carries up to `DEFAULT_MAX_ARTICLES` (15) rows on a **single** Oracle call — a
 lone client timeout used to stamp the whole batch terminal on zero information about

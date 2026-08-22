@@ -25,6 +25,7 @@ const article = (overrides: Record<string, unknown> = {}) => ({
   version: 1,
   supersedesId: null,
   supersededAt: null,
+  status: 'COMPLETE',
   ...overrides,
 })
 
@@ -99,5 +100,46 @@ describe('EvidencePoolAdmin — version chains', () => {
     await openPanel()
 
     expect(await screen.findByText('Orphan row')).toBeInTheDocument()
+  })
+})
+
+describe('EvidencePoolAdmin — usable/total header + status badges (daatan#1521)', () => {
+  it('shows the usable/total split from the API response, not a raw row count', async () => {
+    asAdmin()
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ articles: [article()], poolSize: 62, usableSize: 18 }),
+    })
+    render(<EvidencePoolAdmin predictionId="pred-1" />)
+    await openPanel()
+
+    expect(await screen.findByText('18')).toBeInTheDocument()
+    expect(screen.getByText(/usable \/ 62 total/)).toBeInTheDocument()
+  })
+
+  it('renders no usable/total line when the API omits the counts (older response shape)', async () => {
+    asAdmin()
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ articles: [article()] }) })
+    render(<EvidencePoolAdmin predictionId="pred-1" />)
+    await openPanel()
+
+    await screen.findByText('Example article')
+    expect(screen.queryByText(/usable \//)).toBeNull()
+  })
+
+  it('badges a FAILED row and leaves a COMPLETE row unbadged', async () => {
+    asAdmin()
+    const failed = article({ id: 'a-failed', title: 'Failed article', status: 'FAILED' })
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ articles: [article(), failed], poolSize: 2, usableSize: 1 }),
+    })
+    render(<EvidencePoolAdmin predictionId="pred-1" />)
+    await openPanel()
+
+    expect(await screen.findByText('FAILED')).toBeInTheDocument()
+    expect(screen.getByText('Example article')).toBeInTheDocument()
+    // Only one badge — the COMPLETE row doesn't get one.
+    expect(screen.getAllByText(/^(FAILED|PENDING)$/)).toHaveLength(1)
   })
 })
