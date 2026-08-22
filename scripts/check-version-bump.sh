@@ -1,22 +1,21 @@
 #!/bin/bash
 
-# Two checks on the app version, in increasing order of what they can catch.
+# MONOTONICITY — the version in package.json strictly ADVANCES past the base
+# branch. This catches two concurrent branches both bumping X -> Y: each looks
+# fine in isolation, and both merge. That happened on 2026-08-05, when #1282
+# and #1284 both landed carrying v1.65.37, so that version no longer
+# identifies a unique build — which matters because prod deploys are cut from
+# a `v*` tag and NEXT_PUBLIC_APP_VERSION bakes at build time.
 #
-# 1. CONSISTENCY — package.json and src/lib/version.ts agree. Cheap, local,
-#    and all this script used to do. It cannot tell whether a bump happened at
-#    all, only that the two files say the same thing.
+# `src/lib/version.ts` used to carry a hand-maintained `// vX.Y.Z` comment
+# checked for consistency here too — dropped (daatan#1522-followup): it was
+# never code-read (VERSION comes from the NEXT_PUBLIC_APP_VERSION build arg),
+# so it only added a manual edit that collided across concurrent branches
+# without catching anything this check doesn't already catch.
 #
-# 2. MONOTONICITY — the version strictly ADVANCES past the base branch. This is
-#    the one that catches two concurrent branches both bumping X -> Y: each is
-#    self-consistent, each passes (1), and both merge. That happened on
-#    2026-08-05, when #1282 and #1284 both landed carrying v1.65.37, so that
-#    version no longer identifies a unique build — which matters because prod
-#    deploys are cut from a `v*` tag and NEXT_PUBLIC_APP_VERSION bakes at build
-#    time.
-#
-# (2) is skipped when the base ref is unavailable (a fresh clone with no
-# `origin/main`, or a detached checkout), so the local hook degrades to the old
-# behaviour instead of blocking work offline. CI fetches the base explicitly and
+# This check is skipped when the base ref is unavailable (a fresh clone with
+# no `origin/main`, or a detached checkout), so the local hook degrades to a
+# no-op instead of blocking work offline. CI fetches the base explicitly and
 # therefore always runs it — see .github/workflows/version.yml.
 #
 # Override the base with VERSION_CHECK_BASE (e.g. for a release branch).
@@ -24,20 +23,6 @@
 set -uo pipefail
 
 PKG_VERSION=$(node -p "require('./package.json').version")
-TS_VERSION=$(grep -oP '// v\K[0-9]+\.[0-9]+\.[0-9]+' src/lib/version.ts)
-
-echo "🔍 Checking version consistency..."
-echo "   package.json:       v$PKG_VERSION"
-echo "   src/lib/version.ts: v${TS_VERSION:-<no comment>}"
-
-if [ -n "$TS_VERSION" ] && [ "$PKG_VERSION" != "$TS_VERSION" ]; then
-  echo "❌ ERROR: Version mismatch!"
-  echo "   package.json ($PKG_VERSION) does not match src/lib/version.ts ($TS_VERSION)"
-  echo "   Align both files before committing."
-  exit 1
-fi
-
-echo "✅ Version consistency check passed"
 
 BASE_REF="${VERSION_CHECK_BASE:-origin/main}"
 

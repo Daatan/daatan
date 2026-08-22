@@ -58,17 +58,17 @@ This triggers the `deploy-production` job which:
 2. Pulls the versioned app + migrations images from ECR
 3. Runs the full blue-green deploy on production
 
-> **Version in `src/lib/version.ts`**: Keep the `// v1.X.Y` comment in sync with
-> `package.json`. The pre-commit hook enforces consistency.
+> **Version**: `package.json`'s `version` field is the only place it's edited.
+> `src/lib/version.ts` reads it at runtime via `NEXT_PUBLIC_APP_VERSION` — no
+> comment to keep in sync there.
 
 ---
 
 ## Version Management
 
 - **Single source of truth**: `package.json` → `version` field
-- **Human hint**: `src/lib/version.ts` contains a `// v1.X.Y` comment that must match
-- **Runtime value**: `NEXT_PUBLIC_APP_VERSION` build arg (set by CI from `package.json`)
-- **Pre-commit hook**: `scripts/check-version-bump.sh` — verifies the two files agree
+- **Runtime value**: `NEXT_PUBLIC_APP_VERSION` build arg (set by CI from `package.json`), read by `src/lib/version.ts`
+- **Pre-commit hook**: `scripts/check-version-bump.sh` — verifies the branch's `package.json` version advances past `origin/main`'s
 
 ### Bump commands
 

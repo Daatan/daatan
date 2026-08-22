@@ -34,9 +34,8 @@ chore: Update dependencies        → 1.0.1 (patch bump)
 Version bumps are **manual** and done explicitly when releasing:
 
 1. Update `package.json` → `"version"` field
-2. Update the comment in `src/lib/version.ts` to match (e.g. `// v1.7.16`)
-3. Commit: `git commit -m "chore: bump version to v1.x.x"`
-4. Run `./scripts/release.sh` to tag and trigger production deploy
+2. Commit: `git commit -m "chore: bump version to v1.x.x"`
+3. Run `./scripts/release.sh` to tag and trigger production deploy
 
 ## Where the Version Lives
 
