@@ -782,6 +782,44 @@ export interface PoolRecompute {
   usableArticles: PoolRecomputeArticle[]
 }
 
+const ALREADY_OCCURRED_MIN_ROWS = 5
+const ALREADY_OCCURRED_STANCE_THRESHOLD = 0.7
+
+/**
+ * Log-only shadow check (daatan#1507): does the pool already show the claimed event
+ * having happened *before the claim was even created*? Found via the Brent-crude case
+ * (daatan#1474 swing review #4) — a forecast created 2026-07-29 asking whether Brent
+ * crosses $100, when Brent had already crossed six days earlier; the pool's own
+ * pre-creation evidence proved it, but nothing surfaced that until Mark caught it
+ * manually. Cheap heuristic per the issue's own "first cut": `ALREADY_OCCURRED_MIN_ROWS`
+ * usable rows at stance >= `ALREADY_OCCURRED_STANCE_THRESHOLD`, every one of them
+ * published before `claimCreatedAt`. Log-only, mirrors auditResolveByDatetime /
+ * auditClaimDeadlineMismatch — never blocks or mutates.
+ */
+function auditAlreadyOccurredAtCreation(
+  predictionId: string,
+  usable: PoolRecomputeArticle[],
+  claimCreatedAt: Date | null,
+): void {
+  if (!claimCreatedAt) return
+  const priorStrong = usable.filter((a) => {
+    if (a.stance === null || a.stance < ALREADY_OCCURRED_STANCE_THRESHOLD) return false
+    if (!a.publishedDate) return false
+    const published = new Date(a.publishedDate)
+    return !Number.isNaN(published.getTime()) && published < claimCreatedAt
+  })
+  if (priorStrong.length < ALREADY_OCCURRED_MIN_ROWS) return
+  log.warn(
+    {
+      predictionId,
+      matchingRows: priorStrong.length,
+      claimCreatedAt: claimCreatedAt.toISOString(),
+      urls: priorStrong.map((a) => a.url),
+    },
+    'evidence-pool.already_occurred_at_creation — pool shows the event before claim creation (log-only, daatan#1507)',
+  )
+}
+
 /**
  * Aggregate a forecast's entire evidence pool into one estimate, via retro's
  * `/pool/aggregate` (retro docs/ORACLE_VARIABLES.md §6).
@@ -813,6 +851,8 @@ export async function recomputeFromPool(
   const usable = pool.filter(isUsablePoolRow)
   const incompleteCount = pool.length - excludedCount - usable.length
   if (usable.length === 0) return null
+
+  auditAlreadyOccurredAtCreation(predictionId, usable, claimCreatedAt)
 
   let res: Response
   try {
