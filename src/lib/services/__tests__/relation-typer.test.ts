@@ -7,11 +7,11 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
   fillPrompt: (t: string, v: Record<string, string | number>) =>
     Object.entries(v).reduce((s, [k, val]) => s.replace(`{{${k}}}`, String(val)), t),
 }))
-vi.mock('../question-relation', () => ({ proposeRelation: vi.fn() }))
+vi.mock('../question-relation', () => ({ proposeRelation: vi.fn(), supersedeStaleModelRows: vi.fn().mockResolvedValue(0) }))
 
 import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
-import { proposeRelation } from '../question-relation'
+import { proposeRelation, supersedeStaleModelRows } from '../question-relation'
 import { toProposal, runRelationTyper, MIN_CONFIDENCE, type CandidatePair, type TyperVerdict } from '../relation-typer'
 
 /**
@@ -73,12 +73,14 @@ describe('runRelationTyper', () => {
     expect(s).toMatchObject({ candidates: 2, typed: 2, independent: 1, failed: 0, outcomes: { created: 2 } })
     expect(proposeRelation).toHaveBeenCalledTimes(2)
     expect(vi.mocked(proposeRelation).mock.calls.map(c => c[0].kind).sort()).toEqual(['COMPLEMENT', 'NONE'])
+    expect(supersedeStaleModelRows).toHaveBeenCalledTimes(2)
 
     vi.mocked(prisma.$queryRaw).mockResolvedValue([pair])
     vi.mocked(llmService.generateContent).mockResolvedValueOnce({ text: JSON.stringify(verdict({})) } as never)
     const dry = await runRelationTyper({ dryRun: true })
     expect(dry.proposals).toHaveLength(1)
     expect(proposeRelation).toHaveBeenCalledTimes(2)
+    expect(supersedeStaleModelRows).toHaveBeenCalledTimes(2)
   })
 
   it('fails open per pair — a malformed verdict is counted, not thrown', async () => {

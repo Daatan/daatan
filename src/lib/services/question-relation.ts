@@ -96,6 +96,27 @@ export async function proposeRelation(p: RelationProposal): Promise<ProposeOutco
   return 'created'
 }
 
+/**
+ * Drop undecided MODEL rows on a pair written by an older typer version, so
+ * the current typer's verdict replaces them (the unique key is per kind, so a
+ * changed kind would otherwise leave the stale row beside the new one).
+ * Human-decided rows are never touched.
+ */
+export async function supersedeStaleModelRows(aId: string, bId: string, currentVersion: string): Promise<number> {
+  const { count } = await prisma.questionRelation.deleteMany({
+    where: {
+      createdBy: 'MODEL',
+      decidedBy: null,
+      OR: [
+        { fromPredictionId: aId, toPredictionId: bId },
+        { fromPredictionId: bId, toPredictionId: aId },
+      ],
+      NOT: { typerOutput: { path: ['version'], equals: currentVersion } },
+    },
+  })
+  return count
+}
+
 /** Human decision on a proposed relation. Idempotent. */
 export async function decideRelation(
   id: string,

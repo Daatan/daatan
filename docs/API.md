@@ -678,7 +678,10 @@ the justifying spans, and writes `PROPOSED` rows via `proposeRelation()` for
 post-moderation (a `REJECTED` pair is never re-proposed). Structure only; no
 published number moves. `independent` verdicts are stored as auto-confirmed
 `none` ledger rows so the pair is never re-asked; verdicts under confidence
-0.6 are not stored and get re-asked on a later run. Pairs are typed 8-wide;
+0.6 are not stored and get re-asked on a later run. An undecided model row
+from an older `typer_output.version` does not block the pair: the current
+typer re-asks it and replaces the stale rows, so a prompt upgrade refreshes
+the graph (human-decided rows are never touched). Pairs are typed 8-wide;
 nginx gives this route a 620 s budget (like `/api/cron/ai-panel`). Auth: `x-cron-secret`
 (`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the run throws. Query:
 `?dryRun=1` (return would-be `proposals`, write nothing — the acceptance check
