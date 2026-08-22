@@ -55,15 +55,22 @@ keystore (`android.keystore`, alias `upload`); Google holds the actual **app
 signing key** used on end-user devices. If the upload key is ever lost,
 Google can help reset it — a fully self-managed key would brick the app.
 
-The keystore and both passwords live in AWS Secrets Manager (canonical) and
-are mirrored to GitHub Actions repo secrets (what CI actually reads —
-`gh secret set`, no Terraform/OIDC changes needed):
+The keystore and both passwords live in SSM Parameter Store (canonical —
+migrated off Secrets Manager per docs#122, since nothing here reads them at
+app runtime, only this manual setup step) and are mirrored to GitHub Actions
+repo secrets (what CI actually reads — `gh secret set`, no Terraform/OIDC
+changes needed):
 
-| Secret | Secrets Manager name | GitHub Actions secret |
+| Secret | SSM parameter name | GitHub Actions secret |
 |---|---|---|
-| Keystore (base64) | `daatan/android/upload-keystore-base64` | `ANDROID_KEYSTORE_BASE64` |
-| Keystore password | `daatan/android/upload-keystore-password` | `ANDROID_KEYSTORE_PASSWORD` |
-| Key password | `daatan/android/upload-key-password` | `ANDROID_KEY_PASSWORD` |
+| Keystore (base64) | `/daatan/shared/secrets/ANDROID_UPLOAD_KEYSTORE_BASE64` | `ANDROID_KEYSTORE_BASE64` |
+| Keystore password | `/daatan/shared/secrets/ANDROID_UPLOAD_KEYSTORE_PASSWORD` | `ANDROID_KEYSTORE_PASSWORD` |
+| Key password | `/daatan/shared/secrets/ANDROID_UPLOAD_KEY_PASSWORD` | `ANDROID_KEY_PASSWORD` |
+
+Read one with `aws ssm get-parameter --name <name> --with-decryption --query
+Parameter.Value --output text`; re-mirror to GitHub with `gh secret set
+<GitHub name> --body "$(aws ssm get-parameter --name <name> --with-decryption
+--query Parameter.Value --output text)"`.
 
 The key alias (`upload`) isn't a secret — it's hardcoded in
 `twa-manifest.json` and the CI workflow.

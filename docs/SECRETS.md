@@ -107,7 +107,15 @@ Staging cannot read prod. That is the boundary that matters and it holds. (Until
   description says to set the same value in `daatan-env-prod`, `daatan-env-staging` *and*
   `news-indexer-env`. `openclaw/oracle-api-key` is "shared between oracle-api.service and
   the daatan app", but daatan's role cannot read `openclaw/*` — so daatan holds a copy.
-  Each should become one parameter, read by both roles.
+  Each should become one parameter, read by both roles. (docs#122: `ORACLE_API_KEY`
+  unified at `/daatan/shared/secrets/ORACLE_API_KEY`, read by both retro and daatan's
+  `src/lib/aws/secrets.ts` — the copy-per-blob problem for `news-indexer-secret` and
+  `openclaw/telegram-bot-token-daatan` is not fixed by this pass, only moved: their
+  canonical human-facing copies now live at `/daatan/shared/secrets/NEWS_INDEXER_SECRET`
+  and `/daatan/shared/secrets/TELEGRAM_BOT_TOKEN_DAATAN` respectively, but the app still
+  reads both as plain env vars baked into the `daatan-env-*`/`news-indexer-env` blobs at
+  deploy time — refill those blobs from the new SSM parameters, not from Secrets Manager,
+  going forward.)
 - **`truthmachine-ec2-role` has `daatan/*` and `openclaw/*` wildcards.** It can read
   `openclaw/github-pat` and `openclaw/gcp-service-account-key`, which the Oracle does not
   use. Narrow to the paths it reads. Its role is not managed by Terraform at all.
