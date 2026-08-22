@@ -13,8 +13,7 @@ if echo "$COMMAND" | grep -q "gh pr create"; then
     echo "BLOCKED — version not bumped."
     echo ""
     echo "package.json version is still $CURRENT_VERSION (same as main)."
-    echo "Bump both package.json and src/lib/version.ts (the // vX.Y.Z comment)"
-    echo "before creating a PR."
+    echo "Bump package.json's version field before creating a PR."
     exit 2
   fi
 

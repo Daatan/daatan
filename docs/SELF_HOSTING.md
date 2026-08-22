@@ -224,7 +224,7 @@ Source build — `git pull` then `up --build`. Take a `pg_dump` (see §7) before
 
 The image is published from a **manual** GitHub Action — it never fires on a normal prod tag and touches nothing in the SaaS pipeline (no ECR/EC2/AWS).
 
-1. Bump `package.json` / `src/lib/version.ts` and merge to `main` as usual.
+1. Bump `package.json`'s `version` field and merge to `main` as usual.
 2. **Actions → "Release self-hosted image" → Run workflow.** Leave *Version* blank to publish the current `package.json` version (or type an explicit one).
 3. It builds and pushes both tags to GHCR:
    - `ghcr.io/daatan/daatan-selfhost:<version>` and `:latest`
