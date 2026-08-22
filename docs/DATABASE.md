@@ -687,7 +687,10 @@ newest snapshot's `createdAt` is the last *change*, not the last sync
 
 Oracle 2.0 storage layer **M1**: a declared relation between two forecasts —
 `kind` ∈ alias / nested_deadline / threshold_nesting / mutually_exclusive /
-complement / implies / conditional, `created_by` ∈ human / derived / extracted /
+complement / implies / conditional, plus `none` — a ledger entry meaning "the
+typer looked and found no constraint" (auto-confirmed, never a graph edge,
+skipped by `relationsFor()`; without it the typer re-asks the same pairs
+forever), `created_by` ∈ human / derived / extracted /
 model, `status` ∈ proposed / confirmed / rejected / merged. **Structure only:
 there is deliberately no probability column** — edge weights are a derived
 snapshot layer (M4, daatan#1558) that does not exist yet. Symmetric kinds

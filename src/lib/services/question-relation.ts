@@ -25,6 +25,7 @@ export const SYMMETRIC_KINDS: ReadonlySet<QuestionRelationKind> = new Set<Questi
   'ALIAS',
   'MUTUALLY_EXCLUSIVE',
   'COMPLEMENT',
+  'NONE',
 ])
 
 export interface RelationProposal {
@@ -83,7 +84,14 @@ export async function proposeRelation(p: RelationProposal): Promise<ProposeOutco
     return 'refreshed'
   }
   await prisma.questionRelation.create({
-    data: { ...pair, kind: p.kind, createdBy: p.createdBy, status: 'PROPOSED', ...evidence },
+    data: {
+      ...pair,
+      kind: p.kind,
+      createdBy: p.createdBy,
+      // NONE is a ledger entry ("looked, found nothing"), not a claim to moderate.
+      status: p.kind === 'NONE' ? 'CONFIRMED' : 'PROPOSED',
+      ...evidence,
+    },
   })
   return 'created'
 }
@@ -100,11 +108,12 @@ export async function decideRelation(
   })
 }
 
-/** All non-rejected relations touching a question, either side. */
+/** All non-rejected relations touching a question, either side. NONE ledger rows are not relations. */
 export async function relationsFor(predictionId: string) {
   return prisma.questionRelation.findMany({
     where: {
       status: { not: 'REJECTED' },
+      kind: { not: 'NONE' },
       OR: [{ fromPredictionId: predictionId }, { toPredictionId: predictionId }],
     },
     orderBy: { createdAt: 'asc' },

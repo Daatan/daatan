@@ -53,8 +53,8 @@ describe('toProposal', () => {
     expect(toProposal(pair, verdict({ relation: 'implies', direction: null }))).toBeNull()
   })
 
-  it('stores nothing for independent or low-confidence verdicts', () => {
-    expect(toProposal(pair, verdict({ relation: 'independent' }))).toBeNull()
+  it('records independent as a NONE ledger row and stores nothing for low confidence', () => {
+    expect(toProposal(pair, verdict({ relation: 'independent' }))).toMatchObject({ kind: 'NONE', createdBy: 'MODEL' })
     expect(toProposal(pair, verdict({ confidence: MIN_CONFIDENCE - 0.01 }))).toBeNull()
   })
 })
@@ -62,7 +62,7 @@ describe('toProposal', () => {
 describe('runRelationTyper', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('proposes typed pairs, counts independent ones, and never writes on dryRun', async () => {
+  it('proposes typed pairs, ledgers independent ones, and never writes on dryRun', async () => {
     vi.mocked(prisma.$queryRaw).mockResolvedValue([pair, { ...pair, bId: 'c', bClaim: 'Lebanon recognises Israel' }])
     vi.mocked(llmService.generateContent)
       .mockResolvedValueOnce({ text: JSON.stringify(verdict({})) } as never)
@@ -70,14 +70,15 @@ describe('runRelationTyper', () => {
     vi.mocked(proposeRelation).mockResolvedValue('created')
 
     const s = await runRelationTyper({ limit: 10 })
-    expect(s).toMatchObject({ candidates: 2, typed: 2, independent: 1, failed: 0, outcomes: { created: 1 } })
-    expect(proposeRelation).toHaveBeenCalledTimes(1)
+    expect(s).toMatchObject({ candidates: 2, typed: 2, independent: 1, failed: 0, outcomes: { created: 2 } })
+    expect(proposeRelation).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(proposeRelation).mock.calls.map(c => c[0].kind).sort()).toEqual(['COMPLEMENT', 'NONE'])
 
     vi.mocked(prisma.$queryRaw).mockResolvedValue([pair])
     vi.mocked(llmService.generateContent).mockResolvedValueOnce({ text: JSON.stringify(verdict({})) } as never)
     const dry = await runRelationTyper({ dryRun: true })
     expect(dry.proposals).toHaveLength(1)
-    expect(proposeRelation).toHaveBeenCalledTimes(1)
+    expect(proposeRelation).toHaveBeenCalledTimes(2)
   })
 
   it('fails open per pair — a malformed verdict is counted, not thrown', async () => {
