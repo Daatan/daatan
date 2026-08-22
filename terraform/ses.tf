@@ -65,7 +65,7 @@ resource "aws_s3_bucket_policy" "ses_write_mail" {
         Principal = {
           Service = "ses.amazonaws.com"
         }
-        Action = "s3:PutObject"
+        Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.mail.arn}/*"
         Condition = {
           StringEquals = {
@@ -150,12 +150,12 @@ resource "aws_lambda_function" "forwarder" {
 
   environment {
     variables = {
-      S3_BUCKET              = aws_s3_bucket.mail.id
-      VERIFIED_FROM          = "forwarder@${var.domain_name}"
+      S3_BUCKET     = aws_s3_bucket.mail.id
+      VERIFIED_FROM = "forwarder@${var.domain_name}"
       # Invariant: every mapping must include andrey1bar@gmail.com so Andrey
       # sees every incoming mail. The catch-all below already satisfies this
       # for any address not listed here.
-      FORWARD_MAPPING        = jsonencode({
+      FORWARD_MAPPING = jsonencode({
         "mark@daatan.com"   = ["komapc@gmail.com", "andrey1bar@gmail.com"],
         "andrey@daatan.com" = "andrey1bar@gmail.com"
       })
@@ -165,10 +165,10 @@ resource "aws_lambda_function" "forwarder" {
 }
 
 resource "aws_lambda_permission" "allow_ses" {
-  statement_id  = "AllowExecutionFromSES"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.forwarder.function_name
-  principal     = "ses.amazonaws.com"
+  statement_id   = "AllowExecutionFromSES"
+  action         = "lambda:InvokeFunction"
+  function_name  = aws_lambda_function.forwarder.function_name
+  principal      = "ses.amazonaws.com"
   source_account = data.aws_caller_identity.current.account_id
 }
 

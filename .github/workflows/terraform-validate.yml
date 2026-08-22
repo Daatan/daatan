@@ -1,0 +1,38 @@
+name: Terraform Validate
+
+# Static checks only (fmt + validate) — no AWS credentials, no plan against real state.
+# news-indexer already let invalid HCL merge once because nothing in its CI touched
+# terraform/ at all (ni#345/#346); this closes the identical gap here.
+
+on:
+  pull_request:
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-validate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: fmt + validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
