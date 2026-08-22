@@ -248,6 +248,25 @@ describe('sweepDegradedFetchRows', () => {
     expect(r.diffs).toHaveLength(2)
   })
 
+  it('reports gated (non-null contentHash) separately from the raw remaining count (daatan#1466)', async () => {
+    mockGroupBy.mockResolvedValue([{ predictionId: 'p1', _count: { _all: 1 } }] as never)
+    mockPredictions.mockResolvedValue([
+      { id: 'p1', claimText: 'a', claimDirection: null, claimDeadline: null },
+    ] as never)
+    mockRefresh.mockResolvedValue({ status: 'ok', sources: 1 })
+    // call order: remainingBefore, gatedBefore, [loop has none], results.remaining, results.gated
+    mockCount
+      .mockResolvedValueOnce(140)
+      .mockResolvedValueOnce(137)
+      .mockResolvedValueOnce(140)
+      .mockResolvedValueOnce(137)
+
+    const r = await sweepDegradedFetchRows(5)
+
+    expect(r.remaining).toBe(140)
+    expect(r.gated).toBe(137)
+  })
+
   it('never writes anything itself — refreshOracleSnapshot is the only mutation seam', async () => {
     mockGroupBy.mockResolvedValue([{ predictionId: 'p1', _count: { _all: 1 } }] as never)
     mockPredictions.mockResolvedValue([
