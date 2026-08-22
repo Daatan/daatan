@@ -16,6 +16,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - **Production deploys are tag-triggered and explicit.** Never tag a release or push a `v*` tag unless the user asked for it. CI auto-deploys staging on every PR merge to main; production only on `v*` tags.
 - **Migrations run via the dedicated migrations container** in blue-green Phase 5. Don't rely on `docker exec` for `prisma migrate deploy` — the slim runner image lacks the Prisma CLI deps. See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md`.
 - **The pgvector extension must be present** in the postgres image. Production uses `pgvector/pgvector:pg16`. Don't switch to stock `postgres:16-alpine` without re-evaluating the embedding migration.
+- **Claim an issue before starting work on it.** Several agent sessions work this org's repos concurrently. Before the first exploratory read/edit for a GitHub issue: `gh issue edit <n> --add-assignee @me` and post a short "starting work now" comment. Check existing assignee/comments first — an assignee already set is a live claim, not necessarily a stalled one.
 
 ## Common patterns
 
