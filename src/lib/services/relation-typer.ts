@@ -24,7 +24,7 @@ import { prisma } from '@/lib/prisma'
 import { llmService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { createLogger } from '@/lib/logger'
-import { proposeRelation, type ProposeOutcome, type RelationProposal } from './question-relation'
+import { proposeRelation, supersedeStaleModelRows, type ProposeOutcome, type RelationProposal } from './question-relation'
 
 const log = createLogger('relation-typer')
 
@@ -109,8 +109,11 @@ export function toProposal(pair: CandidatePair, v: TyperVerdict): RelationPropos
 }
 
 /**
- * Open pairs above the bar with a shared tag and no relation row yet, in either
- * orientation. Self-join over ~140 open forecasts — a few thousand distance
+ * Open pairs above the bar with a shared tag and no blocking relation row in
+ * either orientation. A row blocks unless it is an undecided MODEL row from an
+ * older TYPER_VERSION — those are superseded on the next write-run, so a
+ * prompt upgrade refreshes the graph instead of being locked out by its
+ * predecessor's mistakes. Self-join over ~140 open forecasts — a few thousand distance
  * computations, nothing to index.
  */
 export async function findCandidatePairs(limit: number): Promise<CandidatePair[]> {
@@ -137,8 +140,11 @@ export async function findCandidatePairs(limit: number): Promise<CandidatePair[]
       )
       AND NOT EXISTS (
         SELECT 1 FROM question_relations r
-        WHERE (r.from_prediction_id = a.id AND r.to_prediction_id = b.id)
-           OR (r.from_prediction_id = b.id AND r.to_prediction_id = a.id)
+        WHERE ((r.from_prediction_id = a.id AND r.to_prediction_id = b.id)
+            OR (r.from_prediction_id = b.id AND r.to_prediction_id = a.id))
+          -- a MODEL row nobody decided, from an older typer, does not block: the pair is re-typed
+          AND NOT (r.created_by = 'MODEL' AND r.decided_by IS NULL
+                   AND COALESCE(r.typer_output->>'version', '') <> ${TYPER_VERSION})
       )
     ORDER BY a.embedding <=> b.embedding
     LIMIT ${limit}
@@ -217,6 +223,7 @@ export async function runRelationTyper(opts: { limit?: number; dryRun?: boolean 
       if (proposal.kind !== 'NONE') summary.proposals!.push({ ...proposal, aClaim: pair.aClaim, bClaim: pair.bClaim })
       return
     }
+    await supersedeStaleModelRows(pair.aId, pair.bId, TYPER_VERSION)
     const outcome = await proposeRelation(proposal)
     summary.outcomes[outcome]++
   }
