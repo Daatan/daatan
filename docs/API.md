@@ -669,6 +669,23 @@ deploys until it clears. Driven daily by `.github/workflows/evidence-health.yml`
 **Alerts on delta, never on an absolute rate:** 47.2% of all pool rows are `FAILED`
 and that is by design — a wide net discards a lot. Only a *change* carries information.
 
+### `GET /api/cron/relation-typer`
+Signed relation typer (retro#574, Oracle 2.0). Finds open (`ACTIVE`/`PENDING`)
+forecast pairs at cosine ≥ 0.85 with a shared tag and no `question_relations`
+row yet, asks the LLM for the relation — `alias` / `nested` / `threshold` /
+`complement` / `exclusive` / `implies` / `independent` — with its direction and
+the justifying spans, and writes `PROPOSED` rows via `proposeRelation()` for
+post-moderation (a `REJECTED` pair is never re-proposed). Structure only; no
+published number moves. `independent` verdicts and verdicts under confidence
+0.6 are not stored and get re-asked on a later run. Auth: `x-cron-secret`
+(`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the run throws. Query:
+`?dryRun=1` (return would-be `proposals`, write nothing — the acceptance check
+against the hand-labelled 08-21 pairs runs through this), `?limit=N` (≤ 200,
+default 40). Returns `{ ok, version, candidates, typed, independent,
+lowConfidence, failed, outcomes{created,refreshed,kept_rejected,kept_decided,self}, dryRun }`.
+Driven daily by `.github/workflows/relation-typer.yml`. Prompt: `relation-typer`
+(fallback-only, no Bedrock copy).
+
 ### `GET /api/cron/backfill-embeddings`
 Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, done, failed, remaining }` — except when there is nothing to do, which answers `{ ok, done: 0, remaining: 0 }` with **no `failed` key**.
 

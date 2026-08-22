@@ -15,6 +15,7 @@ All prompt templates are managed in **AWS Bedrock Prompt Management** (eu-centra
 | `extract-prediction` | `P3QR7PR50J` | `:2` | Forecast import tools | Extract a structured prediction from arbitrary article text |
 | `forecast-quality-validation` | `MZU2SJWY74` | `:2` | Bot runner | Validate a bot-generated forecast before publishing |
 | `guess-chances` | fallback only | — | Express flow | Suggest probability (0–100%) for a forecast based on news context |
+| `relation-typer` | fallback only | — | `/api/cron/relation-typer` | Type the logical relation (alias/nested/threshold/complement/exclusive/implies) between two similar forecasts — retro#574 |
 | `research-query-generation` | `GQK8IGH3H9` | `:2` | Auto-resolution | Generate web search queries to find resolution evidence |
 | `resolution-research` | `9BJAASRX0U` | `:2` | Auto-resolution | Determine forecast outcome from news context or model knowledge |
 | `suggest-tags` | `4GRPW480KQ` | `:2` | Tag suggestion API | Suggest 1–3 relevant tags for a forecast |

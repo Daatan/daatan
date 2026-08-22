@@ -1,0 +1,54 @@
+name: Relation Typer
+
+# retro#574. Calls GET /api/cron/relation-typer, which types the open
+# cosine ≥ 0.85 + shared-tag forecast pairs that have no `question_relations`
+# row yet (alias / nested / threshold / complement / exclusive / implies) and
+# writes PROPOSED rows for post-moderation. Structure only — no published number
+# moves. The coherence check (Oracle 2.0, Daatan/docs conditionals.md Track A)
+# is the first reader.
+#
+# Runs against PRODUCTION: staging has too few open forecasts for pairs to exist.
+# Daily: new pairs appear at the rate forecasts are created, a handful a day.
+
+on:
+  schedule:
+    - cron: '37 11 * * *'   # daily 11:37 UTC — after evidence-health
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment
+        type: choice
+        options: [production, staging]
+        default: production
+      dryRun:
+        description: Report would-be proposals without writing
+        type: boolean
+        default: false
+
+jobs:
+  relation-typer:
+    name: Type candidate forecast pairs
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Run relation typer
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          TARGET: ${{ inputs.target || 'production' }}
+          DRY_RUN: ${{ inputs.dryRun && '1' || '0' }}
+        run: |
+          if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
+          QS=""; if [ "$DRY_RUN" = "1" ]; then QS="?dryRun=1"; fi
+
+          echo "Running relation typer at $BASE$QS"
+          RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE/api/cron/relation-typer$QS" \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            --max-time 900)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+          echo "Response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then echo "Relation typer failed with HTTP $HTTP_CODE"; exit 1; fi
