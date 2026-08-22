@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import { getAppUrl } from '@/lib/branding'
 import type { NumberFeedbackField } from '@prisma/client'
 
 const log = createLogger('telegram')
@@ -380,7 +381,7 @@ function truncate(text: string, max: number): string {
 }
 
 function forecastUrl(prediction: ForecastInfo): string {
-  const base = process.env.NEXTAUTH_URL || 'https://daatan.com'
+  const base = process.env.NEXTAUTH_URL || getAppUrl()
   return escapeHtml(`${base}/forecasts/${prediction.slug || prediction.id}`)
 }
 
@@ -838,7 +839,7 @@ export async function notifyNewsArticleMatched(
 const RATING_KEYCAPS: Record<number, string> = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', 4: '4️⃣', 5: '5️⃣' }
 
 function buildRatingButtons(counts?: number[]) {
-  const base = process.env.NEXTAUTH_URL || 'https://daatan.com'
+  const base = process.env.NEXTAUTH_URL || getAppUrl()
   return {
     inline_keyboard: [
       [1, 2, 3, 4, 5].map((n) => ({

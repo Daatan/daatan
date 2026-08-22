@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
+import { getAppUrl } from '@/lib/branding'
 
 export const runtime = 'nodejs'
 
@@ -160,7 +161,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           flexShrink: 0,
         }}>
           <span style={{ fontSize: '13px', color: '#5A8AAC', letterSpacing: '0.04em' }}>
-            daatan.com
+            {new URL(getAppUrl()).hostname}
           </span>
           <span style={{ fontSize: '11px', color: '#2A4A62', letterSpacing: '0.18em' }}>
             {'DAATAN<<FORECAST<<PREDICTION<<MARKET<<<<<<<<'}

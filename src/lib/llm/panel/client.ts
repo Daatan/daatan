@@ -1,5 +1,6 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
 import { createLogger } from '@/lib/logger'
+import { getAppUrl } from '@/lib/branding'
 import type { PanelMember } from './roster'
 
 const log = createLogger('ai-panel-client')
@@ -183,7 +184,7 @@ async function callOpenRouterMember(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://daatan.com',
+        'HTTP-Referer': getAppUrl(),
         'X-Title': 'Daatan AI Panel',
       },
       body: JSON.stringify({

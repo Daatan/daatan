@@ -1,4 +1,5 @@
 import { LLMProvider, LLMRequest, LLMResponse, LLMConfig } from '../types'
+import { getAppUrl } from '@/lib/branding'
 
 /** Same order of magnitude as the other fallback legs — without this, a hung
  *  connection to OpenRouter stalls the whole fallback chain indefinitely
@@ -51,7 +52,7 @@ export class OpenRouterProvider implements LLMProvider {
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://daatan.com',
+        'HTTP-Referer': getAppUrl(),
         'X-Title': 'Daatan Bot',
       },
       body: JSON.stringify(body),
