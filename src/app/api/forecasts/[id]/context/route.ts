@@ -176,6 +176,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             insufficientReason?: string | null
             poolSize?: number | null
             settled?: boolean
+            evidenceMass?: number | null
+            nEff?: number | null
+            ageAdjustedMass?: number | null
         }
 
         // Same atomic claim gate as the news-indexer push / backfill paths
@@ -231,6 +234,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     sources: resolved.snapshotSources,
                 },
                 settled: resolved.settled,
+                evidenceMass: resolved.evidenceMass,
+                nEff: resolved.nEff,
+                ageAdjustedMass: resolved.ageAdjustedMass,
             }
         }
 
@@ -470,6 +476,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     let insufficientReason: string | null = null
                     let abstainPoolSize: number | null = null
                     let settled = false
+                    let evidenceMass: number | null = null
+                    let nEff: number | null = null
+                    let ageAdjustedMass: number | null = null
 
                     if (estimationResult === null) {
                         log.warn(
@@ -486,6 +495,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         insufficientReason = estimationResult.insufficientReason ?? null
                         abstainPoolSize = estimationResult.poolSize ?? null
                         settled = estimationResult.settled ?? false
+                        evidenceMass = estimationResult.evidenceMass ?? null
+                        nEff = estimationResult.nEff ?? null
+                        ageAdjustedMass = estimationResult.ageAdjustedMass ?? null
                     }
 
                     const totalMs = Date.now() - t0
@@ -511,6 +523,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         insufficientReason,
                         poolSize: abstainPoolSize,
                         settled,
+                        evidenceMass,
+                        nEff,
+                        ageAdjustedMass,
                         now,
                     })
 

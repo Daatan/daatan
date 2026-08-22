@@ -504,6 +504,9 @@ export async function POST(request: NextRequest) {
         poolSize: null,
         usableSize: null,
         singleRunMean: oracleForecast.mean,
+        evidenceMass: null,
+        nEff: null,
+        ageAdjustedMass: null,
       }
 
       const matchSources = items.map((a) => ({
@@ -569,6 +572,9 @@ export async function POST(request: NextRequest) {
             sources: est.snapshotSources,
           },
           settled: est.settled,
+          evidenceMass: est.evidenceMass,
+          nEff: est.nEff,
+          ageAdjustedMass: est.ageAdjustedMass,
         })
         wasStored = stored
         contextSnapshotId = snapshotId

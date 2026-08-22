@@ -715,6 +715,19 @@ interface PoolAggregateApiResponse {
   settled: boolean
   insufficient_data: boolean
   reason: string | null
+  /** Floored, credibility/evidence-class/recency/relevance-weighted voting
+   *  mass this pool carried (retro#458 Phase 2). 0.0 when insufficient_data
+   *  (or no_sources, where no pool was ever built). */
+  evidence_mass?: number | null
+  /** Kish's effective sample size of the voting weights — exactly
+   *  `articles_used` for equal weights, shrinking toward 1 as one row
+   *  dominates the pool (retro#458 Phase 2). 0.0 when insufficient_data (or
+   *  no_sources). */
+  n_eff?: number | null
+  /** `evidence_mass` recomputed with recency decay switched off; always >=
+   *  `evidence_mass` (retro#458 Phase 2). 0.0 when insufficient_data (or
+   *  no_sources). */
+  age_adjusted_mass?: number | null
 }
 
 /**
@@ -807,6 +820,12 @@ export interface PoolRecompute {
    * snapshot's `sources` so the stored blob lists exactly the articles behind its number.
    */
   usableArticles: PoolRecomputeArticle[]
+  /** See `PoolAggregateApiResponse.evidence_mass`. */
+  evidenceMass: number | null
+  /** See `PoolAggregateApiResponse.n_eff`. */
+  nEff: number | null
+  /** See `PoolAggregateApiResponse.age_adjusted_mass`. */
+  ageAdjustedMass: number | null
 }
 
 const ALREADY_OCCURRED_MIN_ROWS = 5
@@ -968,6 +987,9 @@ export async function recomputeFromPool(
     excludedCount,
     incompleteCount,
     usableArticles: usable,
+    evidenceMass: agg.evidence_mass ?? null,
+    nEff: agg.n_eff ?? null,
+    ageAdjustedMass: agg.age_adjusted_mass ?? null,
   }
 }
 

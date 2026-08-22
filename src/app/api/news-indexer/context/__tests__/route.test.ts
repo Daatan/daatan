@@ -998,6 +998,9 @@ describe('POST /api/news-indexer/context', () => {
       excludedCount: 0,
       incompleteCount: 1,
       usableArticles: POOL_ROWS,
+      evidenceMass: null,
+      nEff: null,
+      ageAdjustedMass: null,
     }
 
     beforeEach(() => {
@@ -1201,6 +1204,7 @@ describe('POST /api/news-indexer/context', () => {
         mean: 0, std: 0, ciLow: 0, ciHigh: 0, articlesUsed: 0, settled: false,
         insufficientData: true, reason: 'all_articles_off_topic',
         poolSize: 3, usableSize: 0, excludedCount: 0, incompleteCount: 3, usableArticles: [],
+        evidenceMass: null, nEff: null, ageAdjustedMass: null,
       })
 
       const body = await (await POST(post('test-secret'))).json()

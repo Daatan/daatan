@@ -13,7 +13,14 @@ export { recordOracleFallback } from '@/lib/services/oracleClient'
 
 const log = createLogger('oracle')
 
-const EXPECTED_API_VERSION = '0.1'
+/** retro has not reached a 1.0 release; every 0.x version is treated as API-
+ *  compatible — minor/patch bumps only add fields (see daatan#1563; retro went
+ *  0.1→0.4.x over 2026 without a single breaking response-shape change). Bump
+ *  this if retro's API ever makes an intentional breaking change. Compared
+ *  against the LEADING component of `data.version` only, not a string prefix —
+ *  a literal '0.1' prefix check broke silently the moment retro passed 0.2.0,
+ *  which live health checks confirmed was still the case at 0.4.1 (daatan#1563). */
+const EXPECTED_API_MAJOR_VERSION = '0'
 
 /**
  * Default Oracle budget: server-to-server and background callers (the news-indexer
@@ -314,6 +321,19 @@ export interface OracleForecastResponse {
    * field can describe.
    */
   outcome_counts?: Record<string, number> | null
+  /** Floored, credibility/evidence-class/recency/relevance-weighted voting
+   *  mass this pool carried (retro#458 Phase 2). 0.0 on an insufficient-data
+   *  response. */
+  evidence_mass?: number | null
+  /** Kish's effective sample size of the voting weights — exactly
+   *  `articles_used` for equal weights, shrinking toward 1 as one row
+   *  dominates the pool (retro#458 Phase 2). 0.0 on an insufficient-data
+   *  response. */
+  n_eff?: number | null
+  /** `evidence_mass` recomputed with recency decay switched off — how much
+   *  this pool would weigh if nothing had aged; always >= `evidence_mass`
+   *  (retro#458 Phase 2). 0.0 on an insufficient-data response. */
+  age_adjusted_mass?: number | null
 }
 
 /**
@@ -784,10 +804,10 @@ export const checkOracleHealth = async (
       return false
     }
 
-    if (data.version && !data.version.startsWith(EXPECTED_API_VERSION)) {
+    if (data.version && data.version.split('.')[0] !== EXPECTED_API_MAJOR_VERSION) {
       log.warn(
-        { expected: EXPECTED_API_VERSION, actual: data.version },
-        'Oracle API version mismatch — falling back to LLM',
+        { expectedMajor: EXPECTED_API_MAJOR_VERSION, actual: data.version },
+        'Oracle API major version mismatch — falling back to LLM',
       )
       void logOracleCall({ callType: 'HEALTH', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status })
       return false

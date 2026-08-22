@@ -40,7 +40,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
 })
 
 import { ClaimDirection } from '@prisma/client'
-import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
+import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, checkOracleHealth, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
 const mockLogOracleCall = vi.mocked(logOracleCall)
@@ -715,5 +715,97 @@ describe('getAuthorShadowLeaderboard', () => {
     const data = await getAuthorShadowLeaderboard()
     expect(data).toBeNull()
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'LEADERBOARD', status: 'ERROR' }))
+  })
+})
+
+describe('checkOracleHealth', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+    mockLog.warn.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // Regression test for the live bug this fix corrects: retro's actual deployed
+  // version (confirmed via `curl https://oracle.daatan.com/health`) is well past
+  // the old '0.1' prefix EXPECTED_API_VERSION check ever matched, so every health
+  // check was silently failing and firing false "Oracle forecast unavailable"
+  // alerts. A same-major bump like this must pass.
+  it('passes health check on retro\'s actual live version (0.4.x)', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '0.4.1+build.37930' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(true)
+    expect(mockLog.warn).not.toHaveBeenCalled()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'OK' }))
+  })
+
+  it('passes health check on the minimum supported version (0.1)', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '0.1.0' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(true)
+  })
+
+  it('fails health check and warns on an incompatible major version', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '1.0.0' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(false)
+    expect(mockLog.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedMajor: '0', actual: '1.0.0' }),
+      'Oracle API major version mismatch — falling back to LLM',
+    )
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
+  })
+
+  it('skips the version check entirely when version is omitted', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(true)
+    expect(mockLog.warn).not.toHaveBeenCalled()
+  })
+
+  it('fails health check when status is not ok', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'degraded', version: '0.4.1' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(false)
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
+  })
+
+  it('fails health check on a non-OK HTTP response', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(false)
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'ERROR', httpStatus: 503 }))
+  })
+
+  it('fails health check when the request throws', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(false)
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'ERROR' }))
   })
 })
