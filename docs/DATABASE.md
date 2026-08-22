@@ -683,6 +683,21 @@ YES price, and since v1.32.x are written **only on a real price change** — the
 newest snapshot's `createdAt` is the last *change*, not the last sync
 (`lastSyncedAt` on the market is the freshness signal).
 
+## Question relations — `question_relations` (daatan#1555)
+
+Oracle 2.0 storage layer **M1**: a declared relation between two forecasts —
+`kind` ∈ alias / nested_deadline / threshold_nesting / mutually_exclusive /
+complement / implies / conditional, `created_by` ∈ human / derived / extracted /
+model, `status` ∈ proposed / confirmed / rejected / merged. **Structure only:
+there is deliberately no probability column** — edge weights are a derived
+snapshot layer (M4, daatan#1558) that does not exist yet. Symmetric kinds
+(alias, exclusive, complement) are stored in one canonical orientation
+(`canonicalPair()` in `question-relation.ts`); directed kinds keep from→to as
+the claim. Post-moderated: a `rejected` row is kept so the typer never
+re-proposes the pair. First writer: the signed relation typer (retro#574);
+first reader: the coherence check. Design and the M2–M4 tables that follow:
+[Daatan/docs planning/oracle-2-harness-and-storage.md §4](https://github.com/Daatan/docs/blob/main/planning/oracle-2-harness-and-storage.md).
+
 ## LASSO (AI panel) — `ai_estimate_runs`, `ai_estimates`, `ai_member_scores`
 
 Multi-LLM ungrounded probability series, modelled on the external-market

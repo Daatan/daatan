@@ -472,6 +472,8 @@ model Prediction {
   commitments      Commitment[]
   comments         Comment[]
   contextSnapshots ContextSnapshot[]
+  relationsFrom    QuestionRelation[]      @relation("QuestionRelationFrom")
+  relationsTo      QuestionRelation[]      @relation("QuestionRelationTo")
   evidencePool     EvidencePoolArticle[]
   translations     PredictionTranslation[]
   slugAliases      PredictionSlugAlias[]
@@ -1756,4 +1758,61 @@ model OracleCallLog {
   @@index([userId])
   @@index([predictionId])
   @@map("oracle_call_logs")
+}
+
+// Oracle 2.0 storage layer M1 (daatan#1555). A declared relation between two
+// questions — STRUCTURE ONLY, no probability: edge weights are a derived
+// snapshot layer (M4) that does not exist yet. Written by the signed relation
+// typer (retro#574), read by the coherence check. Post-moderated: REJECTED rows
+// stay so the typer cannot re-propose a pair a human already refused.
+// Design: Daatan/docs planning/oracle-2-harness-and-storage.md §4.1.
+enum QuestionRelationKind {
+  ALIAS // same question, other wording or language — symmetric
+  NESTED_DEADLINE // from ⊂ to: "E by Oct" ⊂ "E by Dec" (ARRIVAL; SURVIVAL reverses)
+  THRESHOLD_NESTING // from ⊂ to: P(X>200) ≤ P(X>130)
+  MUTUALLY_EXCLUSIVE // Σ ≤ 1 — symmetric
+  COMPLEMENT // P(from) + P(to) = 1 — symmetric
+  IMPLIES // from ⇒ to
+  CONDITIONAL // from is an antecedent of to; `sign` says raises / lowers
+}
+
+enum QuestionRelationOrigin {
+  HUMAN
+  DERIVED // from claimDeadline / claimDirection, no model
+  EXTRACTED // from an article's conditional claim
+  MODEL // proposed by the typer on a cosine + shared-tag candidate pair
+}
+
+enum QuestionRelationStatus {
+  PROPOSED
+  CONFIRMED
+  REJECTED // kept — never re-proposed
+  MERGED // the two questions were one; alias resolved by moderation
+}
+
+model QuestionRelation {
+  id               String     @id @default(cuid())
+  fromPredictionId String     @map("from_prediction_id")
+  fromPrediction   Prediction @relation("QuestionRelationFrom", fields: [fromPredictionId], references: [id], onDelete: Cascade)
+  toPredictionId   String     @map("to_prediction_id")
+  toPrediction     Prediction @relation("QuestionRelationTo", fields: [toPredictionId], references: [id], onDelete: Cascade)
+
+  kind      QuestionRelationKind
+  sign      Int?                   @db.SmallInt // +1 / -1, CONDITIONAL only (CHECK in the migration)
+  createdBy QuestionRelationOrigin @map("created_by")
+  status    QuestionRelationStatus @default(PROPOSED)
+
+  typerOutput Json?    @map("typer_output") // verbatim, for audit — classifierOutput precedent
+  cosine      Float?
+  sharedTag   Boolean? @map("shared_tag")
+
+  decidedBy String?   @map("decided_by")
+  decidedAt DateTime? @map("decided_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([fromPredictionId, toPredictionId, kind])
+  @@index([toPredictionId, status])
+  @@index([fromPredictionId])
+  @@map("question_relations")
 }
