@@ -28,8 +28,8 @@ import { proposeRelation, type ProposeOutcome, type RelationProposal } from './q
 
 const log = createLogger('relation-typer')
 
-/** Bump whenever the prompt or the mapping below materially changes. */
-export const TYPER_VERSION = 'v1'
+/** Bump whenever the prompt or the mapping below materially changes. v2 (08-22): direction defined as stronger → weaker, implies-vs-nested and alias-vs-nested rules — v1 scored 4/8 on the hand labels (retro#574). */
+export const TYPER_VERSION = 'v2'
 export const CANDIDATE_COSINE = 0.85
 /** Below this the verdict is dropped and the pair re-asked on a later run. */
 export const MIN_CONFIDENCE = 0.6
