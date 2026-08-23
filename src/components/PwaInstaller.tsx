@@ -127,7 +127,7 @@ const PwaInstaller = () => {
         </p>
         <button
           type="button"
-          className="shrink-0 rounded-md bg-navy-700 px-3 py-1 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+          className="shrink-0 rounded-md bg-white px-3 py-1 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           onClick={handleInstallClick}
         >
           Install

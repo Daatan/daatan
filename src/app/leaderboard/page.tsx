@@ -277,7 +277,6 @@ export default function LeaderboardPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/profile/${user.id}`) } }}
                   role="button"
                   tabIndex={0}
-                  aria-label={`View profile of ${user.name || user.username || 'user'}`}
                   className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index < 3 ? 'bg-amber-400/5' : ''}`}
                 >
                   <td className="px-3 sm:px-6 py-3 sm:py-4">
@@ -340,52 +339,52 @@ export default function LeaderboardPage() {
       {/* Legend */}
       <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-green-500" />
             {t('legend.rsTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.rsDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Target className="w-4 h-4 text-purple-500" />
             {t('legend.brierTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.brierDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-400" />
             {t('legend.peerScoreTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.peerScoreDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Brain className="w-4 h-4 text-violet-400" />
             {t('legend.aiScoreTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.aiScoreDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Swords className="w-4 h-4 text-orange-400" />
             {t('legend.eloTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.eloDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Target className="w-4 h-4 text-sky-400" />
             {t('legend.truthScoreTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.truthScoreDesc')}</p>
         </div>
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-cyan-400" />
             {t('legend.weightedPeerScoreTitle')}
-          </h3>
+          </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.weightedPeerScoreDesc')}</p>
         </div>
       </div>

@@ -516,9 +516,9 @@ export default function ForecastCard({
 
           {/* Claim Text */}
           <div className="flex items-start gap-3 mb-4">
-            <h3 className="flex-1 text-base sm:text-lg font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug">
+            <h2 className="flex-1 text-base sm:text-lg font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug">
               {showTranslated && translatedClaim ? translatedClaim : prediction.claimText}
-            </h3>
+            </h2>
           </div>
 
           {/* Personal origin marker (no news anchor, manually created) — a subtle
@@ -526,6 +526,7 @@ export default function ForecastCard({
           {!prediction.newsAnchor && prediction.source === 'manual' && (
             <div className="mb-4">
               <span
+                role="img"
                 className="inline-flex items-center justify-center w-6 h-6 rounded-full text-purple-400 bg-purple-400/10 border border-purple-400/20"
                 title={t('personalBadge')}
                 aria-label={t('personalBadge')}

@@ -408,13 +408,13 @@ const Sidebar = () => {
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium truncate text-sm text-white">{session.user.username || session.user.name || 'User'}</p>
                     {session.user.role === 'ADMIN' && (
-                      <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-red-400 bg-red-900/40 border border-red-700 rounded-full shrink-0" title="Admin" aria-label="Admin">A</span>
+                      <span role="img" className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-red-400 bg-red-900/40 border border-red-700 rounded-full shrink-0" title="Admin" aria-label="Admin">A</span>
                     )}
                     {session.user.role === 'RESOLVER' && (
-                      <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-cobalt-light bg-navy-700 border border-navy-600 rounded-full shrink-0" title="Resolver" aria-label="Resolver">R</span>
+                      <span role="img" className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-cobalt-light bg-navy-700 border border-navy-600 rounded-full shrink-0" title="Resolver" aria-label="Resolver">R</span>
                     )}
                     {session.user.role === 'APPROVER' && (
-                      <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-teal bg-navy-700 border border-navy-600 rounded-full shrink-0" title="Approver" aria-label="Approver">B</span>
+                      <span role="img" className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold text-teal bg-navy-700 border border-navy-600 rounded-full shrink-0" title="Approver" aria-label="Approver">B</span>
                     )}
                   </div>
                   <p className="text-xs text-text-subtle truncate mb-1">{session.user.email}</p>
