@@ -1,6 +1,7 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
 import { createLogger } from '@/lib/logger'
 import { getAppUrl } from '@/lib/branding'
+import { vertexEndpoint, vertexAccessToken, vertexEnv } from '../providers/vertex'
 import type { PanelMember } from './roster'
 
 const log = createLogger('ai-panel-client')
@@ -48,6 +49,21 @@ const RESPONSE_FORMAT = {
       },
     },
   },
+} as const
+
+/** Same shape as RESPONSE_FORMAT above, in Vertex's OpenAPI-subset schema dialect
+ *  (SchemaType enum, `nullable` flag) rather than JSON Schema's `type: [...]` union —
+ *  the two providers don't share a wire format even though the JSON they enforce is
+ *  identical. */
+const VERTEX_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    probability: {
+      type: 'INTEGER',
+      nullable: true,
+    },
+  },
+  required: ['probability'],
 } as const
 
 /**
@@ -114,9 +130,14 @@ export async function callPanelMember(
   prompt: string,
   apiKey: string,
 ): Promise<PanelCallResult> {
-  return member.route === 'bedrock'
-    ? callBedrockMember(member, prompt)
-    : callOpenRouterMember(member, prompt, apiKey)
+  switch (member.route) {
+    case 'bedrock':
+      return callBedrockMember(member, prompt)
+    case 'vertex':
+      return callVertexMember(member, prompt)
+    case 'openrouter':
+      return callOpenRouterMember(member, prompt, apiKey)
+  }
 }
 
 /**
@@ -161,6 +182,74 @@ async function callBedrockMember(member: PanelMember, prompt: string): Promise<P
       probability: parseProbability(text, member.model),
       promptTokens: response.usage?.inputTokens ?? null,
       completionTokens: response.usage?.outputTokens ?? null,
+      latencyMs: Date.now() - startedAt,
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+interface VertexPanelResponse {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+}
+
+/**
+ * Invoke Gemini directly via Vertex, with the app's Google service account
+ * (daatan#1513) — same backend the OpenRouter `google-vertex/eu` pin used to reach,
+ * but authenticated and billed without OpenRouter as an intermediary.
+ *
+ * A missing/unprovisioned service account (`vertexEnv()` returns null) throws a
+ * plain Error here, exactly like a missing Bedrock policy above: the member
+ * abstains and the other four are unaffected, rather than aborting the sweep.
+ */
+async function callVertexMember(member: PanelMember, prompt: string): Promise<PanelCallResult> {
+  const env = vertexEnv()
+  if (!env) throw new Error('Vertex service account is not configured')
+
+  const startedAt = Date.now()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+  try {
+    // The roster keeps the OpenRouter-style `google/` prefix on the model id so a
+    // member that moves routes doesn't fork its Brier series (see roster.ts) — but
+    // the actual Vertex endpoint takes the bare model name.
+    const modelName = member.model.replace(/^google\//, '')
+    const token = await vertexAccessToken(env)
+    const response = await fetch(vertexEndpoint(env, modelName, 'generateContent'), {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: MAX_TOKENS,
+          responseMimeType: 'application/json',
+          responseSchema: VERTEX_RESPONSE_SCHEMA,
+        },
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`Vertex ${response.status} for ${member.model}: ${body.slice(0, 200)}`)
+    }
+
+    const data = (await response.json()) as VertexPanelResponse
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    if (typeof text !== 'string' || text.trim() === '') {
+      throw new Error(`Empty response from ${member.model}`)
+    }
+
+    return {
+      probability: parseProbability(text, member.model),
+      promptTokens: data.usageMetadata?.promptTokenCount ?? null,
+      completionTokens: data.usageMetadata?.candidatesTokenCount ?? null,
       latencyMs: Date.now() - startedAt,
     }
   } finally {

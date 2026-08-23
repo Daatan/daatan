@@ -11,6 +11,15 @@ vi.mock('@aws-sdk/client-bedrock-runtime', () => ({
   },
 }))
 
+const vertexEnvMock = vi.fn()
+const vertexAccessTokenMock = vi.fn()
+vi.mock('../../providers/vertex', () => ({
+  vertexEnv: () => vertexEnvMock(),
+  vertexAccessToken: (...args: unknown[]) => vertexAccessTokenMock(...args),
+  vertexEndpoint: (env: { projectId: string; location: string }, model: string, method: string) =>
+    `https://aiplatform.googleapis.com/v1/projects/${env.projectId}/locations/${env.location}/publishers/google/models/${model}:${method}`,
+}))
+
 import { callPanelMember, PanelAuthError, PanelPaymentError } from '../client'
 import type { PanelMember } from '../roster'
 
@@ -25,6 +34,12 @@ const BEDROCK_MEMBER: PanelMember = {
   model: 'qwen.qwen3-235b-a22b-2507-v1:0',
   mode: 'ungrounded',
   route: 'bedrock',
+}
+
+const VERTEX_MEMBER: PanelMember = {
+  model: 'google/gemini-2.5-flash',
+  mode: 'ungrounded',
+  route: 'vertex',
 }
 
 function respond(status: number, body: unknown, ok = status < 400) {
@@ -51,6 +66,10 @@ afterEach(() => vi.unstubAllGlobals())
 
 function converse(text: string, usage?: { inputTokens: number; outputTokens: number }) {
   return { output: { message: { content: [{ text }] } }, usage }
+}
+
+function vertexContent(text: string, usage?: { promptTokenCount: number; candidatesTokenCount: number }) {
+  return respond(200, { candidates: [{ content: { parts: [{ text }] } }], usageMetadata: usage })
 }
 
 describe('callPanelMember request shape', () => {
@@ -229,5 +248,69 @@ describe('bedrock route', () => {
 
     expect(err).toBeInstanceOf(Error)
     expect(err).not.toBeInstanceOf(PanelAuthError)
+  })
+})
+
+describe('vertex route', () => {
+  beforeEach(() => {
+    vertexEnvMock.mockReset().mockReturnValue({
+      projectId: 'proj',
+      location: 'global',
+      clientEmail: 'sa@x.iam.gserviceaccount.com',
+      privateKey: 'key',
+    })
+    vertexAccessTokenMock.mockReset().mockResolvedValue('fake-token')
+  })
+
+  it('calls Vertex generateContent with temperature 0, capped tokens, and a schema — never touching OpenRouter', async () => {
+    fetchMock.mockResolvedValue(
+      vertexContent('{"probability": 61}', { promptTokenCount: 100, candidatesTokenCount: 5 }),
+    )
+
+    const r = await callPanelMember(VERTEX_MEMBER, 'prompt', '')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // The roster keeps the `google/` prefix for Brier continuity (roster.ts); the
+    // wire call must strip it back to the bare Vertex model name.
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('/models/gemini-2.5-flash:generateContent')
+    expect(url).not.toContain('google/gemini')
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.generationConfig.temperature).toBe(0)
+    expect(body.generationConfig.maxOutputTokens).toBe(64)
+    expect(body.generationConfig.responseSchema).toBeDefined()
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer fake-token')
+    expect(r).toMatchObject({ probability: 61, promptTokens: 100, completionTokens: 5 })
+  })
+
+  it('needs no OpenRouter key — that is the entire point of this route', async () => {
+    fetchMock.mockResolvedValue(vertexContent('{"probability": 50}'))
+    await expect(callPanelMember(VERTEX_MEMBER, 'p', '')).resolves.toMatchObject({
+      probability: 50,
+    })
+  })
+
+  // An unprovisioned service account must degrade to an abstention for THIS member
+  // alone, never a PanelAuthError — which would disable the OpenRouter members too.
+  it('an unconfigured service account is a plain Error, not a PanelAuthError', async () => {
+    vertexEnvMock.mockReturnValue(null)
+
+    const err = await callPanelMember(VERTEX_MEMBER, 'p', '').catch((e) => e)
+
+    expect(err).toBeInstanceOf(Error)
+    expect(err).not.toBeInstanceOf(PanelAuthError)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects an out-of-range probability rather than charting it', async () => {
+    fetchMock.mockResolvedValue(vertexContent('{"probability": 140}'))
+    await expect(callPanelMember(VERTEX_MEMBER, 'p', '')).rejects.toThrow(/out-of-range/)
+  })
+
+  it('treats an explicit null as an abstention, not an error', async () => {
+    fetchMock.mockResolvedValue(vertexContent('{"probability": null}'))
+    await expect(callPanelMember(VERTEX_MEMBER, 'p', '')).resolves.toMatchObject({
+      probability: null,
+    })
   })
 })
