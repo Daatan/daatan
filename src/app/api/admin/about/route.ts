@@ -5,6 +5,7 @@ import { VERSION } from '@/lib/version'
 import { getAppName, getAppUrl } from '@/lib/branding'
 import { aiFeaturesEnabled, aiResearchEnabled, externalMarketsEnabled } from '@/lib/capabilities'
 import { isOpenSignupEnabled } from '@/lib/auth/access'
+import { getOracleApiKey } from '@/lib/services/oracleClient'
 
 /**
  * GET /api/admin/about — operator self-diagnosis. Reports the edition, version,
@@ -35,7 +36,7 @@ export const GET = withAuth(async () => {
     integrations: {
       gemini: !!env.GEMINI_API_KEY,
       ollama: !!process.env.OLLAMA_BASE_URL,
-      oracle: !!(env.ORACLE_URL && env.ORACLE_API_KEY),
+      oracle: !!(env.ORACLE_URL && getOracleApiKey()),
       email: !!env.EMAIL_FROM,
       telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID),
       newsIndexer: !!(env.NEWS_INDEXER_URL && env.NEWS_INDEXER_API_KEY),

@@ -1,6 +1,7 @@
 import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
+import { getAwsSecret } from '@/lib/aws/secrets'
 import type { OracleCallType, OracleCallStatus } from '@prisma/client'
 
 const log = createLogger('oracle-log')
@@ -141,12 +142,21 @@ export function getOracleBaseUrl(): string | null {
 }
 
 /**
+ * The Oracle's `x-api-key`, shared with retro's `oracle-api.service` off one SSM
+ * parameter (`/daatan/shared/secrets/ORACLE_API_KEY`) so the two sides can't drift —
+ * see docs/SECRETS.md. `env.ORACLE_API_KEY` stays as the local-dev/self-host fallback.
+ */
+export function getOracleApiKey(): string {
+  return getAwsSecret('ORACLE_API_KEY') || env.ORACLE_API_KEY || ''
+}
+
+/**
  * Normalized base URL + API key, or `null` when either is missing. Use for the
  * authenticated endpoints; pass the result to {@link oracleFetch}.
  */
 export function getOracleConfig(): OracleConfig | null {
   const url = env.ORACLE_URL
-  const key = env.ORACLE_API_KEY
+  const key = getOracleApiKey()
   if (!url || !key) return null
   return { baseUrl: stripTrailingSlash(url), key }
 }

@@ -11,6 +11,9 @@ const { mockEnv } = vi.hoisted(() => ({
 }))
 vi.mock('@/env', () => ({ env: mockEnv }))
 
+const { mockGetAwsSecret } = vi.hoisted(() => ({ mockGetAwsSecret: vi.fn(() => '') }))
+vi.mock('@/lib/aws/secrets', () => ({ getAwsSecret: mockGetAwsSecret }))
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     oracleCallLog: { create: vi.fn(() => ({})), deleteMany: vi.fn(() => ({})) },
@@ -21,7 +24,13 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-import { getOracleBaseUrl, getOracleConfig, oracleFetch, logOracleCall } from '../oracleClient'
+import {
+  getOracleApiKey,
+  getOracleBaseUrl,
+  getOracleConfig,
+  oracleFetch,
+  logOracleCall,
+} from '../oracleClient'
 import { prisma } from '@/lib/prisma'
 
 const mockCreate = vi.mocked(prisma.oracleCallLog.create)
@@ -31,6 +40,21 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockEnv.ORACLE_URL = undefined
   mockEnv.ORACLE_API_KEY = undefined
+  mockGetAwsSecret.mockReturnValue('')
+})
+
+describe('getOracleApiKey', () => {
+  it('prefers the shared SSM secret over the env fallback', () => {
+    mockEnv.ORACLE_API_KEY = 'env-key'
+    mockGetAwsSecret.mockReturnValue('ssm-key')
+    expect(getOracleApiKey()).toBe('ssm-key')
+    expect(mockGetAwsSecret).toHaveBeenCalledWith('ORACLE_API_KEY')
+  })
+
+  it('falls back to the env var when SSM has no value', () => {
+    mockEnv.ORACLE_API_KEY = 'env-key'
+    expect(getOracleApiKey()).toBe('env-key')
+  })
 })
 
 describe('getOracleConfig', () => {

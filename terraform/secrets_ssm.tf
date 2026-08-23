@@ -53,8 +53,14 @@ resource "aws_ssm_parameter" "app_secrets" {
   }
 }
 
-# Read + decrypt, scoped to this environment's secret path only. Staging cannot read
-# prod's secrets and vice versa — the boundary that actually matters.
+# Read + decrypt, scoped to this environment's secret path, plus the shared path
+# (`/daatan/shared/secrets/*` — values like ORACLE_API_KEY that must be byte-for-byte
+# identical across both envs and retro's oracle-api.service, see docs/SECRETS.md's
+# "shared secrets are copied, not referenced" note). The shared path is the one
+# deliberate exception to "staging cannot read prod's secrets and vice versa" — both
+# envs' roles get read access to it, because both need the same value. Its parameter
+# is created manually (`aws ssm put-parameter`), not by Terraform: a `for_each` here
+# would make both staging's and prod's state try to own the same physical resource.
 #
 # Attached via the read-only role lookup (not aws_iam_role.ec2_role): the managed
 # resource only resolves to whichever state you're applying from, and this policy needs
@@ -67,9 +73,12 @@ resource "aws_iam_role_policy" "app_secrets_read" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["ssm:GetParameter", "ssm:GetParameters"]
-        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/daatan/${var.environment}/secrets/*"
+        Effect = "Allow"
+        Action = ["ssm:GetParameter", "ssm:GetParameters"]
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/daatan/${var.environment}/secrets/*",
+          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/daatan/shared/secrets/*",
+        ]
       },
       {
         # SecureString decryption with the AWS-managed aws/ssm key. Scoped to that key,

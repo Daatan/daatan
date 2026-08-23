@@ -173,6 +173,6 @@ In both routes, Oracle is tried first; if it returns `null`, the existing `guess
 | Env var | Required? | Notes |
 |---------|-----------|-------|
 | `ORACLE_URL` | Optional | Defaults to unconfigured (falls back to LLM). Set to `https://oracle.daatan.com` to enable. |
-| `ORACLE_API_KEY` | Optional | Must match the `ORACLE_API_KEY` set in `oracle-api.service` on the retro EC2 instance. Stored in AWS Secrets Manager at `openclaw/oracle-api-key` — note the `openclaw/` prefix is legacy naming from the decommissioned OpenClaw stack and is retained for backwards compatibility. |
+| `ORACLE_API_KEY` | Optional | Must match the `ORACLE_API_KEY` set in `oracle-api.service` on the retro EC2 instance. `getOracleApiKey()` (`src/lib/services/oracleClient.ts`) reads the shared SSM SecureString `/daatan/shared/secrets/ORACLE_API_KEY` first — one parameter, read by both retro and daatan, so the two sides can't drift (docs#122 group 3) — falling back to this env var for local dev / self-host. |
 
-Both are validated in `src/env.ts` and delivered to production/staging via the `daatan-env-prod` / `daatan-env-staging` AWS Secrets Manager bundles, which are pulled to `~/app/.env` on each deploy by `scripts/fetch-secrets.sh`.
+`ORACLE_URL` is validated in `src/env.ts` and delivered to production/staging via the `daatan-env-prod` / `daatan-env-staging` AWS Secrets Manager bundles, which are pulled to `~/app/.env` on each deploy by `scripts/fetch-secrets.sh`. `ORACLE_API_KEY` is validated the same way but is no longer the primary source in SaaS — see above.
