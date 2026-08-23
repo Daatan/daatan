@@ -72,8 +72,13 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+  # PR-only: fast related-tests loop (same logic as .husky/pre-push — see
+  # scripts/run-related-tests.sh). Kept as its own unsharded job so its
+  # check name ("Unit tests") stays stable for branch-protection's required
+  # status check — see unit-test-full below for the push-to-main path.
   unit-test:
     name: Unit tests
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     concurrency:
       group: unit-test-${{ github.ref }}
@@ -94,29 +99,65 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/install-deps
 
-      # On PRs, only run tests related to changed files (same logic as
-      # .husky/pre-push — see scripts/run-related-tests.sh) to keep the PR
-      # loop fast. On push to main, run the full suite as a safety net.
       - name: Run related tests
-        if: github.event_name == 'pull_request'
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
           SKIP_ENV_VALIDATION: 1
         run: ./scripts/run-related-tests.sh ${{ github.event.pull_request.base.sha }}
 
-      - name: Run full test suite
-        if: github.event_name != 'pull_request'
+  # Push to main (or a tag): run the full suite as a safety net, sharded
+  # across 4 parallel runners instead of one serial `npm test` (measured
+  # ~2m19s serial in CI vs a local ~80s run — most of the gap is fixed
+  # per-process CI/Node overhead, which sharding pays once per shard
+  # concurrently rather than once total serially; ~2026-08-23 timing).
+  # Separate job (not a matrix on `unit-test` above) so PRs — where branch
+  # protection requires a status check literally named "Unit tests" — never
+  # see a matrix-suffixed check name like "Unit tests (1)".
+  unit-test-full:
+    name: Unit tests (full suite)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    concurrency:
+      group: unit-test-full-${{ matrix.shard }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run test shard
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
           SKIP_ENV_VALIDATION: 1
-        run: npm test
+        run: npx vitest run --shard=${{ matrix.shard }}/4
 
   # Build and test (runs on all pushes and PRs)
   build:
     name: Build & Test
-    needs: [typecheck, lint, unit-test]
+    needs: [typecheck, lint, unit-test, unit-test-full]
+    # Default needs-gating (all must succeed) doesn't fit here: unit-test
+    # and unit-test-full are mutually exclusive by event (see their `if`
+    # above), so exactly one of them is always "skipped" — explicitly
+    # tolerate that instead of the whole job skipping too.
+    if: |
+      always() &&
+      needs.typecheck.result == 'success' &&
+      needs.lint.result == 'success' &&
+      (needs.unit-test.result == 'success' || needs.unit-test.result == 'skipped') &&
+      (needs.unit-test-full.result == 'success' || needs.unit-test-full.result == 'skipped')
     runs-on: ubuntu-latest
     outputs:
       app_version: ${{ steps.app_version.outputs.version }}
