@@ -1119,7 +1119,6 @@
   },
   "sourceLeaderboard": {
     "title": "Rangolisto de Fontoj",
-    "experimental": "Eksperimenta",
     "backToLeaderboard": "← Reen al la rangolisto",
     "explainer": "Aŭtoroj kaj fontoj poentitaj laŭ siaj propraj direktaj prognozoj (author_lean), kontrolitaj kontraŭ la rezulto — la sama respondigo kiun la rangolisto donas al prognozistoj. Malpli alta Brier estas pli bone; 0,25 estas monero-ĵeto.",
     "view": {
