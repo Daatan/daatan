@@ -21,20 +21,12 @@ fi
 # 2. Targeted test execution
 # We only run tests related to changed files to keep the local loop fast.
 # We EXCLUDE integration tests as they require a real DB (handled in CI).
+# Same logic runs in CI's "unit-test" job on PRs — see scripts/run-related-tests.sh.
 echo "🧪 Running tests related to changes (excluding integration tests)..."
 
-# Get files changed between origin/main and HEAD
-# Filter out non-existent files (deleted) and files that are NOT .ts/.tsx
-FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null | grep -E "\.ts$|\.tsx$" | grep -v "\.integration\.test\.ts" | xargs -I {} sh -c 'if [ -f {} ]; then echo {}; fi' || echo "")
-
-if [ -z "$FILES" ]; then
-  echo "   (No relevant source file changes found, skipping unit tests)"
-else
-  # Use vitest related directly to ensure it only considers these files
-  if ! npx vitest related --run $FILES; then
-    echo "❌ Related tests failed. Please fix failing tests before pushing."
-    exit 1
-  fi
+if ! ./scripts/run-related-tests.sh origin/main; then
+  echo "❌ Related tests failed. Please fix failing tests before pushing."
+  exit 1
 fi
 
 # Check if auth-related files changed (informational warning, non-blocking)
