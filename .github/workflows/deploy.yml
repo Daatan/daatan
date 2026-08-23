@@ -28,9 +28,95 @@ on:
         type: string
 
 jobs:
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: typecheck-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Type check
+        run: npm run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    concurrency:
+      group: lint-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run linter
+        run: npm run lint
+
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    concurrency:
+      group: unit-test-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # Needed to diff against the PR base ref for related-test selection below.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      # On PRs, only run tests related to changed files (same logic as
+      # .husky/pre-push — see scripts/run-related-tests.sh) to keep the PR
+      # loop fast. On push to main, run the full suite as a safety net.
+      - name: Run related tests
+        if: github.event_name == 'pull_request'
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
+          SKIP_ENV_VALIDATION: 1
+        run: ./scripts/run-related-tests.sh ${{ github.event.pull_request.base.sha }}
+
+      - name: Run full test suite
+        if: github.event_name != 'pull_request'
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
+          SKIP_ENV_VALIDATION: 1
+        run: npm test
+
   # Build and test (runs on all pushes and PRs)
   build:
     name: Build & Test
+    needs: [typecheck, lint, unit-test]
     runs-on: ubuntu-latest
     outputs:
       app_version: ${{ steps.app_version.outputs.version }}
@@ -48,20 +134,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Run unit tests
-        env:
-          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
-          NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
-          SKIP_ENV_VALIDATION: 1
-        run: npm test
+        uses: ./.github/actions/install-deps
 
       # Only needed on PRs: they're the only event where the Docker build below
       # is skipped, so this is the sole build-correctness check. On push/tag/
@@ -236,7 +309,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        uses: ./.github/actions/install-deps
 
       - name: Run integration tests
         run: npm run test:integration
