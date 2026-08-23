@@ -239,7 +239,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
               title={t('filterHints.needsReview')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'NEEDS_REVIEW'
                   ? 'bg-purple-600 text-white shadow-sm'
-                  : 'bg-purple-900/20 text-purple-700 hover:bg-purple-100 border border-purple-100'
+                  : 'bg-purple-900/20 text-purple-300 hover:bg-purple-900/40 border border-purple-700/50'
                   }`}
               >
                 {t('filters.needsReview')}

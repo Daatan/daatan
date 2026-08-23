@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/accessibility' },
 }
 
-const LAST_REVIEWED = 'July 6, 2026'
+const LAST_REVIEWED = 'August 23, 2026'
 
 export default function AccessibilityPage() {
   const contactEmail = getContactEmail()
@@ -24,10 +24,10 @@ export default function AccessibilityPage() {
         </a>{' '}
         Level AA conformance (the basis of Israeli Standard IS 5568), but we&apos;re not there yet —
         we&apos;d call it partially conformant. So far we&apos;ve added a skip-to-content link, visible
-        keyboard-focus indicators, labels for screen readers on form controls and icon buttons, and fixed
-        some color-contrast issues, but plenty of the site hasn&apos;t been individually audited yet, and
-        pinch-to-zoom is currently disabled on mobile (a trade-off we&apos;re reconsidering). If you hit a
-        barrier, please tell us — email our accessibility coordinator at{' '}
+        keyboard-focus indicators, labels for screen readers on form controls and icon buttons, fixed
+        several color-contrast issues, and re-enabled pinch-to-zoom on mobile, but plenty of the site
+        hasn&apos;t been individually audited yet. If you hit a barrier, please tell us — email our
+        accessibility coordinator at{' '}
         <a href={`mailto:${contactEmail}`} className="text-cobalt-light hover:underline">{contactEmail}</a>{' '}
         and we&apos;ll look into it.
       </p>
