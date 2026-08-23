@@ -32,6 +32,7 @@ type Job = {
 }
 
 const pct = (p: number | null | undefined) => (p == null ? '–' : `${Math.round(p * 100)}%`)
+const maxNodeDepth = (job: Job) => job.nodes.reduce((max, n) => Math.max(max, n.depth), 0)
 const NODE_W = 190, NODE_H = 58, COL = 230, ROW = 150
 
 export default function OracleV2Playground() {
@@ -129,6 +130,11 @@ export default function OracleV2Playground() {
               <div className="text-base font-mono">{pct(job.result.flat_p)} <span className="text-xs text-gray-500 font-sans">flat (v1)</span></div>
               {job.result.note && <div className="text-xs text-gray-500 mt-1">{job.result.note}</div>}
               <div className="text-xs text-gray-500 font-mono mt-1">calls — forecast {job.calls.forecast} · pool {job.calls.pool_aggregate} · llm {job.calls.llm} · pm {job.calls.polymarket}</div>
+              {job.status === 'done' && maxNodeDepth(job) < depth && (
+                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Requested depth {depth}, tree stopped at depth {maxNodeDepth(job)} — every node at that depth was pruned, unpriced, or the forecast-call budget ran out, so there was nothing left to expand.
+                </div>
+              )}
             </div>
           )}
           <div className="text-xs text-gray-400">Job <span className="font-mono">{jobId ?? '–'}</span></div>
@@ -195,8 +201,9 @@ function Graph({ job, selected, onSelect }: { job: Job; selected: string | null;
         const x1 = s.x + ox, y1 = s.y + oy - NODE_H / 2, x2 = t.x + ox, y2 = t.y + oy + NODE_H / 2
         const priced = e.method === 'pool_split'
         return (
-          <g key={e.id}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={priced ? '#22C55E' : '#F59E0B'} strokeWidth={priced ? 2 : 1.2} strokeDasharray={priced ? undefined : '5 4'} />
+          <g key={e.id} className="cursor-pointer" onClick={() => onSelect(e.target)}>
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={priced ? '#22C55E' : '#F59E0B'} strokeWidth={selected === e.target ? 3 : priced ? 2 : 1.2} strokeDasharray={priced ? undefined : '5 4'} />
             <text x={(x1 + x2) / 2} y={(y1 + y2) / 2} fontSize={9} fill="#6B7280" textAnchor="middle">{priced ? `✓${pct(e.p_given_yes)} ✗${pct(e.p_given_no)}` : 'unpriced'}</text>
           </g>
         )
