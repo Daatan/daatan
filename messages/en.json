@@ -1119,7 +1119,6 @@
   },
   "sourceLeaderboard": {
     "title": "Source Leaderboard",
-    "experimental": "Experimental",
     "backToLeaderboard": "Back to leaderboard",
     "explainer": "Byline authors and outlets scored on their own directional forecasts (author_lean), resolved against outcomes — the same accountability the user leaderboard gives predictors. Lower Brier is better; 0.25 is a coin flip.",
     "view": {

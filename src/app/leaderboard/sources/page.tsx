@@ -1,30 +1,23 @@
-import type { Metadata } from 'next'
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getTranslations } from 'next-intl/server'
-import { ArrowLeft, Newspaper } from 'lucide-react'
-import {
-  getSourceLeaderboard,
-  type SourceLeaderboardView,
-  type SourceSortBy,
+import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { ArrowLeft, Loader2, Newspaper } from 'lucide-react'
+import type {
+  AuthorLeaderboardRow,
+  OutletLeaderboardRow,
+  SourceLeaderboardView,
+  SourceSortBy,
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
+import { createClientLogger } from '@/lib/client-logger'
 
-export const dynamic = 'force-dynamic'
-
-export const metadata: Metadata = {
-  title: 'Source Leaderboard — bloggers & outlets scored on their own calls',
-  description:
-    'Shadow-scoring track record for byline authors and outlets: their own directional forecasts (author_lean), resolved against outcomes.',
-  alternates: { canonical: '/leaderboard/sources' },
-  robots: { index: false }, // experimental surface; keep it out of search for now
-}
+const log = createClientLogger('SourceLeaderboard')
 
 const VIEWS: SourceLeaderboardView[] = ['authors', 'outlets']
 const SORTS: SourceSortBy[] = ['skillConservative', 'brierScore']
-
-interface Props {
-  searchParams: Promise<{ view?: string; sortBy?: string }>
-}
 
 /** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
 function brierTone(brier: number): string {
@@ -38,13 +31,36 @@ function toggleHref(view: SourceLeaderboardView, sortBy: SourceSortBy): string {
   return `/leaderboard/sources?view=${view}&sortBy=${sortBy}`
 }
 
-export default async function SourceLeaderboardPage({ searchParams }: Props) {
-  const params = await searchParams
-  const view: SourceLeaderboardView = params.view === 'outlets' ? 'outlets' : 'authors'
-  const sortBy: SourceSortBy = params.sortBy === 'brierScore' ? 'brierScore' : 'skillConservative'
+export default function SourceLeaderboardPage() {
+  const t = useTranslations('sourceLeaderboard')
+  const searchParams = useSearchParams()
+  const view: SourceLeaderboardView = searchParams.get('view') === 'outlets' ? 'outlets' : 'authors'
+  const sortBy: SourceSortBy = searchParams.get('sortBy') === 'brierScore' ? 'brierScore' : 'skillConservative'
 
-  const t = await getTranslations('sourceLeaderboard')
-  const { authorRows, outletRows } = await getSourceLeaderboard(view, sortBy)
+  const [authorRows, setAuthorRows] = useState<AuthorLeaderboardRow[]>([])
+  const [outletRows, setOutletRows] = useState<OutletLeaderboardRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+
+    fetch(`/api/leaderboard/sources?view=${view}&sortBy=${sortBy}`)
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        setAuthorRows(data.authorRows ?? [])
+        setOutletRows(data.outletRows ?? [])
+      })
+      .catch(err => log.error({ err }, 'Failed to fetch source leaderboard'))
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [view, sortBy])
 
   // Normalize both views to one display shape so the table only renders once.
   const rows = view === 'outlets'
@@ -80,9 +96,6 @@ export default async function SourceLeaderboardPage({ searchParams }: Props) {
       <div className="flex items-center gap-3 mb-2">
         <Newspaper className="w-7 h-7 text-cyan-400" />
         <h1 className="text-2xl sm:text-3xl font-bold text-white">{t('title')}</h1>
-        <span className="rounded-full bg-navy-600 px-2 py-0.5 text-xs font-medium text-cyan-300">
-          {t('experimental')}
-        </span>
       </div>
       <p className="text-sm text-gray-500 mb-6 max-w-2xl">{t('explainer')}</p>
 
@@ -112,7 +125,11 @@ export default async function SourceLeaderboardPage({ searchParams }: Props) {
         ))}
       </div>
 
-      {rows.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-gray-500">
+          <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={<Newspaper className="w-10 h-10" />}
           title={t('emptyTitle')}

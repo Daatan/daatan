@@ -114,6 +114,41 @@ describe('getSourceLeaderboard', () => {
     const { outletRows } = await getSourceLeaderboard('outlets', 'skillConservative')
     expect(outletRows.map(r => r.outletName)).toEqual(['Strong Outlet', 'Weak Outlet'])
   })
+
+  it('does not filter by predictions when minPredictions is omitted (default 0)', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [entry({ author: 'Thin', outlet_name: 'X', predictions: 1 })],
+      count: 1,
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative')
+    expect(authorRows.map(r => r.author)).toEqual(['Thin'])
+  })
+
+  it('filters out author rows below minPredictions', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [
+        entry({ author: 'Thin', outlet_name: 'X', predictions: 2 }),
+        entry({ author: 'Established', outlet_name: 'X', predictions: 10 }),
+      ],
+      count: 2,
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative', 5)
+    expect(authorRows.map(r => r.author)).toEqual(['Established'])
+  })
+
+  it('filters outlet rows by their aggregate predictions count, not by dropping thin authors pre-aggregation', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValueOnce({
+      authors: [
+        entry({ author: 'A', outlet_name: 'Combined', predictions: 2 }),
+        entry({ author: 'B', outlet_name: 'Combined', predictions: 4 }),
+        entry({ author: 'C', outlet_name: 'ThinOutlet', predictions: 2 }),
+      ],
+      count: 3,
+    })
+    const { outletRows } = await getSourceLeaderboard('outlets', 'skillConservative', 5)
+    // Combined: 2+4=6 predictions, clears the bar even though neither author alone would.
+    expect(outletRows.map(r => r.outletName)).toEqual(['Combined'])
+  })
 })
 
 describe('getAuthorShadowRowsForOutlet', () => {

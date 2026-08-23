@@ -99,22 +99,28 @@ function sortRows<T extends { skillConservative: number; brierScore: number }>(
  * retro's `GET /leaderboard/author-shadow` (retro PR #315). Shadow scoring: informational
  * track record only, never feeds the live forecast.
  *
+ * `minPredictions` defaults to 0 (no filtering) because this function also backs single-row
+ * lookups — `/sources/[name]`, `/authors/[author]/[outlet]`, and the byline-linkability check
+ * in forecast-sources.ts — that must keep seeing every scored row regardless of sample size.
+ * Only the public `/leaderboard/sources` board (daatan#1587) passes a non-zero value. Outlets
+ * are filtered on their aggregate `predictions` count (summed across authors), not by dropping
+ * low-sample authors before aggregation.
+ *
  * Fails open — returns empty rows (never throws) when the Oracle is unconfigured or
  * unreachable, matching every other Oracle-backed service in this file.
  */
 export async function getSourceLeaderboard(
   view: SourceLeaderboardView = 'authors',
   sortBy: SourceSortBy = 'skillConservative',
+  minPredictions = 0,
 ): Promise<SourceLeaderboardResult> {
   const data = await getAuthorShadowLeaderboard()
   const entries = data?.authors ?? []
 
-  return {
-    view,
-    sortBy,
-    authorRows: sortRows(entries.map(toAuthorRow), sortBy),
-    outletRows: sortRows(aggregateByOutlet(entries), sortBy),
-  }
+  const authorRows = sortRows(entries.map(toAuthorRow), sortBy).filter(r => r.predictions >= minPredictions)
+  const outletRows = sortRows(aggregateByOutlet(entries), sortBy).filter(r => r.predictions >= minPredictions)
+
+  return { view, sortBy, authorRows, outletRows }
 }
 
 /**
