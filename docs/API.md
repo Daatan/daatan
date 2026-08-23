@@ -467,6 +467,12 @@ Query: `?windowDays=` (1–30, default 30). Response: `{ windowDays, totals: { t
 ### `POST /api/admin/oracle-v2/forecast` · `GET /api/admin/oracle-v2/jobs/[id]` — Admin
 Proxies for the Oracle 2.0 playground (retro#595) behind the admin **Oracle 2.0** tab (`/admin/oracle-v2`). POST body `{ question, depth (1–6, default 2), max_precursors, max_forecast_calls, max_articles, claim_deadline? }` → `202 { job_id, status }`; GET returns the Oracle's growing job trace (nodes, edges, every sub-prompt, log, result) verbatim — see `Daatan/docs` `oracle-api.md` § `POST /v2/forecast`. The Oracle key is added server-side from `ORACLE_API_KEY`; the browser never sees it (the reason this page lives here and not on the public retro GitHub Pages site). 503 when the Oracle is not configured.
 
+### `POST` / `GET /api/admin/latent-nodes` · `POST /api/admin/latent-nodes/[id]/merge` — Admin
+Oracle 2.0 storage M2 (daatan#1556), `src/lib/services/latent-node.ts` — see `docs/DATABASE.md` § Latent nodes. No promotion endpoint yet.
+- `POST /api/admin/latent-nodes` — `{ textEn, claimDeadline?, claimDirection?, claimArchetype?, origin }` (`origin` ∈ `article_antecedent | variant | mcp_probe | express`) → `201` the created row. Minimal create; the real linking pipeline that would normally populate this table doesn't exist yet.
+- `GET /api/admin/latent-nodes?status=&limit=` — `{ nodes: [...] }`, newest first, default limit 50.
+- `POST /api/admin/latent-nodes/[id]/merge` — `{ targetId }` → `{ merged, into, relationsRepointed, relationsDropped }`. 400 on self-merge; 500 if the source isn't `OPEN` or the target is already `MERGED` (error message states which).
+
 ### `GET /api/admin/forecast-attempts` — Admin
 Analytics for Express forecast creation attempts. Returns success rate, daily breakdown, top moderation rejection reasons, and per-user attempt patterns over the last 30 days. Useful for tuning LLM moderation prompts.
 
