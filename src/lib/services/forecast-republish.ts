@@ -147,6 +147,9 @@ export async function republishForecasts(predictionIds: string[], apply: boolean
           // snapshot payload only, never latched onto the prediction.
           settled: resolved.settled,
           externalReasoning: 'TruthMachine Oracle (admin re-publish from pool)',
+          evidenceMass: resolved.evidenceMass,
+          nEff: resolved.nEff,
+          ageAdjustedMass: resolved.ageAdjustedMass,
           oracleSnapshot: {
             mean: probability,
             std: stanceStdToPercent(resolved.std),

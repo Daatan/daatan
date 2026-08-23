@@ -50,6 +50,11 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
    */
   usableSize: number | null
   singleRunMean: number
+  /** Pool-path diagnostics (retro#458 Phase 2) — null on the single-run/pool-insufficient
+   *  outcomes, where no aggregate weight was ever computed. See `PoolRecompute`. */
+  evidenceMass: number | null
+  nEff: number | null
+  ageAdjustedMass: number | null
 }
 
 /**
@@ -114,6 +119,9 @@ export async function resolvePooledEstimate(
       poolSize: pool.poolSize,
       usableSize: pool.usableSize,
       singleRunMean: singleRun.mean,
+      evidenceMass: null,
+      nEff: null,
+      ageAdjustedMass: null,
     }
   }
 
@@ -127,6 +135,9 @@ export async function resolvePooledEstimate(
       poolSize: null,
       usableSize: null,
       singleRunMean: singleRun.mean,
+      evidenceMass: null,
+      nEff: null,
+      ageAdjustedMass: null,
     }
   }
 
@@ -160,5 +171,8 @@ export async function resolvePooledEstimate(
     poolSize: pool.poolSize,
     usableSize: pool.usableSize,
     singleRunMean: singleRun.mean,
+    evidenceMass: pool.evidenceMass,
+    nEff: pool.nEff,
+    ageAdjustedMass: pool.ageAdjustedMass,
   }
 }

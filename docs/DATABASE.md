@@ -140,7 +140,7 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | `articlesUsed` | Oracle evidence volume; null on legacy/LLM-fallback/clock rows |
 | `oracleSnapshot` | full Oracle payload (see scale table above); null on the LLM-fallback path |
 | `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
-| `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}` |
+| `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}`; when the estimate came from a pool aggregate, `{pool: {evidenceMass, nEff, ageAdjustedMass}}` (retro#458 Phase 2 diagnostics, daatan#1563) — the two can appear together on the same row |
 | `summary` / `externalReasoning` | analyze-run LLM summary / writer reasoning marker |
 
 Funnel invariants: `confidence` and `aiCiLow/aiCiHigh` on the prediction move

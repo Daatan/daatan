@@ -462,7 +462,27 @@ describe('recomputeFromPool', () => {
       // stance-less (art-4) rows are dropped, so the caller can list precisely the
       // articles the estimate averages.
       usableArticles: [poolArticle(), poolArticle({ id: 'art-2' })],
+      // AGGREGATE has no evidence_mass/n_eff/age_adjusted_mass — retro omits them
+      // on older responses, and recomputeFromPool must fail open to null rather
+      // than throw or silently drop the keys (daatan#1563).
+      evidenceMass: null,
+      nEff: null,
+      ageAdjustedMass: null,
     })
+  })
+
+  it('surfaces evidence_mass/n_eff/age_adjusted_mass from the pool aggregate (daatan#1563)', async () => {
+    findMany.mockResolvedValue([poolArticle(), poolArticle({ id: 'art-2' })] as never)
+    mockOracleFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...AGGREGATE, evidence_mass: 3.42, n_eff: 2.1, age_adjusted_mass: 3.9 }),
+    } as never)
+
+    const out = await recomputeFromPool('pred-1', null, null)
+
+    expect(out?.evidenceMass).toBe(3.42)
+    expect(out?.nEff).toBe(2.1)
+    expect(out?.ageAdjustedMass).toBe(3.9)
   })
 
   it('queries only current-version rows, excluding superseded ones (daatan#1382)', async () => {

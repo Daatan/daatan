@@ -198,6 +198,13 @@ export interface RecordEstimateInput {
   oracleSnapshot?: Prisma.InputJsonValue | null
   /** Clock provenance JSON (origin='clock' only). */
   meta?: Prisma.InputJsonValue
+  /** Pool-aggregate diagnostics (retro#458 Phase 2) when this estimate came from
+   *  `resolvePooledEstimate`'s pool path — null/omitted on the single-run and
+   *  pool-insufficient outcomes. Persisted alongside `abstainMeta`; read by
+   *  nothing yet (daatan#1563). */
+  evidenceMass?: number | null
+  nEff?: number | null
+  ageAdjustedMass?: number | null
   now?: Date
 }
 
@@ -349,9 +356,17 @@ export async function recordEstimate(input: RecordEstimateInput) {
   // and a pool size and then only LOGGED them, so "why did analyze abstain on a
   // 115-article pool?" could not be answered from the data at all. `meta` is otherwise
   // clock-only and read by nothing, so recording them here costs no migration.
-  const abstainMeta: Prisma.InputJsonValue | undefined = input.insufficientData
+  const abstainMeta = input.insufficientData
     ? { abstain: { reason: input.insufficientReason ?? null, poolSize: input.poolSize ?? null } }
     : undefined
+
+  const poolMeta =
+    input.evidenceMass != null || input.nEff != null || input.ageAdjustedMass != null
+      ? { pool: { evidenceMass: input.evidenceMass ?? null, nEff: input.nEff ?? null, ageAdjustedMass: input.ageAdjustedMass ?? null } }
+      : undefined
+
+  const computedMeta: Prisma.InputJsonValue | undefined =
+    abstainMeta || poolMeta ? ({ ...abstainMeta, ...poolMeta } as Prisma.InputJsonValue) : undefined
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.contextSnapshot.create({
@@ -365,7 +380,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
         externalReasoning: input.externalReasoning ?? null,
         oracleSnapshot: input.oracleSnapshot ?? undefined,
         insufficientData: input.insufficientData ?? false,
-        meta: input.meta ?? abstainMeta ?? undefined,
+        meta: input.meta ?? computedMeta ?? undefined,
         articlesUsed: articlesUsedOf(input.oracleSnapshot),
         materialChange,
         evidenceAt,
@@ -508,6 +523,10 @@ export interface SaveContextUpdateInput {
   insufficientReason?: string | null
   /** Pool rows behind the abstaining aggregate; diagnostics only. */
   poolSize?: number | null
+  /** Pool-aggregate diagnostics (retro#458 Phase 2); see `RecordEstimateInput`. */
+  evidenceMass?: number | null
+  nEff?: number | null
+  ageAdjustedMass?: number | null
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   now: Date
@@ -525,6 +544,9 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
     insufficientData: input.insufficientData,
     insufficientReason: input.insufficientReason,
     poolSize: input.poolSize,
+    evidenceMass: input.evidenceMass,
+    nEff: input.nEff,
+    ageAdjustedMass: input.ageAdjustedMass,
     settled: input.settled,
     summary: input.summary,
     sources: input.sources,
@@ -555,6 +577,10 @@ export interface SaveNewsIndexerMatchInput {
   insufficientReason?: string | null
   /** Pool rows behind the abstaining aggregate; diagnostics only. */
   poolSize?: number | null
+  /** Pool-aggregate diagnostics (retro#458 Phase 2); see `RecordEstimateInput`. */
+  evidenceMass?: number | null
+  nEff?: number | null
+  ageAdjustedMass?: number | null
 }
 
 /** externalReasoning marker identifying snapshots written by the news-indexer push path. */
@@ -596,6 +622,9 @@ export async function saveNewsIndexerMatch(
     insufficientData: input.insufficientData,
     insufficientReason: input.insufficientReason,
     poolSize: input.poolSize,
+    evidenceMass: input.evidenceMass,
+    nEff: input.nEff,
+    ageAdjustedMass: input.ageAdjustedMass,
     sources: input.sources,
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
@@ -793,6 +822,10 @@ export interface SaveOracleSnapshotInput {
   insufficientReason?: string | null
   /** Pool rows behind the abstaining aggregate; diagnostics only. */
   poolSize?: number | null
+  /** Pool-aggregate diagnostics (retro#458 Phase 2); see `RecordEstimateInput`. */
+  evidenceMass?: number | null
+  nEff?: number | null
+  ageAdjustedMass?: number | null
 }
 
 /**
@@ -814,6 +847,9 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     insufficientData: input.insufficientData,
     insufficientReason: input.insufficientReason,
     poolSize: input.poolSize,
+    evidenceMass: input.evidenceMass,
+    nEff: input.nEff,
+    ageAdjustedMass: input.ageAdjustedMass,
     externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
     oracleSnapshot: input.oracleSnapshot,
   })

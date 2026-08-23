@@ -240,6 +240,9 @@ export async function refreshOracleSnapshot(
     aiCiLow: ciLow,
     aiCiHigh: ciHigh,
     settled: resolved.settled,
+    evidenceMass: resolved.evidenceMass,
+    nEff: resolved.nEff,
+    ageAdjustedMass: resolved.ageAdjustedMass,
   })
 
   log.info(
