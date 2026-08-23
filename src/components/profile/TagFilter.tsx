@@ -41,7 +41,7 @@ export function TagFilter({ tags, selectedTag, totalCount }: TagFilterProps) {
       >
         All
         {totalCount != null && (
-          <span className="ml-1.5 opacity-60 font-normal normal-case tracking-normal">{totalCount}</span>
+          <span className={`ml-1.5 font-normal normal-case tracking-normal ${!selectedTag ? 'text-blue-100' : 'text-gray-500'}`}>{totalCount}</span>
         )}
       </Link>
       {visibleTags.map(tag => (
@@ -52,7 +52,7 @@ export function TagFilter({ tags, selectedTag, totalCount }: TagFilterProps) {
         >
           {tag.name}
           {tag.count != null && (
-            <span className="ml-1.5 opacity-60 font-normal normal-case tracking-normal">{tag.count}</span>
+            <span className={`ml-1.5 font-normal normal-case tracking-normal ${selectedTag === tag.slug ? 'text-blue-100' : 'text-gray-500'}`}>{tag.count}</span>
           )}
         </Link>
       ))}

@@ -52,7 +52,7 @@ export function ProfileTabs({
             }`}
           >
             {label}
-            <span className="ml-1.5 text-xs font-medium opacity-60">({count})</span>
+            <span className="ml-1.5 text-xs font-medium text-gray-500">({count})</span>
           </Link>
         ))}
       </div>

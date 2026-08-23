@@ -41,7 +41,7 @@ function ScoreCard({
 
   return (
     <div
-      className={`px-4 py-3 bg-navy-800 rounded-xl border ${muted ? 'border-navy-700 opacity-70' : 'border-navy-600'}`}
+      className={`px-4 py-3 bg-navy-800 rounded-xl border ${muted ? 'border-navy-700' : 'border-navy-600'}`}
       title={title}
     >
       <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block leading-tight mb-1">

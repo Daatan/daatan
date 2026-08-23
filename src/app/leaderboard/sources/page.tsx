@@ -105,7 +105,7 @@ export default function SourceLeaderboardPage() {
             key={v}
             href={toggleHref(v, sortBy)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              v === view ? 'bg-cyan-600 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
+              v === view ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
             }`}
           >
             {t(`view.${v}`)}
@@ -117,7 +117,7 @@ export default function SourceLeaderboardPage() {
             key={s}
             href={toggleHref(view, s)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              s === sortBy ? 'bg-cyan-600 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
+              s === sortBy ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
             }`}
           >
             {t(`sortBy.${s}`)}

@@ -124,7 +124,7 @@ export default function SignInClient() {
               <label className="block text-sm font-medium text-text-secondary" htmlFor="password">
                 {t('passwordLabel')}
               </label>
-              <Link href="/auth/forgot-password" className="text-xs text-blue-500 hover:text-blue-400 transition-colors">
+              <Link href="/auth/forgot-password" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
                 {t('forgotPassword')}
               </Link>
             </div>
@@ -193,7 +193,7 @@ export default function SignInClient() {
         <div className="pt-2 text-center text-sm">
           <p className="text-gray-500">
             {t('noAccount')}{' '}
-            <Link href="/auth/signup" className="text-blue-500 hover:text-blue-400 font-medium transition-colors">
+            <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
               {t('signUp')}
             </Link>
           </p>
