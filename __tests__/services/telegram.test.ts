@@ -71,6 +71,23 @@ describe('Telegram notification service', () => {
     expect(body.text).toContain('Will BTC reach 100k?')
     expect(body.text).toContain('Mark')
     expect(body.text).toMatch(/^\[prod\]/)
+    expect(body.text).toContain('http://localhost:3000/forecasts/p1')
+  })
+
+  it('falls back to the app URL when NEXTAUTH_URL is unset', async () => {
+    delete process.env.NEXTAUTH_URL
+
+    notifyForecastPublished(
+      { id: 'p1', claimText: 'Will BTC reach 100k?' },
+      { name: 'Mark', username: 'mark' },
+    )
+
+    await vi.waitFor(() => {
+      expect(fetch).toHaveBeenCalledOnce()
+    })
+
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.text).toContain('https://daatan.com/forecasts/p1')
   })
 
   it('prefixes with [staging] on staging', async () => {

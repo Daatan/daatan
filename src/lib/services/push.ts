@@ -1,6 +1,8 @@
 import webpush from 'web-push'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
+import { getAppUrl } from '@/lib/branding'
+import { isSelfHosted } from '@/lib/edition'
 
 const log = createLogger('push-service')
 
@@ -20,8 +22,12 @@ export async function dispatchBrowserPush(
     return
   }
 
+  const vapidContact = isSelfHosted()
+    ? `mailto:push@${new URL(getAppUrl()).hostname}`
+    : 'mailto:push@daatan.com'
+
   webpush.setVapidDetails(
-    'mailto:push@daatan.com',
+    vapidContact,
     vapidPublicKey,
     vapidPrivateKey,
   )

@@ -108,6 +108,16 @@ describe('OpenRouterProvider', () => {
       expect(result.text).toBe('')
     })
 
+    it('sends the app URL as the HTTP-Referer header', async () => {
+      mockFetch.mockResolvedValue(okResponse(makeApiResponse('ok')))
+
+      const provider = new OpenRouterProvider({ apiKey: 'sk-test', modelName: 'gpt-4o-mini' })
+      await provider.generateContent({ prompt: 'hi' })
+
+      const [, init] = mockFetch.mock.calls[0]
+      expect(init.headers['HTTP-Referer']).toBe('https://daatan.com')
+    })
+
     it('maps usage fields correctly', async () => {
       mockFetch.mockResolvedValue(
         okResponse(

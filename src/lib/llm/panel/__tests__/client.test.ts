@@ -69,6 +69,15 @@ describe('callPanelMember request shape', () => {
     expect(body.model).toBe(MEMBER.model)
     expect(body.response_format.json_schema.strict).toBe(true)
   })
+
+  it('sends the app URL as the HTTP-Referer header', async () => {
+    fetchMock.mockResolvedValue(content('{"probability": 42}'))
+
+    await callPanelMember(MEMBER, 'prompt', 'sk-test')
+
+    const headers = fetchMock.mock.calls[0][1].headers
+    expect(headers['HTTP-Referer']).toBe('https://daatan.com')
+  })
 })
 
 describe('callPanelMember responses', () => {

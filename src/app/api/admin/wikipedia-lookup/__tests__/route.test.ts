@@ -49,7 +49,7 @@ describe('GET /api/admin/wikipedia-lookup', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://en.wikipedia.org/w/rest.php/v1/search/page?q=Reuters&limit=5',
-      expect.any(Object),
+      { headers: { 'User-Agent': 'Daatan-Admin/1.0 (https://daatan.com)' } },
     )
     expect(body).toEqual({
       results: [{ title: 'Reuters', url: 'https://en.wikipedia.org/wiki/Reuters', description: 'News agency' }],

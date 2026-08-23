@@ -10,15 +10,17 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-const { sendNotification, errorLog, debugLog } = vi.hoisted(() => ({
+const { sendNotification, setVapidDetails, errorLog, debugLog, mockIsSelfHosted } = vi.hoisted(() => ({
   sendNotification: vi.fn(),
+  setVapidDetails: vi.fn(),
   errorLog: vi.fn(),
   debugLog: vi.fn(),
+  mockIsSelfHosted: vi.fn().mockReturnValue(false),
 }))
 
 vi.mock('web-push', () => ({
   default: {
-    setVapidDetails: vi.fn(),
+    setVapidDetails,
     sendNotification,
   },
 }))
@@ -26,6 +28,9 @@ vi.mock('web-push', () => ({
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ debug: debugLog, info: vi.fn(), warn: vi.fn(), error: errorLog }),
 }))
+
+vi.mock('@/lib/edition', () => ({ isSelfHosted: mockIsSelfHosted }))
+vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://forecasts.example.com' }))
 
 import { prisma } from '@/lib/prisma'
 import { dispatchBrowserPush } from '@/lib/services/push'
@@ -56,9 +61,25 @@ class WebPushError extends Error {
 describe('dispatchBrowserPush', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsSelfHosted.mockReturnValue(false)
     process.env.VAPID_PRIVATE_KEY = 'test-private-key'
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key'
     findMany.mockResolvedValue([SUB])
+  })
+
+  it('uses the Daatan literal VAPID contact on the SaaS edition', async () => {
+    await dispatchBrowserPush('user-1', { title: 't', message: 'm', type: 'SYSTEM' })
+    expect(setVapidDetails).toHaveBeenCalledWith('mailto:push@daatan.com', 'test-public-key', 'test-private-key')
+  })
+
+  it('derives the VAPID contact from getAppUrl() on self-host', async () => {
+    mockIsSelfHosted.mockReturnValue(true)
+    await dispatchBrowserPush('user-1', { title: 't', message: 'm', type: 'SYSTEM' })
+    expect(setVapidDetails).toHaveBeenCalledWith(
+      'mailto:push@forecasts.example.com',
+      'test-public-key',
+      'test-private-key',
+    )
   })
 
   it('no-ops without throwing when VAPID keys are not configured', async () => {

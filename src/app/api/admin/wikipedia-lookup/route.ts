@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
+import { getAppUrl } from '@/lib/branding'
 
 interface WikipediaSearchPage {
   key: string
@@ -25,7 +26,7 @@ export const GET = withAuth(async (request: NextRequest) => {
   try {
     const resp = await fetch(
       `https://en.wikipedia.org/w/rest.php/v1/search/page?q=${encodeURIComponent(q)}&limit=5`,
-      { headers: { 'User-Agent': 'Daatan-Admin/1.0 (https://daatan.com)' } },
+      { headers: { 'User-Agent': `Daatan-Admin/1.0 (${getAppUrl()})` } },
     )
     if (!resp.ok) return apiError('Wikipedia lookup failed', 502)
 
