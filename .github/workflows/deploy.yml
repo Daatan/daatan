@@ -229,7 +229,17 @@ jobs:
   build-app-image:
     name: Build & Push App Image
     needs: build
-    if: github.event_name != 'pull_request'
+    # always() + explicit needs.build.result check, not a bare event-name
+    # if: default success() gating walks the whole transitive needs chain,
+    # not just direct needs — since unit-test/unit-test-full are mutually
+    # exclusive by event (one is always "skipped"), that skip poisons the
+    # implicit success() here even though `build` itself succeeded. Same
+    # fix already applied to deploy-production; missing here broke every
+    # push-to-main deploy silently until caught 2026-08-23.
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -290,7 +300,11 @@ jobs:
   build-migrations-image:
     name: Build & Push Migrations Image
     needs: build
-    if: github.event_name != 'pull_request'
+    # See the comment on build-app-image's `if` above — same fix.
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -367,9 +381,21 @@ jobs:
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
+    # always() + explicit needs.*.result checks, not a bare event-name if:
+    # default success() gating walks the whole transitive needs chain, not
+    # just direct needs — since unit-test/unit-test-full are mutually
+    # exclusive by event (one is always "skipped"), that skip poisoned the
+    # implicit success() here even though build/build-app-image/
+    # build-migrations-image all succeeded. Same fix already applied to
+    # deploy-production; missing here broke every push-to-main deploy
+    # silently until caught 2026-08-23.
     if: |
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+      always() &&
+      needs.build.result == 'success' &&
+      needs.build-app-image.result == 'success' &&
+      needs.build-migrations-image.result == 'success' &&
+      ((github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
 
     steps:
       - name: Checkout repository
