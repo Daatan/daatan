@@ -395,7 +395,7 @@ export default function ProbabilityChart({
                 key={r.key}
                 onClick={() => { setPicked(r.key); setBrush(null) }}
                 className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors ${
-                  range === r.key ? 'bg-cobalt text-white' : 'text-gray-500 hover:text-gray-300'
+                  range === r.key ? 'bg-cobalt-hover text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
                 {r.label}
@@ -544,7 +544,7 @@ export default function ProbabilityChart({
         </LineChart>
       </ResponsiveContainer>
       {showPresets && (
-        <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-600">
+        <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-500">
           <span>Drag across the chart to zoom · double-click to reset</span>
           {brush && (
             <button onClick={resetZoom} className="text-gray-500 hover:text-gray-300 font-medium">

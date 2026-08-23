@@ -157,7 +157,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
       >
         <Database className="w-3.5 h-3.5" />
         <span>Evidence pool</span>
-        <span className="text-gray-600">· admin</span>
+        <span className="text-gray-500">· admin</span>
         <ChevronRight className="w-3.5 h-3.5" />
       </button>
     )

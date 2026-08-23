@@ -421,6 +421,7 @@ export default function ForecastDetailClient({
             )}
             {!prediction.newsAnchor && prediction.source === 'manual' && (
               <span
+                role="img"
                 className="inline-flex items-center justify-center w-7 h-7 text-purple-400 bg-purple-400/10 rounded-full border border-purple-400/20"
                 title={t('personalBadge')}
                 aria-label={t('personalBadge')}

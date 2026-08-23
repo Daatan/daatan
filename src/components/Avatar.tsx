@@ -11,15 +11,18 @@ interface AvatarProps {
 }
 
 // Deterministic color based on name string
+// -100/-800 pairs: the -600 text used before this audit fails WCAG AA 4.5:1
+// against a -100 background for 6 of these 8 colors (measured 2.86-4.24:1);
+// -800 clears it with margin (6.4-8.1:1) across the whole palette.
 const AVATAR_COLORS = [
-  { bg: 'bg-blue-100', text: 'text-blue-600' },
-  { bg: 'bg-emerald-100', text: 'text-emerald-600' },
-  { bg: 'bg-violet-100', text: 'text-violet-600' },
-  { bg: 'bg-amber-100', text: 'text-amber-600' },
-  { bg: 'bg-rose-100', text: 'text-rose-600' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-600' },
-  { bg: 'bg-indigo-100', text: 'text-indigo-600' },
-  { bg: 'bg-orange-100', text: 'text-orange-600' },
+  { bg: 'bg-blue-100', text: 'text-blue-800' },
+  { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  { bg: 'bg-violet-100', text: 'text-violet-800' },
+  { bg: 'bg-amber-100', text: 'text-amber-800' },
+  { bg: 'bg-rose-100', text: 'text-rose-800' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+  { bg: 'bg-indigo-100', text: 'text-indigo-800' },
+  { bg: 'bg-orange-100', text: 'text-orange-800' },
 ]
 
 const getInitials = (name: string | null | undefined): string => {
