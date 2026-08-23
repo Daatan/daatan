@@ -40,6 +40,15 @@ const nextConfig = {
   },
   output: 'standalone',
   reactStrictMode: true,
+  // The dedicated typecheck/lint CI jobs already gate every PR on the same
+  // commit, seconds before this build step runs — re-running both here is
+  // pure duplicate work (daatan#1584).
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },
