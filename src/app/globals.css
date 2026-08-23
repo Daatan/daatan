@@ -26,6 +26,11 @@
   --color-mist:           #E6E9EF;
   --color-text-secondary: #B2BED0; /* was #A0AEC0 — bumped for contrast */
   --color-text-subtle:    #9AA5B4; /* was #6B7280 (3.6:1) — now ~6.7:1 on navy-900 */
+
+  /* App is unconditionally dark-themed (not tied to prefers-color-scheme) — without this,
+     native form controls (select dropdown popups, date pickers, scrollbars) render with the
+     browser's default light chrome regardless of our own dark styling. */
+  color-scheme: dark;
 }
 
 /* ── BASE ────────────────────────────────────────────────── */
