@@ -198,13 +198,13 @@ describe('runPanelForPrediction', () => {
   })
 
   // The 2026-07-10 shape: a dead key latched mid-sweep, so the day's run holds only the
-  // Bedrock member. Once the key works again, the same-day sweep must fill the hole —
-  // temperature 0 + a date-only prompt make the appended number exactly what it would
-  // have been at the run's original instant.
+  // self-authenticating (Bedrock/Vertex) members. Once the key works again, the same-day
+  // sweep must fill the hole — temperature 0 + a date-only prompt make the appended
+  // number exactly what it would have been at the run's original instant.
   it('completes a partial run: asks only the missing members and appends to the day\'s run', async () => {
-    const bedrock = PANEL_MEMBERS.filter((m) => m.route === 'bedrock')
+    const authenticated = PANEL_MEMBERS.filter((m) => m.route !== 'openrouter')
     const openrouter = PANEL_MEMBERS.filter((m) => m.route === 'openrouter')
-    findFirst.mockResolvedValue(todaysRun(bedrock) as never)
+    findFirst.mockResolvedValue(todaysRun(authenticated) as never)
 
     const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
 
@@ -229,9 +229,9 @@ describe('runPanelForPrediction', () => {
   })
 
   it('stays quietly skipped when the missing members still cannot be authenticated', async () => {
-    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route !== 'openrouter')) as never)
 
-    // No key: deliberate Bedrock-only mode. The second tick must not report failures.
+    // No key: deliberate Bedrock/Vertex-only mode. The second tick must not report failures.
     const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: '' })
 
     expect(result.status).toBe('skipped-unchanged')
@@ -240,7 +240,7 @@ describe('runPanelForPrediction', () => {
   })
 
   it('appends nothing when every missing member\'s call fails, so the next tick retries', async () => {
-    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route !== 'openrouter')) as never)
     callMember.mockRejectedValue(new Error('upstream 500'))
 
     const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test' })
@@ -250,7 +250,7 @@ describe('runPanelForPrediction', () => {
   })
 
   it('a dry run over a partial run calls nothing and appends nothing', async () => {
-    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route === 'bedrock')) as never)
+    findFirst.mockResolvedValue(todaysRun(PANEL_MEMBERS.filter((m) => m.route !== 'openrouter')) as never)
 
     const result = await runPanelForPrediction(prediction, { now: NOW, apiKey: 'sk-test', dryRun: true })
 
@@ -370,8 +370,8 @@ describe('runPanelForPrediction', () => {
 })
 
 describe('runPanelSweep', () => {
-  // The whole reason the Bedrock member exists: no OpenRouter key must NOT stop the panel.
-  it('runs Bedrock members only when no OpenRouter key is configured', async () => {
+  // The whole reason the Bedrock/Vertex members exist: no OpenRouter key must NOT stop the panel.
+  it('runs Bedrock/Vertex members only when no OpenRouter key is configured', async () => {
     getKey.mockReturnValue('')
     findManyPredictions.mockResolvedValue([prediction] as never)
 
@@ -381,7 +381,7 @@ describe('runPanelSweep', () => {
     expect(summary.written).toBe(1)
 
     const called = callMember.mock.calls.map(([m]) => m.route)
-    expect(called).toEqual(['bedrock'])
+    expect(called.sort()).toEqual(['bedrock', 'vertex'])
     expect(called).not.toContain('openrouter')
   })
 

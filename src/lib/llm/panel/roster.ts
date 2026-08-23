@@ -20,8 +20,13 @@ export type PanelMode = 'ungrounded' | 'grounded-indexer'
  * `bedrock` members use the app's own IAM role (billed to AWS, covered by credits) and
  * survive an OpenRouter outage or a dead OpenRouter key — which is not hypothetical:
  * on 2026-07-10 a stale key made every one of the panel's 285 calls return 401.
+ *
+ * `vertex` members use the app's Google service account (daatan#1472, daatan#1513) —
+ * same Google backend as an OpenRouter `google-vertex/*` pin, but authenticated and
+ * billed directly rather than proxied and marked up, and immune to an OpenRouter-wide
+ * outage (401 key death, 402 credit exhaustion) the same way `bedrock` is.
  */
-export type PanelRoute = 'openrouter' | 'bedrock'
+export type PanelRoute = 'openrouter' | 'bedrock' | 'vertex'
 
 export interface PanelMember {
   /**
@@ -89,15 +94,18 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     providerOrder: ['deepinfra/fp4'],
   },
 
-  // google-vertex/eu pins this member's calls to the EU for routing diversity from
-  // the other Vertex/Gemini legs. This is NOT a stack-wide residency guarantee —
-  // extraction and settlement verification (the calls that actually carry article/
-  // claim text) run on Bedrock in us-east-1 (retro#548).
+  // Direct Vertex (daatan#1513), not proxied through OpenRouter: same Google backend
+  // the old `google-vertex/eu` OpenRouter pin used, but authenticated with the app's
+  // own service account. Model id keeps its `google/` OpenRouter-style prefix rather
+  // than switching to the bare Vertex model name — changing it would treat this as a
+  // new member and orphan its historical Brier series for no benefit, since `route`
+  // already disambiguates it from the OpenRouter-era rows. This is NOT a stack-wide
+  // residency guarantee — extraction and settlement verification (the calls that
+  // actually carry article/claim text) run on Bedrock in us-east-1 (retro#548).
   {
     model: 'google/gemini-2.5-flash',
     mode: 'ungrounded',
-    route: 'openrouter',
-    providerOrder: ['google-vertex/eu'],
+    route: 'vertex',
   },
 
   { model: 'x-ai/grok-4.3', mode: 'ungrounded', route: 'openrouter', providerOrder: ['xai'] },
@@ -120,10 +128,11 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
  * as their ungrounded counterpart, differing ONLY in mode — so the grounded-vs-ungrounded
  * Brier delta per model isolates the value of the injected articles.
  *
- * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), DeepSeek and Gemini
- * Flash are the two cheapest OpenRouter members. Grok is deliberately absent (it alone
- * is ~80% of panel token cost) and the control stays ungrounded — a grounded control
- * would no longer falsify the same instrument.
+ * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), Gemini Flash rides
+ * Vertex (also AWS/GCP credits, daatan#1513), and DeepSeek is the cheapest remaining
+ * OpenRouter member. Grok is deliberately absent (it alone is ~80% of panel token
+ * cost) and the control stays ungrounded — a grounded control would no longer
+ * falsify the same instrument.
  *
  * These members join a forecast's roster only when grounding is configured AND the
  * forecast carries the scope tag — see `runPanelSweep`.
@@ -143,8 +152,7 @@ export const GROUNDED_PANEL_MEMBERS: readonly PanelMember[] = [
   {
     model: 'google/gemini-2.5-flash',
     mode: 'grounded-indexer',
-    route: 'openrouter',
-    providerOrder: ['google-vertex/eu'],
+    route: 'vertex',
   },
 ] as const
 

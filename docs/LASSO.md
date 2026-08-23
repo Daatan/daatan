@@ -131,7 +131,7 @@ The second tick is a free no-op — no LLM calls, no writes — whenever the fir
 succeeded, because the hash is unchanged. It exists purely so a failed tick self-heals
 within 12h instead of 24h.
 
-A *partial* run — e.g. the OpenRouter key 401s and only the Bedrock member answers —
+A *partial* run — e.g. the OpenRouter key 401s and only the Bedrock/Vertex members answer —
 carries the day's hash but not the full roster (unauthenticated members are never asked,
 so no row exists for them). Since v1.53.0 a later same-day sweep **completes it in
 place**: only the missing-and-now-askable members are called, and their estimates are
@@ -153,13 +153,13 @@ say which is better. This comparison is free.
 
 ## 5. Roster
 
-`src/lib/llm/panel/roster.ts`. Four on OpenRouter, one on Bedrock.
+`src/lib/llm/panel/roster.ts`. Three on OpenRouter, one on Bedrock, one on Vertex.
 
 | Member | Route | Lineage | Role |
 |---|---|---|---|
 | `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | Alibaba | deterministic baseline, outage-proof |
 | `deepseek/deepseek-chat` | openrouter (`deepinfra/fp4`) | DeepSeek | |
-| `google/gemini-2.5-flash` | openrouter (`google-vertex/eu`) | Google | |
+| `google/gemini-2.5-flash` | **vertex** | Google | direct, no OpenRouter markup (daatan#1513) |
 | `x-ai/grok-4.3` | openrouter (`xai`) | xAI | |
 | `google/gemma-3-4b-it` | openrouter (`deepinfra/bf16`) | Google (4B) | **control** |
 
@@ -182,6 +182,12 @@ the panel's first real sweep returned 401 and nothing was produced. A member on 
 app's own IAM role keeps the panel producing estimates through an OpenRouter outage or a
 stale key. Its Bedrock model id differs from the OpenRouter slug, so Brier treats it as a
 distinct member — correct, since the weights are the same but the quantization may not be.
+
+Gemini moved to the same posture (daatan#1513): direct Vertex, authenticated with the
+app's own Google service account rather than proxied through OpenRouter's
+`google-vertex/eu` pin. Same weights, same model id family (the roster keeps the
+`google/` prefix — see `roster.ts` for why), but immune to an OpenRouter-wide 401/402
+the way the Bedrock member is.
 
 The **control member** is a falsification check: if a deliberately weak model scores
 the same Brier as Grok, the instrument is not measuring anything and a flat
@@ -216,31 +222,37 @@ breaks determinism at `temperature: 0`.
   `https://openrouter.ai/api/v1/models/{slug}/endpoints`.
 - **The panel never uses `ResilientLLMService`.** That is a *failover* wrapper: it
   would write an `AiEstimate` row labelled `google/gemini-2.5-flash` containing Llama's
-  output. `src/lib/llm/panel/client.ts` calls OpenRouter directly, and a failure is
-  recorded as an **abstention**, never as a substitution.
+  output. `src/lib/llm/panel/client.ts` calls OpenRouter/Bedrock/Vertex directly per
+  member, and a failure is recorded as an **abstention**, never as a substitution.
 - **Dormant only when nothing can authenticate.** A missing OpenRouter key no longer
-  stops the panel: the Bedrock member runs on the app's IAM role, so the sweep proceeds
-  with that member alone. `{dormant: true}` (a 200, not a failure) now requires *both*
-  no OpenRouter key *and* no non-OpenRouter member. See `isDormant()`.
+  stops the panel: the Bedrock and Vertex members run on the app's own IAM role /
+  service account, so the sweep proceeds with those members alone. `{dormant: true}`
+  (a 200, not a failure) now requires *both* no OpenRouter key *and* no non-OpenRouter
+  member. See `isDormant()`.
 
-### AWS credits: not about cost — about not having a single point of failure
+### AWS/GCP credits: not about cost — about not having a single point of failure
 
 Of the five, only `qwen3-235b-a22b-2507` exists on Bedrock
 (`qwen.qwen3-235b-a22b-2507-v1:0`, eu-central-1). Bedrock carries OpenAI's and Google's
-*open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models; xAI is
-absent entirely. Substituting open-weights cousins under the same member label would
-poison the per-member comparison, so the other four stay on OpenRouter.
+*open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models; xAI and
+DeepSeek's own hosted checkpoint are absent entirely. Substituting open-weights cousins
+under the same member label would poison the per-member comparison, so DeepSeek, Grok,
+and Gemma stay on OpenRouter — Gemini, whose flagship API *is* a first-party Google
+surface, moved to Vertex instead (daatan#1513).
 
-Running Qwen on Bedrock saves $0.23/mo, which is nothing. The reason to do it is that
-**every member currently depends on one third-party credential** — and on 2026-07-10
-that credential was dead, so all 285 calls in the first real sweep returned 401 and the
-panel produced nothing. A Bedrock member runs on the account's own IAM role and keeps
-the panel producing data through an OpenRouter outage or a bad key. It is also the only
-non-reasoning member, so it carries none of the hidden-token cost risk.
+Running Qwen on Bedrock and Gemini on Vertex saves little directly. The reason to do it
+is that **every member used to depend on one third-party credential** — and on
+2026-07-10 that credential was dead, so all 285 calls in the first real sweep returned
+401 and the panel produced nothing. A Bedrock or Vertex member runs on the account's own
+credentials and keeps the panel producing data through an OpenRouter outage or a bad
+key. Qwen is also the only non-reasoning member, so it carries none of the hidden-token
+cost risk.
 
 `terraform/bedrock_invoke.tf` grants the app role `bedrock:InvokeModel`, scoped to the
-model ids the roster names. `AiEstimate.model` records the Bedrock model id, so a member
-that moves between routes is correctly treated as a *different* member for Brier.
+model ids the roster names; the Vertex leg reuses the same GCP service account as the
+main LLM chain (daatan#1472). `AiEstimate.model` records the provider's own model id, so
+a member that moves between routes is correctly treated as a *different* member for
+Brier.
 
 ---
 

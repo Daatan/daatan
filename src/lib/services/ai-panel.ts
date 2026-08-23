@@ -163,8 +163,9 @@ interface MemberOutcome {
  *
  * `openRouterDisabled` latches on the first 401/403 and is honoured for every later
  * forecast, so a dead key costs exactly one rejected request per sweep instead of one
- * per member per forecast (285, on 2026-07-10). Bedrock members authenticate with the
- * app's IAM role and keep running regardless — that is the point of having one.
+ * per member per forecast (285, on 2026-07-10). Bedrock and Vertex members authenticate
+ * with the app's own IAM role / service account and keep running regardless — that is
+ * the point of having them.
  */
 export interface SweepContext {
   openRouterDisabled: boolean
@@ -174,7 +175,7 @@ export interface SweepContext {
 /**
  * The panel can ask nobody: no OpenRouter key AND no member on a route that
  * authenticates some other way. A missing OpenRouter key alone is no longer dormancy —
- * Bedrock members use the app's IAM role.
+ * Bedrock and Vertex members authenticate with the app's own credentials.
  */
 export function isDormant(apiKey: string, members: readonly PanelMember[]): boolean {
   if (apiKey) return false
@@ -538,11 +539,11 @@ export async function runPanelSweep(opts?: {
   const apiKey = getOpenRouterKey()
 
   if (isDormant(apiKey, PANEL_MEMBERS)) {
-    log.warn('No OpenRouter key and no Bedrock member — AI panel is dormant')
+    log.warn('No OpenRouter key and no Bedrock/Vertex member — AI panel is dormant')
     return { considered: 0, written: 0, completedPartial: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
   }
   if (!apiKey) {
-    log.warn('No OpenRouter key configured — running Bedrock members only')
+    log.warn('No OpenRouter key configured — running Bedrock/Vertex members only')
   }
 
   const ctx: SweepContext = {
