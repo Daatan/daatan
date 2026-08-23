@@ -689,9 +689,9 @@ YES price, and since v1.32.x are written **only on a real price change** — the
 newest snapshot's `createdAt` is the last *change*, not the last sync
 (`lastSyncedAt` on the market is the freshness signal).
 
-## Question relations — `question_relations` (daatan#1555)
+## Question relations — `question_relations` (daatan#1555, #1556)
 
-Oracle 2.0 storage layer **M1**: a declared relation between two forecasts —
+Oracle 2.0 storage layer **M1**: a declared relation between two questions —
 `kind` ∈ alias / nested_deadline / threshold_nesting / mutually_exclusive /
 complement / implies / conditional, plus `none` — a ledger entry meaning "the
 typer looked and found no constraint" (auto-confirmed, never a graph edge,
@@ -704,8 +704,55 @@ snapshot layer (M4, daatan#1558) that does not exist yet. Symmetric kinds
 (`canonicalPair()` in `question-relation.ts`); directed kinds keep from→to as
 the claim. Post-moderated: a `rejected` row is kept so the typer never
 re-proposes the pair. First writer: the signed relation typer (retro#574);
-first reader: the coherence check. Design and the M2–M4 tables that follow:
-[Daatan/docs planning/oracle-2-harness-and-storage.md §4](https://github.com/Daatan/docs/blob/main/planning/oracle-2-harness-and-storage.md).
+first reader: the coherence check.
+
+**Endpoints are polymorphic as of M2 (#1556):** each side is
+`*_prediction_id` XOR `*_latent_node_id` (CHECK-constrained), so a relation
+can point at a shadow forecast on either end. The original
+`(from_prediction_id, to_prediction_id, kind)` unique constraint is untouched
+— `question-relation.ts`'s `proposeRelation`/`supersedeStaleModelRows` still
+use it directly and don't know latent nodes exist. The three other
+endpoint-type combinations (pred↔latent, latent↔pred, latent↔latent) each get
+their own partial unique index instead of one coalesced index across the two
+id spaces (`prisma/migrations/20260824000000_latent_nodes/migration.sql`) —
+avoids assuming `predictions.id` and `latent_nodes.id` (both `cuid()`) never
+collide. Repointing on merge (below) is the only writer of the latent columns
+today; nothing yet creates a relation whose *initial* endpoint is a latent
+node — that's the linking pipeline, v2 steps 2–4, not built.
+
+Design and the M2–M4 tables: [Daatan/docs
+planning/oracle-2-harness-and-storage.md
+§4](https://github.com/Daatan/docs/blob/main/planning/oracle-2-harness-and-storage.md).
+
+## Latent nodes — `latent_nodes` (daatan#1556)
+
+Oracle 2.0 storage layer **M2**: a "shadow forecast" — a question that exists
+and is priced (pundits price it implicitly through the pool) but that no one
+has published; it "goes live" on promotion. Not a `PredictionStatus`: a
+`Prediction` carries author, deadline, share token, resolution rules and
+cascades into pools/commitments/snapshots, while a latent node is one English
+clause (`text_en`) with an embedding whose commonest fate is merge or
+rejection. `status` ∈ open / merged / promoted / rejected; `origin` ∈
+article_antecedent / variant / mcp_probe / express (default policy: MCP probes
+become latent nodes, express drafts do not — see the harness doc §4.2).
+
+**No promotion path yet.** `prediction_id` / the `PROMOTED` status are on the
+schema for the shape (`CHECK (prediction_id IS NULL OR status = 'PROMOTED')`)
+but nothing sets them — deferred out of #1556's scope.
+
+**No linking pipeline yet either** — the only way rows exist today is
+`POST /api/admin/latent-nodes` (`src/lib/services/latent-node.ts`), a minimal
+admin-only create endpoint that exists so merge has real data to operate on.
+`fan_in`/`first_claim_*`/`last_seen_at` are the provenance columns the future
+linking pipeline (v2 steps 2–4) will maintain; they're inert until then.
+
+**Merge** (`POST /api/admin/latent-nodes/[id]/merge`, admin-only): marks the
+source `MERGED` with `merged_into_id` set, and repoints every
+`question_relations` row touching it onto the target. A repointed row that
+would duplicate one the target already has (checked in both orientations for
+symmetric kinds) is dropped instead, as is a row that directly related the
+source to the target (typically the `ALIAS` that justified the merge — kept
+as-is it would become a self-loop, which the CHECK constraints reject).
 
 ## LASSO (AI panel) — `ai_estimate_runs`, `ai_estimates`, `ai_member_scores`
 

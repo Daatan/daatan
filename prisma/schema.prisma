@@ -474,6 +474,7 @@ model Prediction {
   contextSnapshots ContextSnapshot[]
   relationsFrom    QuestionRelation[]      @relation("QuestionRelationFrom")
   relationsTo      QuestionRelation[]      @relation("QuestionRelationTo")
+  promotedFromLatentNodes LatentNode[]     @relation("LatentNodePromoted")
   evidencePool     EvidencePoolArticle[]
   translations     PredictionTranslation[]
   slugAliases      PredictionSlugAlias[]
@@ -1792,11 +1793,20 @@ enum QuestionRelationStatus {
 }
 
 model QuestionRelation {
-  id               String     @id @default(cuid())
-  fromPredictionId String     @map("from_prediction_id")
-  fromPrediction   Prediction @relation("QuestionRelationFrom", fields: [fromPredictionId], references: [id], onDelete: Cascade)
-  toPredictionId   String     @map("to_prediction_id")
-  toPrediction     Prediction @relation("QuestionRelationTo", fields: [toPredictionId], references: [id], onDelete: Cascade)
+  id               String      @id @default(cuid())
+  // Endpoints are polymorphic as of M2 (daatan#1556): exactly one of
+  // *PredictionId / *LatentNodeId is set per side (CHECK in the migration), so
+  // a shadow forecast (latent node) can sit on either end. The original
+  // prediction-prediction unique constraint below is untouched by that change —
+  // question-relation.ts's `findUnique` depends on its exact shape.
+  fromPredictionId String?     @map("from_prediction_id")
+  fromPrediction   Prediction? @relation("QuestionRelationFrom", fields: [fromPredictionId], references: [id], onDelete: Cascade)
+  toPredictionId   String?     @map("to_prediction_id")
+  toPrediction     Prediction? @relation("QuestionRelationTo", fields: [toPredictionId], references: [id], onDelete: Cascade)
+  fromLatentNodeId String?     @map("from_latent_node_id")
+  fromLatentNode   LatentNode? @relation("QuestionRelationFromLatent", fields: [fromLatentNodeId], references: [id], onDelete: Cascade)
+  toLatentNodeId   String?     @map("to_latent_node_id")
+  toLatentNode     LatentNode? @relation("QuestionRelationToLatent", fields: [toLatentNodeId], references: [id], onDelete: Cascade)
 
   kind      QuestionRelationKind
   sign      Int?                   @db.SmallInt // +1 / -1, CONDITIONAL only (CHECK in the migration)
@@ -1812,8 +1822,95 @@ model QuestionRelation {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
+  variantLatentNodes LatentNode[] @relation("LatentNodeVariantOf")
+
+  // Prediction-prediction uniqueness — shipped M1, unchanged by M2. The three
+  // latent-node-involved combinations get their own partial unique indexes in
+  // the migration (not representable via @@unique, which has no WHERE clause).
   @@unique([fromPredictionId, toPredictionId, kind])
   @@index([toPredictionId, status])
   @@index([fromPredictionId])
+  @@index([toLatentNodeId, status])
+  @@index([fromLatentNodeId])
   @@map("question_relations")
+}
+
+// Oracle 2.0 storage layer M2 (daatan#1556): a "shadow forecast" — a question
+// that exists and is priced but that no one has published. Not a
+// PredictionStatus (a Prediction carries author/deadline/share-token/
+// resolution-rules and cascades into pools, commitments, snapshots; a latent
+// node is one English clause whose commonest fate is merge or rejection).
+// No promotion path yet (deferred) — `predictionId`/PROMOTED are on record for
+// the shape but nothing sets them today.
+// Design: Daatan/docs planning/oracle-2-harness-and-storage.md §4.2.
+enum LatentNodeStatus {
+  OPEN
+  MERGED
+  PROMOTED
+  REJECTED
+}
+
+enum LatentNodeOrigin {
+  ARTICLE_ANTECEDENT // linked from an article's extracted conditional claim
+  VARIANT // opposite / reworded / other-date version of an existing forecast
+  MCP_PROBE // a stateless MCP `forecast` call on a clause with no matching question
+  EXPRESS // the drafting wizard — not created by default policy, kept for completeness
+}
+
+model LatentNode {
+  id     String @id @default(cuid())
+  textEn String @map("text_en") @db.VarChar(500)
+
+  // Semantic embedding, same space as predictions.embedding (pgvector, 768-dim).
+  // No HNSW index until row count clears ~50k (pgvector memory, see
+  // retro retrieval-tooling survey).
+  embedding Unsupported("vector(768)")?
+
+  // Same classifier fields/values as Prediction. The resolvability gate is "all
+  // three non-null" — enforced by callers, not a DB constraint.
+  claimDeadline  DateTime?       @map("claim_deadline")
+  claimDirection ClaimDirection? @map("claim_direction")
+  claimArchetype ClaimArchetype? @map("claim_archetype")
+
+  // Provenance of the first admitting claim. Maintained by the linking
+  // pipeline (v2 steps 2–4, not built yet) — null for nodes created directly
+  // through the admin create endpoint.
+  fanIn                     Int       @default(0) @map("fan_in")
+  firstClaimArticleId       String?   @map("first_claim_article_id")
+  firstClaimIndex           Int?      @map("first_claim_index")
+  lastSeenAt                DateTime? @map("last_seen_at")
+
+  status       LatentNodeStatus @default(OPEN)
+  mergedIntoId String?          @map("merged_into_id")
+  mergedInto   LatentNode?      @relation("LatentNodeMerge", fields: [mergedIntoId], references: [id])
+  mergedFrom   LatentNode[]     @relation("LatentNodeMerge")
+
+  // Set on promotion (not built yet — see enum comment above).
+  predictionId String?     @map("prediction_id")
+  prediction   Prediction? @relation("LatentNodePromoted", fields: [predictionId], references: [id])
+
+  // Last stateless Oracle `/forecast` result on the clause — no evidence pool
+  // in daatan until promoted.
+  priceMean Float?    @map("price_mean")
+  priceVar  Float?    @map("price_var")
+  pricedAt  DateTime? @map("priced_at")
+
+  origin  LatentNodeOrigin
+  // Variants (complement/alias/nested_deadline of an existing forecast) point
+  // at the relation row that makes them so — they price off the logical edge,
+  // not search, and resolve when the parent resolves.
+  variantOfRelationId String?           @map("variant_of_relation_id")
+  variantOfRelation   QuestionRelation? @relation("LatentNodeVariantOf", fields: [variantOfRelationId], references: [id])
+  // user id, 'model', or 'bot' — free-form, unlike QuestionRelationOrigin.
+  createdBy String? @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  relationsFrom QuestionRelation[] @relation("QuestionRelationFromLatent")
+  relationsTo   QuestionRelation[] @relation("QuestionRelationToLatent")
+
+  @@index([status])
+  @@index([mergedIntoId])
+  @@map("latent_nodes")
 }

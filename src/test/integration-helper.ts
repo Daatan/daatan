@@ -52,6 +52,9 @@ const TRUNCATABLE_TABLES = [
   // AI panel (docs/LASSO.md). ai_estimates cascades from ai_estimate_runs, but
   // list both: TRUNCATE is explicit here, not inferred from FKs.
   'ai_estimate_runs', 'ai_estimates',
+  // Oracle 2.0 storage (daatan#1555/#1556). latent_nodes cascades from
+  // question_relations FKs, but list both: TRUNCATE is explicit here.
+  'question_relations', 'latent_nodes',
 ] as const
 
 /**

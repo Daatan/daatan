@@ -137,3 +137,18 @@ export async function embedAndStoreForecast(id: string, claimText: string): Prom
     Prisma.sql`UPDATE predictions SET embedding = ${Prisma.raw(`'${vectorStr}'::vector`)} WHERE id = ${id}`
   )
 }
+
+/** Same contract as {@link embedAndStoreForecast}, targeting latent_nodes (daatan#1556). */
+export async function embedAndStoreLatentNode(id: string, textEn: string): Promise<void> {
+  const embedding = await embedText(textEn)
+  if (!embedding) {
+    throw new Error(`No embedding returned for latent node ${id} — nothing stored`)
+  }
+  if (!embedding.every(Number.isFinite)) {
+    throw new Error(`Embedding for latent node ${id} contains non-finite values — nothing stored`)
+  }
+  const vectorStr = `[${embedding.join(',')}]`
+  await prisma.$executeRaw(
+    Prisma.sql`UPDATE latent_nodes SET embedding = ${Prisma.raw(`'${vectorStr}'::vector`)} WHERE id = ${id}`
+  )
+}
