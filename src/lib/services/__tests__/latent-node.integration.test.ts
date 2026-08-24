@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { createLatentNode, mergeLatentNode } from '../latent-node'
+import { createLatentNode, mergeLatentNode, promoteLatentNode, UnresolvableLatentNodeError, getOrCreateOracle2SystemUser } from '../latent-node'
 
 async function makeUserAndPrediction(claimText: string) {
   const user = await prisma.user.create({
@@ -129,6 +129,117 @@ describe('LatentNode service integration', () => {
   it('rejects self-merge', async () => {
     const node = await createLatentNode({ textEn: 'a', origin: 'MCP_PROBE' })
     await expect(mergeLatentNode(node.id, node.id, 'admin-user')).rejects.toThrow(/itself/)
+  })
+})
+
+describe('LatentNode promotion', () => {
+  it('promotes a standalone OPEN node with its own classifier fields into a DRAFT Prediction', async () => {
+    const node = await createLatentNode({
+      textEn: 'Israel withdraws from southern Lebanon',
+      claimDeadline: new Date('2030-06-01'),
+      claimDirection: 'ARRIVAL',
+      claimArchetype: 'SCHEDULED',
+      origin: 'MCP_PROBE',
+    })
+
+    const prediction = await promoteLatentNode(node.id, 'admin-user')
+    expect(prediction.status).toBe('DRAFT')
+    expect(prediction.claimText).toBe(node.textEn)
+
+    const updated = await prisma.latentNode.findUniqueOrThrow({ where: { id: node.id } })
+    expect(updated.status).toBe('PROMOTED')
+    expect(updated.predictionId).toBe(prediction.id)
+  })
+
+  it('attributes promoted predictions to the shared oracle2 system user, not a BotConfig-backed persona', async () => {
+    const node = await createLatentNode({
+      textEn: 'a distinct promotable clause',
+      claimDeadline: new Date('2030-06-01'),
+      claimDirection: 'ARRIVAL',
+      claimArchetype: 'SCHEDULED',
+      origin: 'MCP_PROBE',
+    })
+    const prediction = await promoteLatentNode(node.id, 'admin-user')
+    const author = await getOrCreateOracle2SystemUser()
+    expect(prediction.authorId).toBe(author.id)
+
+    const botConfig = await prisma.botConfig.findUnique({ where: { userId: author.id } })
+    expect(botConfig).toBeNull()
+  })
+
+  it('rejects promoting a node that has not cleared the resolvability gate', async () => {
+    const node = await createLatentNode({ textEn: 'no classifier fields at all', origin: 'MCP_PROBE' })
+    await expect(promoteLatentNode(node.id, 'admin-user')).rejects.toThrow(UnresolvableLatentNodeError)
+  })
+
+  it('rejects promoting a non-OPEN node', async () => {
+    const node = await createLatentNode({
+      textEn: 'already merged',
+      claimDeadline: new Date('2030-06-01'),
+      claimDirection: 'ARRIVAL',
+      claimArchetype: 'SCHEDULED',
+      origin: 'MCP_PROBE',
+    })
+    await prisma.latentNode.update({ where: { id: node.id }, data: { status: 'REJECTED' } })
+    await expect(promoteLatentNode(node.id, 'admin-user')).rejects.toThrow(/not OPEN/)
+  })
+
+  it('derives missing fields from the parent Prediction for a VARIANT node and repoints the relation', async () => {
+    const pred = await makeUserAndPrediction('Netanyahu remains PM through 2027')
+    await prisma.prediction.update({
+      where: { id: pred.id },
+      data: { claimDeadline: new Date('2030-01-01'), claimDirection: 'ARRIVAL', claimArchetype: 'SCHEDULED' },
+    })
+
+    const variant = await createLatentNode({ textEn: 'Netanyahu does not remain PM through 2027', origin: 'VARIANT' })
+    const relation = await prisma.questionRelation.create({
+      data: { fromPredictionId: pred.id, toLatentNodeId: variant.id, kind: 'COMPLEMENT', createdBy: 'DERIVED' },
+    })
+    await prisma.latentNode.update({ where: { id: variant.id }, data: { variantOfRelationId: relation.id } })
+
+    // The derived deadline (parent's claimDeadline, COMPLEMENT flips direction but not
+    // deadline) becomes resolveByDatetime — createForecast's required field.
+    // claimDeadline/claimDirection on the new row are independently (re-)classified
+    // async by createForecast's own fire-and-forget classifyAndStoreTemporal call, so
+    // they aren't asserted here (known funnel gap, see forecast.ts's comment on it).
+    const promoted = await promoteLatentNode(variant.id, 'admin-user')
+    expect(promoted.resolveByDatetime.toISOString()).toBe(new Date('2030-01-01').toISOString())
+
+    const updatedRelation = await prisma.questionRelation.findUniqueOrThrow({ where: { id: relation.id } })
+    expect(updatedRelation.fromPredictionId).toBe(pred.id)
+    expect(updatedRelation.toPredictionId).toBe(promoted.id)
+    expect(updatedRelation.toLatentNodeId).toBeNull()
+  })
+
+  it('repoints correctly when the latent node sits on the `to` side of its variant relation', async () => {
+    const pred = await makeUserAndPrediction('forms next coalition')
+    await prisma.prediction.update({
+      where: { id: pred.id },
+      data: { claimDeadline: new Date('2030-01-01'), claimDirection: 'ARRIVAL', claimArchetype: 'SCHEDULED' },
+    })
+
+    const variant = await createLatentNode({ textEn: 'reworded coalition clause', origin: 'VARIANT' })
+    const relation = await prisma.questionRelation.create({
+      data: { toPredictionId: pred.id, fromLatentNodeId: variant.id, kind: 'ALIAS', createdBy: 'DERIVED' },
+    })
+    await prisma.latentNode.update({ where: { id: variant.id }, data: { variantOfRelationId: relation.id } })
+
+    const promoted = await promoteLatentNode(variant.id, 'admin-user')
+    const updatedRelation = await prisma.questionRelation.findUniqueOrThrow({ where: { id: relation.id } })
+    expect(updatedRelation.fromPredictionId).toBe(promoted.id)
+    expect(updatedRelation.fromLatentNodeId).toBeNull()
+    expect(updatedRelation.toPredictionId).toBe(pred.id)
+  })
+
+  it('rejects promoting a VARIANT node whose relation has no Prediction endpoint (data invariant check)', async () => {
+    const a = await createLatentNode({ textEn: 'latent a', origin: 'VARIANT' })
+    const b = await createLatentNode({ textEn: 'latent b', origin: 'MCP_PROBE' })
+    const relation = await prisma.questionRelation.create({
+      data: { fromLatentNodeId: a.id, toLatentNodeId: b.id, kind: 'ALIAS', createdBy: 'MODEL' },
+    })
+    await prisma.latentNode.update({ where: { id: a.id }, data: { variantOfRelationId: relation.id } })
+
+    await expect(promoteLatentNode(a.id, 'admin-user')).rejects.toThrow(/data invariant violated/)
   })
 })
 
