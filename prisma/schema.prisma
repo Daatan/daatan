@@ -761,9 +761,14 @@ model EvidencePoolArticle {
   // remembering to bump it); *PromptHash is a SHA-256 of the actual rendered prompt,
   // computed automatically, so it stays correct even when the version label goes stale.
   // Lets a since-fixed prompt bug be traced in stored data instead of being invisible.
-  // SHADOW / storage only, like relevanceBar: nothing reads these yet. Null on rows
-  // written before this existed and on the `/pool/aggregate` recompute path (no LLM call,
-  // retro's ProvenanceModels docstring: "all null on a pool recompute"). No backfill.
+  // SHADOW / storage only, like relevanceBar: nothing reads these yet. Null on the
+  // `/pool/aggregate` recompute path (no LLM call, retro's ProvenanceModels docstring:
+  // "all null on a pool recompute"). Rows that completed extraction before these columns
+  // existed were one-time backfilled to the literal sentinel "pre-v1" (migration
+  // 20260824130000, COMPLETE rows only) rather than a date-inferred guess — Oracle's
+  // SIGHUP-reload deploys and live/batch checkout drift make "merge date" an unreliable
+  // proxy for "which prompt actually ran," so a specific historical version/hash was
+  // deliberately not invented. "pre-v1" means only "predates provenance capture."
   extractorModel          String? @map("extractor_model")
   extractorPromptVersion  String? @map("extractor_prompt_version")
   extractorPromptHash     String? @map("extractor_prompt_hash")
