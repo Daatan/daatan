@@ -233,6 +233,26 @@ describe('addArticlesToPool', () => {
     expect(call.data).toMatchObject({ relevanceBar: 0.7 })
   })
 
+  it('persists the shadow extraction provenance (daatan#1604/retro#627)', async () => {
+    await addArticlesToPool('pred-1', [source({
+      extractorModel: 'claude-haiku-4-5',
+      extractorPromptVersion: 'v1',
+      extractorPromptHash: 'def456',
+      gatekeeperModel: 'nova-micro',
+      gatekeeperPromptVersion: 'v1',
+      gatekeeperPromptHash: 'abc123',
+    })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({
+      extractorModel: 'claude-haiku-4-5',
+      extractorPromptVersion: 'v1',
+      extractorPromptHash: 'def456',
+      gatekeeperModel: 'nova-micro',
+      gatekeeperPromptVersion: 'v1',
+      gatekeeperPromptHash: 'abc123',
+    })
+  })
+
   it('persists the shadow authorLean/authorLeanCertainty', async () => {
     // Author-scoring lane (retro #308/#309) — written to the pool row but never read by any
     // estimate. Verifies the un-fusing shadow column is actually persisted.

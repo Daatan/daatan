@@ -754,6 +754,22 @@ model EvidencePoolArticle {
   // bar isn't returned there). No backfill: the value was never recorded and
   // must not be invented.
   relevanceBar Float? @map("relevance_bar")
+  // Which model/prompt produced this row's stance/certainty (daatan#1604/retro#627) —
+  // retro's ProvenanceModels on the /forecast response that wrote this row. Model fields
+  // are litellm ids (e.g. "claude-haiku-4-5"); *PromptVersion is a hand-bumped human label
+  // (see retro/docs/PROMPT_VERSIONS.md — only as reliable as whoever edited the prompt
+  // remembering to bump it); *PromptHash is a SHA-256 of the actual rendered prompt,
+  // computed automatically, so it stays correct even when the version label goes stale.
+  // Lets a since-fixed prompt bug be traced in stored data instead of being invisible.
+  // SHADOW / storage only, like relevanceBar: nothing reads these yet. Null on rows
+  // written before this existed and on the `/pool/aggregate` recompute path (no LLM call,
+  // retro's ProvenanceModels docstring: "all null on a pool recompute"). No backfill.
+  extractorModel          String? @map("extractor_model")
+  extractorPromptVersion  String? @map("extractor_prompt_version")
+  extractorPromptHash     String? @map("extractor_prompt_hash")
+  gatekeeperModel         String? @map("gatekeeper_model")
+  gatekeeperPromptVersion String? @map("gatekeeper_prompt_version")
+  gatekeeperPromptHash    String? @map("gatekeeper_prompt_hash")
   // The article's most common evidence_class among its extracted claims
   // (retro PR #255) — reported_fact | cited_probability | cited_share |
   // reporting | opinion, or null if unclassified. Needed by the credibility

@@ -435,6 +435,7 @@ export async function POST(request: NextRequest) {
         authorByUrl,
         identityByUrl,
         oracleForecast.relevance_bar ?? null,
+        oracleForecast.provenance?.models ?? null,
       )
 
       // The Oracle run above is an EXTRACTION step, not the estimate. A push usually

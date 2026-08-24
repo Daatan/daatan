@@ -421,6 +421,19 @@ written before the column existed and on the `/pool/aggregate` recompute path
 so that once the bar moves off 0.0, a backtest or recompute can tell which
 admission regime produced each row — a property of the row that can't be
 recovered after the fact once history mixes both regimes.
+`extractorModel`/`extractorPromptVersion`/`extractorPromptHash` and
+`gatekeeperModel`/`gatekeeperPromptVersion`/`gatekeeperPromptHash`
+(daatan#1604, retro#627) record which model/prompt produced a row's
+stance/certainty — retro's `provenance.models` on the `/forecast` response
+that wrote it. `*Model` is a litellm id; `*PromptVersion` is a hand-bumped
+human label (retro `docs/PROMPT_VERSIONS.md` — only as reliable as whoever
+edited the prompt remembering to bump it); `*PromptHash` is a SHA-256 of the
+actual rendered prompt, computed automatically, so it stays correct even
+when the version label goes stale. Fully shadow / additive like
+`relevanceBar`: nothing reads these yet, null on rows written before the
+columns existed and on the `/pool/aggregate` recompute path (no LLM call
+ran), no backfill. Lets a since-fixed prompt bug be traced in stored data
+instead of being invisible.
 `evidenceClass` is the article's most common evidence_class among its
 extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles

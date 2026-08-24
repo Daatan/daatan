@@ -334,6 +334,25 @@ export interface OracleForecastResponse {
    *  this pool would weigh if nothing had aged; always >= `evidence_mass`
    *  (retro#458 Phase 2). 0.0 on an insufficient-data response. */
   age_adjusted_mass?: number | null
+  /** Engine/model/build identity this forecast was produced with (retro#593).
+   *  `models` (daatan#1604/retro#627) is what we read: null on a pool recompute
+   *  (no LLM call ran), populated on a live extraction. Absent entirely on a
+   *  response built before this field existed. */
+  provenance?: {
+    models?: OracleProvenanceModels | null
+  } | null
+}
+
+/** Mirrors retro's ProvenanceModels (api/src/forecast_api/models.py) — which
+ *  model/prompt did the gatekeeper/extractor work, when an LLM call was
+ *  involved (daatan#1604/retro#627). */
+export interface OracleProvenanceModels {
+  gatekeeper?: string | null
+  extractor?: string | null
+  gatekeeper_prompt_version?: string | null
+  gatekeeper_prompt_hash?: string | null
+  extractor_prompt_version?: string | null
+  extractor_prompt_hash?: string | null
 }
 
 /**
