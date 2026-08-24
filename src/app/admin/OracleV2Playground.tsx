@@ -201,9 +201,9 @@ function Graph({ job, selected, onSelect }: { job: Job; selected: string | null;
         const x1 = s.x + ox, y1 = s.y + oy - NODE_H / 2, x2 = t.x + ox, y2 = t.y + oy + NODE_H / 2
         const priced = e.method === 'pool_split'
         return (
-          <g key={e.id} className="cursor-pointer" onClick={() => onSelect(e.target)}>
+          <g key={e.id} className="cursor-pointer" onClick={() => onSelect(e.source)}>
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} />
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={priced ? '#22C55E' : '#F59E0B'} strokeWidth={selected === e.target ? 3 : priced ? 2 : 1.2} strokeDasharray={priced ? undefined : '5 4'} />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={priced ? '#22C55E' : '#F59E0B'} strokeWidth={selected === e.source ? 3 : priced ? 2 : 1.2} strokeDasharray={priced ? undefined : '5 4'} />
             <text x={(x1 + x2) / 2} y={(y1 + y2) / 2} fontSize={9} fill="#6B7280" textAnchor="middle">{priced ? `✓${pct(e.p_given_yes)} ✗${pct(e.p_given_no)}` : 'unpriced'}</text>
           </g>
         )

@@ -55,6 +55,14 @@ body {
   overflow-x: clip;
 }
 
+/* `color-scheme: dark` above themes the native <select> popup chrome, but on some
+   Chrome/Linux builds individual <option> rows still fall back to light-on-light —
+   only the browser-highlighted selected row stays legible. Set colors explicitly. */
+select option {
+  background-color: var(--color-navy-800);
+  color: var(--color-white);
+}
+
 /* ── ACCESSIBILITY ──────────────────────────────────────── */
 /* Keyboard-only focus ring (`:focus-visible` skips mouse/touch clicks) so every
    interactive element gets a visible indicator even where a component doesn't
