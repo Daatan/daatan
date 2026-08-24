@@ -41,7 +41,8 @@ ENV GIT_COMMIT=$GIT_COMMIT
 COPY . .
 
 # Build Next.js
-RUN npx prisma generate
+# (prisma generate already ran during `npm ci`'s postinstall hook above —
+# schema/config were copied before that step for exactly this reason)
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build 2>&1 || (echo "Build failed!" && cat .next/build-error.log 2>/dev/null && exit 1)
 
@@ -73,55 +74,36 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-
-
 # Create non-root user
-
 RUN addgroup --system --gid 1001 nodejs && \
-
     adduser --system --uid 1001 nodejs
 
-
-
 # Copy standalone build and static files
-
-COPY --from=builder /app/public ./public
-
+COPY --from=builder --chown=nodejs:nodejs /app/public ./public
 COPY --from=builder --chown=nodejs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nodejs:nodejs /app/.next/static ./.next/static
 
 # Copy compiled seed script (seed.ts compiled to seed.js during builder stage)
-COPY --from=builder /app/prisma/seed.js ./prisma/seed.js
+COPY --from=builder --chown=nodejs:nodejs /app/prisma/seed.js ./prisma/seed.js
 # Copy generated Prisma client (needed by app + seed at runtime)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 # Note: node_modules/prisma (CLI) and migration deps are NOT copied here.
 # Migrations now run in the dedicated migrations container which has full node_modules.
 # Copy sharp for Next.js Image optimization (required in standalone mode)
-COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/sharp ./node_modules/sharp
 # Copy pg driver (used by @prisma/adapter-pg for database connections)
-COPY --from=builder /app/node_modules/pg ./node_modules/pg
-COPY --from=builder /app/node_modules/pg-pool ./node_modules/pg-pool
-COPY --from=builder /app/node_modules/pg-protocol ./node_modules/pg-protocol
-COPY --from=builder /app/node_modules/pg-types ./node_modules/pg-types
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/pg ./node_modules/pg
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/pg-pool ./node_modules/pg-pool
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/pg-protocol ./node_modules/pg-protocol
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules/pg-types ./node_modules/pg-types
 
 # Verify @prisma/adapter-pg and its deps are present (fails build if missing)
 RUN node -e "require('./node_modules/@prisma/adapter-pg')" && echo "Prisma adapter OK"
 
-RUN chown -R nodejs:nodejs /app
-
-
-
 USER nodejs
-
-
 
 EXPOSE 3000
 
-
-
 # Start Next.js using the standalone server
-
-
-
 CMD ["node", "server.js"]
