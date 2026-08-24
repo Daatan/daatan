@@ -3,11 +3,11 @@ import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError, apiError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
-import { remediatePool } from '@/lib/services/pool-remediate'
+import { remediatePool, remediableWhere, usablePoolWhere } from '@/lib/services/pool-remediate'
 
 const MAX_IDS_PER_CALL = 10
 
-type Body = { ids?: unknown; mode?: unknown }
+type Body = { ids?: unknown; mode?: unknown; scope?: unknown }
 
 async function run(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Body
@@ -17,7 +17,11 @@ async function run(request: NextRequest) {
   if (body.mode !== undefined && body.mode !== 'dry-run' && body.mode !== 'apply') {
     return apiError("mode must be 'dry-run' or 'apply'", 400)
   }
-  return NextResponse.json(await remediatePool(ids, body.mode === 'apply'))
+  if (body.scope !== undefined && body.scope !== 'a6' && body.scope !== 'usable') {
+    return apiError("scope must be 'a6' or 'usable'", 400)
+  }
+  const target = body.scope === 'usable' ? usablePoolWhere() : remediableWhere()
+  return NextResponse.json(await remediatePool(ids, body.mode === 'apply', target))
 }
 
 const authed = withAuth(async (request: NextRequest) => {
@@ -32,11 +36,14 @@ const authed = withAuth(async (request: NextRequest) => {
  * Re-extract the named forecasts' strongest evidence rows against the current
  * extractor and re-publish their estimates — see pool-remediate.ts.
  *
- * `{ "ids": [...], "mode": "apply" }`; **`mode` defaults to `dry-run`**, which reads
- * the target set and writes nothing, so a call that forgets the flag cannot remediate
- * by accident. Each forecast costs one Oracle analysis per 15 target rows, so this is
- * driven by hand over a reviewed list, not on a schedule — the plan's human-review
- * gate sits in front of it, not inside it.
+ * `{ "ids": [...], "mode": "apply", "scope": "usable" }`; **`mode` defaults to
+ * `dry-run`**, which reads the target set and writes nothing, so a call that forgets
+ * the flag cannot remediate by accident. **`scope` defaults to `a6`** (the narrow
+ * over-extraction signature); `usable` targets the whole currently-usable pool for a
+ * blanket recompute (retro#626) instead of an A6-only remediation. Each forecast costs
+ * one Oracle analysis per 15 target rows, so this is driven by hand over a reviewed
+ * list, not on a schedule — the plan's human-review gate sits in front of it, not
+ * inside it.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header — same
  * pattern as the retry route.

@@ -3,7 +3,11 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/env', () => ({ env: { BOT_RUNNER_SECRET: 'test-secret' } }))
 vi.mock('@/auth', () => ({ auth: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/services/pool-remediate', () => ({ remediatePool: vi.fn() }))
+vi.mock('@/lib/services/pool-remediate', () => ({
+  remediatePool: vi.fn(),
+  remediableWhere: () => ({ scope: 'a6' }),
+  usablePoolWhere: () => ({ scope: 'usable' }),
+}))
 
 import { remediatePool } from '@/lib/services/pool-remediate'
 import { POST } from '../remediate/route'
@@ -31,13 +35,32 @@ describe('POST /api/admin/evidence-pool/remediate', () => {
     const res = await POST(req({ ids: ['p1'] }))
 
     expect(res.status).toBe(200)
-    expect(remediate).toHaveBeenCalledWith(['p1'], false)
+    expect(remediate).toHaveBeenCalledWith(['p1'], false, { scope: 'a6' })
   })
 
   it('applies only on an explicit mode=apply', async () => {
     await POST(req({ ids: ['p1', 'p2'], mode: 'apply' }))
 
-    expect(remediate).toHaveBeenCalledWith(['p1', 'p2'], true)
+    expect(remediate).toHaveBeenCalledWith(['p1', 'p2'], true, { scope: 'a6' })
+  })
+
+  it('defaults scope to the A6 signature when omitted', async () => {
+    await POST(req({ ids: ['p1'] }))
+
+    expect(remediate).toHaveBeenCalledWith(['p1'], false, { scope: 'a6' })
+  })
+
+  it('targets the full usable pool on scope=usable', async () => {
+    await POST(req({ ids: ['p1'], scope: 'usable' }))
+
+    expect(remediate).toHaveBeenCalledWith(['p1'], false, { scope: 'usable' })
+  })
+
+  it('rejects an unrecognised scope', async () => {
+    const res = await POST(req({ ids: ['p1'], scope: 'everything' }))
+
+    expect(res.status).toBe(400)
+    expect(remediate).not.toHaveBeenCalled()
   })
 
   it('rejects an unrecognised mode rather than falling back to dry-run', async () => {
