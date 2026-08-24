@@ -131,6 +131,7 @@ export default function CommentsTable() {
                           onClick={() => deleteComment(c.id)}
                           className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-900/20"
                           title={t('deleteComment')}
+                          aria-label={t('deleteComment')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

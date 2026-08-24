@@ -463,6 +463,7 @@ export default function ForecastDetailClient({
               }}
               className="p-2 text-gray-400 hover:text-blue-400 hover:bg-cobalt/10 rounded-lg transition-colors"
               title="Share forecast"
+              aria-label="Share forecast"
             >
               <Share2 className="w-5 h-5" />
             </button>
@@ -471,6 +472,7 @@ export default function ForecastDetailClient({
                 href={`/forecasts/${prediction.slug || prediction.id}/edit`}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-cobalt/10 rounded-lg transition-colors"
                 title={t('editForecastTitle')}
+                aria-label={t('editForecastTitle')}
               >
                 <Edit2 className="w-5 h-5" />
               </Link>
