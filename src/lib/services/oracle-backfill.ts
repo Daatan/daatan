@@ -162,7 +162,14 @@ export async function refreshOracleSnapshot(
 
   const articleMeta = await getArticleMetaByUrl(forecast.sources.map(s => s.url))
   const authorByUrl = new Map([...articleMeta.entries()].map(([url, m]) => [url, m.author]))
-  const sources = enrichOracleSources(forecast.sources, searchResults, authorByUrl, undefined, forecast.relevance_bar ?? null)
+  const sources = enrichOracleSources(
+    forecast.sources,
+    searchResults,
+    authorByUrl,
+    undefined,
+    forecast.relevance_bar ?? null,
+    forecast.provenance?.models ?? null,
+  )
 
   // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate — the same
   // cutover the news-indexer push path got in v1.60.0 (#1121), previously only shadow-logged

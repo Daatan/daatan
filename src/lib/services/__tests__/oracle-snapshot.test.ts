@@ -135,6 +135,37 @@ describe('enrichOracleSources', () => {
     expect(withoutBar[0].relevanceBar).toBeNull()
   })
 
+  it('stamps the response-level provenance.models onto every source, leaving fields undefined when omitted (daatan#1604/retro#627)', () => {
+    const withProvenance = enrichOracleSources(
+      [oracleSource(), oracleSource({ url: 'https://x.com/y' })],
+      [searchResult()],
+      new Map(),
+      new Map(),
+      null,
+      {
+        gatekeeper: 'nova-micro',
+        extractor: 'claude-haiku-4-5',
+        gatekeeper_prompt_version: 'v1',
+        gatekeeper_prompt_hash: 'abc123',
+        extractor_prompt_version: 'v1',
+        extractor_prompt_hash: 'def456',
+      },
+    )
+    expect(withProvenance[0]).toMatchObject({
+      gatekeeperModel: 'nova-micro',
+      extractorModel: 'claude-haiku-4-5',
+      gatekeeperPromptVersion: 'v1',
+      gatekeeperPromptHash: 'abc123',
+      extractorPromptVersion: 'v1',
+      extractorPromptHash: 'def456',
+    })
+    expect(withProvenance[1].extractorModel).toBe('claude-haiku-4-5')
+
+    const withoutProvenance = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(withoutProvenance[0].extractorModel).toBeUndefined()
+    expect(withoutProvenance[0].gatekeeperModel).toBeUndefined()
+  })
+
   it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracle omits them (F11, daatan#1237)', () => {
     const out = enrichOracleSources(
       [oracleSource({
@@ -316,6 +347,29 @@ describe('poolArticleToEnrichedSource', () => {
   it('passes relevanceBar through from the pool row (retro#393/#394, daatan#1289)', () => {
     expect(poolArticleToEnrichedSource(poolArticle({ relevanceBar: 0.7 }), null).relevanceBar).toBe(0.7)
     expect(poolArticleToEnrichedSource(poolArticle({ relevanceBar: null }), null).relevanceBar).toBeNull()
+  })
+
+  it('passes extraction provenance through from the pool row (daatan#1604/retro#627)', () => {
+    const out = poolArticleToEnrichedSource(
+      poolArticle({
+        extractorModel: 'claude-haiku-4-5',
+        extractorPromptVersion: 'v1',
+        extractorPromptHash: 'def456',
+        gatekeeperModel: 'nova-micro',
+        gatekeeperPromptVersion: 'v1',
+        gatekeeperPromptHash: 'abc123',
+      }),
+      null,
+    )
+    expect(out).toMatchObject({
+      extractorModel: 'claude-haiku-4-5',
+      extractorPromptVersion: 'v1',
+      extractorPromptHash: 'def456',
+      gatekeeperModel: 'nova-micro',
+      gatekeeperPromptVersion: 'v1',
+      gatekeeperPromptHash: 'abc123',
+    })
+    expect(poolArticleToEnrichedSource(poolArticle({ extractorModel: null }), null).extractorModel).toBeNull()
   })
 
   it('carries a null author through (pool rows never store one)', () => {

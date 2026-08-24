@@ -1,4 +1,4 @@
-import type { OracleClaimDetail, OracleSource } from '@/lib/services/oracle'
+import type { OracleClaimDetail, OracleProvenanceModels, OracleSource } from '@/lib/services/oracle'
 import type { SearchResult } from '@/lib/services/oracleSearch'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import type { EvidencePoolArticle } from '@prisma/client'
@@ -115,6 +115,16 @@ export type EnrichedOracleSource = {
   // property of the /forecast call, not the article. Persisted on the pool row;
   // nothing reads it yet (shadow, like authorLean/factSignal).
   relevanceBar?: number | null
+  // Which model/prompt produced this source's stance/certainty (daatan#1604/retro#627) —
+  // same value across every source in a batch, since it's a property of the /forecast
+  // call, not the article. Persisted on the pool row; nothing reads it yet (shadow, like
+  // relevanceBar/authorLean).
+  extractorModel?: string | null
+  extractorPromptVersion?: string | null
+  extractorPromptHash?: string | null
+  gatekeeperModel?: string | null
+  gatekeeperPromptVersion?: string | null
+  gatekeeperPromptHash?: string | null
   evidenceClass?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
   // The byline author's OWN directional forecast of the event (retro #308/#309), for the
   // author-scoring lane — deliberately NOT part of the estimate. Null when the author only
@@ -176,6 +186,9 @@ export function enrichOracleSources(
   // to every source in this batch. Passed separately since it lives on
   // OracleForecastResponse, not per-OracleSource.
   relevanceBar: number | null = null,
+  // The response-level `provenance.models` (daatan#1604/retro#627) — same reasoning as
+  // relevanceBar: one value for the whole /forecast call, stamped onto every source.
+  provenanceModels: OracleProvenanceModels | null = null,
 ): EnrichedOracleSource[] {
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
@@ -205,6 +218,12 @@ export function enrichOracleSources(
       evidenceWeight: s.evidence_weight,
       relevanceScore: s.relevance_score,
       relevanceBar,
+      extractorModel: provenanceModels?.extractor,
+      extractorPromptVersion: provenanceModels?.extractor_prompt_version,
+      extractorPromptHash: provenanceModels?.extractor_prompt_hash,
+      gatekeeperModel: provenanceModels?.gatekeeper,
+      gatekeeperPromptVersion: provenanceModels?.gatekeeper_prompt_version,
+      gatekeeperPromptHash: provenanceModels?.gatekeeper_prompt_hash,
       evidenceClass: s.evidence_class,
       authorLean: s.author_lean,
       authorLeanCertainty: s.author_lean_certainty,
@@ -306,6 +325,12 @@ export type PoolArticleSnapshotRow = Pick<
   | 'evidenceWeight'
   | 'relevanceScore'
   | 'relevanceBar'
+  | 'extractorModel'
+  | 'extractorPromptVersion'
+  | 'extractorPromptHash'
+  | 'gatekeeperModel'
+  | 'gatekeeperPromptVersion'
+  | 'gatekeeperPromptHash'
   | 'evidenceClass'
   | 'authorLean'
   | 'authorLeanCertainty'
@@ -344,6 +369,12 @@ export function poolArticleToEnrichedSource(
     evidenceWeight: row.evidenceWeight,
     relevanceScore: row.relevanceScore,
     relevanceBar: row.relevanceBar,
+    extractorModel: row.extractorModel,
+    extractorPromptVersion: row.extractorPromptVersion,
+    extractorPromptHash: row.extractorPromptHash,
+    gatekeeperModel: row.gatekeeperModel,
+    gatekeeperPromptVersion: row.gatekeeperPromptVersion,
+    gatekeeperPromptHash: row.gatekeeperPromptHash,
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
     authorLean: row.authorLean,
     authorLeanCertainty: row.authorLeanCertainty,
