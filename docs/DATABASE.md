@@ -430,10 +430,16 @@ human label (retro `docs/PROMPT_VERSIONS.md` — only as reliable as whoever
 edited the prompt remembering to bump it); `*PromptHash` is a SHA-256 of the
 actual rendered prompt, computed automatically, so it stays correct even
 when the version label goes stale. Fully shadow / additive like
-`relevanceBar`: nothing reads these yet, null on rows written before the
-columns existed and on the `/pool/aggregate` recompute path (no LLM call
-ran), no backfill. Lets a since-fixed prompt bug be traced in stored data
-instead of being invisible.
+`relevanceBar`: nothing reads these yet, null on the `/pool/aggregate`
+recompute path (no LLM call ran there). Rows that completed extraction
+before these columns existed were one-time backfilled to the literal
+sentinel `"pre-v1"` (migration `20260824130000`, `status = COMPLETE` rows
+only — PENDING/FAILED rows stay null) rather than a date-inferred guess:
+Oracle's SIGHUP-reload deploys and live/batch checkout drift make a merge
+timestamp an unreliable proxy for which prompt actually ran, so a specific
+historical version/hash was deliberately not invented — `"pre-v1"` means
+only "predates provenance capture." Lets a since-fixed prompt bug be traced
+in stored data instead of being invisible.
 `evidenceClass` is the article's most common evidence_class among its
 extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles
