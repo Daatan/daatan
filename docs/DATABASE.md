@@ -755,11 +755,7 @@ rejection. `status` ∈ open / merged / promoted / rejected; `origin` ∈
 article_antecedent / variant / mcp_probe / express (default policy: MCP probes
 become latent nodes, express drafts do not — see the harness doc §4.2).
 
-**No promotion path yet.** `prediction_id` / the `PROMOTED` status are on the
-schema for the shape (`CHECK (prediction_id IS NULL OR status = 'PROMOTED')`)
-but nothing sets them — deferred out of #1556's scope.
-
-**No linking pipeline yet either** — the only way rows exist today is
+**No linking pipeline yet** — the only way rows exist today is
 `POST /api/admin/latent-nodes` (`src/lib/services/latent-node.ts`), a minimal
 admin-only create endpoint that exists so merge has real data to operate on.
 `fan_in`/`first_claim_*`/`last_seen_at` are the provenance columns the future
@@ -772,6 +768,25 @@ would duplicate one the target already has (checked in both orientations for
 symmetric kinds) is dropped instead, as is a row that directly related the
 source to the target (typically the `ALIAS` that justified the merge — kept
 as-is it would become a self-loop, which the CHECK constraints reject).
+
+**Promote** (`POST /api/admin/latent-nodes/[id]/promote`, admin-only,
+daatan#1602): turns an `OPEN` node into a real `Prediction` by reusing
+`createForecast` (the Express/manual-draft path), authored by a dedicated
+`oracle2_system` user (`isBot: true`, no `BotConfig` — so `runDueBots()`
+never picks it up) and left `DRAFT`, same as `createForecast`'s own default —
+promotion is the moderation act, publishing is a separate step. Rejects (400)
+a node that hasn't cleared the resolvability gate (`claim_deadline` /
+`claim_direction` / `claim_archetype` all non-null). A `VARIANT` node's
+classifier fields are derived from its `variant_of_relation_id` parent
+`Prediction` when null (`COMPLEMENT` flips `claim_direction`, keeps the
+parent's deadline; `ALIAS` keeps both; `NESTED_DEADLINE` keeps its own
+deadline if set, else the parent's) — a `VARIANT` is always a variant *of an
+existing forecast*, so that relation's other endpoint is guaranteed to
+already be a `Prediction`, never another latent node. On success:
+`status = 'PROMOTED'`, `prediction_id` set, and — for a `VARIANT` —
+`variant_of_relation_id`'s row is repointed from the latent endpoint onto the
+new `Prediction`, so the parent relationship survives as an ordinary
+`question_relations` row instead of being lost.
 
 ## LASSO (AI panel) — `ai_estimate_runs`, `ai_estimates`, `ai_member_scores`
 

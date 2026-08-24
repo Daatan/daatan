@@ -1,25 +1,27 @@
 /**
- * Latent nodes — Oracle 2.0 storage layer M2 (daatan#1556).
+ * Latent nodes — Oracle 2.0 storage layer M2 (daatan#1556) + promotion (daatan#1602).
  *
  * A `LatentNode` is a "shadow forecast": a question that exists and is priced
- * but that no one has published. This module covers creation and merge only.
- * No promotion path yet — `predictionId`/`PROMOTED` are on the schema for the
- * shape but nothing sets them. The linking pipeline that would normally
- * create these rows from article extraction (v2 steps 2–4) doesn't exist yet
- * either — `createLatentNode` here is a minimal admin-facing stand-in so
- * merge has real rows to operate on.
+ * but that no one has published. This module covers creation, merge, and
+ * promotion. The linking pipeline that would normally create these rows from
+ * article extraction (v2 steps 2–4) doesn't exist yet — `createLatentNode`
+ * here is a minimal admin-facing stand-in so merge/promote have real rows to
+ * operate on.
  */
 
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { embedAndStoreLatentNode } from './embedding'
 import { SYMMETRIC_KINDS } from './question-relation'
+import { createForecast } from './forecast'
 import type {
   ClaimArchetype,
   ClaimDirection,
   LatentNode,
   LatentNodeOrigin,
   LatentNodeStatus,
+  Prediction,
+  QuestionRelation,
   QuestionRelationKind,
 } from '@prisma/client'
 
@@ -168,4 +170,155 @@ export async function mergeLatentNode(sourceId: string, targetId: string, decide
 
   log.info({ ...outcome, decidedBy }, 'latent node merged')
   return outcome
+}
+
+// ── Promotion (daatan#1602) ─────────────────────────────────────────────────
+
+const ORACLE2_SYSTEM_USERNAME = 'oracle2_system'
+const ORACLE2_SYSTEM_EMAIL = `${ORACLE2_SYSTEM_USERNAME}@daatan.internal`
+
+/**
+ * The author of record for every promoted latent node. Deliberately a plain
+ * `User` with `isBot: true` and NO `BotConfig` row — a `BotConfig` carries
+ * RSS sources / persona prompts / a scheduler interval, and `runDueBots()`
+ * (bots/runner.ts) iterates `botConfig.findMany`, so giving this identity a
+ * BotConfig would make the 5-minute bot cron try to run it. This account only
+ * needs to exist as an attribution target, never to act.
+ */
+export async function getOrCreateOracle2SystemUser(): Promise<{ id: string }> {
+  const existing = await prisma.user.findUnique({ where: { email: ORACLE2_SYSTEM_EMAIL }, select: { id: true } })
+  if (existing) return existing
+  return prisma.user.create({
+    data: {
+      email: ORACLE2_SYSTEM_EMAIL,
+      name: 'Oracle 2.0',
+      username: ORACLE2_SYSTEM_USERNAME,
+      slug: ORACLE2_SYSTEM_USERNAME,
+      isBot: true,
+      emailNotifications: false,
+      isPublic: true,
+    },
+    select: { id: true },
+  })
+}
+
+/** COMPLEMENT flips the underlying event (P(from)+P(to)=1); ALIAS/NESTED_DEADLINE keep it. */
+function flipDirectionForComplement(direction: ClaimDirection): ClaimDirection {
+  if (direction === 'ARRIVAL') return 'SURVIVAL'
+  if (direction === 'SURVIVAL') return 'ARRIVAL'
+  return direction
+}
+
+interface DerivedFields {
+  claimDeadline: Date | null
+  claimDirection: ClaimDirection | null
+  claimArchetype: ClaimArchetype | null
+}
+
+/**
+ * A VARIANT node is always a variant *of an existing forecast* (origin enum
+ * comment) — its `variantOfRelationId` row's other endpoint is guaranteed to
+ * already be a real `Prediction`, never another latent node. When the node's
+ * own classifier fields are null, derive them from that parent rather than
+ * blocking promotion on fields the linking pipeline doesn't populate yet:
+ * complement flips direction and keeps the parent's deadline; alias keeps
+ * both; nested_deadline keeps its own deadline if set, else falls back to
+ * the parent's.
+ */
+async function deriveVariantFields(node: LatentNode, relation: QuestionRelation): Promise<DerivedFields> {
+  const parentPredictionId = relation.fromLatentNodeId === node.id ? relation.toPredictionId : relation.fromPredictionId
+  if (!parentPredictionId) {
+    throw new Error(`Latent node ${node.id}'s variant relation ${relation.id} has no Prediction endpoint — data invariant violated`)
+  }
+  const parent = await prisma.prediction.findUniqueOrThrow({
+    where: { id: parentPredictionId },
+    select: { claimDeadline: true, claimDirection: true, claimArchetype: true },
+  })
+
+  const claimDirection =
+    node.claimDirection ?? (relation.kind === 'COMPLEMENT' && parent.claimDirection ? flipDirectionForComplement(parent.claimDirection) : parent.claimDirection)
+
+  return {
+    claimDeadline: node.claimDeadline ?? parent.claimDeadline,
+    claimDirection,
+    claimArchetype: node.claimArchetype ?? parent.claimArchetype,
+  }
+}
+
+export class UnresolvableLatentNodeError extends Error {}
+
+/**
+ * Promote an OPEN latent node into a real, published-eligible `Prediction`.
+ * Reuses `createForecast` (the Express/manual-draft path) rather than
+ * hand-rolling a second creation path — the new Prediction starts `DRAFT`
+ * (createForecast's own default), same as the batch-created graph_pm
+ * forecasts: promotion is the moderation act, publishing is a separate step.
+ *
+ * A VARIANT node's `variantOfRelationId` row gets repointed from the latent
+ * endpoint onto the new Prediction, so the parent relationship survives as an
+ * ordinary Prediction↔Prediction `question_relations` row instead of being
+ * lost. If that would collide with a row the parent already has (mirrors the
+ * duplicate check in `mergeLatentNode`), the now-redundant relation is
+ * dropped instead of double-written.
+ */
+export async function promoteLatentNode(id: string, promotedBy: string): Promise<Prediction> {
+  const node = await prisma.latentNode.findUniqueOrThrow({ where: { id } })
+  if (node.status !== 'OPEN') {
+    throw new Error(`Latent node ${id} is not OPEN (status: ${node.status})`)
+  }
+
+  let relation: QuestionRelation | null = null
+  let fields: DerivedFields = { claimDeadline: node.claimDeadline, claimDirection: node.claimDirection, claimArchetype: node.claimArchetype }
+
+  if (node.variantOfRelationId) {
+    relation = await prisma.questionRelation.findUniqueOrThrow({ where: { id: node.variantOfRelationId } })
+    fields = await deriveVariantFields(node, relation)
+  }
+
+  if (!fields.claimDeadline || !fields.claimDirection || !fields.claimArchetype) {
+    throw new UnresolvableLatentNodeError(
+      `Latent node ${id} has not cleared the resolvability gate (claimDeadline/claimDirection/claimArchetype must all be set${node.variantOfRelationId ? ', and could not be derived from its variant parent' : ''})`,
+    )
+  }
+
+  const author = await getOrCreateOracle2SystemUser()
+
+  const prediction = await createForecast({
+    authorId: author.id,
+    claimText: node.textEn,
+    outcomeType: 'BINARY',
+    resolveByDatetime: fields.claimDeadline.toISOString(),
+  })
+  if (!prediction) throw new Error(`createForecast returned no row promoting latent node ${id}`)
+
+  await prisma.$transaction(async (tx) => {
+    const current = await tx.latentNode.findUniqueOrThrow({ where: { id } })
+    if (current.status !== 'OPEN') {
+      throw new Error(`Latent node ${id} changed status to ${current.status} mid-promotion — aborting`)
+    }
+    await tx.latentNode.update({ where: { id }, data: { status: 'PROMOTED', predictionId: prediction.id } })
+
+    if (relation) {
+      // No duplicate check needed here (unlike mergeLatentNode's repoint): `prediction.id`
+      // is brand new in this same operation, so no pre-existing relation could already
+      // reference it — a collision is structurally impossible, not just unlikely.
+      const fromIsNode = relation.fromLatentNodeId === id
+      const otherPredictionId = fromIsNode ? relation.toPredictionId : relation.fromPredictionId
+      if (!otherPredictionId) {
+        throw new Error(`Latent node ${id}'s variant relation ${relation.id} has no Prediction endpoint — data invariant violated`)
+      }
+      await tx.questionRelation.update({
+        where: { id: relation.id },
+        data: {
+          fromPredictionId: fromIsNode ? prediction.id : otherPredictionId,
+          fromLatentNodeId: null,
+          toPredictionId: fromIsNode ? otherPredictionId : prediction.id,
+          toLatentNodeId: null,
+        },
+      })
+    }
+  })
+
+  log.info({ latentNodeId: id, predictionId: prediction.id, promotedBy, variant: !!relation }, 'latent node promoted')
+  return prediction
 }
