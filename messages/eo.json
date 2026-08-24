@@ -1179,5 +1179,22 @@
     "timeAriaLabel": "Horo (24-hora)",
     "openCalendar": "Malfermi kalendaron",
     "hint": "Tago/Monato/Jaro · 24-hora horloĝo"
+  },
+  "accessibility": {
+    "title": "Deklaro pri alirebleco",
+    "metaDescription": "La deklaro pri alirebleco de DAATAN: nia konforma stato al WCAG 2.0 AA / IS 5568, konataj limigoj, kaj kiel raporti alireblec-problemon.",
+    "lastReviewed": "Laste reviziita: {date}",
+    "body": "Ni celas atingi konformecon je <wcag>WCAG 2.0</wcag> Nivelo AA (la bazo de la Israela Normo IS 5568), sed ankoraŭ ne atingis tion — ni nomus la staton parte konforma. Ĝis nun ni aldonis ligon por pretersalti al enhavo, videblajn klavar-fokusajn indikilojn, etikedojn por ekrans-legiloj sur formularaj eroj kaj bildsimbolaj butonoj, riparis kelkajn kolor-kontrastajn problemojn, kaj rehavigis pinĉ-zomadon sur poŝtelefonoj, sed granda parto de la retejo ankoraŭ ne estis unuope reviziita. Se vi trafas baron, bonvolu diri al ni — retpoŝtu al nia alirebleco-koordinanto ĉe <email>{emailAddress}</email> kaj ni esploros tion."
+  },
+  "contact": {
+    "title": "Kontaktu Nin",
+    "metaDescription": "Kontaktu la teamon de DAATAN — demandoj, komentoj, kunlaborideoj, aŭ subteno por la reputaci-bazita novaĵ-prognoza platformo.",
+    "intro": "Ĉu vi havas demandon, komenton, aŭ volas raporti problemon? Ni ŝatus aŭdi de vi.",
+    "getInTouch": "Kontaktiĝu",
+    "email": "Retpoŝto",
+    "githubIssues": "GitHub Issues",
+    "githubIssuesDesc": "Raportu cimojn aŭ petu novajn funkciojn",
+    "twitter": "Twitter / X",
+    "learnMore": "Lernu pli pri DAATAN →"
   }
 }
