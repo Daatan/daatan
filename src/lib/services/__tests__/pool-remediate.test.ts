@@ -16,7 +16,13 @@ vi.mock('@/lib/logger', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
-import { remediatePool, remediableWhere, REMEDIATE_MIN_ABS_STANCE, REMEDIATE_MIN_CERTAINTY } from '../pool-remediate'
+import {
+  remediatePool,
+  remediableWhere,
+  usablePoolWhere,
+  REMEDIATE_MIN_ABS_STANCE,
+  REMEDIATE_MIN_CERTAINTY,
+} from '../pool-remediate'
 
 const mockRows = vi.mocked(prisma.evidencePoolArticle.findMany)
 const mockCount = vi.mocked(prisma.evidencePoolArticle.count)
@@ -180,5 +186,42 @@ describe('remediatePool', () => {
     it('skips search-redirect URLs, which have no article behind them to re-read', () => {
       expect(where.NOT).toEqual({ url: { contains: 'google.com/goto' } })
     })
+  })
+
+  describe('usablePoolWhere', () => {
+    const where = usablePoolWhere()
+
+    it('targets the full usable pool, unfiltered by stance or certainty', () => {
+      expect(where).toMatchObject({
+        supersededAt: null,
+        excluded: false,
+        status: 'COMPLETE',
+        stance: { not: null },
+        certainty: { not: null },
+        credibilityWeight: { not: null },
+        relevanceScore: { not: null },
+      })
+      expect(where.OR).toBeUndefined()
+    })
+
+    it('still skips search-redirect URLs', () => {
+      expect(where.NOT).toEqual({ url: { contains: 'google.com/goto' } })
+    })
+  })
+
+  it('defaults the target to remediableWhere when none is passed', async () => {
+    await remediatePool(['p1'], true)
+
+    expect(mockRows).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ predictionId: 'p1', ...remediableWhere() }) }),
+    )
+  })
+
+  it('uses a passed-in target instead of remediableWhere', async () => {
+    await remediatePool(['p1'], true, usablePoolWhere())
+
+    const where = (mockRows.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where
+    expect(where).not.toHaveProperty('OR')
+    expect(where).toMatchObject({ predictionId: 'p1', status: 'COMPLETE' })
   })
 })

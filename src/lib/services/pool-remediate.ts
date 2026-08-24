@@ -35,6 +35,14 @@ export function remediableWhere(): Prisma.EvidencePoolArticleWhereInput {
   }
 }
 
+/**
+ * The full currently-usable pool, unfiltered by stance/certainty — the target set for a
+ * blanket recompute (e.g. retro#626) rather than an A6-signature-only remediation.
+ */
+export function usablePoolWhere(): Prisma.EvidencePoolArticleWhereInput {
+  return { ...USABLE_POOL_ROW_WHERE, title: { not: null }, NOT: { url: { contains: NON_ARTICLE_URL_FRAGMENT } } }
+}
+
 export interface RemediationForecast {
   predictionId: string
   claimText: string
@@ -77,9 +85,15 @@ export interface RemediationResult {
  *
  * Defaults to dry-run. Nothing here searches: the roster is the forecast's own pool,
  * so the comparison against the read-only preview is like-for-like.
+ *
+ * `target` defaults to {@link remediableWhere} (the A6 signature); pass
+ * {@link usablePoolWhere} for a blanket recompute of everything currently usable.
  */
-export async function remediatePool(predictionIds: string[], apply: boolean): Promise<RemediationResult> {
-  const target = remediableWhere()
+export async function remediatePool(
+  predictionIds: string[],
+  apply: boolean,
+  target: Prisma.EvidencePoolArticleWhereInput = remediableWhere(),
+): Promise<RemediationResult> {
   const preds = await prisma.prediction.findMany({
     where: { id: { in: predictionIds } },
     select: {
