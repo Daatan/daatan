@@ -89,6 +89,7 @@ export async function UserProfileView({
                     href="/profile/edit"
                     className="p-2 hover:bg-navy-600 rounded-lg transition-colors"
                     title={t('editProfile')}
+                    aria-label={t('editProfile')}
                   >
                     <Settings className="w-5 h-5 text-gray-400 hover:text-gray-200" />
                   </Link>

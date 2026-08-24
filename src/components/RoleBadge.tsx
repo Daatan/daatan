@@ -19,13 +19,14 @@ export const RoleBadge = ({ role, size = 'sm' }: RoleBadgeProps) => {
   const title = role === 'ADMIN' ? 'Admin' : role === 'APPROVER' ? 'Approver' : 'Resolver'
   const colorClasses =
     role === 'ADMIN'
-      ? 'bg-red-100 text-red-400 border-red-800/50'
+      ? 'bg-red-100 text-red-700 border-red-800/50'
       : role === 'APPROVER'
         ? 'bg-purple-100 text-purple-700 border-purple-200'
-        : 'bg-blue-100 text-cobalt-light border-cobalt/30'
+        : 'bg-blue-100 text-blue-800 border-cobalt/30'
 
   return (
     <span
+      role="img"
       className={`inline-flex items-center justify-center rounded-full font-bold border ${sizeClasses} ${colorClasses}`}
       title={title}
       aria-label={title}

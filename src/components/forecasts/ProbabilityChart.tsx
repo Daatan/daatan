@@ -79,7 +79,7 @@ const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#
  *  stretch between changes. */
 function MarketDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { marketChanged?: boolean } }) {
   if (cx == null || cy == null || !payload?.marketChanged) return null
-  return <circle className="market-price-dot" cx={cx} cy={cy} r={3} fill="#EC4899" stroke="none" />
+  return <circle className="market-price-dot" cx={cx} cy={cy} r={3} fill="#F472B6" stroke="none" />
 }
 
 /** Marks only real AI snapshot events (not carried step values): evidence runs
@@ -501,7 +501,7 @@ export default function ProbabilityChart({
               type="stepAfter"
               dataKey="market"
               name={marketLabel}
-              stroke="#EC4899"
+              stroke="#F472B6"
               strokeWidth={2}
               dot={<MarketDot />}
               connectNulls

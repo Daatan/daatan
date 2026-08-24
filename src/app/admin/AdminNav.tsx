@@ -44,7 +44,7 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
         const active = pathname === href || pathname.startsWith(href + '/')
         const showBadge = tab.id === 'approvals' && pendingCount !== null && pendingCount > 0
         const tabClassName = `px-3 sm:px-4 py-2 shrink-0 text-sm transition-colors ${active
-          ? 'border-b-2 border-blue-500 font-bold text-blue-600'
+          ? 'border-b-2 border-blue-500 font-bold text-cobalt-light'
           : 'text-gray-500 hover:text-text-secondary'
           }`
 
@@ -56,7 +56,7 @@ export default function AdminNav({ isAdmin, selfHosted = false }: { isAdmin: boo
           >
             {tab.label}
             {showBadge && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full">
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-600 rounded-full">
                 {pendingCount > 99 ? '99+' : pendingCount}
               </span>
             )}
