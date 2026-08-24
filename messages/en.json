@@ -1179,5 +1179,22 @@
     "timeAriaLabel": "Time (24-hour)",
     "openCalendar": "Open calendar",
     "hint": "Day/Month/Year · 24-hour time"
+  },
+  "accessibility": {
+    "title": "Accessibility Statement",
+    "metaDescription": "DAATAN's accessibility statement: our WCAG 2.0 AA / IS 5568 conformance status, known limitations, and how to report an accessibility issue.",
+    "lastReviewed": "Last reviewed: {date}",
+    "body": "We're working toward <wcag>WCAG 2.0</wcag> Level AA conformance (the basis of Israeli Standard IS 5568), but we're not there yet — we'd call it partially conformant. So far we've added a skip-to-content link, visible keyboard-focus indicators, labels for screen readers on form controls and icon buttons, fixed several color-contrast issues, and re-enabled pinch-to-zoom on mobile, but plenty of the site hasn't been individually audited yet. If you hit a barrier, please tell us — email our accessibility coordinator at <email>{emailAddress}</email> and we'll look into it."
+  },
+  "contact": {
+    "title": "Contact Us",
+    "metaDescription": "Get in touch with the DAATAN team — questions, feedback, partnership ideas, or support for the reputation-based news-forecasting platform.",
+    "intro": "Have a question, feedback, or want to report an issue? We'd love to hear from you.",
+    "getInTouch": "Get in Touch",
+    "email": "Email",
+    "githubIssues": "GitHub Issues",
+    "githubIssuesDesc": "Report bugs or request features",
+    "twitter": "Twitter / X",
+    "learnMore": "Learn more about DAATAN →"
   }
 }
