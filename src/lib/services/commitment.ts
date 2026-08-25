@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/services/notification'
 import { triggerAiProbabilityEstimate } from '@/lib/services/ai-estimate'
 import { createLogger } from '@/lib/logger'
 import type { ServiceResult } from '@/lib/types/service'
+import { marketDisplayProbability } from '@/lib/market-display'
 
 const log = createLogger('commitment-service')
 
@@ -21,6 +22,11 @@ export interface CommitmentPrediction {
   resolveByDatetime: Date
   claimDeadline: Date | null
   options: PredictionOption[]
+  // Linked external market (Polymarket/Kalshi), for the polymarketPrice snapshot
+  // below (daatan#1138). Present on every real Prediction row (not a select
+  // subset) — null/false for forecasts with no linked market.
+  externalMarketId: string | null
+  externalMarketInverted: boolean
 }
 
 /** Data validated by createCommitmentSchema. */
@@ -180,6 +186,26 @@ const writeCommitmentInTx = async (
     select: { id: true },
   })
 
+  // Phase 2 of the expertise-rating plan (docs/EXPERTISE_RATING_SYSTEM.md,
+  // daatan#1138): snapshot the linked market's YES probability at commit time.
+  // Reuses the existing ExternalMarket link + price-snapshot history synced by
+  // external-market-sync — no new fetch/integration needed, and no-op (stays
+  // null) for forecasts with no linked market. 0-1 scale, polarity-adjusted,
+  // matching aiProbabilityAtCommit/communityProbabilityAtCommit above so
+  // resolution-time KL-divergence can compare them directly.
+  let polymarketPrice: number | null = null
+  if (prediction.externalMarketId) {
+    const latestMarketSnapshot = await tx.externalMarketPriceSnapshot.findFirst({
+      where: { marketId: prediction.externalMarketId },
+      orderBy: { createdAt: 'desc' },
+      select: { probability: true },
+    })
+    if (latestMarketSnapshot) {
+      polymarketPrice =
+        marketDisplayProbability(latestMarketSnapshot.probability, prediction.externalMarketInverted) / 100
+    }
+  }
+
   const created = await tx.commitment.create({
     data: {
       userId,
@@ -191,6 +217,7 @@ const writeCommitmentInTx = async (
       communityProbabilityAtCommit,
       aiProbabilityAtCommit,
       aiRunIdAtCommit: latestAiRun?.id ?? null,
+      polymarketPrice,
     },
     include: commitmentInclude,
   })

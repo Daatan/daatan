@@ -10,6 +10,24 @@ import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
 
 const log = createLogger('prediction-resolution')
 
+/** Numerical floor/ceiling for KL-divergence inputs — avoids log(0) / divide-by-zero
+ *  at the 0/1 boundaries without materially changing the score anywhere else. */
+const KL_EPSILON = 1e-6
+
+/**
+ * D_KL(user || market): rewards a user whose stated probability was confidently
+ * right where the market wasn't (Phase 2, docs/EXPERTISE_RATING_SYSTEM.md,
+ * daatan#1138). p = the user's probability (same scale/derivation as brierScore's
+ * `p`), q = `Commitment.polymarketPrice` snapshotted at commit time. Both clipped
+ * away from 0/1 so a certain call never produces ±Infinity. Exported for unit
+ * testing; not itself wired into any ranking formula or the Glicko-2 update.
+ */
+export function binaryKLDivergence(p: number, q: number): number {
+  const pc = Math.min(Math.max(p, KL_EPSILON), 1 - KL_EPSILON)
+  const qc = Math.min(Math.max(q, KL_EPSILON), 1 - KL_EPSILON)
+  return pc * Math.log(pc / qc) + (1 - pc) * Math.log((1 - pc) / (1 - qc))
+}
+
 export type ResolutionOutcome = 'correct' | 'wrong' | 'void' | 'unresolvable'
 
 interface ResolutionOptions {
@@ -146,6 +164,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
       let brierScore: number | null = null
       let peerScore: number | null = null
       let aiScore: number | null = null
+      let klDivergence: number | null = null
 
       if (!isVoidOutcome) {
         const confidence = commitment.cuCommitted
@@ -170,6 +189,13 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
         if (commitment.aiProbabilityAtCommit != null) {
           aiScore =
             Math.pow(commitment.aiProbabilityAtCommit - outcomeNumeric, 2) - brierScore
+        }
+
+        // Phase 2 of the expertise-rating plan (daatan#1138): only when the market
+        // price was actually snapshotted at commit time — most existing commitments
+        // predate this field or have no linked market, and stay null.
+        if (commitment.polymarketPrice != null) {
+          klDivergence = binaryKLDivergence(p, commitment.polymarketPrice)
         }
 
         eloInputs.push({
@@ -234,6 +260,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           ...(brierScore !== null && { brierScore }),
           ...(peerScore !== null && { peerScore }),
           ...(aiScore !== null && { aiScore }),
+          ...(klDivergence !== null && { klDivergence }),
         },
       })
 

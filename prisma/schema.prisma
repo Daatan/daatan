@@ -467,6 +467,14 @@ model Prediction {
   // the same market in opposite directions. UI plots 100 − price when set.
   externalMarketInverted   Boolean         @default(false) @map("external_market_inverted")
 
+  // Phase 2 of the expertise-rating plan (docs/EXPERTISE_RATING_SYSTEM.md, daatan#1138).
+  // Reserved for a denormalized "current" market price (0-1, polarity-adjusted),
+  // mirroring the aiCiLow/aiCiHigh denormalization above — not yet populated by any
+  // writer; ExternalMarketPriceSnapshot remains the source of truth until a sync path
+  // writes here. Commitment.polymarketPrice (the per-commit snapshot used for scoring)
+  // is populated at commit time; this field is not.
+  polymarketPrice Float? @map("polymarket_price")
+
   // Relations
   options          PredictionOption[]
   commitments      Commitment[]
@@ -1263,6 +1271,18 @@ model Commitment {
   peerScore                    Float? @map("peer_score")
   aiScore                      Float? @map("ai_score")
   eloChange                    Int?   @map("elo_change")
+
+  // Phase 2 of the expertise-rating plan (docs/EXPERTISE_RATING_SYSTEM.md, daatan#1138).
+  // Linked market's YES probability (0-1, polarity-adjusted per
+  // Prediction.externalMarketInverted — see marketDisplayProbability) as of commit
+  // time, snapshotted from ExternalMarketPriceSnapshot when the forecast has a linked
+  // market. Null when unlinked or no snapshot exists yet — never back-filled.
+  polymarketPrice Float? @map("polymarket_price")
+  // D_KL(user || market) computed at resolution when polymarketPrice is present:
+  // p·log(p/q) + (1-p)·log((1-p)/(1-q)), p = user's stated probability, q =
+  // polymarketPrice. Rewards surprising-but-correct calls relative to the market
+  // consensus. Not yet wired into any ranking formula — storage only (daatan#1138).
+  klDivergence Float? @map("kl_divergence")
 
   // The AI-panel run current at commit time — matched-time Brier (docs/LASSO.md §7).
   // A run FK, NOT a scalar: `aiProbabilityAtCommit` above collapses the Oracle to one

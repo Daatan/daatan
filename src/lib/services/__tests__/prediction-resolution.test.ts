@@ -19,7 +19,7 @@ vi.mock('@/lib/services/calibration', () => ({ recordCalibration: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { recordCalibration } from '@/lib/services/calibration'
-import { resolvePrediction } from '../prediction-resolution'
+import { resolvePrediction, binaryKLDivergence } from '../prediction-resolution'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const transaction = vi.mocked(prisma.$transaction)
@@ -274,6 +274,71 @@ describe('resolvePrediction — ai_member_scores write path', () => {
         data: expect.objectContaining({ brierScore: expect.closeTo(0.09, 6) }), // (0.7 − 1)²
       }),
     )
+  })
+})
+
+/**
+ * Phase 2 of the expertise-rating plan (docs/EXPERTISE_RATING_SYSTEM.md,
+ * daatan#1138): KL-divergence vs. the linked market's price at commit time.
+ */
+describe('binaryKLDivergence', () => {
+  it('is zero when the user matches the market exactly', () => {
+    expect(binaryKLDivergence(0.7, 0.7)).toBeCloseTo(0, 10)
+  })
+
+  it('rewards (produces a large value for) a confident, correct call the market missed', () => {
+    // User said 0.9, market said 0.1 — a "surprising correct information" case.
+    expect(binaryKLDivergence(0.9, 0.1)).toBeGreaterThan(1)
+  })
+
+  it('is small when both are near 0.5 (an uninformative call vs. an uninformative market)', () => {
+    expect(binaryKLDivergence(0.5, 0.5)).toBeCloseTo(0, 10)
+  })
+
+  it('never returns Infinity/NaN at the 0/1 boundaries', () => {
+    expect(Number.isFinite(binaryKLDivergence(1, 0))).toBe(true)
+    expect(Number.isFinite(binaryKLDivergence(0, 1))).toBe(true)
+    expect(Number.isFinite(binaryKLDivergence(0, 0))).toBe(true)
+    expect(Number.isFinite(binaryKLDivergence(1, 1))).toBe(true)
+  })
+})
+
+describe('resolvePrediction — klDivergence write path', () => {
+  it('computes and stores klDivergence when polymarketPrice was snapshotted at commit time', async () => {
+    findUnique.mockResolvedValue(
+      prediction({
+        commitments: [commitment({ polymarketPrice: 0.3 })], // p = 0.8 (cuCommitted 60)
+      }) as never,
+    )
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
+
+    expect(tx.commitment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'c1' },
+        data: expect.objectContaining({ klDivergence: binaryKLDivergence(0.8, 0.3) }),
+      }),
+    )
+  })
+
+  it('leaves klDivergence unset when no market price was snapshotted', async () => {
+    findUnique.mockResolvedValue(prediction() as never) // polymarketPrice: null (default)
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
+
+    const data = tx.commitment.update.mock.calls[0][0].data
+    expect(data).not.toHaveProperty('klDivergence')
+  })
+
+  it('is not computed for void outcomes even with a market price on file', async () => {
+    findUnique.mockResolvedValue(
+      prediction({ commitments: [commitment({ polymarketPrice: 0.3 })] }) as never,
+    )
+
+    await resolvePrediction('p1', { outcome: 'void', resolvedById: 'admin' })
+
+    const data = tx.commitment.update.mock.calls[0][0].data
+    expect(data).not.toHaveProperty('klDivergence')
   })
 })
 
