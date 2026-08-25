@@ -534,6 +534,11 @@ export async function POST(request: NextRequest) {
           insufficientReason: est.reason,
           poolSize: est.poolSize,
           oracleSnapshot: { sources: [], insufficient: true, reason: est.reason },
+          // Provenance passthrough (daatan#1617) — from the single `/forecast` run this
+          // push made, not from `/pool/aggregate` (retro doesn't put a Provenance
+          // envelope on that response yet).
+          engine: oracleForecast.provenance?.engine ?? undefined,
+          schemaVersion: oracleForecast.provenance?.schema_version ?? undefined,
         })
         wasStored = stored
         log.info(
@@ -576,6 +581,9 @@ export async function POST(request: NextRequest) {
           evidenceMass: est.evidenceMass,
           nEff: est.nEff,
           ageAdjustedMass: est.ageAdjustedMass,
+          // Provenance passthrough (daatan#1617) — see the abstention branch above.
+          engine: oracleForecast.provenance?.engine ?? undefined,
+          schemaVersion: oracleForecast.provenance?.schema_version ?? undefined,
         })
         wasStored = stored
         contextSnapshotId = snapshotId

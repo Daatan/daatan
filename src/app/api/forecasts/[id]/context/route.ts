@@ -179,6 +179,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             evidenceMass?: number | null
             nEff?: number | null
             ageAdjustedMass?: number | null
+            /** Provenance passthrough (daatan#1617); see `RecordEstimateInput.engine`/`.schemaVersion`. */
+            engine?: string | null
+            schemaVersion?: string | null
         }
 
         // Same atomic claim gate as the news-indexer push / backfill paths
@@ -203,7 +206,13 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
         // Shared mapping from a resolved pool/single-run estimate to the route's
         // response shape — used both when this run extracted new articles and
         // when it didn't (nothing changed, read the existing pool directly).
-        const toEstimationResult = (resolved: ResolvedPoolEstimate): EstimationResult => {
+        // `provenance` is the triggering `/forecast` run's envelope (daatan#1617) — undefined
+        // when this estimate came from re-reading an unchanged pool with no fresh run behind
+        // it (the `articlesToScore.length === 0` branch below never has one to pass).
+        const toEstimationResult = (
+            resolved: ResolvedPoolEstimate,
+            provenance?: { engine?: string | null; schema_version?: string | null } | null,
+        ): EstimationResult => {
             if (resolved.insufficientData) {
                 return {
                     externalProbability: null,
@@ -214,6 +223,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     insufficientData: true,
                     insufficientReason: resolved.reason,
                     poolSize: resolved.poolSize,
+                    engine: provenance?.engine ?? undefined,
+                    schemaVersion: provenance?.schema_version ?? undefined,
                 }
             }
             const prob = stanceToPercent(resolved.mean)
@@ -237,6 +248,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 evidenceMass: resolved.evidenceMass,
                 nEff: resolved.nEff,
                 ageAdjustedMass: resolved.ageAdjustedMass,
+                engine: provenance?.engine ?? undefined,
+                schemaVersion: provenance?.schema_version ?? undefined,
             }
         }
 
@@ -390,7 +403,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         },
                     'context.ai_estimate',
                 )
-                return toEstimationResult(resolved)
+                return toEstimationResult(resolved, oracleForecast.provenance)
             }
 
             const articlesMapped = searchResults.map((r: SearchResult) => ({
@@ -479,6 +492,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     let evidenceMass: number | null = null
                     let nEff: number | null = null
                     let ageAdjustedMass: number | null = null
+                    let engine: string | null = null
+                    let schemaVersion: string | null = null
 
                     if (estimationResult === null) {
                         log.warn(
@@ -498,6 +513,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         evidenceMass = estimationResult.evidenceMass ?? null
                         nEff = estimationResult.nEff ?? null
                         ageAdjustedMass = estimationResult.ageAdjustedMass ?? null
+                        engine = estimationResult.engine ?? null
+                        schemaVersion = estimationResult.schemaVersion ?? null
                     }
 
                     const totalMs = Date.now() - t0
@@ -526,6 +543,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                         evidenceMass,
                         nEff,
                         ageAdjustedMass,
+                        engine,
+                        schemaVersion,
                         now,
                     })
 
