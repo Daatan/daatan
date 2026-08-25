@@ -383,7 +383,7 @@ export default function ForecastCard({
           <div className={`flex items-center flex-wrap gap-2 mb-4 ${showMenu ? 'pr-7' : ''}`}>
             {prediction.status !== 'ACTIVE' && (
               <span
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider ${badge.className}`}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider ${badge.className}`}
                 title={badge.hint}
               >
                 {badge.icon}
@@ -393,7 +393,7 @@ export default function ForecastCard({
 
             {showModerationControls && prediction.moderationCheckFailed && (
               <span
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-red-100 text-red-700"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider bg-red-100 text-red-700"
                 title="AI moderation check failed for this content — review it manually"
               >
                 <AlertCircle className="w-3 h-3" />
@@ -409,7 +409,7 @@ export default function ForecastCard({
                 : 'text-gray-400'
               return (
                 <div
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 ${dateClass}`}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 ${dateClass}`}
                   title={t('resolveByTooltip')}
                 >
                   <Calendar className="w-3 h-3" />
@@ -423,7 +423,7 @@ export default function ForecastCard({
               <div className="flex items-center">
                 {prediction._count.commitments > 0 && prediction.outcomeType === 'BINARY' && prediction.communityProbability != null && (
                   <div
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-teal"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-teal"
                     title={t('communityProbabilityTooltip')}
                   >
                     <TrendingUp className="w-3 h-3" />
@@ -436,7 +436,7 @@ export default function ForecastCard({
                   const pct = Math.round(((topOption.commitmentsCount || 0) / prediction._count.commitments) * 100)
                   return (
                     <div
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-teal"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-teal"
                       title={t('topOptionShareTooltip', { text: topOption.text, pct })}
                     >
                       <TrendingUp className="w-3 h-3" />
@@ -455,7 +455,7 @@ export default function ForecastCard({
                 : (n === 1 ? 'voter' : 'voters')
               return (
                 <span
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-gray-300"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-navy-600 bg-navy-800 text-gray-300"
                   title={t(titleKey, { count: n, cu: cu ?? 0 })}
                 >
                   <Users className="w-3 h-3" />
@@ -469,7 +469,7 @@ export default function ForecastCard({
               const titleKey = hasRange ? 'aiEstimateWithCiTooltip' : 'aiEstimateTooltip'
               return (
                 <span
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400"
                   title={t(titleKey, {
                     probability: prediction.confidence,
                     spread,
@@ -487,7 +487,7 @@ export default function ForecastCard({
                     href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
                     prefetch={false}
                     title={t('filterByTagTooltip', { tag: tag.name })}
-                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs font-medium rounded-full border border-cobalt/20 transition-colors"
+                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs lg:text-sm font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
                     {tag.name}
                   </Link>
@@ -495,7 +495,7 @@ export default function ForecastCard({
               </>
             )}
             {prediction.isPublic === false && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-navy-800 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full border border-navy-600" title="This forecast is unlisted — only visible via direct link.">
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-navy-800 text-gray-500 text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider rounded-full border border-navy-600" title="This forecast is unlisted — only visible via direct link.">
                 <EyeOff className="w-3 h-3" />
                 Unlisted
               </span>
@@ -503,7 +503,7 @@ export default function ForecastCard({
             {locale !== 'en' && translatedClaim && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTranslated(!showTranslated); }}
-                className={`relative z-[2] flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-colors ${
+                className={`relative z-[2] flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border transition-colors ${
                   showTranslated ? 'bg-blue-100 text-cobalt-light border-cobalt/30' : 'bg-navy-800 text-gray-500 border-navy-600'
                 }`}
                 title={showTranslated ? tt('showOriginal') : tt('translate')}
@@ -516,7 +516,7 @@ export default function ForecastCard({
 
           {/* Claim Text */}
           <div className="flex items-start gap-3 mb-4">
-            <h2 className="flex-1 text-base sm:text-lg font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug">
+            <h2 className="flex-1 text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug">
               {showTranslated && translatedClaim ? translatedClaim : prediction.claimText}
             </h2>
           </div>
@@ -577,7 +577,7 @@ export default function ForecastCard({
       {/* Footer sits outside the flex row so its rule spans the whole card
           rather than stopping short of the chevron column. */}
       <div className="flex items-center justify-between pt-4 border-t border-navy-600/50">
-        <div className="flex items-center gap-x-4 text-xs text-gray-500">
+        <div className="flex items-center gap-x-4 text-xs lg:text-sm text-gray-500">
           {/* Voter count lives in the header pill; only the personal
               "you committed" indicator remains down here. */}
           {prediction.userHasCommitted && (
