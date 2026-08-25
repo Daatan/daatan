@@ -142,6 +142,8 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
 | `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}`; when the estimate came from a pool aggregate, `{pool: {evidenceMass, nEff, ageAdjustedMass}}` (retro#458 Phase 2 diagnostics, daatan#1563) — the two can appear together on the same row |
 | `summary` / `externalReasoning` | analyze-run LLM summary / writer reasoning marker |
+| `engine` | which engine produced this estimate — `'v1'` \| `'v2'`, mirroring retro's `Provenance.engine` (daatan#1617). Real column (not `meta`), defaulted to `'v1'` at the DB layer so every existing and future row without an explicit value reads as v1. Plumbing for the paired v1/v2 scoring plan (`Daatan/docs planning/oracle-2-relations-graph.md` §8/§9) — no write path passes `'v2'` today; daatan doesn't call a v2 engine (gated on M4/daatan#1558) |
+| `schemaVersion` | retro's `Provenance.schema_version` (`"1.0"` today) — the wire schema shape, not retro's free-form `/version` semver. Null on rows written before this column existed (daatan#1617), and NOT defaulted like `engine` |
 
 Funnel invariants: `confidence` and `aiCiLow/aiCiHigh` on the prediction move
 **atomically** (written together, cleared together, or both untouched — never one

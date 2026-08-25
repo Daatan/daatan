@@ -334,11 +334,29 @@ export interface OracleForecastResponse {
    *  this pool would weigh if nothing had aged; always >= `evidence_mass`
    *  (retro#458 Phase 2). 0.0 on an insufficient-data response. */
   age_adjusted_mass?: number | null
-  /** Engine/model/build identity this forecast was produced with (retro#593).
-   *  `models` (daatan#1604/retro#627) is what we read: null on a pool recompute
-   *  (no LLM call ran), populated on a live extraction. Absent entirely on a
-   *  response built before this field existed. */
+  /**
+   * Provenance envelope (retro's `Provenance`, api/src/forecast_api/models.py).
+   * `models` (daatan#1604/retro#627) was the first field read off it: null on a
+   * pool recompute (no LLM call ran), populated on a live extraction. daatan#1617
+   * adds the rest of the envelope as plumbing for the paired v1/v2 scoring plan
+   * (`Daatan/docs planning/oracle-2-relations-graph.md` §8/§9) — nothing reads
+   * `engine`/`schema_version`/`method` yet beyond persisting them.
+   * `inputs`/`upstream` are v2-only (populated when v2 calls v1) and are not
+   * declared here; daatan doesn't call v2 (gated on M4/daatan#1558), so they
+   * would always be absent/empty on every response daatan actually receives.
+   * Absent entirely on a response built before this envelope existed.
+   */
   provenance?: {
+    /** Gate on this, not `/version`'s free-form semver — retro has not reached
+     *  a 1.0 release and bumps that string on any change. */
+    schema_version?: string | null
+    /** Which engine produced this result. Always 'v1' from daatan's perspective
+     *  today — daatan never calls a v2 endpoint. */
+    engine?: 'v1' | 'v2' | null
+    /** How this result was produced: a live `/forecast` run, a `/pool/aggregate`
+     *  read, a propagated (unresolved but reasoned) value, or a logical
+     *  (rule-derived) one. */
+    method?: 'live' | 'pool' | 'propagated' | 'logical' | null
     models?: OracleProvenanceModels | null
   } | null
 }

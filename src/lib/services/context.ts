@@ -205,6 +205,13 @@ export interface RecordEstimateInput {
   evidenceMass?: number | null
   nEff?: number | null
   ageAdjustedMass?: number | null
+  /** Which engine produced this estimate ('v1' | 'v2') and the wire schema
+   *  version it arrived on — retro's `Provenance.engine`/`Provenance.schema_version`
+   *  (daatan#1617). Plumbing only: no caller passes 'v2' today (gated on
+   *  M4/daatan#1558), so omitting these leaves the DB default ('v1') in force —
+   *  see `ContextSnapshot.engine` in prisma/schema.prisma. */
+  engine?: string | null
+  schemaVersion?: string | null
   now?: Date
 }
 
@@ -384,6 +391,11 @@ export async function recordEstimate(input: RecordEstimateInput) {
         articlesUsed: articlesUsedOf(input.oracleSnapshot),
         materialChange,
         evidenceAt,
+        // `?? undefined`, not `?? null`: an omitted `engine` must leave the column's
+        // DB default ('v1') in force rather than overwriting it with an explicit NULL
+        // (daatan#1617) — same convention `oracleSnapshot` above already uses.
+        engine: input.engine ?? undefined,
+        schemaVersion: input.schemaVersion ?? undefined,
       },
     }),
   ]
@@ -527,6 +539,9 @@ export interface SaveContextUpdateInput {
   evidenceMass?: number | null
   nEff?: number | null
   ageAdjustedMass?: number | null
+  /** Provenance passthrough (daatan#1617); see `RecordEstimateInput.engine`/`.schemaVersion`. */
+  engine?: string | null
+  schemaVersion?: string | null
   /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   now: Date
@@ -547,6 +562,8 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
     evidenceMass: input.evidenceMass,
     nEff: input.nEff,
     ageAdjustedMass: input.ageAdjustedMass,
+    engine: input.engine,
+    schemaVersion: input.schemaVersion,
     settled: input.settled,
     summary: input.summary,
     sources: input.sources,
@@ -581,6 +598,9 @@ export interface SaveNewsIndexerMatchInput {
   evidenceMass?: number | null
   nEff?: number | null
   ageAdjustedMass?: number | null
+  /** Provenance passthrough (daatan#1617); see `RecordEstimateInput.engine`/`.schemaVersion`. */
+  engine?: string | null
+  schemaVersion?: string | null
 }
 
 /** externalReasoning marker identifying snapshots written by the news-indexer push path. */
@@ -625,6 +645,8 @@ export async function saveNewsIndexerMatch(
     evidenceMass: input.evidenceMass,
     nEff: input.nEff,
     ageAdjustedMass: input.ageAdjustedMass,
+    engine: input.engine,
+    schemaVersion: input.schemaVersion,
     sources: input.sources,
     externalReasoning: NEWS_INDEXER_REASONING,
     oracleSnapshot: input.oracleSnapshot,
@@ -826,6 +848,9 @@ export interface SaveOracleSnapshotInput {
   evidenceMass?: number | null
   nEff?: number | null
   ageAdjustedMass?: number | null
+  /** Provenance passthrough (daatan#1617); see `RecordEstimateInput.engine`/`.schemaVersion`. */
+  engine?: string | null
+  schemaVersion?: string | null
 }
 
 /**
@@ -850,6 +875,8 @@ export async function saveOracleSnapshotOnly(input: SaveOracleSnapshotInput): Pr
     evidenceMass: input.evidenceMass,
     nEff: input.nEff,
     ageAdjustedMass: input.ageAdjustedMass,
+    engine: input.engine,
+    schemaVersion: input.schemaVersion,
     externalReasoning: 'TruthMachine Oracle (active-forecast backfill)',
     oracleSnapshot: input.oracleSnapshot,
   })

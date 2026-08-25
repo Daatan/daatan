@@ -543,6 +543,20 @@ model ContextSnapshot {
   // §6). Pure provenance; `kind` keeps the pricing semantics (evidence vs clock).
   // Null = row written before the funnel existed.
   origin String? @db.VarChar(32)
+  // Which engine produced this estimate: 'v1' | 'v2', mirroring retro's
+  // `Provenance.engine` (api/src/forecast_api/models.py). Stepping stone for the
+  // paired v1/v2 scoring plan (daatan#1617, `Daatan/docs planning/
+  // oracle-2-relations-graph.md` §8/§9) — no write path passes 'v2' yet (gated on
+  // M4/daatan#1558), so this column changes nothing about current behavior.
+  // Defaulted, unlike `origin`, so every existing and future row reads as v1
+  // without a backfill: no engine other than v1 has ever produced a forecast.
+  engine String? @default("v1") @db.VarChar(16)
+  // retro's `Provenance.schema_version` ("1.0" today) — the wire schema shape a
+  // future v2 reader should gate on, per daatan#1617, rather than retro's
+  // free-form `/version` semver. Null on every row written before this column
+  // existed, and NOT defaulted like `engine`: unlike "which engine", "which wire
+  // schema" genuinely wasn't recorded for those rows.
+  schemaVersion String? @map("schema_version") @db.VarChar(16)
   // Oracle articles_used behind this estimate — evidence volume for a future
   // overwrite policy. Null when unknown (legacy, LLM-fallback, clock rows).
   articlesUsed Int? @map("articles_used")

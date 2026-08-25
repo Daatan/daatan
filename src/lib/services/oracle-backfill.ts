@@ -220,6 +220,11 @@ export async function refreshOracleSnapshot(
       insufficientData: true,
       insufficientReason: resolved.reason,
       poolSize: resolved.poolSize,
+      // Provenance passthrough (daatan#1617) — from the single `/forecast` run that fed
+      // the pool this abstention is over, not from `/pool/aggregate` (retro doesn't put
+      // a Provenance envelope on that response yet).
+      engine: forecast.provenance?.engine ?? undefined,
+      schemaVersion: forecast.provenance?.schema_version ?? undefined,
     })
     log.info(
       { predictionId: prediction.id, estimateSource: 'pool-insufficient', reason: resolved.reason, poolSize: resolved.poolSize },
@@ -250,6 +255,9 @@ export async function refreshOracleSnapshot(
     evidenceMass: resolved.evidenceMass,
     nEff: resolved.nEff,
     ageAdjustedMass: resolved.ageAdjustedMass,
+    // Provenance passthrough (daatan#1617) — see the abstention branch above.
+    engine: forecast.provenance?.engine ?? undefined,
+    schemaVersion: forecast.provenance?.schema_version ?? undefined,
   })
 
   log.info(
