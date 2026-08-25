@@ -63,6 +63,13 @@ export function contextFingerprint(snapshot: PanelContextSnapshot): string {
  * "no matching news" is exactly the day their answer should equal their prior.
  * `null` means retrieval itself failed (down, timeout, non-OK); the caller degrades
  * that forecast to ungrounded-only for this tick and the next tick retries.
+ *
+ * Deliberately calls news-indexer directly instead of going through `oracleSearch()`
+ * (daatan#1421) — the grounded panel needs a frozen, single-source result set (this
+ * index only) so a completion pass hours later can re-ask against the exact same
+ * articles (see the file header above and docs/LASSO.md §9a); `oracleSearch()`'s
+ * multi-provider fallback chain has no such determinism guarantee. Same category of
+ * intentional bypass as `panel/client.ts`'s direct provider calls (retro#493).
  */
 export async function retrievePanelContext(
   claimText: string,
