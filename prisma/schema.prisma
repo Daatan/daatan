@@ -988,6 +988,19 @@ model EvidenceHealthAlert {
   @@map("evidence_health_alerts")
 }
 
+// Dedup ledger for the twice-weekly evidence-second-opinion cron (daatan#1636):
+// detector 1 (cheap-vs-expensive disagreement on one article) and detector 2
+// (same-source stance drift) share this table, same reconcile-wholesale shape
+// as EvidenceHealthAlert — keys absent from a run's active set are deleted,
+// re-arming that case for the next run instead of alerting on it forever.
+model EvidenceSecondOpinionAlert {
+  id      String   @id @default(cuid())
+  key     String   @unique @db.VarChar(200)
+  firedAt DateTime @default(now()) @map("fired_at")
+
+  @@map("evidence_second_opinion_alerts")
+}
+
 // Per-UTC-day counter of AI-panel OpenRouter 402 (payment) failures (daatan#1504).
 // The 402s only surfaced in app logs, which the DB-driven evidence-health digest
 // can't read — so the sweep records them here at the call site and the digest

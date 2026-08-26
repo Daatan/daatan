@@ -334,6 +334,77 @@ export function notifyEvidenceHealthDigest(report: {
   sendChannelNotification(msg, critical ? 'clean' : 'noisy')
 }
 
+/** One flagged case from the twice-weekly evidence-second-opinion cron (daatan#1636). */
+export type EvidenceSecondOpinionIssue =
+  | {
+      kind: 'model_disagreement'
+      predictionId: string
+      claimText: string
+      slug: string | null
+      articleUrl: string
+      articleTitle: string
+      cheapPct: number
+      expensivePct: number
+      publishedPct: number
+    }
+  | {
+      kind: 'source_drift'
+      predictionId: string
+      claimText: string
+      slug: string | null
+      source: string
+      olderPct: number
+      newerPct: number
+      olderDate: string
+      newerDate: string
+    }
+
+const EVIDENCE_SECOND_OPINION_MAX_LINES = 12
+
+function evidenceSecondOpinionLine(i: EvidenceSecondOpinionIssue): string {
+  const url = forecastUrl({ id: i.predictionId, claimText: i.claimText, slug: i.slug })
+  switch (i.kind) {
+    case 'model_disagreement':
+      return (
+        `• <a href="${url}">${escapeHtml(truncate(i.claimText, 70))}</a>: cheap <b>${i.cheapPct}%</b> vs ` +
+        `expensive <b>${i.expensivePct}%</b> (published ${i.publishedPct}%) — ` +
+        `<a href="${escapeHtml(i.articleUrl)}">${escapeHtml(truncate(i.articleTitle, 60))}</a>`
+      )
+    case 'source_drift':
+      return (
+        `• <a href="${url}">${escapeHtml(truncate(i.claimText, 70))}</a>: ` +
+        `<b>${escapeHtml(i.source)}</b> ${i.olderPct}% (${escapeHtml(i.olderDate)}) → ` +
+        `<b>${i.newerPct}%</b> (${escapeHtml(i.newerDate)})`
+      )
+  }
+}
+
+/**
+ * Twice-weekly "interesting cases" digest (daatan#1636): articles whose extracted
+ * stance disagrees between a cheap and an expensive re-read of the SAME article
+ * (detector 1), plus same-source stance drift over time (detector 2). Mechanical —
+ * no auto-filed issues, a human triages via `/audit` or manually. Always the noisy
+ * channel: this is a "worth a look" signal, not a page.
+ */
+export function notifyEvidenceSecondOpinionDigest(report: {
+  issues: EvidenceSecondOpinionIssue[]
+  articlesChecked: number
+}): void {
+  if (isDevEnv()) return
+  if (report.issues.length === 0) return
+
+  const lines = report.issues.slice(0, EVIDENCE_SECOND_OPINION_MAX_LINES).map(evidenceSecondOpinionLine)
+  const overflow = report.issues.length - lines.length
+
+  const msg = [
+    `🔍 <b>Evidence second opinion</b> — ${report.articlesChecked} article(s) re-checked`,
+    ...lines,
+    overflow > 0 ? `…and ${overflow} more` : '',
+  ].filter(Boolean).join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
 // ============================================
 // Event-specific notification helpers
 // ============================================

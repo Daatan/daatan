@@ -594,7 +594,16 @@ export interface OracleAuthorShadowResponse {
  */
 export const getOracleForecast = async (
   question: string,
-  options?: { articles?: ArticleInput[]; timeoutMs?: number } & ClaimMeta,
+  options?: {
+    articles?: ArticleInput[]
+    timeoutMs?: number
+    /** Opt-in litellm model-id override for retro's extractor stage (retro#654,
+     *  `ForecastRequest.model`). Absent ⇒ retro's own configured default, exactly
+     *  as today. Used to get a second opinion on one already-pooled article from a
+     *  stronger model without reaching the gatekeeper or settlement paths, which
+     *  retro deliberately keeps unaffected by this field. */
+    model?: string
+  } & ClaimMeta,
   meta: OracleCallMeta = { source: 'other' },
 ): Promise<OracleForecastResult> => {
   const cfg = getOracleConfig()
@@ -611,6 +620,7 @@ export const getOracleForecast = async (
       body: JSON.stringify({
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
+        ...(options?.model ? { model: options.model } : {}),
         // Log correlation only (retro #273) — lets gate_reused log lines join
         // directly to a context_snapshots row instead of by timestamp.
         ...(meta.predictionId ? { prediction_id: meta.predictionId } : {}),

@@ -55,6 +55,11 @@ const TRUNCATABLE_TABLES = [
   // Oracle 2.0 storage (daatan#1555/#1556). latent_nodes cascades from
   // question_relations FKs, but list both: TRUNCATE is explicit here.
   'question_relations', 'latent_nodes',
+  // Evidence pipeline (daatan#1636/#1478). evidence_pool_articles cascades from
+  // predictions FKs, but list both: TRUNCATE is explicit here, not inferred.
+  // The two alert ledgers have no FK to anything and would otherwise leak
+  // dedup keys across test files indefinitely.
+  'evidence_pool_articles', 'evidence_health_alerts', 'evidence_second_opinion_alerts',
 ] as const
 
 /**

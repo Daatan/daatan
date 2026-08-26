@@ -1,0 +1,81 @@
+name: Evidence Second Opinion
+
+# Twice-weekly "interesting cases" audit (daatan#1636). Calls
+# GET /api/cron/evidence-second-opinion, which re-reads recently-pooled,
+# Gate-0-in-window articles that deviate sharply from their forecast's published
+# number with a stronger model (detector 1: escalates only when the cheap and
+# expensive readings disagree with EACH OTHER, not just with the published
+# number — agreement is treated as real new evidence the normal self-healing
+# ingestion path already handles), plus a same-source stance-drift check
+# (detector 2, pure SQL, no model calls). Posts one grouped digest to the noisy
+# Telegram channel when something fires; files no GitHub issues — a human
+# triages via /audit or manually.
+#
+# Runs against PRODUCTION by default: this is a diagnostic over the live pool,
+# and detector 1 spends real Bedrock tokens (top-10 cap per run, Sonnet 4.5 by
+# default — see EXTRACTOR_MODEL_SURVEY.md). Manual dispatch supports staging and
+# a dry-run mode (report computed, nothing posted, dedup ledger untouched) for
+# verification before this is trusted unattended.
+#
+# Mon/Thu, not daily: the candidate window (4 days) already covers the gap, and
+# this is a "worth a look" signal, not a page — dedup is DB-persisted
+# (evidence_second_opinion_alerts), so a case fires once and stays quiet until it
+# clears.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1,4'   # Mon/Thu 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to check
+        type: choice
+        options: [production, staging]
+        default: production
+      dryRun:
+        description: Compute the report without posting to Telegram or touching the dedup ledger
+        type: boolean
+        default: false
+
+jobs:
+  evidence-second-opinion:
+    name: Check for interesting cases
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Run evidence second-opinion check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          TARGET: ${{ inputs.target || 'production' }}
+          DRY_RUN: ${{ inputs.dryRun || 'false' }}
+        run: |
+          if [ "$TARGET" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
+
+          URL="$BASE/api/cron/evidence-second-opinion"
+          if [ "$DRY_RUN" = "true" ]; then
+            URL="$URL?dryRun=true"
+          fi
+
+          echo "Checking evidence second opinion at $URL"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" "$URL" \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+            --max-time 280)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "Response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Evidence second-opinion check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
