@@ -682,6 +682,28 @@ deploys until it clears. Driven daily by `.github/workflows/evidence-health.yml`
 **Alerts on delta, never on an absolute rate:** 47.2% of all pool rows are `FAILED`
 and that is by design — a wide net discards a lot. Only a *change* carries information.
 
+### `GET /api/cron/evidence-second-opinion`
+Twice-weekly "interesting cases" audit (#1636), built after a manual 2026-08-26 outlier
+scan showed a naive "article stance vs. published number" comparison is mostly noise once
+Gate-0 (retro#545 slice iii) is enforced — old, correctly zero-weighted articles still look
+like huge outliers. Detector 1 re-derives Gate-0's window check directly (never trusts the
+persisted `evidence_weight` column, which is unrelated to the temporal window — see the
+module docstring in `src/lib/services/evidence-second-opinion.ts`), and for an in-window
+article whose stance deviates ≥20pp from its forecast's published `confidence`, gets a
+second opinion on that same article from a stronger model (`EVIDENCE_SECOND_OPINION_MODEL`,
+default Sonnet 4.5). It escalates only when the cheap and expensive readings disagree with
+**each other** by ≥15pp — agreement, even against the published number, is treated as real
+new evidence the normal ingestion path already self-heals from. Detector 2 is pure SQL, no
+model calls: flags a same-source stance drift ≥25pp between an older and a newer article on
+the same forecast. Capped at 10 re-extractions per run (`MAX_REEXTRACTIONS_PER_RUN`), run
+concurrently via `Promise.all`. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401
+otherwise; 500 if the check itself fails. `?dryRun=true` computes the report without
+posting to Telegram or touching the dedup ledger. Returns
+`{ ok, dryRun, articlesChecked, suppressed, issues[] }`. Dedup/re-arm state is the
+`evidence_second_opinion_alerts` table — same reconcile-wholesale shape as evidence-health.
+Files no GitHub issues; a human triages via `/audit` or manually. Driven Mon/Thu by
+`.github/workflows/evidence-second-opinion.yml`.
+
 ### `GET /api/cron/relation-typer`
 Signed relation typer (retro#574, Oracle 2.0). Finds open (`ACTIVE`/`PENDING`)
 forecast pairs at cosine ≥ 0.85 with a shared tag and no `question_relations`

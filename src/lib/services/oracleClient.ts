@@ -28,6 +28,7 @@ export type OracleCallSource =
   | 'source-leaderboard'
   | 'admin-outlet-detail'
   | 'news-indexer'
+  | 'evidence-second-opinion'
   | 'other'
 
 /** LLM token usage as the Oracle reports it (`token_usage` on /forecast,
