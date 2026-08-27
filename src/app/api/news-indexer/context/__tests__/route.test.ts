@@ -1406,6 +1406,32 @@ describe('POST /api/news-indexer/context', () => {
       expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!.length).toBeLessThanOrEqual(4000)
     })
 
+    it('never emits a lone surrogate when the cap falls mid-emoji', async () => {
+      // The cap is a fixed UTF-16 offset, so an emoji straddling it is cut in half. The lone
+      // high surrogate left behind survives JSON.stringify but is not UTF-8-encodable, so the
+      // Oracle would raise UnicodeEncodeError on a body we already told the producer we took —
+      // reintroducing the dropped-delivery failure daatan#1278 removed. The emoji test above
+      // happens to cut on an even offset and never sees this.
+      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+
+      // 3,999 filler + emoji ⇒ the 4,000th unit is the emoji's HIGH surrogate.
+      const straddling = 'x'.repeat(3999) + '😀' + 'tail'
+
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [{ url: 'https://a.com/1', title: 'A', snippet: 's', text: straddling }],
+        }),
+      )
+
+      const text = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!
+      expect(text.length).toBeLessThanOrEqual(4000)
+      // The half-emoji is dropped rather than shipped broken.
+      expect(text).toHaveLength(3999)
+      expect(text.isWellFormed()).toBe(true)
+      expect(() => Buffer.from(text, 'utf8').toString('utf8')).not.toThrow()
+    })
+
     it('forwards the language hint to the Oracle alongside the body', async () => {
       // daatan#1290 / news-indexer#210. news-indexer knows the language per-source but never
       // sent it, so the Oracle stances raw Hebrew/Russian with English prompts. Inert at the
