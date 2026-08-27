@@ -193,6 +193,42 @@ resource "aws_sns_topic_subscription" "infra_alerts_email" {
   endpoint  = "komapc@gmail.com"
 }
 
+# ====================================================================
+# INFRASTRUCTURE ALERTS (us-east-1)
+# ====================================================================
+# A CloudWatch alarm can only publish to an SNS topic in its OWN region, and
+# AWS/Bedrock metrics exist only in us-east-1 — so any alarm on Bedrock needs a
+# us-east-1 topic to talk to. The eu-central-1 topic above cannot serve them:
+# PutMetricAlarm rejects a cross-region ARN outright ("Invalid region
+# eu-central-1 specified. Only us-east-1 is supported").
+#
+# That is why retro's two Bedrock alarms have never existed despite being merged
+# since 2026-07-21 — they point at the eu-central-1 topic and every apply of them
+# fails. `terraform plan` cannot catch it: the plan renders clean and the region
+# mismatch only surfaces at apply. See Daatan/retro#669.
+#
+# Deliberately a second topic rather than reusing daatan-billing-alerts (which is
+# already in us-east-1): that one is for Budgets, and routing a stalled-pipeline
+# page through a topic named for billing costs nothing today, when everything
+# lands in one inbox, but misroutes the moment alerts are dispatched by topic.
+#
+# No aws_sns_topic_policy here, unlike billing_alerts above: that one needs an
+# explicit grant because Budgets publishes as a SERVICE principal. CloudWatch
+# alarms publish on behalf of the account owner, which the AWS-generated default
+# policy already covers — verified against daatan-infra-alerts, which carries only
+# the default statement and whose EC2 alarms deliver fine.
+resource "aws_sns_topic" "infra_alerts_us_east_1" {
+  provider = aws.us_east_1
+  name     = "daatan-infra-alerts-us-east-1"
+}
+
+resource "aws_sns_topic_subscription" "infra_alerts_us_east_1_email" {
+  provider  = aws.us_east_1
+  topic_arn = aws_sns_topic.infra_alerts_us_east_1.arn
+  protocol  = "email"
+  endpoint  = "komapc@gmail.com"
+}
+
 # Production EC2 — fires if instance fails host or reachability checks for 2 consecutive minutes
 resource "aws_cloudwatch_metric_alarm" "prod_ec2_status_check" {
   alarm_name          = "prod-ec2-status-check-failed"
