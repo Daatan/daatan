@@ -58,7 +58,14 @@ const capArticleText = (
   if (!text) return undefined
   if (text.length <= ARTICLE_TEXT_MAX_CHARS) return text
   overCap.push(url)
-  return text.slice(0, ARTICLE_TEXT_MAX_CHARS)
+  const cut = text.slice(0, ARTICLE_TEXT_MAX_CHARS)
+  // Cutting at a fixed UTF-16 offset can land between the two halves of a surrogate pair. The
+  // resulting lone surrogate survives JSON.stringify (as a \udXXX escape) but is not encodable
+  // as UTF-8, so the Oracle raises UnicodeEncodeError on a body we said we had accepted — the
+  // same "one bad article kills the push" failure this function exists to prevent, in the very
+  // character class (emoji) that triggered news-indexer#207.
+  const last = cut.charCodeAt(cut.length - 1)
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut
 }
 
 // One article in the evidence set. `similarity` is per-article so the trigger
