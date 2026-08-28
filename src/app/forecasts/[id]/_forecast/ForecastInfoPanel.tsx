@@ -10,10 +10,15 @@ import type { Prediction } from './types'
 interface Props {
   prediction: Prediction
   variant?: 'desktop' | 'mobile'
+  /** Mobile renders dates and tags as two separate calls (tags moves below the
+   *  forecasting CTA there); desktop always renders everything together. */
+  section?: 'all' | 'dates' | 'tags'
 }
 
-export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
+export function ForecastInfoPanel({ prediction, variant = 'desktop', section = 'all' }: Props) {
   const t = useTranslations('forecast')
+  const showDates = section !== 'tags'
+  const showTags = section !== 'dates'
   // Mobile shows the two date cards side by side; below sm the half-width card
   // can't fit the full timestamp or label, so use the date-only format and the
   // short label there (full versions from sm up).
@@ -69,48 +74,54 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
           </div>
         )}
 
-        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
-          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
-            <Calendar className="w-3.5 h-3.5" />
-            {dateLabel('creationDateShort', 'creationDate')}
+        {showDates && (
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
+              <Calendar className="w-3.5 h-3.5" />
+              {dateLabel('creationDateShort', 'creationDate')}
+            </div>
+            <div className="text-white font-semibold truncate">
+              {dateCell(prediction.createdAt)}
+            </div>
           </div>
-          <div className="text-white font-semibold truncate">
-            {dateCell(prediction.createdAt)}
-          </div>
-        </div>
+        )}
 
-        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
-          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
-            <Calendar className="w-3.5 h-3.5" />
-            {dateLabel('deadlineShort', 'deadline')}
+        {showDates && (
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
+              <Calendar className="w-3.5 h-3.5" />
+              {dateLabel('deadlineShort', 'deadline')}
+            </div>
+            <div className="text-white font-semibold truncate">
+              {dateCell(prediction.resolveByDatetime)}
+            </div>
           </div>
-          <div className="text-white font-semibold truncate">
-            {dateCell(prediction.resolveByDatetime)}
-          </div>
-        </div>
+        )}
 
-        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
-          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
-            <Target className="w-3.5 h-3.5" />
-            Tags
+        {showTags && (
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
+            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
+              <Target className="w-3.5 h-3.5" />
+              Tags
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {prediction.tags && prediction.tags.length > 0 ? (
+                prediction.tags.map((tag) => (
+                  <Link
+                    key={tag.id}
+                    href={`/tags/${tag.slug}`}
+                    title={t('filterByTagTooltip', { tag: tag.name })}
+                    className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600 transition-colors"
+                  >
+                    {tag.name}
+                  </Link>
+                ))
+              ) : (
+                <span className="text-gray-400 italic text-xs">None</span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {prediction.tags && prediction.tags.length > 0 ? (
-              prediction.tags.map((tag) => (
-                <Link
-                  key={tag.id}
-                  href={`/tags/${tag.slug}`}
-                  title={t('filterByTagTooltip', { tag: tag.name })}
-                  className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600 transition-colors"
-                >
-                  {tag.name}
-                </Link>
-              ))
-            ) : (
-              <span className="text-gray-400 italic text-xs">None</span>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </>
   )
