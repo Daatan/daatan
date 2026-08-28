@@ -510,8 +510,8 @@
     "disclaimer": "Translated by AI — the original text takes precedence in case of discrepancies."
   },
   "context": {
-    "title": "Situation",
-    "analyze": "Analyze Context",
+    "title": "Context",
+    "analyze": "Update Context",
     "analyzing": "Analyzing latest news...",
     "stepSearching": "Searching articles...",
     "stepAnalyzing": "Analyzing context...",
@@ -524,7 +524,9 @@
     "settledNoteSources": "Reported as decided by: {names}",
     "lastUpdated": "Last updated",
     "previousUpdates": "{count} previous update",
-    "previousUpdatesPlural": "{count} previous updates"
+    "previousUpdatesPlural": "{count} previous updates",
+    "seeMore": "See more",
+    "seeLess": "See less"
   },
   "sources": {
     "title": "Sources behind the AI estimate",

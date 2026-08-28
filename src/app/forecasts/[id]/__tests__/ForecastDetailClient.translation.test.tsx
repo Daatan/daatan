@@ -32,7 +32,13 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/comments/CommentThread', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/CommitmentForm', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/Speedometer', () => ({ default: () => null }))
-vi.mock('@/components/forecasts/ContextTimeline', () => ({ default: () => null }))
+// The forecast's own (possibly translated) description is passed through as
+// ContextTimeline's initialContext prop rather than rendered separately — the
+// mock surfaces that prop so this file can keep asserting on it without
+// pulling in ContextTimeline's own fetch/analyze behavior.
+vi.mock('@/components/forecasts/ContextTimeline', () => ({
+  default: ({ initialContext }: { initialContext?: string | null }) => <div>{initialContext}</div>,
+}))
 vi.mock('../ModeratorResolutionSection', () => ({ ModeratorResolutionSection: () => null }))
 vi.mock('../_forecast/SimilarForecasts', () => ({ SimilarForecasts: () => null }))
 

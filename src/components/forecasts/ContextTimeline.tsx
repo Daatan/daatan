@@ -7,9 +7,15 @@ import { useTranslations } from 'next-intl'
 import { createClientLogger } from '@/lib/client-logger'
 import { toError } from '@/lib/utils/error'
 import { formatDisplayDateTime } from '@/lib/utils/date'
+import { truncateAtSentence } from '@/lib/utils/truncate-text'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('ContextTimeline')
+
+// Mobile gets a noticeably shorter preview than desktop, so the forecasting/
+// commitment area is reachable sooner on a small screen.
+const MOBILE_PREVIEW_MAX_CHARS = 180
+const DESKTOP_PREVIEW_MAX_CHARS = 420
 
 type Source = {
   title: string
@@ -167,7 +173,7 @@ export default function ContextTimeline({
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analyzeStep, setAnalyzeStep] = useState<'searching' | 'analyzing' | 'estimating' | null>(null)
   const stepTimers = useRef<ReturnType<typeof setTimeout>[]>([])
-  const [isContextOpen, setIsContextOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
   const [hasFetched, setHasFetched] = useState(hasInitialSnapshots)
   const { aiResearch } = useCapabilities()
@@ -284,7 +290,7 @@ export default function ContextTimeline({
           if (msg.type === 'summary') {
             setCurrentContext(msg.newContext as string)
             setContextUpdatedAt(msg.contextUpdatedAt as string)
-            setIsContextOpen(true)
+            setIsExpanded(true)
             setAnalyzeStep('estimating')
             toast.loading(t('stepEstimating'), { id: 'analyze' })
           } else if (msg.type === 'done') {
@@ -318,6 +324,13 @@ export default function ContextTimeline({
 
   const previousSnapshots = snapshots.slice(1)
 
+  // Sentence-boundary previews, computed per breakpoint so mobile can be more
+  // aggressive than desktop about how much shows before "See more".
+  const mobilePreview = truncateAtSentence(currentContext ?? '', MOBILE_PREVIEW_MAX_CHARS)
+  const desktopPreview = truncateAtSentence(currentContext ?? '', DESKTOP_PREVIEW_MAX_CHARS)
+  const mobileCollapsed = !isExpanded && mobilePreview.isTruncated
+  const desktopCollapsed = !isExpanded && desktopPreview.isTruncated
+
   // Don't render section at all if no context and user can't analyze
   if (!currentContext && !canAnalyze && hasFetched) {
     return null
@@ -325,28 +338,11 @@ export default function ContextTimeline({
 
   return (
     <div className="mb-8">
-      {/* Header. The toggle target and the "analyze" action are siblings, not
-          nested — a focusable control inside a role="button"/<button> container
-          is an accessibility violation (double tab stop, screen readers treat
-          role="button" as a leaf and can hide the nested control). */}
-      <div className="w-full flex items-center justify-between mb-3 group">
-        <button
-          type="button"
-          onClick={() => setIsContextOpen((o) => !o)}
-          aria-expanded={isContextOpen}
-          aria-controls={`context-panel-${predictionId}`}
-          className="flex items-center gap-2 text-left"
-        >
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            {t('title')}
-          </h2>
-          {isContextOpen ? (
-            <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-300 transition-colors" aria-hidden="true" />
-          )}
-        </button>
+      <div className="w-full flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          {t('title')}
+        </h2>
         {canAnalyze && aiResearch && (
           <button
             type="button"
@@ -364,102 +360,144 @@ export default function ContextTimeline({
         )}
       </div>
 
-      {/* Current context card — always in the DOM (crawlable); collapsed via CSS
-          rather than removed, so the AI summary, estimate, reasoning and Oracle
-          sources are part of the SSR HTML for SEO. */}
+      {/* Context card — always in the DOM (crawlable); the collapsed preview and
+          the full text/AI summary/estimate/reasoning/Oracle sources both render,
+          with CSS `hidden` picking which one shows, so everything stays part of
+          the SSR HTML for SEO even while visually collapsed. */}
       {currentContext && (
-        <div id={`context-panel-${predictionId}`} className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${isContextOpen ? '' : 'hidden'}`}>
-          <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">{currentContext}</p>
-          {contextUpdatedAt && (
-            <p className="text-xs text-gray-400 mt-2" suppressHydrationWarning>
-              {t('lastUpdated')}: {formatDate(contextUpdatedAt)}
+        <div id={`context-panel-${predictionId}`} className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+          {mobilePreview.isTruncated && (
+            <p className={`text-gray-300 whitespace-pre-wrap leading-relaxed xl:hidden ${mobileCollapsed ? 'block' : 'hidden'}`}>
+              {mobilePreview.preview}…
             </p>
           )}
-          {/* News anchor */}
-          {newsAnchor && (
-            <div className="mt-3 pt-3 border-t border-navy-600">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Based on</p>
-              <a
-                href={newsAnchor.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-cobalt-light hover:underline"
-              >
-                {newsAnchor.source || newsAnchor.title}
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
+          {desktopPreview.isTruncated && (
+            <p className={`text-gray-300 whitespace-pre-wrap leading-relaxed hidden ${desktopCollapsed ? 'xl:block' : 'xl:hidden'}`}>
+              {desktopPreview.preview}…
+            </p>
           )}
-          {/* AI probability estimate.
-              Source badge ("Oracle" vs "LLM estimate") makes the provenance
-              of the number explicit: when the Oracle is unreachable / has no
-              usable predictions, daatan silently falls back to the legacy
-              LLM `guessChances` path which returns only a point estimate.
-              Without the badge the user sees a single number with no CI and
-              has no way to know which path produced it. */}
-          {snapshots[0]?.externalProbability != null && (() => {
-            const latest = snapshots[0]
-            const oracle = latest.oracleSnapshot ?? null
-            const isOracle = oracle != null
-            return (
+          <p className={`text-gray-300 whitespace-pre-wrap leading-relaxed ${mobileCollapsed ? 'hidden' : 'block'} ${desktopCollapsed ? 'xl:hidden' : 'xl:block'}`}>
+            {currentContext}
+          </p>
+
+          {mobilePreview.isTruncated && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((v) => !v)}
+              aria-expanded={isExpanded}
+              aria-controls={`context-panel-${predictionId}`}
+              className="xl:hidden mt-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              {isExpanded ? t('seeLess') : t('seeMore')}
+            </button>
+          )}
+          {desktopPreview.isTruncated && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((v) => !v)}
+              aria-expanded={isExpanded}
+              aria-controls={`context-panel-${predictionId}`}
+              className="hidden xl:inline-block mt-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              {isExpanded ? t('seeLess') : t('seeMore')}
+            </button>
+          )}
+
+          {/* Last-updated, source attribution, and the AI estimate breakdown ride
+              along with the full text — they reveal together via "See more"
+              (or immediately, when the text was never long enough to collapse). */}
+          <div className={`${mobileCollapsed ? 'hidden' : 'block'} ${desktopCollapsed ? 'xl:hidden' : 'xl:block'}`}>
+            {contextUpdatedAt && (
+              <p className="text-xs text-gray-400 mt-2" suppressHydrationWarning>
+                {t('lastUpdated')}: {formatDate(contextUpdatedAt)}
+              </p>
+            )}
+            {/* News anchor */}
+            {newsAnchor && (
               <div className="mt-3 pt-3 border-t border-navy-600">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">AI estimate</p>
-                  <span
-                    className={
-                      isOracle
-                        ? 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                        : 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-500/15 text-gray-400 border border-gray-500/30'
-                    }
-                    title={
-                      isOracle
-                        ? 'TruthMachine Oracle — calibrated multi-source estimate with confidence interval'
-                        : 'LLM fallback — single point estimate, used when Oracle has no usable sources'
-                    }
-                  >
-                    {isOracle ? 'Oracle' : 'LLM estimate'}
-                  </span>
-                  {oracle?.settled && (
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Based on</p>
+                <a
+                  href={newsAnchor.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-cobalt-light hover:underline"
+                >
+                  {newsAnchor.source || newsAnchor.title}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+            {/* AI probability estimate.
+                Source badge ("Oracle" vs "LLM estimate") makes the provenance
+                of the number explicit: when the Oracle is unreachable / has no
+                usable predictions, daatan silently falls back to the legacy
+                LLM `guessChances` path which returns only a point estimate.
+                Without the badge the user sees a single number with no CI and
+                has no way to know which path produced it. */}
+            {snapshots[0]?.externalProbability != null && (() => {
+              const latest = snapshots[0]
+              const oracle = latest.oracleSnapshot ?? null
+              const isOracle = oracle != null
+              return (
+                <div className="mt-3 pt-3 border-t border-navy-600">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">AI estimate</p>
                     <span
-                      className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                      title={t('settledHint')}
+                      className={
+                        isOracle
+                          ? 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-500/15 text-gray-400 border border-gray-500/30'
+                      }
+                      title={
+                        isOracle
+                          ? 'TruthMachine Oracle — calibrated multi-source estimate with confidence interval'
+                          : 'LLM fallback — single point estimate, used when Oracle has no usable sources'
+                      }
                     >
-                      {t('settledBadge')}
+                      {isOracle ? 'Oracle' : 'LLM estimate'}
                     </span>
+                    {oracle?.settled && (
+                      <span
+                        className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        title={t('settledHint')}
+                      >
+                        {t('settledBadge')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xl font-black text-amber-400">
+                    {latest.externalProbability}%
+                    {oracle && oracle.ciHigh > oracle.ciLow && (
+                      <span className="ml-2 text-xs font-normal text-gray-400">
+                        ± {Math.round((oracle.ciHigh - oracle.ciLow) / 2)}%
+                      </span>
+                    )}
+                  </p>
+                  {oracle?.settled && (() => {
+                    const names = settlingSourceNames(oracle)
+                    return (
+                      <p className="text-xs text-amber-300/90 mt-1 leading-relaxed" data-testid="settled-pin-note">
+                        {t('settledNote')}
+                        {names.length > 0 && ` ${t('settledNoteSources', { names: names.join(', ') })}`}
+                      </p>
+                    )
+                  })()}
+                  {latest.externalReasoning && (
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      {latest.externalReasoning}
+                      {oracle && ` · ${oracle.articlesUsed} article${oracle.articlesUsed === 1 ? '' : 's'}`}
+                    </p>
                   )}
                 </div>
-                <p className="text-2xl font-black text-amber-400">
-                  {latest.externalProbability}%
-                  {oracle && oracle.ciHigh > oracle.ciLow && (
-                    <span className="ml-2 text-xs font-normal text-gray-400">
-                      ± {Math.round((oracle.ciHigh - oracle.ciLow) / 2)}%
-                    </span>
-                  )}
-                </p>
-                {oracle?.settled && (() => {
-                  const names = settlingSourceNames(oracle)
-                  return (
-                    <p className="text-xs text-amber-300/90 mt-1 leading-relaxed" data-testid="settled-pin-note">
-                      {t('settledNote')}
-                      {names.length > 0 && ` ${t('settledNoteSources', { names: names.join(', ') })}`}
-                    </p>
-                  )
-                })()}
-                {latest.externalReasoning && (
-                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                    {latest.externalReasoning}
-                    {oracle && ` · ${oracle.articlesUsed} article${oracle.articlesUsed === 1 ? '' : 's'}`}
-                  </p>
-                )}
-              </div>
-            )
-          })()}
+              )
+            })()}
+          </div>
         </div>
       )}
 
-      {/* Previous updates toggle — only visible when context is expanded */}
-      {isContextOpen && previousSnapshots.length > 0 && (
-        <div className="mt-4">
+      {/* Previous updates toggle — rides along with the rest of the expanded state */}
+      {previousSnapshots.length > 0 && (
+        <div className={`mt-4 ${mobileCollapsed ? 'hidden' : 'block'} ${desktopCollapsed ? 'xl:hidden' : 'xl:block'}`}>
           <button
             onClick={() => setIsTimelineOpen(!isTimelineOpen)}
             className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-text-secondary transition-colors"
@@ -469,8 +507,8 @@ export default function ContextTimeline({
             ) : (
               <ChevronDown className="w-4 h-4" />
             )}
-            {previousSnapshots.length === 1 
-              ? t('previousUpdates', { count: 1 }) 
+            {previousSnapshots.length === 1
+              ? t('previousUpdates', { count: 1 })
               : t('previousUpdatesPlural', { count: previousSnapshots.length })}
           </button>
 

@@ -510,8 +510,8 @@
     "disclaimer": "תורגם על ידי בינה מלאכותית - הטקסט המקורי הוא המחייב במקרה של סתירה."
   },
   "context": {
-    "title": "מצב",
-    "analyze": "נתח הקשר",
+    "title": "הקשר",
+    "analyze": "עדכן הקשר",
     "analyzing": "מנתח חדשות אחרונות...",
     "stepSearching": "מחפש מאמרים...",
     "stepAnalyzing": "מנתח הקשר...",
@@ -524,7 +524,9 @@
     "settledNoteSources": "מדווח כמוכרע על ידי: {names}",
     "lastUpdated": "עדכון אחרון",
     "previousUpdates": "עדכון קודם אחד",
-    "previousUpdatesPlural": "{count} עדכונים קודמים"
+    "previousUpdatesPlural": "{count} עדכונים קודמים",
+    "seeMore": "הצג עוד",
+    "seeLess": "הצג פחות"
   },
   "sources": {
     "title": "המקורות שמאחורי הערכת ה-AI",
