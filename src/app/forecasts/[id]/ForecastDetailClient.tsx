@@ -515,7 +515,7 @@ export default function ForecastDetailClient({
 
           return (
             <div className="flex flex-col items-center">
-              <div className="w-full max-w-lg relative rounded-3xl border border-navy-600 bg-navy-700 p-8 sm:p-12 flex flex-col items-center justify-center shadow-2xl overflow-hidden">
+              <div className="w-full max-w-lg relative rounded-3xl border border-navy-600 bg-navy-700 p-5 sm:p-10 xl:p-12 flex flex-col items-center justify-center shadow-2xl overflow-hidden">
                 {/* Background glow */}
                 <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
@@ -533,7 +533,7 @@ export default function ForecastDetailClient({
                 />
 
                 {/* Legend */}
-                <div className="flex justify-center gap-6 mt-10 text-[10px] font-bold uppercase tracking-widest border-t border-navy-600 pt-8 w-full">
+                <div className="flex justify-center gap-6 mt-6 xl:mt-10 text-[10px] font-bold uppercase tracking-widest border-t border-navy-600 pt-4 xl:pt-8 w-full">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-1 bg-[#A0AEC0] rounded-full" />
                     <span className="text-gray-400">{t('legendCommunity')} {marketProb}%</span>
