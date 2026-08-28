@@ -15,8 +15,12 @@ const renderWithIntl = (ui: React.ReactElement) => {
   )
 }
 
-const openSection = () =>
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(enMessages.context.title, 'i') }))
+// Long enough to exceed both the mobile (180) and desktop (420) preview caps,
+// built from short, distinct sentences so truncation boundaries are easy to assert on.
+const LONG_CONTEXT = Array.from(
+  { length: 12 },
+  (_, i) => `This is sentence number ${i + 1} of the ongoing situation update.`
+).join(' ')
 
 describe('ContextTimeline', () => {
   beforeEach(() => {
@@ -36,21 +40,21 @@ describe('ContextTimeline', () => {
     expect(screen.getByText(enMessages.context.title)).toBeInTheDocument()
   })
 
-  it('shows analyze button when canAnalyze is true', async () => {
+  it('shows the update-context button when canAnalyze is true', async () => {
     await act(async () => {
       renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />)
     })
     expect(screen.getByText(enMessages.context.analyze)).toBeInTheDocument()
   })
 
-  it('hides analyze button when canAnalyze is false', async () => {
+  it('hides the update-context button when canAnalyze is false', async () => {
     await act(async () => {
       renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
     })
     expect(screen.queryByText(enMessages.context.analyze)).not.toBeInTheDocument()
   })
 
-  it('has no automatically detectable a11y violations, with the analyze button visible', async () => {
+  it('has no automatically detectable a11y violations, with the update-context button visible', async () => {
     let container: HTMLElement
     await act(async () => {
       ;({ container } = renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />))
@@ -58,53 +62,17 @@ describe('ContextTimeline', () => {
     expect(await axe(container!)).toHaveNoViolations()
   })
 
-  it('keeps the context body in the DOM while collapsed by default (crawlable, hidden via CSS)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        currentContext: 'Current situation summary',
-        contextUpdatedAt: '2026-02-20T10:00:00Z',
-        snapshots: [{ id: 's1', summary: 'Current situation summary', sources: [], createdAt: '2026-02-20T10:00:00Z' }],
-      }),
-    })
-
-    await act(async () => {
-      renderWithIntl(<ContextTimeline predictionId="p1" initialContext="Current situation summary" canAnalyze={false} />)
-    })
-
-    // The summary is rendered into the HTML for SEO even though the section is
-    // visually collapsed — its container carries the `hidden` class rather than
-    // being removed from the tree.
-    const body = screen.getByText('Current situation summary')
-    expect(body).toBeInTheDocument()
-    expect(body.parentElement?.className).toContain('hidden')
-  })
-
-  it('displays initial context after expanding section', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        currentContext: 'Current situation summary',
-        contextUpdatedAt: '2026-02-20T10:00:00Z',
-        snapshots: [{ id: 's1', summary: 'Current situation summary', sources: [], createdAt: '2026-02-20T10:00:00Z' }],
-      }),
-    })
-
+  it('shows short context directly under the heading, with no "See more" needed', async () => {
     await act(async () => {
       renderWithIntl(
-        <ContextTimeline
-          predictionId="p1"
-          initialContext="Current situation summary"
-          canAnalyze={false}
-        />
+        <ContextTimeline predictionId="p1" initialContext="Current situation summary" initialSnapshots={[]} canAnalyze={false} />
       )
     })
-
-    openSection()
     expect(screen.getByText('Current situation summary')).toBeInTheDocument()
+    expect(screen.queryByText(enMessages.context.seeMore)).not.toBeInTheDocument()
   })
 
-  it('fetches timeline on mount', async () => {
+  it('fetches timeline on mount and displays the fetched context without needing a click', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -120,14 +88,77 @@ describe('ContextTimeline', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/p1/context')
     })
 
-    openSection()
-
     await waitFor(() => {
       expect(screen.getByText('Fetched context')).toBeInTheDocument()
     })
   })
 
-  it('shows previous updates toggle when section is expanded', async () => {
+  it('shows a truncated preview with "See more" when context is long, and never cuts mid-sentence', async () => {
+    await act(async () => {
+      renderWithIntl(
+        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} />
+      )
+    })
+
+    const seeMoreButtons = screen.getAllByText(enMessages.context.seeMore)
+    expect(seeMoreButtons.length).toBeGreaterThan(0)
+
+    // The full text is present in the DOM (crawlable) even while visually collapsed.
+    const full = screen.getByText(LONG_CONTEXT)
+    expect(full).toBeInTheDocument()
+    expect(full.className).toMatch(/hidden/)
+
+    // Sentence boundary preserved: the preview (ellipsis-suffixed, shorter than
+    // the full text) always ends its kept sentence with a period, never a
+    // mid-word/mid-sentence cut.
+    const previews = screen.getAllByText((content, el) => {
+      if (el?.tagName !== 'P') return false
+      const text = el.textContent ?? ''
+      return text.endsWith('…') && text.length < LONG_CONTEXT.length
+    })
+    expect(previews.length).toBeGreaterThan(0)
+    for (const p of previews) {
+      expect(p.textContent!.slice(0, -1).trim().endsWith('.')).toBe(true)
+    }
+  })
+
+  it('expands to show the full text and "See less" when "See more" is clicked', async () => {
+    await act(async () => {
+      renderWithIntl(
+        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} />
+      )
+    })
+
+    fireEvent.click(screen.getAllByText(enMessages.context.seeMore)[0])
+
+    expect(screen.getAllByText(enMessages.context.seeLess).length).toBeGreaterThan(0)
+    const full = screen.getByText(LONG_CONTEXT)
+    expect(full.className).not.toMatch(/hidden/)
+  })
+
+  it('reveals "Based on" source attribution once expanded, and keeps it in the DOM while collapsed', async () => {
+    await act(async () => {
+      renderWithIntl(
+        <ContextTimeline
+          predictionId="p1"
+          initialContext={LONG_CONTEXT}
+          initialSnapshots={[]}
+          canAnalyze={false}
+          newsAnchor={{ title: 'Original article', url: 'https://example.com/a', source: 'Example News' }}
+        />
+      )
+    })
+
+    // Present in the DOM (crawlable) even before expanding.
+    const basedOnLink = screen.getByText('Example News')
+    expect(basedOnLink).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByText(enMessages.context.seeMore)[0])
+    // Still there, now visible (the wrapping "hidden" class list is gone at least once).
+    expect(screen.getByText('Example News')).toBeInTheDocument()
+  })
+
+  it('shows previous updates toggle for short (non-collapsing) context', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
@@ -141,9 +172,6 @@ describe('ContextTimeline', () => {
     })
 
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
 
     await waitFor(() => {
       expect(screen.getByText('1 previous update')).toBeInTheDocument()
@@ -165,9 +193,6 @@ describe('ContextTimeline', () => {
 
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
 
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
-
     await waitFor(() => {
       expect(screen.getByText('1 previous update')).toBeInTheDocument()
     })
@@ -180,7 +205,7 @@ describe('ContextTimeline', () => {
     expect(screen.getByText('Older update')).toBeInTheDocument()
   })
 
-  it('calls POST and updates state when analyze is clicked, then auto-expands', async () => {
+  it('calls POST and updates state when update-context is clicked', async () => {
     // First call: GET on mount
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -193,7 +218,7 @@ describe('ContextTimeline', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/p1/context')
     })
 
-    // Second call: POST on analyze — returns SSE stream
+    // Second call: POST on update — returns SSE stream
     const sseData = [
       `data: ${JSON.stringify({ type: 'summary', newContext: 'Freshly analyzed context', contextUpdatedAt: '2026-02-20T12:00:00Z' })}\n\n`,
       `data: ${JSON.stringify({ type: 'done', success: true, timeline: [{ id: 's1', summary: 'Freshly analyzed context', sources: [], createdAt: '2026-02-20T12:00:00Z' }], timings: { searchMs: 1000, llmMs: 2000, oracleMs: 3000, totalMs: 6000 } })}\n\n`,
@@ -215,7 +240,6 @@ describe('ContextTimeline', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/p1/context', { method: 'POST' })
     })
 
-    // Section auto-expands after analyze
     await waitFor(() => {
       expect(screen.getByText('Freshly analyzed context')).toBeInTheDocument()
     })
@@ -271,7 +295,6 @@ describe('ContextTimeline', () => {
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
 
     // Spread shown as ±halfWidth (ciHigh=76, ciLow=52 → (76-52)/2 = 12)
     await waitFor(() => {
@@ -326,7 +349,6 @@ describe('ContextTimeline', () => {
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
 
     await waitFor(() => {
       expect(screen.getByText(enMessages.context.settledBadge)).toBeInTheDocument()
@@ -360,7 +382,6 @@ describe('ContextTimeline', () => {
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
 
     await waitFor(() => {
       expect(screen.getByText('55%')).toBeInTheDocument()
@@ -384,9 +405,6 @@ describe('ContextTimeline', () => {
     })
 
     renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    openSection()
 
     await waitFor(() => {
       expect(screen.getByText('2 previous updates')).toBeInTheDocument()

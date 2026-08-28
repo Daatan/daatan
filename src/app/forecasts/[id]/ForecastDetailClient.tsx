@@ -462,12 +462,20 @@ export default function ForecastDetailClient({
           </div>
         )}
 
-        {(showTranslated && translatedFields?.detailsText ? translatedFields.detailsText : prediction.detailsText) && (
-          <div className="prose prose-sm max-w-none text-text-secondary mb-8 whitespace-pre-wrap">
-            {showTranslated && translatedFields?.detailsText ? translatedFields.detailsText : prediction.detailsText}
-          </div>
-        )}
       </div>
+
+      {/* Context — the forecast's own description plus the AI-analyzed situation
+          summary, unified into one section (replaces the old separate top
+          paragraph + collapsible "Situation" panel). */}
+      <ContextTimeline
+        predictionId={prediction.id}
+        initialContext={showTranslated && translatedFields?.detailsText ? translatedFields.detailsText : prediction.detailsText}
+        initialContextUpdatedAt={prediction.contextUpdatedAt}
+        initialSnapshots={initialContextSnapshots}
+        canAnalyze={!!session?.user && prediction.status === 'ACTIVE'}
+        newsAnchor={prediction.newsAnchor}
+        onAiEstimate={setAiEstimate}
+      />
 
       {/* Resolution Rules */}
       <div className="mb-8">
@@ -485,17 +493,6 @@ export default function ForecastDetailClient({
           {prediction.resolutionRules ?? t('noResolutionRules')}
         </div>
       </div>
-
-      {/* Situation Context / Timeline */}
-      <ContextTimeline
-        predictionId={prediction.id}
-        initialContext={prediction.detailsText}
-        initialContextUpdatedAt={prediction.contextUpdatedAt}
-        initialSnapshots={initialContextSnapshots}
-        canAnalyze={!!session?.user && prediction.status === 'ACTIVE'}
-        newsAnchor={prediction.newsAnchor}
-        onAiEstimate={setAiEstimate}
-      />
 
       {/* Probability Display (Interactive Gauge) */}
       <div className="mb-12">

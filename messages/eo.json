@@ -510,8 +510,8 @@
     "disclaimer": "Tradukita de AI — la originala teksto havas prioritaton en kazo de malkongruoj."
   },
   "context": {
-    "title": "Situacio",
-    "analyze": "Analizi Kuntekston",
+    "title": "Kunteksto",
+    "analyze": "Ĝisdatigi Kuntekston",
     "analyzing": "Analizante lastatempajn novaĵojn...",
     "stepSearching": "Serĉante artikolojn...",
     "stepAnalyzing": "Analizante kuntekston...",
@@ -524,7 +524,9 @@
     "settledNoteSources": "Raportas la rezulton kiel jam deciditan: {names}",
     "lastUpdated": "Laste ĝisdatigita",
     "previousUpdates": "{count} antaŭa ĝisdatigo",
-    "previousUpdatesPlural": "{count} antaŭaj ĝisdatigoj"
+    "previousUpdatesPlural": "{count} antaŭaj ĝisdatigoj",
+    "seeMore": "Vidi pli",
+    "seeLess": "Vidi malpli"
   },
   "sources": {
     "title": "Fontoj malantaŭ la AI-takso",
