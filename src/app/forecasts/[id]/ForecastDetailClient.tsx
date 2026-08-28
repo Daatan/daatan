@@ -340,7 +340,7 @@ export default function ForecastDetailClient({
       {/* Back Link */}
       <button
         onClick={handleBack}
-        className="inline-flex items-center gap-1 text-gray-500 hover:text-text-secondary mb-6"
+        className="inline-flex items-center gap-1 text-gray-500 hover:text-text-secondary mb-4 xl:mb-6"
       >
         <ChevronLeft className="w-4 h-4" />
         {t('backToFeed')}
@@ -351,7 +351,7 @@ export default function ForecastDetailClient({
         <div className="min-w-0">
 
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 xl:mb-6">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             {prediction.status !== 'ACTIVE' && (
@@ -447,7 +447,7 @@ export default function ForecastDetailClient({
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-4 break-words">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-3 xl:mb-4 break-words">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
@@ -478,7 +478,7 @@ export default function ForecastDetailClient({
       />
 
       {/* Resolution Rules */}
-      <div className="mb-8">
+      <div className="mb-5 xl:mb-8">
         <button
           type="button"
           onClick={() => setShowRules(v => !v)}

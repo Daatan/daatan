@@ -337,8 +337,8 @@ export default function ContextTimeline({
   }
 
   return (
-    <div className="mb-8">
-      <div className="w-full flex items-center justify-between mb-3">
+    <div className="mb-5 xl:mb-8">
+      <div className="w-full flex items-center justify-between mb-2 xl:mb-3">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
           <FileText className="w-5 h-5" />
           {t('title')}

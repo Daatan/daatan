@@ -35,9 +35,14 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
     ) : (
       t(fullKey)
     )
+  // Mobile's date/tags cards are a compact strip meant to get out of the way
+  // before the forecasting CTA, so they carry tighter padding than desktop's
+  // sidebar cards (which have more room and sit next to, not above, the CTA).
+  const cardPadding = variant === 'mobile' ? 'p-3' : 'p-4'
+  const labelMargin = variant === 'mobile' ? 'mb-1' : 'mb-2'
   return (
     <>
-      <div className={variant === 'mobile' ? 'grid grid-cols-2 gap-4 mb-8' : 'grid grid-cols-1 gap-3'}>
+      <div className={variant === 'mobile' ? 'grid grid-cols-2 gap-3 mb-5' : 'grid grid-cols-1 gap-3'}>
         {variant === 'desktop' && (
           <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
@@ -64,8 +69,8 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
           </div>
         )}
 
-        <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
             <Calendar className="w-3.5 h-3.5" />
             {dateLabel('creationDateShort', 'creationDate')}
           </div>
@@ -74,8 +79,8 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
           </div>
         </div>
 
-        <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
             <Calendar className="w-3.5 h-3.5" />
             {dateLabel('deadlineShort', 'deadline')}
           </div>
@@ -84,8 +89,8 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop' }: Props) {
           </div>
         </div>
 
-        <div className={`p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
+        <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
+          <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
             <Target className="w-3.5 h-3.5" />
             Tags
           </div>
