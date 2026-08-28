@@ -365,7 +365,7 @@ export default function ContextTimeline({
           with CSS `hidden` picking which one shows, so everything stays part of
           the SSR HTML for SEO even while visually collapsed. */}
       {currentContext && (
-        <div id={`context-panel-${predictionId}`} className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+        <div id={`context-panel-${predictionId}`} className="p-3 xl:p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
           {mobilePreview.isTruncated && (
             <p className={`text-gray-300 whitespace-pre-wrap leading-relaxed xl:hidden ${mobileCollapsed ? 'block' : 'hidden'}`}>
               {mobilePreview.preview}…
