@@ -767,6 +767,10 @@ export function notifyDailySummary(stats: {
  * caller's job to skip, not this function's — see news-indexer/context/
  * route.ts's `wasStored`.
  */
+/** Heading the article-match panel puts above the shadow-lane rows (daatan#1661): every row
+ *  under it is captured and shown but NOT read by the Oracle's estimate. Exported for tests. */
+export const SHADOW_MARKER = '<i>not in estimate:</i>'
+
 export async function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
   article: {
@@ -782,6 +786,8 @@ export async function notifyNewsArticleMatched(
     factSignal?: number | null
     evidenceClass?: string | null
     credibilityWeight?: number | null
+    consensusView?: string | null
+    reportKind?: string | null
   },
   match: { similarity: number; articleCount?: number; poolSize?: number | null; usableSize?: number | null },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
@@ -817,45 +823,58 @@ export async function notifyNewsArticleMatched(
         : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})${volumeLabel}`
 
   const sourceLabel = article.source ? ` — ${escapeHtml(article.source)}` : ''
-  const simPct = Math.round(match.similarity * 100)
   const signed = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`
   const cert = (v: number | null | undefined) => (v != null ? ` (cert ${v.toFixed(2)})` : '')
 
   // Every number this push produced, one per row, null-omitted rather than printed as "null"
   // (an older Oracle response, or a daatan prod that predates a given passthrough, must
-  // degrade to a shorter panel). Row order is deliberate:
+  // degrade to a shorter panel). The panel is split in two (daatan#1661): the rows the
+  // Oracle's aggregation actually reads, then — under a "not in estimate" marker — the
+  // shadow-lane fields it captures but does not read yet. That split is the ONE place the
+  // live/shadow boundary is spelled out for readers; when Oracle 1.5 graduates a field, move
+  // its row from `shadowRows` to `liveRows` and update /help/rating-numbers + docs/ — nothing
+  // else in the renderer knows which is which.
+  //
   //   stance      [-1,1] — which way the article argues; signed, so -0.72 reads as "argues NO".
   //                        The extractor's certainty about that reading rides along.
   //   relevance   [0,1]  — the Oracle's claim-aware judgment; its SQUARE weights the article
   //                        in aggregation, so 0.5 counts a quarter as much as 1.0.
-  //   match %            — embedding cosine, the weakest of the three and the one proven to
-  //                        misrank (news-indexer#124).
-  //   author_lean/fact_signal/credibility/class — judgment-lane signals (Signal Lanes),
-  //                        shadow-only: nothing in the Oracle's own aggregation reads them yet,
-  //                        so this panel is the only place they're visible at all.
-  //                        `credibilityWeight` is pre-filtered to null at the caller while the
-  //                        credibility cutover flag is OFF (1.0 is a neutral default, not a
-  //                        judgment).
   //   range              — omitted when under 2 points wide (display noise) or when a bound is
   //                        missing (older snapshots predate ciLow/ciHigh).
-  const rows: Array<[string, string] | null> = [
+  //   author_lean/fact_signal/credibility/class/consensus/report_kind — judgment-lane and
+  //                        elicited shadow fields (Signal Lanes, retro#686): nothing in the
+  //                        Oracle's own aggregation reads them, so this panel is the only place
+  //                        they're visible at all. `credibilityWeight` is pre-filtered to null
+  //                        at the caller while the credibility cutover flag is OFF (1.0 is a
+  //                        neutral default, not a judgment).
+  //
+  // The embedding cosine (`match.similarity`) is deliberately NOT a row any more: it is why
+  // news-indexer pushed, not evidence about the claim, and under Funnel v2 the judge's
+  // `relevance` is the gate. It stays persisted on the rating prompt (`snapshotSimilarity`).
+  const liveRows: Array<[string, string] | null> = [
     article.stance != null ? ['stance', `${signed(article.stance)}${cert(article.certainty)}`] : null,
     article.relevance != null ? ['relevance', article.relevance.toFixed(2)] : null,
-    ['match', `${simPct}%`],
+    ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? ['range', `${ciLow}–${ciHigh}%`] : null,
+  ]
+  const shadowRows: Array<[string, string] | null> = [
     article.authorLean != null
       ? ['author_lean', `${signed(article.authorLean)}${cert(article.authorLeanCertainty)}`]
       : null,
     article.factSignal != null ? ['fact_signal', signed(article.factSignal)] : null,
     article.credibilityWeight != null ? ['credibility', article.credibilityWeight.toFixed(2)] : null,
     article.evidenceClass ? ['class', article.evidenceClass] : null,
-    ciLow !== null && ciHigh !== null && ciHigh - ciLow >= 2 ? ['range', `${ciLow}–${ciHigh}%`] : null,
+    article.consensusView ? ['consensus', article.consensusView] : null,
+    article.reportKind ? ['report_kind', article.reportKind] : null,
   ]
+  const renderRows = (rows: Array<[string, string] | null>) =>
+    rows
+      .filter((r): r is [string, string] => r !== null)
+      .map(([label, value]) => `<b>${label}</b>  ${escapeHtml(value)}`)
   // A Telegram blockquote, not <pre>: the quote bar visually groups the numbers into a
   // panel without the monospace code chrome ("copy code") clients hang on pre blocks.
-  const panel = rows
-    .filter((r): r is [string, string] => r !== null)
-    .map(([label, value]) => `<b>${label}</b>  ${escapeHtml(value)}`)
-    .join('\n')
+  const live = renderRows(liveRows)
+  const shadow = renderRows(shadowRows)
+  const panel = [...live, ...(shadow.length ? [SHADOW_MARKER, ...shadow] : [])].join('\n')
 
   // A short quote of what was actually judged: the Oracle's extracted claim when it produced
   // one (that's the text the numbers scored), the raw article snippet otherwise.
@@ -866,8 +885,7 @@ export async function notifyNewsArticleMatched(
     '',
     `📰 <a href="${escapeHtml(article.url)}">${truncate(article.title, 100)}</a>${sourceLabel}`,
     ...(extractLine ? [extractLine] : []),
-    '',
-    `<blockquote>${panel}</blockquote>`,
+    ...(panel ? ['', `<blockquote>${panel}</blockquote>`] : []),
     '',
     `🎯 <a href="${forecastUrl(prediction)}">${truncate(prediction.claimText, 120)}</a>`,
   ].join('\n')
@@ -1173,10 +1191,12 @@ const FEEDBACK_FIELD_LABELS: Record<NumberFeedbackField, string> = {
   OTHER: 'Other',
 }
 
+// SIMILARITY is intentionally absent (daatan#1661): the `match` row it referred to is no
+// longer shown, so a rater can't flag it. The enum value and its label stay — existing
+// feedback rows carry it and the admin dashboard still renders them.
 const FEEDBACK_FIELD_ORDER: NumberFeedbackField[] = [
   'STANCE',
   'RELEVANCE',
-  'SIMILARITY',
   'PROBABILITY',
   'AUTHOR_LEAN',
   'FACT_SIGNAL',

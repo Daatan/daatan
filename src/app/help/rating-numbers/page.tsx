@@ -40,15 +40,17 @@ export default function RatingNumbersHelpPage() {
         <h2 className="text-xl font-semibold text-white mb-3">The numbers panel</h2>
         <p className="mb-3">
           One row per number the article&apos;s extraction produced — a row appears only when that
-          value exists. Three of the rows (<code className="bg-navy-800 px-1 rounded text-xs font-mono">stance</code>,{' '}
+          value exists. The panel is in two parts. The rows above the{' '}
+          <em>not in estimate:</em> marker (<code className="bg-navy-800 px-1 rounded text-xs font-mono">stance</code>,{' '}
           <code className="bg-navy-800 px-1 rounded text-xs font-mono">relevance</code>,{' '}
-          <code className="bg-navy-800 px-1 rounded text-xs font-mono">match</code>) actually feed
-          the Oracle&apos;s estimate today. The rest — <strong>author_lean</strong>,{' '}
-          <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong> — are
-          captured and shown, but nothing in the estimate reads them yet: this panel is currently
-          the only place they&apos;re visible at all. That&apos;s deliberate (a &quot;shadow
-          lane&quot;) — it lets us accumulate real-world numbers and eyeball them, via your
-          ratings, before trusting any of them to move a forecast.
+          <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>) actually feed
+          the Oracle&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
+          <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong>,{' '}
+          <strong>consensus</strong>, <strong>report_kind</strong> — is captured and shown, but
+          nothing in the estimate reads it yet: this panel is currently the only place those
+          values are visible at all. That&apos;s deliberate (a &quot;shadow lane&quot;) — it lets us
+          accumulate real-world numbers and eyeball them, via your ratings, before trusting any of
+          them to move a forecast. When one graduates, its row moves above the marker.
         </p>
         <table className="w-full table-fixed text-xs sm:text-sm border border-navy-600 rounded-lg">
           <colgroup>
@@ -83,18 +85,6 @@ export default function RatingNumbersHelpPage() {
                 judgment, not a topic tag. <strong>Live:</strong> its <em>square</em> weights the
                 article in aggregation, so 0.5 relevance counts a quarter as much as 1.0, and a
                 weakly-relevant article can&apos;t move the estimate much on its own.
-              </td>
-            </tr>
-            <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">match</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">0–100%</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600">
-                Embedding cosine similarity between the article and the claim — the cheapest and
-                least reliable of the three, and the one we&apos;ve confirmed can misrank: a
-                topically-close but unrelated article (or, rarely, a near-zero score for a
-                genuinely relevant one) can still slip through. <strong>Live:</strong> this is the
-                score news-indexer used to decide the article was worth sending at all — it
-                doesn&apos;t separately weight the estimate the way relevance does.
               </td>
             </tr>
             <tr>
@@ -147,13 +137,40 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">consensus</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">3 values</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600">
+                What <em>this article says most people expect</em> — as distinct from what the
+                author thinks (<code className="bg-navy-800 px-1 rounded text-xs font-mono">author_lean</code>):{' '}
+                <code className="bg-navy-800 px-1 rounded text-xs font-mono">expects_yes</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded text-xs font-mono">expects_no</code> or{' '}
+                <code className="bg-navy-800 px-1 rounded text-xs font-mono">divided</code>; omitted
+                when the article doesn&apos;t report a consensus. <strong>Shadow only:</strong> the
+                eventual use is spotting information every source shares (and so shouldn&apos;t be
+                counted once per source).
+              </td>
+            </tr>
+            <tr>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">report_kind</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">2 values</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600">
+                Does the quoted claim report the standing <em>situation</em>{' '}
+                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">level</code>: &quot;the
+                rate is 8.75%&quot;) or a <em>movement</em> in it{' '}
+                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">change</code>: &quot;the
+                rate was cut&quot;)? <strong>Shadow only:</strong> a level report measures the state
+                directly and should eventually reset the Oracle&apos;s recency handling rather
+                than decay out of it.
+              </td>
+            </tr>
+            <tr>
               <td className="p-1.5 sm:p-2 font-mono break-words">range</td>
               <td className="p-1.5 sm:p-2 font-mono break-words">CI %</td>
               <td className="p-1.5 sm:p-2">
                 The confidence interval around the headline estimate — how much uncertainty the
                 Oracle still has, not a property of this one article. Omitted when narrower than 2
                 points (display noise) or when the pool doesn&apos;t have enough articles yet to
-                compute one.
+                compute one. <strong>Live:</strong> it is part of the estimate itself.
               </td>
             </tr>
           </tbody>
@@ -186,14 +203,10 @@ export default function RatingNumbersHelpPage() {
           A rating of 1 or 2 also opens a private DM from the bot with a checklist — tap every
           field that looked off, then <strong>Done</strong>. This is what turns &quot;something&apos;s
           wrong&quot; into &quot;this specific number is wrong,&quot; which is far more useful for
-          tracking down the cause. Two of the checklist items don&apos;t map 1:1 to a panel row by
+          tracking down the cause. One checklist item doesn&apos;t map 1:1 to a panel row by
           name:
         </p>
         <ul className="list-disc list-inside space-y-1 mb-2">
-          <li>
-            <strong>Similarity</strong> — the <code className="bg-navy-800 px-1 rounded text-xs font-mono">match</code>{' '}
-            row above (the embedding score).
-          </li>
           <li>
             <strong>Probability</strong> — the headline move at the very top of the message (the{' '}
             <code className="bg-navy-800 px-1 rounded text-xs font-mono">Oracle 63% → 71%</code>{' '}
@@ -203,7 +216,10 @@ export default function RatingNumbersHelpPage() {
         </ul>
         <p>
           The rest — Stance, Relevance, Author Lean, Fact Signal, Evidence Class, Credibility — are
-          the matching panel row. <strong>Other</strong> catches anything not covered above. The
+          the matching panel row. <strong>Other</strong> catches anything not covered above
+          (including the article being matched to the wrong forecast — the old &quot;Similarity&quot;
+          item; the embedding score behind that decision is no longer shown, but it is still
+          recorded with your rating). The
           bot only DMs raters who&apos;ve started a chat with it before (a Telegram rule for all
           bots) — if you&apos;ve never messaged @DaatanClawBot directly, your rating still saves,
           but the drilldown prompt will ask you to <code className="bg-navy-800 px-1 rounded text-xs font-mono">/start</code>{' '}
