@@ -447,12 +447,12 @@ export default function ForecastDetailClient({
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-3 xl:mb-4 break-words">
+        <h1 className="text-xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-3 xl:mb-4 break-words">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
         <div className="xl:hidden">
-          <ForecastInfoPanel prediction={prediction} variant="mobile" />
+          <ForecastInfoPanel prediction={prediction} variant="mobile" section="dates" />
         </div>
 
         {(showTranslated && translatedFields) && (
@@ -776,6 +776,13 @@ export default function ForecastDetailClient({
             </div>
           )
         })()}
+      </div>
+
+      {/* Tags: on mobile, deliberately placed after the forecasting CTA (not
+          above it) to keep pre-CTA vertical space to a minimum; desktop keeps
+          its own copy in the ForecastInfoPanel sidebar. */}
+      <div className="xl:hidden">
+        <ForecastInfoPanel prediction={prediction} variant="mobile" section="tags" />
       </div>
 
       {/* Related forecasts: inline on mobile/tablet (after the gauge, so users
