@@ -445,6 +445,13 @@ export async function recordEstimate(input: RecordEstimateInput) {
  * prod DB UPDATE at the time). Re-admits the forecast to the temporal
  * clock's glide candidates (`CANDIDATE_WHERE: settled: false`) on its next
  * daily run; does not itself trigger a re-estimate.
+ *
+ * Also drops the forecast out of the "Awaiting Resolution" queue (daatan#1655):
+ * `awaitingAiResolution` is otherwise only recomputed on the next estimate write, so
+ * a human clear left the forecast sitting in `/?status=PENDING` — which is where the
+ * admin found it in the first place. The temporal clock's settled-drift / unlatched-
+ * pin alert stamps are nulled for the same reason (they re-arm on their own). The
+ * next requote still re-flags it if the bare probability is ≥90% / ≤10% — by design.
  */
 export async function clearSettledLatch(predictionId: string, clearedBy: string, now = new Date()): Promise<void> {
   await prisma.prediction.update({
@@ -454,7 +461,15 @@ export async function clearSettledLatch(predictionId: string, clearedBy: string,
     // cleared forecast is byte-identical to one that never latched, which is why
     // "did the latch fire and get cleared, or never fire?" could not be answered for
     // 24 predictions from the data alone.
-    data: { settled: false, settledAt: null, settledClearedAt: now, settledClearedBy: clearedBy },
+    data: {
+      settled: false,
+      settledAt: null,
+      settledClearedAt: now,
+      settledClearedBy: clearedBy,
+      awaitingAiResolution: false,
+      settledDriftAlertAt: null,
+      unlatchedPinAlertAt: null,
+    },
   })
   log.info({ predictionId, clearedBy }, 'settled latch cleared')
 }

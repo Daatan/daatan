@@ -215,8 +215,26 @@ describe('clearSettledLatch — the only way back from a settled=true latch', ()
     await clearSettledLatch('pred-1', 'admin-user-1', now)
     expect(update).toHaveBeenCalledWith({
       where: { id: 'pred-1' },
-      data: { settled: false, settledAt: null, settledClearedAt: now, settledClearedBy: 'admin-user-1' },
+      data: {
+        settled: false,
+        settledAt: null,
+        settledClearedAt: now,
+        settledClearedBy: 'admin-user-1',
+        awaitingAiResolution: false,
+        settledDriftAlertAt: null,
+        unlatchedPinAlertAt: null,
+      },
     })
+  })
+
+  // daatan#1655: the "Awaiting Resolution" feed reads awaitingAiResolution, which only
+  // recordEstimate recomputes — so a clear that left it alone changed nothing visible.
+  it('drops the forecast out of Awaiting Resolution and re-arms the clock alerts', async () => {
+    await clearSettledLatch('pred-1', 'admin-user-1')
+    const data = (update.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    expect(data.awaitingAiResolution).toBe(false)
+    expect(data.settledDriftAlertAt).toBeNull()
+    expect(data.unlatchedPinAlertAt).toBeNull()
   })
 
   // Without this the clear erased its own tracks — a cleared row and a row that never
