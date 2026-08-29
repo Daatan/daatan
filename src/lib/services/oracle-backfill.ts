@@ -171,6 +171,7 @@ export async function refreshOracleSnapshot(
     undefined,
     forecast.relevance_bar ?? null,
     forecast.provenance?.models ?? null,
+    forecast.provenance?.oracle ?? null,
   )
 
   // Pool this run's articles, then let the WHOLE-pool aggregate be the estimate — the same

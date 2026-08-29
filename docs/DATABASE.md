@@ -456,6 +456,14 @@ timestamp an unreliable proxy for which prompt actually ran, so a specific
 historical version/hash was deliberately not invented — `"pre-v1"` means
 only "predates provenance capture." Lets a since-fixed prompt bug be traced
 in stored data instead of being invisible.
+`oracleVersion`/`oracleGitSha` (daatan#1669, umbrella Daatan/retro#742) record
+which Oracle *build* produced the row — retro's `provenance.oracle` on the
+`/forecast` response (`version` is `/version`'s `{base}+build.{n}`, e.g.
+`1.4.0+build.38912`; `git_sha` the deployed commit). Prompt version alone can't
+say this: prompt PRs are sequential but the code between them is not, and the
+Oracle 1.5 harvest's per-field kill criteria need "rows from builds ≥ X" to be
+a WHERE clause. Same shadow/additive rules as the prompt columns; null =
+predates the stamp (migration `20260829200000`), no backfill.
 `evidenceClass` is the article's most common evidence_class among its
 extracted claims (retro `SourceSignal.evidence_class`, PR #255) — needed by
 the credibility feedback loop (see below) to exclude opinion-class articles

@@ -168,6 +168,24 @@ describe('enrichOracleSources', () => {
     expect(withoutProvenance[0].gatekeeperModel).toBeUndefined()
   })
 
+  it('stamps the response-level provenance.oracle build onto every source; undefined when absent (daatan#1669)', () => {
+    const withOracle = enrichOracleSources(
+      [oracleSource(), oracleSource({ url: 'https://x.com/y' })],
+      [searchResult()],
+      new Map(),
+      new Map(),
+      null,
+      null,
+      { version: '1.4.0+build.38912', git_sha: 'c335796afb3e25158c12a965dc05ac71b2e65346', built_at: '2026-08-29T18:23:54Z' },
+    )
+    expect(withOracle[0]).toMatchObject({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346' })
+    expect(withOracle[1].oracleVersion).toBe('1.4.0+build.38912')
+
+    const withoutOracle = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(withoutOracle[0].oracleVersion).toBeUndefined()
+    expect(withoutOracle[0].oracleGitSha).toBeUndefined()
+  })
+
   it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracle omits them (F11, daatan#1237)', () => {
     const out = enrichOracleSources(
       [oracleSource({
@@ -390,6 +408,15 @@ describe('poolArticleToEnrichedSource', () => {
       gatekeeperPromptHash: 'abc123',
     })
     expect(poolArticleToEnrichedSource(poolArticle({ extractorModel: null }), null).extractorModel).toBeNull()
+  })
+
+  it('passes the Oracle build stamp through from the pool row (daatan#1669)', () => {
+    const out = poolArticleToEnrichedSource(
+      poolArticle({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796a' }),
+      null,
+    )
+    expect(out).toMatchObject({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796a' })
+    expect(poolArticleToEnrichedSource(poolArticle({ oracleVersion: null }), null).oracleVersion).toBeNull()
   })
 
   it('carries a null author through (pool rows never store one)', () => {

@@ -1,4 +1,4 @@
-import type { OracleClaimDetail, OracleProvenanceModels, OracleSource } from '@/lib/services/oracle'
+import type { OracleClaimDetail, OracleProvenanceModels, OracleProvenanceOracle, OracleSource } from '@/lib/services/oracle'
 import type { SearchResult } from '@/lib/services/oracleSearch'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import type { EvidencePoolArticle } from '@prisma/client'
@@ -125,6 +125,10 @@ export type EnrichedOracleSource = {
   gatekeeperModel?: string | null
   gatekeeperPromptVersion?: string | null
   gatekeeperPromptHash?: string | null
+  // Which Oracle build ran (daatan#1669) — response-level `provenance.oracle`, one value per
+  // /forecast call, stamped onto every source. Persisted; nothing reads it yet.
+  oracleVersion?: string | null
+  oracleGitSha?: string | null
   evidenceClass?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
   // The byline author's OWN directional forecast of the event (retro #308/#309), for the
   // author-scoring lane — deliberately NOT part of the estimate. Null when the author only
@@ -195,6 +199,8 @@ export function enrichOracleSources(
   // The response-level `provenance.models` (daatan#1604/retro#627) — same reasoning as
   // relevanceBar: one value for the whole /forecast call, stamped onto every source.
   provenanceModels: OracleProvenanceModels | null = null,
+  // The response-level `provenance.oracle` (daatan#1669) — same shape of argument.
+  provenanceOracle: OracleProvenanceOracle | null = null,
 ): EnrichedOracleSource[] {
   const articleByUrl = new Map(searchResults.map((r) => [r.url, r]))
   return sources.map((s) => {
@@ -230,6 +236,8 @@ export function enrichOracleSources(
       gatekeeperModel: provenanceModels?.gatekeeper,
       gatekeeperPromptVersion: provenanceModels?.gatekeeper_prompt_version,
       gatekeeperPromptHash: provenanceModels?.gatekeeper_prompt_hash,
+      oracleVersion: provenanceOracle?.version,
+      oracleGitSha: provenanceOracle?.git_sha,
       evidenceClass: s.evidence_class,
       authorLean: s.author_lean,
       authorLeanCertainty: s.author_lean_certainty,
@@ -344,6 +352,8 @@ export type PoolArticleSnapshotRow = Pick<
   | 'gatekeeperModel'
   | 'gatekeeperPromptVersion'
   | 'gatekeeperPromptHash'
+  | 'oracleVersion'
+  | 'oracleGitSha'
   | 'evidenceClass'
   | 'authorLean'
   | 'authorLeanCertainty'
@@ -389,6 +399,8 @@ export function poolArticleToEnrichedSource(
     gatekeeperModel: row.gatekeeperModel,
     gatekeeperPromptVersion: row.gatekeeperPromptVersion,
     gatekeeperPromptHash: row.gatekeeperPromptHash,
+    oracleVersion: row.oracleVersion,
+    oracleGitSha: row.oracleGitSha,
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
     authorLean: row.authorLean,
     authorLeanCertainty: row.authorLeanCertainty,

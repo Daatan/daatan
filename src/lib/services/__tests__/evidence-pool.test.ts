@@ -259,6 +259,24 @@ describe('addArticlesToPool', () => {
     })
   })
 
+  it('persists the Oracle build stamp (daatan#1669)', async () => {
+    await addArticlesToPool('pred-1', [source({
+      oracleVersion: '1.4.0+build.38912',
+      oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346',
+    })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({
+      oracleVersion: '1.4.0+build.38912',
+      oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346',
+    })
+  })
+
+  it('writes null Oracle build fields, never throws, when the response carried no provenance (daatan#1669)', async () => {
+    await addArticlesToPool('pred-1', [source({ oracleVersion: null, oracleGitSha: null })], 'analyze', idFor('https://reuters.com/a'))
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ oracleVersion: null, oracleGitSha: null })
+  })
+
   it('persists the shadow authorLean/authorLeanCertainty', async () => {
     // Author-scoring lane (retro #308/#309) — written to the pool row but never read by any
     // estimate. Verifies the un-fusing shadow column is actually persisted.
