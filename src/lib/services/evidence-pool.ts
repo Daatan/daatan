@@ -249,7 +249,15 @@ const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
  * hatch documented in pool-retry.ts, and only closing the loop that had no new information
  * in it.
  */
-export const TERMINAL_POOL_REASONS: readonly string[] = ['oracle_omitted', 'oracle_null_final', 'retired_legacy']
+/** `statusReason` stamped by the publish-date admission gate — see `STALE_PUBLISHED_REJECT_DAYS`. */
+export const STALE_PUBLISHED_REASON = 'stale_published_date'
+
+export const TERMINAL_POOL_REASONS: readonly string[] = [
+  'oracle_omitted',
+  'oracle_null_final',
+  'retired_legacy',
+  STALE_PUBLISHED_REASON,
+]
 
 /**
  * The pre-#1231 conflated `oracle_null` string (daatan#1522) — permanent zombies, not
@@ -261,6 +269,44 @@ export const TERMINAL_POOL_REASONS: readonly string[] = ['oracle_omitted', 'orac
  * `retired_legacy` (see {@link retireLegacyNullRows}) is the only way out.
  */
 export const LEGACY_NULL_REASON = 'oracle_null'
+
+/**
+ * Publish-date admission gate (daatan#1651). An article published more than
+ * `STALE_PUBLISHED_REJECT_DAYS` before the forecast was created is coverage of a
+ * *previous* instance of the event — the 2021 Bennett swearing-in scored as evidence
+ * for "Netanyahu is PM on 2026-12-31", the 2022 election for the 2026 one — and the
+ * extractor reads it at face value (retro#545's adjacent-event class). Re-extraction
+ * can't repair that: the text genuinely supports the claim, for the wrong year. So the
+ * row is admitted terminal and excluded (`status: FAILED`, `statusReason:
+ * STALE_PUBLISHED_REASON`, `excluded: true`) and never sent to the extractor —
+ * visible in the admin pool, reversible by un-excluding, and never retried (the reason
+ * is in `TERMINAL_POOL_REASONS`). Measured 2026-08-29: 173 usable rows on 32 ACTIVE
+ * forecasts sat past this line; 64 more sat in the 180–365-day band, which is log-only
+ * (`STALE_PUBLISHED_WARN_DAYS`) until that band's mass is understood.
+ *
+ * Only a parseable `publishedAt` gates. A date that doesn't parse says nothing about
+ * the article's age and is left alone. A sentinel like `2014-01-01` does parse and IS
+ * rejected — a real-but-unknown date on a 2026 article is still evidence we can't date,
+ * and an un-exclude is one click.
+ */
+export const STALE_PUBLISHED_REJECT_DAYS = 365
+export const STALE_PUBLISHED_WARN_DAYS = 180
+const DAY_MS = 86_400_000
+
+/** How far before `claimCreatedAt` the article was published, in whole days —
+ *  `null` when either side is missing or `publishedAt` doesn't parse. */
+export function publishedDaysBeforeClaim(publishedAt: string | null, claimCreatedAt: Date | null | undefined): number | null {
+  if (!publishedAt || !claimCreatedAt) return null
+  const published = new Date(publishedAt)
+  if (Number.isNaN(published.getTime())) return null
+  return Math.floor((claimCreatedAt.getTime() - published.getTime()) / DAY_MS)
+}
+
+export interface ClaimOptions {
+  /** `Prediction.createdAt` — enables the publish-date admission gate above. Omit
+   *  (or pass null) and every article is admitted as before. */
+  claimCreatedAt?: Date | null
+}
 
 export interface ClaimableArticle {
   url: string
@@ -277,9 +323,11 @@ export interface ClaimableArticle {
  * evidence that was never missing. `skip_pending` — the existing row is still resolving
  * (a fresh `PENDING` claim from a concurrent request, a `FAILED` row still in backoff, or a
  * concurrent content-changed claim this call lost the race to) — genuinely worth a later
- * retry, unlike `skip_complete`.
+ * retry, unlike `skip_complete`. `skip_stale` — the publish-date admission gate refused
+ * it (see `STALE_PUBLISHED_REJECT_DAYS`); a terminal, excluded row records the refusal,
+ * so it is never retried and never extracted.
  */
-export type ClaimResult = 'claimed' | 'skip_complete' | 'skip_pending'
+export type ClaimResult = 'claimed' | 'skip_complete' | 'skip_pending' | 'skip_stale'
 
 /** The row a claim landed on (or already covers), so callers can address
  *  `addArticlesToPool`'s write at the exact row rather than re-deriving
@@ -316,9 +364,21 @@ export async function claimArticleForExtraction(
   predictionId: string,
   article: ClaimableArticle,
   origin: PoolOrigin,
+  opts: ClaimOptions = {},
 ): Promise<ClaimOutcome> {
   const urlHash = hashUrl(article.url)
   const contentHash = hashArticleContent(article.title, article.snippet)
+
+  const daysBefore = publishedDaysBeforeClaim(article.publishedAt, opts.claimCreatedAt)
+  if (daysBefore !== null && daysBefore > STALE_PUBLISHED_REJECT_DAYS) {
+    return claimStaleArticle(predictionId, article, origin, urlHash, contentHash, daysBefore)
+  }
+  if (daysBefore !== null && daysBefore > STALE_PUBLISHED_WARN_DAYS) {
+    log.warn(
+      { predictionId, url: article.url, publishedAt: article.publishedAt, daysBefore, origin },
+      'event=evidence_pool_stale_published_warn — admitted; older than the warn band, younger than the reject line (daatan#1651)',
+    )
+  }
 
   try {
     const created = await prisma.evidencePoolArticle.create({
@@ -453,13 +513,62 @@ export async function claimArticleForExtraction(
   }
 }
 
+/**
+ * The publish-date gate's refusal (daatan#1651): record a terminal, excluded row so the
+ * refusal is visible and never re-offered, and tell the caller not to extract. Only a
+ * fresh (predictionId, urlHash) gets the row — if one already exists in any state it is
+ * left exactly as it was (an admin may have un-excluded it on purpose), and the outcome
+ * simply points at it. Never sends the article anywhere.
+ */
+async function claimStaleArticle(
+  predictionId: string,
+  article: ClaimableArticle,
+  origin: PoolOrigin,
+  urlHash: string,
+  contentHash: string,
+  daysBefore: number,
+): Promise<ClaimOutcome> {
+  log.warn(
+    { predictionId, url: article.url, publishedAt: article.publishedAt, daysBefore, origin },
+    'event=evidence_pool_stale_published_reject — published before the claim by more than the reject line; admitted excluded, not extracted (daatan#1651)',
+  )
+  try {
+    const created = await prisma.evidencePoolArticle.create({
+      data: {
+        predictionId,
+        url: article.url,
+        urlHash,
+        title: article.title,
+        snippet: article.snippet || null,
+        source: article.source,
+        publishedDate: article.publishedAt,
+        contentHash,
+        status: 'FAILED',
+        statusReason: STALE_PUBLISHED_REASON,
+        excluded: true,
+        origin,
+      },
+      select: { id: true },
+    })
+    return { result: 'skip_stale', articleId: created.id }
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
+  }
+  const current = await prisma.evidencePoolArticle.findFirst({
+    where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
+    select: { id: true },
+  })
+  return { result: 'skip_stale', articleId: current?.id ?? null }
+}
+
 /** Claim a whole evidence set. Per-article outcomes, same order as `articles`. */
 export async function claimArticlesForExtraction(
   predictionId: string,
   articles: ClaimableArticle[],
   origin: PoolOrigin,
+  opts: ClaimOptions = {},
 ): Promise<ClaimOutcome[]> {
-  return Promise.all(articles.map((a) => claimArticleForExtraction(predictionId, a, origin)))
+  return Promise.all(articles.map((a) => claimArticleForExtraction(predictionId, a, origin, opts)))
 }
 
 /** Builds the `addArticlesToPool` id map from a claim step's outcomes — same

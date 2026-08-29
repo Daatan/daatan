@@ -1313,6 +1313,9 @@ describe('POST /api/news-indexer/context', () => {
           expect.objectContaining({ url: 'https://bbc.com/news/x', title: 'Headline', snippet: 'A snippet.' }),
         ],
         'news-indexer',
+        // daatan#1651: the claim step gates on publish date relative to the forecast's creation.
+        // (ACTIVE_PREDICTION carries no createdAt, so the gate is handed `undefined` and stays off.)
+        { claimCreatedAt: undefined },
       )
     })
 

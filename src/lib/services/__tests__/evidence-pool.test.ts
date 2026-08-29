@@ -56,6 +56,11 @@ import {
   claimArticleForExtraction,
   claimArticlesForExtraction,
   failClaimedArticles,
+  publishedDaysBeforeClaim,
+  STALE_PUBLISHED_REASON,
+  STALE_PUBLISHED_REJECT_DAYS,
+  STALE_PUBLISHED_WARN_DAYS,
+  TERMINAL_POOL_REASONS,
   hashArticleContent,
   retireLegacyNullRows,
 } from '../evidence-pool'
@@ -1264,7 +1269,7 @@ describe('claimArticleForExtraction', () => {
         expect.arrayContaining([
           {
             status: 'FAILED',
-            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy'] },
+            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy', 'stale_published_date'] },
             updatedAt: { lt: expect.any(Date) },
           },
           { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
@@ -1419,6 +1424,123 @@ describe('claimArticleForExtraction', () => {
     create.mockRejectedValue(new Error('connection reset'))
     await expect(claimArticleForExtraction('pred-1', article(), 'news-indexer')).rejects.toThrow('connection reset')
     expect(updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('publish-date admission gate (daatan#1651)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  // Forecast created 2026-04-08; the four real outliers on the Netanyahu-PM pool were
+  // 2021-06 / 2022-11 articles about the previous swearing-in and election.
+  const claimCreatedAt = new Date('2026-04-08T10:00:00Z')
+  const opts = { claimCreatedAt }
+
+  it('publishedDaysBeforeClaim: whole days before creation; null when unknowable', () => {
+    expect(publishedDaysBeforeClaim('2026-04-01', claimCreatedAt)).toBe(7)
+    expect(publishedDaysBeforeClaim('2026-04-09', claimCreatedAt)).toBe(-1)
+    expect(publishedDaysBeforeClaim('2021-06-11', claimCreatedAt)).toBeGreaterThan(STALE_PUBLISHED_REJECT_DAYS)
+    expect(publishedDaysBeforeClaim(null, claimCreatedAt)).toBeNull()
+    expect(publishedDaysBeforeClaim('not a date', claimCreatedAt)).toBeNull()
+    expect(publishedDaysBeforeClaim('2021-06-11', null)).toBeNull()
+    expect(publishedDaysBeforeClaim('2021-06-11', undefined)).toBeNull()
+  })
+
+  it('refuses an article published past the reject line: terminal excluded row, skip_stale, no PENDING claim', async () => {
+    create.mockResolvedValue({ id: 'stale-1' } as never)
+
+    const result = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'news-indexer', opts)
+
+    expect(result).toEqual({ result: 'skip_stale', articleId: 'stale-1' })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        predictionId: 'pred-1',
+        url: 'https://reuters.com/a',
+        publishedDate: '2021-06-11',
+        status: 'FAILED',
+        statusReason: STALE_PUBLISHED_REASON,
+        excluded: true,
+        origin: 'news-indexer',
+      }),
+      select: { id: true },
+    })
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('the refusal is terminal — the retry sweep must never re-drive it', () => {
+    expect(TERMINAL_POOL_REASONS).toContain(STALE_PUBLISHED_REASON)
+  })
+
+  it('leaves an existing row untouched on conflict and points the outcome at it', async () => {
+    // An admin may have un-excluded the row on purpose; the gate never re-excludes.
+    create.mockRejectedValue(uniqueViolation())
+    findFirst.mockResolvedValue({ id: 'existing-9' } as never)
+
+    const result = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'analyze', opts)
+
+    expect(result).toEqual({ result: 'skip_stale', articleId: 'existing-9' })
+    expect(update).not.toHaveBeenCalled()
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('admits the 180–365-day band (log-only) and anything younger, as a normal claim', async () => {
+    create.mockResolvedValue({ id: 'new-1' } as never)
+    const warnBand = new Date(claimCreatedAt.getTime() - (STALE_PUBLISHED_WARN_DAYS + 10) * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+
+    const inBand = await claimArticleForExtraction('pred-1', article({ publishedAt: warnBand }), 'news-indexer', opts)
+    const fresh = await claimArticleForExtraction('pred-1', article({ publishedAt: '2026-04-01' }), 'news-indexer', opts)
+
+    expect(inBand).toEqual({ result: 'claimed', articleId: 'new-1' })
+    expect(fresh).toEqual({ result: 'claimed', articleId: 'new-1' })
+    expect(create).toHaveBeenCalledTimes(2)
+    for (const call of create.mock.calls) {
+      expect(call[0].data).toEqual(expect.objectContaining({ status: 'PENDING' }))
+      expect(call[0].data).not.toHaveProperty('excluded')
+    }
+  })
+
+  it('never gates without a creation date or a parseable publish date', async () => {
+    create.mockResolvedValue({ id: 'new-1' } as never)
+
+    const noCreatedAt = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'news-indexer')
+    const nullCreatedAt = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'news-indexer', {
+      claimCreatedAt: null,
+    })
+    const noDate = await claimArticleForExtraction('pred-1', article({ publishedAt: null }), 'news-indexer', opts)
+    const junkDate = await claimArticleForExtraction('pred-1', article({ publishedAt: 'yesterday-ish' }), 'news-indexer', opts)
+
+    for (const r of [noCreatedAt, nullCreatedAt, noDate, junkDate]) {
+      expect(r).toEqual({ result: 'claimed', articleId: 'new-1' })
+    }
+    for (const call of create.mock.calls) {
+      expect(call[0].data).toEqual(expect.objectContaining({ status: 'PENDING' }))
+    }
+  })
+
+  it('claimArticlesForExtraction threads the options through to every article', async () => {
+    create.mockResolvedValueOnce({ id: 'stale-1' } as never).mockResolvedValueOnce({ id: 'new-2' } as never)
+
+    const results = await claimArticlesForExtraction(
+      'pred-1',
+      [article({ url: 'https://a.com/1', publishedAt: '2021-06-11' }), article({ url: 'https://b.com/2' })],
+      'backfill',
+      opts,
+    )
+
+    expect(results).toEqual([
+      { result: 'skip_stale', articleId: 'stale-1' },
+      { result: 'claimed', articleId: 'new-2' },
+    ])
+    // `articleIdsByUrl` still maps the refused row — callers only extract `claimed`
+    // entries, so the id is harmless there and useful to the admin pool view.
+    expect(articleIdsByUrl([article({ url: 'https://a.com/1' }), article({ url: 'https://b.com/2' })], results)).toEqual(
+      new Map([
+        ['https://a.com/1', 'stale-1'],
+        ['https://b.com/2', 'new-2'],
+      ]),
+    )
   })
 })
 

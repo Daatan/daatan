@@ -472,6 +472,9 @@ describe('refreshOracleSnapshot', () => {
         'p1',
         [{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedAt: '2026-07-01' }],
         'backfill',
+        // The publish-date gate (daatan#1651) needs the forecast's creation date; this
+        // fixture has none, and the gate must then stay off rather than guess.
+        { claimCreatedAt: null },
       )
     })
 
@@ -522,7 +525,9 @@ describe('refreshOracleSnapshot', () => {
       expect(r.status).toBe('ok')
       expect(mockSearch).not.toHaveBeenCalled()
       expect(mockBuildQuery).not.toHaveBeenCalled()
-      expect(mockClaim).toHaveBeenCalledWith('p1', [expect.objectContaining({ url: 'https://a.com/1' })], 'retry')
+      expect(mockClaim).toHaveBeenCalledWith('p1', [expect.objectContaining({ url: 'https://a.com/1' })], 'retry', {
+        claimCreatedAt: null,
+      })
       expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.anything(), 'retry', expect.any(Map))
     })
 

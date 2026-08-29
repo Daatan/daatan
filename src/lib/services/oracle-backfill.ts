@@ -111,7 +111,9 @@ export async function refreshOracleSnapshot(
     source: r.source ?? null,
     publishedAt: r.publishedDate ?? null,
   }))
-  const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, origin)
+  const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, origin, {
+    claimCreatedAt: prediction.createdAt ?? null,
+  })
   const claimedArticleIdByUrl = articleIdsByUrl(claimableResults, claimResults)
   if (!claimResults.some((r) => r.result === 'claimed')) {
     return { status: 'unchanged' }
