@@ -90,6 +90,42 @@ function isAwaitingAiResolution(confidence: number | null, pinned = false, backe
   return confidence !== null && (confidence >= AWAITING_AI_RESOLUTION_HIGH || confidence <= AWAITING_AI_RESOLUTION_LOW)
 }
 
+/** A human dismissal from Awaiting Resolution (daatan#1659) holds while the new
+ *  estimate stays within this many points of the number the human dismissed. */
+export const AWAITING_DISMISSAL_STICKY_PTS = 5
+
+interface AwaitingDismissal {
+  awaitingDismissedAt: Date | null
+  awaitingDismissedConfidence: number | null
+}
+
+/**
+ * Apply a standing human dismissal to a freshly computed `awaitingAiResolution`.
+ * Returns the flag to write plus whether the dismissal survives this write. The
+ * dismissal is forgotten as soon as the estimate moves more than
+ * AWAITING_DISMISSAL_STICKY_PTS from what the human saw — in either direction —
+ * because at that point they have not seen this number.
+ */
+export function applyAwaitingDismissal(
+  computed: boolean,
+  confidence: number,
+  dismissal: AwaitingDismissal | null,
+): { awaitingAiResolution: boolean; keepDismissal: boolean } {
+  if (!dismissal?.awaitingDismissedAt || dismissal.awaitingDismissedConfidence === null) {
+    return { awaitingAiResolution: computed, keepDismissal: false }
+  }
+  const moved = Math.abs(confidence - dismissal.awaitingDismissedConfidence) > AWAITING_DISMISSAL_STICKY_PTS
+  if (moved) return { awaitingAiResolution: computed, keepDismissal: false }
+  return { awaitingAiResolution: false, keepDismissal: true }
+}
+
+async function readAwaitingDismissal(predictionId: string): Promise<AwaitingDismissal | null> {
+  return prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { awaitingDismissedAt: true, awaitingDismissedConfidence: true },
+  })
+}
+
 interface PreviousConfidence {
   confidence: number | null
   claimText: string
@@ -346,12 +382,22 @@ export async function recordEstimate(input: RecordEstimateInput) {
       ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
       : {}
     : input.probability !== null
-      ? {
-          confidence: input.probability,
-          awaitingAiResolution: isAwaitingAiResolution(input.probability, pinned, backing.backed),
-          aiCiLow: input.ciLow ?? null,
-          aiCiHigh: input.ciHigh ?? null,
-        }
+      ? await (async () => {
+          const computed = isAwaitingAiResolution(input.probability as number, pinned, backing.backed)
+          // Only a write that would put the forecast INTO the queue can be overridden
+          // by a standing dismissal, so that is the only time the extra read is paid.
+          const dismissal = computed ? await readAwaitingDismissal(input.predictionId) : null
+          const applied = applyAwaitingDismissal(computed, input.probability as number, dismissal)
+          return {
+            confidence: input.probability,
+            awaitingAiResolution: applied.awaitingAiResolution,
+            aiCiLow: input.ciLow ?? null,
+            aiCiHigh: input.ciHigh ?? null,
+            ...(applied.keepDismissal || !dismissal?.awaitingDismissedAt
+              ? {}
+              : { awaitingDismissedAt: null, awaitingDismissedConfidence: null }),
+          }
+        })()
       : {}
   const predictionData: Prisma.PredictionUpdateInput = {
     ...estimateFields,
@@ -454,6 +500,10 @@ export async function recordEstimate(input: RecordEstimateInput) {
  * next requote still re-flags it if the bare probability is ≥90% / ≤10% — by design.
  */
 export async function clearSettledLatch(predictionId: string, clearedBy: string, now = new Date()): Promise<void> {
+  const current = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { confidence: true },
+  })
   await prisma.prediction.update({
     where: { id: predictionId },
     // `settledAt` keeps its meaning — the last settled *write*, hence nulled here —
@@ -469,9 +519,37 @@ export async function clearSettledLatch(predictionId: string, clearedBy: string,
       awaitingAiResolution: false,
       settledDriftAlertAt: null,
       unlatchedPinAlertAt: null,
+      // Sticky (daatan#1659): a clear that the next requote silently re-flags is no clear.
+      awaitingDismissedAt: now,
+      awaitingDismissedConfidence: current?.confidence ?? null,
     },
   })
   log.info({ predictionId, clearedBy }, 'settled latch cleared')
+}
+
+/**
+ * Human dismissal from the Awaiting Resolution queue (daatan#1659) — for a forecast
+ * the AI is confident about but a human has looked at and decided is not resolvable
+ * yet. Clears the flag and the clock's alert stamps now, and remembers the number
+ * the human saw so `recordEstimate` keeps the forecast out of the queue until the
+ * estimate actually moves (see `applyAwaitingDismissal`).
+ */
+export async function dismissAwaitingResolution(predictionId: string, dismissedBy: string, now = new Date()): Promise<void> {
+  const current = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { confidence: true },
+  })
+  await prisma.prediction.update({
+    where: { id: predictionId },
+    data: {
+      awaitingAiResolution: false,
+      settledDriftAlertAt: null,
+      unlatchedPinAlertAt: null,
+      awaitingDismissedAt: now,
+      awaitingDismissedConfidence: current?.confidence ?? null,
+    },
+  })
+  log.info({ predictionId, dismissedBy, confidence: current?.confidence ?? null }, 'awaiting-resolution dismissed')
 }
 
 /** Keep the heavy JSON (`sources[]` + `oracleSnapshot`) only for this many most-recent

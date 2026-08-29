@@ -439,6 +439,13 @@ model Prediction {
   // Mirror of the above (daatan#1498): the latest evidence snapshot asserts
   // settlement while `settled` is false. Same fire/re-arm idiom.
   unlatchedPinAlertAt DateTime? @map("unlatched_pin_alert_at")
+  // Human dismissal from the Awaiting Resolution queue (daatan#1659). recordEstimate
+  // recomputes awaitingAiResolution from the bare probability on every write, so a
+  // clear alone is undone by the next requote. While set, the flag stays false as
+  // long as the new number is within AWAITING_DISMISSAL_STICKY_PTS of the confidence
+  // the human saw; a larger move forgets the dismissal. Resolution clears both.
+  awaitingDismissedAt         DateTime? @map("awaiting_dismissed_at")
+  awaitingDismissedConfidence Int?      @map("awaiting_dismissed_confidence")
 
   // The running Telegram notification for this forecast's news-article matches
   // (daatan#1215). NULL = no notification sent yet. Latest-state, not a log:

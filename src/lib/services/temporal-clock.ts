@@ -470,11 +470,11 @@ async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promi
   // were not deployed that way (a restored DB, a hand-rolled container), and there an
   // unguarded throw would take the whole requote down with it. Degrades to one counted
   // error per run, which shows up in the summary rather than passing for a clean run.
-  let latched: { id: string; slug: string | null; claimText: string; confidence: number | null; settledDriftAlertAt: Date | null }[]
+  let latched: { id: string; slug: string | null; claimText: string; confidence: number | null; settledDriftAlertAt: Date | null; awaitingDismissedAt: Date | null }[]
   try {
     latched = await prisma.prediction.findMany({
       where: { status: 'ACTIVE', settled: true, confidence: { not: null } },
-      select: { id: true, slug: true, claimText: true, confidence: true, settledDriftAlertAt: true },
+      select: { id: true, slug: true, claimText: true, confidence: true, settledDriftAlertAt: true, awaitingDismissedAt: true },
     })
   } catch (err) {
     summary.errors++
@@ -499,6 +499,9 @@ async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promi
         continue
       }
       if (p.settledDriftAlertAt !== null) continue // already firing, already queued
+      // A human dismissed this one (daatan#1659); recordEstimate forgets the
+      // dismissal once the number moves, and the sweep re-checks daily.
+      if (p.awaitingDismissedAt) continue
 
       await prisma.prediction.update({
         where: { id: p.id },
@@ -537,7 +540,7 @@ async function alertUnlatchedPins(now: Date, summary: RequoteSummary): Promise<v
   // Narrowed by relation first (~24 rows population-wide) so the per-candidate currency
   // check runs over a handful, not over every ACTIVE forecast. Guarded for the same
   // reason as the sweep above.
-  let candidates: { id: string; slug: string | null; claimText: string; unlatchedPinAlertAt: Date | null }[]
+  let candidates: { id: string; slug: string | null; claimText: string; unlatchedPinAlertAt: Date | null; awaitingDismissedAt: Date | null }[]
   try {
     candidates = await prisma.prediction.findMany({
       where: {
@@ -551,7 +554,7 @@ async function alertUnlatchedPins(now: Date, summary: RequoteSummary): Promise<v
           },
         },
       },
-      select: { id: true, slug: true, claimText: true, unlatchedPinAlertAt: true },
+      select: { id: true, slug: true, claimText: true, unlatchedPinAlertAt: true, awaitingDismissedAt: true },
     })
   } catch (err) {
     summary.errors++
@@ -573,6 +576,7 @@ async function alertUnlatchedPins(now: Date, summary: RequoteSummary): Promise<v
         continue
       }
       if (p.unlatchedPinAlertAt !== null) continue // already firing, already queued
+      if (p.awaitingDismissedAt) continue // human dismissed (daatan#1659)
 
       await prisma.prediction.update({
         where: { id: p.id },

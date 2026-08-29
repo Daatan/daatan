@@ -144,6 +144,8 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
         // awaiting AI resolution (daatan#1492 finding #2: 6 RESOLVED rows kept
         // the flag set because this update never cleared it).
         awaitingAiResolution: false,
+        awaitingDismissedAt: null,
+        awaitingDismissedConfidence: null,
       },
     })
 

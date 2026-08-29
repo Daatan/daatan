@@ -90,6 +90,14 @@ The central table (`Prediction`). Field groups:
   the outcome a resolver just declared — then true, since `resolvePrediction`
   rejects the request otherwise. See `detectPinContradiction` in
   `src/lib/utils/pin-contradiction.ts`.
+- **Awaiting Resolution dismissal** (daatan#1659): `awaitingDismissedAt` /
+  `awaitingDismissedConfidence`. `awaitingAiResolution` is recomputed from the bare
+  probability on every `recordEstimate` write, so a human clear alone lasts one
+  requote. A dismissal (admin "Dismiss from Awaiting Resolution", or clearing the
+  settled latch) records the number the human saw; the flag stays false while the
+  new estimate is within `AWAITING_DISMISSAL_STICKY_PTS` (5) of it, and the
+  dismissal is forgotten on a larger move. The temporal clock's drift / unlatched-pin
+  alerts skip dismissed forecasts. Resolution clears both columns.
 - **Temporal-model metadata** (glide; retro `TEMPORAL_MODEL_PLAN.md`):
   `claimDeadline` (parsed from claim *text* — deliberately distinct from
   `resolveByDatetime`; the two diverging triggers the divergence rule),
