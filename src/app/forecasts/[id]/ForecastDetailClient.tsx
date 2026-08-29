@@ -110,6 +110,19 @@ export default function ForecastDetailClient({
       router.push('/')
     }
   }
+  // Shared by the desktop badges-row copy and the mobile back-row copy of the
+  // Share button (mobile moves Share/Edit next to "Back to Forecasts" so the
+  // top badges row — freed of the redundant resolve-date/community pills —
+  // can disappear entirely for the common case with no other badges).
+  const handleShare = async () => {
+    const url = window.location.href
+    if (navigator.share) {
+      await navigator.share({ title: prediction?.claimText, url }).catch(() => {})
+    } else {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copied!')
+    }
+  }
   const { data: session } = useSession()
   const t = useTranslations('forecast')
   const tt = useTranslations('translate')
@@ -337,14 +350,38 @@ export default function ForecastDetailClient({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-      {/* Back Link */}
-      <button
-        onClick={handleBack}
-        className="inline-flex items-center gap-1 text-gray-500 hover:text-text-secondary mb-4 xl:mb-6"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        {t('backToFeed')}
-      </button>
+      {/* Back Link — mobile also carries Share/Edit here (opposite side), since
+          the badges row below drops its own Share/Edit group on mobile. */}
+      <div className="flex items-center justify-between mb-4 xl:mb-6">
+        <button
+          onClick={handleBack}
+          className="inline-flex items-center gap-1 text-gray-500 hover:text-text-secondary"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          {t('backToFeed')}
+        </button>
+        <div className="flex items-center gap-1 xl:hidden">
+          <button
+            type="button"
+            onClick={handleShare}
+            className="p-2 text-gray-400 hover:text-blue-400 hover:bg-cobalt/10 rounded-lg transition-colors"
+            title="Share forecast"
+            aria-label="Share forecast"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+          {canEdit && (
+            <Link
+              href={`/forecasts/${prediction.slug || prediction.id}/edit`}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-cobalt/10 rounded-lg transition-colors"
+              title={t('editForecastTitle')}
+              aria-label={t('editForecastTitle')}
+            >
+              <Edit2 className="w-5 h-5" />
+            </Link>
+          )}
+        </div>
+      </div>
 
       <div className="xl:grid xl:grid-cols-[1fr_420px] xl:gap-8 xl:items-start">
         {/* Left column */}
@@ -352,6 +389,12 @@ export default function ForecastDetailClient({
 
       {/* Header */}
       <div className="mb-4 xl:mb-6">
+        {/* Badges row — single shared instance. On mobile, the resolve-date and
+            community-estimate pills are hidden (both already appear again
+            lower on the page — the RESOLVES card and the forecasting/
+            commitment gauge, respectively), and Share/Edit are hidden here
+            too (moved up to the "Back to Forecasts" row instead). Desktop is
+            unaffected: every pill and the Share/Edit group still show. */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             {prediction.status !== 'ACTIVE' && (
@@ -360,18 +403,18 @@ export default function ForecastDetailClient({
               </span>
             )}
 
-            {/* Deadline - Moved to top */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-gray-400 text-sm font-medium">
+            {/* Deadline - Moved to top (desktop only; redundant with the RESOLVES card on mobile) */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-gray-400 text-sm font-medium">
               <Calendar className="w-4 h-4" />
               <span>{formatDisplayDate(prediction.resolveByDatetime)}</span>
             </div>
 
-            {/* Confidence/Probability - Moved to top */}
+            {/* Confidence/Probability - Moved to top (desktop only; redundant with the gauge on mobile) */}
             {prediction.status === 'ACTIVE' && prediction.outcomeType === 'BINARY' && (() => {
               const prob = communityProbability(prediction.commitments) ?? 50
               return (
                 <div
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-teal text-sm font-medium border border-teal/20"
+                  className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-teal text-sm font-medium border border-teal/20"
                   title={t('communityProbabilityTooltip')}
                 >
                   <TrendingUp className="w-4 h-4" />
@@ -402,8 +445,8 @@ export default function ForecastDetailClient({
                 onClick={() => setShowTranslated(!showTranslated)}
                 disabled={isTranslating}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  showTranslated 
-                    ? 'bg-blue-100 text-cobalt-light hover:bg-blue-200' 
+                  showTranslated
+                    ? 'bg-blue-100 text-cobalt-light hover:bg-blue-200'
                     : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
                 }`}
               >
@@ -416,18 +459,10 @@ export default function ForecastDetailClient({
               </button>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="hidden xl:flex items-center gap-1">
             <button
               type="button"
-              onClick={async () => {
-                const url = window.location.href
-                if (navigator.share) {
-                  await navigator.share({ title: prediction.claimText, url }).catch(() => {})
-                } else {
-                  await navigator.clipboard.writeText(url)
-                  toast.success('Link copied!')
-                }
-              }}
+              onClick={handleShare}
               className="p-2 text-gray-400 hover:text-blue-400 hover:bg-cobalt/10 rounded-lg transition-colors"
               title="Share forecast"
               aria-label="Share forecast"
@@ -447,7 +482,7 @@ export default function ForecastDetailClient({
           </div>
         </div>
 
-        <h1 className="text-xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-3 xl:mb-4 break-words">
+        <h1 className="text-base leading-[1.15] sm:text-3xl sm:leading-tight font-bold text-white tracking-tight mb-3 xl:mb-4 break-words">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 

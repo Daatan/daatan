@@ -12,9 +12,10 @@ import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 const log = createClientLogger('ContextTimeline')
 
-// Mobile gets a noticeably shorter preview than desktop, so the forecasting/
-// commitment area is reachable sooner on a small screen.
-const MOBILE_PREVIEW_MAX_CHARS = 180
+// Mobile's default preview aims for roughly one sentence — just enough for a
+// quick read before "See more" — so the forecasting/commitment area is
+// reachable sooner on a small screen. Desktop stays generous.
+const MOBILE_PREVIEW_MAX_CHARS = 100
 const DESKTOP_PREVIEW_MAX_CHARS = 420
 
 type Source = {
