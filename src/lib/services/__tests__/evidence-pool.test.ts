@@ -109,6 +109,7 @@ const source = (over: Partial<EnrichedOracleSource> = {}): EnrichedOracleSource 
   evidenceClass: null,
   authorLean: null,
   authorLeanCertainty: null,
+  consensusView: null,
   factSignal: null,
   eventActors: null,
   eventTarget: null,
@@ -269,6 +270,35 @@ describe('addArticlesToPool', () => {
     )
     const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
     expect(call.data).toMatchObject({ authorLean: -0.6, authorLeanCertainty: 0.4 })
+  })
+
+  it('persists the shadow consensusView (retro#686, daatan#1653)', async () => {
+    // What the article says everyone ELSE expects — the same shape of judgement as
+    // authorLean, for Phase 3 S2's shared-information detector. Written to the pool
+    // row, read by nothing, never sent to /pool/aggregate.
+    await addArticlesToPool(
+      'pred-1',
+      [source({ consensusView: 'expects_no' })],
+      'analyze',
+      idFor('https://reuters.com/a'),
+    )
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data).toMatchObject({ consensusView: 'expects_no' })
+  })
+
+  it('leaves a stored consensusView alone when the Oracle omits it (F11, daatan#1237)', async () => {
+    // The failure mode #1237 recorded: a re-touch that carries no opinion this run
+    // must not erase one we already hold. `undefined` tells Prisma to skip the column;
+    // an explicit null would overwrite. There is no backfill, so an erased value is gone.
+    const { consensusView: _omitted, ...withoutConsensusView } = source()
+    await addArticlesToPool(
+      'pred-1',
+      [withoutConsensusView],
+      'analyze',
+      idFor('https://reuters.com/a'),
+    )
+    const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(call.data.consensusView).toBeUndefined()
   })
 
   it('persists the shadow factSignal + facets', async () => {

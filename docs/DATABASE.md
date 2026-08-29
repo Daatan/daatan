@@ -486,6 +486,19 @@ only on NEW extractions (pool rows are a `contentHash` cache — no backfill
 without the reset→retry sweep). Byline-author-string scoring can start at
 ~84% `author` coverage; per-outlet scoring stays blocked until `outletId`
 populates (news-indexer #1131).
+`consensusView` is what **this article reports that most OTHERS expect** for the
+event (retro `SourceSignal.consensus_view`, retro#686, extractor prompt v8):
+`expects_yes` | `expects_no` | `divided`, null when the article says nothing
+about what anyone else thinks. It sits beside `authorLean` because it is the same
+shape of judgement about the same article — `authorLean` is what the byline
+*thinks*, this is what the byline says *everyone else* thinks — and it carries the
+same shadow discipline, verbatim: nothing in aggregation or the recompute reads
+it, it is never sent to `/pool/aggregate`, and there is no backfill. Stored as a
+plain `VARCHAR(16)` like `evidenceClass`, so the read path narrows it back to the
+three-member union rather than casting (`isConsensusView` in `oracle-snapshot.ts`).
+The consumer is Phase 3 S2's shared-information detector: the GAP between a
+source's stated consensus and the pool's own position is the shared component
+(Palley & Satopää 2023), which is what a naive average double-counts.
 `factSignal` + `eventActors`/`eventTarget`/`isOccurrence`/`verified` are the
 **fact-lane** counterpart of `stance` (retro `SourceSignal.fact_signal`, #313):
 `factSignal` ∈ [-1,1] is what the **reported facts alone** imply about the event,

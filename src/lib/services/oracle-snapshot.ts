@@ -131,6 +131,12 @@ export type EnrichedOracleSource = {
   // reported facts. Persisted on the pool row; nothing in aggregation reads it (shadow).
   authorLean?: number | null
   authorLeanCertainty?: number | null
+  // What THIS ARTICLE reports that most OTHERS expect for the event (retro#686) — the same shape
+  // of judgement about the same article as `authorLean`, which is what the byline itself thinks.
+  // Consumer is Phase 3 S2's shared-information detector: the GAP between a source's stated
+  // consensus and the pool is the shared component (Palley & Satopää 2023). Persisted on the pool
+  // row; nothing in aggregation reads it (shadow).
+  consensusView?: 'expects_yes' | 'expects_no' | 'divided' | null
   // The FACT-lane counterpart of `stance` + its qualifying facets (retro #313) — a DIAGNOSTIC
   // lane, deliberately not part of the estimate and not a pricing lane in waiting: the cutover
   // framing was retired by decision (retro#533, `Daatan/docs/decisions.md`). It earns its keep
@@ -227,6 +233,7 @@ export function enrichOracleSources(
       evidenceClass: s.evidence_class,
       authorLean: s.author_lean,
       authorLeanCertainty: s.author_lean_certainty,
+      consensusView: s.consensus_view,
       factSignal: s.fact_signal,
       eventActors: s.event_actors,
       eventTarget: s.event_target,
@@ -255,6 +262,12 @@ type Facet = NonNullable<EnrichedOracleSource['facet']>
 const FACETS: readonly Facet[] = ['announcement', 'denial', 'neither']
 function isFacet(v: unknown): v is Facet {
   return typeof v === 'string' && (FACETS as readonly string[]).includes(v)
+}
+
+type ConsensusView = NonNullable<EnrichedOracleSource['consensusView']>
+const CONSENSUS_VIEWS: readonly ConsensusView[] = ['expects_yes', 'expects_no', 'divided']
+function isConsensusView(v: unknown): v is ConsensusView {
+  return typeof v === 'string' && (CONSENSUS_VIEWS as readonly string[]).includes(v)
 }
 
 /**
@@ -334,6 +347,7 @@ export type PoolArticleSnapshotRow = Pick<
   | 'evidenceClass'
   | 'authorLean'
   | 'authorLeanCertainty'
+  | 'consensusView'
   | 'factSignal'
   | 'eventActors'
   | 'eventTarget'
@@ -378,6 +392,7 @@ export function poolArticleToEnrichedSource(
     evidenceClass: isEvidenceClass(row.evidenceClass) ? row.evidenceClass : null,
     authorLean: row.authorLean,
     authorLeanCertainty: row.authorLeanCertainty,
+    consensusView: isConsensusView(row.consensusView) ? row.consensusView : null,
     factSignal: row.factSignal,
     eventActors: row.eventActors,
     eventTarget: row.eventTarget,

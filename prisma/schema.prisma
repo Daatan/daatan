@@ -826,6 +826,22 @@ model EvidencePoolArticle {
   authorLean          Float? @map("author_lean")
   authorLeanCertainty Float? @map("author_lean_certainty")
 
+  // What THIS ARTICLE reports that most OTHERS expect for the event, as elicited
+  // (retro#686, extractor prompt v8): 'expects_yes' | 'expects_no' | 'divided'.
+  // Sits here beside authorLean because it is the same shape of judgement about
+  // the same article — authorLean is what the byline thinks, this is what the
+  // byline says everyone else thinks. Plain string, not a Prisma enum, matching
+  // `evidenceClass`/`origin`'s convention for this model.
+  // Consumer is Phase 3 S2's shared-information detector: the GAP between a
+  // source's stated consensus and the pool is the shared component (Palley &
+  // Satopää 2023). SHADOW / storage only — nothing in aggregation or the
+  // recompute reads it, and it is never sent to `/pool/aggregate`.
+  // Populated from the Oracle's per-source SourceSignal.consensus_view; null on
+  // rows written before this field existed and on the `/pool/aggregate` recompute
+  // path (compute-only, never re-extracts). No backfill without a reset→retry
+  // sweep — pool rows are a contentHash extraction cache.
+  consensusView String? @map("consensus_view") @db.VarChar(16)
+
   // The FACT-lane counterpart of `stance` (retro #313, Phase 2 of the un-fusing
   // work): what the REPORTED FACTS alone imply about the event, separated from
   // author assertion/framing. `factSignal` ∈ [-1,1] — claim-weighted MEAN over

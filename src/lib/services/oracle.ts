@@ -244,8 +244,12 @@ export interface OracleSource {
   author_lean?: number | null
   /** How firmly the author commits to `author_lean` [0,1]; null when it is null. */
   author_lean_certainty?: number | null
-  /** EXPERIMENTAL shadow (retro#686), article-level: what THIS article reports that
-   *  most others expect for the event. Nothing in the estimate reads it. */
+  /** What THIS ARTICLE reports that most OTHERS expect for the event (retro#686,
+   *  extractor v8) — article-level, which is why it rides beside `author_lean`:
+   *  that is what the byline thinks, this is what the byline says everyone else
+   *  thinks. Consumer is Phase 3 S2's shared-information detector — the GAP
+   *  between a source's stated consensus and the pool is the shared component
+   *  (Palley & Satopää 2023). Nothing in the Oracle's aggregation reads it. */
   consensus_view?: 'expects_yes' | 'expects_no' | 'divided' | null
   /** The FACT-lane counterpart of `stance` (retro #313, Phase 2 un-fusing): what
    *  the REPORTED FACTS alone imply about the event [-1,1], un-fused from author
