@@ -371,7 +371,19 @@ export interface OracleForecastResponse {
      *  (rule-derived) one. */
     method?: 'live' | 'pool' | 'propagated' | 'logical' | null
     models?: OracleProvenanceModels | null
+    /** Which Oracle BUILD produced this result (retro#593) — persisted per pool
+     *  row as `oracleVersion`/`oracleGitSha` (daatan#1669) so a harvest can be
+     *  sliced by build, not just by prompt version. */
+    oracle?: OracleProvenanceOracle | null
   } | null
+}
+
+/** Mirrors retro's ProvenanceOracle (api/src/forecast_api/models.py). `version`
+ *  is `/version`'s `{base}+build.{n}`; `git_sha` the deployed commit. */
+export interface OracleProvenanceOracle {
+  version?: string | null
+  git_sha?: string | null
+  built_at?: string | null
 }
 
 /** Mirrors retro's ProvenanceModels (api/src/forecast_api/models.py) — which

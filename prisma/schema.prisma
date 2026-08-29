@@ -804,6 +804,12 @@ model EvidencePoolArticle {
   gatekeeperModel         String? @map("gatekeeper_model")
   gatekeeperPromptVersion String? @map("gatekeeper_prompt_version")
   gatekeeperPromptHash    String? @map("gatekeeper_prompt_hash")
+  // Which Oracle BUILD produced this row — retro's `provenance.oracle` on the response
+  // (`{base}+build.{n}` as /version reports it, plus the deployed commit). Prompt version
+  // alone can't say that: prompt PRs are sequential but code between them is not.
+  // Null = predates the stamp (daatan#1669, umbrella Daatan/retro#742); no backfill.
+  oracleVersion           String? @map("oracle_version")
+  oracleGitSha            String? @map("oracle_git_sha") @db.VarChar(40)
   // The article's most common evidence_class among its extracted claims
   // (retro PR #255) — reported_fact | cited_probability | cited_share |
   // reporting | opinion, or null if unclassified. Needed by the credibility
