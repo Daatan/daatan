@@ -33,6 +33,8 @@ import {
   saveOracleSnapshotOnly,
   markOracleAttempted,
   clearSettledLatch,
+  dismissAwaitingResolution,
+  applyAwaitingDismissal,
   latestEvidenceAssertsSettlement,
 } from '@/lib/services/context'
 
@@ -208,6 +210,7 @@ describe('recordEstimate — the single estimate writer', () => {
 describe('clearSettledLatch — the only way back from a settled=true latch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    findUnique.mockResolvedValue({ confidence: 97 } as never)
   })
 
   it('clears settled and settledAt directly (not via recordEstimate, which can only set true)', async () => {
@@ -223,6 +226,8 @@ describe('clearSettledLatch — the only way back from a settled=true latch', ()
         awaitingAiResolution: false,
         settledDriftAlertAt: null,
         unlatchedPinAlertAt: null,
+        awaitingDismissedAt: now,
+        awaitingDismissedConfidence: 97,
       },
     })
   })
@@ -244,6 +249,89 @@ describe('clearSettledLatch — the only way back from a settled=true latch', ()
     const data = (update.mock.calls[0][0] as { data: Record<string, unknown> }).data
     expect(data.settledClearedBy).toBe('admin-user-1')
     expect(data.settledClearedAt).toBeInstanceOf(Date)
+  })
+})
+
+describe('Awaiting Resolution dismissal (daatan#1659)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    transaction.mockResolvedValue([{ id: 'snap-1' }] as never)
+    findFirst.mockResolvedValue(null as never)
+  })
+
+  it('dismissAwaitingResolution clears the flag + clock stamps and records the number the human saw', async () => {
+    findUnique.mockResolvedValue({ confidence: 95 } as never)
+    const now = new Date('2026-08-29T17:00:00.000Z')
+    await dismissAwaitingResolution('pred-1', 'admin-user-1', now)
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'pred-1' },
+      data: {
+        awaitingAiResolution: false,
+        settledDriftAlertAt: null,
+        unlatchedPinAlertAt: null,
+        awaitingDismissedAt: now,
+        awaitingDismissedConfidence: 95,
+      },
+    })
+  })
+
+  it('applyAwaitingDismissal: holds while the estimate stays within the sticky band', () => {
+    const d = { awaitingDismissedAt: new Date(), awaitingDismissedConfidence: 95 }
+    expect(applyAwaitingDismissal(true, 97, d)).toEqual({ awaitingAiResolution: false, keepDismissal: true })
+    expect(applyAwaitingDismissal(true, 90, d)).toEqual({ awaitingAiResolution: false, keepDismissal: true })
+  })
+
+  it('applyAwaitingDismissal: forgotten once the estimate moves more than the band, either way', () => {
+    const d = { awaitingDismissedAt: new Date(), awaitingDismissedConfidence: 95 }
+    expect(applyAwaitingDismissal(true, 89, d)).toEqual({ awaitingAiResolution: true, keepDismissal: false })
+    expect(applyAwaitingDismissal(false, 60, d)).toEqual({ awaitingAiResolution: false, keepDismissal: false })
+  })
+
+  it('applyAwaitingDismissal: no dismissal → the computed flag passes through', () => {
+    expect(applyAwaitingDismissal(true, 97, null)).toEqual({ awaitingAiResolution: true, keepDismissal: false })
+    expect(applyAwaitingDismissal(true, 97, { awaitingDismissedAt: null, awaitingDismissedConfidence: null }))
+      .toEqual({ awaitingAiResolution: true, keepDismissal: false })
+  })
+
+  it('recordEstimate keeps a dismissed forecast out of the queue on a same-number requote', async () => {
+    findUnique.mockResolvedValue({
+      confidence: 95, claimText: 'Claim', slug: 'claim',
+      awaitingDismissedAt: new Date('2026-08-29T17:00:00.000Z'), awaitingDismissedConfidence: 95,
+    } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'clock', probability: 96,
+      oracleSnapshot: { mean: 96, sources: [] },
+    })
+    const data = updateData()
+    expect(data.awaitingAiResolution).toBe(false)
+    expect(data).not.toHaveProperty('awaitingDismissedAt')
+  })
+
+  it('recordEstimate forgets the dismissal and re-flags once the estimate moves past the band', async () => {
+    findUnique.mockResolvedValue({
+      confidence: 95, claimText: 'Claim', slug: 'claim',
+      awaitingDismissedAt: new Date('2026-08-29T17:00:00.000Z'), awaitingDismissedConfidence: 88,
+    } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'news-indexer', probability: 95, ciLow: 90, ciHigh: 99,
+      oracleSnapshot: { mean: 95, sources: [] },
+    })
+    const data = updateData()
+    expect(data.awaitingAiResolution).toBe(true)
+    expect(data.awaitingDismissedAt).toBeNull()
+    expect(data.awaitingDismissedConfidence).toBeNull()
+  })
+
+  it('recordEstimate does not read the dismissal when the write would not flag anyway', async () => {
+    findUnique.mockResolvedValue({ confidence: 50, claimText: 'Claim', slug: 'claim' } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'clock', probability: 55,
+      oracleSnapshot: { mean: 55, sources: [] },
+    })
+    expect(updateData().awaitingAiResolution).toBe(false)
+    expect(findUnique).not.toHaveBeenCalledWith(
+      expect.objectContaining({ select: { awaitingDismissedAt: true, awaitingDismissedConfidence: true } }),
+    )
   })
 })
 

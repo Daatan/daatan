@@ -26,6 +26,8 @@ export type Prediction = {
   aiCiHigh?: number | null
   /** Oracle settlement pin — outcome reported as fact, awaiting human resolution. */
   settled?: boolean
+  /** In the Awaiting Resolution queue (extreme AI confidence or a clock alert). */
+  awaitingAiResolution?: boolean
   /** Parsed from claim TEXT by the temporal classifier — may diverge from resolveByDatetime. */
   claimDeadline?: string | null
   claimArchetype?: 'DIFFUSE' | 'SCHEDULED' | 'THRESHOLD' | 'NONE' | null

@@ -40,6 +40,7 @@ import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
 import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
+import { AwaitingResolutionAdmin } from './_forecast/AwaitingResolutionAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
@@ -852,7 +853,13 @@ export default function ForecastDetailClient({
       {/* Admin-only false-settlement override (renders nothing unless settled) */}
       <SettledLatchAdmin
         prediction={prediction}
-        onCleared={() => setPrediction(p => (p ? { ...p, settled: false } : p))}
+        onCleared={() => setPrediction(p => (p ? { ...p, settled: false, awaitingAiResolution: false } : p))}
+      />
+
+      {/* Admin-only sticky dismissal from the Awaiting Resolution queue (daatan#1659) */}
+      <AwaitingResolutionAdmin
+        prediction={prediction}
+        onDismissed={() => setPrediction(p => (p ? { ...p, awaitingAiResolution: false } : p))}
       />
 
       {/* Admin-only external-market link control (renders nothing for non-admins) */}
