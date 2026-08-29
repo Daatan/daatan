@@ -30,6 +30,7 @@ const oracleSource = (over: Partial<OracleSource> = {}): OracleSource => ({
   relevance_score: 0.85,
   author_lean: -0.4,
   author_lean_certainty: 0.7,
+  consensus_view: 'divided',
   fact_signal: 0.3,
   event_actors: 'Israel',
   event_target: 'Iran',
@@ -83,6 +84,7 @@ describe('enrichOracleSources', () => {
       relevanceScore: 0.85,
       authorLean: -0.4,
       authorLeanCertainty: 0.7,
+      consensusView: 'divided',
       factSignal: 0.3,
       eventActors: 'Israel',
       eventTarget: 'Iran',
@@ -176,6 +178,7 @@ describe('enrichOracleSources', () => {
         relevance_score: undefined,
         author_lean: undefined,
         author_lean_certainty: undefined,
+        consensus_view: undefined,
         fact_signal: undefined,
         event_actors: undefined,
         event_target: undefined,
@@ -193,6 +196,7 @@ describe('enrichOracleSources', () => {
     expect(out[0].relevanceScore).toBeUndefined()
     expect(out[0].authorLean).toBeUndefined()
     expect(out[0].authorLeanCertainty).toBeUndefined()
+    expect(out[0].consensusView).toBeUndefined()
     expect(out[0].factSignal).toBeUndefined()
     expect(out[0].eventActors).toBeUndefined()
     expect(out[0].eventTarget).toBeUndefined()
@@ -213,6 +217,7 @@ describe('enrichOracleSources', () => {
       { enrichedKey: 'evidenceClass', oracleKey: 'evidence_class' },
       { enrichedKey: 'authorLean', oracleKey: 'author_lean' },
       { enrichedKey: 'authorLeanCertainty', oracleKey: 'author_lean_certainty' },
+      { enrichedKey: 'consensusView', oracleKey: 'consensus_view' },
       { enrichedKey: 'factSignal', oracleKey: 'fact_signal' },
       { enrichedKey: 'eventActors', oracleKey: 'event_actors' },
       { enrichedKey: 'eventTarget', oracleKey: 'event_target' },
@@ -289,6 +294,7 @@ const poolArticle = (over: Partial<EvidencePoolArticle> = {}): EvidencePoolArtic
     evidenceClass: 'reported_fact',
     authorLean: -0.4,
     authorLeanCertainty: 0.7,
+    consensusView: 'divided',
     factSignal: 0.3,
     eventActors: 'Israel',
     eventTarget: 'Iran',
@@ -333,6 +339,7 @@ describe('poolArticleToEnrichedSource', () => {
       evidenceClass: 'reported_fact',
       authorLean: -0.4,
       authorLeanCertainty: 0.7,
+      consensusView: 'divided',
       factSignal: 0.3,
       eventActors: 'Israel',
       eventTarget: 'Iran',
@@ -342,6 +349,19 @@ describe('poolArticleToEnrichedSource', () => {
       claimsDetail: null,
       carriedForward: false,
     })
+  })
+
+  // `consensusView` is a plain String column, so anything could be in it — the same
+  // reason `evidenceClass` and `facet` are narrowed rather than cast. A legacy or
+  // malformed value degrades to null instead of propagating a bad shape into a
+  // snapshot that is typed as the three-member union.
+  it('narrows an off-enum consensusView to null (retro#686, daatan#1653)', () => {
+    expect(poolArticleToEnrichedSource(poolArticle({ consensusView: 'expects_no' }), null).consensusView)
+      .toBe('expects_no')
+    expect(poolArticleToEnrichedSource(poolArticle({ consensusView: 'unknown' }), null).consensusView)
+      .toBeNull()
+    expect(poolArticleToEnrichedSource(poolArticle({ consensusView: null }), null).consensusView)
+      .toBeNull()
   })
 
   it('passes relevanceBar through from the pool row (retro#393/#394, daatan#1289)', () => {
