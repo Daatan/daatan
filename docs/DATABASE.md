@@ -363,7 +363,13 @@ which after `REASK_DELAY_MS` (120 s) re-drives the run through `refreshOracleSna
 
 Other reasons: `oracle_omitted` (the Oracle ran but its gatekeeper dropped the
 article — terminal), `oracle_null_final` (two consecutive **attributable** null runs —
-terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`.
+terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`,
+`stale_published_date` (terminal, **and `excluded: true`**: the publish-date admission
+gate, daatan#1651 — the article was published more than `STALE_PUBLISHED_REJECT_DAYS`
+(365) before the forecast's `createdAt`, so it is coverage of a *previous* instance of
+the event and never reaches the extractor; 180–365 days is admitted with a
+`evidence_pool_stale_published_warn` log line only. Reversible by un-excluding the row
+in the admin pool; the gate never re-excludes an existing row).
 
 **"Attributable" is the load-bearing word (daatan#1253).** Only
 `ATTRIBUTABLE_NULL_REASONS` — `oracle_abstain` and `oracle_no_articles` — retire a

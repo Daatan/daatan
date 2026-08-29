@@ -199,7 +199,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             source: r.source ?? null,
             publishedAt: r.publishedDate ?? null,
         }))
-        const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, 'analyze')
+        const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, 'analyze', {
+          claimCreatedAt: prediction.createdAt,
+        })
         const claimedArticleIdByUrl = articleIdsByUrl(claimableResults, claimResults)
         const articlesToScore = searchResults.filter((_, i) => claimResults[i].result === 'claimed')
 

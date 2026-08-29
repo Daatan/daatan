@@ -297,6 +297,8 @@ describe('POST /api/forecasts/[id]/context', () => {
           expect.objectContaining({ url: 'https://b.com/2' }),
         ],
         'analyze',
+        // daatan#1651: the claim step gates on publish date relative to the forecast's creation.
+        { claimCreatedAt: expect.toSatisfy((v: unknown) => v === undefined || v === null || v instanceof Date) },
       )
     })
   })

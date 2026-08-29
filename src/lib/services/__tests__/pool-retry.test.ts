@@ -140,7 +140,7 @@ describe('retryPoolExtractions', () => {
     expect(where).toMatchObject({ excluded: false, title: { not: null } })
     expect(where.OR).toEqual([
       { status: 'FAILED', statusReason: null },
-      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy'] } },
+      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy', 'stale_published_date'] } },
       { status: 'PENDING' },
     ])
   })

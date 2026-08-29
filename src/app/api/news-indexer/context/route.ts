@@ -251,7 +251,9 @@ export async function POST(request: NextRequest) {
       source: a.source ?? null,
       publishedAt: a.publishedAt ?? null,
     }))
-    const claimResults = await claimArticlesForExtraction(prediction.id, claimableItems, 'news-indexer')
+    const claimResults = await claimArticlesForExtraction(prediction.id, claimableItems, 'news-indexer', {
+      claimCreatedAt: prediction.createdAt,
+    })
     // Built once here (not lazily near addArticlesToPool below) so the trigger's id is
     // available immediately after the claim step for evidencePoolArticleId, matching
     // the id addArticlesToPool itself writes onto rather than a separate re-fetch.
@@ -261,9 +263,13 @@ export async function POST(request: NextRequest) {
       // extraction — retrying can never learn anything new) vs `in_flight` (at least one
       // item is still resolving elsewhere — worth a later retry). A caller that can't tell
       // these apart burns a retry budget on evidence that was never actually missing.
+      // `skip_stale` (daatan#1651) reads as `already_complete` to the caller: the refusal is
+      // terminal, a retry can never admit it. Counted separately in the log so the gate's
+      // rate is visible without a DB query.
       const skipReason = claimResults.some((r) => r.result === 'skip_pending') ? 'in_flight' : 'already_complete'
+      const stale = claimResults.filter((r) => r.result === 'skip_stale').length
       log.info(
-        { predictionId: prediction.id, articles: items.length, skipReason },
+        { predictionId: prediction.id, articles: items.length, skipReason, stale },
         'news-indexer: all articles already claimed/unchanged, skipping oracle call',
       )
       return NextResponse.json({
