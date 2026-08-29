@@ -178,6 +178,9 @@ export type OracleClaimDetail = {
   specificity?: number | null
   /** binary | continuous | range | trend. */
   prediction_type?: string | null
+  /** EXPERIMENTAL shadow (retro#686): does the claim report the standing SITUATION
+   *  (`level`) or a MOVEMENT in it (`change`)? Nothing in the estimate reads it. */
+  report_kind?: 'level' | 'change' | null
   /** This claim's OWN evidence class — the article-level field is only the most
    *  common one, so mixed-class articles are unattributable above this layer. */
   evidence_class?: 'reported_fact' | 'cited_probability' | 'cited_share' | 'reporting' | 'opinion' | null
@@ -241,6 +244,9 @@ export interface OracleSource {
   author_lean?: number | null
   /** How firmly the author commits to `author_lean` [0,1]; null when it is null. */
   author_lean_certainty?: number | null
+  /** EXPERIMENTAL shadow (retro#686), article-level: what THIS article reports that
+   *  most others expect for the event. Nothing in the estimate reads it. */
+  consensus_view?: 'expects_yes' | 'expects_no' | 'divided' | null
   /** The FACT-lane counterpart of `stance` (retro #313, Phase 2 un-fusing): what
    *  the REPORTED FACTS alone imply about the event [-1,1], un-fused from author
    *  assertion/framing — a claim-weighted MEAN over the article's fact-bearing

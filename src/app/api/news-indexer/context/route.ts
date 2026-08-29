@@ -339,6 +339,9 @@ export async function POST(request: NextRequest) {
       stance: s.stance ?? null,
       certainty: s.certainty ?? null,
       claim: s.claims?.[0] ?? null,
+      // Per-claim shadow field (retro#686) for the SAME claim quoted above — `claims_detail`
+      // is `claims` with per-claim fields intact, same order (oracle.ts).
+      reportKind: s.claims_detail?.[0]?.report_kind ?? null,
       // The Oracle's claim-aware relevance for this article. It was being dropped here — the same
       // way `author` was, before #1067 — so news-indexer could never see WHY an article counted,
       // only that it did. It is the one number that explains a match: the embedding cosine says
@@ -349,6 +352,7 @@ export async function POST(request: NextRequest) {
       // reading the match notification can see WHY, the same rationale as `relevance` above.
       authorLean: s.author_lean ?? null,
       authorLeanCertainty: s.author_lean_certainty ?? null,
+      consensusView: s.consensus_view ?? null,
       factSignal: s.fact_signal ?? null,
       evidenceClass: s.evidence_class ?? null,
       // 1.0 is the neutral default the Oracle returns while the credibility cutover flag is OFF —
@@ -700,6 +704,8 @@ export async function POST(request: NextRequest) {
           factSignal: triggerEnrich?.factSignal ?? null,
           evidenceClass: triggerEnrich?.evidenceClass ?? null,
           credibilityWeight: triggerEnrich?.credibilityWeight ?? null,
+          consensusView: triggerEnrich?.consensusView ?? null,
+          reportKind: triggerEnrich?.reportKind ?? null,
         },
         { similarity: triggerSimilarity, articleCount: items.length, poolSize, usableSize },
         { probability, previous: prediction.confidence, ciLow, ciHigh },

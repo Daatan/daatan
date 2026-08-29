@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { notifyNewsArticleMatched } from '@/lib/services/telegram'
+import { notifyNewsArticleMatched, SHADOW_MARKER } from '@/lib/services/telegram'
 
 const PREDICTION = { id: 'p1', claimText: 'Will Netanyahu form the next government?', slug: 'nety' }
 const MATCH = { similarity: 0.368 }
@@ -45,7 +45,7 @@ describe('notifyNewsArticleMatched', () => {
     vi.restoreAllMocks()
   })
 
-  it('reports the move, and what the article said (stance/relevance/match) as table rows', async () => {
+  it('reports the move, and what the article said (stance/relevance) as table rows', async () => {
     // The numbers that make a match legible: which way the article argues, whether the Oracle
     // judged it to bear on the claim at all, and how far the estimate moved. Without stance
     // and relevance the message says the number changed but never why.
@@ -62,8 +62,12 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).not.toContain('<pre>')
     expect(msg).toContain('<b>stance</b>  -0.72') // signed: reads as "argues NO"
     expect(msg).toContain('<b>relevance</b>  0.80')
-    expect(msg).toContain('<b>match</b>  37%') // the embedding cosine: the weakest signal
     expect(msg).toContain('<b>range</b>  55–85%')
+    // The embedding cosine is routing metadata, not evidence — no longer a row (daatan#1661).
+    expect(msg).not.toContain('match')
+    expect(msg).not.toContain('37%')
+    // No shadow fields supplied → no "not in estimate" section either.
+    expect(msg).not.toContain(SHADOW_MARKER)
   })
 
   it("shows the extractor's certainty alongside stance when known", async () => {
@@ -127,7 +131,19 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).not.toContain('null')
     expect(msg).not.toContain('stance')
     expect(msg).not.toContain('relevance')
-    expect(msg).toContain('<b>match</b>  37%')
+    // Only the live `range` row is left (ESTIMATE carries a CI) — no shadow section.
+    expect(msg).toContain('<b>range</b>')
+    expect(msg).not.toContain(SHADOW_MARKER)
+  })
+
+  it('omits the panel entirely when no row rendered', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet' },
+      MATCH,
+      { probability: 71, previous: 63, ciLow: null, ciHigh: null },
+    )
+    expect(sentMessage()).not.toContain('<blockquote>')
   })
 
   it('reports judgment-lane signals (Signal Lanes) as table rows when present', async () => {
@@ -142,6 +158,8 @@ describe('notifyNewsArticleMatched', () => {
         factSignal: 0.3,
         evidenceClass: 'reporting',
         credibilityWeight: 1.24,
+        consensusView: 'expects_no',
+        reportKind: 'level',
       },
       MATCH,
       ESTIMATE,
@@ -152,6 +170,29 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).toContain('<b>fact_signal</b>  +0.30')
     expect(msg).toContain('<b>credibility</b>  1.24')
     expect(msg).toContain('<b>class</b>  reporting')
+    expect(msg).toContain('<b>consensus</b>  expects_no')
+    expect(msg).toContain('<b>report_kind</b>  level')
+  })
+
+  it('marks the shadow-lane rows as not read by the estimate, below the live rows', async () => {
+    // daatan#1661: a rater must be able to tell "this number moved the forecast" from "this
+    // number is captured for later". The marker sits between the two groups, once.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', stance: 0.5, relevance: 0.9, authorLean: 0.6, evidenceClass: 'opinion' },
+      MATCH,
+      ESTIMATE,
+    )
+    const msg = sentMessage()
+    const panel = msg.slice(msg.indexOf('<blockquote>'), msg.indexOf('</blockquote>'))
+    const marker = panel.indexOf(SHADOW_MARKER)
+    expect(marker).toBeGreaterThan(0)
+    expect(panel.split(SHADOW_MARKER)).toHaveLength(2)
+    expect(panel.indexOf('<b>stance</b>')).toBeLessThan(marker)
+    expect(panel.indexOf('<b>relevance</b>')).toBeLessThan(marker)
+    expect(panel.indexOf('<b>range</b>')).toBeLessThan(marker)
+    expect(panel.indexOf('<b>author_lean</b>')).toBeGreaterThan(marker)
+    expect(panel.indexOf('<b>class</b>')).toBeGreaterThan(marker)
   })
 
   it('renders only the judgment fields that are present, omitting the rest', async () => {

@@ -246,6 +246,8 @@ describe('POST /api/news-indexer/context', () => {
     await POST(post('test-secret'))
     const [, article, match] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
     expect(article).toMatchObject({ stance: 0.42, certainty: 0.77, relevance: 0.8 })
+    // Shadow fields ride along null-safe (daatan#1661): absent upstream → null, never undefined.
+    expect(article).toMatchObject({ consensusView: null, reportKind: null })
     // Single-run fallback (the beforeEach default): no pool behind the estimate.
     expect(match).toMatchObject({ poolSize: null })
   })
