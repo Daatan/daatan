@@ -42,9 +42,9 @@
       "schema_chars": 166
     },
     "content-moderation": {
-      "version": "v1",
-      "hash": "c2e18187d64e2863",
-      "chars": 1318,
+      "version": "v2",
+      "hash": "9d7ef16c0ea87cdb",
+      "chars": 2060,
       "schema": "moderationSchema",
       "schema_hash": "301354de80dc237e",
       "schema_chars": 314
@@ -82,12 +82,12 @@
       "schema_chars": null
     },
     "guess-chances": {
-      "version": "v1",
-      "hash": "6fb56c97cd22c8c5",
-      "chars": 596,
+      "version": "v2",
+      "hash": "6ab8008b423458c8",
+      "chars": 1266,
       "schema": "guessChancesSchema",
-      "schema_hash": "589a3bf166915605",
-      "schema_chars": 313
+      "schema_hash": "23d6ee05b2166419",
+      "schema_chars": 429
     },
     "panel-estimate": {
       "version": "v1",

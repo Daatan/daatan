@@ -27,7 +27,7 @@ export interface GeneratedPrediction {
   resolutionRules: string
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE'
   options: string[]
-  probabilitySuggestion: number
+  probabilitySuggestion: number | null
   probabilityReasoning: string
   newsAnchor: {
     url: string
@@ -917,8 +917,11 @@ export default function ExpressForecastClient({
                     </button>
                   </div>
                 ) : !isGuessing && (
+                  /* No number: either not asked yet (the hint), or the model
+                     abstained on a claim too vague to estimate (#1657) — then its
+                     reasoning says what is missing, which is what the drafter needs. */
                   <p className="text-xs text-purple-600/70">
-                    {t('probabilityHint')}
+                    {generated.probabilityReasoning || t('probabilityHint')}
                   </p>
                 )}
               </div>

@@ -67,6 +67,25 @@ describe('POST /api/forecasts/express/guess', () => {
     expect(mockGuessChances).toHaveBeenCalledWith('X will happen', '', [], undefined)
   })
 
+  it('returns the abstention rather than a substituted number (#1657)', async () => {
+    // guess-chances may answer null when the claim is too vague to estimate. The
+    // route must pass that through: an invented number would reach the drafter
+    // looking exactly like a real suggestion, which is the reason for the abstain
+    // contract in the first place. The reasoning says what is missing.
+    mockGetOracleProbability.mockResolvedValue(null)
+    mockGuessChances.mockResolvedValue({
+      probability: null,
+      reasoning: 'The claim names no resolution criterion.',
+    })
+
+    const res = await callPOST(makeRequest({ claimText: 'X will happen', detailsText: '', articles: [] }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.probability).toBeNull()
+    expect(body.reasoning).toBe('The claim names no resolution criterion.')
+  })
+
   it('short-circuits on an Oracle answer without calling guessChances', async () => {
     mockGetOracleProbability.mockResolvedValue(0.81)
 

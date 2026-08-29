@@ -88,11 +88,12 @@ export const guessChancesSchema: Schema = {
   properties: {
     probability: {
       type: SchemaType.NUMBER,
-      description: "Suggested probability (0 to 100)",
+      nullable: true,
+      description: "Suggested probability (0 to 100), or null if the forecast is too vague or underspecified to estimate",
     },
     reasoning: {
       type: SchemaType.STRING,
-      description: "Brief explanation for the suggested probability",
+      description: "Brief explanation for the suggested probability, or for why one cannot be given",
     },
   },
   required: ["probability", "reasoning"],
@@ -649,13 +650,18 @@ URL: ${article.url}
 
 /**
  * Specifically guess the chances of a prediction based on provided sources.
+ *
+ * `probability` is null when the model judges the claim too vague to estimate
+ * (#1657) — the same abstain contract both panel prompts already offer. A forced
+ * number on an unanswerable claim is noise presented to a drafter as a suggestion;
+ * `reasoning` then says what is missing, which is the more useful answer.
  */
 export async function guessChances(
   claimText: string,
   detailsText: string,
   articles: Array<{ title: string; source: string; snippet: string }>,
   marketProbability?: number | null,
-): Promise<{ probability: number; reasoning: string }> {
+): Promise<{ probability: number | null; reasoning: string }> {
   // Explicit prior alongside the articles, never in place of them — same
   // "one signal among the sources" framing generateExpressPrediction uses.
   const marketPriorBlock = marketProbability != null
