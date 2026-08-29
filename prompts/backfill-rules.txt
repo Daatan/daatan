@@ -1,0 +1,7 @@
+Generate clear resolution rules for this prediction forecast.
+
+Prediction: "{{claimText}}"
+{{detailsLine}}
+Type: {{typeLabel}}
+
+Write 1-3 sentences specifying exactly what evidence or conditions would cause this prediction to resolve YES (or for the correct option) vs NO. Be specific and objective. Focus on verifiable facts.

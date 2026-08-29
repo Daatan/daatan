@@ -66,8 +66,16 @@ resource "aws_iam_role_policy" "bedrock_prompts" {
 }
 
 # SSM parameters — one per env × prompt.
-# Values start as PLACEHOLDER and are updated manually via promote-prompt.sh
-# after creating the first version in the Bedrock console.
+#
+# NOTHING READS THESE since #1658 (2026-08-29): prompts are served from git and the
+# app's SSM → Bedrock lookup is gone, along with the promote-prompt.sh/
+# create-bedrock-prompt.sh pair that used to write the values here. This file, the
+# IAM policy above and the live parameters are pending teardown — deliberately left
+# in place so the removal is its own reviewed change rather than a side effect of the
+# code migration. Do not add a prompt name here; see docs/PROMPTS.md.
+#
+# Values started as PLACEHOLDER and were updated out-of-band after creating the first
+# version in the Bedrock console.
 resource "aws_ssm_parameter" "prompts" {
   for_each = {
     for pair in setproduct(local.prompt_envs, local.prompt_names) :
@@ -85,7 +93,7 @@ resource "aws_ssm_parameter" "prompts" {
   }
 
   lifecycle {
-    # Never overwrite values updated by promote-prompt.sh
+    # Never overwrite the out-of-band values (the promoted Bedrock ARNs).
     ignore_changes = [value]
   }
 }

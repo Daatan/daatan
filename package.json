@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.65.285",
+  "version": "1.65.286",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
@@ -31,7 +31,6 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
-    "@aws-sdk/client-bedrock-agent": "^3.1000.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1084.0",
     "@aws-sdk/client-s3": "^3.1002.0",
     "@aws-sdk/client-ssm": "^3.1000.0",

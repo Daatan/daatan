@@ -11,7 +11,7 @@ DAATAN includes an autonomous bot system: configurable agents that monitor RSS f
 3. [Configuration Reference](#configuration-reference)
 4. [Approval Flags](#approval-flags)
 5. [Admin API Endpoints](#admin-api-endpoints)
-6. [Bedrock Prompts Catalog](#bedrock-prompts-catalog)
+6. [Prompts](#prompts)
 7. [Parameter Storage Reference](#parameter-storage-reference)
 
 ---
@@ -205,51 +205,23 @@ Runs all bots that are currently due. Returns `{ ok: true, summaries: BotRunSumm
 
 ---
 
-## Bedrock Prompts Catalog
+## Prompts
 
-All LLM prompts are stored in **AWS Bedrock Prompt Management** (region `eu-central-1`) and referenced via **AWS SSM Parameter Store**. The app fetches prompts by name through `getBedrockPrompt(name)` in `src/lib/llm/bedrock-prompts.ts`, with a 5-minute in-memory cache. If an SSM value is `PLACEHOLDER` or the fetch fails, a hardcoded fallback is used.
+Bot prompts live in git with every other prompt — `PROMPTS` in
+`src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/*.txt`, both halves hashed in
+`prompts/prompt_versions.lock.json`. Inventory and edit procedure:
+**[docs/PROMPTS.md](PROMPTS.md)**.
 
-SSM path pattern: `/daatan/{env}/prompts/{prompt-name}` where `env` is `prod` or `staging`.
+The bot lane uses seven of them: `bot-config-generation`, `bot-forecast-generation`,
+`bot-sourceless-forecast-generation`, `bot-vote-decision`, `dedupe-check`,
+`forecast-quality-validation` and `topic-extraction`.
 
-### Updating a Prompt
-
-All prompts are stored as source files in `prompts/*.txt` (source of truth). Edit the file, then publish:
-
-```bash
-# 1. Edit the prompt text
-vim prompts/<name>.txt
-
-# 2. Publish to staging first
-./scripts/create-bedrock-prompt.sh <name> prompts/<name>.txt --env staging
-
-# 3. Validate on staging, then promote to prod
-./scripts/promote-prompt.sh prod <name> <new-arn>
-
-# 4. Rollback if needed
-./scripts/promote-prompt.sh <env> <name> --rollback
-```
-
-The app picks up the new prompt within 5 minutes (cache TTL).
-
-### Prompt Reference
-
-| Prompt Name | Bedrock ID | Current Version | Used By | Purpose |
-|-------------|-----------|-----------------|---------|---------|
-| `bot-config-generation` | `V7KWZIDZ5G` | `:2` | Admin: create bot | Generate persona/forecast/vote prompts and RSS sources from bot name |
-| `content-moderation` | `7DWWBJAS1O` | `:1` | Forecast + comment creation | Validate content against safety policies; geopolitical forecasts explicitly allowed |
-| `guess-chances` | fallback only | — | Express flow | Suggest probability (0–100%) for a forecast based on news context |
-| `bot-forecast-generation` | `4VVM1AE8WG` | `:2` | Bot runner | Create a verifiable forecast JSON from a hot RSS topic |
-| `bot-sourceless-forecast-generation` | fallback only | — | Bot runner | Create a forecast from bot persona/knowledge when no hot topics are detected |
-| `bot-vote-decision` | `FMSCSIWJ0N` | `:2` | Bot runner | Decide whether and how to vote on an open forecast |
-| `dedupe-check` | `E3UJXEIV39` | `:2` | Bot runner | Detect if a new topic duplicates an existing active forecast |
-| `express-prediction` | `0BXFPNKYL4` | `:3` | `/api/forecasts/express` | Convert a user's casual text into a structured prediction |
-| `extract-prediction` | `P3QR7PR50J` | `:2` | Forecast import tools | Extract a structured prediction from arbitrary article text |
-| `forecast-quality-validation` | `MZU2SJWY74` | `:2` | Bot runner | Validate a bot-generated forecast before publishing |
-| `research-query-generation` | `GQK8IGH3H9` | `:3` | Auto-resolution | Generate web search queries to find evidence for resolution |
-| `resolution-research` | `9BJAASRX0U` | `:6` | Auto-resolution | Determine forecast outcome from news context, the curated evidence pool, or model knowledge |
-| `suggest-tags` | `4GRPW480KQ` | `:2` | Tag suggestion API | Suggest 1–3 relevant tags for a forecast |
-| `topic-extraction` | `7EKX6FRNE0` | `:2` | Bot runner / RSS | Extract a 5–10 word search query from an article |
-| `update-context` | `OX9GBXOT0B` | `:2` | Forecast detail page | Write a neutral 2–3 sentence summary of current news context |
+Until #1658 these were fetched at runtime from AWS Bedrock Prompt Management via
+`/daatan/{env}/prompts/{name}` in SSM, with a 5-minute cache and an in-code fallback. That
+path is gone, and the publish/promote scripts with it — editing a prompt in the Bedrock
+console now has no effect. Two of this lane's own prompts are why: `forecast-quality-validation`
+lost a date-rule fix and `bot-forecast-generation` lost its stricter quality rules, both
+corrected in git and never promoted to the copy that was actually serving.
 
 ---
 
@@ -282,7 +254,7 @@ Non-secret, environment-specific config fetched at runtime without a redeploy.
 
 | Path pattern | Contents |
 |---|---|
-| `/daatan/{env}/prompts/{name}` | Bedrock prompt ARN (see catalog above) |
+| `/daatan/{env}/prompts/{name}` | Bedrock prompt ARN — **no longer read** since #1658; pending teardown |
 
 To list all current values:
 ```bash

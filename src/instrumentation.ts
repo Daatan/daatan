@@ -103,47 +103,10 @@ export async function register() {
     }
   }
 
-  // Validate critical SSM prompt params are not PLACEHOLDER.
-  // All of these are called without fallbacks in user-facing request paths;
-  // a PLACEHOLDER value causes a runtime error only when the feature is used.
-  const criticalPrompts = [
-    'express-prediction',
-    'extract-prediction',
-    'suggest-tags',
-    'update-context',
-    'dedupe-check',
-    'research-query-generation',
-    'resolution-research',
-    'forecast-quality-validation',
-  ] as const
-
-  const rawEnv = process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'staging'
-  let ssmEnv = rawEnv === 'production' ? 'prod' : rawEnv
-  if (ssmEnv === 'next') ssmEnv = 'staging' // NEXT environment uses staging prompts
-
-  try {
-    const { SSMClient, GetParametersCommand } = await import('@aws-sdk/client-ssm')
-    const ssm = new SSMClient({ region: process.env.AWS_REGION || 'eu-central-1' })
-
-    const paramNames = criticalPrompts.map((p) => `/daatan/${ssmEnv}/prompts/${p}`)
-    const res = await ssm.send(new GetParametersCommand({ Names: paramNames }))
-
-    const placeholders = (res.Parameters ?? [])
-      .filter((p) => !p.Value || p.Value === 'PLACEHOLDER')
-      .map((p) => p.Name ?? '')
-
-    const missing2 = paramNames.filter(
-      (name) => placeholders.includes(name) || !(res.Parameters ?? []).find((p) => p.Name === name),
-    )
-
-    if (missing2.length > 0) {
-      // Warn only — hardcoded fallback prompts in bedrock-prompts.ts cover all PLACEHOLDER params
-      log.warn({ missing: missing2 }, '[startup] SSM params using hardcoded fallbacks (Bedrock not fully configured)')
-    } else {
-      log.info({ env: ssmEnv, count: criticalPrompts.length }, '[startup] SSM prompt params OK')
-    }
-  } catch (error) {
-    // SSM unreachable — log and continue
-    log.warn({ err: error }, '[startup] Could not validate SSM prompt params')
-  }
+  // #1658 removed the SSM prompt-param check that used to live here. It reported
+  // on a copy of the prompts that no longer exists, and it could not have caught
+  // anything anyway: it warned that a PLACEHOLDER "causes a runtime error", but
+  // every one of the eight had a fallback and would have silently served it.
+  // The lock in prompts/prompt_versions.lock.json is the real check, and it runs
+  // in CI rather than at boot.
 }

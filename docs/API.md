@@ -724,7 +724,7 @@ against the hand-labelled 08-21 pairs runs through this), `?limit=N` (≤ 200,
 default 40). Returns `{ ok, version, candidates, typed, independent,
 lowConfidence, failed, outcomes{created,refreshed,kept_rejected,kept_decided,self}, dryRun }`.
 Driven daily by `.github/workflows/relation-typer.yml`. Prompt: `relation-typer`
-(fallback-only, no Bedrock copy).
+(see [PROMPTS.md](PROMPTS.md)).
 
 ### `GET /api/cron/backfill-embeddings`
 Generates missing vector embeddings in batches of 20. Picks up predictions where `embedding IS NULL` and calls the Gemini embedding API. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, done, failed, remaining }` — except when there is nothing to do, which answers `{ ok, done: 0, remaining: 0 }` with **no `failed` key**.

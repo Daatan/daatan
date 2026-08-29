@@ -1,32 +1,19 @@
 import { withAuth } from '@/lib/api-middleware'
 import { llmService } from '@/lib/llm'
-import { SchemaType } from '@google/generative-ai'
-import type { Schema } from '@google/generative-ai'
+import { fillPrompt, getPromptTemplate } from '@/lib/llm/bedrock-prompts'
+import { rulesSchema } from '@/lib/llm/schemas'
 import { findPredictionsWithoutRules, updateForecastResolutionRules } from '@/lib/services/forecast'
 
 export const maxDuration = 300
 
-const rulesSchema: Schema = {
-  description: 'Resolution rules for a prediction',
-  type: SchemaType.OBJECT,
-  properties: {
-    resolutionRules: {
-      type: SchemaType.STRING,
-      description: 'Clear, specific criteria for how this prediction resolves. 1-3 sentences.',
-    },
-  },
-  required: ['resolutionRules'],
-}
-
 async function generateRules(claimText: string, detailsText: string | null, outcomeType: string): Promise<string> {
+  const template = await getPromptTemplate('backfill-rules')
   const response = await llmService.generateContent({
-    prompt: `Generate clear resolution rules for this prediction forecast.
-
-Prediction: "${claimText}"
-${detailsText ? `Details: "${detailsText}"` : ''}
-Type: ${outcomeType === 'BINARY' ? 'Yes/No (BINARY)' : 'Multiple choice (MULTIPLE_CHOICE)'}
-
-Write 1-3 sentences specifying exactly what evidence or conditions would cause this prediction to resolve YES (or for the correct option) vs NO. Be specific and objective. Focus on verifiable facts.`,
+    prompt: fillPrompt(template, {
+      claimText,
+      detailsLine: detailsText ? `Details: "${detailsText}"` : '',
+      typeLabel: outcomeType === 'BINARY' ? 'Yes/No (BINARY)' : 'Multiple choice (MULTIPLE_CHOICE)',
+    }),
     schema: rulesSchema,
     temperature: 0,
   })

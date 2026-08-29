@@ -80,7 +80,8 @@ per-member Brier shows whether the ungrounded priors are worth anything at all.
 ## 3. The prompt
 
 Claim + dates + resolution rules. **No article text.** Lives as the `panel-estimate`
-Bedrock prompt (`src/lib/llm/bedrock-prompts.ts`), with a hardcoded fallback.
+prompt in `PROMPTS` (`src/lib/llm/bedrock-prompts.ts`), mirrored in `prompts/panel-estimate.txt`
+and hashed in the lock — see [PROMPTS.md](PROMPTS.md).
 
 Deliberately **not** `guess-chances`: that prompt is context-fed (`{{articlesText}}`)
 and live on `/api/forecasts/express/guess`, so tuning the panel through it would
