@@ -48,39 +48,31 @@ A single provider failing is **logged but not paged** — a later leg may still 
     *   `ollama.ts`: HTTP client for Ollama API.
     *   `openrouter.ts`: HTTP client for OpenRouter API (main-chain fallback + bots).
 *   **`src/lib/llm/service.ts`**: `ResilientLLMService` class that handles the retry/fallback logic.
-*   **`src/lib/llm/bedrock-prompts.ts`**: AWS Bedrock Prompt Management client (5-minute TTL cache).
+*   **`src/lib/llm/bedrock-prompts.ts`**: the `PROMPTS` record and `getPromptTemplate()` / `fillPrompt()`. (Name kept from when it fetched from Bedrock; 39 call sites.)
 *   **`src/lib/llm/index.ts`**: Instantiates and exports `llmService` and `createBotLLMService`.
 
-## Bedrock Prompt Management
+## Prompts
 
-LLM prompts are managed via **AWS Bedrock Prompt Management** rather than local files. The flow is:
+Prompts live in git — `PROMPTS` in `src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/*.txt`,
+with both the prose and the paired response schema hashed in `prompts/prompt_versions.lock.json`.
+No runtime fetch, no cache, no copy outside version control.
 
-```
-SSM Parameter Store             Bedrock Prompt Management
-/daatan/{env}/prompts/{name}  →  arn:aws:bedrock:...:prompt/{ID}:{version}
-        ↓                                    ↓
-  bedrock-prompts.ts  ←──── GetPromptCommand ────────────────────────
-  (5-min TTL cache)
-        ↓
-  prompt template string
-  (with {{variable}} placeholders)
-```
-
-Usage:
 ```typescript
-import { getBedrockPrompt } from '@/lib/llm/bedrock-prompts'
+import { fillPrompt, getPromptTemplate } from '@/lib/llm/bedrock-prompts'
 
-const prompt = await getBedrockPrompt('express-prediction')
-// Returns the prompt template string; falls back to hardcoded string if SSM=PLACEHOLDER
+const template = await getPromptTemplate('express-prediction')   // {{appName}} already applied
+const prompt = fillPrompt(template, { userInput, currentDate })
 ```
 
-**Fallback behavior**: if the SSM value is `PLACEHOLDER` or the Bedrock fetch fails, a hardcoded fallback prompt is used so the app never breaks.
+`getPromptTemplate` still returns a `Promise` so the 39 call sites did not have to change when
+#1658 removed the fetch; it cannot fail, and every `PromptName` resolves to text by type.
 
-**To update a prompt**: edit the DRAFT in the Bedrock console → create a new version → update the SSM parameter to the new ARN. The cache clears within 5 minutes.
+Full inventory, the two-halves argument, and how to change one: **[docs/PROMPTS.md](PROMPTS.md)**.
 
-See `docs/bots.md` → [Bedrock Prompts Catalog](bots.md#bedrock-prompts-catalog) for the full list of prompt names, IDs, and SSM keys.
-
-Requires `AWS_REGION` and an IAM role/profile with `bedrock:GetPrompt` and `ssm:GetParameter` permissions.
+Until #1658 this was an SSM → Bedrock Prompt Management lookup with a 5-minute cache and an
+in-code fallback. Prompt text that reached production lived in a console git could not see, so
+`git revert` rolled back code but not prompts, and two prompts drifted for months. `AWS_REGION`,
+`bedrock:GetPrompt` and `ssm:GetParameter` are no longer needed for prompts.
 
 ### Express prediction date grounding (#1086)
 

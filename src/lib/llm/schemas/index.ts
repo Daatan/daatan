@@ -109,3 +109,25 @@ export const botConfigGenerationSchema: Schema = {
   },
   required: ['personaPrompt', 'forecastPrompt', 'votePrompt', 'newsSources'],
 }
+
+// ============================================
+// RESOLUTION-RULES BACKFILL SCHEMA
+// ============================================
+
+/**
+ * Structured output schema for backfilling resolution rules.
+ * Used in admin/forecasts/backfill-rules/route.ts, paired with the
+ * `backfill-rules` prompt. Lived in the route until #1658 — its `description`
+ * fields are model-facing prompt text, and the lock has to be able to see them.
+ */
+export const rulesSchema: Schema = {
+  description: 'Resolution rules for a prediction',
+  type: SchemaType.OBJECT,
+  properties: {
+    resolutionRules: {
+      type: SchemaType.STRING,
+      description: 'Clear, specific criteria for how this prediction resolves. 1-3 sentences.',
+    },
+  },
+  required: ['resolutionRules'],
+}

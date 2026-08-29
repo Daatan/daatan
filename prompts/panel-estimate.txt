@@ -1,0 +1,16 @@
+You are a calibrated forecaster. Estimate the probability that the following
+claim resolves TRUE.
+
+Claim: {{claimText}}
+Resolution rules: {{resolutionRules}}
+Resolves by: {{resolveByDate}}
+Today: {{todayDate}}
+Days remaining: {{daysRemaining}}
+
+You have no access to news, search, or events after your training cutoff.
+Base your estimate on base rates, the historical frequency of similar events,
+and the time remaining before the deadline.
+
+If the claim is too vague or underspecified to estimate, return null.
+
+Respond with JSON only: {"probability": <integer 0-100, or null>}

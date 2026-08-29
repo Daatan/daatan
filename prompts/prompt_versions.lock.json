@@ -1,0 +1,165 @@
+{
+  "_comment": "Source of truth for src/lib/llm/__tests__/promptLock.test.ts. Each entry pins BOTH halves of the text one prompt sends: `hash`/`chars` cover the prose in PROMPTS (hashed with {{appName}} still a placeholder), and `schema_hash`/`schema_chars` cover the paired response schema as JSON.stringify emits it — its `description` fields are model-facing instructions, and retro measured the schema half at 27% of its extractor prompt (retro#700). `schema: null` means the prompt genuinely has no schema; its prose is still locked. `chars` sits beside each hash so growth shows as a number in the diff rather than as an opaque hash change. Hashes are the first 16 hex chars of SHA-256. Regenerate with `npx tsx scripts/update-prompt-lock.ts`; `version` is never written by the script — bump it by hand in the same commit when the edit changes model behaviour, and add a row to docs/PROMPTS.md. Versions all start at v1: the Bedrock version numbers these prompts carried until #1658 counted edits to the prose alone, so they do not describe the same thing and are not carried forward (issue #1658 records what each was on).",
+  "prompts": {
+    "backfill-rules": {
+      "version": "v1",
+      "hash": "27cf32cce7e08038",
+      "chars": 326,
+      "schema": "rulesSchema",
+      "schema_hash": "27be7d5cc54e059a",
+      "schema_chars": 239
+    },
+    "bot-config-generation": {
+      "version": "v1",
+      "hash": "b009d6e277fdc1aa",
+      "chars": 816,
+      "schema": "botConfigGenerationSchema",
+      "schema_hash": "88b8c9bcb2eb5919",
+      "schema_chars": 262
+    },
+    "bot-forecast-generation": {
+      "version": "v1",
+      "hash": "afb31c8d61629f31",
+      "chars": 1431,
+      "schema": "forecastBatchSchema",
+      "schema_hash": "c8ae135bd1bd47b7",
+      "schema_chars": 427
+    },
+    "bot-sourceless-forecast-generation": {
+      "version": "v1",
+      "hash": "98f461ecc8732dfb",
+      "chars": 893,
+      "schema": "forecastBatchSchema",
+      "schema_hash": "c8ae135bd1bd47b7",
+      "schema_chars": 427
+    },
+    "bot-vote-decision": {
+      "version": "v1",
+      "hash": "ee2b2c9727f1b3fe",
+      "chars": 423,
+      "schema": "voteDecisionSchema",
+      "schema_hash": "760c1ac2e80b7285",
+      "schema_chars": 166
+    },
+    "content-moderation": {
+      "version": "v1",
+      "hash": "c2e18187d64e2863",
+      "chars": 1318,
+      "schema": "moderationSchema",
+      "schema_hash": "301354de80dc237e",
+      "schema_chars": 314
+    },
+    "dedupe-check": {
+      "version": "v1",
+      "hash": "616a29c850927c0a",
+      "chars": 286,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    },
+    "express-prediction": {
+      "version": "v1",
+      "hash": "dec51daa94315ebc",
+      "chars": 4903,
+      "schema": "expressPredictionSchema",
+      "schema_hash": "c1bd735fc2ad4c94",
+      "schema_chars": 1756
+    },
+    "extract-prediction": {
+      "version": "v1",
+      "hash": "c99646d91552643e",
+      "chars": 502,
+      "schema": "predictionSchema",
+      "schema_hash": "35dba167662ff278",
+      "schema_chars": 691
+    },
+    "forecast-quality-validation": {
+      "version": "v1",
+      "hash": "49bf5312ccfe39ff",
+      "chars": 1087,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    },
+    "guess-chances": {
+      "version": "v1",
+      "hash": "6fb56c97cd22c8c5",
+      "chars": 596,
+      "schema": "guessChancesSchema",
+      "schema_hash": "589a3bf166915605",
+      "schema_chars": 313
+    },
+    "panel-estimate": {
+      "version": "v1",
+      "hash": "261acc6e2592335c",
+      "chars": 578,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    },
+    "panel-estimate-grounded": {
+      "version": "v1",
+      "hash": "b499cb0e8ec97b83",
+      "chars": 705,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    },
+    "relation-typer": {
+      "version": "v1",
+      "hash": "82130ffb95585f9f",
+      "chars": 4017,
+      "schema": "relationTyperSchema",
+      "schema_hash": "d1a892d64983fc25",
+      "schema_chars": 497
+    },
+    "research-query-generation": {
+      "version": "v1",
+      "hash": "a83890a1c1f9fe73",
+      "chars": 559,
+      "schema": "queryGenerationSchema",
+      "schema_hash": "bfe4d75fe81d70fb",
+      "schema_chars": 219
+    },
+    "resolution-research": {
+      "version": "v1",
+      "hash": "e613c34d9ebc0134",
+      "chars": 3513,
+      "schema": "researchSchema",
+      "schema_hash": "3b50a9e8623d44e6",
+      "schema_chars": 607
+    },
+    "suggest-tags": {
+      "version": "v1",
+      "hash": "14d83d6cb870e53f",
+      "chars": 617,
+      "schema": "suggestTagsSchema",
+      "schema_hash": "c0354bcae6754eb2",
+      "schema_chars": 192
+    },
+    "temporal-classifier": {
+      "version": "v1",
+      "hash": "39aa524df205fc36",
+      "chars": 2233,
+      "schema": "temporalClassifierSchema",
+      "schema_hash": "828ef7790960178e",
+      "schema_chars": 718
+    },
+    "topic-extraction": {
+      "version": "v1",
+      "hash": "f6e03b7a06b4981a",
+      "chars": 165,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    },
+    "update-context": {
+      "version": "v1",
+      "hash": "0f2d872a336d294e",
+      "chars": 475,
+      "schema": null,
+      "schema_hash": null,
+      "schema_chars": null
+    }
+  }
+}

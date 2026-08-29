@@ -1,9 +1,4 @@
-import { BedrockAgentClient, GetPromptCommand } from '@aws-sdk/client-bedrock-agent'
-import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm'
-import { createLogger } from '@/lib/logger'
 import { getAppName } from '@/lib/branding'
-
-const log = createLogger('llm-bedrock-prompts')
 
 /**
  * Replace the {{appName}} placeholder with the configured brand so prompts are
@@ -17,11 +12,7 @@ function applyAppName(template: string): string {
   return template.replace(/\{\{appName\}\}/g, () => name)
 }
 
-const REGION = process.env.AWS_REGION || 'eu-central-1'
-const bedrock = new BedrockAgentClient({ region: REGION })
-const ssm = new SSMClient({ region: REGION })
-
-type PromptName =
+export type PromptName =
     | 'express-prediction'
     | 'extract-prediction'
     | 'suggest-tags'
@@ -39,27 +30,38 @@ type PromptName =
     | 'content-moderation'
     | 'temporal-classifier'
     | 'relation-typer'
+    // Was an inline template literal in the backfill-rules route until #1658. It is
+    // the 13th prose/schema pair, and a pair the lock cannot hold while half of it
+    // is anonymous in a route file.
+    | 'backfill-rules'
     // Deliberately NOT 'guess-chances': that prompt is context-fed ({{articlesText}})
     // and live on /api/forecasts/express/guess, so tuning the panel through it would
     // silently perturb forecast creation. See docs/LASSO.md §3.
     | 'panel-estimate'
     | 'panel-estimate-grounded'
 
-interface CacheEntry {
-    template: string
-    expiresAt: number
-}
-
-const templateCache = new Map<PromptName, CacheEntry>()
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
-
 /**
- * Hardcoded fallback prompts used when the SSM parameter is PLACEHOLDER or
- * Bedrock is not configured. These are the original inline prompts that existed
- * before the Bedrock migration and are kept in sync manually.
- * Exported only for the prompts/*.txt drift-guard test.
+ * Every prompt this app sends to a model. This is the source of truth (#1658):
+ * there is no runtime fetch, no cache, and no second copy in a console that git
+ * cannot see.
+ *
+ * `prompts/*.txt` is the human-editable mirror — easier to read and diff than a
+ * TypeScript string literal — and `promptSync.test.ts` asserts the two are
+ * byte-identical in both directions, so "one text" is enforced rather than
+ * intended. The runtime reads this record and not the files because the app
+ * builds with `output: 'standalone'` and `prompts/` is not copied into the
+ * runtime image; a `readFileSync` here would work in dev and CI and fail in
+ * production.
+ *
+ * Prose is only half of a structured prompt — the paired response schema's
+ * `description` fields are model-facing text too, and used to live under
+ * separate change control. `prompts/prompt_versions.lock.json` now pins both
+ * halves together, one entry per prompt (retro#700's lesson, #1658's argument).
+ *
+ * Total, not Partial: the type now proves every PromptName resolves to text,
+ * which is what makes the lookup below infallible.
  */
-export const FALLBACK_PROMPTS: Partial<Record<PromptName, string>> = {
+export const PROMPTS: Record<PromptName, string> = {
     'express-prediction': `You are a prediction assistant for {{appName}}, a reputation-based prediction platform. Your job is to convert user's casual prediction ideas into formal, testable predictions.
 
 Rules:
@@ -456,6 +458,17 @@ A — claim deadline: {{aDeadline}}; direction: {{aDirection}}
 </b>
 B — claim deadline: {{bDeadline}}; direction: {{bDirection}}`,
 
+    // {{detailsLine}} is the whole line, blank when the forecast has no details —
+    // fillPrompt has no conditionals, and this reproduces the inline original's
+    // output byte for byte, blank line included.
+    'backfill-rules': `Generate clear resolution rules for this prediction forecast.
+
+Prediction: "{{claimText}}"
+{{detailsLine}}
+Type: {{typeLabel}}
+
+Write 1-3 sentences specifying exactly what evidence or conditions would cause this prediction to resolve YES (or for the correct option) vs NO. Be specific and objective. Focus on verifiable facts.`,
+
     'temporal-classifier': `You are a forecast-claim classifier for a prediction platform. You receive ONE
 claim written by a user, plus the platform's resolution date. Classify the claim's
 temporal structure. Output ONLY the JSON object — no prose.
@@ -498,66 +511,19 @@ Today: {{currentDate}}
 </claim>`,
 }
 
-function getFallbackPrompt(promptName: PromptName, paramName: string, reason: string): string {
-    const fallback = FALLBACK_PROMPTS[promptName]
-    if (fallback) {
-        log.warn({ promptName, paramName, reason }, 'Using hardcoded fallback prompt (Bedrock not configured)')
-        return applyAppName(fallback)
-    }
-    throw new Error(`Prompt '${promptName}' has no Bedrock ARN and no hardcoded fallback. Reason: ${reason}`)
-}
-
 /**
- * Fetch a prompt template from Bedrock using an ARN stored in SSM.
- * Uses a 5-minute in-memory cache.
+ * Resolve a prompt template, branded.
+ *
+ * Stays `async` on purpose: this used to be an SSM lookup plus a Bedrock
+ * `GetPrompt` behind a 5-minute cache, and keeping the `Promise` return means
+ * all 39 call sites across 12 files are untouched by #1658. There is nothing
+ * left to await — the lookup cannot miss (`PROMPTS` is total over `PromptName`)
+ * and cannot fail, which is the point: the old path was fail-open, so a bad ARN,
+ * an SSM outage or a `PLACEHOLDER` served different text than intended behind a
+ * `log.warn` that nothing paged on.
  */
 export async function getPromptTemplate(promptName: PromptName): Promise<string> {
-    const now = Date.now()
-    const cached = templateCache.get(promptName)
-
-    if (cached && cached.expiresAt > now) {
-        return cached.template
-    }
-
-    const rawEnv = process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'staging'
-    let env = rawEnv === 'production' ? 'prod' : rawEnv
-    if (env === 'next') env = 'staging' // NEXT environment uses staging prompts
-    const paramName = `/daatan/${env}/prompts/${promptName}`
-
-    log.debug({ promptName, env, paramName, region: REGION }, 'Fetching prompt template')
-
-    try {
-        // 1. Get ARN from SSM
-        const ssmRes = await ssm.send(new GetParameterCommand({ Name: paramName }))
-        const promptArn = ssmRes.Parameter?.Value
-
-        if (!promptArn || promptArn === 'PLACEHOLDER') {
-            return getFallbackPrompt(promptName, paramName, 'SSM parameter is PLACEHOLDER')
-        }
-
-        log.debug({ promptName, promptArn }, 'Fetched ARN from SSM, now fetching from Bedrock')
-        // ARN format typically includes :prompt/ID:VERSION
-        const bedrockRes = await bedrock.send(new GetPromptCommand({ promptIdentifier: promptArn }))
-
-        // The variant contains the actual template string. We assume standard text prompt variant.
-        const templateText = bedrockRes.variants?.[0]?.templateConfiguration?.text?.text
-
-        if (!templateText) {
-            return getFallbackPrompt(promptName, paramName, `Bedrock returned no text template for ARN ${promptArn}`)
-        }
-
-        // Cache and return (branded, so the placeholder never leaks downstream)
-        const branded = applyAppName(templateText)
-        templateCache.set(promptName, {
-            template: branded,
-            expiresAt: now + CACHE_TTL_MS
-        })
-
-        return branded
-    } catch (error) {
-        log.error({ err: error, promptName, paramName, region: REGION }, 'Failed to fetch prompt template from AWS')
-        return getFallbackPrompt(promptName, paramName, String(error))
-    }
+    return applyAppName(PROMPTS[promptName])
 }
 
 /**
