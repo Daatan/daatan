@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns'
 import type { NotificationType } from '@prisma/client'
 import EmptyState from '@/components/ui/EmptyState'
 import { UserLink } from '@/components/UserLink'
+import { notifyUnreadCountChanged } from '@/lib/hooks/useUnreadCount'
 
 interface Notification {
   id: string
@@ -82,6 +83,7 @@ export default function NotificationList({
           body: JSON.stringify({ read: true }),
         })
         if (res.ok) {
+          notifyUnreadCountChanged() // sidebar badge refetches immediately
           router.refresh() // invalidate router cache so next visit shows updated state
         } else {
           // Rollback
@@ -112,6 +114,7 @@ export default function NotificationList({
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
         setUnreadCount(0)
+        notifyUnreadCountChanged(0) // sidebar badge clears immediately
         router.refresh() // invalidate router cache so next visit shows updated state
       } else {
         toast.error('Failed to mark notifications as read')
