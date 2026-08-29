@@ -13,14 +13,17 @@ export { recordOracleFallback } from '@/lib/services/oracleClient'
 
 const log = createLogger('oracle')
 
-/** retro has not reached a 1.0 release; every 0.x version is treated as API-
- *  compatible — minor/patch bumps only add fields (see daatan#1563; retro went
- *  0.1→0.4.x over 2026 without a single breaking response-shape change). Bump
- *  this if retro's API ever makes an intentional breaking change. Compared
- *  against the LEADING component of `data.version` only, not a string prefix —
- *  a literal '0.1' prefix check broke silently the moment retro passed 0.2.0,
- *  which live health checks confirmed was still the case at 0.4.1 (daatan#1563). */
-const EXPECTED_API_MAJOR_VERSION = '0'
+/** Accepted leading components of retro's `/health` `version`. Compared against
+ *  the LEADING component only, not a string prefix — a literal '0.1' prefix check
+ *  broke silently the moment retro passed 0.2.0 (daatan#1563).
+ *
+ *  Two-step switch (daatan#1668, umbrella Daatan/retro#742): retro moves from the
+ *  ad-hoc 0.4.x to generation-based 1.4.x (1.5.x / 2.x reserved for the Oracle
+ *  1.5 programme and the graph engine). Step 1 (this): accept both majors so
+ *  retro can flip (retro#745) once this reaches production. Step 2: drop '0'.
+ *  Response-shape compatibility is gated on `provenance.schema_version`, not on
+ *  this number. */
+const EXPECTED_API_MAJOR_VERSIONS = ['0', '1']
 
 /**
  * Default Oracle budget: server-to-server and background callers (the news-indexer
@@ -861,9 +864,9 @@ export const checkOracleHealth = async (
       return false
     }
 
-    if (data.version && data.version.split('.')[0] !== EXPECTED_API_MAJOR_VERSION) {
+    if (data.version && !EXPECTED_API_MAJOR_VERSIONS.includes(data.version.split('.')[0])) {
       log.warn(
-        { expectedMajor: EXPECTED_API_MAJOR_VERSION, actual: data.version },
+        { expectedMajors: EXPECTED_API_MAJOR_VERSIONS, actual: data.version },
         'Oracle API major version mismatch — falling back to LLM',
       )
       void logOracleCall({ callType: 'HEALTH', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status })

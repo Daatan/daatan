@@ -122,7 +122,7 @@ Calibrated probability estimates for binary forecast questions come from the **T
 *   **`src/lib/services/oracle.ts`**: Oracle client.
     *   `getOracleForecast(question)` → `OracleForecastResponse | null`. Returns the full payload (`mean`, `std`, `ci_low`, `ci_high`, `articles_used`, `sources[]` with per-source `stance` / `certainty` / `credibility_weight` / `claims`) so callers can surface provenance alongside the probability. Never throws; returns `null` on any failure so callers can fall back silently.
     *   `getOracleProbability(question)` → `number | null` in `[0, 1]`. Thin wrapper around `getOracleForecast` for callers that only need the scaled probability.
-    *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version's major component matches the currently-expected one (`EXPECTED_API_MAJOR_VERSION`, `'0'` today) — a strict `0.1` prefix check went stale as retro shipped 0.2–0.4.x and was silently failing every call (daatan#1563).
+    *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version's major component is one of the accepted ones (`EXPECTED_API_MAJOR_VERSIONS`, `['0', '1']` while retro moves from 0.4.x to generation-based 1.4.x — daatan#1668, umbrella Daatan/retro#742) — a strict `0.1` prefix check went stale as retro shipped 0.2–0.4.x and was silently failing every call (daatan#1563).
 
 ### Funnel diagnostics: `outcomeCounts`
 
