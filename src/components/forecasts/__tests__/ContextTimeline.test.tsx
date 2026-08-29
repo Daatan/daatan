@@ -15,7 +15,7 @@ const renderWithIntl = (ui: React.ReactElement) => {
   )
 }
 
-// Long enough to exceed both the mobile (180) and desktop (420) preview caps,
+// Long enough to exceed both the mobile (100) and desktop (420) preview caps,
 // built from short, distinct sentences so truncation boundaries are easy to assert on.
 const LONG_CONTEXT = Array.from(
   { length: 12 },

@@ -447,7 +447,7 @@ export default function ForecastDetailClient({
           </div>
         </div>
 
-        <h1 className="text-xl sm:text-3xl font-bold text-white tracking-tight leading-tight mb-3 xl:mb-4 break-words">
+        <h1 className="text-base leading-[1.15] sm:text-3xl sm:leading-tight font-bold text-white tracking-tight mb-3 xl:mb-4 break-words">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
