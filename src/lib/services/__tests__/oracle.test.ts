@@ -758,16 +758,29 @@ describe('checkOracleHealth', () => {
     expect(ok).toBe(true)
   })
 
+  // daatan#1668: retro is moving to generation-based 1.4.x; both majors are
+  // accepted during the switch (Daatan/retro#742).
+  it('passes health check on retro\'s upcoming 1.4.x version', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '1.4.0+build.5' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(true)
+    expect(mockLog.warn).not.toHaveBeenCalled()
+  })
+
   it('fails health check and warns on an incompatible major version', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ status: 'ok', version: '1.0.0' }),
+      json: async () => ({ status: 'ok', version: '2.0.0' }),
     })
     const ok = await checkOracleHealth()
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedMajor: '0', actual: '1.0.0' }),
+      expect.objectContaining({ expectedMajors: ['0', '1'], actual: '2.0.0' }),
       'Oracle API major version mismatch — falling back to LLM',
     )
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
