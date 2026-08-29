@@ -362,11 +362,11 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     const texts = vi.mocked(fetch).mock.calls.map(
       (c) => JSON.parse(c[1]!.body as string).text as string,
     )
-    expect(texts[0]).toContain('<b>match</b>  72%')
+    expect(texts[0]).not.toContain('match') // cosine is no longer a row (daatan#1661)
     expect(texts[0]).not.toContain('articles')
     expect(texts[1]).not.toContain('articles')
     expect(texts[2]).toContain('· 3 articles')
-    expect(texts[2]).toContain('<b>match</b>  72%')
+    expect(texts[2]).not.toContain('match') // cosine is no longer a row (daatan#1661)
   })
 })
 
