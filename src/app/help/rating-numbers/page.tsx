@@ -46,7 +46,8 @@ export default function RatingNumbersHelpPage() {
           <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>) actually feed
           the Oracle&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
           <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong>,{' '}
-          <strong>consensus</strong>, <strong>report_kind</strong> — is captured and shown, but
+          <strong>consensus</strong>, <strong>report_kind</strong>, <strong>reader</strong>,{' '}
+          <strong>quantity</strong> — is captured and shown, but
           nothing in the estimate reads it yet: this panel is currently the only place those
           values are visible at all. That&apos;s deliberate (a &quot;shadow lane&quot;) — it lets us
           accumulate real-world numbers and eyeball them, via your ratings, before trusting any of
@@ -161,6 +162,35 @@ export default function RatingNumbersHelpPage() {
                 rate was cut&quot;)? <strong>Shadow only:</strong> a level report measures the state
                 directly and should eventually reset the Oracle&apos;s recency handling rather
                 than decay out of it.
+              </td>
+            </tr>
+            <tr>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">reader</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">3 levels</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600">
+                How confident the extractor is in its own <em>reading</em> of the quote — which is
+                a different question from the <code className="bg-navy-800 px-1 rounded text-xs font-mono">cert</code>{' '}
+                riding on <strong>stance</strong>, which is how firmly the <em>article</em> commits
+                to the claim. A flat, unhedged sentence the reader may have misparsed is high
+                certainty and low reader confidence. When a known reading trap applies it is named
+                in brackets (<code className="bg-navy-800 px-1 rounded text-xs font-mono">low (negation)</code>) —
+                that half is the useful one, because it says <em>which</em> misreading was a risk.
+                <strong> Shadow only:</strong> the eventual use is down-weighting articles the
+                extractor itself flagged as hard to read.
+              </td>
+            </tr>
+            <tr>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">quantity</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">figure</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600">
+                The number the quoted claim reports, with the relation the <em>article</em> asserts
+                about it (<code className="bg-navy-800 px-1 rounded text-xs font-mono">214 daily departures</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded text-xs font-mono">&lt; 40 million tonnes</code>).
+                It is emphatically <em>not</em> a verdict on the forecast&apos;s own threshold —
+                asking a language model &quot;does 214 clear 250?&quot; is how you get a confident wrong
+                answer, so the number is extracted here and the comparison is done in code.
+                Absent on most claims, because most claims quote no figure.
+                <strong> Shadow only</strong> so far.
               </td>
             </tr>
             <tr>

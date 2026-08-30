@@ -342,6 +342,12 @@ export async function POST(request: NextRequest) {
       // Per-claim shadow field (retro#686) for the SAME claim quoted above — `claims_detail`
       // is `claims` with per-claim fields intact, same order (oracle.ts).
       reportKind: s.claims_detail?.[0]?.report_kind ?? null,
+      // Two more per-claim shadow fields, from the SAME claim as `reportKind` and the
+      // quote above — deliberately per-claim rather than the article-level rollup
+      // (`reader_confidence_level` is the WORST level across the article's claims), so
+      // every number in the panel describes the one claim the panel quotes.
+      readerConfidence: s.claims_detail?.[0]?.reader_confidence ?? null,
+      quantity: s.claims_detail?.[0]?.quantity ?? null,
       // The Oracle's claim-aware relevance for this article. It was being dropped here — the same
       // way `author` was, before #1067 — so news-indexer could never see WHY an article counted,
       // only that it did. It is the one number that explains a match: the embedding cosine says
@@ -707,6 +713,8 @@ export async function POST(request: NextRequest) {
           credibilityWeight: triggerEnrich?.credibilityWeight ?? null,
           consensusView: triggerEnrich?.consensusView ?? null,
           reportKind: triggerEnrich?.reportKind ?? null,
+          readerConfidence: triggerEnrich?.readerConfidence ?? null,
+          quantity: triggerEnrich?.quantity ?? null,
         },
         { similarity: triggerSimilarity, articleCount: items.length, poolSize, usableSize },
         { probability, previous: prediction.confidence, ciLow, ciHigh },

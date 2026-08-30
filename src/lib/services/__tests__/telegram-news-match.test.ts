@@ -174,6 +174,127 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).toContain('<b>report_kind</b>  level')
   })
 
+  it('reports reader_confidence with its trap, and the trap is what makes the row worth a line', async () => {
+    // retro#681. `reader` answers a different question from the `cert` on `stance`: that one is
+    // how firmly the SOURCE commits, this one is how sure the extractor is it read the sentence
+    // right. The trap names WHICH misreading was a risk, so it rides in the same row — "medium"
+    // alone is noise.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        readerConfidence: { level: 'low', trap: 'negation' },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>reader</b>  low (negation)')
+  })
+
+  it('omits the trap when none applied, and the whole row when there is no level', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', readerConfidence: { level: 'high' } },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>reader</b>  high')
+
+    vi.mocked(global.fetch).mockClear()
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', stance: 0.5, readerConfidence: { trap: 'negation' } },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).not.toContain('<b>reader</b>')
+  })
+
+  it('renders a stated level as a bare figure, and a bound with its operator', async () => {
+    // retro#683. "= 214 daily departures" reads like an assertion about the QUESTION; the
+    // article said "214 daily departures". The operator only earns its place when the article
+    // actually asserted a bound.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        quantity: { value: 214, unit: 'daily departures', comparator: '=' },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>quantity</b>  214 daily departures')
+
+    vi.mocked(global.fetch).mockClear()
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        quantity: { value: 40, unit: 'million tonnes', comparator: '<', as_of: '2026-06-30' },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>quantity</b>  &lt; 40 million tonnes @ 2026-06-30')
+  })
+
+  it('renders a range with both bounds, and falls back to one when the upper is missing', async () => {
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        quantity: { value: 1.8, unit: 'million containers', comparator: 'between', value_hi: 2.2 },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>quantity</b>  1.8\u20132.2 million containers')
+
+    vi.mocked(global.fetch).mockClear()
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        quantity: { value: 1.8, unit: 'million containers', comparator: 'between' },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    // Never "between 1.8 and undefined" — a range without its upper bound is not a range.
+    expect(sentMessage()).toContain('<b>quantity</b>  1.8 million containers')
+  })
+
+  it('prints value and unit exactly as extracted, without recombining them', async () => {
+    // The live-data caveat from retro#683: the SAME figure comes back as
+    // 452 / "thousand active US Army personnel" and as 452000 / "active US Army personnel".
+    // Both obey the field description and neither normalises to the other, so the renderer
+    // must not try — folding either way prints a number the article never wrote.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        quantity: { value: 452, unit: 'thousand active US Army personnel', comparator: '=' },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    const msg = sentMessage()
+    expect(msg).toContain('<b>quantity</b>  452 thousand active US Army personnel')
+    expect(msg).not.toContain('452000')
+  })
+
   it('marks the shadow-lane rows as not read by the estimate, below the live rows', async () => {
     // daatan#1661: a rater must be able to tell "this number moved the forecast" from "this
     // number is captured for later". The marker sits between the two groups, once.
