@@ -9,7 +9,7 @@
  * are run per bot run (see MAX_ORACLE_SOURCES_PER_RUN) and only enabled when an
  * admin explicitly adds an `oracle:` entry — there is no default.
  */
-import type { RssItem } from './rss'
+import { parsePublishedAt, type RssItem } from './rss'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
 import type { OracleCallMeta } from '@/lib/services/oracleClient'
@@ -48,7 +48,7 @@ export async function fetchOracleSources(
         title: r.title.trim(),
         url: r.url,
         source: r.source || hostnameOrUrl(r.url),
-        publishedAt: r.publishedDate ? new Date(r.publishedDate) : new Date(),
+        publishedAt: parsePublishedAt(r.publishedDate),
         snippet: r.snippet?.slice(0, 500),
       })
     }

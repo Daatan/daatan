@@ -250,19 +250,32 @@ describe('fetchRssFeeds', () => {
     expect(results[0].title).toBe('Valid headline')
   })
 
-  it('falls back to current date when pubDate is missing', async () => {
-    const before = Date.now()
+  // Was "falls back to current date when pubDate is missing" until daatan#1679. That
+  // fallback is the same one news-indexer#122 removed upstream: a crawl-time stamp on an
+  // undated article is indistinguishable from a real publish date, so it defeats every
+  // guard that keys off the date. Undated now means null, and detectHotTopics drops it.
+  it('reports a missing pubDate as null rather than the current time', async () => {
     mockParseURL.mockResolvedValue({
       title: 'Feed',
       items: [{ title: 'Undated headline', link: 'https://example.com/undated' }],
     })
 
     const results = await fetchRssFeeds(['https://example.com/rss'])
-    const after = Date.now()
 
     expect(results).toHaveLength(1)
-    expect(results[0].publishedAt.getTime()).toBeGreaterThanOrEqual(before)
-    expect(results[0].publishedAt.getTime()).toBeLessThanOrEqual(after)
+    expect(results[0].publishedAt).toBeNull()
+  })
+
+  it('reports an unparseable pubDate as null', async () => {
+    mockParseURL.mockResolvedValue({
+      title: 'Feed',
+      items: [{ title: 'Bad date', link: 'https://example.com/bad', pubDate: 'not-a-date' }],
+    })
+
+    const results = await fetchRssFeeds(['https://example.com/rss'])
+
+    expect(results).toHaveLength(1)
+    expect(results[0].publishedAt).toBeNull()
   })
 
   it('truncates contentSnippet to 500 characters', async () => {
