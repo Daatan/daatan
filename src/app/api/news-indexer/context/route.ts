@@ -349,6 +349,8 @@ export async function POST(request: NextRequest) {
       // every number in the panel describes the one claim the panel quotes.
       readerConfidence: s.claims_detail?.[0]?.reader_confidence ?? null,
       quantity: s.claims_detail?.[0]?.quantity ?? null,
+      // retro#763, same claim again: what the quoted claim's position rests on.
+      grounds: s.claims_detail?.[0]?.grounds ?? null,
       // The Oracle's claim-aware relevance for this article. It was being dropped here — the same
       // way `author` was, before #1067 — so news-indexer could never see WHY an article counted,
       // only that it did. It is the one number that explains a match: the embedding cosine says
@@ -716,6 +718,7 @@ export async function POST(request: NextRequest) {
           reportKind: triggerEnrich?.reportKind ?? null,
           readerConfidence: triggerEnrich?.readerConfidence ?? null,
           quantity: triggerEnrich?.quantity ?? null,
+          grounds: triggerEnrich?.grounds ?? null,
         },
         { similarity: triggerSimilarity, articleCount: items.length, poolSize, usableSize },
         { probability, previous: prediction.confidence, ciLow, ciHigh },

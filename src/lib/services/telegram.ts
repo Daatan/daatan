@@ -811,6 +811,19 @@ export function quantityRow(
   return ['quantity', `${op}${q.value} ${q.unit}${asOf}`]
 }
 
+/** The `grounds` panel row (retro#763), or null when the claim carries none.
+ *  Rendered as the kind, spelled out, then the basis phrase after a middle dot:
+ *  "official statement · the ministry's 12 March statement". The kind alone is a
+ *  category a rater can check at a glance; the basis is the half that says whether
+ *  two articles are repeating ONE reason, which is the field's whole purpose. */
+export function groundsRow(
+  g: { kind?: string | null; basis?: string | null } | null | undefined,
+): [string, string] | null {
+  if (!g?.kind) return null
+  const kind = g.kind.replace(/_/g, ' ')
+  return ['grounds', g.basis ? `${kind} · ${g.basis}` : kind]
+}
+
 export async function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
   article: {
@@ -836,6 +849,7 @@ export async function notifyNewsArticleMatched(
       value_hi?: number | null
       as_of?: string | null
     } | null
+    grounds?: { kind?: string | null; basis?: string | null } | null
   },
   match: { similarity: number; articleCount?: number; poolSize?: number | null; usableSize?: number | null },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
@@ -906,6 +920,12 @@ export async function notifyNewsArticleMatched(
   //                        comes back as `452 thousand active US Army personnel` and as `452000
   //                        active US Army personnel`, and folding either way would invent a
   //                        precision the article did not give.
+  //   grounds     what the quoted claim's position RESTS ON (retro#763): the kind of reason
+  //                        (a milestone, a statement, a poll figure, an inference, a precedent,
+  //                        the writer's own view) and the phrase naming it. The one shadow row
+  //                        that is readable by construction — it is the answer to "why does
+  //                        this article think so?" — and the basis phrase is what lets a rater
+  //                        see that two articles are repeating one ministry statement.
   //
   // The embedding cosine (`match.similarity`) is deliberately NOT a row any more: it is why
   // news-indexer pushed, not evidence about the claim, and under Funnel v2 the judge's
@@ -926,6 +946,7 @@ export async function notifyNewsArticleMatched(
     article.reportKind ? ['report_kind', article.reportKind] : null,
     readerRow(article.readerConfidence),
     quantityRow(article.quantity),
+    groundsRow(article.grounds),
   ]
   const renderRows = (rows: Array<[string, string] | null>) =>
     rows

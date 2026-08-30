@@ -47,7 +47,7 @@ export default function RatingNumbersHelpPage() {
           the Oracle&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
           <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong>,{' '}
           <strong>consensus</strong>, <strong>report_kind</strong>, <strong>reader</strong>,{' '}
-          <strong>quantity</strong> — is captured and shown, but
+          <strong>quantity</strong>, <strong>grounds</strong> — is captured and shown, but
           nothing in the estimate reads it yet: this panel is currently the only place those
           values are visible at all. That&apos;s deliberate (a &quot;shadow lane&quot;) — it lets us
           accumulate real-world numbers and eyeball them, via your ratings, before trusting any of
@@ -190,6 +190,22 @@ export default function RatingNumbersHelpPage() {
                 asking a language model &quot;does 214 clear 250?&quot; is how you get a confident wrong
                 answer, so the number is extracted here and the comparison is done in code.
                 Absent on most claims, because most claims quote no figure.
+                <strong> Shadow only</strong> so far.
+              </td>
+            </tr>
+            <tr>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">grounds</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">kind · basis</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600">
+                What the quoted claim&apos;s position <em>rests on</em> — the reason, not the
+                direction. The kind is one of six (a milestone that happened, an official statement,
+                a market or poll figure, an analyst&apos;s inference, a precedent or base rate, the
+                writer&apos;s own judgement), and the phrase after the dot names it
+                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">official statement · the ministry&apos;s 12 March statement</code>).
+                Three articles repeating one ministry statement agree for <em>one</em> reason;
+                three citing a milestone, a poll and a precedent agree for three — and the estimate
+                cannot currently tell those apart. This is not the <strong>class</strong> row:
+                class is the route the information took, grounds is what was seen at the end of it.
                 <strong> Shadow only</strong> so far.
               </td>
             </tr>

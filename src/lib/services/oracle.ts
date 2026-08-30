@@ -224,6 +224,22 @@ export type OracleClaimDetail = {
     value_hi?: number | null
     as_of?: string | null
   } | null
+  /** EXPERIMENTAL shadow (retro#763): what this claim's position RESTS ON — the reason,
+   *  not the direction. `kind` is a closed pick (a milestone, a statement, a market or
+   *  poll figure, an inference, a precedent, the writer's own judgement); `basis` is the
+   *  short phrase naming it, and is the half that lets two "official_statement" claims be
+   *  recognised as the SAME statement. Not `evidence_class`: that is the route the
+   *  information took, this is what was seen. */
+  grounds?: {
+    kind:
+      | 'observed_milestone'
+      | 'official_statement'
+      | 'market_or_poll_figure'
+      | 'analyst_inference'
+      | 'precedent_or_base_rate'
+      | 'authors_judgement'
+    basis?: string | null
+  } | null
 }
 
 export interface OracleSource {
