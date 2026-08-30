@@ -11,9 +11,16 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('backfill-oracle-sources')
 const MAX_PER_CALL = 25
 
-/** ACTIVE forecasts with no context snapshot carrying an oracleSnapshot. */
+/**
+ * ACTIVE, public forecasts with no context snapshot carrying an oracleSnapshot.
+ *
+ * isPublic:true excludes forecasts flagged private for moderation reasons
+ * (daatan#1603) — this route spends real Oracle calls per candidate, so a
+ * flagged low-value forecast shouldn't consume backfill slots.
+ */
 const NO_ORACLE_SNAPSHOT: Prisma.PredictionWhereInput = {
   status: 'ACTIVE',
+  isPublic: true,
   contextSnapshots: { none: { oracleSnapshot: { not: Prisma.DbNull } } },
 }
 
