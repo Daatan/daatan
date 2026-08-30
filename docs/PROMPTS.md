@@ -144,10 +144,17 @@ records what each was on.
 
 ## Bedrock
 
-Bedrock Prompt Management is no longer read at runtime. The prompts and their SSM parameters
-still exist in both environments as of this writing and are pending teardown (#1658 step 7,
-including the `daatan-translate` prompt that #1292 left behind at DRAFT after removing its SSM
-parameters — the half git could see got cleaned up, the half only a console could see did not).
-`terraform/bedrock_prompts.tf` still manages those parameters; it goes when they do.
+There is no Bedrock copy any more. #1658 deleted the runtime lookup; #1674 deleted what it used
+to read — 15 SSM parameters and one IAM role policy per environment, and all 15 prompts.
+`terraform/bedrock_prompts.tf` went with them.
 
-Nothing reads them. Do not publish prompt edits there — they will have no effect.
+The console history was archived verbatim first, in the private `Daatan/docs` repo at
+`archive/bedrock-prompts-2026-08-30.json`: 15 prompts, 59 version records, DRAFT included. It is
+an archive, not a source — nothing reads it, and restoring from it would mean pasting text back
+into this file.
+
+Two things that archive preserved, both of which existed only in the console: `9BJAASRX0U` was
+created as `daatan-resolution-research` and renamed to `resolution-research` at version 4, and
+`daatan-translate` sat at DRAFT from 2026-06-15 after #1292 removed its SSM parameters but not
+the prompt — the half git could see got cleaned up, the half only a console could see did not.
+That orphan is the clearest argument for why prompts belong here.

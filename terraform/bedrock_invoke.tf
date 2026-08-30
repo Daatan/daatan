@@ -1,9 +1,9 @@
 # Bedrock model invocation for the AI panel (docs/LASSO.md).
 #
-# Separate from `aws_iam_role_policy.bedrock_prompts` on purpose: reading a prompt
-# template and invoking a model are different privileges with different blast radii,
-# so this grant can be applied, reviewed, or revoked with `-target` without touching
-# prompt access.
+# This is the only Bedrock grant left. It used to sit beside
+# `aws_iam_role_policy.bedrock_prompts`, kept separate because reading a prompt template
+# and invoking a model are different privileges with different blast radii; #1674 removed
+# that policy along with the prompts it read, and this one is untouched by it.
 #
 # WHY THIS EXISTS
 #   Without a Bedrock member, all panel members run through OpenRouter and the feature
