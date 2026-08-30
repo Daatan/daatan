@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
   }
 
   const predictions = await prisma.prediction.findMany({
-    where: { status: 'ACTIVE' },
+    // isPublic:false is also how a low-value/false-premise forecast gets moderated out of
+    // the funnel (daatan#1603) — the public listing endpoint already excludes these by
+    // default, but this feed queried on status alone, so a private forecast burned the same
+    // matching+judging cost as a public one while being invisible to any review that only
+    // browses the public listing.
+    where: { status: 'ACTIVE', isPublic: true },
     select: {
       id: true,
       claimText: true,
