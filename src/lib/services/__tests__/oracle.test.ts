@@ -731,36 +731,10 @@ describe('checkOracleHealth', () => {
     vi.unstubAllGlobals()
   })
 
-  // Regression test for the live bug this fix corrects: retro's actual deployed
-  // version (confirmed via `curl https://oracle.daatan.com/health`) is well past
-  // the old '0.1' prefix EXPECTED_API_VERSION check ever matched, so every health
-  // check was silently failing and firing false "Oracle forecast unavailable"
-  // alerts. A same-major bump like this must pass.
-  it('passes health check on retro\'s actual live version (0.4.x)', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ status: 'ok', version: '0.4.1+build.37930' }),
-    })
-    const ok = await checkOracleHealth()
-    expect(ok).toBe(true)
-    expect(mockLog.warn).not.toHaveBeenCalled()
-    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'OK' }))
-  })
-
-  it('passes health check on the minimum supported version (0.1)', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ status: 'ok', version: '0.1.0' }),
-    })
-    const ok = await checkOracleHealth()
-    expect(ok).toBe(true)
-  })
-
-  // daatan#1668: retro is moving to generation-based 1.4.x; both majors are
-  // accepted during the switch (Daatan/retro#742).
-  it('passes health check on retro\'s upcoming 1.4.x version', async () => {
+  // The gate compares the LEADING component only, not a string prefix — a
+  // literal '0.1' prefix check once broke silently when retro passed 0.2.0
+  // (daatan#1563). A same-major bump like this must pass.
+  it('passes health check on retro\'s live 1.4.x version', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -769,6 +743,33 @@ describe('checkOracleHealth', () => {
     const ok = await checkOracleHealth()
     expect(ok).toBe(true)
     expect(mockLog.warn).not.toHaveBeenCalled()
+    expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'OK' }))
+  })
+
+  it('passes health check on a later 1.x patch/minor', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '1.12.3+build.99' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(true)
+  })
+
+  // daatan#1673: the transitional '0' from daatan#1668 is gone — the old
+  // ad-hoc 0.4.x line must now fail the gate like any other foreign major.
+  it('fails health check on the retired 0.x line', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', version: '0.4.1+build.37930' }),
+    })
+    const ok = await checkOracleHealth()
+    expect(ok).toBe(false)
+    expect(mockLog.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedMajors: ['1'], actual: '0.4.1+build.37930' }),
+      'Oracle API major version mismatch — falling back to LLM',
+    )
   })
 
   it('fails health check and warns on an incompatible major version', async () => {
@@ -780,7 +781,7 @@ describe('checkOracleHealth', () => {
     const ok = await checkOracleHealth()
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedMajors: ['0', '1'], actual: '2.0.0' }),
+      expect.objectContaining({ expectedMajors: ['1'], actual: '2.0.0' }),
       'Oracle API major version mismatch — falling back to LLM',
     )
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
@@ -801,7 +802,7 @@ describe('checkOracleHealth', () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ status: 'degraded', version: '0.4.1' }),
+      json: async () => ({ status: 'degraded', version: '1.4.0' }),
     })
     const ok = await checkOracleHealth()
     expect(ok).toBe(false)
