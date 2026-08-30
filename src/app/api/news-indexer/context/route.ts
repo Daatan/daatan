@@ -263,13 +263,14 @@ export async function POST(request: NextRequest) {
       // extraction — retrying can never learn anything new) vs `in_flight` (at least one
       // item is still resolving elsewhere — worth a later retry). A caller that can't tell
       // these apart burns a retry budget on evidence that was never actually missing.
-      // `skip_stale` (daatan#1651) reads as `already_complete` to the caller: the refusal is
-      // terminal, a retry can never admit it. Counted separately in the log so the gate's
-      // rate is visible without a DB query.
+      // `skip_stale` (daatan#1651) and `skip_undated` (daatan#1679) read as `already_complete`
+      // to the caller: both refusals are terminal, a retry can never admit them. Counted
+      // separately in the log so each gate arm's rate is visible without a DB query.
       const skipReason = claimResults.some((r) => r.result === 'skip_pending') ? 'in_flight' : 'already_complete'
       const stale = claimResults.filter((r) => r.result === 'skip_stale').length
+      const undated = claimResults.filter((r) => r.result === 'skip_undated').length
       log.info(
-        { predictionId: prediction.id, articles: items.length, skipReason, stale },
+        { predictionId: prediction.id, articles: items.length, skipReason, stale, undated },
         'news-indexer: all articles already claimed/unchanged, skipping oracle call',
       )
       return NextResponse.json({
