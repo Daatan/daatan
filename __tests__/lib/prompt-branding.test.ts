@@ -10,15 +10,10 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const brand = { name: 'DAATAN' }
 vi.mock('@/lib/branding', () => ({ getAppName: () => brand.name }))
 
-// Force the hardcoded-fallback path (no Bedrock/SSM in tests): make SSM reject.
-vi.mock('@aws-sdk/client-ssm', () => ({
-  SSMClient: class { send() { return Promise.reject(new Error('no ssm in test')) } },
-  GetParameterCommand: class {},
-}))
-vi.mock('@aws-sdk/client-bedrock-agent', () => ({
-  BedrockAgentClient: class { send() { return Promise.reject(new Error('no bedrock')) } },
-  GetPromptCommand: class {},
-}))
+// These used to mock @aws-sdk/client-ssm and @aws-sdk/client-bedrock-agent into rejecting,
+// to force the hardcoded-fallback path. #1658 deleted the fetch, so there is no path to
+// force and no fallback to fall back to — getPromptTemplate is a lookup in PROMPTS. The
+// bedrock-agent package is not even a dependency any more.
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))

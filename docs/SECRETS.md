@@ -12,7 +12,6 @@ isolation you already have, and would make the genuinely-shared values worse.
 | App secrets, rotated independently | **SSM SecureString** `/daatan/<env>/secrets/<NAME>` | free, KMS-encrypted, IAM-scopable per path, rotates without a redeploy |
 | Bootstrap secrets (DB password, GitHub token for the clone) | Secrets Manager `daatan-env-<env>`, `daatan-github-token` | needed before the app runs, injected at container start |
 | Shared across services | **SSM SecureString** `/daatan/shared/secrets/<NAME>`, one parameter, **referenced** — never copied | one rotation, one place |
-| Prompt ARNs | SSM String `/daatan/<env>/prompts/<name>` | not secret — **unread since #1658**, pending teardown; prompts live in git ([PROMPTS.md](PROMPTS.md)) |
 
 ## Rotating an app secret
 

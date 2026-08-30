@@ -218,10 +218,11 @@ The bot lane uses seven of them: `bot-config-generation`, `bot-forecast-generati
 
 Until #1658 these were fetched at runtime from AWS Bedrock Prompt Management via
 `/daatan/{env}/prompts/{name}` in SSM, with a 5-minute cache and an in-code fallback. That
-path is gone, and the publish/promote scripts with it — editing a prompt in the Bedrock
-console now has no effect. Two of this lane's own prompts are why: `forecast-quality-validation`
-lost a date-rule fix and `bot-forecast-generation` lost its stricter quality rules, both
-corrected in git and never promoted to the copy that was actually serving.
+path is gone, and the publish/promote scripts with it. #1674 then deleted the parameters and
+the prompts themselves, so there is no console copy left to edit by mistake. Two of this
+lane's own prompts are why: `forecast-quality-validation` lost a date-rule fix and
+`bot-forecast-generation` lost its stricter quality rules, both corrected in git and never
+promoted to the copy that was actually serving.
 
 ---
 
@@ -248,19 +249,16 @@ Sensitive credentials and infrastructure endpoints. Never stored in the DB or SS
 | `AWS_REGION` | `.env` / Docker | AWS region (used for Bedrock + SSM) |
 | `STAGING_URL` | GitHub Actions secrets | URL passed to bots cron workflow |
 
-### 2. AWS SSM Parameter Store (`/daatan/{env}/...`)
+### 2. AWS SSM Parameter Store (`/daatan/{env}/secrets/...`)
 
-Non-secret, environment-specific config fetched at runtime without a redeploy.
+App secrets, as SecureStrings, rotatable without a redeploy — see
+[SECRETS.md](SECRETS.md). The bot lane reads no *non*-secret config from SSM: the prompt
+ARNs under `/daatan/{env}/prompts/` were the only entries, and #1674 deleted them.
 
-| Path pattern | Contents |
-|---|---|
-| `/daatan/{env}/prompts/{name}` | Bedrock prompt ARN — **no longer read** since #1658; pending teardown |
-
-To list all current values:
+To list what is there:
 ```bash
 aws ssm get-parameters-by-path --path "/daatan" --recursive \
-  --query 'Parameters[*].{Name:Name,Value:Value}' \
-  --output table --region eu-central-1
+  --query 'Parameters[*].Name' --output table --region eu-central-1
 ```
 
 ### 3. Database (`BotConfig` table)
