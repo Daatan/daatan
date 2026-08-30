@@ -1,9 +1,10 @@
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
-import { embedText } from '@/lib/services/embedding'
+import { embedText, embedAndStoreExternalMarket } from '@/lib/services/embedding'
 import { getLatestEvidenceEstimate } from '@/lib/services/context'
 import { notifyMarketDivergence } from '@/lib/services/telegram'
 import type { ExternalMarket, MarketProvider as MarketProviderEnum } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 const log = createLogger('external-markets')
 
@@ -746,6 +747,12 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
     })
   }
 
+  // Fire-and-forget, same pattern as embedAndStoreLatentNode's caller — a failed
+  // embed shouldn't fail the market link/sync itself (daatan#1640).
+  embedAndStoreExternalMarket(market.id, m.question).catch(err =>
+    log.error({ err, marketId: market.id }, 'Failed to embed external market')
+  )
+
   return market
 }
 
@@ -958,7 +965,10 @@ export async function suggestMarketsForClaim(
   const claimVec = await embedText(claimText.trim())
   if (!claimVec) return []
 
-  const vecs = await Promise.all(candidates.map(c => embedText(c.question)))
+  const cached = await storedEmbeddings(candidates)
+  const vecs = await Promise.all(
+    candidates.map(c => cached.get(`${c.provider}:${c.externalId}`) ?? embedText(c.question))
+  )
   return candidates
     .map((c, i) => {
       const cosine = vecs[i] ? cosineSimilarity(claimVec, vecs[i]!) : 0
@@ -1001,6 +1011,35 @@ export function deadlineWeight(
   return 1 / (1 + over / DEADLINE_DECAY_DAYS)
 }
 
+/**
+ * Stored embeddings for whichever candidates are already cached rows (keyed
+ * `provider:externalId`) — lets the re-rank reuse a vector instead of
+ * re-embedding a market we've already upserted, cutting the redundant
+ * per-candidate embedText() calls the schema comment always intended to avoid
+ * (daatan#1640). Candidates with no cached row, or whose row predates this
+ * fix and has a NULL embedding, are left for the caller to embed live.
+ */
+async function storedEmbeddings(candidates: MarketSuggestion[]): Promise<Map<string, number[]>> {
+  if (candidates.length === 0) return new Map()
+  const cached = await prisma.externalMarket.findMany({
+    where: { OR: candidates.map(c => ({ provider: c.provider, externalId: c.externalId })) },
+    select: { id: true, provider: true, externalId: true },
+  })
+  if (cached.length === 0) return new Map()
+
+  const rows = await prisma.$queryRaw<{ id: string; vec: string }[]>(
+    Prisma.sql`SELECT id, embedding::text AS vec FROM external_markets WHERE id IN (${Prisma.join(cached.map(m => m.id))}) AND embedding IS NOT NULL`
+  )
+  const vecById = new Map(rows.map(r => [r.id, r.vec.slice(1, -1).split(',').map(Number)]))
+
+  const out = new Map<string, number[]>()
+  for (const m of cached) {
+    const vec = vecById.get(m.id)
+    if (vec) out.set(`${m.provider}:${m.externalId}`, vec)
+  }
+  return out
+}
+
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0
   let na = 0
@@ -1033,7 +1072,10 @@ export async function suggestMarketMatch(
   const claimVec = await embedText(q)
   if (!claimVec) return null
 
-  const candidateVecs = await Promise.all(candidates.map(c => embedText(c.question)))
+  const cached = await storedEmbeddings(candidates)
+  const candidateVecs = await Promise.all(
+    candidates.map(c => cached.get(`${c.provider}:${c.externalId}`) ?? embedText(c.question))
+  )
 
   let best: { cand: MarketSuggestion; score: number } | null = null
   for (let i = 0; i < candidates.length; i++) {

@@ -12,7 +12,7 @@ vi.mock('@/lib/services/google-auth', () => ({
   googleAccessToken: vi.fn(async () => 'ya29.test-token'),
 }))
 
-import { embedText, embedAndStoreForecast } from '../embedding'
+import { embedText, embedAndStoreForecast, embedAndStoreExternalMarket } from '../embedding'
 import { prisma } from '@/lib/prisma'
 
 const FAKE_768 = Array.from({ length: 768 }, (_, i) => i / 768)
@@ -223,6 +223,48 @@ describe('embedAndStoreForecast', () => {
     vi.mocked(fetch).mockResolvedValue(embedResponse(withNaN))
 
     await expect(embedAndStoreForecast('pred-1', 'claim text')).rejects.toThrow(
+      /non-finite values/
+    )
+    expect(prisma.$executeRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('embedAndStoreExternalMarket', () => {
+  beforeEach(() => {
+    clearVertexEnv()
+    process.env.GEMINI_API_KEY = 'fake-key'
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('calls $executeRaw to update the embedding column', async () => {
+    vi.mocked(fetch).mockResolvedValue(embedResponse())
+    vi.mocked(prisma.$executeRaw).mockResolvedValue(1)
+
+    await embedAndStoreExternalMarket('market-1', 'Will X happen?')
+
+    expect(prisma.$executeRaw).toHaveBeenCalledOnce()
+  })
+
+  it('throws and does not call $executeRaw if embedding fails', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('fail'))
+
+    await expect(embedAndStoreExternalMarket('market-1', 'Will X happen?')).rejects.toThrow(
+      /No embedding returned for external market market-1/
+    )
+    expect(prisma.$executeRaw).not.toHaveBeenCalled()
+  })
+
+  it('throws and does not call $executeRaw when the vector has non-finite values', async () => {
+    const withNaN = [...FAKE_768]
+    withNaN[0] = NaN
+    vi.mocked(fetch).mockResolvedValue(embedResponse(withNaN))
+
+    await expect(embedAndStoreExternalMarket('market-1', 'Will X happen?')).rejects.toThrow(
       /non-finite values/
     )
     expect(prisma.$executeRaw).not.toHaveBeenCalled()

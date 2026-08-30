@@ -152,3 +152,18 @@ export async function embedAndStoreLatentNode(id: string, textEn: string): Promi
     Prisma.sql`UPDATE latent_nodes SET embedding = ${Prisma.raw(`'${vectorStr}'::vector`)} WHERE id = ${id}`
   )
 }
+
+/** Same contract as {@link embedAndStoreForecast}, targeting external_markets (daatan#1640). */
+export async function embedAndStoreExternalMarket(id: string, question: string): Promise<void> {
+  const embedding = await embedText(question)
+  if (!embedding) {
+    throw new Error(`No embedding returned for external market ${id} — nothing stored`)
+  }
+  if (!embedding.every(Number.isFinite)) {
+    throw new Error(`Embedding for external market ${id} contains non-finite values — nothing stored`)
+  }
+  const vectorStr = `[${embedding.join(',')}]`
+  await prisma.$executeRaw(
+    Prisma.sql`UPDATE external_markets SET embedding = ${Prisma.raw(`'${vectorStr}'::vector`)} WHERE id = ${id}`
+  )
+}
