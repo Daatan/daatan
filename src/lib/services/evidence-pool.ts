@@ -255,11 +255,16 @@ const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
 /** `statusReason` stamped by the publish-date admission gate — see `STALE_PUBLISHED_REJECT_DAYS`. */
 export const STALE_PUBLISHED_REASON = 'stale_published_date'
 
+/** `statusReason` stamped when the article carries no usable publish date at all —
+ *  see `claimUndatedArticle`. */
+export const UNDATED_PUBLISHED_REASON = 'undated_published'
+
 export const TERMINAL_POOL_REASONS: readonly string[] = [
   'oracle_omitted',
   'oracle_null_final',
   'retired_legacy',
   STALE_PUBLISHED_REASON,
+  UNDATED_PUBLISHED_REASON,
 ]
 
 /**
@@ -287,10 +292,18 @@ export const LEGACY_NULL_REASON = 'oracle_null'
  * forecasts sat past this line; 64 more sat in the 180–365-day band, which is log-only
  * (`STALE_PUBLISHED_WARN_DAYS`) until that band's mass is understood.
  *
- * Only a parseable `publishedAt` gates. A date that doesn't parse says nothing about
- * the article's age and is left alone. A sentinel like `2014-01-01` does parse and IS
- * rejected — a real-but-unknown date on a 2026 article is still evidence we can't date,
- * and an un-exclude is one click.
+ * A sentinel like `2014-01-01` does parse and IS rejected — a real-but-unknown date on a
+ * 2026 article is still evidence we can't date, and an un-exclude is one click.
+ *
+ * An article with **no** parseable date is refused too, by `claimUndatedArticle`
+ * (daatan#1679). This reverses the original "a date that doesn't parse says nothing about
+ * the article's age and is left alone": saying nothing about the age is precisely the
+ * problem, because this gate and #1507's already-occurred audit both read that field, so an
+ * undated article passes every temporal check by default. news-indexer#122 previously hid
+ * the whole population by stamping crawl time on undated articles — a value indistinguishable
+ * from a real date — which is how a December-2022 op-ed reached 2026 election forecasts at
+ * stance 1.00. With that fallback removed upstream, undated now arrives as a real null and
+ * must fail closed rather than sail through.
  */
 export const STALE_PUBLISHED_REJECT_DAYS = 365
 export const STALE_PUBLISHED_WARN_DAYS = 180
@@ -303,6 +316,14 @@ export function publishedDaysBeforeClaim(publishedAt: string | null, claimCreate
   const published = new Date(publishedAt)
   if (Number.isNaN(published.getTime())) return null
   return Math.floor((claimCreatedAt.getTime() - published.getTime()) / DAY_MS)
+}
+
+/** Whether the article carries a date we can actually reason about. Deliberately independent
+ *  of `claimCreatedAt`: an article is undated regardless of what it is being claimed against,
+ *  so unlike the stale gate this does not need the claim's creation time to fire. */
+export function hasUsablePublishedDate(publishedAt: string | null): boolean {
+  if (!publishedAt) return false
+  return !Number.isNaN(new Date(publishedAt).getTime())
 }
 
 export interface ClaimOptions {
@@ -328,9 +349,10 @@ export interface ClaimableArticle {
  * concurrent content-changed claim this call lost the race to) — genuinely worth a later
  * retry, unlike `skip_complete`. `skip_stale` — the publish-date admission gate refused
  * it (see `STALE_PUBLISHED_REJECT_DAYS`); a terminal, excluded row records the refusal,
- * so it is never retried and never extracted.
+ * so it is never retried and never extracted. `skip_undated` — the same gate's other arm
+ * (daatan#1679): no parseable publish date at all, refused on the same terms.
  */
-export type ClaimResult = 'claimed' | 'skip_complete' | 'skip_pending' | 'skip_stale'
+export type ClaimResult = 'claimed' | 'skip_complete' | 'skip_pending' | 'skip_stale' | 'skip_undated'
 
 /** The row a claim landed on (or already covers), so callers can address
  *  `addArticlesToPool`'s write at the exact row rather than re-deriving
@@ -372,6 +394,9 @@ export async function claimArticleForExtraction(
   const urlHash = hashUrl(article.url)
   const contentHash = hashArticleContent(article.title, article.snippet)
 
+  if (!hasUsablePublishedDate(article.publishedAt)) {
+    return claimUndatedArticle(predictionId, article, origin, urlHash, contentHash)
+  }
   const daysBefore = publishedDaysBeforeClaim(article.publishedAt, opts.claimCreatedAt)
   if (daysBefore !== null && daysBefore > STALE_PUBLISHED_REJECT_DAYS) {
     return claimStaleArticle(predictionId, article, origin, urlHash, contentHash, daysBefore)
@@ -535,6 +560,45 @@ async function claimStaleArticle(
     { predictionId, url: article.url, publishedAt: article.publishedAt, daysBefore, origin },
     'event=evidence_pool_stale_published_reject — published before the claim by more than the reject line; admitted excluded, not extracted (daatan#1651)',
   )
+  return claimRefusedArticle(predictionId, article, origin, urlHash, contentHash, STALE_PUBLISHED_REASON, 'skip_stale')
+}
+
+/**
+ * The publish-date admission gate's other arm (daatan#1679): an article we cannot date at
+ * all. Refused on the same terms as a stale one — terminal, excluded, never extracted,
+ * never retried — because an undated article does not fail the temporal checks, it *skips*
+ * them: `publishedDaysBeforeClaim` returns null, so the stale gate cannot fire, and
+ * `auditAlreadyOccurredAtCreation` filters it out before counting. Fail-closed is the only
+ * treatment that makes those guards mean what they claim to mean.
+ *
+ * Reversible exactly like the stale arm: the row is visible in the admin pool and an
+ * un-exclude is one click, so a genuinely useful undated article is one action away.
+ */
+async function claimUndatedArticle(
+  predictionId: string,
+  article: ClaimableArticle,
+  origin: PoolOrigin,
+  urlHash: string,
+  contentHash: string,
+): Promise<ClaimOutcome> {
+  log.warn(
+    { predictionId, url: article.url, publishedAt: article.publishedAt, origin },
+    'event=evidence_pool_undated_reject — no parseable publish date; admitted excluded, not extracted (daatan#1679)',
+  )
+  return claimRefusedArticle(predictionId, article, origin, urlHash, contentHash, UNDATED_PUBLISHED_REASON, 'skip_undated')
+}
+
+/** Shared write for both arms of the admission gate: a terminal, excluded row recording the
+ *  refusal, so it is never extracted and never retried. */
+async function claimRefusedArticle(
+  predictionId: string,
+  article: ClaimableArticle,
+  origin: PoolOrigin,
+  urlHash: string,
+  contentHash: string,
+  statusReason: string,
+  result: Extract<ClaimResult, 'skip_stale' | 'skip_undated'>,
+): Promise<ClaimOutcome> {
   try {
     const created = await prisma.evidencePoolArticle.create({
       data: {
@@ -547,13 +611,13 @@ async function claimStaleArticle(
         publishedDate: article.publishedAt,
         contentHash,
         status: 'FAILED',
-        statusReason: STALE_PUBLISHED_REASON,
+        statusReason,
         excluded: true,
         origin,
       },
       select: { id: true },
     })
-    return { result: 'skip_stale', articleId: created.id }
+    return { result, articleId: created.id }
   } catch (err) {
     if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err
   }
@@ -561,7 +625,7 @@ async function claimStaleArticle(
     where: { predictionId, urlHash, ...CURRENT_VERSION_ONLY },
     select: { id: true },
   })
-  return { result: 'skip_stale', articleId: current?.id ?? null }
+  return { result, articleId: current?.id ?? null }
 }
 
 /** Claim a whole evidence set. Per-article outcomes, same order as `articles`. */

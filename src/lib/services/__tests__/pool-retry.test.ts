@@ -17,6 +17,7 @@ vi.mock('@/lib/logger', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { retryPoolExtractions } from '../pool-retry'
+import { TERMINAL_POOL_REASONS } from '../evidence-pool'
 
 const mockGroupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
 const mockRows = vi.mocked(prisma.evidencePoolArticle.findMany)
@@ -140,7 +141,7 @@ describe('retryPoolExtractions', () => {
     expect(where).toMatchObject({ excluded: false, title: { not: null } })
     expect(where.OR).toEqual([
       { status: 'FAILED', statusReason: null },
-      { status: 'FAILED', statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy', 'stale_published_date'] } },
+      { status: 'FAILED', statusReason: { notIn: TERMINAL_POOL_REASONS } },
       { status: 'PENDING' },
     ])
   })

@@ -1317,7 +1317,7 @@ describe('claimArticleForExtraction', () => {
         expect.arrayContaining([
           {
             status: 'FAILED',
-            statusReason: { notIn: ['oracle_omitted', 'oracle_null_final', 'retired_legacy', 'stale_published_date'] },
+            statusReason: { notIn: TERMINAL_POOL_REASONS },
             updatedAt: { lt: expect.any(Date) },
           },
           { status: 'FAILED', statusReason: null, updatedAt: { lt: expect.any(Date) } },
@@ -1549,22 +1549,54 @@ describe('publish-date admission gate (daatan#1651)', () => {
     }
   })
 
-  it('never gates without a creation date or a parseable publish date', async () => {
+  it('does not apply the stale gate without a creation date', async () => {
     create.mockResolvedValue({ id: 'new-1' } as never)
 
     const noCreatedAt = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'news-indexer')
     const nullCreatedAt = await claimArticleForExtraction('pred-1', article({ publishedAt: '2021-06-11' }), 'news-indexer', {
       claimCreatedAt: null,
     })
-    const noDate = await claimArticleForExtraction('pred-1', article({ publishedAt: null }), 'news-indexer', opts)
-    const junkDate = await claimArticleForExtraction('pred-1', article({ publishedAt: 'yesterday-ish' }), 'news-indexer', opts)
 
-    for (const r of [noCreatedAt, nullCreatedAt, noDate, junkDate]) {
+    for (const r of [noCreatedAt, nullCreatedAt]) {
       expect(r).toEqual({ result: 'claimed', articleId: 'new-1' })
     }
     for (const call of create.mock.calls) {
       expect(call[0].data).toEqual(expect.objectContaining({ status: 'PENDING' }))
     }
+  })
+
+  // Was part of "never gates without a creation date or a parseable publish date" until
+  // daatan#1679: an undated article used to be admitted on the reasoning that a missing date
+  // says nothing about its age. Saying nothing is the problem — it skips every temporal
+  // check rather than failing one — so it now fails closed.
+  it('refuses an article with no parseable publish date, terminally (daatan#1679)', async () => {
+    create.mockResolvedValue({ id: 'undated-1' } as never)
+
+    const noDate = await claimArticleForExtraction('pred-1', article({ publishedAt: null }), 'news-indexer', opts)
+    const junkDate = await claimArticleForExtraction('pred-1', article({ publishedAt: 'yesterday-ish' }), 'news-indexer', opts)
+
+    for (const r of [noDate, junkDate]) {
+      expect(r).toEqual({ result: 'skip_undated', articleId: 'undated-1' })
+    }
+    for (const call of create.mock.calls) {
+      expect(call[0].data).toEqual(
+        expect.objectContaining({ status: 'FAILED', statusReason: 'undated_published', excluded: true }),
+      )
+    }
+  })
+
+  it('refuses an undated article even when no creation date is supplied', async () => {
+    create.mockResolvedValue({ id: 'undated-2' } as never)
+
+    // Unlike the stale gate, this arm does not need claimCreatedAt: an article is undated
+    // regardless of what it is being claimed against.
+    const r = await claimArticleForExtraction('pred-1', article({ publishedAt: null }), 'news-indexer')
+
+    expect(r).toEqual({ result: 'skip_undated', articleId: 'undated-2' })
+  })
+
+  it('keeps undated_published out of the retry path', () => {
+    expect(TERMINAL_POOL_REASONS).toContain('undated_published')
   })
 
   it('claimArticlesForExtraction threads the options through to every article', async () => {

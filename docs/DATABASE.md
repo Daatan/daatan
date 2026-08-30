@@ -377,7 +377,16 @@ gate, daatan#1651 — the article was published more than `STALE_PUBLISHED_REJEC
 (365) before the forecast's `createdAt`, so it is coverage of a *previous* instance of
 the event and never reaches the extractor; 180–365 days is admitted with a
 `evidence_pool_stale_published_warn` log line only. Reversible by un-excluding the row
-in the admin pool; the gate never re-excludes an existing row).
+in the admin pool; the gate never re-excludes an existing row),
+`undated_published` (terminal, **and `excluded: true`**: the same gate's other arm,
+daatan#1679 — no parseable publish date at all. Refused for a sharper reason than the
+stale arm: an undated article does not *fail* the temporal checks, it *skips* them —
+`publishedDaysBeforeClaim` returns null so the stale gate cannot fire, and #1507's
+already-occurred audit filters it out before counting. Needs no `createdAt`, since an
+article is undated regardless of what it is claimed against. Equally reversible by
+un-excluding. This population used to be invisible: news-indexer#122 stamped crawl time
+on undated articles, indistinguishable from a real date, which is how a December-2022
+op-ed reached 2026 election forecasts at stance 1.00).
 
 **"Attributable" is the load-bearing word (daatan#1253).** Only
 `ATTRIBUTABLE_NULL_REASONS` — `oracle_abstain` and `oracle_no_articles` — retire a
