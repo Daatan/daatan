@@ -206,6 +206,24 @@ export type OracleClaimDetail = {
   /** Whether THIS claim's fact ANNOUNCES the event, DENIES it, or is NEITHER
    *  (retro#354 D2a). Per-claim: `OracleSource.facet` is the dominant claim's only. */
   facet?: 'announcement' | 'denial' | 'neither' | null
+  /** EXPERIMENTAL shadow (retro#681): the extractor's confidence in its OWN reading
+   *  of this claim, as against `certainty`, which is the SOURCE's confidence in the
+   *  claim. `trap` is the informative half — it names which known misreading applied,
+   *  and it is null far more often than `level` is. */
+  reader_confidence?: { level: 'high' | 'medium' | 'low'; trap?: string | null } | null
+  /** EXPERIMENTAL shadow (retro#683): the number this claim reports about the event,
+   *  with the relation the ARTICLE asserts about it — never whether it satisfies the
+   *  question, which retro decides in code. Render what is stored and do NOT normalise:
+   *  the same figure comes back as `452 / "thousand active US Army personnel"` and as
+   *  `452000 / "active US Army personnel"`, both obeying the field description, and
+   *  folding one into the other would invent a precision the article did not give. */
+  quantity?: {
+    value: number
+    unit: string
+    comparator: '=' | '<' | '<=' | '>' | '>=' | 'between'
+    value_hi?: number | null
+    as_of?: string | null
+  } | null
 }
 
 export interface OracleSource {

@@ -771,6 +771,46 @@ export function notifyDailySummary(stats: {
  *  under it is captured and shown but NOT read by the Oracle's estimate. Exported for tests. */
 export const SHADOW_MARKER = '<i>not in estimate:</i>'
 
+/** The `reader_confidence` panel row (retro#681), or null when the claim carries none.
+ *  The trap is appended rather than given its own row because it is only ever meaningful
+ *  beside the level — "medium" alone is noise, "medium/numeric_comparison" says which
+ *  reading the extractor thought it might have got wrong. */
+export function readerRow(
+  rc: { level?: string | null; trap?: string | null } | null | undefined,
+): [string, string] | null {
+  if (!rc?.level) return null
+  return ['reader', rc.trap ? `${rc.level} (${rc.trap})` : rc.level]
+}
+
+/** The `quantity` panel row (retro#683), or null when the claim reports no figure — which
+ *  is most claims.
+ *
+ *  Rendered VERBATIM. Two rules the renderer must not break:
+ *   - `=` prints as a bare figure. "= 214 daily departures" reads like an assertion about
+ *     the question; "214 daily departures" is what the article said.
+ *   - value and unit are never recombined. The extractor legitimately returns the same
+ *     figure as `452 / "thousand active US Army personnel"` and `452000 / "active US Army
+ *     personnel"` — both obey the field description, and normalising either way would
+ *     print a number the article never wrote. */
+export function quantityRow(
+  q:
+    | { value: number; unit: string; comparator: string; value_hi?: number | null; as_of?: string | null }
+    | null
+    | undefined,
+): [string, string] | null {
+  if (!q || typeof q.value !== 'number' || !q.unit) return null
+  const asOf = q.as_of ? ` @ ${q.as_of}` : ''
+  if (q.comparator === 'between') {
+    // A range without its upper bound is not a range; fall back to the lower bound alone
+    // rather than print "between 1.8 and undefined".
+    return q.value_hi == null
+      ? ['quantity', `${q.value} ${q.unit}${asOf}`]
+      : ['quantity', `${q.value}–${q.value_hi} ${q.unit}${asOf}`]
+  }
+  const op = q.comparator && q.comparator !== '=' ? `${q.comparator} ` : ''
+  return ['quantity', `${op}${q.value} ${q.unit}${asOf}`]
+}
+
 export async function notifyNewsArticleMatched(
   prediction: { id: string; claimText: string; slug?: string | null },
   article: {
@@ -788,6 +828,14 @@ export async function notifyNewsArticleMatched(
     credibilityWeight?: number | null
     consensusView?: string | null
     reportKind?: string | null
+    readerConfidence?: { level?: string | null; trap?: string | null } | null
+    quantity?: {
+      value: number
+      unit: string
+      comparator: string
+      value_hi?: number | null
+      as_of?: string | null
+    } | null
   },
   match: { similarity: number; articleCount?: number; poolSize?: number | null; usableSize?: number | null },
   estimate: { probability: number; previous: number | null; ciLow: number | null; ciHigh: number | null },
@@ -841,12 +889,23 @@ export async function notifyNewsArticleMatched(
   //                        in aggregation, so 0.5 counts a quarter as much as 1.0.
   //   range              — omitted when under 2 points wide (display noise) or when a bound is
   //                        missing (older snapshots predate ciLow/ciHigh).
-  //   author_lean/fact_signal/credibility/class/consensus/report_kind — judgment-lane and
-  //                        elicited shadow fields (Signal Lanes, retro#686): nothing in the
-  //                        Oracle's own aggregation reads them, so this panel is the only place
-  //                        they're visible at all. `credibilityWeight` is pre-filtered to null
-  //                        at the caller while the credibility cutover flag is OFF (1.0 is a
-  //                        neutral default, not a judgment).
+  //   author_lean/fact_signal/credibility/class/consensus/report_kind/reader/quantity —
+  //                        judgment-lane and elicited shadow fields (Signal Lanes, retro#686,
+  //                        #681, #683): nothing in the Oracle's own aggregation reads them, so
+  //                        this panel is the only place they're visible at all.
+  //                        `credibilityWeight` is pre-filtered to null at the caller while the
+  //                        credibility cutover flag is OFF (1.0 is a neutral default, not a
+  //                        judgment).
+  //   reader      shows the extractor's confidence in its own READING (retro#681) — as against
+  //                        the `certainty` riding on `stance`, which is the SOURCE's. The trap,
+  //                        when set, is the informative half and is what makes the row worth a
+  //                        line: "low/negation" says the panel's own numbers are suspect.
+  //   quantity    the figure the claim reports and the relation the ARTICLE asserts about it
+  //                        (retro#683) — NOT whether it clears the question's bar, which retro
+  //                        decides in code. Rendered verbatim, never normalised: the same figure
+  //                        comes back as `452 thousand active US Army personnel` and as `452000
+  //                        active US Army personnel`, and folding either way would invent a
+  //                        precision the article did not give.
   //
   // The embedding cosine (`match.similarity`) is deliberately NOT a row any more: it is why
   // news-indexer pushed, not evidence about the claim, and under Funnel v2 the judge's
@@ -865,6 +924,8 @@ export async function notifyNewsArticleMatched(
     article.evidenceClass ? ['class', article.evidenceClass] : null,
     article.consensusView ? ['consensus', article.consensusView] : null,
     article.reportKind ? ['report_kind', article.reportKind] : null,
+    readerRow(article.readerConfidence),
+    quantityRow(article.quantity),
   ]
   const renderRows = (rows: Array<[string, string] | null>) =>
     rows
