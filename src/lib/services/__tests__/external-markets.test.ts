@@ -4,7 +4,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     externalMarket: {
       upsert: vi.fn(),
-      findMany: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn(),
     },
     externalMarketPriceSnapshot: {
@@ -17,11 +17,15 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   },
 }))
 
-vi.mock('@/lib/services/embedding', () => ({ embedText: vi.fn() }))
+vi.mock('@/lib/services/embedding', () => ({
+  embedText: vi.fn(),
+  embedAndStoreExternalMarket: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('@/lib/services/context', () => ({ getLatestEvidenceEstimate: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyMarketDivergence: vi.fn() }))
 
@@ -44,7 +48,7 @@ import {
   samplePoints,
 } from '../external-markets'
 import { prisma } from '@/lib/prisma'
-import { embedText } from '@/lib/services/embedding'
+import { embedText, embedAndStoreExternalMarket } from '@/lib/services/embedding'
 import { getLatestEvidenceEstimate } from '@/lib/services/context'
 import { notifyMarketDivergence } from '@/lib/services/telegram'
 
@@ -309,6 +313,25 @@ describe('resolveMarketByUrl', () => {
     await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
 
     expect(prisma.externalMarketPriceSnapshot.create).not.toHaveBeenCalled()
+  })
+
+  it('embeds the market after upsert (daatan#1640)', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+
+    await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(embedAndStoreExternalMarket).toHaveBeenCalledWith('m1', 'Will X happen?')
+  })
+
+  it('does not let a failed embed fail the market resolution', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(embedAndStoreExternalMarket).mockRejectedValueOnce(new Error('embed down'))
+
+    const result = await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')
+
+    expect(result).toEqual({ id: 'm1' })
   })
 
   it('backfills provider history before seeding when the market has a history id', async () => {
@@ -812,7 +835,13 @@ describe('buildMarketSearchQuery', () => {
 })
 
 describe('suggestMarketsForClaim', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Reset after any earlier describe block (e.g. syncLinkedMarkets) left
+    // findMany permanently pointed at unrelated fixture data — clearAllMocks
+    // resets calls, not implementations set via mockResolvedValue.
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([])
+  })
 
   it('re-ranks candidates by similarity to the claim', async () => {
     global.fetch = gammaFetchMock([
@@ -874,12 +903,44 @@ describe('suggestMarketsForClaim', () => {
     )
     expect(out[0].externalId).toBe('0xnear')
   })
+
+  /**
+   * daatan#1640: a candidate already cached with a non-null embedding must reuse
+   * it instead of paying another embedText() call — that redundant re-embed on
+   * every suggest, proportional to candidate count, is what the issue filed.
+   */
+  it('reuses a cached candidate embedding instead of re-embedding it', async () => {
+    global.fetch = gammaFetchMock([gammaRow()]) // externalId '0xabc', provider POLYMARKET
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'cached-1', provider: 'POLYMARKET', externalId: '0xabc' },
+    ] as never)
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: 'cached-1', vec: '[1,0,0]' }] as never)
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // claim vector only
+
+    const out = await suggestMarketsForClaim('Will X happen?', [])
+
+    expect(out).toHaveLength(1)
+    // embedText called once — for the claim — never for the cached candidate.
+    expect(embedText).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to embedText for a candidate with no cached row', async () => {
+    global.fetch = gammaFetchMock([gammaRow()])
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0])
+
+    const out = await suggestMarketsForClaim('Will X happen?', [])
+
+    expect(out).toHaveLength(1)
+    expect(embedText).toHaveBeenCalledTimes(2) // claim + the one live-embedded candidate
+  })
 })
 
 describe('suggestMarketMatch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([])
   })
 
   it('returns the best candidate when similarity clears the threshold', async () => {
@@ -937,6 +998,20 @@ describe('suggestMarketMatch', () => {
     )
     expect(match).not.toBeNull()
     expect(match!.score).toBe(100)
+  })
+
+  it('reuses a cached candidate embedding instead of re-embedding it (daatan#1640)', async () => {
+    global.fetch = gammaFetchMock([gammaRow()])
+    vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+      { id: 'cached-1', provider: 'POLYMARKET', externalId: '0xabc' },
+    ] as never)
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: 'cached-1', vec: '[1,0,0]' }] as never)
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // claim vector only
+
+    const match = await suggestMarketMatch('Will X definitely happen this year?')
+
+    expect(match).not.toBeNull()
+    expect(embedText).toHaveBeenCalledTimes(1) // claim only — candidate reused the cache
   })
 })
 
