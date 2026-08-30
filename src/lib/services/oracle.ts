@@ -17,13 +17,13 @@ const log = createLogger('oracle')
  *  the LEADING component only, not a string prefix — a literal '0.1' prefix check
  *  broke silently the moment retro passed 0.2.0 (daatan#1563).
  *
- *  Two-step switch (daatan#1668, umbrella Daatan/retro#742): retro moves from the
- *  ad-hoc 0.4.x to generation-based 1.4.x (1.5.x / 2.x reserved for the Oracle
- *  1.5 programme and the graph engine). Step 1 (this): accept both majors so
- *  retro can flip (retro#745) once this reaches production. Step 2: drop '0'.
- *  Response-shape compatibility is gated on `provenance.schema_version`, not on
- *  this number. */
-const EXPECTED_API_MAJOR_VERSIONS = ['0', '1']
+ *  Generation-based versioning (umbrella Daatan/retro#742): retro reports 1.4.x
+ *  for the live v1 engine; 1.5.x / 2.x are reserved for the Oracle 1.5 programme
+ *  and the graph engine and each flip is an explicit decision that lands here
+ *  first. The transitional '0' (daatan#1668) was dropped in daatan#1673 once
+ *  retro#745 put 1.4.0 on the box. Response-shape compatibility is gated on
+ *  `provenance.schema_version`, not on this number. */
+const EXPECTED_API_MAJOR_VERSIONS = ['1']
 
 /**
  * Default Oracle budget: server-to-server and background callers (the news-indexer
