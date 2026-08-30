@@ -55,9 +55,16 @@ money. It measures understanding, not profit.
 real usage data / testimonials to add.
 
 ## Category
-Suggested: **News & Magazines** or **Education** (not "Finance"/"Casino" — no
-money is involved, and mischaracterizing the category risks a content-rating
-mismatch). Final call is the user's in Play Console.
+**Finance.** Decided 2026-08-30 (Mark + Andrej) after Google rejected the first
+submission on 2026-08-25 under the *News and Magazines* policy: the app was
+listed as News & Magazines but does not function as a news publisher — it is a
+forecasting / prediction app, and Google's own "how to fix" guidance is to pick
+the category that matches the actual content. Finance (probability forecasts,
+prediction markets) fits; it also removes the News & Magazines transparency
+declaration requirement entirely.
+
+Not "Casino" — no real money is involved, and the long description says so
+explicitly. Keep that wording in sync with whatever the category implies.
 
 ## Contact details
 - Privacy policy URL: `https://daatan.com/privacy` (already live — `src/app/privacy/page.tsx`).
