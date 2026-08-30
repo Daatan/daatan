@@ -2,7 +2,7 @@ export interface RssItem {
   title: string
   url: string
   source: string
-  publishedAt: string
+  publishedAt: string | null
 }
 
 export interface HotTopic {

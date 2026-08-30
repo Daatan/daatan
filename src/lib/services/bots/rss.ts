@@ -19,8 +19,20 @@ export interface RssItem {
   title: string
   url: string
   source: string       // Per-article publisher when known, else the feed name/domain
-  publishedAt: Date
+  /** `null` when the source gave no parseable date. Never substitute the current time:
+   *  news-indexer#122 shipped exactly that fallback, and a crawl-time stamp on an old
+   *  article is indistinguishable from a real one — it defeated both publish-date guards
+   *  built to catch stale evidence (daatan#1651, #1507) and put December-2022 coverage
+   *  into 2026 forecasts at full confidence (daatan#1679). */
+  publishedAt: Date | null
   snippet?: string
+}
+
+/** Parses a feed/provider date, returning `null` for absent or unparseable values. */
+export function parsePublishedAt(raw: string | null | undefined): Date | null {
+  if (!raw) return null
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? null : d
 }
 
 /**
@@ -118,7 +130,7 @@ async function fetchFeed(url: string): Promise<RssItem[]> {
           title,
           url: item.link!,
           source,
-          publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+          publishedAt: parsePublishedAt(item.pubDate),
           snippet: item.contentSnippet?.slice(0, 500),
         }
       })
@@ -161,7 +173,9 @@ export function detectHotTopics(
   windowHours: number,
 ): HotTopic[] {
   const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000)
-  const recent = items.filter((item) => item.publishedAt >= cutoff)
+  // Undated items are dropped, not admitted: an article we cannot date cannot be shown
+  // to fall inside the hotness window, and guessing "now" is the bug this closes.
+  const recent = items.filter((item) => item.publishedAt !== null && item.publishedAt >= cutoff)
   if (recent.length === 0) return []
 
   const keywordSets = recent.map((item) => extractKeywords(item.title))
