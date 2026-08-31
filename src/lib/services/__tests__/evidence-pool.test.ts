@@ -259,7 +259,7 @@ describe('addArticlesToPool', () => {
     })
   })
 
-  it('persists the Oracle build stamp (daatan#1669)', async () => {
+  it('persists the Oracul build stamp (daatan#1669)', async () => {
     await addArticlesToPool('pred-1', [source({
       oracleVersion: '1.4.0+build.38912',
       oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346',
@@ -271,7 +271,7 @@ describe('addArticlesToPool', () => {
     })
   })
 
-  it('writes null Oracle build fields, never throws, when the response carried no provenance (daatan#1669)', async () => {
+  it('writes null Oracul build fields, never throws, when the response carried no provenance (daatan#1669)', async () => {
     await addArticlesToPool('pred-1', [source({ oracleVersion: null, oracleGitSha: null })], 'analyze', idFor('https://reuters.com/a'))
     const call = update.mock.calls[0][0] as { data: Record<string, unknown> }
     expect(call.data).toMatchObject({ oracleVersion: null, oracleGitSha: null })
@@ -304,7 +304,7 @@ describe('addArticlesToPool', () => {
     expect(call.data).toMatchObject({ consensusView: 'expects_no' })
   })
 
-  it('leaves a stored consensusView alone when the Oracle omits it (F11, daatan#1237)', async () => {
+  it('leaves a stored consensusView alone when the Oracul omits it (F11, daatan#1237)', async () => {
     // The failure mode #1237 recorded: a re-touch that carries no opinion this run
     // must not erase one we already hold. `undefined` tells Prisma to skip the column;
     // an explicit null would overwrite. There is no backfill, so an erased value is gone.
@@ -736,7 +736,7 @@ describe('recomputeFromPool', () => {
     expect(out).toMatchObject({ insufficientData: true, reason: 'no_decisive_signal' })
   })
 
-  it('returns null when the Oracle is not configured', async () => {
+  it('returns null when the Oracul is not configured', async () => {
     mockGetOracleConfig.mockReturnValue(null)
     expect(await recomputeFromPool('pred-1', null, null)).toBeNull()
     expect(mockOracleFetch).not.toHaveBeenCalled()
@@ -850,7 +850,7 @@ describe('pushCredibilityFeedback', () => {
     predictionFindUnique.mockResolvedValue(null as never)
   })
 
-  it('does nothing when the Oracle is not configured', async () => {
+  it('does nothing when the Oracul is not configured', async () => {
     mockGetOracleConfig.mockReturnValue(null)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
     expect(findMany).not.toHaveBeenCalled()
@@ -1095,7 +1095,7 @@ describe('pushCredibilityFeedback', () => {
     )
   })
 
-  it('never throws when the Oracle returns a non-OK status', async () => {
+  it('never throws when the Oracul returns a non-OK status', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOracleFetch.mockResolvedValue({ ok: false, status: 500 } as never)
     await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()

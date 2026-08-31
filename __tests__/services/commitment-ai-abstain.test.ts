@@ -85,7 +85,7 @@ async function commit(contextSnapshots: Array<{ insufficientData: boolean }>) {
 describe('createCommitment — AI base-rate backfill vs. abstention', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('does NOT backfill an LLM estimate when the Oracle abstained', async () => {
+  it('does NOT backfill an LLM estimate when the Oracul abstained', async () => {
     const { triggerAiProbabilityEstimate } = await commit([{ insufficientData: true }])
     expect(triggerAiProbabilityEstimate).not.toHaveBeenCalled()
   })

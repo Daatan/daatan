@@ -57,7 +57,7 @@ describe('notifyNewsArticleMatched', () => {
     )
 
     const msg = sentMessage()
-    expect(msg).toContain('Oracle 63% → 71%') // old → new
+    expect(msg).toContain('Oracul 63% → 71%') // old → new
     expect(msg).toContain('<blockquote>') // quote-bar panel, not <pre> (no "copy code" chrome)
     expect(msg).not.toContain('<pre>')
     expect(msg).toContain('<b>stance</b>  -0.72') // signed: reads as "argues NO"
@@ -374,7 +374,7 @@ describe('notifyNewsArticleMatched', () => {
       { similarity: 0.368, articleCount: 3, poolSize: 22 },
       ESTIMATE,
     )
-    expect(sentMessage()).toContain('Oracle 63% → 71%</b>  (+8) · 3 new / 22 in pool')
+    expect(sentMessage()).toContain('Oracul 63% → 71%</b>  (+8) · 3 new / 22 in pool')
 
     // No pool (single-run fallback): only a multi-article push shows a count at all.
     vi.mocked(global.fetch).mockClear()

@@ -50,7 +50,7 @@ const searchResult = (over: Partial<SearchResult> = {}): SearchResult => ({
 })
 
 describe('enrichOracleSources', () => {
-  it('carries the Oracle\'s per-claim layer through untouched (F1, retro#364)', () => {
+  it('carries the Oracul\'s per-claim layer through untouched (F1, retro#364)', () => {
     const claims_detail = [
       { claim: 'A.', quote: 'Verbatim.', stance: 0.6, certainty: 0.8, evidence_class: 'reported_fact' as const },
     ]
@@ -58,7 +58,7 @@ describe('enrichOracleSources', () => {
     expect(out[0].claimsDetail).toEqual(claims_detail)
   })
 
-  it('leaves claimsDetail undefined when the Oracle omitted it (F11, daatan#1237)', () => {
+  it('leaves claimsDetail undefined when the Oracul omitted it (F11, daatan#1237)', () => {
     const out = enrichOracleSources([oracleSource()], [searchResult()], new Map())
     expect(out[0].claimsDetail).toBeUndefined()
   })
@@ -186,7 +186,7 @@ describe('enrichOracleSources', () => {
     expect(withoutOracle[0].oracleGitSha).toBeUndefined()
   })
 
-  it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracle omits them (F11, daatan#1237)', () => {
+  it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracul omits them (F11, daatan#1237)', () => {
     const out = enrichOracleSources(
       [oracleSource({
         settled: undefined,
@@ -410,7 +410,7 @@ describe('poolArticleToEnrichedSource', () => {
     expect(poolArticleToEnrichedSource(poolArticle({ extractorModel: null }), null).extractorModel).toBeNull()
   })
 
-  it('passes the Oracle build stamp through from the pool row (daatan#1669)', () => {
+  it('passes the Oracul build stamp through from the pool row (daatan#1669)', () => {
     const out = poolArticleToEnrichedSource(
       poolArticle({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796a' }),
       null,

@@ -144,7 +144,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(getOracleForecast).not.toHaveBeenCalled()
   })
 
-  it('returns the per-article Oracle output so news-indexer can store it', async () => {
+  it('returns the per-article Oracul output so news-indexer can store it', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     const res = await POST(post('test-secret'))
@@ -190,7 +190,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
   })
 
-  it('threads the trigger article\'s gatekeeper verdict into the Oracle articles (Phase 1.3)', async () => {
+  it('threads the trigger article\'s gatekeeper verdict into the Oracul articles (Phase 1.3)', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret', { ...VALID_BODY, relevance: 0.83, isPrediction: true }))
@@ -211,7 +211,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(opts?.articles?.[0]?.isPrediction).toBeUndefined()
   })
 
-  it('returns null enrichment when the Oracle has no usable forecast', async () => {
+  it('returns null enrichment when the Oracul has no usable forecast', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
     const res = await POST(post('test-secret'))
@@ -228,7 +228,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
   })
 
-  it('notifies Telegram when the Oracle produced an estimate, with the pre-push value as "previous"', async () => {
+  it('notifies Telegram when the Oracul produced an estimate, with the pre-push value as "previous"', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
@@ -252,7 +252,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(match).toMatchObject({ poolSize: null })
   })
 
-  it('passes the Oracle-extracted claim as the article extract, falling back to the snippet', async () => {
+  it('passes the Oracul-extracted claim as the article extract, falling back to the snippet', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
@@ -306,7 +306,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toBeNull()
   })
 
-  it('passes the Oracle relevance through to news-indexer instead of dropping it', async () => {
+  it('passes the Oracul relevance through to news-indexer instead of dropping it', async () => {
     // The Oracul grades every article's claim-aware relevance and its SQUARE weights the article
     // in aggregation — but this route used to drop the field (exactly as it once dropped `author`),
     // so news-indexer could record THAT an article counted and never WHY.
@@ -320,7 +320,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(body.previousProbability).toBe(65)
   })
 
-  it('does NOT notify Telegram on a null-Oracle push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
+  it('does NOT notify Telegram on a null-Oracul push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
     await POST(post('test-secret'))
@@ -335,7 +335,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
   })
 
-  it('feeds the whole article set to the Oracle and returns per-article sources', async () => {
+  it('feeds the whole article set to the Oracul and returns per-article sources', async () => {
     // Both articles are newly claimed — matches the 2-article request below.
     // The beforeEach default (a single 'claimed') is for the single-article
     // VALID_BODY most other tests send.
@@ -388,7 +388,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(sources).toHaveLength(2)
   })
 
-  it('reports NO top-level signal when the Oracle omitted the trigger article (daatan#1252)', async () => {
+  it('reports NO top-level signal when the Oracul omitted the trigger article (daatan#1252)', async () => {
     // The trigger is dropped by the Oracul (gate-rejected / extraction failed) while a neighbour
     // in the same evidence set survives. news-indexer writes these top-level fields into
     // forecast_match FOR THE TRIGGER, under the trigger's person_id, and that row feeds
@@ -1214,7 +1214,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(saveNewsIndexerMatch).toHaveBeenCalledWith(expect.objectContaining({ externalProbability: 75 }))
     })
 
-    it('does not touch the pool when the Oracle returns no usable forecast', async () => {
+    it('does not touch the pool when the Oracul returns no usable forecast', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))
@@ -1231,7 +1231,7 @@ describe('POST /api/news-indexer/context', () => {
     // recorded verdict can satisfy in full — an abstention on a forecast with no prior
     // confidence, whose trigger article the Oracul dropped, is all-null and gets retried
     // anyway. The field says it outright instead.
-    it('is true when the Oracle produced an estimate and it was stored', async () => {
+    it('is true when the Oracul produced an estimate and it was stored', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       const body = await (await POST(post('test-secret'))).json()
@@ -1257,7 +1257,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(body.scored).toBe(true)
     })
 
-    it('is false when the Oracle returned nothing — the case that IS worth retrying', async () => {
+    it('is false when the Oracul returned nothing — the case that IS worth retrying', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       const body = await (await POST(post('test-secret'))).json()
@@ -1284,7 +1284,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   describe('extraction claim gate (evidence-pool.ts) — fixes the confirmed near-instant duplicate-write race', () => {
-    it('skips the Oracle call entirely when every article is already claimed/unchanged', async () => {
+    it('skips the Oracul call entirely when every article is already claimed/unchanged', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'skip_complete', articleId: 'row-1' }])
 
       const res = await POST(post('test-secret'))
@@ -1297,7 +1297,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(body).toMatchObject({ ok: true, probability: null, skipped: 'already_complete' })
     })
 
-    it('skips the Oracle call with `skipped: "in_flight"` when the only skip is still resolving', async () => {
+    it('skips the Oracul call with `skipped: "in_flight"` when the only skip is still resolving', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'skip_pending', articleId: 'row-1' }])
 
       const body = await (await POST(post('test-secret'))).json()
@@ -1306,7 +1306,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(body).toMatchObject({ ok: true, probability: null, skipped: 'in_flight' })
     })
 
-    it('proceeds to call the Oracle when at least one article in a multi-article push is newly claimed', async () => {
+    it('proceeds to call the Oracul when at least one article in a multi-article push is newly claimed', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
@@ -1318,7 +1318,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(getOracleForecast).toHaveBeenCalledTimes(1)
     })
 
-    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted (daatan#1172)', async () => {
+    it('only sends newly-claimed articles to the Oracul — an unchanged article must not be re-extracted (daatan#1172)', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
@@ -1368,7 +1368,7 @@ describe('POST /api/news-indexer/context', () => {
     // (`logOracleCall`) swallows its own errors. The mock could do what the real function
     // cannot. That invariant is pinned directly in oracle.test.ts → "never rejects".
 
-    it('forwards the pre-fetched article body to the Oracle', async () => {
+    it('forwards the pre-fetched article body to the Oracul', async () => {
       // news-indexer#201 / daatan#1255. `z.object().parse()` STRIPS unknown keys, so before this
       // the body was dropped silently at the boundary — news-indexer could have been sending it
       // for months with no error anywhere and no effect. The Oracul has always accepted
@@ -1405,7 +1405,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBeUndefined()
     })
 
-    it('truncates a body over the Oracle\'s truncation point instead of dropping the push', async () => {
+    it('truncates a body over the Oracul\'s truncation point instead of dropping the push', async () => {
       // daatan#1278. This used to be a schema `.max()`, which rejected the WHOLE request — so one
       // over-long article killed an 8-article push, including the seven that were fine, over a
       // field whose entire contract is "absent means fetch it yourself".
@@ -1477,7 +1477,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(() => Buffer.from(text, 'utf8').toString('utf8')).not.toThrow()
     })
 
-    it('forwards the language hint to the Oracle alongside the body', async () => {
+    it('forwards the language hint to the Oracul alongside the body', async () => {
       // daatan#1290 / news-indexer#210. news-indexer knows the language per-source but never
       // sent it, so the Oracul stances raw Hebrew/Russian with English prompts. Inert at the
       // Oracul until retro#417 adds the field (its pydantic model ignores extras).
@@ -1511,7 +1511,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].language).toBeUndefined()
     })
 
-    it('stamps the Oracle failure CLASS on the released claims, not a blanket oracle_null', async () => {
+    it('stamps the Oracul failure CLASS on the released claims, not a blanket oracle_null', async () => {
       // The measured problem: a 12s client timeout and a deliberate abstention wrote
       // byte-identical pool rows, so 73% of recent fetches carried one uninformative
       // string and the retry sweep could not tell "not worth re-asking" from "never got
@@ -1556,7 +1556,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(origin).toBe('news-indexer')
     })
 
-    it('does NOT re-ask when the Oracle actually answered and declined', async () => {
+    it('does NOT re-ask when the Oracul actually answered and declined', async () => {
       // `oracle_abstain` is a verdict about the articles: the run completed, so there is
       // no abandoned result to collect and re-asking with the same set buys the same
       // answer at full price. Only the transport classes leave work behind.
@@ -1577,7 +1577,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(scheduleOracleReask).not.toHaveBeenCalled()
     })
 
-    it('does NOT re-ask when the Oracle returned a usable forecast', async () => {
+    it('does NOT re-ask when the Oracul returned a usable forecast', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({
         forecast: { mean: 0.4, std: 0.1, ci_low: 0.2, ci_high: 0.6, articles_used: 1, sources: [], placeholder: false },
         logId: null,
@@ -1626,7 +1626,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://bbc.com/news/x'], 'oracle_null')
     })
 
-    it('releases claims the Oracle omitted after pooling — a gatekeeper-rejected article must not stay PENDING forever', async () => {
+    it('releases claims the Oracul omitted after pooling — a gatekeeper-rejected article must not stay PENDING forever', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(post('test-secret'))

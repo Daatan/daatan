@@ -594,7 +594,7 @@ describe('syncLinkedMarkets', () => {
     })
   })
 
-  describe('market vs Oracle divergence', () => {
+  describe('market vs Oracul divergence', () => {
     // gammaRow()'s default outcomePrices ["0.68", "0.32"] → market YES probability 68.
     const prediction = (overrides: Record<string, unknown> = {}) => ({
       id: 'p1',
@@ -708,7 +708,7 @@ describe('syncLinkedMarkets', () => {
       expect(notifyMarketDivergence).not.toHaveBeenCalled()
     })
 
-    it('skips a prediction with no Oracle estimate yet', async () => {
+    it('skips a prediction with no Oracul estimate yet', async () => {
       vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
         { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction()] },
       ] as never)

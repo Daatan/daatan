@@ -134,7 +134,7 @@ describe('getOracleForecast', () => {
     expect(headers['Content-Type']).toBe('application/json')
   })
 
-  it('maps supplied articles to the Oracle snake_case `published_date`', async () => {
+  it('maps supplied articles to the Oracul snake_case `published_date`', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
     await getOracleForecast('Q?', {
       articles: [
@@ -148,7 +148,7 @@ describe('getOracleForecast', () => {
     expect(body.articles[0].publishedDate).toBeUndefined()
   })
 
-  it('threads the supplied gatekeeper verdict to the Oracle (both fields, snake_case)', async () => {
+  it('threads the supplied gatekeeper verdict to the Oracul (both fields, snake_case)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
     await getOracleForecast('Q?', {
       articles: [
@@ -190,7 +190,7 @@ describe('getOracleForecast', () => {
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'no_search_results' }))
   })
 
-  it('flags insufficientData (and returns null) when the Oracle abstains', async () => {
+  it('flags insufficientData (and returns null) when the Oracul abstains', async () => {
     // _empty_response carries insufficient_data:true (and placeholder:true); the
     // abstention check runs first so the caller can distinguish "no evidence bears
     // on the claim" from "Oracul unavailable" and avoid an ungrounded LLM guess.
@@ -205,7 +205,7 @@ describe('getOracleForecast', () => {
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_low_certainty' }))
   })
 
-  it('returns null when articles_used is 0, passing through the Oracle reason', async () => {
+  it('returns null when articles_used is 0, passing through the Oracul reason', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -216,7 +216,7 @@ describe('getOracleForecast', () => {
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_articles_off_topic' }))
   })
 
-  it('renames the Oracle internal timeout reason to oracle_timeout', async () => {
+  it('renames the Oracul internal timeout reason to oracle_timeout', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -768,7 +768,7 @@ describe('checkOracleHealth', () => {
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
       expect.objectContaining({ expectedMajors: ['1'], actual: '0.4.1+build.37930' }),
-      'Oracle API major version mismatch — falling back to LLM',
+      'Oracul API major version mismatch — falling back to LLM',
     )
   })
 
@@ -782,7 +782,7 @@ describe('checkOracleHealth', () => {
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
       expect.objectContaining({ expectedMajors: ['1'], actual: '2.0.0' }),
-      'Oracle API major version mismatch — falling back to LLM',
+      'Oracul API major version mismatch — falling back to LLM',
     )
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
   })

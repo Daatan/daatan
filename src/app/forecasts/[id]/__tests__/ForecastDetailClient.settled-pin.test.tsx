@@ -75,7 +75,7 @@ const wrap = (ui: React.ReactElement) => (
 const globalFetch = global.fetch
 afterEach(() => { global.fetch = globalFetch })
 
-describe('ForecastDetailClient — Oracle settlement-pin indicator (#1250)', () => {
+describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useSession).mockReturnValue({

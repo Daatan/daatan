@@ -93,7 +93,7 @@ describe('remediatePool', () => {
     expect(r.forecasts[0].confidenceAfter).toBeNull()
   })
 
-  it('batches at the Oracle article cap, nulling each batch separately', async () => {
+  it('batches at the Oracul article cap, nulling each batch separately', async () => {
     // Per batch, not all up front: an aborted run then leaves the rows it never reached
     // with their hashes intact, so the next organic push still de-duplicates on them.
     mockRows.mockResolvedValue(Array.from({ length: 16 }, (_, i) => row(i + 1)) as never)
@@ -150,7 +150,7 @@ describe('remediatePool', () => {
     expect(r.forecasts[0]).toMatchObject({ confidenceBefore: 66, confidenceAfter: 34, poolBefore: 20, poolAfter: 17 })
   })
 
-  it('makes no Oracle call for a forecast with no target rows', async () => {
+  it('makes no Oracul call for a forecast with no target rows', async () => {
     mockRows.mockResolvedValue([] as never)
 
     const r = await remediatePool(['p1'], true)

@@ -183,7 +183,7 @@ describe('resolvePrediction — ai_member_scores write path', () => {
     expect(market.create.brierScore).toBeCloseTo(0.36, 6) // ((100−60)/100 − 1)²
   })
 
-  it('writes nothing to ai_member_scores when no run was pinned, no Oracle estimate existed and no market is linked — the commitment itself still resolves', async () => {
+  it('writes nothing to ai_member_scores when no run was pinned, no Oracul estimate existed and no market is linked — the commitment itself still resolves', async () => {
     findUnique.mockResolvedValue(prediction() as never)
 
     await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' })
@@ -374,7 +374,7 @@ describe('resolvePrediction — calibration record', () => {
     expect(recorded).toHaveBeenCalledWith(
       expect.objectContaining({
         disputed: true,
-        disputeNote: "Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'",
+        disputeNote: "Oracul settled this 'wrong' at confidence=3; resolver declared 'correct'",
       }),
     )
   })

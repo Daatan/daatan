@@ -110,7 +110,7 @@ describe('Commitment.aiRunIdAtCommit', () => {
     expect(tx.commitment.create).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves the Oracle scalar snapshot untouched — the two are independent', async () => {
+  it('leaves the Oracul scalar snapshot untouched — the two are independent', async () => {
     tx.aiEstimateRun.findFirst.mockResolvedValue({ id: 'run-current' })
 
     await createCommitment('user-1', 'pred-1', { confidence: 70 })

@@ -28,7 +28,7 @@ describe('fetchOracleSources', () => {
     expect(mockOracleSearch).not.toHaveBeenCalled()
   })
 
-  it('maps Oracle search results to RssItems with their real publisher as source', async () => {
+  it('maps Oracul search results to RssItems with their real publisher as source', async () => {
     mockOracleSearch.mockResolvedValue([
       {
         title: '  OpenAI ships a new model  ',

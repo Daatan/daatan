@@ -165,7 +165,7 @@ describe('POST /api/forecasts/[id]/context', () => {
   })
 
   describe('extraction claim gate (daatan#1172)', () => {
-    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted', async () => {
+    it('only sends newly-claimed articles to the Oracul — an unchanged article must not be re-extracted', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'skip_complete', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
@@ -183,7 +183,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       )
     })
 
-    it('asks the Oracle with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
+    it('asks the Oracul with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
       // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (15s), so the
       // Oracul call must fit inside it. The service default is 30s — sized for the
       // background push/sweep paths — and inheriting it here would mean the race abandons
@@ -204,7 +204,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(15_000)
     })
 
-    it('forwards the claim\'s resolutionRules to the Oracle (daatan#1375)', async () => {
+    it('forwards the claim\'s resolutionRules to the Oracul (daatan#1375)', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
@@ -221,7 +221,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
     })
 
-    it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {
+    it('reads the existing pool aggregate directly, without calling the Oracul or the LLM fallback, when every searched article is already unchanged', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'skip_complete', articleId: 'row-1' },
         { result: 'skip_complete', articleId: 'row-2' },

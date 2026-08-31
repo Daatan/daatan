@@ -110,7 +110,7 @@ describe('buildProviders / rebuildLlmService', () => {
     expect(kinds()).not.toContain('openrouter')
   })
 
-  it('registers the Oracle (nova-pro) only when the Oracle is configured', async () => {
+  it('registers the Oracul (nova-pro) only when the Oracul is configured', async () => {
     await load()
     expect(kinds()).not.toContain('oracle')
 
@@ -130,7 +130,7 @@ describe('buildProviders / rebuildLlmService', () => {
     expect(find('ollama')?.baseUrl).toBe('http://localhost:11434')
   })
 
-  it('orders the full chain Gemini → Oracle → OpenRouter → Ollama when all are configured', async () => {
+  it('orders the full chain Gemini → Oracul → OpenRouter → Ollama when all are configured', async () => {
     process.env.GEMINI_API_KEY = 'g-key'
     oracleConfigured = true
     orKey = 'sk-or-key'

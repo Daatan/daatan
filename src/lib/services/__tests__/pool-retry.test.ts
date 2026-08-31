@@ -158,7 +158,7 @@ describe('retryPoolExtractions', () => {
       ] as never)
     })
 
-    it('finalizes rows already declined by the Oracle when it declines again', async () => {
+    it('finalizes rows already declined by the Oracul when it declines again', async () => {
       mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'oracle_abstain' })
       mockUpdateMany.mockResolvedValue({ count: 1 } as never)
 

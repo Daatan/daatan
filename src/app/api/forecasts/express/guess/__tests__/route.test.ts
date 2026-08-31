@@ -43,7 +43,7 @@ describe('POST /api/forecasts/express/guess', () => {
     process.env.GEMINI_API_KEY = 'test-key'
   })
 
-  it('passes marketProbability through to guessChances when Oracle has no answer', async () => {
+  it('passes marketProbability through to guessChances when Oracul has no answer', async () => {
     mockGetOracleProbability.mockResolvedValue(null)
     mockGuessChances.mockResolvedValue({ probability: 70, reasoning: 'Market-informed estimate.' })
 
@@ -86,7 +86,7 @@ describe('POST /api/forecasts/express/guess', () => {
     expect(body.reasoning).toBe('The claim names no resolution criterion.')
   })
 
-  it('short-circuits on an Oracle answer without calling guessChances', async () => {
+  it('short-circuits on an Oracul answer without calling guessChances', async () => {
     mockGetOracleProbability.mockResolvedValue(0.81)
 
     const res = await callPOST(makeRequest({

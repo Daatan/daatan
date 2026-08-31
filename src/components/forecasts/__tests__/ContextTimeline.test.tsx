@@ -246,16 +246,16 @@ describe('ContextTimeline', () => {
   })
 
 
-  it('renders Oracle CI text without a per-source list when oracleSnapshot is present', async () => {
+  it('renders Oracul CI text without a per-source list when oracleSnapshot is present', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        currentContext: 'Oracle-backed context',
+        currentContext: 'Oracul-backed context',
         contextUpdatedAt: '2026-02-20T10:00:00Z',
         snapshots: [
           {
             id: 's1',
-            summary: 'Oracle-backed context',
+            summary: 'Oracul-backed context',
             sources: [],
             createdAt: '2026-02-20T10:00:00Z',
             externalProbability: 64,
@@ -359,7 +359,7 @@ describe('ContextTimeline', () => {
     expect(note).not.toHaveTextContent('Reuters')
   })
 
-  it('omits the Oracle sources sub-section when oracleSnapshot is null', async () => {
+  it('omits the Oracul sources sub-section when oracleSnapshot is null', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({

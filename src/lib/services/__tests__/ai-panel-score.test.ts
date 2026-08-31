@@ -34,20 +34,20 @@ describe('computeMemberScores (matched-time Brier)', () => {
     expect(rows.map((r) => r.model)).toEqual(['b'])
   })
 
-  it('scores the Oracle from its commit-time probability (already 0–1), with no promptVersion', () => {
+  it('scores the Oracul from its commit-time probability (already 0–1), with no promptVersion', () => {
     const rows = computeMemberScores([], 0.9, 1)
     expect(rows).toEqual([
       { model: ORACLE_MEMBER, mode: SENTINEL_MODE, brierScore: expect.closeTo(0.01, 6), promptVersion: null },
     ])
   })
 
-  it('omits the Oracle when it had no estimate at commit time', () => {
+  it('omits the Oracul when it had no estimate at commit time', () => {
     expect(
       computeMemberScores([{ model: 'm', mode: 'ungrounded', probability: 50, promptVersion: 'pv1' }], null, 1),
     ).toHaveLength(1)
   })
 
-  it('returns nothing when there is neither a member number nor an Oracle estimate', () => {
+  it('returns nothing when there is neither a member number nor an Oracul estimate', () => {
     expect(
       computeMemberScores([{ model: 'm', mode: 'ungrounded', probability: null, promptVersion: 'pv1' }], null, 1),
     ).toEqual([])
@@ -81,7 +81,7 @@ describe('computeMarketScore (matched-time market benchmark)', () => {
     expect(computeMarketScore([], false, new Date('2026-07-02T00:00:00Z'), 1)).toBeNull()
   })
 
-  it('MARKET_MEMBER is a distinct sentinel from the Oracle', () => {
+  it('MARKET_MEMBER is a distinct sentinel from the Oracul', () => {
     expect(MARKET_MEMBER).toBe('market')
     expect(MARKET_MEMBER).not.toBe(ORACLE_MEMBER)
   })

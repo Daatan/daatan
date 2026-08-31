@@ -1355,7 +1355,7 @@ describe('runDueBots — voting', () => {
     expect(votePromptArg.prompt).not.toContain('disposition')
   })
 
-  it('consults the Oracle and surfaces its P(YES) estimate in the vote prompt', async () => {
+  it('consults the Oracul and surfaces its P(YES) estimate in the vote prompt', async () => {
     const { prisma } = await import('@/lib/prisma')
     const { createCommitment } = await import('@/lib/services/commitment')
     const { getOracleProbability } = await import('@/lib/services/oracle')
@@ -1386,10 +1386,10 @@ describe('runDueBots — voting', () => {
     // …and the estimate reached the LLM vote prompt
     const votePromptArg = mockGenerateContent.mock.calls[0][0]
     expect(votePromptArg.prompt).toContain('84%')
-    expect(votePromptArg.prompt).toContain('external forecasting Oracle')
+    expect(votePromptArg.prompt).toContain('external forecasting Oracul')
   })
 
-  it('votes normally without an Oracle hint when the Oracle is unavailable', async () => {
+  it('votes normally without an Oracul hint when the Oracul is unavailable', async () => {
     const { prisma } = await import('@/lib/prisma')
     const { createCommitment } = await import('@/lib/services/commitment')
     const { getOracleProbability } = await import('@/lib/services/oracle')
@@ -1411,11 +1411,11 @@ describe('runDueBots — voting', () => {
     const summaries = await runDueBots()
 
     const votePromptArg = mockGenerateContent.mock.calls[0][0]
-    expect(votePromptArg.prompt).not.toContain('external forecasting Oracle')
+    expect(votePromptArg.prompt).not.toContain('external forecasting Oracul')
     expect(summaries[0].votes).toBe(1)
   })
 
-  it('caps Oracle consultations per run even with many vote candidates', async () => {
+  it('caps Oracul consultations per run even with many vote candidates', async () => {
     const { prisma } = await import('@/lib/prisma')
     const { createCommitment } = await import('@/lib/services/commitment')
     const { getOracleProbability } = await import('@/lib/services/oracle')

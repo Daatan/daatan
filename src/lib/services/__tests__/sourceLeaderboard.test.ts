@@ -72,7 +72,7 @@ describe('getSourceLeaderboard', () => {
     mockGetAuthorShadowLeaderboard.mockReset()
   })
 
-  it('fails open to empty rows when the Oracle call returns null', async () => {
+  it('fails open to empty rows when the Oracul call returns null', async () => {
     mockGetAuthorShadowLeaderboard.mockResolvedValueOnce(null)
     const result = await getSourceLeaderboard()
     expect(result.authorRows).toEqual([])
@@ -156,7 +156,7 @@ describe('getAuthorShadowRowsForOutlet', () => {
     mockGetAuthorShadowLeaderboard.mockReset()
   })
 
-  it('fails open to an empty array when the Oracle call returns null', async () => {
+  it('fails open to an empty array when the Oracul call returns null', async () => {
     mockGetAuthorShadowLeaderboard.mockResolvedValueOnce(null)
     expect(await getAuthorShadowRowsForOutlet('Some Outlet')).toEqual([])
   })

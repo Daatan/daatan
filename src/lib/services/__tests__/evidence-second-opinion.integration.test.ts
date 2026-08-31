@@ -183,7 +183,7 @@ describe('checkEvidenceSecondOpinion — detector 1 model disagreement', () => {
     expect(issues.filter((i) => i.kind === 'model_disagreement')).toEqual([])
   })
 
-  it('skips a candidate when the Oracle re-read comes back null, rather than escalating', async () => {
+  it('skips a candidate when the Oracul re-read comes back null, rather than escalating', async () => {
     const now = new Date()
     const user = await makeUser()
     const prediction = await makePrediction(user.id, { createdAt: now, confidence: 70 })

@@ -53,7 +53,7 @@ beforeEach(() => {
 })
 
 describe('getForecastVoters', () => {
-  it('returns indexer-only when no Oracle snapshot exists', async () => {
+  it('returns indexer-only when no Oracul snapshot exists', async () => {
     mockSnapshot.mockResolvedValue(null)
     mockIndexerRows([{ url: 'https://bbc.com/x', stance: -0.3, author: 'Tom' }])
     const out = await getForecastVoters('fc-1')
@@ -72,7 +72,7 @@ describe('getForecastVoters', () => {
     expect(out.map(s => s.origin).sort()).toEqual(['indexer', 'oracle'])
   })
 
-  it('dedups overlapping URLs by canonical key: Oracle stance wins, author filled from indexer, origin=both', async () => {
+  it('dedups overlapping URLs by canonical key: Oracul stance wins, author filled from indexer, origin=both', async () => {
     mockSnapshot.mockResolvedValue({
       oracleSnapshot: { sources: [{ url: 'https://reuters.com/a', sourceName: 'Reuters', stance: 0.5, certainty: 0.8, author: null }] },
       createdAt: new Date(),

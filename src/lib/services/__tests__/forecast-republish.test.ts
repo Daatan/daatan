@@ -152,7 +152,7 @@ describe('republishForecasts', () => {
     expect(mockRecord).not.toHaveBeenCalled()
   })
 
-  it('skips a forecast with no usable pool rows before ever calling the Oracle', async () => {
+  it('skips a forecast with no usable pool rows before ever calling the Oracul', async () => {
     mockCount.mockResolvedValue(0)
 
     const r = await republishForecasts(['p1'], true)

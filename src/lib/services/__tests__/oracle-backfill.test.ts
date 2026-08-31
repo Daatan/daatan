@@ -153,7 +153,7 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
     expect(REASK_DELAY_MS).toBeGreaterThan(90_000)
   })
 
-  it('does NOT re-ask when the Oracle ran and declined', async () => {
+  it('does NOT re-ask when the Oracul ran and declined', async () => {
     // `oracle_abstain` is a verdict about the articles — the run completed, there is
     // nothing abandoned to collect, and re-asking buys the same answer at full price.
     mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' })
@@ -278,7 +278,7 @@ describe('refreshOracleSnapshot', () => {
     expect(mockSave).not.toHaveBeenCalled()
   })
 
-  it('marks attempted when the Oracle returns no usable forecast', async () => {
+  it('marks attempted when the Oracul returns no usable forecast', async () => {
     mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
     mockForecast.mockResolvedValue({ forecast: null })
     const r = await refreshOracleSnapshot(prediction)
@@ -413,7 +413,7 @@ describe('refreshOracleSnapshot', () => {
       )
     })
 
-    it('does not pool or resolve when the Oracle returns no usable forecast', async () => {
+    it('does not pool or resolve when the Oracul returns no usable forecast', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
       mockForecast.mockResolvedValue({ forecast: null })
 
@@ -450,7 +450,7 @@ describe('refreshOracleSnapshot', () => {
   })
 
   describe('extraction claim gate (evidence-pool.ts)', () => {
-    it('reports status: unchanged and skips the Oracle call when every searched article is already claimed/unchanged', async () => {
+    it('reports status: unchanged and skips the Oracul call when every searched article is already claimed/unchanged', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
       mockClaim.mockResolvedValue([{ result: 'skip_complete', articleId: 'row-1' }])
 
@@ -462,7 +462,7 @@ describe('refreshOracleSnapshot', () => {
       expect(mockMark).not.toHaveBeenCalled()
     })
 
-    it('claims the searched articles before calling the Oracle', async () => {
+    it('claims the searched articles before calling the Oracul', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedDate: '2026-07-01' }])
       mockForecast.mockResolvedValue({ forecast: null })
 
@@ -480,7 +480,7 @@ describe('refreshOracleSnapshot', () => {
       )
     })
 
-    it('releases the claim (FAILED, oracle_null) and still marks attempted when the Oracle returns no usable forecast', async () => {
+    it('releases the claim (FAILED, oracle_null) and still marks attempted when the Oracul returns no usable forecast', async () => {
       mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
       mockForecast.mockResolvedValue({ forecast: null })
 
@@ -533,7 +533,7 @@ describe('refreshOracleSnapshot', () => {
       expect(mockAddToPool).toHaveBeenCalledWith('p1', expect.anything(), 'retry', expect.any(Map))
     })
 
-    it('with supplied articles, an Oracle null releases the claims but writes NO empty marker', async () => {
+    it('with supplied articles, an Oracul null releases the claims but writes NO empty marker', async () => {
       mockForecast.mockResolvedValue({ forecast: null })
 
       const r = await refreshOracleSnapshot(prediction, {
@@ -548,7 +548,7 @@ describe('refreshOracleSnapshot', () => {
       expect(mockMark).not.toHaveBeenCalled()
     })
 
-    it('releases claims the Oracle omitted after pooling (FAILED, oracle_omitted), scoped to this run\'s claims', async () => {
+    it('releases claims the Oracul omitted after pooling (FAILED, oracle_omitted), scoped to this run\'s claims', async () => {
       mockSearch.mockResolvedValue([
         { url: 'https://a.com/1', title: 't', snippet: 's' },
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },
@@ -571,7 +571,7 @@ describe('refreshOracleSnapshot', () => {
       expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://b.com/2'], 'oracle_omitted')
     })
 
-    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted (daatan#1172)', async () => {
+    it('only sends newly-claimed articles to the Oracul — an unchanged article must not be re-extracted (daatan#1172)', async () => {
       mockSearch.mockResolvedValue([
         { url: 'https://a.com/1', title: 't', snippet: 's' },
         { url: 'https://b.com/2', title: 't2', snippet: 's2' },

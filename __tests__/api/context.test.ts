@@ -300,7 +300,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     expect(mockOracleSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, undefined, expect.objectContaining({ source: 'context-update' }))
   })
 
-  it('denormalizes Oracle CI bounds onto Prediction when Oracle path runs', async () => {
+  it('denormalizes Oracul CI bounds onto Prediction when Oracul path runs', async () => {
     // Guards the list-card rendering path: cards read aiCiLow/aiCiHigh directly
     // from Prediction (no ContextSnapshot join), so the route must persist them.
     mockAuth.mockResolvedValue({ user: authenticatedUser })

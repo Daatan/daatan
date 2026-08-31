@@ -79,7 +79,7 @@ describe('capabilities', () => {
     expect((await load()).aiFeaturesEnabled()).toBe(true)
   })
 
-  it('AI research turns on only with LLM + search (Oracle) configured', async () => {
+  it('AI research turns on only with LLM + search (Oracul) configured', async () => {
     mockEnv.DAATAN_EDITION = 'self_hosted'
     mockEnv.OPENROUTER_API_KEY = 'or-key'
     mockEnv.ORACLE_URL = 'https://oracle'
