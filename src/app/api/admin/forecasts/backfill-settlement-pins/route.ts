@@ -13,7 +13,7 @@ const log = createLogger('backfill-settlement-pins')
 const MAX_PER_CALL = 50
 
 /**
- * Resolved binaries that carry a settled Oracle snapshot. Superset of what will
+ * Resolved binaries that carry a settled Oracul snapshot. Superset of what will
  * actually be recorded: the `createdAt <= resolvedAt` cut can't be expressed as
  * a column-to-column comparison here, so `pushCredibilityFeedback` re-applies it
  * per prediction and simply omits the field when nothing qualifies.

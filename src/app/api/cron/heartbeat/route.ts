@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
 import { notifyDailySummary } from '@/lib/services/telegram'
-import { getOracleSearchHealth } from '@/lib/services/oracleSearch'
+import { getOraculSearchHealth } from '@/lib/services/oracleSearch'
 import { prisma } from '@/lib/prisma'
 import { secretsMatch } from '@/lib/cron-auth'
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     prisma.prediction.count({ where: { publishedAt: { gte: since } } }),
     prisma.commitment.count({ where: { createdAt: { gte: since } } }),
     prisma.prediction.count({ where: { resolvedAt: { gte: since } } }),
-    getOracleSearchHealth(),
+    getOraculSearchHealth(),
   ])
 
   const search = health

@@ -46,7 +46,7 @@ describe('notifyNewsArticleMatched', () => {
   })
 
   it('reports the move, and what the article said (stance/relevance) as table rows', async () => {
-    // The numbers that make a match legible: which way the article argues, whether the Oracle
+    // The numbers that make a match legible: which way the article argues, whether the Oracul
     // judged it to bear on the claim at all, and how far the estimate moved. Without stance
     // and relevance the message says the number changed but never why.
     await notifyNewsArticleMatched(
@@ -57,7 +57,7 @@ describe('notifyNewsArticleMatched', () => {
     )
 
     const msg = sentMessage()
-    expect(msg).toContain('Oracle 63% → 71%') // old → new
+    expect(msg).toContain('Oracul 63% → 71%') // old → new
     expect(msg).toContain('<blockquote>') // quote-bar panel, not <pre> (no "copy code" chrome)
     expect(msg).not.toContain('<pre>')
     expect(msg).toContain('<b>stance</b>  -0.72') // signed: reads as "argues NO"
@@ -118,7 +118,7 @@ describe('notifyNewsArticleMatched', () => {
   })
 
   it('omits stance/relevance rows when unknown rather than printing null', async () => {
-    // An older Oracle response may carry neither. The table must degrade to fewer rows,
+    // An older Oracul response may carry neither. The table must degrade to fewer rows,
     // not render "stance null".
     await notifyNewsArticleMatched(
       PREDICTION,
@@ -374,7 +374,7 @@ describe('notifyNewsArticleMatched', () => {
       { similarity: 0.368, articleCount: 3, poolSize: 22 },
       ESTIMATE,
     )
-    expect(sentMessage()).toContain('Oracle 63% → 71%</b>  (+8) · 3 new / 22 in pool')
+    expect(sentMessage()).toContain('Oracul 63% → 71%</b>  (+8) · 3 new / 22 in pool')
 
     // No pool (single-run fallback): only a multi-article push shows a count at all.
     vi.mocked(global.fetch).mockClear()

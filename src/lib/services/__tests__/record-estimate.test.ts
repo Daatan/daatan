@@ -31,7 +31,7 @@ import { notifyHighConfidence } from '@/lib/services/telegram'
 import {
   recordEstimate,
   saveOracleSnapshotOnly,
-  markOracleAttempted,
+  markOraculAttempted,
   clearSettledLatch,
   dismissAwaitingResolution,
   applyAwaitingDismissal,
@@ -358,8 +358,8 @@ describe('backfill adapters through the funnel', () => {
     })
   })
 
-  it('markOracleAttempted records a probability-free backfill snapshot and leaves the prediction alone', async () => {
-    await markOracleAttempted('pred-1', 'no-articles')
+  it('markOraculAttempted records a probability-free backfill snapshot and leaves the prediction alone', async () => {
+    await markOraculAttempted('pred-1', 'no-articles')
     expect(snapshotData()).toMatchObject({
       origin: 'backfill',
       externalProbability: null,

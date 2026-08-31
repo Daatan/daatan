@@ -10,7 +10,7 @@
  * failure mode this table exists to avoid.
  *
  * Idempotent (upsert on predictionId), so it is safe to re-run. Expect a large
- * share of records with `pFinal = null`: most resolutions predate Oracle
+ * share of records with `pFinal = null`: most resolutions predate Oracul
  * snapshot coverage, and only ~17 of the first 45 had a usable published
  * probability at all. A null record is the honest answer — it says "this
  * resolution is not scorable" instead of inventing a number for it.

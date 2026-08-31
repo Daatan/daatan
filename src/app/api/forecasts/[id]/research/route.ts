@@ -142,7 +142,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }) => {
               ).join('\n\n')
             : ''
 
-        // The Oracle's own evidence pool: stance-scored evidence extracted for
+        // The Oracul's own evidence pool: stance-scored evidence extracted for
         // exactly this claim, including any settlement assertions — the
         // resolution assistant previously never saw it and judged from fresh
         // search snippets alone.

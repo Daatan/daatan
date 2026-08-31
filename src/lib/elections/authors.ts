@@ -9,7 +9,7 @@
  * `author`/`sourceName` against the aliases below.
  *
  * Aliases include English, Hebrew, and the Telegram handle so a match survives
- * whichever form the Oracle/news-indexer recorded.
+ * whichever form the Oracul/news-indexer recorded.
  */
 export type CuratedAuthor = {
   /** Stable row key + URL segment for the future per-author page. */
@@ -33,7 +33,7 @@ export type CuratedAuthor = {
 
 export const CURATED_ELECTION_AUTHORS: CuratedAuthor[] = [
   // nameHe is the correct spelling (עמית, with an ayin); 'אמית' below is a known
-  // Oracle-side misspelling kept only as a match alias — see elections' sources.ts,
+  // Oracul-side misspelling kept only as a match alias — see elections' sources.ts,
   // which carries the same correction and both aliases.
   { key: 'amit-segal', name: 'Amit Segal', nameHe: 'עמית סגל', handle: 'amitsegal', lang: 'he', aliases: ['amit segal', 'עמית סגל', 'אמית סגל', 'amitsegal'] },
   { key: 'ben-caspit', name: 'Ben Caspit', nameHe: 'בן כספית', handle: 'Ben_Caspit', personId: '6b9ee26f-b1be-4ad4-be60-0a747a2caf07', lang: 'he', aliases: ['ben caspit', 'בן כספית', 'ben_caspit'] },
@@ -47,7 +47,7 @@ function normalize(s: string | null | undefined): string {
 }
 
 /**
- * Resolve a live Oracle source (its `author` and/or `sourceName`) to a curated
+ * Resolve a live Oracul source (its `author` and/or `sourceName`) to a curated
  * author key, or null if it isn't one of the tracked commentators. Prefers the
  * `author` field (individual), falls back to `sourceName` (outlet).
  */

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import {
-  getOracleForecast,
+  getOraculForecast,
   DEFAULT_MAX_ARTICLES,
   isTransportNullReason,
   type OracleFailureClass,
@@ -11,7 +11,7 @@ import {
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
-import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
+import { saveOracleSnapshotOnly, markOraculAttempted } from '@/lib/services/context'
 import {
   addArticlesToPool,
   articleIdsByUrl,
@@ -27,9 +27,9 @@ export type RefreshResult =
   | { status: 'ok'; sources: number }
   | { status: 'no-articles' }
   // `failureClass` is WHY the run produced nothing. It is already computed here to
-  // stamp the pool rows; surfacing it lets a caller tell "the Oracle judged these
+  // stamp the pool rows; surfacing it lets a caller tell "the Oracul judged these
   // and declined" from "we hung up at 30s", which is the difference between a
-  // verdict and a network event (daatan#1253). Undefined only when the Oracle was
+  // verdict and a network event (daatan#1253). Undefined only when the Oracul was
   // never reached in a way that yielded a class.
   | { status: 'no-oracle'; failureClass?: OracleFailureClass }
   | { status: 'unchanged' }
@@ -40,7 +40,7 @@ export type RefreshResult =
 
 /** An article handed to refreshOracleSnapshot instead of a fresh search — the retry
  *  sweep rebuilds these from stuck pool rows (which store title but not snippet; the
- *  Oracle fetches article content itself, so an empty snippet costs little). */
+ *  Oracul fetches article content itself, so an empty snippet costs little). */
 export type SuppliedArticle = {
   url: string
   title: string
@@ -49,7 +49,7 @@ export type SuppliedArticle = {
   publishedDate?: string
 }
 
-/** The claim fields every Oracle re-drive needs. `claimDirection`/`claimDeadline`/
+/** The claim fields every Oracul re-drive needs. `claimDirection`/`claimDeadline`/
  *  `resolutionRules` are load-bearing beyond the direction guard: retro folds exactly
  *  those three into its `forecast_cache` key (`claim_meta`, retro#510), so a re-ask
  *  that omits any of them lands on a different key and re-runs the extractor.
@@ -65,16 +65,16 @@ export type ReaskPrediction = {
 }
 
 /**
- * Run the Oracle's analysis for one forecast and persist its source roster as an
- * Oracle snapshot — WITHOUT touching the user-facing context summary (uses
+ * Run the Oracul's analysis for one forecast and persist its source roster as an
+ * Oracul snapshot — WITHOUT touching the user-facing context summary (uses
  * saveOracleSnapshotOnly). This is the building block of the active-forecast
  * backfill that populates the "sources behind the AI estimate" panel for forecasts
  * created before per-source capture existed, and (via `opts.articles`) of the
  * pool-retry sweep, which re-drives stuck pool rows through the same path instead
- * of searching. Reuses the same search → Oracle → enrich path as the user-triggered
+ * of searching. Reuses the same search → Oracul → enrich path as the user-triggered
  * analyze route.
  *
- * With supplied articles the two empty-marker writes (`markOracleAttempted`) are
+ * With supplied articles the two empty-marker writes (`markOraculAttempted`) are
  * skipped: they exist only so the backfill's candidate query converges, and on a
  * retried forecast — which already has real snapshots — an empty marker would
  * become the LATEST evidence snapshot that every latest-snapshot reader trusts.
@@ -94,7 +94,7 @@ export async function refreshOracleSnapshot(
     })
   }
   if (!searchResults || searchResults.length === 0) {
-    if (!supplied) await markOracleAttempted(prediction.id, 'no-articles')
+    if (!supplied) await markOraculAttempted(prediction.id, 'no-articles')
     return { status: 'no-articles' }
   }
 
@@ -103,14 +103,14 @@ export async function refreshOracleSnapshot(
   // claimed by another still-fresh in-flight run), there's nothing new to
   // extract. Backfill targets forecasts with NO oracle snapshot yet, so this
   // rarely fires on a first pass, but it does protect a re-run over the same
-  // candidate from redundantly re-calling the Oracle.
+  // candidate from redundantly re-calling the Oracul.
   const claimableResults = searchResults.map((r) => ({
     url: r.url,
     title: r.title,
     snippet: r.snippet,
     source: r.source ?? null,
     publishedAt: r.publishedDate ?? null,
-    // Oracle search results carry no provenance for their dates — see the same note on the
+    // Oracul search results carry no provenance for their dates — see the same note on the
     // /forecasts/[id]/context lane (daatan#1679 item 2).
     publishedAtSource: null,
   }))
@@ -128,9 +128,9 @@ export async function refreshOracleSnapshot(
   // URL-keyed metadata lookup.
   const articlesToScore = searchResults.filter((_, i) => claimResults[i].result === 'claimed')
 
-  // No try/catch — `getOracleForecast` never throws; the `extractor_error` branch that
+  // No try/catch — `getOraculForecast` never throws; the `extractor_error` branch that
   // used to sit here was dead code. Same removal as the news-indexer route (daatan#1231).
-  const { forecast, failureClass } = await getOracleForecast(
+  const { forecast, failureClass } = await getOraculForecast(
     prediction.claimText,
     {
       articles: articlesToScore,
@@ -155,12 +155,12 @@ export async function refreshOracleSnapshot(
       searchResults.filter((_, i) => claimResults[i].result === 'claimed').map((r) => r.url),
       failureClass ?? 'oracle_null',
     )
-    if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
+    if (!supplied) await markOraculAttempted(prediction.id, 'no-oracle')
     // We hung up on a run retro is finishing anyway — go back for it (daatan#1262).
     // Opt-in per caller so the re-ask below can re-enter this function without
     // scheduling another one.
     if (opts?.reask && isTransportNullReason(failureClass)) {
-      scheduleOracleReask(prediction, articlesToScore, origin)
+      scheduleOraculReask(prediction, articlesToScore, origin)
     }
     return { status: 'no-oracle', failureClass }
   }
@@ -184,7 +184,7 @@ export async function refreshOracleSnapshot(
   // job with no request timeout, so awaiting the compute-only aggregate costs nothing; on any
   // failure `resolvePooledEstimate` falls back to this single run.
   await addArticlesToPool(prediction.id, sources, origin, claimedArticleIdByUrl)
-  // Release this run's claims the Oracle omitted (gatekeeper-rejected), or they rot as
+  // Release this run's claims the Oracul omitted (gatekeeper-rejected), or they rot as
   // PENDING forever — same lifecycle close as the news-indexer route; the PENDING filter
   // inside failClaimedArticles is the set-difference against what the pool write completed.
   await failClaimedArticles(
@@ -212,7 +212,7 @@ export async function refreshOracleSnapshot(
   )
 
   // The whole pool is off-topic — abstain rather than persist a number built from articles
-  // the Oracle judged irrelevant. Records an abstention snapshot; the non-null oracleSnapshot
+  // the Oracul judged irrelevant. Records an abstention snapshot; the non-null oracleSnapshot
   // marker still converges the backfill (this forecast now HAS a snapshot). Any confidence/CI
   // already published survives it — the reason decides, and none of the pool's reasons
   // condemn a prior estimate (daatan#1473).
@@ -298,7 +298,7 @@ export const REASK_DELAY_MS = 120 * 1000
 
 /**
  * Ceiling on re-asks waiting or running at once. These are background promises
- * nothing is blocked on, so the only real risk is a hard-down Oracle turning every
+ * nothing is blocked on, so the only real risk is a hard-down Oracul turning every
  * push into another queued 90s call; this bounds that. Deliberately small — a re-ask
  * is a recovery, not a throughput mechanism.
  */
@@ -332,7 +332,7 @@ export function _reaskInFlight(): number {
  *
  * Fire-and-forget by construction: callers have already responded. Never throws.
  */
-export function scheduleOracleReask(
+export function scheduleOraculReask(
   prediction: ReaskPrediction,
   articles: SuppliedArticle[],
   origin: PoolOrigin,
@@ -347,7 +347,7 @@ export function scheduleOracleReask(
   }
   inFlightReasks++
   const timer = setTimeout(() => {
-    void runOracleReask(prediction, articles, origin).finally(() => {
+    void runOraculReask(prediction, articles, origin).finally(() => {
       inFlightReasks--
     })
   }, REASK_DELAY_MS)
@@ -375,7 +375,7 @@ export function scheduleOracleReask(
  *    Deliberate: the number is the point, and a match notification two minutes after
  *    the fact is noise.
  */
-export async function runOracleReask(
+export async function runOraculReask(
   prediction: ReaskPrediction,
   articles: SuppliedArticle[],
   origin: PoolOrigin,

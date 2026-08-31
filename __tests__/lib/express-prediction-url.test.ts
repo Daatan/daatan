@@ -10,9 +10,9 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
-const mockOracleSearch = vi.fn()
+const mockOraculSearch = vi.fn()
 vi.mock('@/lib/services/oracleSearch', () => ({
-  oracleSearch: (...args: unknown[]) => mockOracleSearch(...args),
+  oracleSearch: (...args: unknown[]) => mockOraculSearch(...args),
 }))
 
 const mockFetchUrlContent = vi.fn()
@@ -126,12 +126,12 @@ describe('generateExpressPrediction', () => {
 
   describe('text input flow', () => {
     it('searches articles using user text and returns prediction', async () => {
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       setupLlmMock()
 
       const result = await generateExpressPrediction('Bitcoin price prediction')
 
-      expect(mockOracleSearch).toHaveBeenCalledWith(MOCK_EXTRACTED_QUERY, 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith(MOCK_EXTRACTED_QUERY, 15, undefined, { source: 'express-creation' })
       expect(mockFetchUrlContent).not.toHaveBeenCalled()
       expect(result.claimText).toBe(mockLlmPrediction.claimText)
       expect(result.newsAnchor!.url).toBe('https://cnn.com/btc')
@@ -143,7 +143,7 @@ describe('generateExpressPrediction', () => {
       mockGenerateContent.mockResolvedValueOnce({
         text: JSON.stringify(mockModerationPass),
       })
-      mockOracleSearch.mockResolvedValue([])
+      mockOraculSearch.mockResolvedValue([])
 
       await expect(generateExpressPrediction('obscure topic xyz'))
         .rejects.toThrow('NO_ARTICLES_FOUND')
@@ -153,7 +153,7 @@ describe('generateExpressPrediction', () => {
       // Regression: "link + text" must honor the link as the source (Andrej's case),
       // not fall back to a keyword search that anchors on a different article.
       mockFetchUrlContent.mockResolvedValue('CNN Bitcoin Rally. Full body text here.')
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       setupLlmMock()
 
       const result = await generateExpressPrediction('check https://cnn.com for news about bitcoin')
@@ -163,7 +163,7 @@ describe('generateExpressPrediction', () => {
     })
 
     it('anchors on the model-selected relevant article, not the first result', async () => {
-      mockOracleSearch.mockResolvedValue(mockArticles) // [cnn, bloomberg, coindesk]
+      mockOraculSearch.mockResolvedValue(mockArticles) // [cnn, bloomberg, coindesk]
       mockGenerateContent
         .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
@@ -177,7 +177,7 @@ describe('generateExpressPrediction', () => {
     })
 
     it('creates the forecast source-free when no articles are relevant', async () => {
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockGenerateContent
         .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
         .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
@@ -209,7 +209,7 @@ describe('generateExpressPrediction', () => {
         .mockResolvedValueOnce({ text: 'Bitcoin price rally 2026' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
 
       const result = await generateExpressPrediction(testUrl)
 
@@ -222,7 +222,7 @@ describe('generateExpressPrediction', () => {
       expect(topicCall.prompt).toContain('Extract the main topic')
 
       // Should search for related articles using extracted topic
-      expect(mockOracleSearch).toHaveBeenCalledWith('Bitcoin price rally 2026', 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin price rally 2026', 15, undefined, { source: 'express-creation' })
 
       // Primary article (the URL) should be the news anchor
       expect(result.newsAnchor!.url).toBe(testUrl)
@@ -233,7 +233,7 @@ describe('generateExpressPrediction', () => {
       mockGenerateContent
         .mockResolvedValueOnce({ text: 'European climate policy' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
 
       const result = await generateExpressPrediction(testUrl)
 
@@ -246,7 +246,7 @@ describe('generateExpressPrediction', () => {
         .mockResolvedValueOnce({ text: 'test topic' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       
-      mockOracleSearch.mockResolvedValue([
+      mockOraculSearch.mockResolvedValue([
         { title: 'Same article', url: testUrl, snippet: 'Same content', source: 'cnn.com' },
         ...mockArticles,
       ])
@@ -260,9 +260,9 @@ describe('generateExpressPrediction', () => {
 
     it('keeps the user URL as the anchor when the fetch fails (no search-result substitution)', async () => {
       // Bot-blocked/paywalled pages (e.g. Walla) fail to scrape; the user's link must
-      // still anchor the forecast rather than being replaced by the first Oracle hit.
+      // still anchor the forecast rather than being replaced by the first Oracul hit.
       mockFetchUrlContent.mockRejectedValue(new Error('Network error'))
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
 
       mockGenerateContent
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
@@ -270,7 +270,7 @@ describe('generateExpressPrediction', () => {
       const result = await generateExpressPrediction(testUrl)
 
       // Related-article search still runs (best effort), but the anchor stays the user's URL.
-      expect(mockOracleSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
       expect(mockGenerateContent).toHaveBeenCalledTimes(1)
       expect(result.newsAnchor!.url).toBe(testUrl)
     })
@@ -280,12 +280,12 @@ describe('generateExpressPrediction', () => {
       mockGenerateContent
         .mockRejectedValueOnce(new Error('LLM error')) // topic extraction fails
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) }) 
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
 
       const result = await generateExpressPrediction(testUrl)
 
       // Should fall back to using the URL as search query
-      expect(mockOracleSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith(testUrl, 15, undefined, { source: 'express-creation' })
       expect(result.newsAnchor!.url).toBe(testUrl)
     })
 
@@ -294,7 +294,7 @@ describe('generateExpressPrediction', () => {
       mockGenerateContent
         .mockResolvedValueOnce({ text: 'niche topic' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
-      mockOracleSearch.mockResolvedValue([])
+      mockOraculSearch.mockResolvedValue([])
 
       const result = await generateExpressPrediction(testUrl)
 
@@ -307,11 +307,11 @@ describe('generateExpressPrediction', () => {
       mockGenerateContent
         .mockResolvedValueOnce({ text: '"Bitcoin rally 2026"' })
         .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
 
       await generateExpressPrediction(testUrl)
 
-      expect(mockOracleSearch).toHaveBeenCalledWith('Bitcoin rally 2026', 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin rally 2026', 15, undefined, { source: 'express-creation' })
     })
   })
 
@@ -328,14 +328,14 @@ describe('generateExpressPrediction', () => {
       mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
       mockResolveMarketByUrl.mockResolvedValue(mockMarket)
       mockGetLatestMarketPrice.mockResolvedValue(62)
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       const result = await generateExpressPrediction(marketUrl)
 
       expect(mockResolveMarketByUrl).toHaveBeenCalledWith(marketUrl)
       expect(mockFetchUrlContent).not.toHaveBeenCalled()
-      expect(mockOracleSearch).toHaveBeenCalledWith(mockMarket.question, 15, undefined, { source: 'express-creation' })
+      expect(mockOraculSearch).toHaveBeenCalledWith(mockMarket.question, 15, undefined, { source: 'express-creation' })
       expect(result.externalMarketId).toBe('market-cuid-1')
       expect(result.market).toEqual({
         provider: 'POLYMARKET',
@@ -354,7 +354,7 @@ describe('generateExpressPrediction', () => {
       mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
       mockResolveMarketByUrl.mockResolvedValue(mockMarket)
       mockGetLatestMarketPrice.mockResolvedValue(62)
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       await generateExpressPrediction(marketUrl)
@@ -366,7 +366,7 @@ describe('generateExpressPrediction', () => {
     it('falls back to plain-link handling when the market cannot be resolved', async () => {
       mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
       mockResolveMarketByUrl.mockResolvedValue(null)
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       const result = await generateExpressPrediction(marketUrl)
@@ -381,7 +381,7 @@ describe('generateExpressPrediction', () => {
       mockGetProviderForUrl.mockReturnValue({ id: 'POLYMARKET' })
       mockResolveMarketByUrl.mockResolvedValue(mockMarket)
       mockGetLatestMarketPrice.mockResolvedValue(null)
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
 
       const result = await generateExpressPrediction(marketUrl)
@@ -394,7 +394,7 @@ describe('generateExpressPrediction', () => {
 
   describe('progress callbacks', () => {
     it('emits source summary in found_articles stage', async () => {
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       setupLlmMock()
 
       const stages: Array<{ stage: string; data?: Record<string, unknown> }> = []
@@ -413,7 +413,7 @@ describe('generateExpressPrediction', () => {
       ['https://cnn.com/article', true],
       ['Bitcoin will reach $100k', false],
     ])('input "%s" detected as URL: %s', async (input, isUrl) => {
-      mockOracleSearch.mockResolvedValue(mockArticles)
+      mockOraculSearch.mockResolvedValue(mockArticles)
       mockFetchUrlContent.mockResolvedValue('Some fetched content.')
       
       if (isUrl) {

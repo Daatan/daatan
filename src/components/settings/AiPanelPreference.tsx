@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 /**
  * Toggle for the experimental AI-panel chart lines (docs/LASSO.md §8). Off by
  * default; when on, forecast charts show the per-model estimate lines as a hidden,
- * opt-in source — separate from and with no effect on the Oracle line.
+ * opt-in source — separate from and with no effect on the Oracul line.
  */
 export default function AiPanelPreference() {
   const t = useTranslations('settings')

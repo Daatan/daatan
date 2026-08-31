@@ -248,7 +248,7 @@ function SaasAboutPage() {
               Glicko-2 &amp; ELO Skill Ratings
             </h3>
             <p className="text-sm text-text-secondary mb-3">
-              Beyond RS and Brier, the leaderboard offers 11 sorting systems including Glicko-2 (uncertainty-aware skill rating), ELO (head-to-head), Peer Score (vs. community consensus), AI Score (vs. the Oracle), and more. All systems support per-tag filtering so you can compare forecasters within a specific topic.
+              Beyond RS and Brier, the leaderboard offers 11 sorting systems including Glicko-2 (uncertainty-aware skill rating), ELO (head-to-head), Peer Score (vs. community consensus), AI Score (vs. the Oracul), and more. All systems support per-tag filtering so you can compare forecasters within a specific topic.
             </p>
             <ul className="text-sm text-text-secondary space-y-1 ml-4">
               <li className="flex items-start gap-2">
@@ -281,7 +281,7 @@ function SaasAboutPage() {
             </div>
             <div className="p-3 bg-navy-800 rounded-lg">
               <p className="font-medium text-sm text-white mb-1">🤖 AI Assistance</p>
-              <p className="text-xs text-text-secondary">Extract forecasts from news articles and get AI probability estimates via the Oracle</p>
+              <p className="text-xs text-text-secondary">Extract forecasts from news articles and get AI probability estimates via the Oracul</p>
             </div>
             <div className="p-3 bg-navy-800 rounded-lg">
               <p className="font-medium text-sm text-white mb-1">🔗 Social Sharing</p>

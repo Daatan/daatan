@@ -19,7 +19,7 @@ const AWAITING_AI_RESOLUTION_HIGH = 90
 
 /** Settling votes a settlement pin must carry in its snapshot pool before the
  *  band or the crossing alert treats it as real (daatan#1248). Mirrors the
- *  Oracle's own `settlement_min_sources`, re-checked on our side of the wire
+ *  Oracul's own `settlement_min_sources`, re-checked on our side of the wire
  *  because a pin's confidence is a *constant* (~97), not a level: it clears any
  *  level band by construction, whether it stands on two syndicated echoes or on
  *  a certified outcome. Counted from the persisted pool rows, so a pin arriving
@@ -38,7 +38,7 @@ const MIN_SETTLING_SOURCES = 2
  *  is `settling / total >= 0.25` without the float. */
 const MIN_SETTLING_SHARE_DENOM = 4
 
-/** Rows of the persisted Oracle pool that carried a settlement-grade vote.
+/** Rows of the persisted Oracul pool that carried a settlement-grade vote.
  *  Defensive over unvalidated Json, same as `maxPublishedAt` below. */
 function settlingSourceCount(oracleSnapshot: unknown): number {
   const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
@@ -53,7 +53,7 @@ function sourceCount(oracleSnapshot: unknown): number {
 }
 
 /**
- * Does this snapshot's pool actually back the Oracle's settlement claim?
+ * Does this snapshot's pool actually back the Oracul's settlement claim?
  *
  * One predicate for all three consumers — latch, band and crossing alert — because
  * they used to disagree (daatan#1525). The latch, which excludes a forecast from the
@@ -80,7 +80,7 @@ function settlementBacking(oracleSnapshot: unknown): { settling: number; total: 
  * sharing the `confidence` column (daatan#1248): 97 from thirty agreeing
  * weighted sources is a level; 97 from a pin is `settlement_stance`, a policy
  * constant. So a pin enters the Awaiting Resolution band as what it is — the
- * Oracle's claim that the question is decided, admitted only when the snapshot's
+ * Oracul's claim that the question is decided, admitted only when the snapshot's
  * pool actually backs it (`settlementBacking`) — and never via the level check its
  * constant would trivially clear. Organic estimates keep the plain level band (the
  * #1185 false-negative fix relies on that shape).
@@ -226,7 +226,7 @@ export interface RecordEstimateInput {
   /** How many pool rows the abstaining aggregate saw. Diagnostics only — persisted
    *  beside `insufficientReason`, read by nothing. */
   poolSize?: number | null
-  /** Oracle settlement detection; honored only where the origin policy allows. */
+  /** Oracul settlement detection; honored only where the origin policy allows. */
   settled?: boolean
   summary?: string
   sources?: Prisma.InputJsonValue
@@ -251,7 +251,7 @@ export interface RecordEstimateInput {
   now?: Date
 }
 
-/** Oracle articles_used out of the snapshot payload, else null (LLM fallback, clock). */
+/** Oracul articles_used out of the snapshot payload, else null (LLM fallback, clock). */
 function articlesUsedOf(oracleSnapshot: unknown): number | null {
   const n = (oracleSnapshot as { articlesUsed?: unknown } | null | undefined)?.articlesUsed
   return typeof n === 'number' ? n : null
@@ -362,7 +362,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
     : { settling: 0, total: 0, backed: false }
   if (pinned && !backing.backed) {
     // Visible from day one rather than inferred later: this is the rate at which the
-    // Oracle claims settlement on a pool that does not carry it (daatan#1525).
+    // Oracul claims settlement on a pool that does not carry it (daatan#1525).
     log.info(
       { predictionId: input.predictionId, origin: input.origin, ...backing },
       'settlement pin rejected: pool does not back the claim, latch not written',
@@ -619,7 +619,7 @@ export interface SaveContextUpdateInput {
   confidence: number | null
   aiCiLow: number | null
   aiCiHigh: number | null
-  /** The Oracle abstained — no evidence bears on the claim. Records the snapshot
+  /** The Oracul abstained — no evidence bears on the claim. Records the snapshot
    *  as an abstention; the prediction's last published number is LEFT STANDING unless
    *  `insufficientReason` condemns it (daatan#1473 — see `CLEARING_ABSTAIN_REASONS`).
    *  The gauge shows "Insufficient evidence" off the snapshot either way. */
@@ -635,7 +635,7 @@ export interface SaveContextUpdateInput {
   /** Provenance passthrough (daatan#1617); see `RecordEstimateInput.engine`/`.schemaVersion`. */
   engine?: string | null
   schemaVersion?: string | null
-  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  /** Oracul settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   now: Date
 }
@@ -668,7 +668,7 @@ export async function saveContextUpdate(input: SaveContextUpdateInput) {
 
 export interface SaveNewsIndexerMatchInput {
   predictionId: string
-  /** The evidence set fed to the Oracle: [{ url, title, source, publishedDate }, ...]. */
+  /** The evidence set fed to the Oracul: [{ url, title, source, publishedDate }, ...]. */
   sources: Prisma.InputJsonValue
   /** Null on an abstention (`insufficientData`) — the whole pool was off-topic, so this run
    *  has no estimate to persist. The prediction's existing confidence/CI survive it
@@ -677,7 +677,7 @@ export interface SaveNewsIndexerMatchInput {
   ciLow: number | null
   ciHigh: number | null
   oracleSnapshot: Prisma.InputJsonValue
-  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  /** Oracul settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   /** The pool aggregated but found no usable signal (off-topic). Records an abstention:
    *  snapshot flagged, no notification, excluded from glide/chart — and the prediction's
@@ -757,8 +757,8 @@ export async function listContextSnapshots(predictionId: string) {
 }
 
 /**
- * The most recent context snapshot that carries an Oracle estimate, for a
- * forecast (= prediction). Used to surface the Oracle's analysed sources as
+ * The most recent context snapshot that carries an Oracul estimate, for a
+ * forecast (= prediction). Used to surface the Oracul's analysed sources as
  * voters. Returns null when no analyze run has produced an oracleSnapshot.
  */
 export async function getLatestOracleSnapshot(predictionId: string) {
@@ -906,12 +906,12 @@ export async function getProbabilityHistory(predictionId: string) {
 }
 
 /**
- * Mark a forecast as Oracle-attempted when the Oracle produced no usable sources
+ * Mark a forecast as Oracul-attempted when the Oracul produced no usable sources
  * (no articles / no estimate). Writes an empty oracleSnapshot marker so the backfill
  * stops re-selecting it (it now HAS a non-null oracleSnapshot) and the loop converges.
  * Touches nothing on the prediction — no estimate, no CI, no detailsText.
  */
-export async function markOracleAttempted(predictionId: string, reason: string): Promise<void> {
+export async function markOraculAttempted(predictionId: string, reason: string): Promise<void> {
   await recordEstimate({
     predictionId,
     origin: 'backfill',
@@ -923,12 +923,12 @@ export async function markOracleAttempted(predictionId: string, reason: string):
 
 export interface SaveOracleSnapshotInput {
   predictionId: string
-  /** The enriched Oracle source roster: EnrichedOracleSource[] under `{ sources }`. */
+  /** The enriched Oracul source roster: EnrichedOracleSource[] under `{ sources }`. */
   oracleSnapshot: Prisma.InputJsonValue
   confidence: number | null
   aiCiLow: number | null
   aiCiHigh: number | null
-  /** Oracle settlement detection: the outcome was reported as an accomplished fact. */
+  /** Oracul settlement detection: the outcome was reported as an accomplished fact. */
   settled?: boolean
   /** The pool aggregated but found no usable signal (off-topic) — records an abstention,
    *  leaving any published confidence/CI standing (daatan#1473). */
@@ -947,7 +947,7 @@ export interface SaveOracleSnapshotInput {
 }
 
 /**
- * Persist ONLY an Oracle snapshot (for the active-forecast backfill): creates a
+ * Persist ONLY an Oracul snapshot (for the active-forecast backfill): creates a
  * ContextSnapshot carrying the oracleSnapshot and refreshes the probability fields,
  * WITHOUT touching detailsText/contextUpdatedAt or translations — so it never
  * clobbers a user-written context summary. Mirrors saveNewsIndexerMatch.

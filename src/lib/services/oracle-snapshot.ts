@@ -30,7 +30,7 @@ export const PUBLISH_PERCENT_MAX = 99
 export const MATERIAL_CHANGE_PTS = 1
 
 /**
- * Map an aggregated Oracle stance/CI bound in [-1, 1] to a probability percent
+ * Map an aggregated Oracul stance/CI bound in [-1, 1] to a probability percent
  * in [PUBLISH_PERCENT_MIN, PUBLISH_PERCENT_MAX]. Shared by every call site that
  * builds a `ContextSnapshot.oracleSnapshot`
  * (news-indexer push, user-triggered analyze, backfill) so `mean`/`ciLow`/`ciHigh`
@@ -44,7 +44,7 @@ export const MATERIAL_CHANGE_PTS = 1
  * stance ±0.99 → 99.5 → `Math.round` → **100** went out as a literal certainty:
  * 1,699 snapshots on record, 1,509 of them settled, and 29% of everything
  * written in the 48h before this shipped. The `mean` was never the problem —
- * the Oracle's per-vote clamp already held it inside [1, 99].
+ * the Oracul's per-vote clamp already held it inside [1, 99].
  */
 export function stanceToPercent(v: number): number {
   const percent = Math.round(((v + 1) / 2) * 100)
@@ -73,10 +73,10 @@ export function stanceStdToPercent(v: number): number {
 }
 
 /**
- * One Oracle-analysed source as persisted in `ContextSnapshot.oracleSnapshot.sources`.
- * The Oracle returns stance/certainty/credibility/claims but no title/date/author;
+ * One Oracul-analysed source as persisted in `ContextSnapshot.oracleSnapshot.sources`.
+ * The Oracul returns stance/certainty/credibility/claims but no title/date/author;
  * those are joined on at capture time — title/date from the input articles, author
- * from news-indexer (which the Oracle response omits).
+ * from news-indexer (which the Oracul response omits).
  */
 export type EnrichedOracleSource = {
   sourceId: string
@@ -99,7 +99,7 @@ export type EnrichedOracleSource = {
   // and null/undefined distinction as personId/personName above.
   outletId?: string | null
   outletName?: string | null
-  // Below: mirrors OracleSource's optionality (oracle.ts). Undefined means the Oracle response
+  // Below: mirrors OracleSource's optionality (oracle.ts). Undefined means the Oracul response
   // omitted the key — no opinion this run, must NOT overwrite a previously-stored value (F11,
   // daatan#1237). Null means the response explicitly carried a null — a real signal (e.g.
   // "unclassified", "author reported facts only") that DOES overwrite.
@@ -125,7 +125,7 @@ export type EnrichedOracleSource = {
   gatekeeperModel?: string | null
   gatekeeperPromptVersion?: string | null
   gatekeeperPromptHash?: string | null
-  // Which Oracle build ran (daatan#1669) — response-level `provenance.oracle`, one value per
+  // Which Oracul build ran (daatan#1669) — response-level `provenance.oracle`, one value per
   // /forecast call, stamped onto every source. Persisted; nothing reads it yet.
   oracleVersion?: string | null
   oracleGitSha?: string | null
@@ -175,7 +175,7 @@ export type EnrichedOracleSource = {
 }
 
 /**
- * Enrich the Oracle's per-source output with title + publishedDate (joined from the
+ * Enrich the Oracul's per-source output with title + publishedDate (joined from the
  * input articles by URL, in-memory) and author (from the news-indexer by-URL lookup).
  * Pure — no I/O. Shared by the analyze route and the backfill script.
  */

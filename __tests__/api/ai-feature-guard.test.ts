@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 /**
  * Defense-in-depth: AI/market API routes must short-circuit (404) when the
- * capability is off, before touching any LLM/Oracle/market dependency. We mock
+ * capability is off, before touching any LLM/Oracul/market dependency. We mock
  * withAuth to invoke the handler directly with a fake user, and toggle the
  * capability mock.
  */

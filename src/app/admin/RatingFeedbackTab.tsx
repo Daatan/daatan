@@ -108,7 +108,7 @@ function VotesTable({ votes }: { votes: Vote[] }) {
                 <SortHeader label="★" sortKey="rating" sort={sort} onSort={toggle} align="right" />
                 <SortHeader label="Article" sortKey="article" sort={sort} onSort={toggle} />
                 <SortHeader label="Prediction" sortKey="prediction" sort={sort} onSort={toggle} />
-                <th className="py-2 pr-4 font-medium">Oracle</th>
+                <th className="py-2 pr-4 font-medium">Oracul</th>
                 <th className="py-2 pr-4 font-medium">Flagged</th>
                 <th className="py-2 font-medium">Note</th>
               </tr>

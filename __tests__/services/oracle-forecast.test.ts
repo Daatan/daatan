@@ -13,7 +13,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-// getOracleForecast fires logOracleCall() without awaiting it (telemetry is
+// getOraculForecast fires logOracleCall() without awaiting it (telemetry is
 // best-effort). The real implementation hits prisma; left unmocked it runs a DB
 // write that outlives the test and settles during worker teardown, which trips
 // vitest's "Closing rpc while onUserConsoleLog was pending" flake. Stub it to a
@@ -26,9 +26,9 @@ vi.mock('@/lib/services/oracleClient', async (importActual) => {
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { getOracleForecast } from '@/lib/services/oracle'
+import { getOraculForecast } from '@/lib/services/oracle'
 
-function makeOracleResponse(overrides: Record<string, unknown> = {}) {
+function makeOraculResponse(overrides: Record<string, unknown> = {}) {
   return {
     question: 'Will X happen?',
     mean: 0.2,
@@ -50,18 +50,18 @@ function okResponse(body: unknown) {
   } as Response
 }
 
-describe('getOracleForecast', () => {
+describe('getOraculForecast', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockEnv.ORACLE_URL = 'https://oracle.example.com'
     mockEnv.ORACLE_API_KEY = 'test-key'
-    mockFetch.mockResolvedValue(okResponse(makeOracleResponse()))
+    mockFetch.mockResolvedValue(okResponse(makeOraculResponse()))
   })
 
   it('returns null when oracle is not configured', async () => {
     mockEnv.ORACLE_URL = undefined
     mockEnv.ORACLE_API_KEY = undefined
-    const result = await getOracleForecast('Will X happen?')
+    const result = await getOraculForecast('Will X happen?')
     expect(result.forecast).toBeNull()
   })
 
@@ -71,7 +71,7 @@ describe('getOracleForecast', () => {
       { url: 'https://example.com/2', title: 'Article 2', snippet: 'Snippet 2' },
     ]
 
-    await getOracleForecast('Will X happen?', { articles })
+    await getOraculForecast('Will X happen?', { articles })
 
     expect(mockFetch).toHaveBeenCalledOnce()
     const [, init] = mockFetch.mock.calls[0]
@@ -83,14 +83,14 @@ describe('getOracleForecast', () => {
   })
 
   it('sends text and language per article when present, omits them when absent', async () => {
-    // daatan#1290: `text` skips the Oracle's own fetch; `language` is a prompt hint retro's
+    // daatan#1290: `text` skips the Oracul's own fetch; `language` is a prompt hint retro's
     // pydantic model ignores until retro#417 lands (default extra="ignore" — safe to send).
     const articles = [
       { url: 'https://example.com/1', title: 'A', snippet: 's', text: 'the body', language: 'he' },
       { url: 'https://example.com/2', title: 'B', snippet: 's' },
     ]
 
-    await getOracleForecast('Will X happen?', { articles })
+    await getOraculForecast('Will X happen?', { articles })
 
     const [, init] = mockFetch.mock.calls[0]
     const body = JSON.parse(init.body as string)
@@ -101,7 +101,7 @@ describe('getOracleForecast', () => {
   })
 
   it('omits articles key from body when no articles provided', async () => {
-    await getOracleForecast('Will X happen?')
+    await getOraculForecast('Will X happen?')
 
     const [, init] = mockFetch.mock.calls[0]
     const body = JSON.parse(init.body as string)
@@ -109,7 +109,7 @@ describe('getOracleForecast', () => {
   })
 
   it('omits articles key from body when empty array provided', async () => {
-    await getOracleForecast('Will X happen?', { articles: [] })
+    await getOraculForecast('Will X happen?', { articles: [] })
 
     const [, init] = mockFetch.mock.calls[0]
     const body = JSON.parse(init.body as string)
@@ -117,38 +117,38 @@ describe('getOracleForecast', () => {
   })
 
   it('returns null for placeholder response', async () => {
-    mockFetch.mockResolvedValue(okResponse(makeOracleResponse({ placeholder: true })))
+    mockFetch.mockResolvedValue(okResponse(makeOraculResponse({ placeholder: true })))
 
-    const result = await getOracleForecast('Will X happen?')
+    const result = await getOraculForecast('Will X happen?')
     expect(result.forecast).toBeNull()
   })
 
   it('returns null when articles_used is 0', async () => {
-    mockFetch.mockResolvedValue(okResponse(makeOracleResponse({ articles_used: 0 })))
+    mockFetch.mockResolvedValue(okResponse(makeOraculResponse({ articles_used: 0 })))
 
-    const result = await getOracleForecast('Will X happen?')
+    const result = await getOraculForecast('Will X happen?')
     expect(result.forecast).toBeNull()
   })
 
   it('returns null on non-OK HTTP status', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 503 } as Response)
 
-    const result = await getOracleForecast('Will X happen?')
+    const result = await getOraculForecast('Will X happen?')
     expect(result.forecast).toBeNull()
   })
 
   it('returns null on fetch error (never throws)', async () => {
     mockFetch.mockRejectedValue(new Error('network error'))
 
-    const result = await getOracleForecast('Will X happen?')
+    const result = await getOraculForecast('Will X happen?')
     expect(result.forecast).toBeNull()
   })
 
   it('returns full forecast payload on success', async () => {
-    const payload = makeOracleResponse({ mean: 0.4, articles_used: 5 })
+    const payload = makeOraculResponse({ mean: 0.4, articles_used: 5 })
     mockFetch.mockResolvedValue(okResponse(payload))
 
-    const { forecast } = await getOracleForecast('Will X happen?')
+    const { forecast } = await getOraculForecast('Will X happen?')
     expect(forecast).not.toBeNull()
     expect(forecast!.mean).toBe(0.4)
     expect(forecast!.articles_used).toBe(5)

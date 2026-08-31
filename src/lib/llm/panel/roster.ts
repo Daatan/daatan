@@ -194,7 +194,7 @@ export function isControlModel(model: string, members: readonly PanelMember[] = 
 
 /**
  * A distinct, stable colour per member for the dashed panel lines. Deliberately not
- * the Oracle's amber (#FBBF24), the community blue, or the market pink — the panel is
+ * the Oracul's amber (#FBBF24), the community blue, or the market pink — the panel is
  * its own source. Indexed by roster position so colours don't shuffle when a member
  * abstains on a given run.
  */

@@ -10,7 +10,7 @@ const log = createLogger('pool-retry')
 /**
  * One retry per row per day. A row that fails again drops out of the retryable set
  * until tomorrow (its updatedAt was bumped), so `remaining` strictly shrinks within
- * a workflow run and a permanently-broken article costs at most one Oracle look a
+ * a workflow run and a permanently-broken article costs at most one Oracul look a
  * day instead of a hot loop. Also keeps the sweep clear of anything in-flight.
  */
 const RETRY_MIN_AGE_MS = 24 * 60 * 60 * 1000
@@ -41,17 +41,17 @@ function retryableWhere(cutoff: Date): Prisma.EvidencePoolArticleWhereInput {
 }
 
 export interface RetrySweepResult {
-  /** Predictions this call ran the Oracle for. */
+  /** Predictions this call ran the Oracul for. */
   processed: number
   /** Stuck rows re-driven through extraction across those predictions. */
   rowsRetried: number
   ok: number
-  noOracle: number
+  noOracul: number
   unchanged: number
   insufficient: number
   failed: number
   /** Rows stamped oracle_null_final this call — two consecutive ATTRIBUTABLE nulls
-   *  (the Oracle ran and declined, both times), out of the sweep. */
+   *  (the Oracul ran and declined, both times), out of the sweep. */
   finalized: number
   /** Retryable rows still waiting on ACTIVE forecasts — the workflow's convergence gauge. */
   remaining: number
@@ -88,7 +88,7 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
     processed: 0,
     rowsRetried: 0,
     ok: 0,
-    noOracle: 0,
+    noOracul: 0,
     unchanged: 0,
     insufficient: 0,
     failed: 0,
@@ -103,15 +103,15 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       take: DEFAULT_MAX_ARTICLES,
       select: { url: true, title: true, snippet: true, source: true, publishedDate: true, statusReason: true },
     })
-    // Second-strike rule: a batch where the Oracle rejects EVERY article comes back as a
+    // Second-strike rule: a batch where the Oracul rejects EVERY article comes back as a
     // null forecast, so its rows land on a retryable null-family reason. Rows that were
     // ALREADY null-family before this claim (captured here, since claiming resets
     // statusReason) and go null again get stamped terminal below: two independent null
-    // runs a day apart is the article telling us it's dead, not the Oracle hiccuping. An
+    // runs a day apart is the article telling us it's dead, not the Oracul hiccuping. An
     // organic re-push with changed content can still revive them — only the sweep stops.
     //
     // Matched against ATTRIBUTABLE_NULL_REASONS, not the whole null family: strike one
-    // only counts if it was a verdict about the article (the Oracle ran and declined),
+    // only counts if it was a verdict about the article (the Oracul ran and declined),
     // not a timeout or an HTTP error. A row whose first null was pure latency has been
     // judged once, not twice, and the rule below wants two (daatan#1253).
     //
@@ -145,9 +145,9 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++
       else {
-        results.noOracle++
+        results.noOracul++
         // Strike two must ALSO be a verdict about the articles. One batch of up to
-        // DEFAULT_MAX_ARTICLES rows rides on a single Oracle call, so a client timeout
+        // DEFAULT_MAX_ARTICLES rows rides on a single Oracul call, so a client timeout
         // used to retire every row in it permanently on zero information about any of
         // them — 94.9% of terminal rows were retired in multi-row groups, and 24% of the
         // calls behind them were client-side errors at exactly 12,001 ms (daatan#1253).

@@ -318,7 +318,7 @@ describe('AI panel series', () => {
   })
 
   // The chart becomes visible on panel data alone once opted in — even with no
-  // commitments, Oracle, or market. (recharts' Legend text isn't reliably queryable
+  // commitments, Oracul, or market. (recharts' Legend text isn't reliably queryable
   // under the jsdom ResponsiveContainer stub, so the line rendering is covered by the
   // buildPanelSeries unit tests above; here we assert the gating behaviour.)
   it('shows the chart on panel data alone when opted in', () => {

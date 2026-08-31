@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the Oracle client so the provider never touches prisma/env/network.
+// Mock the Oracul client so the provider never touches prisma/env/network.
 vi.mock('@/lib/services/oracleClient', () => ({
   oracleFetch: vi.fn(),
 }))
@@ -54,7 +54,7 @@ describe('OracleProvider', () => {
     expect(body.messages[1]).toEqual({ role: 'user', content: 'give json' })
   })
 
-  it('throws on a non-ok Oracle response', async () => {
+  it('throws on a non-ok Oracul response', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 502,
@@ -62,7 +62,7 @@ describe('OracleProvider', () => {
     } as never)
 
     const provider = new OracleProvider(cfg, 'm')
-    await expect(provider.generateContent({ prompt: 'x' })).rejects.toThrow(/Oracle \/llm error 502/)
+    await expect(provider.generateContent({ prompt: 'x' })).rejects.toThrow(/Oracul \/llm error 502/)
   })
 
   it('throws when the response carries no content', async () => {

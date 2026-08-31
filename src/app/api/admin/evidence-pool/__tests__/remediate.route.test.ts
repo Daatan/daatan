@@ -79,7 +79,7 @@ describe('POST /api/admin/evidence-pool/remediate', () => {
     expect(remediate).not.toHaveBeenCalled()
   })
 
-  it('caps the batch so one call cannot queue an unbounded number of Oracle analyses', async () => {
+  it('caps the batch so one call cannot queue an unbounded number of Oracul analyses', async () => {
     const res = await POST(req({ ids: Array.from({ length: 11 }, (_, i) => `p${i}`), mode: 'apply' }))
 
     expect(res.status).toBe(400)

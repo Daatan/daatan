@@ -7,7 +7,7 @@ import { llmService } from '@/lib/llm'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
+import { getOraculForecast, recordOraculFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { addArticlesToPool, articleIdsByUrl, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, { params }: RawRouteContext) {
 // POST — protected endpoint (wrapped by withAuth, params already awaited)
 export const POST = withAuth(async (request: NextRequest, user, { params }: RouteContext) => {
     try {
-        // Context analysis needs web search + Oracle + LLM — gated on aiResearch
+        // Context analysis needs web search + Oracul + LLM — gated on aiResearch
         // (an LLM-only self-host hides this). Read-only GET timeline stays available.
         if (!aiResearchEnabled()) {
             return apiError('AI features are not enabled on this instance', 404)
@@ -198,7 +198,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             snippet: r.snippet,
             source: r.source ?? null,
             publishedAt: r.publishedDate ?? null,
-            // Oracle search results carry a date but never say where it came from, so this lane
+            // Oracul search results carry a date but never say where it came from, so this lane
             // genuinely has no provenance to record (daatan#1679 item 2). Null, not a guess.
             publishedAtSource: null,
         }))
@@ -258,12 +258,12 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             }
         }
 
-        // Oracle estimation starts immediately; LLM runs concurrently below
+        // Oracul estimation starts immediately; LLM runs concurrently below
         const estimationWork: Promise<EstimationResult> = (async () => {
             if (articlesToScore.length === 0) {
                 // Every searched article is already pooled with unchanged content —
                 // nothing to extract. Read the existing pool aggregate directly
-                // rather than either calling getOracleForecast with an empty
+                // rather than either calling getOraculForecast with an empty
                 // articles list (which makes retro fall back to its OWN internal
                 // search instead of what daatan already found — a silent
                 // divergence) or falling through to the ungrounded guessChances
@@ -277,7 +277,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.claimText,
                 )
                 if (resolved.estimateSource === 'single-run') {
-                    // The pool itself couldn't be read either (rare — e.g. Oracle
+                    // The pool itself couldn't be read either (rare — e.g. Oracul
                     // unreachable) and there's no fresh run to fall back to since we
                     // deliberately skipped one. Report nothing this round rather than
                     // the placeholder zero-value noNewRun above.
@@ -303,7 +303,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 return toEstimationResult(resolved)
             }
 
-            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOracleForecast(prediction.claimText, {
+            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOraculForecast(prediction.claimText, {
                 articles: articlesToScore.map(r => ({
                     url: r.url,
                     title: r.title,
@@ -317,12 +317,12 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 claimArchetype: prediction.claimArchetype,
                 resolutionRules: prediction.resolutionRules,
                 // Must stay under ESTIMATION_TIMEOUT_MS: this whole block is raced
-                // against it below, so a longer Oracle budget would just be abandoned
+                // against it below, so a longer Oracul budget would just be abandoned
                 // 15s in — with the call still running, uncancelled. The default (30s)
                 // is for the background push/sweep paths. See daatan#1254.
                 timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS,
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })
-            // The Oracle abstained — the evidence doesn't bear on the claim. Record
+            // The Oracul abstained — the evidence doesn't bear on the claim. Record
             // the abstention and do NOT fall back to an LLM guess, which would just
             // re-introduce an ungrounded number from the same off-topic articles.
             if (insufficientData) {
@@ -337,14 +337,14 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     predictionCiHigh: null,
                     oracleSnapshotData: null,
                     insufficientData: true,
-                    // No pool was read on this leg — the Oracle itself declined, which is the
+                    // No pool was read on this leg — the Oracul itself declined, which is the
                     // `oracle_abstain` failure class it reports on its own call log.
                     insufficientReason: 'oracle_abstain',
                     poolSize: null,
                 }
             }
             if (oracleForecast !== null) {
-                // Attach authors to the Oracle's sources (it omits them); best-effort,
+                // Attach authors to the Oracul's sources (it omits them); best-effort,
                 // never blocks the estimate. Title/date come from the input articles below.
                 const articleMeta = await getArticleMetaByUrl(oracleForecast.sources.map(s => s.url))
                 const authorByUrl = new Map(
@@ -422,7 +422,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.detailsText ?? '',
                     articlesMapped
                 )
-                void recordOracleFallback(oracleLogId, chances.probability)
+                void recordOraculFallback(oracleLogId, chances.probability)
                 log.info(
                     {
                         predictionId: prediction.id,

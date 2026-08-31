@@ -60,7 +60,7 @@ import type { EnrichedOracleSource } from '../oracle-snapshot'
 const findMany = vi.mocked(prisma.evidencePoolArticle.findMany)
 const update = vi.mocked(prisma.evidencePoolArticle.update)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
-const mockOracleFetch = vi.mocked(oracleFetch)
+const mockOraculFetch = vi.mocked(oracleFetch)
 
 /**
  * One claim carrying the full Phase 1 field set, none of which exists on `OracleClaimDetail`
@@ -308,12 +308,12 @@ describe('daatan#1645 — schema-v3 per-claim fields survive claims_detail stora
       // the new fields, the gate would see a different claim layer than /forecast does — the
       // exact divergence Phase 3 would have to debug.
       findMany.mockResolvedValue([poolArticle({ claimsDetail: structuredClone(CLAIMS_V3) })] as never)
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       await recomputeFromPool('pred-1', null, null, null, null, 'Will turnout exceed 70%?')
 
       // `oracleFetch(cfg, path, init)` — the body is the THIRD argument.
-      const [, , init] = mockOracleFetch.mock.calls[0] as [unknown, string, { body: string }]
+      const [, , init] = mockOraculFetch.mock.calls[0] as [unknown, string, { body: string }]
       const body = JSON.parse(init.body) as {
         sources: { claims_detail: Record<string, unknown>[] | null }[]
       }

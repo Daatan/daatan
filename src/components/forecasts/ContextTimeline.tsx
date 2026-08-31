@@ -59,7 +59,7 @@ export function groupSources(sources: Source[]): GroupedSource[] {
   }))
 }
 
-/** Single source entry within an Oracle forecast snapshot (camelCase variant used in UI). */
+/** Single source entry within an Oracul forecast snapshot (camelCase variant used in UI). */
 type OracleSnapshotSource = {
   sourceId: string
   sourceName: string
@@ -75,16 +75,16 @@ type OracleSnapshotSource = {
   settled?: boolean | null
 }
 
-/** Full Oracle payload persisted alongside a context snapshot when the Oracle path is taken. */
+/** Full Oracul payload persisted alongside a context snapshot when the Oracul path is taken. */
 type OracleSnapshot = {
-  /** Probability percent [0, 100] — converted from the Oracle's raw stance mean. */
+  /** Probability percent [0, 100] — converted from the Oracul's raw stance mean. */
   mean: number
   /** Spread, on the same percent scale as `mean`/`ciLow`/`ciHigh`. */
   std: number
   ciLow: number
   ciHigh: number
   articlesUsed: number
-  /** Settlement pin (#1250): the Oracle read the question as already decided and
+  /** Settlement pin (#1250): the Oracul read the question as already decided and
    *  REPLACED the pooled estimate with a pinned constant — a different epistemic
    *  regime, not a confident average. Surfaced in the UI, never restyled away. */
   settled?: boolean
@@ -96,7 +96,7 @@ export type AiEstimate = {
   probability: number | null
   ciLow?: number
   ciHigh?: number
-  /** The Oracle had no evidence bearing on the claim — show "Insufficient evidence". */
+  /** The Oracul had no evidence bearing on the claim — show "Insufficient evidence". */
   abstained?: boolean
   /** The estimate is a settlement pin, not a pooled average (see OracleSnapshot.settled). */
   settled?: boolean
@@ -130,7 +130,7 @@ type Props = {
   onAiEstimate?: (value: AiEstimate | null) => void
 }
 
-/** Map a snapshot's persisted probability + Oracle CI (if any) into the callback shape. */
+/** Map a snapshot's persisted probability + Oracul CI (if any) into the callback shape. */
 const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
   if (!snap) return null
   // The latest run abstained — surface "Insufficient evidence", not a stale number.
@@ -362,7 +362,7 @@ export default function ContextTimeline({
       </div>
 
       {/* Context card — always in the DOM (crawlable); the collapsed preview and
-          the full text/AI summary/estimate/reasoning/Oracle sources both render,
+          the full text/AI summary/estimate/reasoning/Oracul sources both render,
           with CSS `hidden` picking which one shows, so everything stays part of
           the SSR HTML for SEO even while visually collapsed. */}
       {currentContext && (
@@ -429,8 +429,8 @@ export default function ContextTimeline({
               </div>
             )}
             {/* AI probability estimate.
-                Source badge ("Oracle" vs "LLM estimate") makes the provenance
-                of the number explicit: when the Oracle is unreachable / has no
+                Source badge ("Oracul" vs "LLM estimate") makes the provenance
+                of the number explicit: when the Oracul is unreachable / has no
                 usable predictions, daatan silently falls back to the legacy
                 LLM `guessChances` path which returns only a point estimate.
                 Without the badge the user sees a single number with no CI and
@@ -452,10 +452,10 @@ export default function ContextTimeline({
                       title={
                         isOracle
                           ? 'TruthMachine Oracle — calibrated multi-source estimate with confidence interval'
-                          : 'LLM fallback — single point estimate, used when Oracle has no usable sources'
+                          : 'LLM fallback — single point estimate, used when Oracul has no usable sources'
                       }
                     >
-                      {isOracle ? 'Oracle' : 'LLM estimate'}
+                      {isOracle ? 'Oracul' : 'LLM estimate'}
                     </span>
                     {oracle?.settled && (
                       <span

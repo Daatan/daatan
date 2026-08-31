@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
-import { getOracleSearchHealth, SEARCH_LOW_CREDITS_THRESHOLD } from '@/lib/services/oracleSearch'
+import { getOraculSearchHealth, SEARCH_LOW_CREDITS_THRESHOLD } from '@/lib/services/oracleSearch'
 import { notifySearchHealthDigest, type SearchHealthIssue } from '@/lib/services/telegram'
 import { secretsMatch } from '@/lib/cron-auth'
 
@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const health = await getOracleSearchHealth()
+  const health = await getOraculSearchHealth()
 
   if (!health) {
-    log.warn('Oracle search health unavailable — skipping notifications')
+    log.warn('Oracul search health unavailable — skipping notifications')
     return NextResponse.json({ ok: true, skipped: true, reason: 'oracle_not_configured' })
   }
 
-  log.info({ overall: health.overall, usable_count: health.usable_count }, 'Oracle search health check')
+  log.info({ overall: health.overall, usable_count: health.usable_count }, 'Oracul search health check')
 
   const issues: SearchHealthIssue[] = []
 

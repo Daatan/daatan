@@ -120,7 +120,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
     }
 
     if (pinContradiction.contradicts && !pinAcknowledged) {
-      setError('Please acknowledge the Oracle disagreement before confirming')
+      setError('Please acknowledge the Oracul disagreement before confirming')
       return
     }
 
@@ -337,7 +337,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       </div>
 
       {/* Pin-contradiction gate (daatan#1234 check #2): only once an outcome is
-          picked AND it disagrees with the Oracle's current estimate. Doesn't
+          picked AND it disagrees with the Oracul's current estimate. Doesn't
           block outcome selection itself — only Confirm, until acknowledged. */}
       {pinContradiction.contradicts && (
         <div className="p-4 border border-amber-500/30 rounded-xl bg-navy-700 space-y-3">
@@ -345,8 +345,8 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
             <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
               {pinContradiction.isSettled
-                ? "The Oracle settled this forecast as an accomplished fact, and its direction disagrees with the outcome you're about to declare."
-                : "The Oracle's current confidence is extreme, and its direction disagrees with the outcome you're about to declare."}
+                ? "The Oracul settled this forecast as an accomplished fact, and its direction disagrees with the outcome you're about to declare."
+                : "The Oracul's current confidence is extreme, and its direction disagrees with the outcome you're about to declare."}
               {' '}Confirm you&apos;ve reviewed the disagreement before proceeding.
             </span>
           </div>
@@ -357,7 +357,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
               onChange={(e) => setPinAcknowledged(e.target.checked)}
               className="rounded border-amber-500/50"
             />
-            I&apos;ve reviewed the Oracle&apos;s estimate and confirm this resolution
+            I&apos;ve reviewed the Oracul&apos;s estimate and confirm this resolution
           </label>
         </div>
       )}

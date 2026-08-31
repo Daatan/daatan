@@ -23,7 +23,7 @@ function hasLLM(): boolean {
   return !!(getOpenRouterKey() || env.GEMINI_API_KEY || env.OLLAMA_BASE_URL)
 }
 
-/** A web/news search backend is configured (the Oracle). */
+/** A web/news search backend is configured (the Oracul). */
 function hasSearch(): boolean {
   return !!(env.ORACLE_URL && getOracleApiKey())
 }
@@ -41,7 +41,7 @@ export function aiFeaturesEnabled(): boolean {
 
 /**
  * Search-backed AI: the "Analyze" context co-forecaster and resolve-time AI
- * research. These additionally need a search backend (the Oracle), so they stay
+ * research. These additionally need a search backend (the Oracul), so they stay
  * hidden on an LLM-only self-host rather than appearing and failing.
  */
 export function aiResearchEnabled(): boolean {

@@ -56,7 +56,7 @@ describe('buildSearchQuery', () => {
 
     it('keeps a 3.8s extraction — the exact latency that fell back in prod', async () => {
       // The incident: Gemini took 3.8s against the old 2s budget, so search ran on the raw
-      // claim sentence, retrieved 7 off-topic Putin articles, and the Oracle abstained —
+      // claim sentence, retrieved 7 off-topic Putin articles, and the Oracul abstained —
       // the analyze run published "Insufficient evidence" for ~18 minutes.
       mockGenerateContent.mockImplementation(() => slow(3_800, 'Putin illness health reports'))
 

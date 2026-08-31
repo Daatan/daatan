@@ -602,7 +602,7 @@ export interface RunRequoteOptions {
 /**
  * Daily production driver (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0): the
  * component that makes P(t) actually move on a quiet day. Pure arithmetic per
- * candidate — no Oracle call, no search, no LLM — except the bounded self-heal
+ * candidate — no Oracul call, no search, no LLM — except the bounded self-heal
  * pass that classifies any ACTIVE forecast still missing metadata.
  */
 export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummary> {

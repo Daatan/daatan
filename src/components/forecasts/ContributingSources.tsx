@@ -9,7 +9,7 @@ import { Avatar } from '@/components/Avatar'
 
 type Side = 'yes' | 'no' | 'neutral'
 
-/** Stance → side: same thresholds as the Oracle-snapshot source chips. */
+/** Stance → side: same thresholds as the Oracul-snapshot source chips. */
 function getSide(stance: number | null): Side {
   if (stance == null) return 'neutral'
   if (stance > 0.15) return 'yes'
@@ -70,7 +70,7 @@ function articleProbYes(s: ContributingSource): number {
 /**
  * How much this article's stance actually moves the needle: |stance| × certainty.
  * Used to pick an outlet's lead article — certainty alone isn't a safe proxy for
- * relevance, since the Oracle can be highly certain about an off-topic article's
+ * relevance, since the Oracul can be highly certain about an off-topic article's
  * stance on ITS OWN subject while being less certain, but far more decisive, about
  * the one article that's actually on-topic. Magnitude × certainty favours the
  * article that actually says something about the claim.
@@ -98,17 +98,17 @@ type OutletGroup = {
 }
 
 /**
- * The publications that fed the Oracle's estimate, grouped by outlet and shown as
+ * The publications that fed the Oracul's estimate, grouped by outlet and shown as
  * "voters" in the same "will happen / won't happen" language readers use to vote.
  * A tug-of-war lean bar summarises where the press sits; below it, outlets split
  * into will / won't / neutral columns by their single most-decisive article's
  * stance (highest |stance| × certainty) — not an outlet-wide average, which could
  * cancel a strong signal against an unrelated article from the same domain and
- * mislabel the whole outlet "neutral"; not raw certainty either, since the Oracle
+ * mislabel the whole outlet "neutral"; not raw certainty either, since the Oracul
  * can be very certain about an off-topic article's stance on its own subject.
  * An outlet with several articles is an expandable card listing each; a
  * single-article outlet is a plain link. Articles news-indexer matched but the
- * Oracle gate-rejected as off-topic (no stance) are not shown at all.
+ * Oracul gate-rejected as off-topic (no stance) are not shown at all.
  * Sits below the human forecasters and never affects the community number.
  *
  * Every percentage on this panel is the same quantity: implied P(YES)
@@ -132,15 +132,15 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
 
   if (unique.length === 0) return null
 
-  // Only stance-scored articles were actually incorporated into the Oracle's estimate;
-  // a null stance means news-indexer matched it but the Oracle gate-rejected it as not
+  // Only stance-scored articles were actually incorporated into the Oracul's estimate;
+  // a null stance means news-indexer matched it but the Oracul gate-rejected it as not
   // bearing on the claim. Those never appear here.
   const used = unique.filter((s) => s.stance != null)
 
   if (used.length === 0) return null
 
-  // Press lean is article-granular (it's about the coverage that fed the Oracle),
-  // independent of grouping, and only over articles the Oracle actually used.
+  // Press lean is article-granular (it's about the coverage that fed the Oracul),
+  // independent of grouping, and only over articles the Oracul actually used.
   const pressMeanYes = used.reduce((sum, s) => sum + articleProbYes(s), 0) / used.length
   const leanPct = Math.round(pressMeanYes * 100)
   const summary =
@@ -192,7 +192,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
   }
 
   const originText = (origin: ContributingSource['origin']): string | null => {
-    if (origin === 'oracle') return t('originOracle')
+    if (origin === 'oracle') return t('originOracul')
     if (origin === 'both') return t('originBoth')
     if (origin === 'indexer') return t('originIndexer')
     return null
@@ -214,7 +214,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
   }
 
   // Settlement-pin marker (#1250): this article reported the outcome as already
-  // decided — it's what made the Oracle discard the pooled estimate for a pin.
+  // decided — it's what made the Oracul discard the pooled estimate for a pin.
   // Highlighted so a bad pin is self-diagnosing from the page instead of a DB session.
   const SettledFlag = () => (
     <span

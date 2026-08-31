@@ -9,21 +9,21 @@ const { mockAuth } = vi.hoisted(() => ({
 vi.mock('@/auth', () => ({ auth: mockAuth }))
 
 const {
-  mockOracleSearch,
+  mockOraculSearch,
   mockGenerateContent,
   mockPrisma,
-  mockGetOracleForecast,
-  mockRecordOracleFallback,
+  mockGetOraculForecast,
+  mockRecordOraculFallback,
   mockClaimArticlesForExtraction,
   mockAddArticlesToPool,
 } = vi.hoisted(() => ({
-  mockOracleSearch: vi.fn(),
+  mockOraculSearch: vi.fn(),
   mockGenerateContent: vi.fn(),
-  mockGetOracleForecast: vi.fn().mockResolvedValue({ forecast: null, logId: null }),
-  mockRecordOracleFallback: vi.fn().mockResolvedValue(undefined),
+  mockGetOraculForecast: vi.fn().mockResolvedValue({ forecast: null, logId: null }),
+  mockRecordOraculFallback: vi.fn().mockResolvedValue(undefined),
   // Every test here searches a single article, so a fixed one-element
   // 'claimed' response keeps the claim gate (daatan#1172) a no-op for tests
-  // that predate it — they're exercising the Oracle/LLM/persistence paths,
+  // that predate it — they're exercising the Oracul/LLM/persistence paths,
   // not the gate itself.
   mockClaimArticlesForExtraction: vi.fn().mockResolvedValue([{ result: 'claimed', articleId: 'row-1' }]),
   mockAddArticlesToPool: vi.fn().mockResolvedValue(undefined),
@@ -52,8 +52,8 @@ const {
 vi.mock('@/lib/services/oracle', () => ({
   DEFAULT_MAX_ARTICLES: 30,
   INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
-  getOracleForecast: (...args: unknown[]) => mockGetOracleForecast(...args),
-  recordOracleFallback: (...args: unknown[]) => mockRecordOracleFallback(...args),
+  getOraculForecast: (...args: unknown[]) => mockGetOraculForecast(...args),
+  recordOraculFallback: (...args: unknown[]) => mockRecordOraculFallback(...args),
 }))
 
 vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
@@ -65,7 +65,7 @@ vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({
-  oracleSearch: (...args: unknown[]) => mockOracleSearch(...args),
+  oracleSearch: (...args: unknown[]) => mockOraculSearch(...args),
 }))
 
 vi.mock('@/lib/llm', () => ({
@@ -236,7 +236,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       contextUpdatedAt: null,
       newsAnchor: null,
     })
-    mockOracleSearch.mockResolvedValue([])
+    mockOraculSearch.mockResolvedValue([])
 
     const res = await POST(makeRequest('pred1', 'POST'), routeParams('pred1'))
     expect(res.status).toBe(503)
@@ -255,7 +255,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       contextUpdatedAt: null,
       newsAnchor: null,
     })
-    mockOracleSearch.mockRejectedValue(new Error('Search API not available'))
+    mockOraculSearch.mockRejectedValue(new Error('Search API not available'))
 
     const res = await POST(makeRequest('pred1', 'POST'), routeParams('pred1'))
     expect(res.status).toBe(503)
@@ -275,7 +275,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       newsAnchor: { title: 'Bitcoin Rally' },
     })
 
-    mockOracleSearch.mockResolvedValue([
+    mockOraculSearch.mockResolvedValue([
       { title: 'Bitcoin at 95k', url: 'https://example.com/1', source: 'Reuters', publishedDate: '2026-02-20', snippet: 'Bitcoin surges.' },
     ])
 
@@ -297,10 +297,10 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
 
     // Verify search used claimText (not newsAnchor title)
-    expect(mockOracleSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, undefined, expect.objectContaining({ source: 'context-update' }))
+    expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, undefined, expect.objectContaining({ source: 'context-update' }))
   })
 
-  it('denormalizes Oracle CI bounds onto Prediction when Oracle path runs', async () => {
+  it('denormalizes Oracul CI bounds onto Prediction when Oracul path runs', async () => {
     // Guards the list-card rendering path: cards read aiCiLow/aiCiHigh directly
     // from Prediction (no ContextSnapshot join), so the route must persist them.
     mockAuth.mockResolvedValue({ user: authenticatedUser })
@@ -313,12 +313,12 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       contextUpdatedAt: null,
       newsAnchor: null,
     })
-    mockOracleSearch.mockResolvedValue([
+    mockOraculSearch.mockResolvedValue([
       { title: 'BTC', url: 'https://example.com/1', source: 'Reuters', publishedDate: '2026-02-20', snippet: '.' },
     ])
     mockGenerateContent.mockResolvedValue({ text: 'Summary' })
-    // Oracle returns stance in [-1, 1]; route maps to percent via (v+1)/2 * 100
-    mockGetOracleForecast.mockResolvedValueOnce({
+    // Oracul returns stance in [-1, 1]; route maps to percent via (v+1)/2 * 100
+    mockGetOraculForecast.mockResolvedValueOnce({
       forecast: {
         question: 'Bitcoin will reach $100k',
         mean: 0.2,      // → 60%
@@ -360,11 +360,11 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       contextUpdatedAt: null,
       newsAnchor: null,
     })
-    mockOracleSearch.mockResolvedValue([
+    mockOraculSearch.mockResolvedValue([
       { title: 'N', url: 'https://example.com', source: 'X', publishedDate: '2026-02-20', snippet: '.' },
     ])
     mockGenerateContent.mockResolvedValue({ text: 'Summary' })
-    mockGetOracleForecast.mockResolvedValueOnce({ forecast: null, logId: 'log-1' })
+    mockGetOraculForecast.mockResolvedValueOnce({ forecast: null, logId: 'log-1' })
     mockPrisma.$transaction.mockResolvedValue([{ id: 'snap1', summary: 'Summary', sources: [], createdAt: new Date() }, {}])
     mockPrisma.contextSnapshot.findMany.mockResolvedValue([])
 
@@ -391,7 +391,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       newsAnchor: null,
     })
 
-    mockOracleSearch.mockResolvedValue([
+    mockOraculSearch.mockResolvedValue([
       { title: 'News', url: 'https://example.com', source: 'BBC', publishedDate: '2026-02-20', snippet: 'Something happened.' },
     ])
 
@@ -421,7 +421,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       newsAnchor: null,
     })
 
-    mockOracleSearch.mockResolvedValue([
+    mockOraculSearch.mockResolvedValue([
       { title: 'News', url: 'https://example.com', source: 'BBC', publishedDate: '2026-02-20', snippet: 'News.' },
     ])
 

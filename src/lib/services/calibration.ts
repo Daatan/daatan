@@ -30,10 +30,10 @@ type SnapshotRow = {
   oracleSnapshot: Prisma.JsonValue
 }
 
-/** The Oracle's interval and pin state, if this snapshot carried one.
+/** The Oracul's interval and pin state, if this snapshot carried one.
  *
  * `oracleSnapshot.mean/ciLow/ciHigh` are probability PERCENT (0–100), not the
- * Oracle's raw [-1,1] stance — the conversion happens before storage. Reading
+ * Oracul's raw [-1,1] stance — the conversion happens before storage. Reading
  * them as stance is a mistake this repo has made before. */
 function oracleFields(snapshot: Prisma.JsonValue) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return {}

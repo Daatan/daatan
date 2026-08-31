@@ -8,7 +8,7 @@ name: TLS Cert Expiry Watch
 # Runs from a GitHub Actions runner — independent of the EC2 box and SSM.
 #
 # Every host we serve over HTTPS must be listed here. On 2026-07-13 oracle.daatan.com's
-# cert expired and took down every daatan->Oracle call for ~19h: this job existed, but
+# cert expired and took down every daatan->Oracul call for ~19h: this job existed, but
 # its matrix only covered daatan.com and staging.daatan.com, so nothing was watching the
 # host that actually broke. A cert this job does not name is a cert nobody is watching.
 

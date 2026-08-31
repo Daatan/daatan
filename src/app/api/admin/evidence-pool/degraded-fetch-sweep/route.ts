@@ -32,7 +32,7 @@ function parseWhereOptions(request: NextRequest): DegradedFetchWhereOptions {
  * Read-only preview (daatan#1446 Step 2/3 machinery): counts rows/predictions
  * currently matching the sweep's filter — by default the confirmed url_hash
  * allowlist (see parseWhereOptions); `?filter=domains` shows the legacy domain
- * superset for comparison. Never calls the Oracle; safe to hit any time to see
+ * superset for comparison. Never calls the Oracul; safe to hit any time to see
  * how the candidate set is trending as rows get re-extracted.
  *
  * `rows` splits into `reachable` (null contentHash — actually re-extractable) and
@@ -65,7 +65,7 @@ export const GET = withAuth(async (request: NextRequest) => {
  * forecast is a product decision, not cleanup." An ADMIN calls this by hand, reads
  * the report, and decides whether the results should stand. Bounded per call
  * (?limit=N predictions, default 3, max 10) for the same pacing reason as the retry
- * sweep — each prediction is one full Oracle analysis.
+ * sweep — each prediction is one full Oracul analysis.
  */
 export const POST = withAuth(async (request: NextRequest) => {
   try {

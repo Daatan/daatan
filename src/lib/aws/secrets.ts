@@ -30,7 +30,7 @@ export const AWS_SECRET_NAMES = ['OPENROUTER_API_KEY'] as const
 
 /**
  * Secrets read by both environments off ONE parameter at `/daatan/shared/secrets/<NAME>`
- * — for values like the Oracle API key that retro's `oracle-api.service` and daatan's app
+ * — for values like the Oracul API key that retro's `oracle-api.service` and daatan's app
  * must agree on byte-for-byte. Per-env copies would just reintroduce the "shared secret
  * copied into two places, drifts silently" problem docs/SECRETS.md flags.
  */

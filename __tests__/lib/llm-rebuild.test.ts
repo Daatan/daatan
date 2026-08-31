@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * The main LLM service builds a cross-vendor fallback chain
- *   Gemini → Oracle (Bedrock/Nova) → OpenRouter → Ollama
+ *   Gemini → Oracul (Bedrock/Nova) → OpenRouter → Ollama
  * where each leg registers ONLY when it's configured:
  *   - Gemini:     GEMINI_API_KEY set
- *   - Oracle:     getOracleConfig() non-null (ORACLE_URL + ORACLE_API_KEY)
+ *   - Oracul:     getOracleConfig() non-null (ORACLE_URL + ORACLE_API_KEY)
  *   - OpenRouter: getOpenRouterKey() non-empty — BOTH editions. Self-host uses the
  *                 admin-chosen model; SaaS uses the free NON-Google backstop model.
  *   - Ollama:     OLLAMA_BASE_URL set (no implicit localhost default)
@@ -110,7 +110,7 @@ describe('buildProviders / rebuildLlmService', () => {
     expect(kinds()).not.toContain('openrouter')
   })
 
-  it('registers the Oracle (nova-pro) only when the Oracle is configured', async () => {
+  it('registers the Oracul (nova-pro) only when the Oracul is configured', async () => {
     await load()
     expect(kinds()).not.toContain('oracle')
 
@@ -130,7 +130,7 @@ describe('buildProviders / rebuildLlmService', () => {
     expect(find('ollama')?.baseUrl).toBe('http://localhost:11434')
   })
 
-  it('orders the full chain Gemini → Oracle → OpenRouter → Ollama when all are configured', async () => {
+  it('orders the full chain Gemini → Oracul → OpenRouter → Ollama when all are configured', async () => {
     process.env.GEMINI_API_KEY = 'g-key'
     oracleConfigured = true
     orKey = 'sk-or-key'

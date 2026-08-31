@@ -8,8 +8,8 @@
  * 3. Deduplicates against existing forecast titles (LLM-based)
  * 4. Generates and posts a new forecast (with 🤖 in title)
  * 5. Stakes on the forecast immediately (or defers if requireApprovalForForecasts)
- * 6. Optionally votes on existing ACTIVE forecasts (informed by the Oracle's
- *    P(YES) estimate when the Oracle is configured and reachable)
+ * 6. Optionally votes on existing ACTIVE forecasts (informed by the Oracul's
+ *    P(YES) estimate when the Oracul is configured and reachable)
  * 7. Logs all actions to BotRunLog
  *
  * The per-stage logic lives in sibling modules: forecastCreate (news-anchored),
@@ -20,7 +20,7 @@
 import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { fetchRssFeeds, detectHotTopics, type HotTopic } from '@/lib/services/bots/rss'
-import { fetchOracleSources, MAX_ORACLE_SOURCES_PER_RUN } from '@/lib/services/bots/oracleSource'
+import { fetchOraculSources, MAX_ORACLE_SOURCES_PER_RUN } from '@/lib/services/bots/oracleSource'
 import { type BotWithUser, log, countTodayActions, countThisHourActions, logBotAction } from './shared'
 import { processTopic } from './forecastCreate'
 import { processSourcelessForecast } from './sourceless'
@@ -163,7 +163,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
     // ── Forecast creation ────────────────────────────────────────────────
     if (bot.canCreateForecasts) {
       const allSources = bot.newsSources as string[]
-      // `oracle: <query>` entries route through the paid Oracle /search; everything
+      // `oracle: <query>` entries route through the paid Oracul /search; everything
       // else (RSS URLs and `Search:` Google News queries) goes through fetchRssFeeds.
       const isOracle = (s: string) => s.trim().toLowerCase().startsWith('oracle:')
       const oracleQueries = allSources
@@ -176,9 +176,9 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
       if ((feedUrls.length > 0 || oracleQueries.length > 0) && initialForecastCount < bot.maxForecastsPerDay) {
         const metrics = startMetrics()
 
-        // Cap paid Oracle searches per run; extras are ignored until the next run.
-        const cappedOracleQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
-        if (oracleQueries.length > cappedOracleQueries.length) {
+        // Cap paid Oracul searches per run; extras are ignored until the next run.
+        const cappedOraculQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
+        if (oracleQueries.length > cappedOraculQueries.length) {
           log.info(
             { botId: bot.id, configured: oracleQueries.length, cap: MAX_ORACLE_SOURCES_PER_RUN },
             'Capping oracle: source queries for this run',
@@ -188,7 +188,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
         const rssFetchStart = Date.now()
         const [rssItems, oracleItems] = await Promise.all([
           fetchRssFeeds(feedUrls),
-          fetchOracleSources(cappedOracleQueries, {
+          fetchOraculSources(cappedOraculQueries, {
             windowHours: bot.hotnessWindowHours,
             meta: { source: 'bot-sourcing', userId: bot.userId },
           }),

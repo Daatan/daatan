@@ -53,7 +53,7 @@ describe('POST /api/admin/forecasts/republish', () => {
     expect(republish).not.toHaveBeenCalled()
   })
 
-  it('caps the batch so one call cannot queue an unbounded number of Oracle aggregations', async () => {
+  it('caps the batch so one call cannot queue an unbounded number of Oracul aggregations', async () => {
     const res = await POST(req({ forecastIds: Array.from({ length: 51 }, (_, i) => `p${i}`), mode: 'apply' }))
 
     expect(res.status).toBe(400)

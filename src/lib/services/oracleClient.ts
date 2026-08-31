@@ -11,7 +11,7 @@ export interface OracleConfig {
   key: string
 }
 
-/** Daatan workflow that triggered an Oracle call. */
+/** Daatan workflow that triggered an Oracul call. */
 export type OracleCallSource =
   | 'context-update'
   | 'research'
@@ -31,7 +31,7 @@ export type OracleCallSource =
   | 'evidence-second-opinion'
   | 'other'
 
-/** LLM token usage as the Oracle reports it (`token_usage` on /forecast,
+/** LLM token usage as the Oracul reports it (`token_usage` on /forecast,
  *  /relevance and /llm responses). Nullable/omitted when unknown. */
 export interface OracleTokenUsage {
   prompt_tokens?: number | null
@@ -62,7 +62,7 @@ interface LogOracleCallInput {
   resultCount?: number | null
   /** Why the call failed / came back empty; null on success. */
   failureReason?: string | null
-  /** The response's `token_usage` object, when the Oracle reported one
+  /** The response's `token_usage` object, when the Oracul reported one
    *  (FORECAST and LLM calls only — retro doesn't report usage for SEARCH etc.). */
   tokenUsage?: OracleTokenUsage | null
 }
@@ -70,12 +70,12 @@ interface LogOracleCallInput {
 const PRUNE_DAYS = 30
 
 /**
- * Record one Oracle call (any type, success or failure) for the admin usage
+ * Record one Oracul call (any type, success or failure) for the admin usage
  * stats. Fire-and-forget: never throws — callers invoke as `void logOracleCall(...)`.
  * Also prunes rows older than {@link PRUNE_DAYS} on each write.
  *
  * Returns the created row's id (or null on failure) so a caller that later
- * takes the LLM fallback can attribute it via {@link recordOracleFallback}.
+ * takes the LLM fallback can attribute it via {@link recordOraculFallback}.
  */
 export async function logOracleCall(input: LogOracleCallInput): Promise<string | null> {
   try {
@@ -114,11 +114,11 @@ export async function logOracleCall(input: LogOracleCallInput): Promise<string |
 }
 
 /**
- * Mark a logged Oracle call as having fallen back to the LLM, recording the
+ * Mark a logged Oracul call as having fallen back to the LLM, recording the
  * probability the fallback produced. Fire-and-forget: never throws. No-op when
  * `id` is null (the original log write failed).
  */
-export async function recordOracleFallback(id: string | null, fallbackProbability: number | null): Promise<void> {
+export async function recordOraculFallback(id: string | null, fallbackProbability: number | null): Promise<void> {
   if (!id) return
   try {
     await prisma.oracleCallLog.update({
@@ -134,7 +134,7 @@ export async function recordOracleFallback(id: string | null, fallbackProbabilit
 const stripTrailingSlash = (url: string): string => url.replace(/\/$/, '')
 
 /**
- * Normalized Oracle base URL when `ORACLE_URL` is set; `null` otherwise.
+ * Normalized Oracul base URL when `ORACLE_URL` is set; `null` otherwise.
  * No API key required — for the unauthenticated endpoints (`/health`,
  * `/fetch-url`).
  */
@@ -143,7 +143,7 @@ export function getOracleBaseUrl(): string | null {
 }
 
 /**
- * The Oracle's `x-api-key`, shared with retro's `oracle-api.service` off one SSM
+ * The Oracul's `x-api-key`, shared with retro's `oracle-api.service` off one SSM
  * parameter (`/daatan/shared/secrets/ORACLE_API_KEY`) so the two sides can't drift —
  * see docs/SECRETS.md. `env.ORACLE_API_KEY` stays as the local-dev/self-host fallback.
  */
@@ -163,7 +163,7 @@ export function getOracleConfig(): OracleConfig | null {
 }
 
 /**
- * `fetch()` against an authenticated Oracle endpoint: applies the `x-api-key`
+ * `fetch()` against an authenticated Oracul endpoint: applies the `x-api-key`
  * header and an abort timeout. Callers own the response handling — services
  * fail open (return `null`), proxy routes pass the status through.
  */

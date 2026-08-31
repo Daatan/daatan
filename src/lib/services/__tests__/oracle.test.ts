@@ -2,7 +2,7 @@
  * @jest-environment node
  *
  * Unit tests for the TruthMachine Oracle client. All network calls to the
- * Oracle API are mocked with vi.stubGlobal('fetch', ...).
+ * Oracul API are mocked with vi.stubGlobal('fetch', ...).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -40,7 +40,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
 })
 
 import { ClaimDirection } from '@prisma/client'
-import { getOracleForecast, getOracleProbability, getAuthorShadowLeaderboard, checkOracleHealth, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
+import { getOraculForecast, getOraculProbability, getAuthorShadowLeaderboard, checkOracleHealth, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
 const mockLogOracleCall = vi.mocked(logOracleCall)
@@ -77,7 +77,7 @@ const fullPayload = {
   placeholder: false,
 }
 
-describe('getOracleForecast', () => {
+describe('getOraculForecast', () => {
   const fetchMock = vi.fn()
 
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe('getOracleForecast', () => {
       json: async () => fullPayload,
     })
 
-    const { forecast: data, logId } = await getOracleForecast('Will X happen?')
+    const { forecast: data, logId } = await getOraculForecast('Will X happen?')
     expect(data).not.toBeNull()
     expect(data?.mean).toBe(0.3)
     expect(data?.ci_low).toBe(0.05)
@@ -114,18 +114,18 @@ describe('getOracleForecast', () => {
       status: 200,
       json: async () => ({ ...fullPayload, token_usage: usage }),
     })
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'OK', tokenUsage: usage }))
 
     mockLogOracleCall.mockClear()
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ tokenUsage: undefined }))
   })
 
   it('sends the x-api-key header and posts to /forecast', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://oracle.daatan.com/forecast')
     expect(init.method).toBe('POST')
@@ -134,9 +134,9 @@ describe('getOracleForecast', () => {
     expect(headers['Content-Type']).toBe('application/json')
   })
 
-  it('maps supplied articles to the Oracle snake_case `published_date`', async () => {
+  it('maps supplied articles to the Oracul snake_case `published_date`', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleForecast('Q?', {
+    await getOraculForecast('Q?', {
       articles: [
         { url: 'https://x.com/a', title: 'T', snippet: 'S', source: 'X', publishedDate: '2026-06-14' },
       ],
@@ -144,13 +144,13 @@ describe('getOracleForecast', () => {
     const [, init] = fetchMock.mock.calls[0]
     const body = JSON.parse(init.body as string)
     expect(body.articles[0].published_date).toBe('2026-06-14')
-    // the camelCase key must not leak through to the Oracle
+    // the camelCase key must not leak through to the Oracul
     expect(body.articles[0].publishedDate).toBeUndefined()
   })
 
-  it('threads the supplied gatekeeper verdict to the Oracle (both fields, snake_case)', async () => {
+  it('threads the supplied gatekeeper verdict to the Oracul (both fields, snake_case)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleForecast('Q?', {
+    await getOraculForecast('Q?', {
       articles: [
         { url: 'https://x.com/a', title: 'T', snippet: 'S', relevance: 0.83, isPrediction: true },
       ],
@@ -159,13 +159,13 @@ describe('getOracleForecast', () => {
     const body = JSON.parse(init.body as string)
     expect(body.articles[0].relevance).toBe(0.83)
     expect(body.articles[0].is_prediction).toBe(true)
-    // the camelCase key must not leak through to the Oracle
+    // the camelCase key must not leak through to the Oracul
     expect(body.articles[0].isPrediction).toBeUndefined()
   })
 
   it('omits the verdict when absent or incomplete (both-or-neither)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleForecast('Q?', {
+    await getOraculForecast('Q?', {
       articles: [
         { url: 'https://x.com/a', title: 'T', snippet: 'S' },                 // no verdict
         { url: 'https://x.com/b', title: 'T', snippet: 'S', relevance: 0.7 }, // partial -> omit both
@@ -185,50 +185,50 @@ describe('getOracleForecast', () => {
       status: 200,
       json: async () => ({ ...fullPayload, placeholder: true, reason: 'no_search_results' }),
     })
-    const { forecast } = await getOracleForecast('Q?')
+    const { forecast } = await getOraculForecast('Q?')
     expect(forecast).toBeNull()
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'no_search_results' }))
   })
 
-  it('flags insufficientData (and returns null) when the Oracle abstains', async () => {
+  it('flags insufficientData (and returns null) when the Oracul abstains', async () => {
     // _empty_response carries insufficient_data:true (and placeholder:true); the
     // abstention check runs first so the caller can distinguish "no evidence bears
-    // on the claim" from "Oracle unavailable" and avoid an ungrounded LLM guess.
+    // on the claim" from "Oracul unavailable" and avoid an ungrounded LLM guess.
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ ...fullPayload, mean: 0, articles_used: 0, placeholder: true, insufficient_data: true, reason: 'all_low_certainty' }),
     })
-    const { forecast, insufficientData } = await getOracleForecast('Q?')
+    const { forecast, insufficientData } = await getOraculForecast('Q?')
     expect(forecast).toBeNull()
     expect(insufficientData).toBe(true)
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_low_certainty' }))
   })
 
-  it('returns null when articles_used is 0, passing through the Oracle reason', async () => {
+  it('returns null when articles_used is 0, passing through the Oracul reason', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ ...fullPayload, articles_used: 0, reason: 'all_articles_off_topic' }),
     })
-    const { forecast } = await getOracleForecast('Q?')
+    const { forecast } = await getOraculForecast('Q?')
     expect(forecast).toBeNull()
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'EMPTY', failureReason: 'all_articles_off_topic' }))
   })
 
-  it('renames the Oracle internal timeout reason to oracle_timeout', async () => {
+  it('renames the Oracul internal timeout reason to oracle_timeout', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ ...fullPayload, articles_used: 0, reason: 'timeout' }),
     })
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'oracle_timeout' }))
   })
 
   it('classifies a non-OK 5xx status as http_5xx', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
-    const { forecast } = await getOracleForecast('Q?')
+    const { forecast } = await getOraculForecast('Q?')
     expect(forecast).toBeNull()
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'ERROR', failureReason: 'http_5xx' }))
   })
@@ -237,19 +237,19 @@ describe('getOracleForecast', () => {
     const err = new Error('aborted')
     err.name = 'TimeoutError'
     fetchMock.mockRejectedValueOnce(err)
-    const { forecast } = await getOracleForecast('Q?')
+    const { forecast } = await getOraculForecast('Q?')
     expect(forecast).toBeNull()
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ status: 'ERROR', failureReason: 'timeout' }))
   })
 
   it('classifies a generic thrown error as a network failure', async () => {
     fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ failureReason: 'network' }))
   })
 
   describe('failureClass — why the forecast is null (daatan#1231)', () => {
-    // `getOracleForecast` returns null for six different reasons and used to say which
+    // `getOraculForecast` returns null for six different reasons and used to say which
     // only in OracleCallLog, which the evidence-pool retry sweep never reads. So a 12s
     // client timeout and a deliberate all-articles-off-topic abstention wrote BYTE-
     // IDENTICAL pool rows, both stamped `oracle_null` — 73% of the 200 most recent
@@ -262,7 +262,7 @@ describe('getOracleForecast', () => {
         status: 200,
         json: async () => ({ ...fullPayload, mean: 0, articles_used: 0, placeholder: true, insufficient_data: true, reason: 'all_low_certainty' }),
       })
-      const { failureClass, insufficientData } = await getOracleForecast('Q?')
+      const { failureClass, insufficientData } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_abstain')
       expect(insufficientData).toBe(true)
     })
@@ -275,19 +275,19 @@ describe('getOracleForecast', () => {
       const err = new Error('aborted')
       err.name = 'TimeoutError'
       fetchMock.mockRejectedValueOnce(err)
-      const { failureClass } = await getOracleForecast('Q?')
+      const { failureClass } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_timeout')
     })
 
     it('classifies a generic transport error as oracle_network', async () => {
       fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
-      const { failureClass } = await getOracleForecast('Q?')
+      const { failureClass } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_network')
     })
 
     it('classifies a non-OK status as oracle_http', async () => {
       fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
-      const { failureClass } = await getOracleForecast('Q?')
+      const { failureClass } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_http')
     })
 
@@ -297,7 +297,7 @@ describe('getOracleForecast', () => {
         status: 200,
         json: async () => ({ ...fullPayload, placeholder: true, reason: 'no_search_results' }),
       })
-      const { failureClass } = await getOracleForecast('Q?')
+      const { failureClass } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_placeholder')
     })
 
@@ -307,13 +307,13 @@ describe('getOracleForecast', () => {
         status: 200,
         json: async () => ({ ...fullPayload, articles_used: 0, reason: 'all_articles_off_topic' }),
       })
-      const { failureClass } = await getOracleForecast('Q?')
+      const { failureClass } = await getOraculForecast('Q?')
       expect(failureClass).toBe('oracle_no_articles')
     })
 
     it('leaves failureClass undefined on a successful forecast', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      const { forecast, failureClass } = await getOracleForecast('Q?')
+      const { forecast, failureClass } = await getOraculForecast('Q?')
       expect(forecast).not.toBeNull()
       expect(failureClass).toBeUndefined()
     })
@@ -327,14 +327,14 @@ describe('getOracleForecast', () => {
       // than leaving it as a comment. A future `await` added outside the try would break
       // it silently: claims would be left PENDING for the full staleness window.
       fetchMock.mockRejectedValueOnce(new Error('boom'))
-      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+      await expect(getOraculForecast('Q?')).resolves.toMatchObject({ forecast: null })
 
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => { throw new SyntaxError('Unexpected token < in JSON') },
       })
-      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+      await expect(getOraculForecast('Q?')).resolves.toMatchObject({ forecast: null })
 
       fetchMock.mockResolvedValueOnce({
         ok: false,
@@ -342,7 +342,7 @@ describe('getOracleForecast', () => {
         json: async () => ({}),
         text: async () => { throw new Error('unreadable body') },
       })
-      await expect(getOracleForecast('Q?')).resolves.toMatchObject({ forecast: null })
+      await expect(getOraculForecast('Q?')).resolves.toMatchObject({ forecast: null })
     })
 
     it('every null branch sets a class — none may fall through to the residual', async () => {
@@ -359,12 +359,12 @@ describe('getOracleForecast', () => {
       ]
       for (const res of nullResponses) {
         fetchMock.mockResolvedValueOnce(res)
-        const { forecast, failureClass } = await getOracleForecast('Q?')
+        const { forecast, failureClass } = await getOraculForecast('Q?')
         expect(forecast).toBeNull()
         expect(failureClass).toBeDefined()
       }
       fetchMock.mockRejectedValueOnce(timeoutErr)
-      expect((await getOracleForecast('Q?')).failureClass).toBeDefined()
+      expect((await getOraculForecast('Q?')).failureClass).toBeDefined()
     })
   })
 
@@ -387,7 +387,7 @@ describe('getOracleForecast', () => {
         json: async () => ({ ...fullPayload, outcome_counts: counts }),
       })
 
-      const result = await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      const result = await getOraculForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
       expect(result.forecast?.outcome_counts).toEqual(counts)
       expect(result.outcomeCounts).toEqual(counts)
       // Yield is only computable when a success also reports the histogram: this
@@ -406,7 +406,7 @@ describe('getOracleForecast', () => {
         json: async () => ({ ...fullPayload, ...overrides, outcome_counts: counts }),
       })
 
-      const result = await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      const result = await getOraculForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
       expect(result.forecast).toBeNull()
       // The whole point: these are the runs whose yield needs explaining, and
       // `forecast` is null on all of them, so the histogram has to ride on the
@@ -425,7 +425,7 @@ describe('getOracleForecast', () => {
         json: async () => ({ ...fullPayload, ...overrides, outcome_counts: counts }),
       })
 
-      await getOracleForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
+      await getOraculForecast('Q?', {}, { source: 'news-indexer', predictionId: 'pred-1' })
       // A debug-only histogram is parsed and then dropped on the one deployment
       // that needs it: pino runs at level `info` in production.
       expect(mockLog.info).toHaveBeenCalledTimes(1)
@@ -444,7 +444,7 @@ describe('getOracleForecast', () => {
 
       // `{}` is not "zero articles at every stage" — it's indistinguishable from
       // a retro build too old to send the field, so it must not read as data.
-      const result = await getOracleForecast('Q?')
+      const result = await getOraculForecast('Q?')
       expect(result.outcomeCounts).toBeNull()
       expect(lastInfoPayload().outcomeCounts).toBeNull()
     })
@@ -454,7 +454,7 @@ describe('getOracleForecast', () => {
       timeoutErr.name = 'TimeoutError'
       fetchMock.mockRejectedValueOnce(timeoutErr)
 
-      const result = await getOracleForecast('Q?')
+      const result = await getOraculForecast('Q?')
       expect(result.failureClass).toBe('oracle_timeout')
       expect(result.outcomeCounts ?? null).toBeNull()
     })
@@ -463,7 +463,7 @@ describe('getOracleForecast', () => {
   describe('claim direction/deadline (retro #244 direction guard)', () => {
     it('sends claim_direction: "arrival" for ClaimDirection.ARRIVAL', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDirection: ClaimDirection.ARRIVAL })
+      await getOraculForecast('Q?', { claimDirection: ClaimDirection.ARRIVAL })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.claim_direction).toBe('arrival')
@@ -471,7 +471,7 @@ describe('getOracleForecast', () => {
 
     it('sends claim_direction: "survival" for ClaimDirection.SURVIVAL', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDirection: ClaimDirection.SURVIVAL })
+      await getOraculForecast('Q?', { claimDirection: ClaimDirection.SURVIVAL })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.claim_direction).toBe('survival')
@@ -479,7 +479,7 @@ describe('getOracleForecast', () => {
 
     it('omits claim_direction for ClaimDirection.NONE (retro 422s on the literal string "none")', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDirection: ClaimDirection.NONE })
+      await getOraculForecast('Q?', { claimDirection: ClaimDirection.NONE })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.claim_direction).toBeUndefined()
@@ -488,19 +488,19 @@ describe('getOracleForecast', () => {
 
     it('omits claim_direction when null/undefined', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDirection: null })
+      await getOraculForecast('Q?', { claimDirection: null })
       const [, init] = fetchMock.mock.calls[0]
       expect('claim_direction' in JSON.parse(init.body as string)).toBe(false)
 
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?')
+      await getOraculForecast('Q?')
       const [, init2] = fetchMock.mock.calls[1]
       expect('claim_direction' in JSON.parse(init2.body as string)).toBe(false)
     })
 
     it('sends claim_deadline as an ISO string when present', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDeadline: new Date('2026-12-31T00:00:00.000Z') })
+      await getOraculForecast('Q?', { claimDeadline: new Date('2026-12-31T00:00:00.000Z') })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.claim_deadline).toBe('2026-12-31T00:00:00.000Z')
@@ -508,7 +508,7 @@ describe('getOracleForecast', () => {
 
     it('omits claim_deadline when null/undefined', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { claimDeadline: null })
+      await getOraculForecast('Q?', { claimDeadline: null })
       const [, init] = fetchMock.mock.calls[0]
       expect('claim_deadline' in JSON.parse(init.body as string)).toBe(false)
     })
@@ -517,7 +517,7 @@ describe('getOracleForecast', () => {
   describe('resolution_criteria (retro #353 / daatan#1375)', () => {
     it('sends resolution_criteria when the claim has resolution rules', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', { resolutionRules: 'Only an official government announcement counts.' })
+      await getOraculForecast('Q?', { resolutionRules: 'Only an official government announcement counts.' })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.resolution_criteria).toBe('Only an official government announcement counts.')
@@ -529,7 +529,7 @@ describe('getOracleForecast', () => {
       // rules-less caller hash as if it had sent rules.
       for (const rules of [null, undefined, '']) {
         fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-        await getOracleForecast('Q?', { resolutionRules: rules })
+        await getOraculForecast('Q?', { resolutionRules: rules })
       }
       for (const [, init] of fetchMock.mock.calls) {
         expect('resolution_criteria' in JSON.parse(init.body as string)).toBe(false)
@@ -540,7 +540,7 @@ describe('getOracleForecast', () => {
   describe('prediction_id (retro #273 log correlation)', () => {
     it('sends prediction_id when meta.predictionId is set', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?', undefined, { source: 'news-indexer', predictionId: 'pred-123' })
+      await getOraculForecast('Q?', undefined, { source: 'news-indexer', predictionId: 'pred-123' })
       const [, init] = fetchMock.mock.calls[0]
       const body = JSON.parse(init.body as string)
       expect(body.prediction_id).toBe('pred-123')
@@ -548,14 +548,14 @@ describe('getOracleForecast', () => {
 
     it('omits prediction_id when meta.predictionId is absent', async () => {
       fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-      await getOracleForecast('Q?')
+      await getOraculForecast('Q?')
       const [, init] = fetchMock.mock.calls[0]
       expect('prediction_id' in JSON.parse(init.body as string)).toBe(false)
     })
   })
 })
 
-describe('getOracleProbability', () => {
+describe('getOraculProbability', () => {
   const fetchMock = vi.fn()
 
   beforeEach(() => {
@@ -573,21 +573,21 @@ describe('getOracleProbability', () => {
       status: 200,
       json: async () => ({ ...fullPayload, mean: 0.3 }),
     })
-    const prob = await getOracleProbability('Q?')
+    const prob = await getOraculProbability('Q?')
     expect(prob).toBeCloseTo(0.65, 5)
   })
 
   it('returns null when the full forecast is unavailable', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
-    expect(await getOracleProbability('Q?')).toBeNull()
+    expect(await getOraculProbability('Q?')).toBeNull()
   })
 
   it('forwards resolutionRules through to the request body', async () => {
     // This wrapper enumerates the ClaimMeta fields it forwards rather than spreading,
-    // so a field added to ClaimMeta reaches getOracleForecast but silently stops here.
+    // so a field added to ClaimMeta reaches getOraculForecast but silently stops here.
     // bots/voting is the only caller and it needs the rules in the cache key.
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
-    await getOracleProbability('Q?', { source: 'bot-voting' }, { resolutionRules: 'Official announcement only.' })
+    await getOraculProbability('Q?', { source: 'bot-voting' }, { resolutionRules: 'Official announcement only.' })
     const [, init] = fetchMock.mock.calls[0]
     expect(JSON.parse(init.body as string).resolution_criteria).toBe('Official announcement only.')
   })
@@ -615,7 +615,7 @@ describe('forecast request timeout', () => {
     // discarded 15.3% of forecasts it had already paid for. The default is deliberately
     // the LONG one: a new background caller silently censoring completed work is worse
     // than a new interactive caller waiting too long.
-    await getOracleForecast('Q?')
+    await getOraculForecast('Q?')
     expect(timeoutSpy).toHaveBeenCalledWith(30_000)
   })
 
@@ -633,27 +633,27 @@ describe('forecast request timeout', () => {
 
   it('interactive callers fit inside the 15s estimation race they run under', async () => {
     // forecasts/[id]/context races the whole estimation at ESTIMATION_TIMEOUT_MS=15s.
-    // An Oracle budget above that is abandoned one level up while still running — the
+    // An Oracul budget above that is abandoned one level up while still running — the
     // same inversion, one hop further in. Keep them consistent.
     const ESTIMATION_TIMEOUT_MS = 15_000
     expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(ESTIMATION_TIMEOUT_MS)
-    await getOracleForecast('Q?', { timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS })
+    await getOraculForecast('Q?', { timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(INTERACTIVE_FORECAST_TIMEOUT_MS)
   })
 
   it('uses a caller-supplied timeout when provided', async () => {
-    await getOracleForecast('Q?', { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
+    await getOraculForecast('Q?', { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(BOT_FORECAST_TIMEOUT_MS)
     expect(BOT_FORECAST_TIMEOUT_MS).toBeGreaterThan(INTERACTIVE_FORECAST_TIMEOUT_MS)
   })
 
-  it('getOracleProbability forwards its timeout option to the request', async () => {
-    await getOracleProbability('Q?', { source: 'bot-voting' }, { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
+  it('getOraculProbability forwards its timeout option to the request', async () => {
+    await getOraculProbability('Q?', { source: 'bot-voting' }, { timeoutMs: BOT_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(BOT_FORECAST_TIMEOUT_MS)
   })
 
-  it('getOracleProbability forwards claimDirection/claimDeadline to the request', async () => {
-    await getOracleProbability(
+  it('getOraculProbability forwards claimDirection/claimDeadline to the request', async () => {
+    await getOraculProbability(
       'Q?',
       { source: 'bot-voting' },
       { claimDirection: ClaimDirection.SURVIVAL, claimDeadline: new Date('2026-06-01T00:00:00.000Z') },
@@ -768,7 +768,7 @@ describe('checkOracleHealth', () => {
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
       expect.objectContaining({ expectedMajors: ['1'], actual: '0.4.1+build.37930' }),
-      'Oracle API major version mismatch — falling back to LLM',
+      'Oracul API major version mismatch — falling back to LLM',
     )
   })
 
@@ -782,7 +782,7 @@ describe('checkOracleHealth', () => {
     expect(ok).toBe(false)
     expect(mockLog.warn).toHaveBeenCalledWith(
       expect.objectContaining({ expectedMajors: ['1'], actual: '2.0.0' }),
-      'Oracle API major version mismatch — falling back to LLM',
+      'Oracul API major version mismatch — falling back to LLM',
     )
     expect(mockLogOracleCall).toHaveBeenCalledWith(expect.objectContaining({ callType: 'HEALTH', status: 'EMPTY' }))
   })

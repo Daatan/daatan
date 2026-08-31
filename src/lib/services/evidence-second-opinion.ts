@@ -2,7 +2,7 @@ import { Prisma, type ClaimDirection, type ClaimArchetype } from '@prisma/client
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
-import { getOracleForecast } from '@/lib/services/oracle'
+import { getOraculForecast } from '@/lib/services/oracle'
 import type { EvidenceSecondOpinionIssue } from '@/lib/services/telegram'
 
 const log = createLogger('evidence-second-opinion')
@@ -162,13 +162,13 @@ async function findCandidates(now: Date): Promise<CandidateRow[]> {
 
 /**
  * Re-read one candidate article with the expensive model, isolated to that one
- * article (`articles: [...]`, `max_articles` unaffected — see getOracleForecast).
+ * article (`articles: [...]`, `max_articles` unaffected — see getOraculForecast).
  * Never persists anything: this is a diagnostic re-read, not a pool write.
- * Returns null on any Oracle failure (unconfigured, transport, abstain) — a
+ * Returns null on any Oracul failure (unconfigured, transport, abstain) — a
  * missing second opinion is silently skipped, not escalated.
  */
 async function secondOpinion(row: CandidateRow): Promise<number | null> {
-  const result = await getOracleForecast(
+  const result = await getOraculForecast(
     row.claim_text,
     {
       articles: [

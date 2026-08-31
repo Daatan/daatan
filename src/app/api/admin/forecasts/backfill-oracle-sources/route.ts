@@ -15,7 +15,7 @@ const MAX_PER_CALL = 25
  * ACTIVE, public forecasts with no context snapshot carrying an oracleSnapshot.
  *
  * isPublic:true excludes forecasts flagged private for moderation reasons
- * (daatan#1603) — this route spends real Oracle calls per candidate, so a
+ * (daatan#1603) — this route spends real Oracul calls per candidate, so a
  * flagged low-value forecast shouldn't consume backfill slots.
  */
 const NO_ORACLE_SNAPSHOT: Prisma.PredictionWhereInput = {
@@ -35,7 +35,7 @@ async function runBackfill(limit: number) {
     take: limit,
   })
 
-  const results = { ok: 0, noArticles: 0, noOracle: 0, unchanged: 0, insufficient: 0, failed: 0 }
+  const results = { ok: 0, noArticles: 0, noOracul: 0, unchanged: 0, insufficient: 0, failed: 0 }
   for (const p of candidates) {
     try {
       const r = await refreshOracleSnapshot(p)
@@ -43,7 +43,7 @@ async function runBackfill(limit: number) {
       else if (r.status === 'no-articles') results.noArticles++
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++
-      else results.noOracle++
+      else results.noOracul++
     } catch (err) {
       results.failed++
       log.warn({ predictionId: p.id, err }, 'backfill forecast failed')
@@ -59,15 +59,15 @@ const authed = withAuth(async (request: NextRequest) => {
   try {
     return NextResponse.json(await runBackfill(parseLimit(request)))
   } catch (error) {
-    return handleRouteError(error, 'Oracle-sources backfill failed')
+    return handleRouteError(error, 'Oracul-sources backfill failed')
   }
 }, { roles: ['ADMIN'] })
 
 /**
- * One-time-ish backfill: populate the Oracle source roster for ACTIVE forecasts that
- * have no Oracle snapshot yet (created before per-source capture existed). Bounded per
+ * One-time-ish backfill: populate the Oracul source roster for ACTIVE forecasts that
+ * have no Oracul snapshot yet (created before per-source capture existed). Bounded per
  * call (?limit=N, default 10, max 25) so a single request can't run unbounded; re-call
- * until `remaining` is 0. Each forecast runs a full search + Oracle analysis, so it's paced.
+ * until `remaining` is 0. Each forecast runs a full search + Oracul analysis, so it's paced.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header so the
  * backfill workflow can drive it headlessly — same pattern as the cron routes.
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     try {
       return NextResponse.json(await runBackfill(parseLimit(request)))
     } catch (error) {
-      return handleRouteError(error, 'Oracle-sources backfill failed')
+      return handleRouteError(error, 'Oracul-sources backfill failed')
     }
   }
   return authed(request, { params: Promise.resolve({}) })

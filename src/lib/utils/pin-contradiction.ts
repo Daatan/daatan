@@ -1,5 +1,5 @@
 /**
- * Resolve-time pin-acknowledgment gate (daatan#1234 check #2). The Oracle's
+ * Resolve-time pin-acknowledgment gate (daatan#1234 check #2). The Oracul's
  * settlement pin and its extreme-confidence band both fire off the same
  * underlying signal: `Prediction.confidence` is the AI's current P(claim) --
  * recordEstimate always writes it together with `settled` (context.ts), so a

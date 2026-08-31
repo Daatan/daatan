@@ -10,7 +10,7 @@ const log = createLogger('evidence-health')
  *
  * The pipeline had no alerting at all: `evidence-pool.ts` writes
  * `{status:'FAILED', statusReason}` with a `log.warn` and imports nothing from
- * telegram.ts, `fetchOracleSources` discards `Promise.allSettled` rejections, and
+ * telegram.ts, `fetchOraculSources` discards `Promise.allSettled` rejections, and
  * `/api/cron/evidence-pool-stats` computes throughput for the weekly waste report
  * and alerts on nothing. Every evidence-quality bug in the backlog was therefore
  * found by a human going and looking — including a source that had been silent for
@@ -89,7 +89,7 @@ const MAX_KEY_SOURCE_LEN = 150
 /**
  * TruthMachine batch-loop liveness (retro#556).
  *
- * The batch tree on the Oracle box ran stale code twice (six weeks once) with
+ * The batch tree on the Oracul box ran stale code twice (six weeks once) with
  * zero detection; retro PR#555 makes a failed sync refuse the cycle, but that is
  * only visible in `pipeline_log.txt` on the box. The loop's one externally
  * visible heartbeat is the `atlas:` / `progress:` commits it pushes to

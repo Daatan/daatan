@@ -22,11 +22,11 @@ export interface PanelMemberSeries {
  * Per-member panel history for one forecast, oldest first, ready for the chart.
  *
  * Read-only and isolation-preserving: this touches ONLY `ai_estimates` — never
- * `Prediction.confidence` or the Oracle's `ContextSnapshot`. The panel is a separate
- * source (docs/LASSO.md §1), so nothing here can move the needle or the Oracle line.
+ * `Prediction.confidence` or the Oracul's `ContextSnapshot`. The panel is a separate
+ * source (docs/LASSO.md §1), so nothing here can move the needle or the Oracul line.
  *
  * Abstentions (`insufficientData`, null probability) are dropped: a member that declined
- * has no point to plot, exactly as the Oracle line skips its abstained snapshots. A
+ * has no point to plot, exactly as the Oracul line skips its abstained snapshots. A
  * member is omitted entirely if it never produced a number, so the legend shows only
  * members with something to say.
  */

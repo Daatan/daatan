@@ -43,8 +43,8 @@ vi.mock('@/lib/llm', () => ({ llmService: { generateContent: generateContentMock
 
 vi.mock('@/lib/llm/expressPrediction', () => ({ guessChances: vi.fn() }))
 vi.mock('@/lib/services/oracle', () => ({
-  getOracleForecast: vi.fn(),
-  recordOracleFallback: vi.fn(),
+  getOraculForecast: vi.fn(),
+  recordOraculFallback: vi.fn(),
   DEFAULT_MAX_ARTICLES: 10,
   INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
 }))
@@ -79,7 +79,7 @@ import {
 } from '@/lib/services/context'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
+import { getOraculForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
@@ -152,7 +152,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-    vi.mocked(getOracleForecast).mockResolvedValue({
+    vi.mocked(getOraculForecast).mockResolvedValue({
       forecast: ORACLE_FORECAST_ONE_SOURCE,
       logId: 'log-1',
       insufficientData: false,
@@ -165,7 +165,7 @@ describe('POST /api/forecasts/[id]/context', () => {
   })
 
   describe('extraction claim gate (daatan#1172)', () => {
-    it('only sends newly-claimed articles to the Oracle — an unchanged article must not be re-extracted', async () => {
+    it('only sends newly-claimed articles to the Oracul — an unchanged article must not be re-extracted', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'skip_complete', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
@@ -174,7 +174,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      expect(getOracleForecast).toHaveBeenCalledWith(
+      expect(getOraculForecast).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           articles: [expect.objectContaining({ url: 'https://b.com/2' })],
@@ -183,9 +183,9 @@ describe('POST /api/forecasts/[id]/context', () => {
       )
     })
 
-    it('asks the Oracle with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
+    it('asks the Oracul with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
       // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (15s), so the
-      // Oracle call must fit inside it. The service default is 30s — sized for the
+      // Oracul call must fit inside it. The service default is 30s — sized for the
       // background push/sweep paths — and inheriting it here would mean the race abandons
       // a call that is still running: the same timeout inversion, one hop further in.
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
@@ -196,7 +196,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      expect(getOracleForecast).toHaveBeenCalledWith(
+      expect(getOraculForecast).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS }),
         expect.anything(),
@@ -204,7 +204,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(15_000)
     })
 
-    it('forwards the claim\'s resolutionRules to the Oracle (daatan#1375)', async () => {
+    it('forwards the claim\'s resolutionRules to the Oracul (daatan#1375)', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
@@ -217,11 +217,11 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+      const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
       expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
     })
 
-    it('reads the existing pool aggregate directly, without calling the Oracle or the LLM fallback, when every searched article is already unchanged', async () => {
+    it('reads the existing pool aggregate directly, without calling the Oracul or the LLM fallback, when every searched article is already unchanged', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'skip_complete', articleId: 'row-1' },
         { result: 'skip_complete', articleId: 'row-2' },
@@ -230,7 +230,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       const done = await collectDoneEvent(res)
 
-      expect(getOracleForecast).not.toHaveBeenCalled()
+      expect(getOraculForecast).not.toHaveBeenCalled()
       expect(guessChances).not.toHaveBeenCalled()
       expect(addArticlesToPool).not.toHaveBeenCalled()
       // resolvePooledEstimate was still called (with an empty fallback set) to

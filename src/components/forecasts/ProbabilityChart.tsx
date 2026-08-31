@@ -44,7 +44,7 @@ type ChartMarketPoint = {
 
 /** One AI-panel member's estimate history (docs/LASSO.md §8). A hidden, opt-in
  *  source: rendered only when the viewer enabled it in Settings, as dashed lines
- *  distinct from the solid Oracle `ai` line, which it never touches. */
+ *  distinct from the solid Oracul `ai` line, which it never touches. */
 type ChartPanelMember = {
   model: string
   /** 'ungrounded' or 'grounded-indexer' — twins share a model string, so the mode is
@@ -166,7 +166,7 @@ export function panelKey(model: string, mode: string): string {
 }
 
 /** Carry each member's estimate forward as a step function across the merged timeline,
- *  exactly as the Oracle `ai` line does — an unchanged input yields an unchanged number
+ *  exactly as the Oracul `ai` line does — an unchanged input yields an unchanged number
  *  (temperature 0), so a flat stretch between real updates is correct, not missing data. */
 export function buildPanelSeries(
   members: ChartPanelMember[],
@@ -228,13 +228,13 @@ export default function ProbabilityChart({
   // forecasts. When a linked market has history we render the chart even with
   // <3 commitments, so the market line shows before the community moves.
   const showMarket = outcomeType === 'BINARY' && marketSnapshots.length > 0
-  // Likewise render once there are ≥2 AI (Oracle) updates, so a forecast with an
+  // Likewise render once there are ≥2 AI (Oracul) updates, so a forecast with an
   // estimate trend shows the chart even before the community has moved. Two points
   // is the minimum that draws a line (a single estimate is just a dot).
   const aiPointCount = snapshots.filter(s => s.externalProbability != null).length
   const showAiHistory = aiPointCount >= 2
   // A viewer who opted into the panel gets the chart as soon as the panel has any point,
-  // even on a forecast with no commitments/Oracle/market yet.
+  // even on a forecast with no commitments/Oracul/market yet.
   const hasPanelData = showAiPanel && panelSeries.some(m => m.points.length > 0)
   const shouldRender =
     outcomeType !== 'NUMERIC_THRESHOLD' &&
@@ -277,7 +277,7 @@ export default function ProbabilityChart({
 
     const panelTs = panelMembers.flatMap(m => m.points.map(p => new Date(p.createdAt).getTime()))
 
-    // One data point per event (commitment, Oracle run, market snapshot, or panel run), sorted chronologically
+    // One data point per event (commitment, Oracul run, market snapshot, or panel run), sorted chronologically
     const allTs = [
       ...sortedCommits.map(c => new Date(c.createdAt).getTime()),
       ...sortedSnaps.map(s => new Date(s.createdAt).getTime()),
@@ -331,12 +331,12 @@ export default function ProbabilityChart({
   if (!shouldRender) return null
 
   // A line with few data points draws a barely-visible (or zero-length) segment,
-  // so a sparse forecast — e.g. two same-day Oracle estimates, or a lone market
+  // so a sparse forecast — e.g. two same-day Oracul estimates, or a lone market
   // snapshot — would read as an empty chart. Render point markers while the series
   // is sparse so each value is legible; drop them once the trend is dense.
   const showDots = data.length <= 5
   // The AI series carries its last value forward as a step function, so a single
-  // Oracle estimate dated AFTER all commitments yields one non-null point at the
+  // Oracul estimate dated AFTER all commitments yields one non-null point at the
   // right edge — with no segment to draw and dots off (because the commitments
   // made `data` dense), it's invisible. Decide dots by how many real points the
   // series has, so a lone estimate always shows as a marker.
@@ -487,7 +487,7 @@ export default function ProbabilityChart({
             <Line
               type="stepAfter"
               dataKey="ai"
-              name="AI (Oracle)"
+              name="AI (Oracul)"
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
@@ -510,7 +510,7 @@ export default function ProbabilityChart({
 
           {/* AI-panel member lines (docs/LASSO.md §8): thinner, finer-dashed and
               semi-transparent so they read as a secondary, experimental source and never
-              compete with the Oracle line. */}
+              compete with the Oracul line. */}
           {panelMembers.map(m => (
             <Line
               key={`${m.model}:${m.mode}`}

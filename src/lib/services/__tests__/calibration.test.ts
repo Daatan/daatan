@@ -84,8 +84,8 @@ describe('buildCalibrationRecord', () => {
     expect(r.pFinalAt).toEqual(day(4))
   })
 
-  it('carries the Oracle interval and pin state from the final snapshot', () => {
-    // ciLow/ciHigh are probability PERCENT, not the Oracle's raw stance — the
+  it('carries the Oracul interval and pin state from the final snapshot', () => {
+    // ciLow/ciHigh are probability PERCENT, not the Oracul's raw stance — the
     // conversion happens before storage. The CI-honesty check (audit F16, first
     // measured at r = -0.07) is what these two columns exist for.
     const r = build([
@@ -151,14 +151,14 @@ describe('recordCalibration — dispute flag', () => {
         outcome: 'correct',
         resolvedAt: new Date('2026-08-01T12:00:00Z'),
         disputed: true,
-        disputeNote: "Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'",
+        disputeNote: "Oracul settled this 'wrong' at confidence=3; resolver declared 'correct'",
       },
       client as never,
     )
 
     const call = client.calibrationRecord.upsert.mock.calls[0][0]
     expect(call.create.disputed).toBe(true)
-    expect(call.create.disputeNote).toBe("Oracle settled this 'wrong' at confidence=3; resolver declared 'correct'")
+    expect(call.create.disputeNote).toBe("Oracul settled this 'wrong' at confidence=3; resolver declared 'correct'")
     expect(call.update.disputed).toBeUndefined()
     expect(call.update.disputeNote).toBeUndefined()
   })

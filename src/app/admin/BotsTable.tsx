@@ -10,7 +10,7 @@ import { SubmitProgress, type ProgressStep } from '@/components/forecasts/Submit
 import { getEstimate, recordDuration, type TimingKey } from '@/lib/forecast-timing'
 
 // "Run now" progress phases (daatan#1139), mirroring runner.ts's RunMetrics
-// stages: RSS/Oracle fetch, hot-topic detection, dedup+LLM generation, stake.
+// stages: RSS/Oracul fetch, hot-topic detection, dedup+LLM generation, stake.
 const BOT_RUN_STEP_KEYS = ['fetch', 'detect', 'generate', 'stake'] as const
 type BotRunStepKey = typeof BOT_RUN_STEP_KEYS[number]
 const BOT_RUN_TIMING_KEY: Record<BotRunStepKey, TimingKey> = {

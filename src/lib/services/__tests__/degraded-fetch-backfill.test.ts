@@ -243,7 +243,7 @@ describe('sweepDegradedFetchRows', () => {
 
     const r = await sweepDegradedFetchRows(5)
 
-    expect(r).toMatchObject({ processed: 3, ok: 1, noOracle: 1, failed: 1, remaining: 4 })
+    expect(r).toMatchObject({ processed: 3, ok: 1, noOracul: 1, failed: 1, remaining: 4 })
     // The rejected prediction never got a diff pair recorded — nothing to diff.
     expect(r.diffs).toHaveLength(2)
   })

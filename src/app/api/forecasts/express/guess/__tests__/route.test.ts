@@ -1,15 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-const { mockAuth, mockGetOracleProbability, mockGuessChances } = vi.hoisted(() => ({
+const { mockAuth, mockGetOraculProbability, mockGuessChances } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
-  mockGetOracleProbability: vi.fn(),
+  mockGetOraculProbability: vi.fn(),
   mockGuessChances: vi.fn(),
 }))
 
 vi.mock('@/auth', () => ({ auth: mockAuth }))
 
 vi.mock('@/lib/services/oracle', () => ({
-  getOracleProbability: mockGetOracleProbability,
+  getOraculProbability: mockGetOraculProbability,
   INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
 }))
 
@@ -43,8 +43,8 @@ describe('POST /api/forecasts/express/guess', () => {
     process.env.GEMINI_API_KEY = 'test-key'
   })
 
-  it('passes marketProbability through to guessChances when Oracle has no answer', async () => {
-    mockGetOracleProbability.mockResolvedValue(null)
+  it('passes marketProbability through to guessChances when Oracul has no answer', async () => {
+    mockGetOraculProbability.mockResolvedValue(null)
     mockGuessChances.mockResolvedValue({ probability: 70, reasoning: 'Market-informed estimate.' })
 
     const res = await callPOST(makeRequest({
@@ -59,7 +59,7 @@ describe('POST /api/forecasts/express/guess', () => {
   })
 
   it('omits marketProbability when the client sends none', async () => {
-    mockGetOracleProbability.mockResolvedValue(null)
+    mockGetOraculProbability.mockResolvedValue(null)
     mockGuessChances.mockResolvedValue({ probability: 50, reasoning: 'No prior.' })
 
     await callPOST(makeRequest({ claimText: 'X will happen', detailsText: '', articles: [] }))
@@ -72,7 +72,7 @@ describe('POST /api/forecasts/express/guess', () => {
     // route must pass that through: an invented number would reach the drafter
     // looking exactly like a real suggestion, which is the reason for the abstain
     // contract in the first place. The reasoning says what is missing.
-    mockGetOracleProbability.mockResolvedValue(null)
+    mockGetOraculProbability.mockResolvedValue(null)
     mockGuessChances.mockResolvedValue({
       probability: null,
       reasoning: 'The claim names no resolution criterion.',
@@ -86,8 +86,8 @@ describe('POST /api/forecasts/express/guess', () => {
     expect(body.reasoning).toBe('The claim names no resolution criterion.')
   })
 
-  it('short-circuits on an Oracle answer without calling guessChances', async () => {
-    mockGetOracleProbability.mockResolvedValue(0.81)
+  it('short-circuits on an Oracul answer without calling guessChances', async () => {
+    mockGetOraculProbability.mockResolvedValue(0.81)
 
     const res = await callPOST(makeRequest({
       claimText: 'X will happen',

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'AI Panel Leaderboard — LLM forecasters vs the crowd',
   description:
-    'Matched-time Brier scores for each AI-panel model and the Oracle, compared with human forecasters on the same commitments.',
+    'Matched-time Brier scores for each AI-panel model and the Oracul, compared with human forecasters on the same commitments.',
   alternates: { canonical: '/leaderboard/ai' },
   robots: { index: false }, // experimental surface; keep it out of search for now
 }
@@ -88,7 +88,7 @@ export default async function AiLeaderboardPage() {
                     <span className="text-white font-medium">{m.label}</span>
                     {m.isOracle && (
                       <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
-                        {t('oracleBadge')}
+                        {t('oraculBadge')}
                       </span>
                     )}
                     {m.isMarket && (

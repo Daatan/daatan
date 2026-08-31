@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { OracleCallType, OracleCallStatus } from '@prisma/client'
 import { withAuth } from '@/lib/api-middleware'
-import { getOracleUsageStats } from '@/lib/services/oracleStats'
+import { getOraculUsageStats } from '@/lib/services/oracleStats'
 
 const VALID_CALL_TYPES = Object.values(OracleCallType) as string[]
 const VALID_STATUSES = Object.values(OracleCallStatus) as string[]
@@ -21,6 +21,6 @@ export const GET = withAuth(async (req) => {
     ? (statusParam as OracleCallStatus)
     : undefined
 
-  const stats = await getOracleUsageStats(windowDays, { source, callType, status })
+  const stats = await getOraculUsageStats(windowDays, { source, callType, status })
   return NextResponse.json(stats)
 }, { roles: ['ADMIN'] })

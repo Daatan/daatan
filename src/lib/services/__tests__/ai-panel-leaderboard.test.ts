@@ -30,7 +30,7 @@ describe('getAiLeaderboard', () => {
 
     const lb = await getAiLeaderboard()
 
-    expect(lb.members.map((m) => m.label)).toEqual(['Oracle', 'Grok', 'DeepSeek'])
+    expect(lb.members.map((m) => m.label)).toEqual(['Oracul', 'Grok', 'DeepSeek'])
     expect(lb.members[0]).toMatchObject({ isOracle: true, avgBrier: 0.11, count: 12 })
     expect(lb.members[1].isOracle).toBe(false)
     // Member identity includes the prompt version (docs/LASSO.md §6): the aggregation

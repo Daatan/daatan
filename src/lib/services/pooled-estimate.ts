@@ -9,7 +9,7 @@ import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { getLatestOracleSnapshot } from '@/lib/services/context'
 
 /**
- * A single `/forecast` run's estimate, in the Oracle's stance space [-1, 1] — the caller's
+ * A single `/forecast` run's estimate, in the Oracul's stance space [-1, 1] — the caller's
  * fallback when the pool can't produce an aggregate.
  */
 export interface SingleRunEstimate {
@@ -31,7 +31,7 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
   estimateSource: 'pool' | 'single-run' | 'pool-insufficient'
   /**
    * The pool aggregated but returned no usable estimate — in prod either
-   * `all_articles_off_topic` or `no_usable_weight` (see `reason`; the Oracle may add more,
+   * `all_articles_off_topic` or `no_usable_weight` (see `reason`; the Oracul may add more,
    * so never switch on the value here). The caller must record an ABSTENTION
    * (probability null, snapshot `insufficientData: true`), NOT fall back to the single run:
    * that run scored the same off-topic articles, so its number is meaningless. The
@@ -70,9 +70,9 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
  *    (`sources.length === articlesUsed`). Authors aren't kept on pool rows, so they're
  *    re-looked-up from news-indexer by URL, best-effort, reusing any the caller already
  *    fetched (pass `authorByUrl`).
- *  - **single-run** (`insufficientData: false`) — the pool could not be *read* (Oracle
+ *  - **single-run** (`insufficientData: false`) — the pool could not be *read* (Oracul
  *    unreachable, nothing usable pooled yet, transport error). Fall back to the caller's
- *    single `/forecast` run so a flaky Oracle degrades the estimate rather than dropping it.
+ *    single `/forecast` run so a flaky Oracul degrades the estimate rather than dropping it.
  *  - **pool-insufficient** (`insufficientData: true`) — the pool *was* aggregated and found
  *    no usable signal (in prod: every article off-topic). The caller must ABSTAIN, never
  *    fall back to the single run over those same off-topic articles.

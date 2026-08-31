@@ -11,9 +11,9 @@ export const POST = withAuth(async (request, user) => {
     const body = await request.json()
     const { url } = schema.parse(body)
 
-    // This endpoint is unauthenticated on the Oracle side (no x-api-key).
+    // This endpoint is unauthenticated on the Oracul side (no x-api-key).
     const baseUrl = getOracleBaseUrl()
-    if (!baseUrl) return NextResponse.json({ error: 'Oracle not configured' }, { status: 503 })
+    if (!baseUrl) return NextResponse.json({ error: 'Oracul not configured' }, { status: 503 })
 
     const t0 = Date.now()
     const res = await fetch(`${baseUrl}/fetch-url`, {
@@ -32,7 +32,7 @@ export const POST = withAuth(async (request, user) => {
       return NextResponse.json(JSON.parse(text), { status: res.status })
     } catch {
       return NextResponse.json(
-        { error: 'Oracle returned a non-JSON response' },
+        { error: 'Oracul returned a non-JSON response' },
         { status: res.status >= 400 ? res.status : 502 },
       )
     }

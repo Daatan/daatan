@@ -242,18 +242,18 @@ const RECENT_GETTERS: Record<string, (e: RecentCall) => unknown> = {
 // Human-readable hints for the failureReason codes stored on OracleCallLog,
 // surfaced as a per-row tooltip in the recent-calls table.
 const FAILURE_REASON_HINTS: Record<string, string> = {
-  timeout: 'The Oracle did not respond within the request timeout.',
-  oracle_timeout: 'The Oracle did not respond within the request timeout.',
-  network: 'Network/transport error reaching the Oracle.',
-  http_4xx: 'The Oracle returned a 4xx client error.',
-  http_5xx: 'The Oracle returned a 5xx server error.',
+  timeout: 'The Oracul did not respond within the request timeout.',
+  oracle_timeout: 'The Oracul did not respond within the request timeout.',
+  network: 'Network/transport error reaching the Oracul.',
+  http_4xx: 'The Oracul returned a 4xx client error.',
+  http_5xx: 'The Oracul returned a 5xx server error.',
   no_search_results: 'The search returned zero articles.',
   insufficient_data: 'Not enough articles for a real estimate (placeholder returned).',
-  placeholder: 'The Oracle returned a placeholder rather than a real estimate.',
+  placeholder: 'The Oracul returned a placeholder rather than a real estimate.',
 }
 
 export function failureReasonTitle(reason: string): string {
-  return FAILURE_REASON_HINTS[reason] ?? 'Failure/empty reason reported by the Oracle.'
+  return FAILURE_REASON_HINTS[reason] ?? 'Failure/empty reason reported by the Oracul.'
 }
 
 /** "dataforseo → gdelt → caller" — the ordered providers attempted. */
@@ -261,16 +261,16 @@ export function formatProviderChain(chain: string[]): string {
   return chain.length > 0 ? chain.join(' → ') : ''
 }
 
-// Column-header tooltips that make the Oracle vocabulary self-explanatory.
+// Column-header tooltips that make the Oracul vocabulary self-explanatory.
 const HEADER_HINTS = {
-  type: 'Oracle call type — FORECAST: AI probability estimate; SEARCH: article retrieval; LEADERBOARD/HEALTH/LLM/FETCH_URL: support calls.',
-  source: 'Daatan workflow that triggered this Oracle call (e.g. context-update, research, express-creation).',
+  type: 'Oracul call type — FORECAST: AI probability estimate; SEARCH: article retrieval; LEADERBOARD/HEALTH/LLM/FETCH_URL: support calls.',
+  source: 'Daatan workflow that triggered this Oracul call (e.g. context-update, research, express-creation).',
   status: 'OK: usable result · EMPTY: no usable result (see Detail) · ERROR: call failed (see Detail).',
   detail: 'Why a call was EMPTY or ERROR — hover a row for the specific reason.',
   engine: 'Search engine that ultimately served the result. "caller" = articles supplied directly by the caller (no search); "none" = no provider claimed it.',
   provider: 'Provider that served the result; hover a row for the full provider chain attempted.',
   fallback: 'Whether a FORECAST fell back to the LLM (with its probability) instead of an article-grounded estimate.',
-  by: 'The caller that triggered the Oracle call.',
+  by: 'The caller that triggered the Oracul call.',
 } as const
 
 function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
@@ -365,7 +365,7 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
 
 export default function OracleTab() {
   const { selfHosted } = useCapabilities()
-  // 'bot-voting' is a SaaS-only Oracle caller — drop it from the filter on self-host.
+  // 'bot-voting' is a SaaS-only Oracul caller — drop it from the filter on self-host.
   const sourceOptions = selfHosted ? SOURCE_OPTIONS.filter(s => s !== 'bot-voting') : SOURCE_OPTIONS
   const [stats, setStats] = useState<OracleStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -393,7 +393,7 @@ export default function OracleTab() {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold">Oracle Usage</h2>
+        <h2 className="text-lg font-semibold">Oracul Usage</h2>
         <div className="flex items-center gap-3">
           <select
             value={windowDays}
@@ -452,7 +452,7 @@ export default function OracleTab() {
           <Loader2 className="animate-spin text-gray-400" size={24} />
         </div>
       ) : !stats ? (
-        <p className="text-gray-500 text-sm">Failed to load Oracle stats.</p>
+        <p className="text-gray-500 text-sm">Failed to load Oracul stats.</p>
       ) : (
         <>
           {/* Totals */}

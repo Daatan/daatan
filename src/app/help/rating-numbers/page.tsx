@@ -6,18 +6,18 @@ import type { Metadata } from 'next'
 // explainer for channel members who aren't part of the team (notably Andrey). Not indexed:
 // this is an internal-audience page, not marketing content (see src/app/robots.ts).
 export const metadata: Metadata = {
-  title: 'Reading the Oracle’s numbers — DAATAN',
+  title: 'Reading the Oracul’s numbers — DAATAN',
   description: 'What the numbers in a DAATAN Telegram article-match message mean.',
   robots: { index: false, follow: false },
 }
 
 export default function RatingNumbersHelpPage() {
   return (
-    <LegalPage title="Reading the Oracle's numbers" Icon={Gauge}>
+    <LegalPage title="Reading the Oracul's numbers" Icon={Gauge}>
       <section>
         <p className="text-white font-medium mb-2">In short:</p>
         <p>
-          When a news article moves one of the Oracle&apos;s forecasts, DAATAN posts the movement,
+          When a news article moves one of the Oracul&apos;s forecasts, DAATAN posts the movement,
           the article, and a panel of numbers explaining <em>why</em>. The 1️⃣–5️⃣ buttons ask one
           question: <strong>does this number look right, given the article?</strong>
         </p>
@@ -27,7 +27,7 @@ export default function RatingNumbersHelpPage() {
         <h2 className="text-xl font-semibold text-white mb-3">The headline</h2>
         <p>
           <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
-            Oracle 63% → 71%
+            Oracul 63% → 71%
           </code>{' '}
           is the forecast&apos;s probability before/after this article. &quot;First estimate&quot;
           = nothing to move from yet; &quot;unchanged&quot; = no shift. The suffix (e.g.
@@ -44,7 +44,7 @@ export default function RatingNumbersHelpPage() {
           <em>not in estimate:</em> marker (<code className="bg-navy-800 px-1 rounded text-xs font-mono">stance</code>,{' '}
           <code className="bg-navy-800 px-1 rounded text-xs font-mono">relevance</code>,{' '}
           <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>) actually feed
-          the Oracle&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
+          the Oracul&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
           <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong>,{' '}
           <strong>consensus</strong>, <strong>report_kind</strong>, <strong>reader</strong>,{' '}
           <strong>quantity</strong>, <strong>grounds</strong> — is captured and shown, but
@@ -75,7 +75,7 @@ export default function RatingNumbersHelpPage() {
                 <code className="bg-navy-800 px-1 rounded text-xs font-mono">(cert x.xx)</code> is
                 the extractor&apos;s own confidence in that reading, not a second opinion — a
                 low-cert stance still counts in aggregation, just noisily. <strong>Live:</strong>{' '}
-                averaged into the Oracle&apos;s estimate today.
+                averaged into the Oracul&apos;s estimate today.
               </td>
             </tr>
             <tr>
@@ -160,7 +160,7 @@ export default function RatingNumbersHelpPage() {
                 rate is 8.75%&quot;) or a <em>movement</em> in it{' '}
                 (<code className="bg-navy-800 px-1 rounded text-xs font-mono">change</code>: &quot;the
                 rate was cut&quot;)? <strong>Shadow only:</strong> a level report measures the state
-                directly and should eventually reset the Oracle&apos;s recency handling rather
+                directly and should eventually reset the Oracul&apos;s recency handling rather
                 than decay out of it.
               </td>
             </tr>
@@ -214,7 +214,7 @@ export default function RatingNumbersHelpPage() {
               <td className="p-1.5 sm:p-2 font-mono break-words">CI %</td>
               <td className="p-1.5 sm:p-2">
                 The confidence interval around the headline estimate — how much uncertainty the
-                Oracle still has, not a property of this one article. Omitted when narrower than 2
+                Oracul still has, not a property of this one article. Omitted when narrower than 2
                 points (display noise) or when the pool doesn&apos;t have enough articles yet to
                 compute one. <strong>Live:</strong> it is part of the estimate itself.
               </td>
@@ -255,7 +255,7 @@ export default function RatingNumbersHelpPage() {
         <ul className="list-disc list-inside space-y-1 mb-2">
           <li>
             <strong>Probability</strong> — the headline move at the very top of the message (the{' '}
-            <code className="bg-navy-800 px-1 rounded text-xs font-mono">Oracle 63% → 71%</code>{' '}
+            <code className="bg-navy-800 px-1 rounded text-xs font-mono">Oracul 63% → 71%</code>{' '}
             line and the <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>{' '}
             row), i.e. the estimate itself rather than any one input to it.
           </li>

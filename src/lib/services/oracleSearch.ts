@@ -1,5 +1,5 @@
 import { createLogger } from '@/lib/logger'
-import { notifyOracleSearchUnavailable } from '@/lib/services/telegram'
+import { notifyOraculSearchUnavailable } from '@/lib/services/telegram'
 import { getOracleConfig, oracleFetch, logOracleCall, type OracleCallMeta } from '@/lib/services/oracleClient'
 
 export interface SearchResult {
@@ -33,11 +33,11 @@ export interface OracleSearchHealthResponse {
 }
 
 /**
- * Fetch provider health from the Oracle's /search/health endpoint.
+ * Fetch provider health from the Oracul's /search/health endpoint.
  * Returns null if oracle is not configured or the request fails.
  * Never throws.
  */
-export async function getOracleSearchHealth(
+export async function getOraculSearchHealth(
   meta: OracleCallMeta = { source: 'health-cron' },
 ): Promise<OracleSearchHealthResponse | null> {
   const cfg = getOracleConfig()
@@ -80,7 +80,7 @@ interface OracleSearchResponse {
 }
 
 /**
- * Search via the Oracle's /search endpoint, sharing the oracle's provider
+ * Search via the Oracul's /search endpoint, sharing the oracle's provider
  * fallback chain and quota counter with the oracle's own forecast calls.
  *
  * Returns null if:
@@ -116,7 +116,7 @@ export async function oracleSearch(
       const errorBody = await res.text().catch(() => '(unreadable)')
       log.warn({ status: res.status, body: errorBody, query, durationMs: Date.now() - t0 }, 'oracle-search: non-OK response')
       void logOracleCall({ callType: 'SEARCH', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status, query })
-      notifyOracleSearchUnavailable(query)
+      notifyOraculSearchUnavailable(query)
       return null
     }
 
@@ -149,7 +149,7 @@ export async function oracleSearch(
   } catch (err) {
     log.warn({ err, query, durationMs: Date.now() - t0 }, 'oracle-search: request failed')
     void logOracleCall({ callType: 'SEARCH', status: 'ERROR', meta, durationMs: Date.now() - t0, query })
-    notifyOracleSearchUnavailable(query)
+    notifyOraculSearchUnavailable(query)
     return null
   }
 }

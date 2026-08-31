@@ -41,7 +41,7 @@ const makePrediction = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-// A latest snapshot whose Oracle payload is (or isn't) a settlement pin. The
+// A latest snapshot whose Oracul payload is (or isn't) a settlement pin. The
 // second settling source has no sourceName, so its display name must fall back
 // to the URL host (sans www).
 const makeSnapshots = (settled: boolean, extra: Partial<Snapshot> = {}): Snapshot[] => [
@@ -75,7 +75,7 @@ const wrap = (ui: React.ReactElement) => (
 const globalFetch = global.fetch
 afterEach(() => { global.fetch = globalFetch })
 
-describe('ForecastDetailClient — Oracle settlement-pin indicator (#1250)', () => {
+describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useSession).mockReturnValue({

@@ -14,7 +14,7 @@ interface Props {
 }
 
 /**
- * Admin-only override for a false-positive Oracle settlement pin (the
+ * Admin-only override for a false-positive Oracul settlement pin (the
  * 2026-07-08 F-35 incident was fixed by hand via a prod DB UPDATE — this is
  * that fix, self-service). recordEstimate can only ever set `settled: true`
  * (docs/DATABASE.md "Settlement latch"); this is the only way to clear it.
@@ -49,7 +49,7 @@ export function SettledLatchAdmin({ prediction, onCleared }: Props) {
         <div className="flex items-start gap-2 text-sm text-amber-300">
           <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
-            The Oracle reported this outcome as an accomplished fact. If that was a false
+            The Oracul reported this outcome as an accomplished fact. If that was a false
             settlement (a background fact misread as a live event), clear it — the forecast
             leaves Awaiting Resolution now and resumes daily glide on the next requote run.
           </span>

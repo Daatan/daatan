@@ -33,9 +33,9 @@ export interface AiLeaderboard {
 }
 
 /**
- * How each panel member (and the Oracle) scored on matched-time Brier, vs humans on the
+ * How each panel member (and the Oracul) scored on matched-time Brier, vs humans on the
  * same commitments (docs/LASSO.md §7). This is the feature's payoff: do LLMs forecast
- * better than the crowd, the Oracle, or each other?
+ * better than the crowd, the Oracul, or each other?
  *
  * Read-only. `ai_member_scores` is comparable to `Commitment.brierScore` because both are
  * computed at the same instant against the same outcome — the entire reason matched-time
@@ -69,7 +69,7 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
     .map((g) => {
       const baseLabel =
         g.model === ORACLE_MEMBER
-          ? 'Oracle'
+          ? 'Oracul'
           : g.model === MARKET_MEMBER
             ? 'Market'
             : panelSeriesLabel(g.model, g.mode)

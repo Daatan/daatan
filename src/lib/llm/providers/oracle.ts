@@ -1,18 +1,18 @@
 import { LLMProvider, LLMRequest, LLMResponse } from '../types'
 import { oracleFetch, type OracleConfig } from '@/lib/services/oracleClient'
 
-/** Matches daatan's existing Oracle /llm proxy timeout; the Oracle itself caps at 55s. */
+/** Matches daatan's existing Oracul /llm proxy timeout; the Oracul itself caps at 55s. */
 const ORACLE_TIMEOUT_MS = 60_000
 
 /**
- * Fallback LLM provider backed by the Oracle's `/llm` endpoint (AWS Bedrock / Amazon
+ * Fallback LLM provider backed by the Oracul's `/llm` endpoint (AWS Bedrock / Amazon
  * Nova via litellm). A different vendor from Google, so it survives a Gemini/Google
- * outage. The Oracle has no native JSON-schema mode, so `schema` requests are steered
+ * outage. The Oracul has no native JSON-schema mode, so `schema` requests are steered
  * with a system message (same tactic as {@link OpenRouterProvider}); the JSON is still
- * parsed by the caller. Returns text only — the Oracle `/llm` response carries no usage.
+ * parsed by the caller. Returns text only — the Oracul `/llm` response carries no usage.
  */
 export class OracleProvider implements LLMProvider {
-  name = 'Oracle'
+  name = 'Oracul'
   private cfg: OracleConfig
   private modelName: string
 
@@ -45,12 +45,12 @@ export class OracleProvider implements LLMProvider {
 
     if (!res.ok) {
       const body = await res.text()
-      throw new Error(`Oracle /llm error ${res.status}: ${body.slice(0, 200)}`)
+      throw new Error(`Oracul /llm error ${res.status}: ${body.slice(0, 200)}`)
     }
 
     const data = (await res.json()) as { content?: unknown }
     if (typeof data.content !== 'string' || !data.content) {
-      throw new Error('Oracle /llm returned no content')
+      throw new Error('Oracul /llm returned no content')
     }
     return { text: data.content }
   }

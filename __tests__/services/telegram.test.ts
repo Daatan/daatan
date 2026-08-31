@@ -264,7 +264,7 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
     expect(body.text).toMatch(/^\[prod\] /)
-    expect(body.text).toContain('Oracle')
+    expect(body.text).toContain('Oracul')
   })
 
   it('labels a first estimate, a move, and an unchanged value distinctly', async () => {
@@ -286,9 +286,9 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     const texts = vi.mocked(fetch).mock.calls.map(
       (c) => JSON.parse(c[1]!.body as string).text as string,
     )
-    expect(texts[0]).toContain('Oracle 58%</b> · first estimate')
-    expect(texts[1]).toContain('Oracle 45% → 58%</b>  (+13)')
-    expect(texts[2]).toContain('Oracle 58%</b> · unchanged')
+    expect(texts[0]).toContain('Oracul 58%</b> · first estimate')
+    expect(texts[1]).toContain('Oracul 45% → 58%</b>  (+13)')
+    expect(texts[2]).toContain('Oracul 58%</b> · unchanged')
   })
 
   it('signs a downward move with a bare minus, not a double sign', async () => {
@@ -303,7 +303,7 @@ describe('Telegram channel routing (clean vs noisy)', () => {
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
-    expect(body.text).toContain('Oracle 58% → 40%</b>  (-18)')
+    expect(body.text).toContain('Oracul 58% → 40%</b>  (-18)')
   })
 
   it('renders the confidence range when it is wide enough to be informative', async () => {

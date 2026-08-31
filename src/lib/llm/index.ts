@@ -18,9 +18,9 @@ const geminiApiKey = process.env.GEMINI_API_KEY || ''
 /** One model name for both Google legs — they must not silently diverge. */
 const GEMINI_MODEL = 'gemini-2.5-flash'
 
-// The Oracle fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
+// The Oracul fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
 // from Google), so it can serve precisely when Gemini/Google is unavailable. We
-// pin an explicit model rather than inherit the Oracle's pipeline default.
+// pin an explicit model rather than inherit the Oracul's pipeline default.
 const ORACLE_FALLBACK_MODEL = 'bedrock/amazon.nova-pro-v1:0'
 
 // OpenRouter no longer offers a free Gemini model (the :free Gemini slugs now
@@ -30,9 +30,9 @@ const ORACLE_FALLBACK_MODEL = 'bedrock/amazon.nova-pro-v1:0'
 const OPENROUTER_FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
 
 // Build the main service's provider list in priority order:
-//   Gemini → Oracle (Bedrock/Nova) → OpenRouter → Ollama
+//   Gemini → Oracul (Bedrock/Nova) → OpenRouter → Ollama
 // Each leg registers only when it's configured, so a call is never Gemini-only in
-// practice. The OpenRouter/Oracle keys are read at build time from admin settings
+// practice. The OpenRouter/Oracul keys are read at build time from admin settings
 // (DB) → env, so re-running this after the settings cache warms (or after the admin
 // saves a key) picks it up without a restart — see rebuildLlmService().
 function buildProviders(): LLMProvider[] {
@@ -44,7 +44,7 @@ function buildProviders(): LLMProvider[] {
   // rather than replacing it: if Vertex is misconfigured or its quota is exhausted,
   // the key-based leg below is right behind it and the chain still serves. Daatan's
   // own SaaS containers no longer carry GEMINI_API_KEY (#1472), so in production
-  // that leg does not register at all and the chain falls through to Oracle/Bedrock
+  // that leg does not register at all and the chain falls through to Oracul/Bedrock
   // — a different vendor, which is the more useful fallback anyway. The leg stays in
   // the code for the self-host edition, where a Developer API key is the easy path.
   const vertex = vertexEnv()
@@ -63,10 +63,10 @@ function buildProviders(): LLMProvider[] {
     )
   }
 
-  // Fallback 1: the Oracle's /llm (AWS Bedrock / Amazon Nova) — a different vendor
+  // Fallback 1: the Oracul's /llm (AWS Bedrock / Amazon Nova) — a different vendor
   // from Google, so it survives a Gemini/Google outage. Registered whenever the
-  // Oracle is configured (ORACLE_URL + ORACLE_API_KEY); a no-op otherwise, e.g. on
-  // self-host installs that don't reach Daatan's Oracle.
+  // Oracul is configured (ORACLE_URL + ORACLE_API_KEY); a no-op otherwise, e.g. on
+  // self-host installs that don't reach Daatan's Oracul.
   const oracleConfig = getOracleConfig()
   if (oracleConfig) {
     providers.push(new OracleProvider(oracleConfig, ORACLE_FALLBACK_MODEL))

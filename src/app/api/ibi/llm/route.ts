@@ -16,7 +16,7 @@ export const POST = withAuth(async (request, user) => {
     const payload = schema.parse(body)
 
     const cfg = getOracleConfig()
-    if (!cfg) return NextResponse.json({ error: 'Oracle not configured' }, { status: 503 })
+    if (!cfg) return NextResponse.json({ error: 'Oracul not configured' }, { status: 503 })
 
     const t0 = Date.now()
     const res = await oracleFetch(cfg, '/llm', {
@@ -44,7 +44,7 @@ export const POST = withAuth(async (request, user) => {
 
     if (!bodyIsJson) {
       return NextResponse.json(
-        { error: 'Oracle returned a non-JSON response' },
+        { error: 'Oracul returned a non-JSON response' },
         { status: res.status >= 400 ? res.status : 502 },
       )
     }

@@ -1,5 +1,5 @@
 /**
- * When the Oracle abstained on a forecast (latest ContextSnapshot.insufficientData),
+ * When the Oracul abstained on a forecast (latest ContextSnapshot.insufficientData),
  * a commit with null Prediction.confidence must NOT trigger the LLM base-rate
  * backfill — the UI shows no AI estimate, so manufacturing one to grade the user's
  * aiScore against would defeat the abstention. Leaving aiProbabilityAtCommit null
@@ -85,7 +85,7 @@ async function commit(contextSnapshots: Array<{ insufficientData: boolean }>) {
 describe('createCommitment — AI base-rate backfill vs. abstention', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('does NOT backfill an LLM estimate when the Oracle abstained', async () => {
+  it('does NOT backfill an LLM estimate when the Oracul abstained', async () => {
     const { triggerAiProbabilityEstimate } = await commit([{ insufficientData: true }])
     expect(triggerAiProbabilityEstimate).not.toHaveBeenCalled()
   })

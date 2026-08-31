@@ -25,7 +25,7 @@ import { POST } from '../backfill-settlement-pins/route'
 
 const findMany = vi.mocked(prisma.prediction.findMany)
 const push = vi.mocked(pushCredibilityFeedback)
-const fetchOracle = vi.mocked(oracleFetch)
+const fetchOracul = vi.mocked(oracleFetch)
 
 const CRON_HEADERS = { 'x-cron-secret': 'test-secret' }
 
@@ -36,7 +36,7 @@ function req(url = 'http://localhost/api/admin/forecasts/backfill-settlement-pin
 /** Ledger report bodies, in call order. */
 function ledgerReturns(...reports: Array<{ total_settled_pins: number; contradicted_count: number }>) {
   for (const r of reports) {
-    fetchOracle.mockResolvedValueOnce({ ok: true, json: async () => r } as never)
+    fetchOracul.mockResolvedValueOnce({ ok: true, json: async () => r } as never)
   }
 }
 
@@ -82,7 +82,7 @@ describe('POST /api/admin/forecasts/backfill-settlement-pins', () => {
     findMany.mockResolvedValue([
       { id: 'pred-1', status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-07-07') },
     ] as never)
-    fetchOracle.mockResolvedValue({ ok: false, status: 500 } as never)
+    fetchOracul.mockResolvedValue({ ok: false, status: 500 } as never)
 
     const body = await (await POST(req())).json()
 

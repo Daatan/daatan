@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Capability gating. SaaS (and unset edition, the SKIP_ENV_VALIDATION case) is
  * always fully on. For self_hosted: AI turns on when an LLM key is configured
  * (the key is the opt-in) or via the explicit ENABLE_AI_FEATURES override;
- * "AI research" (Analyze) additionally needs a search backend (the Oracle).
+ * "AI research" (Analyze) additionally needs a search backend (the Oracul).
  */
 
 const mockEnv: Record<string, unknown> = {}
@@ -79,7 +79,7 @@ describe('capabilities', () => {
     expect((await load()).aiFeaturesEnabled()).toBe(true)
   })
 
-  it('AI research turns on only with LLM + search (Oracle) configured', async () => {
+  it('AI research turns on only with LLM + search (Oracul) configured', async () => {
     mockEnv.DAATAN_EDITION = 'self_hosted'
     mockEnv.OPENROUTER_API_KEY = 'or-key'
     mockEnv.ORACLE_URL = 'https://oracle'

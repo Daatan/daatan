@@ -27,7 +27,7 @@ beforeEach(() => vi.clearAllMocks())
 describe('ResilientLLMService', () => {
   it('returns the first provider result and never tries the rest', async () => {
     const first = ok('Gemini', 'first')
-    const second = ok('Oracle', 'second')
+    const second = ok('Oracul', 'second')
     const svc = new ResilientLLMService([first, second])
 
     const res = await svc.generateContent({ prompt: 'x' })
@@ -39,7 +39,7 @@ describe('ResilientLLMService', () => {
 
   it('falls through to a later provider and does NOT page when one rescues the call', async () => {
     const primary = fail('Gemini', '503 Service Unavailable')
-    const backup = ok('Oracle', 'rescued')
+    const backup = ok('Oracul', 'rescued')
     const svc = new ResilientLLMService([primary, backup])
 
     const res = await svc.generateContent({ prompt: 'x' })
@@ -50,12 +50,12 @@ describe('ResilientLLMService', () => {
   })
 
   it('pages once with the full provider chain only when every provider fails', async () => {
-    const svc = new ResilientLLMService([fail('Gemini', '503'), fail('Oracle', '502')])
+    const svc = new ResilientLLMService([fail('Gemini', '503'), fail('Oracul', '502')])
 
     await expect(svc.generateContent({ prompt: 'x' })).rejects.toThrow(/All LLM providers failed/)
 
     expect(mockNotify).toHaveBeenCalledTimes(1)
-    expect(mockNotify).toHaveBeenCalledWith('Gemini → Oracle', '502')
+    expect(mockNotify).toHaveBeenCalledWith('Gemini → Oracul', '502')
   })
 
   it('pages with "none" when no providers are configured', async () => {

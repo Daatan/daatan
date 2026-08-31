@@ -22,7 +22,7 @@ const authed = withAuth(async (request: NextRequest) => {
 /**
  * Drain stuck evidence-pool rows (FAILED except oracle_omitted, abandoned PENDING)
  * by re-driving them through extraction — see pool-retry.ts. Bounded per call
- * (?limit=N predictions, default 3, max 10): each prediction is one full Oracle
+ * (?limit=N predictions, default 3, max 10): each prediction is one full Oracul
  * analysis, so calls are paced; re-call until `remaining` is 0.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header so the

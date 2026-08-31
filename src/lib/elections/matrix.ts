@@ -10,7 +10,7 @@ export function stanceSide(stance: number | null): StanceSide {
   return 'neutral'
 }
 
-/** One Oracle source as consumed here — a structural subset of EnrichedOracleSource. */
+/** One Oracul source as consumed here — a structural subset of EnrichedOracleSource. */
 export type ElectionSourceInput = {
   author: string | null
   sourceName: string | null
@@ -23,14 +23,14 @@ export type ElectionSourceInput = {
   personId?: string | null
 }
 
-/** One election-tagged forecast + the sources the Oracle used on it (its latest evidence snapshot). */
+/** One election-tagged forecast + the sources the Oracul used on it (its latest evidence snapshot). */
 export type ElectionEventInput = {
   id: string
   slug: string | null
   claimText: string
   resolveByISO: string
   status: string
-  /** 0–100, or null when the Oracle abstained / no snapshot. */
+  /** 0–100, or null when the Oracul abstained / no snapshot. */
   probabilityYes: number | null
   sources: ElectionSourceInput[]
 }
@@ -84,7 +84,7 @@ function collapseCell(sources: ElectionSourceInput[]): ElectionCell {
 
 /**
  * Build the top table: curated authors as rows (fixed order), election forecasts as
- * columns, and a cell wherever a curated author has an Oracle source on that event.
+ * columns, and a cell wherever a curated author has an Oracul source on that event.
  * Pure — the caller supplies the already-loaded events + parsed sources.
  */
 export function buildElectionMatrix(

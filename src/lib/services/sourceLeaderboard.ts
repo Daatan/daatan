@@ -106,8 +106,8 @@ function sortRows<T extends { skillConservative: number; brierScore: number }>(
  * are filtered on their aggregate `predictions` count (summed across authors), not by dropping
  * low-sample authors before aggregation.
  *
- * Fails open — returns empty rows (never throws) when the Oracle is unconfigured or
- * unreachable, matching every other Oracle-backed service in this file.
+ * Fails open — returns empty rows (never throws) when the Oracul is unconfigured or
+ * unreachable, matching every other Oracul-backed service in this file.
  */
 export async function getSourceLeaderboard(
   view: SourceLeaderboardView = 'authors',
@@ -126,7 +126,7 @@ export async function getSourceLeaderboard(
 /**
  * Author-shadow rows for a single outlet — backs the admin outlet detail page
  * (`/admin/sources/[name]`). Reuses the full-board fetch and filters by `outlet_name`
- * in-memory; the board already carries it on every row, so no separate Oracle endpoint is
+ * in-memory; the board already carries it on every row, so no separate Oracul endpoint is
  * needed. Fails open to `[]`, same as `getSourceLeaderboard`.
  */
 export async function getAuthorShadowRowsForOutlet(outletName: string): Promise<AuthorLeaderboardRow[]> {

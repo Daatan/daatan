@@ -46,11 +46,11 @@ function fold<T extends GroupedRow>(rows: T[], keyOf: (r: T) => string): OracleU
 }
 
 /**
- * Aggregate Oracle call usage over the given window for the admin stats view:
+ * Aggregate Oracul call usage over the given window for the admin stats view:
  * breakdowns by source / call type / search engine / status, plus totals and
  * the most recent calls.
  */
-export async function getOracleUsageStats(
+export async function getOraculUsageStats(
   windowDays = 30,
   filters?: { source?: string; callType?: OracleCallType; status?: OracleCallStatus },
 ) {

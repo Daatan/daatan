@@ -37,7 +37,7 @@ export const POST = withAuth(async (request, user, { params }) => {
 
   // Forecast-level probabilities (0–1) so the crowd & our model join the news-indexer
   // reliability ELO ladder. Only meaningful for BINARY; community = mean of the crowd's
-  // committed P(YES), AI = the denormalized Oracle estimate (prediction.confidence, 0–100).
+  // committed P(YES), AI = the denormalized Oracul estimate (prediction.confidence, 0–100).
   let communityProbability: number | null = null
   let aiProbability: number | null = null
   if (prediction.outcomeType === 'BINARY') {
