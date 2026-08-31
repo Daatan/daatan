@@ -56,6 +56,8 @@ describe('GET /api/news-indexer/active-forecasts', () => {
       {
         id: 'pred-1',
         claimText: 'Will X happen?',
+        createdAt: new Date('2026-08-04T09:30:00.000Z'),
+        claimArchetype: 'threshold',
         translations: [{ language: 'he', translatedText: 'האם X יקרה?' }],
       },
     ] as never)
@@ -67,8 +69,30 @@ describe('GET /api/news-indexer/active-forecasts', () => {
       {
         id: 'pred-1',
         question: 'Will X happen?',
+        createdAt: '2026-08-04T09:30:00.000Z',
+        claimArchetype: 'threshold',
         translations: [{ language: 'he', text: 'האם X יקרה?' }],
       },
     ])
+  })
+
+  it('carries the evidence-window inputs — news-indexer#394', async () => {
+    vi.mocked(prisma.prediction.findMany).mockResolvedValue([
+      {
+        id: 'pred-2',
+        claimText: 'Will Y happen?',
+        createdAt: new Date('2026-08-04T09:30:00.000Z'),
+        claimArchetype: null,
+        translations: [],
+      },
+    ] as never)
+
+    await GET(get('test-secret'))
+
+    expect(prisma.prediction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ createdAt: true, claimArchetype: true }),
+      }),
+    )
   })
 })

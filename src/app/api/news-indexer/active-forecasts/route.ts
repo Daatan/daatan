@@ -21,6 +21,12 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       claimText: true,
+      // The two inputs to retro's Gate-0 evidence window (news-indexer#394). news-indexer
+      // applies its lower edge at match time so a 2021 article never reaches the judge;
+      // Gate-0 keeps enforcing the full window at aggregation. Both must read the same
+      // fields, or the two gates disagree about which rows are in-window.
+      createdAt: true,
+      claimArchetype: true,
       // claimText translations let news-indexer build a multilingual forecast
       // embedding, so articles in he/ar/ru match an English-authored claim.
       translations: {
@@ -34,6 +40,8 @@ export async function GET(request: NextRequest) {
     predictions.map(p => ({
       id: p.id,
       question: p.claimText,
+      createdAt: p.createdAt.toISOString(),
+      claimArchetype: p.claimArchetype,
       translations: p.translations.map(t => ({ language: t.language, text: t.translatedText })),
     })),
   )
