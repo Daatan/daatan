@@ -35,7 +35,7 @@ vi.mock('@/lib/llm/searchQuery', () => ({ buildSearchQuery: (...a: unknown[]) =>
 // failures are recoverable, and a stub here would keep passing after that rule changed.
 vi.mock('@/lib/services/oracle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/oracle')>()),
-  getOracleForecast: (...a: unknown[]) => mockForecast(...a),
+  getOraculForecast: (...a: unknown[]) => mockForecast(...a),
   DEFAULT_MAX_ARTICLES: 15,
 }))
 vi.mock('@/lib/prisma', () => ({
@@ -44,7 +44,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: (...a: unknown[]) => mockMeta(...a) }))
 vi.mock('@/lib/services/context', () => ({
   saveOracleSnapshotOnly: (...a: unknown[]) => mockSave(...a),
-  markOracleAttempted: (...a: unknown[]) => mockMark(...a),
+  markOraculAttempted: (...a: unknown[]) => mockMark(...a),
 }))
 vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
   // `articleIdsByUrl` is taken from the REAL module — see the route tests' identical
@@ -61,7 +61,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-import { refreshOracleSnapshot, scheduleOracleReask, runOracleReask, REASK_DELAY_MS, _reaskInFlight } from '../oracle-backfill'
+import { refreshOracleSnapshot, scheduleOraculReask, runOraculReask, REASK_DELAY_MS, _reaskInFlight } from '../oracle-backfill'
 
 const prediction = { id: 'p1', claimText: 'Will X happen?' }
 
@@ -251,13 +251,13 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
     // These are background promises nothing blocks on, so an Oracul that is hard-down
     // would otherwise turn every push into another queued 90s call.
     for (let i = 0; i < 12; i++) {
-      scheduleOracleReask({ id: `p${i}`, claimText: 'q' }, supplied, 'news-indexer')
+      scheduleOraculReask({ id: `p${i}`, claimText: 'q' }, supplied, 'news-indexer')
     }
     expect(_reaskInFlight()).toBe(4)
   })
 
   it('ignores an empty article set — there is no cache key to hit', () => {
-    scheduleOracleReask(prediction, [], 'news-indexer')
+    scheduleOraculReask(prediction, [], 'news-indexer')
     expect(_reaskInFlight()).toBe(0)
   })
 
@@ -265,7 +265,7 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
     // It runs detached from any request; an unhandled rejection here would take the
     // process's error budget for a recovery that is best-effort by design.
     mockPredictionFind.mockRejectedValue(new Error('db down'))
-    await expect(runOracleReask(prediction, supplied, 'news-indexer')).resolves.toBeUndefined()
+    await expect(runOraculReask(prediction, supplied, 'news-indexer')).resolves.toBeUndefined()
   })
 })
 
@@ -314,7 +314,7 @@ describe('refreshOracleSnapshot', () => {
     expect(saved.oracleSnapshot.sources[0]).toMatchObject({ sourceName: 'BBC', stance: 0.2 })
   })
 
-  it('forwards claimDirection/claimDeadline to getOracleForecast when present on the prediction', async () => {
+  it('forwards claimDirection/claimDeadline to getOraculForecast when present on the prediction', async () => {
     const deadline = new Date('2026-12-31T00:00:00.000Z')
     mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
     mockForecast.mockResolvedValue({ forecast: null })
@@ -324,7 +324,7 @@ describe('refreshOracleSnapshot', () => {
     expect(opts.claimDeadline).toBe(deadline)
   })
 
-  it('forwards resolutionRules to getOracleForecast — the re-drive must land on the same cache key as the original ask (daatan#1375)', async () => {
+  it('forwards resolutionRules to getOraculForecast — the re-drive must land on the same cache key as the original ask (daatan#1375)', async () => {
     mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
     mockForecast.mockResolvedValue({ forecast: null })
     await refreshOracleSnapshot({ ...prediction, resolutionRules: 'Official announcement only.' })
@@ -504,8 +504,8 @@ describe('refreshOracleSnapshot', () => {
     })
 
     // The `extractor_error` test that used to sit here is gone with the branch it covered
-    // (daatan#1231). It asserted that a throw from `getOracleForecast` released the claim and
-    // rethrew — but `getOracleForecast` cannot throw: `getOracleConfig` is a pure env read,
+    // (daatan#1231). It asserted that a throw from `getOraculForecast` released the claim and
+    // rethrew — but `getOraculForecast` cannot throw: `getOracleConfig` is a pure env read,
     // every network/parse path is inside its own try, and the catch's only await
     // (`logOracleCall`) swallows its own errors. The test reached the branch solely because
     // the mock could do what the real function cannot. The invariant that makes the catch
@@ -543,7 +543,7 @@ describe('refreshOracleSnapshot', () => {
 
       expect(r.status).toBe('no-oracle')
       expect(mockFailClaimed).toHaveBeenCalledWith('p1', ['https://a.com/1'], 'oracle_null')
-      // markOracleAttempted would write an empty oracleSnapshot marker, which on a
+      // markOraculAttempted would write an empty oracleSnapshot marker, which on a
       // forecast with real snapshots becomes the LATEST one every reader trusts.
       expect(mockMark).not.toHaveBeenCalled()
     })

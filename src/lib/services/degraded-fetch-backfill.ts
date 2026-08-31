@@ -116,7 +116,7 @@ export interface DegradedFetchSweepResult {
   /** Rows re-driven through extraction across those predictions. */
   rowsRetried: number
   ok: number
-  noOracle: number
+  noOracul: number
   unchanged: number
   insufficient: number
   failed: number
@@ -179,7 +179,7 @@ export async function sweepDegradedFetchRows(
     processed: 0,
     rowsRetried: 0,
     ok: 0,
-    noOracle: 0,
+    noOracul: 0,
     unchanged: 0,
     insufficient: 0,
     failed: 0,
@@ -212,7 +212,7 @@ export async function sweepDegradedFetchRows(
       if (r.status === 'ok') results.ok++
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++
-      else results.noOracle++
+      else results.noOracul++
 
       const after = await latestSnapshotSummary(p.id)
       results.diffs.push({ predictionId: p.id, before, after })

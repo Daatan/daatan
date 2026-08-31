@@ -93,7 +93,7 @@ export async function republishForecasts(predictionIds: string[], apply: boolean
       continue
     }
     if (p.status !== 'ACTIVE') {
-      // Same guard every other estimate writer applies (cf. runOracleReask): a fresh
+      // Same guard every other estimate writer applies (cf. runOraculReask): a fresh
       // AI estimate on a resolved/expired forecast would rewrite history.
       report({ ...base, reason: 'not_active' })
       continue

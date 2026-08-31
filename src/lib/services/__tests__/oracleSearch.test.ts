@@ -11,7 +11,7 @@ vi.mock('@/lib/services/oracleClient', () => ({
   oracleFetch: vi.fn(),
   logOracleCall: vi.fn(),
 }))
-vi.mock('@/lib/services/telegram', () => ({ notifyOracleSearchUnavailable: vi.fn() }))
+vi.mock('@/lib/services/telegram', () => ({ notifyOraculSearchUnavailable: vi.fn() }))
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))

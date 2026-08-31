@@ -75,7 +75,7 @@ const PRUNE_DAYS = 30
  * Also prunes rows older than {@link PRUNE_DAYS} on each write.
  *
  * Returns the created row's id (or null on failure) so a caller that later
- * takes the LLM fallback can attribute it via {@link recordOracleFallback}.
+ * takes the LLM fallback can attribute it via {@link recordOraculFallback}.
  */
 export async function logOracleCall(input: LogOracleCallInput): Promise<string | null> {
   try {
@@ -118,7 +118,7 @@ export async function logOracleCall(input: LogOracleCallInput): Promise<string |
  * probability the fallback produced. Fire-and-forget: never throws. No-op when
  * `id` is null (the original log write failed).
  */
-export async function recordOracleFallback(id: string | null, fallbackProbability: number | null): Promise<void> {
+export async function recordOraculFallback(id: string | null, fallbackProbability: number | null): Promise<void> {
   if (!id) return
   try {
     await prisma.oracleCallLog.update({

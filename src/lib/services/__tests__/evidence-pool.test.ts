@@ -75,7 +75,7 @@ const count = vi.mocked(prisma.evidencePoolArticle.count)
 const snapshotFindFirst = vi.mocked(prisma.contextSnapshot.findFirst)
 const predictionFindUnique = vi.mocked(prisma.prediction.findUnique)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
-const mockOracleFetch = vi.mocked(oracleFetch)
+const mockOraculFetch = vi.mocked(oracleFetch)
 
 /** A P2002 unique-constraint-violation error, as Prisma throws it. */
 function uniqueViolation(): Prisma.PrismaClientKnownRequestError {
@@ -514,7 +514,7 @@ describe('recomputeFromPool', () => {
       poolArticle({ id: 'art-3', excluded: true }),
       poolArticle({ id: 'art-4', stance: null }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     const out = await recomputeFromPool('pred-1', null, null)
 
@@ -546,7 +546,7 @@ describe('recomputeFromPool', () => {
 
   it('surfaces evidence_mass/n_eff/age_adjusted_mass from the pool aggregate (daatan#1563)', async () => {
     findMany.mockResolvedValue([poolArticle(), poolArticle({ id: 'art-2' })] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ ...AGGREGATE, evidence_mass: 3.42, n_eff: 2.1, age_adjusted_mass: 3.9 }),
     } as never)
@@ -560,7 +560,7 @@ describe('recomputeFromPool', () => {
 
   it('queries only current-version rows, excluding superseded ones (daatan#1382)', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
@@ -575,11 +575,11 @@ describe('recomputeFromPool', () => {
       poolArticle({ id: 'art-2', excluded: true }),
       poolArticle({ id: 'art-3', relevanceScore: null }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     const out = await recomputeFromPool('pred-1', null, null)
 
-    const posted = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body).sources
+    const posted = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body).sources
     expect(out?.usableArticles).toHaveLength(posted.length)
     expect(out?.usableArticles.map((a) => a.id)).toEqual(['art-1'])
   })
@@ -589,11 +589,11 @@ describe('recomputeFromPool', () => {
       poolArticle({ settled: true, settlementEventDate: '2026-07-14' }),
       poolArticle({ id: 'art-2' }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', 'ARRIVAL' as never, new Date('2026-07-19T23:59:59Z'), new Date('2026-07-04T10:00:00Z'), 'SCHEDULED' as never)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources[0].settlement_event_date).toBe('2026-07-14')
     expect(body.sources[1].settlement_event_date).toBeNull()
     expect(body.claim_created_at).toBe('2026-07-04T10:00:00.000Z')
@@ -602,11 +602,11 @@ describe('recomputeFromPool', () => {
 
   it('omits claim_created_at/claim_archetype entirely when unclassified — retro must fail open', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect('claim_created_at' in body).toBe(false)
     expect('claim_archetype' in body).toBe(false)
   })
@@ -621,11 +621,11 @@ describe('recomputeFromPool', () => {
       { claim: 'Turnout was high.', stance: 0.2, certainty: 0.5, settled: false },
     ]
     findMany.mockResolvedValue([poolArticle({ claimsDetail, outletName: 'Reuters' })] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null, null, null, 'Will the bill pass by July?')
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.question).toBe('Will the bill pass by July?')
     expect(body.sources[0].claims_detail).toEqual(claimsDetail)
     // Vote identity — retro attributes each vote via `outlet or url`.
@@ -641,11 +641,11 @@ describe('recomputeFromPool', () => {
     findMany.mockResolvedValue([
       poolArticle({ publishedDate: '2026-01-15', addedAt: new Date('2026-07-20T08:30:00Z') }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources[0].added_at).toBe('2026-07-20T08:30:00.000Z')
     expect(body.sources[0].published_date).toBe('2026-01-15')
   })
@@ -658,11 +658,11 @@ describe('recomputeFromPool', () => {
       poolArticle({ id: 'pending', stance: null, addedAt: new Date('2026-07-30T00:00:00Z') }),
       poolArticle({ id: 'complete', addedAt: new Date('2026-07-02T00:00:00Z') }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources).toHaveLength(1)
     expect(body.sources[0].added_at).toBe('2026-07-02T00:00:00.000Z')
   })
@@ -675,27 +675,27 @@ describe('recomputeFromPool', () => {
       poolArticle({ id: 'stale-failed', status: 'FAILED', addedAt: new Date('2026-07-30T00:00:00Z') }),
       poolArticle({ id: 'complete', addedAt: new Date('2026-07-02T00:00:00Z') }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources).toHaveLength(1)
     expect(body.sources[0].added_at).toBe('2026-07-02T00:00:00.000Z')
   })
 
   it('omits question entirely when there is no usable claim text — retro must skip, not guess', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
-    expect('question' in JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
+    expect('question' in JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
 
     // Below retro's `min_length=5`: sending it would 422 the WHOLE aggregate and drop the
     // estimate to the single-run fallback — far worse than skipping the gate.
-    mockOracleFetch.mockClear()
+    mockOraculFetch.mockClear()
     await recomputeFromPool('pred-1', null, null, null, null, '  hi  ')
-    expect('question' in JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
+    expect('question' in JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)).toBe(false)
   })
 
   it('nulls a legacy or malformed claims_detail instead of 422ing the whole aggregate', async () => {
@@ -704,11 +704,11 @@ describe('recomputeFromPool', () => {
       poolArticle({ id: 'art-2', claimsDetail: [{ claim: 'no certainty', stance: 0.4 }] }),
       poolArticle({ id: 'art-3', claimsDetail: 'nope' }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null, null, null, 'Will the bill pass by July?')
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     // retro's ClaimDetail requires claim+stance+certainty; one bad element would reject the
     // request outright, so an unusable value is dropped to null and the gate skips that row.
     expect(body.sources.map((s: { claims_detail: unknown }) => s.claims_detail)).toEqual([null, null, null])
@@ -716,17 +716,17 @@ describe('recomputeFromPool', () => {
 
   it("drops admin-excluded articles from the aggregate, so an exclusion moves the number", async () => {
     findMany.mockResolvedValue([poolArticle(), poolArticle({ id: 'art-2', excluded: true })] as never)
-    mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
     await recomputeFromPool('pred-1', null, null)
 
-    const [, , init] = mockOracleFetch.mock.calls[0]
+    const [, , init] = mockOraculFetch.mock.calls[0]
     expect(JSON.parse((init as { body: string }).body).sources).toHaveLength(1)
   })
 
   it('surfaces insufficient_data rather than passing off a non-estimate as one', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ ...AGGREGATE, insufficient_data: true, reason: 'no_decisive_signal' }),
     } as never)
@@ -739,27 +739,27 @@ describe('recomputeFromPool', () => {
   it('returns null when the Oracul is not configured', async () => {
     mockGetOracleConfig.mockReturnValue(null)
     expect(await recomputeFromPool('pred-1', null, null)).toBeNull()
-    expect(mockOracleFetch).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   it('returns null when nothing in the pool is usable', async () => {
     findMany.mockResolvedValue([poolArticle({ excluded: true }), poolArticle({ id: 'a2', certainty: null })] as never)
     expect(await recomputeFromPool('pred-1', null, null)).toBeNull()
-    expect(mockOracleFetch).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   // Both failure paths return null rather than throwing: the caller falls back to its
   // single-run forecast, so a flaky Oracul degrades the estimate instead of dropping it.
   it('returns null (never throws) on a non-OK status', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({ ok: false, status: 503 } as never)
+    mockOraculFetch.mockResolvedValue({ ok: false, status: 503 } as never)
     await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 
   it('returns null (never throws) when the fetch rejects', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockRejectedValue(new Error('network down'))
+    mockOraculFetch.mockRejectedValue(new Error('network down'))
     await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
@@ -779,7 +779,7 @@ describe('recomputeFromPool', () => {
           poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
         ) as never,
       )
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       await recomputeFromPool('pred-1', null, null, claimCreatedAt)
 
@@ -792,7 +792,7 @@ describe('recomputeFromPool', () => {
           poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
         ) as never,
       )
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       await recomputeFromPool('pred-1', null, null, claimCreatedAt)
 
@@ -805,7 +805,7 @@ describe('recomputeFromPool', () => {
           poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-08-05' }),
         ) as never,
       )
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       await recomputeFromPool('pred-1', null, null, claimCreatedAt)
 
@@ -818,7 +818,7 @@ describe('recomputeFromPool', () => {
           poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
         ) as never,
       )
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       await recomputeFromPool('pred-1', null, null, null)
 
@@ -831,7 +831,7 @@ describe('recomputeFromPool', () => {
           poolArticle({ id: `art-${i}`, stance: 0.8, publishedDate: '2026-07-23' }),
         ) as never,
       )
-      mockOracleFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+      mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
       const out = await recomputeFromPool('pred-1', null, null, claimCreatedAt)
 
@@ -854,13 +854,13 @@ describe('pushCredibilityFeedback', () => {
     mockGetOracleConfig.mockReturnValue(null)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
     expect(findMany).not.toHaveBeenCalled()
-    expect(mockOracleFetch).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   it('does nothing when the pool is empty', async () => {
     findMany.mockResolvedValue([] as never)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
-    expect(mockOracleFetch).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   it('reads only current-version pool rows, so a corrected article is not double-credited (daatan#1382)', async () => {
@@ -880,7 +880,7 @@ describe('pushCredibilityFeedback', () => {
       poolArticle({ id: 'art-no-stance', stance: null }),
     ] as never)
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
-    expect(mockOracleFetch).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   it('sends author_signals for non-excluded rows with an author_lean, opinion included', async () => {
@@ -889,14 +889,14 @@ describe('pushCredibilityFeedback', () => {
       poolArticle({ id: 'art-excluded', excluded: true, authorLean: 0.5 }),
       poolArticle({ id: 'art-no-lean' }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1, author_signals_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', false, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.author_signals).toHaveLength(1)
     expect(body.author_signals[0]).toEqual({
       author: 'Ben Caspit',
@@ -911,15 +911,15 @@ describe('pushCredibilityFeedback', () => {
     findMany.mockResolvedValue([
       poolArticle({ id: 'art-opinion', evidenceClass: 'opinion', author: 'Pundit', authorLean: -0.7 }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 0, author_signals_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(mockOraculFetch).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources).toHaveLength(0)
     expect(body.author_signals).toHaveLength(1)
   })
@@ -930,15 +930,15 @@ describe('pushCredibilityFeedback', () => {
       poolArticle({ id: 'art-2', excluded: true }),
       poolArticle({ id: 'art-3', evidenceClass: 'opinion' }),
     ] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
-    const [, path, init] = mockOracleFetch.mock.calls[0]
+    expect(mockOraculFetch).toHaveBeenCalledTimes(1)
+    const [, path, init] = mockOraculFetch.mock.calls[0]
     expect(path).toBe('/leaderboard/ingest')
     const body = JSON.parse((init as { body: string }).body)
     expect(body.prediction_id).toBe('pred-1')
@@ -960,14 +960,14 @@ describe('pushCredibilityFeedback', () => {
   it('sends claim_archetype lowercased for retro’s Literal', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     predictionFindUnique.mockResolvedValue({ claimArchetype: 'DIFFUSE' } as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.claim_archetype).toBe('diffuse')
   })
 
@@ -976,28 +976,28 @@ describe('pushCredibilityFeedback', () => {
   it('omits claim_archetype entirely when the claim is unclassified', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     predictionFindUnique.mockResolvedValue({ claimArchetype: null } as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect('claim_archetype' in body).toBe(false)
   })
 
   it('sends the NONE archetype as a real class, not as an omission', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     predictionFindUnique.mockResolvedValue({ claimArchetype: 'NONE' } as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.claim_archetype).toBe('none')
   })
 
@@ -1008,14 +1008,14 @@ describe('pushCredibilityFeedback', () => {
     snapshotFindFirst.mockResolvedValue({
       oracleSnapshot: { mean: 97, ciLow: 91, ciHigh: 99, settled: true },
     } as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', false, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.settlement_snapshot.settled).toBe(true)
     expect(body.settlement_snapshot.mean).toBeCloseTo(0.94, 10)
     expect(body.settlement_snapshot.ci_low).toBeCloseTo(0.82, 10)
@@ -1024,7 +1024,7 @@ describe('pushCredibilityFeedback', () => {
 
   it('reads the pin from the latest settled non-clock snapshot at or before resolution', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
@@ -1046,14 +1046,14 @@ describe('pushCredibilityFeedback', () => {
 
   it('omits settlement_snapshot entirely when the claim was never pinned', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect('settlement_snapshot' in body).toBe(false)
   })
 
@@ -1062,22 +1062,22 @@ describe('pushCredibilityFeedback', () => {
     snapshotFindFirst.mockResolvedValue({
       oracleSnapshot: { mean: 3, ciLow: 1, ciHigh: 9, settled: true },
     } as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 0 }),
     } as never)
 
     await pushCredibilityFeedback('pred-1', true, resolvedAt)
 
-    expect(mockOracleFetch).toHaveBeenCalledTimes(1)
-    const body = JSON.parse((mockOracleFetch.mock.calls[0][2] as { body: string }).body)
+    expect(mockOraculFetch).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.sources).toHaveLength(0)
     expect(body.settlement_snapshot.mean).toBeCloseTo(-0.94, 10)
   })
 
   it('logs the ingest result on success', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({
+    mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
     } as never)
@@ -1097,14 +1097,14 @@ describe('pushCredibilityFeedback', () => {
 
   it('never throws when the Oracul returns a non-OK status', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockResolvedValue({ ok: false, status: 500 } as never)
+    mockOraculFetch.mockResolvedValue({ ok: false, status: 500 } as never)
     await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 
   it('never throws when the fetch itself rejects', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    mockOracleFetch.mockRejectedValue(new Error('network down'))
+    mockOraculFetch.mockRejectedValue(new Error('network down'))
     await expect(pushCredibilityFeedback('pred-1', true, resolvedAt)).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()
   })

@@ -169,7 +169,7 @@ describe('enrichOracleSources', () => {
   })
 
   it('stamps the response-level provenance.oracle build onto every source; undefined when absent (daatan#1669)', () => {
-    const withOracle = enrichOracleSources(
+    const withOracul = enrichOracleSources(
       [oracleSource(), oracleSource({ url: 'https://x.com/y' })],
       [searchResult()],
       new Map(),
@@ -178,12 +178,12 @@ describe('enrichOracleSources', () => {
       null,
       { version: '1.4.0+build.38912', git_sha: 'c335796afb3e25158c12a965dc05ac71b2e65346', built_at: '2026-08-29T18:23:54Z' },
     )
-    expect(withOracle[0]).toMatchObject({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346' })
-    expect(withOracle[1].oracleVersion).toBe('1.4.0+build.38912')
+    expect(withOracul[0]).toMatchObject({ oracleVersion: '1.4.0+build.38912', oracleGitSha: 'c335796afb3e25158c12a965dc05ac71b2e65346' })
+    expect(withOracul[1].oracleVersion).toBe('1.4.0+build.38912')
 
-    const withoutOracle = enrichOracleSources([oracleSource()], [searchResult()], new Map())
-    expect(withoutOracle[0].oracleVersion).toBeUndefined()
-    expect(withoutOracle[0].oracleGitSha).toBeUndefined()
+    const withoutOracul = enrichOracleSources([oracleSource()], [searchResult()], new Map())
+    expect(withoutOracul[0].oracleVersion).toBeUndefined()
+    expect(withoutOracul[0].oracleGitSha).toBeUndefined()
   })
 
   it('leaves settled/quantitativeEstimate/evidenceWeight/relevanceScore/authorLean/factSignal undefined when the Oracul omits them (F11, daatan#1237)', () => {

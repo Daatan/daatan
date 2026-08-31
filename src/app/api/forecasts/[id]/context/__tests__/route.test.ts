@@ -43,8 +43,8 @@ vi.mock('@/lib/llm', () => ({ llmService: { generateContent: generateContentMock
 
 vi.mock('@/lib/llm/expressPrediction', () => ({ guessChances: vi.fn() }))
 vi.mock('@/lib/services/oracle', () => ({
-  getOracleForecast: vi.fn(),
-  recordOracleFallback: vi.fn(),
+  getOraculForecast: vi.fn(),
+  recordOraculFallback: vi.fn(),
   DEFAULT_MAX_ARTICLES: 10,
   INTERACTIVE_FORECAST_TIMEOUT_MS: 12_000,
 }))
@@ -79,7 +79,7 @@ import {
 } from '@/lib/services/context'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
+import { getOraculForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
@@ -152,7 +152,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-    vi.mocked(getOracleForecast).mockResolvedValue({
+    vi.mocked(getOraculForecast).mockResolvedValue({
       forecast: ORACLE_FORECAST_ONE_SOURCE,
       logId: 'log-1',
       insufficientData: false,
@@ -174,7 +174,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      expect(getOracleForecast).toHaveBeenCalledWith(
+      expect(getOraculForecast).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           articles: [expect.objectContaining({ url: 'https://b.com/2' })],
@@ -196,7 +196,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      expect(getOracleForecast).toHaveBeenCalledWith(
+      expect(getOraculForecast).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS }),
         expect.anything(),
@@ -217,7 +217,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       await collectDoneEvent(res)
 
-      const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+      const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
       expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
     })
 
@@ -230,7 +230,7 @@ describe('POST /api/forecasts/[id]/context', () => {
       const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
       const done = await collectDoneEvent(res)
 
-      expect(getOracleForecast).not.toHaveBeenCalled()
+      expect(getOraculForecast).not.toHaveBeenCalled()
       expect(guessChances).not.toHaveBeenCalled()
       expect(addArticlesToPool).not.toHaveBeenCalled()
       // resolvePooledEstimate was still called (with an empty fallback set) to

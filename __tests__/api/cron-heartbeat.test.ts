@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 const {
   mockNotifyDailySummary,
-  mockGetOracleSearchHealth,
+  mockGetOraculSearchHealth,
   mockUserCount,
   mockPredictionCount,
   mockCommitmentCount,
 } = vi.hoisted(() => ({
   mockNotifyDailySummary: vi.fn(),
-  mockGetOracleSearchHealth: vi.fn(),
+  mockGetOraculSearchHealth: vi.fn(),
   mockUserCount: vi.fn(),
   mockPredictionCount: vi.fn(),
   mockCommitmentCount: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('@/lib/services/telegram', () => ({
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({
-  getOracleSearchHealth: (...args: unknown[]) => mockGetOracleSearchHealth(...args),
+  getOraculSearchHealth: (...args: unknown[]) => mockGetOraculSearchHealth(...args),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -61,7 +61,7 @@ describe('GET /api/cron/heartbeat', () => {
     // prediction.count is used twice (published, resolutions) — order matters
     mockPredictionCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2)
     mockCommitmentCount.mockResolvedValue(12)
-    mockGetOracleSearchHealth.mockResolvedValue({
+    mockGetOraculSearchHealth.mockResolvedValue({
       overall: 'degraded',
       usable_count: 4,
       providers: { a: {}, b: {}, c: {}, d: {}, e: {}, f: {} },
@@ -86,7 +86,7 @@ describe('GET /api/cron/heartbeat', () => {
     mockUserCount.mockResolvedValue(0)
     mockPredictionCount.mockResolvedValue(0)
     mockCommitmentCount.mockResolvedValue(0)
-    mockGetOracleSearchHealth.mockResolvedValue(null)
+    mockGetOraculSearchHealth.mockResolvedValue(null)
 
     const { GET } = await import('@/app/api/cron/heartbeat/route')
     await GET(makeRequest('test-secret'))

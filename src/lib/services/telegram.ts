@@ -159,7 +159,7 @@ export function notifyAllSearchProvidersFailed(query?: string): void {
   sendChannelNotification(msg, 'clean')
 }
 
-export function notifyOracleSearchUnavailable(query?: string): void {
+export function notifyOraculSearchUnavailable(query?: string): void {
   if (isDevEnv()) return
   if (!canNotify('oracle-search-unavailable')) return
 
@@ -694,7 +694,7 @@ export function notifyHighLoad(
   sendChannelNotification(msg, 'clean')
 }
 
-export function notifyOracleForecastUnavailable(): void {
+export function notifyOraculForecastUnavailable(): void {
   if (isDevEnv()) return
   if (!canNotify('oracle-forecast-unavailable')) return
 
@@ -707,7 +707,7 @@ export function notifyOracleForecastUnavailable(): void {
   sendChannelNotification(msg, 'clean')
 }
 
-export function notifyOracleForecastRecovered(): void {
+export function notifyOraculForecastRecovered(): void {
   if (isDevEnv()) return
   if (!canNotify('oracle-forecast-recovered')) return
 

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import {
-  getOracleForecast,
+  getOraculForecast,
   DEFAULT_MAX_ARTICLES,
   isTransportNullReason,
   type OracleFailureClass,
@@ -11,7 +11,7 @@ import {
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
-import { saveOracleSnapshotOnly, markOracleAttempted } from '@/lib/services/context'
+import { saveOracleSnapshotOnly, markOraculAttempted } from '@/lib/services/context'
 import {
   addArticlesToPool,
   articleIdsByUrl,
@@ -74,7 +74,7 @@ export type ReaskPrediction = {
  * of searching. Reuses the same search → Oracul → enrich path as the user-triggered
  * analyze route.
  *
- * With supplied articles the two empty-marker writes (`markOracleAttempted`) are
+ * With supplied articles the two empty-marker writes (`markOraculAttempted`) are
  * skipped: they exist only so the backfill's candidate query converges, and on a
  * retried forecast — which already has real snapshots — an empty marker would
  * become the LATEST evidence snapshot that every latest-snapshot reader trusts.
@@ -94,7 +94,7 @@ export async function refreshOracleSnapshot(
     })
   }
   if (!searchResults || searchResults.length === 0) {
-    if (!supplied) await markOracleAttempted(prediction.id, 'no-articles')
+    if (!supplied) await markOraculAttempted(prediction.id, 'no-articles')
     return { status: 'no-articles' }
   }
 
@@ -128,9 +128,9 @@ export async function refreshOracleSnapshot(
   // URL-keyed metadata lookup.
   const articlesToScore = searchResults.filter((_, i) => claimResults[i].result === 'claimed')
 
-  // No try/catch — `getOracleForecast` never throws; the `extractor_error` branch that
+  // No try/catch — `getOraculForecast` never throws; the `extractor_error` branch that
   // used to sit here was dead code. Same removal as the news-indexer route (daatan#1231).
-  const { forecast, failureClass } = await getOracleForecast(
+  const { forecast, failureClass } = await getOraculForecast(
     prediction.claimText,
     {
       articles: articlesToScore,
@@ -155,12 +155,12 @@ export async function refreshOracleSnapshot(
       searchResults.filter((_, i) => claimResults[i].result === 'claimed').map((r) => r.url),
       failureClass ?? 'oracle_null',
     )
-    if (!supplied) await markOracleAttempted(prediction.id, 'no-oracle')
+    if (!supplied) await markOraculAttempted(prediction.id, 'no-oracle')
     // We hung up on a run retro is finishing anyway — go back for it (daatan#1262).
     // Opt-in per caller so the re-ask below can re-enter this function without
     // scheduling another one.
     if (opts?.reask && isTransportNullReason(failureClass)) {
-      scheduleOracleReask(prediction, articlesToScore, origin)
+      scheduleOraculReask(prediction, articlesToScore, origin)
     }
     return { status: 'no-oracle', failureClass }
   }
@@ -332,7 +332,7 @@ export function _reaskInFlight(): number {
  *
  * Fire-and-forget by construction: callers have already responded. Never throws.
  */
-export function scheduleOracleReask(
+export function scheduleOraculReask(
   prediction: ReaskPrediction,
   articles: SuppliedArticle[],
   origin: PoolOrigin,
@@ -347,7 +347,7 @@ export function scheduleOracleReask(
   }
   inFlightReasks++
   const timer = setTimeout(() => {
-    void runOracleReask(prediction, articles, origin).finally(() => {
+    void runOraculReask(prediction, articles, origin).finally(() => {
       inFlightReasks--
     })
   }, REASK_DELAY_MS)
@@ -375,7 +375,7 @@ export function scheduleOracleReask(
  *    Deliberate: the number is the point, and a match notification two minutes after
  *    the fact is noise.
  */
-export async function runOracleReask(
+export async function runOraculReask(
   prediction: ReaskPrediction,
   articles: SuppliedArticle[],
   origin: PoolOrigin,

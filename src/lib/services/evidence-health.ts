@@ -10,7 +10,7 @@ const log = createLogger('evidence-health')
  *
  * The pipeline had no alerting at all: `evidence-pool.ts` writes
  * `{status:'FAILED', statusReason}` with a `log.warn` and imports nothing from
- * telegram.ts, `fetchOracleSources` discards `Promise.allSettled` rejections, and
+ * telegram.ts, `fetchOraculSources` discards `Promise.allSettled` rejections, and
  * `/api/cron/evidence-pool-stats` computes throughput for the weekly waste report
  * and alerts on nothing. Every evidence-quality bug in the backlog was therefore
  * found by a human going and looking — including a source that had been silent for

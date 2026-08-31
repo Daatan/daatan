@@ -250,7 +250,7 @@ describe('retryPoolExtractions', () => {
       expect(mockUpdateMany).not.toHaveBeenCalled()
       expect(r.finalized).toBe(0)
       // Still counted as a null run — the sweep's own accounting is unchanged.
-      expect(r.noOracle).toBe(1)
+      expect(r.noOracul).toBe(1)
     })
 
     it('does not finalize when the run reports no failure class at all', async () => {
@@ -315,7 +315,7 @@ describe('retryPoolExtractions', () => {
 
     const r = await retryPoolExtractions(5)
 
-    expect(r).toMatchObject({ processed: 3, ok: 1, noOracle: 1, failed: 1, remaining: 4 })
+    expect(r).toMatchObject({ processed: 3, ok: 1, noOracul: 1, failed: 1, remaining: 4 })
   })
 
   it('skips a prediction whose retryable rows all lack a title', async () => {

@@ -9,10 +9,10 @@ import {
 
 vi.mock('@/lib/services/oracle', async () => {
   const actual = await vi.importActual<typeof import('@/lib/services/oracle')>('@/lib/services/oracle')
-  return { ...actual, getOracleForecast: vi.fn() }
+  return { ...actual, getOraculForecast: vi.fn() }
 })
-import { getOracleForecast } from '@/lib/services/oracle'
-const oracleMock = vi.mocked(getOracleForecast)
+import { getOraculForecast } from '@/lib/services/oracle'
+const oracleMock = vi.mocked(getOraculForecast)
 
 beforeEach(() => {
   oracleMock.mockReset()

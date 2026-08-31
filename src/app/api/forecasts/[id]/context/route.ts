@@ -7,7 +7,7 @@ import { llmService } from '@/lib/llm'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import { guessChances } from '@/lib/llm/expressPrediction'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
-import { getOracleForecast, recordOracleFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
+import { getOraculForecast, recordOraculFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { addArticlesToPool, articleIdsByUrl, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
@@ -263,7 +263,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             if (articlesToScore.length === 0) {
                 // Every searched article is already pooled with unchanged content —
                 // nothing to extract. Read the existing pool aggregate directly
-                // rather than either calling getOracleForecast with an empty
+                // rather than either calling getOraculForecast with an empty
                 // articles list (which makes retro fall back to its OWN internal
                 // search instead of what daatan already found — a silent
                 // divergence) or falling through to the ungrounded guessChances
@@ -303,7 +303,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 return toEstimationResult(resolved)
             }
 
-            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOracleForecast(prediction.claimText, {
+            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOraculForecast(prediction.claimText, {
                 articles: articlesToScore.map(r => ({
                     url: r.url,
                     title: r.title,
@@ -422,7 +422,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     prediction.detailsText ?? '',
                     articlesMapped
                 )
-                void recordOracleFallback(oracleLogId, chances.probability)
+                void recordOraculFallback(oracleLogId, chances.probability)
                 log.info(
                     {
                         predictionId: prediction.id,

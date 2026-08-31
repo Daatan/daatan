@@ -60,7 +60,7 @@ export interface RemediationForecast {
   /** Batches the claim gate refused. Non-zero means a contentHash null did not take —
    *  the mechanism failed, not the extraction. */
   unchanged: number
-  noOracle: number
+  noOracul: number
   insufficient: number
   failed: number
 }
@@ -126,7 +126,7 @@ export async function remediatePool(
       confidenceAfter: null,
       ok: 0,
       unchanged: 0,
-      noOracle: 0,
+      noOracul: 0,
       insufficient: 0,
       failed: 0,
     }
@@ -152,7 +152,7 @@ export async function remediatePool(
         if (r.status === 'ok') f.ok++
         else if (r.status === 'unchanged') f.unchanged++
         else if (r.status === 'insufficient') f.insufficient++
-        else f.noOracle++
+        else f.noOracul++
       } catch (err) {
         f.failed++
         log.warn({ predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, err }, 'pool-remediate.batch_failed')

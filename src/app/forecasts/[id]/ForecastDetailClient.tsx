@@ -545,9 +545,9 @@ export default function ForecastDetailClient({
           // decided and REPLACED the pooled estimate with a pinned constant.
           // Same freshness rule as aiAbstained — an in-page analyze run's
           // aiEstimate overrides the server-prefetched latest snapshot.
-          const latestOracle = initialContextSnapshots?.[0]?.oracleSnapshot ?? null
-          const aiSettled = !aiAbstained && (aiEstimate ? !!aiEstimate.settled : !!latestOracle?.settled)
-          const settlerNames = aiSettled ? settlingSourceNames(latestOracle) : []
+          const latestOracul = initialContextSnapshots?.[0]?.oracleSnapshot ?? null
+          const aiSettled = !aiAbstained && (aiEstimate ? !!aiEstimate.settled : !!latestOracul?.settled)
+          const settlerNames = aiSettled ? settlingSourceNames(latestOracul) : []
 
           return (
             <div className="flex flex-col items-center">

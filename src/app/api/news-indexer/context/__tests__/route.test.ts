@@ -19,9 +19,9 @@ vi.mock('@/lib/prisma', () => ({
 // passing after that set changed. Only the network call is replaced.
 vi.mock('@/lib/services/oracle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/oracle')>()),
-  getOracleForecast: vi.fn(),
+  getOraculForecast: vi.fn(),
 }))
-vi.mock('@/lib/services/oracle-backfill', () => ({ scheduleOracleReask: vi.fn() }))
+vi.mock('@/lib/services/oracle-backfill', () => ({ scheduleOraculReask: vi.fn() }))
 vi.mock('@/lib/services/context', () => ({ saveNewsIndexerMatch: vi.fn(), getLatestOracleSnapshot: vi.fn() }))
 vi.mock('@/lib/services/telegram', () => ({ notifyNewsArticleMatched: vi.fn() }))
 vi.mock('@/lib/services/forecast-sources', () => ({ getArticleMetaByUrl: vi.fn() }))
@@ -51,8 +51,8 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 import { POST } from '../route'
 import { prisma } from '@/lib/prisma'
-import { getOracleForecast } from '@/lib/services/oracle'
-import { scheduleOracleReask } from '@/lib/services/oracle-backfill'
+import { getOraculForecast } from '@/lib/services/oracle'
+import { scheduleOraculReask } from '@/lib/services/oracle-backfill'
 import { saveNewsIndexerMatch, getLatestOracleSnapshot } from '@/lib/services/context'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
@@ -135,17 +135,17 @@ describe('POST /api/news-indexer/context', () => {
   it('rejects a wrong secret with 401 before doing any work', async () => {
     const res = await POST(post('wrong-secret'))
     expect(res.status).toBe(401)
-    expect(getOracleForecast).not.toHaveBeenCalled()
+    expect(getOraculForecast).not.toHaveBeenCalled()
   })
 
   it('rejects a missing secret header with 401', async () => {
     const res = await POST(post(null))
     expect(res.status).toBe(401)
-    expect(getOracleForecast).not.toHaveBeenCalled()
+    expect(getOraculForecast).not.toHaveBeenCalled()
   })
 
   it('returns the per-article Oracul output so news-indexer can store it', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     const res = await POST(post('test-secret'))
     expect(res.status).toBe(200)
@@ -161,58 +161,58 @@ describe('POST /api/news-indexer/context', () => {
     })
   })
 
-  it('forwards the prediction\'s claimDirection/claimDeadline to getOracleForecast (arms retro #244)', async () => {
+  it('forwards the prediction\'s claimDirection/claimDeadline to getOraculForecast (arms retro #244)', async () => {
     const deadline = new Date('2026-12-31T00:00:00.000Z')
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
       ...ACTIVE_PREDICTION,
       claimDirection: 'ARRIVAL',
       claimDeadline: deadline,
     } as never)
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
 
-    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
     expect(opts?.claimDirection).toBe('ARRIVAL')
     expect(opts?.claimDeadline).toBe(deadline)
   })
 
-  it('forwards the prediction\'s resolutionRules to getOracleForecast (daatan#1375)', async () => {
+  it('forwards the prediction\'s resolutionRules to getOraculForecast (daatan#1375)', async () => {
     vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
       ...ACTIVE_PREDICTION,
       resolutionRules: 'Only an official government announcement counts.',
     } as never)
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
 
-    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
     expect(opts?.resolutionRules).toBe('Only an official government announcement counts.')
   })
 
   it('threads the trigger article\'s gatekeeper verdict into the Oracul articles (Phase 1.3)', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret', { ...VALID_BODY, relevance: 0.83, isPrediction: true }))
 
-    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
     const trigger = opts?.articles?.find((a) => a.url === VALID_BODY.articleUrl)
     expect(trigger?.relevance).toBe(0.83)
     expect(trigger?.isPrediction).toBe(true)
   })
 
   it('omits the verdict when the push carries none (matcher fast-path)', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))  // VALID_BODY has no relevance/isPrediction
 
-    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
     expect(opts?.articles?.[0]?.relevance).toBeUndefined()
     expect(opts?.articles?.[0]?.isPrediction).toBeUndefined()
   })
 
   it('returns null enrichment when the Oracul has no usable forecast', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
     const res = await POST(post('test-secret'))
     expect(res.status).toBe(200)
@@ -229,7 +229,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('notifies Telegram when the Oracul produced an estimate, with the pre-push value as "previous"', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).toHaveBeenCalledTimes(1)
@@ -241,7 +241,7 @@ describe('POST /api/news-indexer/context', () => {
   it('tells Telegram what the trigger article actually SAID — its stance and relevance', async () => {
     // Without these the message reports that the estimate moved but never why: a reader cannot
     // tell a decisive on-topic article from a marginal one that happened to clear the gate.
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     const [, article, match] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
@@ -253,7 +253,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('passes the Oracul-extracted claim as the article extract, falling back to the snippet', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     const [, article] = vi.mocked(notifyNewsArticleMatched).mock.calls[0]
@@ -261,7 +261,7 @@ describe('POST /api/news-indexer/context', () => {
 
     // No extracted claim → the raw snippet stands in.
     vi.mocked(notifyNewsArticleMatched).mockClear()
-    vi.mocked(getOracleForecast).mockResolvedValue({
+    vi.mocked(getOraculForecast).mockResolvedValue({
       forecast: { ...ORACLE_WITH_SOURCE, sources: [{ ...ORACLE_WITH_SOURCE.sources[0], claims: [] }] },
       logId: null,
     } as never)
@@ -273,7 +273,7 @@ describe('POST /api/news-indexer/context', () => {
     // The claim step already resolved the trigger article's row id (daatan#1381) — no
     // separate findUnique lookup exists anymore, so the id comes straight off the claim.
     vi.mocked(claimArticlesForExtraction).mockResolvedValue([{ result: 'claimed', articleId: 'epa-1' }])
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(post('test-secret'))
     expect(vi.mocked(notifyNewsArticleMatched).mock.calls[0][4]).toEqual({
@@ -291,7 +291,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'claimed', articleId: 'row-bbc' },
       { result: 'skip_pending', articleId: null },
     ])
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     await POST(
       post('test-secret', {
@@ -310,7 +310,7 @@ describe('POST /api/news-indexer/context', () => {
     // The Oracul grades every article's claim-aware relevance and its SQUARE weights the article
     // in aggregation — but this route used to drop the field (exactly as it once dropped `author`),
     // so news-indexer could record THAT an article counted and never WHY.
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
     const res = await POST(post('test-secret'))
     const body = await res.json()
@@ -321,14 +321,14 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('does NOT notify Telegram on a null-Oracul push (news-indexer retries the same set; each retry would duplicate the message)', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
     await POST(post('test-secret'))
     expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
   })
 
   it('does NOT notify Telegram when the push dedups to nothing stored (a re-delivered measurement)', async () => {
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false, contextSnapshotId: 'snap-1' })
 
     await POST(post('test-secret'))
@@ -359,7 +359,7 @@ describe('POST /api/news-indexer/context', () => {
         },
       ],
     }
-    vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
 
     const res = await POST(
       post('test-secret', {
@@ -375,7 +375,7 @@ describe('POST /api/news-indexer/context', () => {
     const body = await res.json()
 
     // Oracul saw both articles (aggregation, not last-write-wins).
-    const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
+    const [, opts] = vi.mocked(getOraculForecast).mock.calls[0]
     expect(opts?.articles).toHaveLength(2)
 
     // Per-article enrichment for the whole set is returned.
@@ -399,7 +399,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-    vi.mocked(getOracleForecast).mockResolvedValue({
+    vi.mocked(getOraculForecast).mockResolvedValue({
       // Only the BBC (non-trigger) article comes back; the AJ trigger is absent.
       forecast: { ...ORACLE_WITH_SOURCE, articles_used: 1, sources: [ORACLE_WITH_SOURCE.sources[0]] },
       logId: null,
@@ -429,7 +429,7 @@ describe('POST /api/news-indexer/context', () => {
     // Downstream (elections.daatan.com) matches tracked commentators on
     // `oracleSnapshot.sources[].author`; the Oracul response never carries one.
     beforeEach(() => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
 
     const snapshotSources = (): Record<string, unknown>[] =>
@@ -481,7 +481,7 @@ describe('POST /api/news-indexer/context', () => {
     // over the lookup's, and a lookup name is never attached to a different push-supplied id.
     // A NEWER news-indexer does send names — that path is the news-indexer#302 suite below.
     beforeEach(() => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
 
     const snapshotSources = (): Record<string, unknown>[] =>
@@ -625,7 +625,7 @@ describe('POST /api/news-indexer/context', () => {
           },
         ],
       }
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_TWO_SOURCES, logId: null } as never)
       vi.mocked(getArticleMetaByUrl).mockResolvedValue(
         new Map([
           [
@@ -775,7 +775,7 @@ describe('POST /api/news-indexer/context', () => {
     // Collapsing the two would re-derive by DB round-trip exactly what we were just handed,
     // which is the per-push latency daatan#1463 had to give back to fix the NULL-names bug.
     beforeEach(() => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
 
     const snapshotSources = (): Record<string, unknown>[] =>
@@ -849,7 +849,7 @@ describe('POST /api/news-indexer/context', () => {
         { result: 'claimed', articleId: 'row-1' },
         { result: 'claimed', articleId: 'row-2' },
       ])
-      vi.mocked(getOracleForecast).mockResolvedValue({
+      vi.mocked(getOraculForecast).mockResolvedValue({
         forecast: {
           ...ORACLE_WITH_SOURCE,
           articles_used: 2,
@@ -1046,7 +1046,7 @@ describe('POST /api/news-indexer/context', () => {
     }
 
     beforeEach(() => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
 
     it('persists the pool aggregate — mean, CI, std and articlesUsed all come from the pool', async () => {
@@ -1215,7 +1215,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('does not touch the pool when the Oracul returns no usable forecast', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))
 
@@ -1232,7 +1232,7 @@ describe('POST /api/news-indexer/context', () => {
     // confidence, whose trigger article the Oracul dropped, is all-null and gets retried
     // anyway. The field says it outright instead.
     it('is true when the Oracul produced an estimate and it was stored', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       const body = await (await POST(post('test-secret'))).json()
 
@@ -1241,7 +1241,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('is true on an ABSTENTION — the all-null payload that used to read as "unscored"', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
       vi.mocked(recomputeFromPool).mockResolvedValue({
         mean: 0, std: 0, ciLow: 0, ciHigh: 0, articlesUsed: 0, settled: false,
         insufficientData: true, reason: 'all_articles_off_topic',
@@ -1258,7 +1258,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('is false when the Oracul returned nothing — the case that IS worth retrying', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       const body = await (await POST(post('test-secret'))).json()
 
@@ -1266,7 +1266,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('is false when the write dedupped to nothing stored', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
       vi.mocked(saveNewsIndexerMatch).mockResolvedValue({ stored: false, contextSnapshotId: 'snap-1' })
 
       const body = await (await POST(post('test-secret'))).json()
@@ -1291,7 +1291,7 @@ describe('POST /api/news-indexer/context', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
 
-      expect(getOracleForecast).not.toHaveBeenCalled()
+      expect(getOraculForecast).not.toHaveBeenCalled()
       expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
       expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
       expect(body).toMatchObject({ ok: true, probability: null, skipped: 'already_complete' })
@@ -1302,7 +1302,7 @@ describe('POST /api/news-indexer/context', () => {
 
       const body = await (await POST(post('test-secret'))).json()
 
-      expect(getOracleForecast).not.toHaveBeenCalled()
+      expect(getOraculForecast).not.toHaveBeenCalled()
       expect(body).toMatchObject({ ok: true, probability: null, skipped: 'in_flight' })
     })
 
@@ -1311,11 +1311,11 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       const res = await POST(post('test-secret'))
       expect(res.status).toBe(200)
-      expect(getOracleForecast).toHaveBeenCalledTimes(1)
+      expect(getOraculForecast).toHaveBeenCalledTimes(1)
     })
 
     it('only sends newly-claimed articles to the Oracul — an unchanged article must not be re-extracted (daatan#1172)', async () => {
@@ -1323,7 +1323,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(
         post('test-secret', {
@@ -1335,7 +1335,7 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      expect(getOracleForecast).toHaveBeenCalledWith(
+      expect(getOraculForecast).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           articles: [expect.objectContaining({ url: 'https://b.com/2' })],
@@ -1345,7 +1345,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('claims each article in the push with its url/title/snippet, keyed to this prediction', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(post('test-secret'))
 
@@ -1362,8 +1362,8 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     // The `extractor_error` test that used to sit here is gone with the branch it covered
-    // (daatan#1231). It asserted a throw from `getOracleForecast` released the claim and
-    // returned 500 — but `getOracleForecast` cannot throw: `getOracleConfig` is a pure env
+    // (daatan#1231). It asserted a throw from `getOraculForecast` released the claim and
+    // returned 500 — but `getOraculForecast` cannot throw: `getOracleConfig` is a pure env
     // read, every network/parse path is inside its own try, and the catch's only await
     // (`logOracleCall`) swallows its own errors. The mock could do what the real function
     // cannot. That invariant is pinned directly in oracle.test.ts → "never rejects".
@@ -1375,7 +1375,7 @@ describe('POST /api/news-indexer/context', () => {
       // `ArticleInput.text` ("if omitted, oracle fetches via trafilatura"); daatan was the
       // missing link. Measured: 1.5% of 88,033 Oracul article reads were pre-fetched, 19.0%
       // fell through to the extractor running over title+snippet.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
         post('test-secret', {
@@ -1384,25 +1384,25 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      const sent = vi.mocked(getOraculForecast).mock.calls[0][1]!.articles!
       expect(sent[0].text).toBe('the archived body')
     })
 
     it('accepts the body on the legacy single-article shape too', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(post('test-secret', { ...VALID_BODY, articleText: 'legacy body' }))
 
-      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBe('legacy body')
+      expect(vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].text).toBe('legacy body')
     })
 
     it('leaves the body undefined when none is sent, so nothing changes for an unarchived article', async () => {
       // The inert case, and it is the ONLY case until news-indexer's PUSH_ARTICLE_TEXT is on.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(post('test-secret'))
 
-      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text).toBeUndefined()
+      expect(vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].text).toBeUndefined()
     })
 
     it('truncates a body over the Oracul\'s truncation point instead of dropping the push', async () => {
@@ -1413,7 +1413,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'claimed', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
         post('test-secret', {
@@ -1425,7 +1425,7 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      const sent = vi.mocked(getOraculForecast).mock.calls[0][1]!.articles!
       expect(sent[0].text).toHaveLength(4000)
       // The innocent neighbour still arrives — that is the whole point of the change.
       expect(sent[1].text).toBe('a good body')
@@ -1436,7 +1436,7 @@ describe('POST /api/news-indexer/context', () => {
       // which counts CODE POINTS, while JS `.length` counts UTF-16 units — an emoji is 1 there
       // and 2 here. So a body news-indexer measured at 4,000 arrived measuring 8,000 and the
       // `.max(4000)` 400'd the entire push on its first live payload.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       const inBoundsForPython = '😀'.repeat(4000) // 4,000 code points, 8,000 UTF-16 units
 
@@ -1447,8 +1447,8 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      expect(getOracleForecast).toHaveBeenCalled()
-      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!.length).toBeLessThanOrEqual(4000)
+      expect(getOraculForecast).toHaveBeenCalled()
+      expect(vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].text!.length).toBeLessThanOrEqual(4000)
     })
 
     it('never emits a lone surrogate when the cap falls mid-emoji', async () => {
@@ -1457,7 +1457,7 @@ describe('POST /api/news-indexer/context', () => {
       // Oracul would raise UnicodeEncodeError on a body we already told the producer we took —
       // reintroducing the dropped-delivery failure daatan#1278 removed. The emoji test above
       // happens to cut on an even offset and never sees this.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       // 3,999 filler + emoji ⇒ the 4,000th unit is the emoji's HIGH surrogate.
       const straddling = 'x'.repeat(3999) + '😀' + 'tail'
@@ -1469,7 +1469,7 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      const text = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].text!
+      const text = vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].text!
       expect(text.length).toBeLessThanOrEqual(4000)
       // The half-emoji is dropped rather than shipped broken.
       expect(text).toHaveLength(3999)
@@ -1481,7 +1481,7 @@ describe('POST /api/news-indexer/context', () => {
       // daatan#1290 / news-indexer#210. news-indexer knows the language per-source but never
       // sent it, so the Oracul stances raw Hebrew/Russian with English prompts. Inert at the
       // Oracul until retro#417 adds the field (its pydantic model ignores extras).
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
         post('test-secret', {
@@ -1490,25 +1490,25 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      const sent = vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!
+      const sent = vi.mocked(getOraculForecast).mock.calls[0][1]!.articles!
       expect(sent[0].language).toBe('he')
       expect(sent[0].text).toBe('גוף המאמר')
     })
 
     it('accepts the language on the legacy single-article shape as articleLanguage', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(post('test-secret', { ...VALID_BODY, articleLanguage: 'ru' }))
 
-      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].language).toBe('ru')
+      expect(vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].language).toBe('ru')
     })
 
     it('leaves the language undefined when none is sent', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(post('test-secret'))
 
-      expect(vi.mocked(getOracleForecast).mock.calls[0][1]!.articles![0].language).toBeUndefined()
+      expect(vi.mocked(getOraculForecast).mock.calls[0][1]!.articles![0].language).toBeUndefined()
     })
 
     it('stamps the Oracul failure CLASS on the released claims, not a blanket oracle_null', async () => {
@@ -1516,7 +1516,7 @@ describe('POST /api/news-indexer/context', () => {
       // byte-identical pool rows, so 73% of recent fetches carried one uninformative
       // string and the retry sweep could not tell "not worth re-asking" from "never got
       // an answer". The cause now lands where the sweep can read it.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
 
       await POST(post('test-secret'))
 
@@ -1533,7 +1533,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' } as never)
 
       await POST(
         post('test-secret', {
@@ -1545,11 +1545,11 @@ describe('POST /api/news-indexer/context', () => {
         }),
       )
 
-      expect(scheduleOracleReask).toHaveBeenCalledTimes(1)
-      const [, articles, origin] = vi.mocked(scheduleOracleReask).mock.calls[0]
+      expect(scheduleOraculReask).toHaveBeenCalledTimes(1)
+      const [, articles, origin] = vi.mocked(scheduleOraculReask).mock.calls[0]
       // Set equality with what the extractor was handed — this is the cache key.
       expect(articles.map((a) => a.url)).toEqual(
-        vi.mocked(getOracleForecast).mock.calls[0][1]!.articles!.map((a) => a.url),
+        vi.mocked(getOraculForecast).mock.calls[0][1]!.articles!.map((a) => a.url),
       )
       expect(articles.map((a) => a.url)).toEqual(['https://b.com/2'])
       expect(articles[0]).toMatchObject({ title: 'B', snippet: 'sb' })
@@ -1560,32 +1560,32 @@ describe('POST /api/news-indexer/context', () => {
       // `oracle_abstain` is a verdict about the articles: the run completed, so there is
       // no abandoned result to collect and re-asking with the same set buys the same
       // answer at full price. Only the transport classes leave work behind.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(post('test-secret'))
 
-      expect(scheduleOracleReask).not.toHaveBeenCalled()
+      expect(scheduleOraculReask).not.toHaveBeenCalled()
     })
 
     it('does NOT re-ask on an unclassified null', async () => {
       // Legacy `oracle_null` conflates all six causes, so it is not evidence that a run
       // completed — same reasoning that keeps it out of ATTRIBUTABLE_NULL_REASONS.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))
 
-      expect(scheduleOracleReask).not.toHaveBeenCalled()
+      expect(scheduleOraculReask).not.toHaveBeenCalled()
     })
 
     it('does NOT re-ask when the Oracul returned a usable forecast', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({
+      vi.mocked(getOraculForecast).mockResolvedValue({
         forecast: { mean: 0.4, std: 0.1, ci_low: 0.2, ci_high: 0.6, articles_used: 1, sources: [], placeholder: false },
         logId: null,
       } as never)
 
       await POST(post('test-secret'))
 
-      expect(scheduleOracleReask).not.toHaveBeenCalled()
+      expect(scheduleOraculReask).not.toHaveBeenCalled()
     })
 
     it('fails only THIS request\'s claims on a null forecast, never a concurrent run\'s', async () => {
@@ -1598,7 +1598,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(
         post('test-secret', {
@@ -1619,7 +1619,7 @@ describe('POST /api/news-indexer/context', () => {
       // Belt and braces: an unclassified null is unreachable today (every branch sets a
       // class, pinned in oracle.test.ts), but releasing the claim must never depend on
       // that — a claim left PENDING blocks the article for the full staleness window.
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: null } as never)
 
       await POST(post('test-secret'))
 
@@ -1627,7 +1627,7 @@ describe('POST /api/news-indexer/context', () => {
     })
 
     it('releases claims the Oracul omitted after pooling — a gatekeeper-rejected article must not stay PENDING forever', async () => {
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(post('test-secret'))
 
@@ -1641,7 +1641,7 @@ describe('POST /api/news-indexer/context', () => {
       { result: 'skip_complete', articleId: 'row-1' },
       { result: 'claimed', articleId: 'row-2' },
     ])
-      vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 
       await POST(
         post('test-secret', {

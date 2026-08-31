@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const { mockGetOracleSearchHealth, mockNotifySearchHealthDigest } = vi.hoisted(() => ({
-  mockGetOracleSearchHealth: vi.fn(),
+const { mockGetOraculSearchHealth, mockNotifySearchHealthDigest } = vi.hoisted(() => ({
+  mockGetOraculSearchHealth: vi.fn(),
   mockNotifySearchHealthDigest: vi.fn(),
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({
-  getOracleSearchHealth: (...args: unknown[]) => mockGetOracleSearchHealth(...args),
+  getOraculSearchHealth: (...args: unknown[]) => mockGetOraculSearchHealth(...args),
   SEARCH_LOW_CREDITS_THRESHOLD: 100,
 }))
 
@@ -47,7 +47,7 @@ describe('GET /api/cron/search-health', () => {
   })
 
   it('returns ok with skipped=true when oracle not configured', async () => {
-    mockGetOracleSearchHealth.mockResolvedValue(null)
+    mockGetOraculSearchHealth.mockResolvedValue(null)
     const { GET } = await import('@/app/api/cron/search-health/route')
     const res = await GET(makeRequest('test-secret'))
     expect(res.status).toBe(200)
@@ -58,7 +58,7 @@ describe('GET /api/cron/search-health', () => {
   })
 
   it('sends ONE grouped digest covering exhausted + low providers, skipping healthy/unconfigured', async () => {
-    mockGetOracleSearchHealth.mockResolvedValue({
+    mockGetOraculSearchHealth.mockResolvedValue({
       overall: 'degraded',
       usable_count: 1,
       providers: {
@@ -83,7 +83,7 @@ describe('GET /api/cron/search-health', () => {
   })
 
   it('marks the digest critical (unhealthy) when no providers are usable', async () => {
-    mockGetOracleSearchHealth.mockResolvedValue({
+    mockGetOraculSearchHealth.mockResolvedValue({
       overall: 'unhealthy',
       usable_count: 0,
       providers: {
@@ -100,7 +100,7 @@ describe('GET /api/cron/search-health', () => {
   })
 
   it('still calls the digest (which no-ops) when all providers are healthy', async () => {
-    mockGetOracleSearchHealth.mockResolvedValue({
+    mockGetOraculSearchHealth.mockResolvedValue({
       overall: 'healthy',
       usable_count: 2,
       providers: {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
 import { checkOracleHealth } from '@/lib/services/oracle'
-import { notifyOracleForecastUnavailable } from '@/lib/services/telegram'
+import { notifyOraculForecastUnavailable } from '@/lib/services/telegram'
 import { secretsMatch } from '@/lib/cron-auth'
 
 const log = createLogger('cron-oracle-health')
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   log.info({ healthy }, 'Oracul health check')
 
   if (!healthy) {
-    notifyOracleForecastUnavailable()
+    notifyOraculForecastUnavailable()
     log.warn('Oracul forecast unavailable — Telegram alert fired')
   }
 

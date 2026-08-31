@@ -27,7 +27,7 @@ export const MAX_ORACLE_SOURCES_PER_RUN = 3
  * individual queries are skipped (oracleSearch never throws and returns null
  * when the Oracul is unconfigured or empty).
  */
-export async function fetchOracleSources(
+export async function fetchOraculSources(
   queries: string[],
   opts: { windowHours: number; meta: OracleCallMeta },
 ): Promise<RssItem[]> {

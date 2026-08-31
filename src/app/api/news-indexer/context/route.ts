@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError, handleRouteError } from '@/lib/api-error'
-import { getOracleForecast, isTransportNullReason, type ArticleInput } from '@/lib/services/oracle'
-import { scheduleOracleReask } from '@/lib/services/oracle-backfill'
+import { getOraculForecast, isTransportNullReason, type ArticleInput } from '@/lib/services/oracle'
+import { scheduleOraculReask } from '@/lib/services/oracle-backfill'
 import { stanceToPercent, stanceStdToPercent, enrichOracleSources } from '@/lib/services/oracle-snapshot'
 import { saveNewsIndexerMatch } from '@/lib/services/context'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
@@ -306,11 +306,11 @@ export async function POST(request: NextRequest) {
     // over the full set.
     const articlesToScore = articles.filter((_, i) => claimResults[i].result === 'claimed')
 
-    // No try/catch: `getOracleForecast` never throws — it classifies every failure and
+    // No try/catch: `getOraculForecast` never throws — it classifies every failure and
     // returns. The `extractor_error` branch that used to sit here was unreachable (its
     // only `await` inside the catch, `logOracleCall`, is itself fire-and-forget), so it
     // was dead code claiming to handle a case that cannot occur (daatan#1231).
-    const { forecast: oracleForecast, failureClass } = await getOracleForecast(
+    const { forecast: oracleForecast, failureClass } = await getOraculForecast(
       prediction.claimText,
       {
         articles: articlesToScore,
@@ -681,7 +681,7 @@ export async function POST(request: NextRequest) {
       // whole mechanism — retro keys its cache on the sorted URL set, so a set that
       // merely overlaps re-runs the extractor and inverts the saving.
       if (isTransportNullReason(failureClass)) {
-        scheduleOracleReask(
+        scheduleOraculReask(
           prediction,
           items
             .filter((_, i) => claimResults[i].result === 'claimed')

@@ -6,12 +6,12 @@
 import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
-import { getOracleProbability, BOT_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
+import { getOraculProbability, BOT_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { createCommitment } from '@/lib/services/commitment'
 import { voteDecisionSchema } from '@/lib/llm/schemas'
 import { type BotWithUser, log, callLLMWithTimeout, logBotAction, randomInt } from './shared'
 
-// Per-run cap on Oracul consultations during voting. Each getOracleProbability
+// Per-run cap on Oracul consultations during voting. Each getOraculProbability
 // call hits the Oracul's /forecast endpoint (article search + analysis), which
 // runs sequentially here, so cap × timeout bounds the Oracul time per bot run.
 // We use the longer BOT_FORECAST_TIMEOUT_MS (20s) to let slow-but-valid calls
@@ -73,14 +73,14 @@ export async function runVoting(
       // Consult the TruthMachine Oracle for an external P(YES) estimate and
       // surface it to the LLM. Appended in code rather than via a {{oracleHint}}
       // template placeholder so it works regardless of whether the template is
-      // served from Bedrock or the local fallback. getOracleProbability never
+      // served from Bedrock or the local fallback. getOraculProbability never
       // throws and returns null when the Oracul is unconfigured/unavailable, so
       // this is fail-open: no signal → unchanged behaviour.
       if (oracleConsults < MAX_ORACLE_CONSULTS_PER_VOTE_RUN) {
         oracleConsults++
         // Strip the 🤖 author prefix; it's noise in the Oracul's search query.
         const oracleQuestion = forecast.claimText.replace(/^🤖\s*/, '')
-        const oracleProbability = await getOracleProbability(
+        const oracleProbability = await getOraculProbability(
           oracleQuestion,
           { source: 'bot-voting', userId: bot.userId, predictionId: forecast.id },
           { timeoutMs: BOT_FORECAST_TIMEOUT_MS, claimDirection: forecast.claimDirection, claimDeadline: forecast.claimDeadline, resolutionRules: forecast.resolutionRules },

@@ -9,7 +9,7 @@ import {
   type OracleTokenUsage,
 } from '@/lib/services/oracleClient'
 
-export { recordOracleFallback } from '@/lib/services/oracleClient'
+export { recordOraculFallback } from '@/lib/services/oracleClient'
 
 const log = createLogger('oracle')
 
@@ -526,7 +526,7 @@ export const ATTRIBUTABLE_NULL_REASONS: readonly string[] = ['oracle_abstain', '
  *    `TRANSPORT_RECLAIM_BACKOFF_MS` in evidence-pool.ts.
  *  - **the work is recoverable** (daatan#1262). Re-asking with the IDENTICAL
  *    article set inside the TTL is served from `forecast_cache` at zero LLM cost.
- *    See `scheduleOracleReask` in oracle-backfill.ts.
+ *    See `scheduleOraculReask` in oracle-backfill.ts.
  *
  * `oracle_http` and `oracle_unconfigured` are deliberately NOT here. They are also
  * facts about us rather than the article, but neither leaves a completed run behind
@@ -541,7 +541,7 @@ export function isTransportNullReason(reason: string | null | undefined): boolea
   return reason != null && (TRANSPORT_NULL_REASONS as readonly string[]).includes(reason)
 }
 
-/** Result of {@link getOracleForecast}: the forecast (null when unusable) plus the
+/** Result of {@link getOraculForecast}: the forecast (null when unusable) plus the
  *  id of the logged call, so a caller can attribute its LLM fallback to it. */
 export interface OracleForecastResult {
   forecast: OracleForecastResponse | null
@@ -651,9 +651,9 @@ export interface OracleAuthorShadowResponse {
  * response, had no usable articles, or failed for any reason (timeout,
  * non-OK status, network error). `logId` is the OracleCallLog row id (null when
  * unconfigured or the log write failed) so a caller that then takes the LLM
- * fallback can attribute it via {@link recordOracleFallback}. Never throws.
+ * fallback can attribute it via {@link recordOraculFallback}. Never throws.
  */
-export const getOracleForecast = async (
+export const getOraculForecast = async (
   question: string,
   options?: {
     articles?: ArticleInput[]
@@ -805,15 +805,15 @@ export const getOracleForecast = async (
 
 /**
  * Thin back-compat wrapper: returns just the scaled probability in [0, 1],
- * or null if the Oracul path wasn't usable. Prefer `getOracleForecast` when
+ * or null if the Oracul path wasn't usable. Prefer `getOraculForecast` when
  * you also want the sources, confidence interval, or the log id.
  */
-export const getOracleProbability = async (
+export const getOraculProbability = async (
   question: string,
   meta: OracleCallMeta = { source: 'other' },
   options?: { timeoutMs?: number } & ClaimMeta,
 ): Promise<number | null> => {
-  const { forecast } = await getOracleForecast(
+  const { forecast } = await getOraculForecast(
     question,
     {
       timeoutMs: options?.timeoutMs,
@@ -834,7 +834,7 @@ export const getOracleProbability = async (
  * current without requiring a server redeploy.  Returns null if the Oracul is
  * not configured or the request fails.  Never throws.
  */
-export const getOracleLeaderboard = async (
+export const getOraculLeaderboard = async (
   meta: OracleCallMeta = { source: 'leaderboard' },
 ): Promise<OracleLeaderboardResponse | null> => {
   const cfg = getOracleConfig()

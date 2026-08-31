@@ -20,7 +20,7 @@
 import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { fetchRssFeeds, detectHotTopics, type HotTopic } from '@/lib/services/bots/rss'
-import { fetchOracleSources, MAX_ORACLE_SOURCES_PER_RUN } from '@/lib/services/bots/oracleSource'
+import { fetchOraculSources, MAX_ORACLE_SOURCES_PER_RUN } from '@/lib/services/bots/oracleSource'
 import { type BotWithUser, log, countTodayActions, countThisHourActions, logBotAction } from './shared'
 import { processTopic } from './forecastCreate'
 import { processSourcelessForecast } from './sourceless'
@@ -177,8 +177,8 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
         const metrics = startMetrics()
 
         // Cap paid Oracul searches per run; extras are ignored until the next run.
-        const cappedOracleQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
-        if (oracleQueries.length > cappedOracleQueries.length) {
+        const cappedOraculQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
+        if (oracleQueries.length > cappedOraculQueries.length) {
           log.info(
             { botId: bot.id, configured: oracleQueries.length, cap: MAX_ORACLE_SOURCES_PER_RUN },
             'Capping oracle: source queries for this run',
@@ -188,7 +188,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
         const rssFetchStart = Date.now()
         const [rssItems, oracleItems] = await Promise.all([
           fetchRssFeeds(feedUrls),
-          fetchOracleSources(cappedOracleQueries, {
+          fetchOraculSources(cappedOraculQueries, {
             windowHours: bot.hotnessWindowHours,
             meta: { source: 'bot-sourcing', userId: bot.userId },
           }),

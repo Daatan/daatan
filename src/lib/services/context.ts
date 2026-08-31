@@ -911,7 +911,7 @@ export async function getProbabilityHistory(predictionId: string) {
  * stops re-selecting it (it now HAS a non-null oracleSnapshot) and the loop converges.
  * Touches nothing on the prediction — no estimate, no CI, no detailsText.
  */
-export async function markOracleAttempted(predictionId: string, reason: string): Promise<void> {
+export async function markOraculAttempted(predictionId: string, reason: string): Promise<void> {
   await recordEstimate({
     predictionId,
     origin: 'backfill',

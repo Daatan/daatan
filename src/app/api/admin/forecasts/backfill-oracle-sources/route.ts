@@ -35,7 +35,7 @@ async function runBackfill(limit: number) {
     take: limit,
   })
 
-  const results = { ok: 0, noArticles: 0, noOracle: 0, unchanged: 0, insufficient: 0, failed: 0 }
+  const results = { ok: 0, noArticles: 0, noOracul: 0, unchanged: 0, insufficient: 0, failed: 0 }
   for (const p of candidates) {
     try {
       const r = await refreshOracleSnapshot(p)
@@ -43,7 +43,7 @@ async function runBackfill(limit: number) {
       else if (r.status === 'no-articles') results.noArticles++
       else if (r.status === 'unchanged') results.unchanged++
       else if (r.status === 'insufficient') results.insufficient++
-      else results.noOracle++
+      else results.noOracul++
     } catch (err) {
       results.failed++
       log.warn({ predictionId: p.id, err }, 'backfill forecast failed')
