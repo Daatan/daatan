@@ -98,21 +98,46 @@ is final, more may be added later): `komapc@gmail.com`,
 share an owner — this is what lets the TWA open **without a visible browser
 URL bar**. A mismatch here is the classic TWA bug.
 
-It now lists **two** SHA-256 fingerprints: the **upload key** (for
-locally-built/sideloaded installs via `adb install`) and the **Play App
-Signing key** (added after the first Play Console upload — Google re-signs
-the distributed APK with a different, Google-managed key). Keep both
-entries; each is needed for a different install path.
+It lists **three** SHA-256 fingerprints:
 
-To find the Play App Signing key's SHA-256 again (e.g. if it's ever
-rotated): Play Console → **Protected with Play** → expand **"Play Store
-protection"** → **"Protect app signing key"** row → **"Manage Play app
-signing"** button → use the **classical key**'s SHA-256 (not the
-post-quantum one — Digital Asset Links verification doesn't support PQC
-keys yet). Google has moved this page at least once (it used to be under
-"App integrity → App signing" directly); if the path above is stale, use
-the console's own search or try
-`.../app/<app-id>/app-signing` directly.
+| Fingerprint | What it is | Needed for |
+|---|---|---|
+| `1B:79:A3:BC:…:CF:18` | **Upload key** (our keystore) | Locally-built / sideloaded installs via `adb install` |
+| `B0:60:24:A9:…:42:90` | **Play App Signing key** — what Google actually re-signs the distributed APK with | Every install from Google Play |
+| `FC:BE:B0:3B:…:81:52` | **Unaccounted for** — see warning below | Nothing known |
+
+**Do not read the Play App Signing fingerprint out of the Play Console UI.**
+That is how this broke (#1697): `FC:BE:B0:3B:…:81:52` was transcribed from
+the console as "the classical key" on 2026-07-25 and is **not** the key Play
+signs with. It went unnoticed for five weeks, during which every Play
+install rendered with a visible `daatan.com` URL bar. The console shows
+several fingerprints (upload key, app signing key, classical vs
+post-quantum) and it is easy to take the wrong one — and nothing downstream
+will tell you, because a wrong value still serves HTTP 200 and still passes
+the unit test.
+
+`FC:BE:…:81:52` is retained only because it may be the post-quantum app
+signing key, which Google could begin distributing later. It has never been
+observed on a real artifact. **If it can't be positively identified in Play
+Console, remove it** — an unidentified certificate in a
+`delegate_permission/common.handle_all_urls` allowlist grants URL-handling
+authority to a key we cannot account for.
+
+### Getting the Play App Signing fingerprint the reliable way
+
+Read it off a real artifact rather than a UI, on a device with the app
+installed **from Google Play** (`installer=com.android.vending`):
+
+```bash
+adb shell pm list packages -i com.daatan.app        # confirm installer=com.android.vending
+adb pull "$(adb shell pm path com.daatan.app | sed 's/package://' | tr -d '\r')" /tmp/play.apk
+~/Android/Sdk/build-tools/36.1.0/apksigner verify --print-certs -v /tmp/play.apk \
+  | grep "Signer #1 certificate SHA-256"
+```
+
+Use `apksigner`, not `keytool -printcert -jarfile` — the latter reads only
+the legacy v1 JAR signature and can disagree with the v2/v3 signer that
+Android actually uses for Digital Asset Links.
 
 **Production gotcha (bit us for 4 days, 2026-07-21 to 2026-07-25):**
 Next.js's `output: 'standalone'` static file server silently 404s any
@@ -126,6 +151,28 @@ after any change here. See `docs/DEPLOYMENT.md` for the general fix
 (a `next.config.js` rewrite to a normal API route) and
 [daatan#1176](https://github.com/Daatan/daatan/issues/1176) for the full
 incident.
+
+**And the `curl` is not sufficient either** (#1697, 5 weeks): a file with a
+*wrong* fingerprint serves HTTP 200 exactly like a correct one. The three
+checks are independent and you need all of them — content is committed, the
+file is **served**, and the fingerprints are the keys actually in use.
+
+### The only acceptance test that means anything
+
+Sideloading proves nothing about the Play path: `adb install` uses the
+**upload** key, and that fingerprint has always been correct. Both TWA
+regressions to date were invisible to sideload testing. Verify like this:
+
+1. Install **from Google Play** (not `adb install`), then launch the app.
+2. Screenshot it — there must be **no URL bar**.
+3. `adb logcat | grep -E "TWAConnectionPool|DelegationService"` must show
+   Chrome binding `com.daatan.app.DelegationService` for `https://daatan.com/`.
+   Chrome only binds that after Digital Asset Links verification succeeds, so
+   its **absence is the failure signal**.
+
+Note that the resolved top activity is `TranslucentCustomTabActivity` in
+*both* the working and broken cases — Chrome reuses that class for TWAs and
+Custom Tabs alike and just toggles the toolbar. Do not use it as a signal.
 
 ## Store listing
 
