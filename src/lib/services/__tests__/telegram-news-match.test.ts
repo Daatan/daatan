@@ -295,6 +295,41 @@ describe('notifyNewsArticleMatched', () => {
     expect(msg).not.toContain('452000')
   })
 
+  it('renders grounds as the spelled-out kind, with the basis phrase when the claim named one', async () => {
+    // retro#763. The kind is a category a rater checks at a glance; the basis is the half that
+    // says whether two articles are repeating ONE reason, so it rides in the same row.
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      {
+        title: 'T',
+        url: 'https://x.com/a',
+        source: 'Ynet',
+        grounds: { kind: 'authority_asserted', basis: "the ministry's 12 March statement" },
+      },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain("<b>grounds</b>  authority asserted · the ministry's 12 March statement")
+
+    vi.mocked(global.fetch).mockClear()
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', grounds: { kind: 'writer_assertion' } },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).toContain('<b>grounds</b>  writer assertion')
+
+    vi.mocked(global.fetch).mockClear()
+    await notifyNewsArticleMatched(
+      PREDICTION,
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', stance: 0.5, grounds: { basis: 'a phrase with no kind' } },
+      MATCH,
+      ESTIMATE,
+    )
+    expect(sentMessage()).not.toContain('<b>grounds</b>')
+  })
+
   it('marks the shadow-lane rows as not read by the estimate, below the live rows', async () => {
     // daatan#1661: a rater must be able to tell "this number moved the forecast" from "this
     // number is captured for later". The marker sits between the two groups, once.
