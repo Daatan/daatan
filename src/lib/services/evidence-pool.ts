@@ -338,6 +338,10 @@ export interface ClaimableArticle {
   snippet: string
   source: string | null
   publishedAt: string | null
+  /** Where `publishedAt` came from, verbatim from news-indexer: `page` | `feed` | `pushed` |
+   *  `url`, or null when unknown. Persisted alongside the date on every write path — a row
+   *  that records the date but not its source cannot be audited later (daatan#1679 item 2). */
+  publishedAtSource: string | null
 }
 
 /**
@@ -420,6 +424,7 @@ export async function claimArticleForExtraction(
         snippet: article.snippet || null,
         source: article.source,
         publishedDate: article.publishedAt,
+        publishedDateSource: article.publishedAtSource,
         contentHash,
         status: 'PENDING',
         origin,
@@ -461,6 +466,7 @@ export async function claimArticleForExtraction(
             snippet: article.snippet || null,
             source: article.source,
             publishedDate: article.publishedAt,
+            publishedDateSource: article.publishedAtSource,
             contentHash,
             status: 'PENDING',
             origin,
@@ -519,6 +525,7 @@ export async function claimArticleForExtraction(
       snippet: article.snippet || null,
       source: article.source,
       publishedDate: article.publishedAt,
+      publishedDateSource: article.publishedAtSource,
       contentHash,
       status: 'PENDING',
       statusReason: null,
@@ -609,6 +616,7 @@ async function claimRefusedArticle(
         snippet: article.snippet || null,
         source: article.source,
         publishedDate: article.publishedAt,
+        publishedDateSource: article.publishedAtSource,
         contentHash,
         status: 'FAILED',
         statusReason,

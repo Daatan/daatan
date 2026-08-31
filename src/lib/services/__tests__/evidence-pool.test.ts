@@ -1124,12 +1124,13 @@ describe('hashArticleContent', () => {
   })
 })
 
-const article = (over: Partial<{ url: string; title: string; snippet: string; source: string | null; publishedAt: string | null }> = {}) => ({
+const article = (over: Partial<{ url: string; title: string; snippet: string; source: string | null; publishedAt: string | null; publishedAtSource: string | null }> = {}) => ({
   url: 'https://reuters.com/a',
   title: 'Headline',
   snippet: 'A snippet',
   source: 'reuters.com',
   publishedAt: '2026-07-01',
+  publishedAtSource: 'page',
   ...over,
 })
 
@@ -1583,6 +1584,45 @@ describe('publish-date admission gate (daatan#1651)', () => {
         expect.objectContaining({ status: 'FAILED', statusReason: 'undated_published', excluded: true }),
       )
     }
+  })
+
+  // daatan#1679 item 2. The provenance is only useful if it survives on EVERY write path,
+  // including the ones that refuse the article: a row excluded as undated or stale is exactly
+  // the row a later audit wants to ask "where did that date come from?" about.
+  it('persists the date provenance on the admitted path', async () => {
+    create.mockResolvedValue({ id: 'new-1' } as never)
+
+    await claimArticleForExtraction('pred-1', article({ publishedAtSource: 'feed' }), 'news-indexer')
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ publishedDate: '2026-07-01', publishedDateSource: 'feed' }),
+      select: { id: true },
+    })
+  })
+
+  it('persists the date provenance on the refused paths too', async () => {
+    create.mockResolvedValue({ id: 'refused-1' } as never)
+
+    await claimArticleForExtraction(
+      'pred-1', article({ publishedAt: null, publishedAtSource: 'pushed' }), 'news-indexer', opts,
+    )
+    await claimArticleForExtraction(
+      'pred-1', article({ publishedAt: '2019-01-01', publishedAtSource: 'page' }), 'news-indexer', opts,
+    )
+
+    expect(create.mock.calls[0][0].data).toEqual(expect.objectContaining({ publishedDateSource: 'pushed' }))
+    expect(create.mock.calls[1][0].data).toEqual(expect.objectContaining({ publishedDateSource: 'page' }))
+  })
+
+  it('stores a null provenance rather than inventing one', async () => {
+    create.mockResolvedValue({ id: 'new-2' } as never)
+
+    await claimArticleForExtraction('pred-1', article({ publishedAtSource: null }), 'news-indexer')
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ publishedDateSource: null }),
+      select: { id: true },
+    })
   })
 
   it('refuses an undated article even when no creation date is supplied', async () => {

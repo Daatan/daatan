@@ -716,6 +716,14 @@ model EvidencePoolArticle {
   outletId   String? @map("outlet_id") @db.VarChar(64)
   outletName String? @map("outlet_name") @db.VarChar(200)
   publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
+  // Where `publishedDate` came from, as reported by news-indexer (`article.published_at_source`,
+  // news-indexer#426): `page` (read off the article), `feed` (the RSS/Atom pubDate), `pushed`
+  // (MTProto message date / tweet timestamp), `url` (parsed from a dated URL path — backfill
+  // only). Null means unknown: rows written before this column, and rows whose upstream article
+  // predates the news-indexer field. Read null as "no information", never as a defect — the
+  // point of the column is that a date read off a page and a date inherited from a mislabelled
+  // feed entry are the same string with very different credibility (daatan#1679 item 2).
+  publishedDateSource String? @map("published_date_source") @db.VarChar(16)
 
   // Content fingerprint (hash of title+snippet as pushed by the discovering
   // path — the only fields news-indexer's webhook actually sends; no full

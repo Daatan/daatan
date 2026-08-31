@@ -110,6 +110,9 @@ export async function refreshOracleSnapshot(
     snippet: r.snippet,
     source: r.source ?? null,
     publishedAt: r.publishedDate ?? null,
+    // Oracle search results carry no provenance for their dates — see the same note on the
+    // /forecasts/[id]/context lane (daatan#1679 item 2).
+    publishedAtSource: null,
   }))
   const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, origin, {
     claimCreatedAt: prediction.createdAt ?? null,
