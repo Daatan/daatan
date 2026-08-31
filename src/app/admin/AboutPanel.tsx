@@ -92,7 +92,7 @@ export default function AboutPanel() {
         rows={[
           ['Gemini (LLM)', <Flag key="ge" on={data.integrations.gemini} />],
           ['Ollama (LLM)', <Flag key="ol" on={data.integrations.ollama} />],
-          ['Oracle co-forecaster', <Flag key="or" on={data.integrations.oracle} />],
+          ['Oracul co-forecaster', <Flag key="or" on={data.integrations.oracle} />],
           ['Email (outbound)', <Flag key="em" on={data.integrations.email} />],
           ['Telegram', <Flag key="tg" on={data.integrations.telegram} />],
           ['News-indexer', <Flag key="ni" on={data.integrations.newsIndexer} />],

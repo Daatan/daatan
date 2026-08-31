@@ -12,7 +12,7 @@ const ORACLE_TIMEOUT_MS = 60_000
  * parsed by the caller. Returns text only — the Oracul `/llm` response carries no usage.
  */
 export class OracleProvider implements LLMProvider {
-  name = 'Oracle'
+  name = 'Oracul'
   private cfg: OracleConfig
   private modelName: string
 
@@ -45,12 +45,12 @@ export class OracleProvider implements LLMProvider {
 
     if (!res.ok) {
       const body = await res.text()
-      throw new Error(`Oracle /llm error ${res.status}: ${body.slice(0, 200)}`)
+      throw new Error(`Oracul /llm error ${res.status}: ${body.slice(0, 200)}`)
     }
 
     const data = (await res.json()) as { content?: unknown }
     if (typeof data.content !== 'string' || !data.content) {
-      throw new Error('Oracle /llm returned no content')
+      throw new Error('Oracul /llm returned no content')
     }
     return { text: data.content }
   }

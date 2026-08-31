@@ -362,7 +362,7 @@ export default function ContextTimeline({
       </div>
 
       {/* Context card — always in the DOM (crawlable); the collapsed preview and
-          the full text/AI summary/estimate/reasoning/Oracle sources both render,
+          the full text/AI summary/estimate/reasoning/Oracul sources both render,
           with CSS `hidden` picking which one shows, so everything stays part of
           the SSR HTML for SEO even while visually collapsed. */}
       {currentContext && (
@@ -429,8 +429,8 @@ export default function ContextTimeline({
               </div>
             )}
             {/* AI probability estimate.
-                Source badge ("Oracle" vs "LLM estimate") makes the provenance
-                of the number explicit: when the Oracle is unreachable / has no
+                Source badge ("Oracul" vs "LLM estimate") makes the provenance
+                of the number explicit: when the Oracul is unreachable / has no
                 usable predictions, daatan silently falls back to the legacy
                 LLM `guessChances` path which returns only a point estimate.
                 Without the badge the user sees a single number with no CI and
@@ -452,10 +452,10 @@ export default function ContextTimeline({
                       title={
                         isOracle
                           ? 'TruthMachine Oracle — calibrated multi-source estimate with confidence interval'
-                          : 'LLM fallback — single point estimate, used when Oracle has no usable sources'
+                          : 'LLM fallback — single point estimate, used when Oracul has no usable sources'
                       }
                     >
-                      {isOracle ? 'Oracle' : 'LLM estimate'}
+                      {isOracle ? 'Oracul' : 'LLM estimate'}
                     </span>
                     {oracle?.settled && (
                       <span

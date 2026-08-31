@@ -49,7 +49,7 @@ export function SettledLatchAdmin({ prediction, onCleared }: Props) {
         <div className="flex items-start gap-2 text-sm text-amber-300">
           <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
-            The Oracle reported this outcome as an accomplished fact. If that was a false
+            The Oracul reported this outcome as an accomplished fact. If that was a false
             settlement (a background fact misread as a live event), clear it — the forecast
             leaves Awaiting Resolution now and resumes daily glide on the next requote run.
           </span>

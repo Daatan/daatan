@@ -25,11 +25,11 @@ export async function GET(request: NextRequest) {
   const health = await getOracleSearchHealth()
 
   if (!health) {
-    log.warn('Oracle search health unavailable — skipping notifications')
+    log.warn('Oracul search health unavailable — skipping notifications')
     return NextResponse.json({ ok: true, skipped: true, reason: 'oracle_not_configured' })
   }
 
-  log.info({ overall: health.overall, usable_count: health.usable_count }, 'Oracle search health check')
+  log.info({ overall: health.overall, usable_count: health.usable_count }, 'Oracul search health check')
 
   const issues: SearchHealthIssue[] = []
 

@@ -59,7 +59,7 @@ const authed = withAuth(async (request: NextRequest) => {
   try {
     return NextResponse.json(await runBackfill(parseLimit(request)))
   } catch (error) {
-    return handleRouteError(error, 'Oracle-sources backfill failed')
+    return handleRouteError(error, 'Oracul-sources backfill failed')
   }
 }, { roles: ['ADMIN'] })
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     try {
       return NextResponse.json(await runBackfill(parseLimit(request)))
     } catch (error) {
-      return handleRouteError(error, 'Oracle-sources backfill failed')
+      return handleRouteError(error, 'Oracul-sources backfill failed')
     }
   }
   return authed(request, { params: Promise.resolve({}) })

@@ -487,7 +487,7 @@ export default function ProbabilityChart({
             <Line
               type="stepAfter"
               dataKey="ai"
-              name="AI (Oracle)"
+              name="AI (Oracul)"
               stroke="#FBBF24"
               strokeWidth={2}
               strokeDasharray="4 2"
@@ -510,7 +510,7 @@ export default function ProbabilityChart({
 
           {/* AI-panel member lines (docs/LASSO.md §8): thinner, finer-dashed and
               semi-transparent so they read as a secondary, experimental source and never
-              compete with the Oracle line. */}
+              compete with the Oracul line. */}
           {panelMembers.map(m => (
             <Line
               key={`${m.model}:${m.mode}`}

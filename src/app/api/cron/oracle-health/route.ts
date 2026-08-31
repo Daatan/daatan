@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
 
   const healthy = await checkOracleHealth()
 
-  log.info({ healthy }, 'Oracle health check')
+  log.info({ healthy }, 'Oracul health check')
 
   if (!healthy) {
     notifyOracleForecastUnavailable()
-    log.warn('Oracle forecast unavailable — Telegram alert fired')
+    log.warn('Oracul forecast unavailable — Telegram alert fired')
   }
 
   return NextResponse.json({ ok: true, healthy })

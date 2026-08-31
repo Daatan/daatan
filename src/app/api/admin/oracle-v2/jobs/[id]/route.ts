@@ -12,14 +12,14 @@ export const GET = withAuth(
       const id = params.id
       if (!/^[a-f0-9]{6,32}$/i.test(id)) return NextResponse.json({ error: 'Invalid job id' }, { status: 400 })
       const cfg = getOracleConfig()
-      if (!cfg) return NextResponse.json({ error: 'Oracle not configured' }, { status: 503 })
+      if (!cfg) return NextResponse.json({ error: 'Oracul not configured' }, { status: 503 })
       const res = await oracleFetch(cfg, `/v2/jobs/${id}`, { timeoutMs: 15_000 })
       const text = await res.text()
       try {
         return NextResponse.json(JSON.parse(text), { status: res.status })
       } catch {
         return NextResponse.json(
-          { error: 'Oracle returned a non-JSON response' },
+          { error: 'Oracul returned a non-JSON response' },
           { status: res.status >= 400 ? res.status : 502 },
         )
       }

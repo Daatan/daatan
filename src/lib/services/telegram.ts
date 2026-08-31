@@ -164,7 +164,7 @@ export function notifyOracleSearchUnavailable(query?: string): void {
   if (!canNotify('oracle-search-unavailable')) return
 
   const msg = [
-    `⚠️ <b>Oracle /search unavailable</b>`,
+    `⚠️ <b>Oracul /search unavailable</b>`,
     query ? `Query: <code>${truncate(query, 100)}</code>` : '',
     `Falling back to local search providers`,
   ].filter(Boolean).join('\n')
@@ -276,7 +276,7 @@ function evidenceHealthLine(i: EvidenceHealthIssue): string {
       return (
         `• <b>TruthMachine batch loop</b>: no atlas commit for <b>${i.hoursSince}h</b> ` +
         `(threshold ${i.thresholdHours}h, last ${escapeHtml(i.lastCommitAt)}) — ` +
-        `check the batch tree on the Oracle box (retro#556)`
+        `check the batch tree on the Oracul box (retro#556)`
       )
     case 'batch_heartbeat_unreachable':
       return `• <b>TruthMachine batch loop</b>: heartbeat unreadable — ${escapeHtml(i.detail)} (GitHub API problem, not proof the loop is down)`
@@ -699,7 +699,7 @@ export function notifyOracleForecastUnavailable(): void {
   if (!canNotify('oracle-forecast-unavailable')) return
 
   const msg = [
-    `🚨 <b>Oracle /forecast unavailable</b>`,
+    `🚨 <b>Oracul /forecast unavailable</b>`,
     `The TruthMachine Oracle is unreachable or failing health checks.`,
     `Forecast context analysis is falling back to LLM-only estimates.`,
   ].join('\n')
@@ -711,7 +711,7 @@ export function notifyOracleForecastRecovered(): void {
   if (isDevEnv()) return
   if (!canNotify('oracle-forecast-recovered')) return
 
-  const msg = `✅ <b>Oracle /forecast recovered</b> — health check passing again.`
+  const msg = `✅ <b>Oracul /forecast recovered</b> — health check passing again.`
   sendChannelNotification(msg, 'clean')
 }
 
@@ -879,10 +879,10 @@ export async function notifyNewsArticleMatched(
         : ''
   const headerLine =
     previous === null
-      ? `🗞️ <b>Oracle ${probability}%</b> · first estimate${volumeLabel}`
+      ? `🗞️ <b>Oracul ${probability}%</b> · first estimate${volumeLabel}`
       : previous === probability
-        ? `🗞️ <b>Oracle ${probability}%</b> · unchanged${volumeLabel}`
-        : `🗞️ <b>Oracle ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})${volumeLabel}`
+        ? `🗞️ <b>Oracul ${probability}%</b> · unchanged${volumeLabel}`
+        : `🗞️ <b>Oracul ${previous}% → ${probability}%</b>  (${probability > previous ? '+' : ''}${probability - previous})${volumeLabel}`
 
   const sourceLabel = article.source ? ` — ${escapeHtml(article.source)}` : ''
   const signed = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`
@@ -1040,7 +1040,7 @@ export function notifyHighConfidence(
 
   const fromLine = previous !== null ? ` (from ${previous}%)` : ''
   const settledLine = settled
-    ? '\n✅ Oracle reports the outcome as <b>settled</b> — consider resolving'
+    ? '\n✅ Oracul reports the outcome as <b>settled</b> — consider resolving'
     : ''
 
   const msg = [
@@ -1210,9 +1210,9 @@ export function notifyMarketDivergence(
   if (isDevEnv()) return
 
   const msg = [
-    `📊 <b>Market ⇄ Oracle divergence</b>`,
+    `📊 <b>Market ⇄ Oracul divergence</b>`,
     `"${truncate(prediction.claimText, 120)}"`,
-    `Market ${marketProbability}% vs Oracle ${oracleProbability}% (Δ ${gapPts}pt).`,
+    `Market ${marketProbability}% vs Oracul ${oracleProbability}% (Δ ${gapPts}pt).`,
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
 

@@ -669,7 +669,7 @@ export const getOracleForecast = async (
 ): Promise<OracleForecastResult> => {
   const cfg = getOracleConfig()
   if (!cfg) {
-    log.debug('Oracle not configured — skipping')
+    log.debug('Oracul not configured — skipping')
     return { forecast: null, logId: null, failureClass: 'oracle_unconfigured' }
   }
 
@@ -738,7 +738,7 @@ export const getOracleForecast = async (
 
     if (!res.ok) {
       const errorBody = await res.text().catch(() => '(unreadable)')
-      log.warn({ status: res.status, body: errorBody, durationMs: Date.now() - t0 }, 'Oracle returned non-OK status')
+      log.warn({ status: res.status, body: errorBody, durationMs: Date.now() - t0 }, 'Oracul returned non-OK status')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, failureReason: res.status >= 500 ? 'http_5xx' : 'http_4xx' })
       return { forecast: null, logId, failureClass: 'oracle_http' }
     }
@@ -759,19 +759,19 @@ export const getOracleForecast = async (
     // the claim (off-topic, all-hedged, or too thin). Signal this distinctly so
     // the caller can show "insufficient evidence" instead of guessing a number.
     if (data.insufficient_data) {
-      log.info({ ...logCtx, reason: data.reason, articlesUsed: data.articles_used, outcomeCounts }, 'Oracle abstained — insufficient evidence')
+      log.info({ ...logCtx, reason: data.reason, articlesUsed: data.articles_used, outcomeCounts }, 'Oracul abstained — insufficient evidence')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, insufficientData: true, failureClass: 'oracle_abstain', outcomeCounts }
     }
 
     if (data.placeholder) {
-      log.info({ ...logCtx, reason: data.reason, outcomeCounts }, 'Oracle returned placeholder response — no real forecast available')
+      log.info({ ...logCtx, reason: data.reason, outcomeCounts }, 'Oracul returned placeholder response — no real forecast available')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, failureClass: 'oracle_placeholder', outcomeCounts }
     }
 
     if (typeof data.mean !== 'number' || data.articles_used === 0) {
-      log.info({ ...logCtx, articlesUsed: data.articles_used, reason: data.reason, outcomeCounts }, 'Oracle returned no usable articles')
+      log.info({ ...logCtx, articlesUsed: data.articles_used, reason: data.reason, outcomeCounts }, 'Oracul returned no usable articles')
       const logId = await logOracleCall({ callType: 'FORECAST', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, failureReason: emptyFailureReason(data.reason), tokenUsage: data.token_usage })
       return { forecast: null, logId, failureClass: 'oracle_no_articles', outcomeCounts }
     }
@@ -788,12 +788,12 @@ export const getOracleForecast = async (
         // 2 of 20 candidates is the interesting case, not just an empty one.
         outcomeCounts,
       },
-      'Oracle forecast',
+      'Oracul forecast',
     )
     const logId = await logOracleCall({ callType: 'FORECAST', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, query: question, searchEngine, resultCount: data.articles_used, tokenUsage: data.token_usage })
     return { forecast: data, logId, outcomeCounts }
   } catch (err) {
-    log.warn({ err, durationMs: Date.now() - t0 }, 'Oracle request failed')
+    log.warn({ err, durationMs: Date.now() - t0 }, 'Oracul request failed')
     // 12s client budget against retro's own 90s — an unknown share of what the pool
     // recorded as "the extractor produced nothing" was this line, and nothing on the
     // row said so (daatan#1231).
@@ -915,7 +915,7 @@ export const checkOracleHealth = async (
     if (data.version && !EXPECTED_API_MAJOR_VERSIONS.includes(data.version.split('.')[0])) {
       log.warn(
         { expectedMajors: EXPECTED_API_MAJOR_VERSIONS, actual: data.version },
-        'Oracle API major version mismatch — falling back to LLM',
+        'Oracul API major version mismatch — falling back to LLM',
       )
       void logOracleCall({ callType: 'HEALTH', status: 'EMPTY', meta, durationMs: Date.now() - t0, httpStatus: res.status })
       return false

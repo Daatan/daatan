@@ -899,7 +899,7 @@ export default function ForecastDetailClient({
           : undefined}
       />
 
-      {/* Publications that fed the Oracle — a roster of "AI forecasters",
+      {/* Publications that fed the Oracul — a roster of "AI forecasters",
           shown like the human commitments above but in its own section. */}
       <ContributingSources sources={initialContributingSources ?? []} />
 

@@ -69,7 +69,7 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
     .map((g) => {
       const baseLabel =
         g.model === ORACLE_MEMBER
-          ? 'Oracle'
+          ? 'Oracul'
           : g.model === MARKET_MEMBER
             ? 'Market'
             : panelSeriesLabel(g.model, g.mode)

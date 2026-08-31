@@ -87,8 +87,8 @@ export async function runVoting(
         )
         if (oracleProbability !== null) {
           const pct = Math.round(oracleProbability * 100)
-          votePrompt += `\n\nAn external forecasting Oracle estimates the probability that this resolves YES at ${pct}%. Weigh this signal alongside your own judgement.`
-          log.debug({ botId: bot.id, forecastId: forecast.id, oraclePct: pct }, 'Oracle signal added to vote prompt')
+          votePrompt += `\n\nAn external forecasting Oracul estimates the probability that this resolves YES at ${pct}%. Weigh this signal alongside your own judgement.`
+          log.debug({ botId: bot.id, forecastId: forecast.id, oraclePct: pct }, 'Oracul signal added to vote prompt')
         }
       }
 

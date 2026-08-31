@@ -115,7 +115,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
   const pinContradiction = detectPinContradiction(prediction.settled, prediction.confidence, prediction.outcomeType, outcome)
   if (pinContradiction.contradicts && !resolutionOverrodePin) {
     throw Object.assign(
-      new Error('This outcome contradicts the Oracle\'s current estimate — acknowledge the disagreement to proceed'),
+      new Error('This outcome contradicts the Oracul\'s current estimate — acknowledge the disagreement to proceed'),
       { statusCode: 400 },
     )
   }
@@ -344,7 +344,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
       // scoring it as a plain miss.
       disputed: pinContradiction.contradicts,
       disputeNote: pinContradiction.contradicts
-        ? `Oracle ${pinContradiction.isSettled ? 'settled' : 'estimated'} this '${pinContradiction.impliedOutcome}' at confidence=${prediction.confidence}; resolver declared '${outcome}'`
+        ? `Oracul ${pinContradiction.isSettled ? 'settled' : 'estimated'} this '${pinContradiction.impliedOutcome}' at confidence=${prediction.confidence}; resolver declared '${outcome}'`
         : undefined,
     })
   }
