@@ -2,7 +2,7 @@
 
 Run Daatan inside your own organization for **internal forecasting** — a calibrated AI co-forecaster plus per-person reputation/calibration tracking, on your own infrastructure.
 
-This guide targets a **single organization, one install** (corp / gov / NGO) running in its own cloud VPC or network. It is **not** air-gapped: outbound HTTPS is assumed (so you can use a hosted Oracle, a cloud LLM, and S3/MinIO).
+This guide targets a **single organization, one install** (corp / gov / NGO) running in its own cloud VPC or network. It is **not** air-gapped: outbound HTTPS is assumed (so you can use a hosted Oracul, a cloud LLM, and S3/MinIO).
 
 > **SaaS note.** The public daatan.com SaaS is the same codebase with `DAATAN_EDITION=saas` (the default). Everything in this guide is gated behind `DAATAN_EDITION=self_hosted` and is inert for the SaaS deploy.
 
@@ -167,7 +167,7 @@ A MinIO service is included (commented) in `docker-compose.selfhost.yml` — unc
 
 ## 6. Optional add-on features (OFF by default)
 
-v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and track per-person calibration/reputation (Brier/Glicko/ELO) — none of which need any external service. The AI/Oracle/search and external-market features are **opt-in and off by default** on self-host, so a fresh install shows no AI buttons and never calls out.
+v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and track per-person calibration/reputation (Brier/Glicko/ELO) — none of which need any external service. The AI/Oracul/search and external-market features are **opt-in and off by default** on self-host, so a fresh install shows no AI buttons and never calls out.
 
 **The LLM key is the switch** — configure one and AI-assisted features appear; configure none and they're hidden (UI gone, API routes 404 — no broken buttons).
 
@@ -179,7 +179,7 @@ v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and
 
 Notes:
 - **Easiest path:** an admin pastes the OpenRouter key under **Admin → Settings** (§3a) — no `.env` edit, no restart. The `OPENROUTER_API_KEY` env var is just a seed for the same setting.
-- On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracle.
+- On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracul.
 - `OPENROUTER_MODEL` (or the Model field in Settings) overrides the default model (`openai/gpt-4o-mini`).
 - `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
 - Providers degrade gracefully relative to one another (Gemini → OpenRouter → Ollama).

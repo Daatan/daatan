@@ -35,7 +35,7 @@ URL, **or a URL pasted alongside text** in a single field. A source link found
 *anywhere* in the input (`extractFirstUrl`) is always used as the news anchor —
 the user's link is never silently replaced by a search-engine result. If the page
 can't be scraped (paywall, bot-blocking, non-HTTPS), the anchor is still built from
-the URL's domain plus the user's own text, and the Oracle search is used only to
+the URL's domain plus the user's own text, and the Oracul search is used only to
 attach *related* links, never to pick the anchor. Only fully text-only input (no
 URL) can raise `NoArticlesFoundError`.
 

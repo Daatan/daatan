@@ -301,7 +301,7 @@ terraform/
 | `PRODUCT.md` | Product documentation |
 | `TESTING.md` | Testing strategy and guidelines |
 | `docs/API.md` | HTTP API reference |
-| `docs/LLM_ARCHITECTURE.md` | LLM chain + Oracle integration |
+| `docs/LLM_ARCHITECTURE.md` | LLM chain + Oracul integration |
 
 ### Testing Structure
 

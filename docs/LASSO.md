@@ -1,7 +1,7 @@
 # LASSO — LLM AS SOurce
 
 **Status:** live in production since v1.50.0 (2026-07-11). Estimate → chart → score →
-rank, all shipped. Pooling and the Oracle-integration are the open extensions (§10).
+rank, all shipped. Pooling and the Oracul-integration are the open extensions (§10).
 
 > Internally the code still calls this the "AI panel" (`ai_estimates`, `ai-panel.ts`,
 > `PANEL_MEMBERS`, `/api/cron/ai-panel`). **LASSO is the project name; "AI panel" is the
@@ -13,7 +13,7 @@ rank, all shipped. Pooling and the Oracle-integration are the open extensions (�
 
 Several independent LLMs each estimate a probability for every open forecast. **The name
 is the thesis: each LLM is treated AS a candidate SOurce of forecasting signal** — sitting
-alongside daatan's other sources (the crowd, linked markets, the Oracle) — and then
+alongside daatan's other sources (the crowd, linked markets, the Oracul) — and then
 *measured* on how good a source it actually is.
 
 The pun is deliberate: statistical **LASSO regression** does feature *selection* — keeping
@@ -22,19 +22,19 @@ same to models: score each one against real outcomes and learn which to trust, p
 
 Two things it is **not**:
 
-- **Not the Oracle.** The Oracle (TruthMachine) is *one grounded verdict* — it searches,
+- **Not the Oracul.** The Oracul (TruthMachine) is *one grounded verdict* — it searches,
   weighs evidence by source credibility, and emits a single reasoned probability. LASSO is
-  *many unaided priors*, compared. The Oracle is scored inside LASSO as just another
-  member (`'oracle'`), so the board answers "does the grounded Oracle beat the raw LLMs?".
+  *many unaided priors*, compared. The Oracul is scored inside LASSO as just another
+  member (`'oracle'`), so the board answers "does the grounded Oracul beat the raw LLMs?".
 - **Not (yet) a source for anything.** An LLM here is a **candidate being measured**, not a
   deployed input. Nothing consumes LASSO's output as a forecasting signal today — not the
-  Oracle, not the needle, not any score. It only *earns a track record*. Wiring a proven
-  model back in (as the Oracle's prior, say) is a future extension (§10), not the current
+  Oracul, not the needle, not any score. It only *earns a track record*. Wiring a proven
+  model back in (as the Oracul's prior, say) is a future extension (§10), not the current
   reality.
 
 So LASSO never moves the needle, the gauge, or any user-facing score. It produces
 estimates, charts them as an opt-in source, scores them at resolution, and ranks them —
-to answer: *do LLM forecasters beat the Oracle, the crowd, or each other, and which one
+to answer: *do LLM forecasters beat the Oracul, the crowd, or each other, and which one
 where?*
 
 ---
@@ -286,7 +286,7 @@ Instead `Commitment.aiRunIdAtCommit` pins the run current at commit time, exactl
 `aiScore` at `prediction-resolution.ts`.
 
 **A run FK, not a scalar.** The existing `aiProbabilityAtCommit` is a scalar because
-the Oracle *is* one number. The panel is many, and a scalar would collapse it at the
+the Oracul *is* one number. The panel is many, and a scalar would collapse it at the
 exact instant we capture it, destroying per-model Brier — the entire reason for running
 several models. The FK keeps every member's probability recoverable, and lets a member
 added in month six be backfilled and scored without migrating `commitments`.
@@ -303,9 +303,9 @@ commit arrives before its first run yields a null `aiRunIdAtCommit` and is perma
 unscoreable. The runs must lead the commits. At ~$6/mo the gate buys nothing and costs
 data.
 
-### The Oracle is a free fifth member
+### The Oracul is a free fifth member
 
-The Oracle's needle at commit time is already pinned on the commitment as
+The Oracul's needle at commit time is already pinned on the commitment as
 `aiProbabilityAtCommit`, so scoring it as a panel member (`model: 'oracle'`) costs
 **zero extra calls and zero extra columns**. This answers whether TruthMachine beats
 cheap LLMs with no search at all. (Shipped in v1.49.0; the linked market joined as a
@@ -315,7 +315,7 @@ second sentinel member, `'market'`, in v1.51.0.)
 
 ## 8. UI (shipped in v1.48.0)
 
-`ProbabilityChart.tsx` already renders `community`, `ai` (the Oracle needle), and
+`ProbabilityChart.tsx` already renders `community`, `ai` (the Oracul needle), and
 `market`. The panel adds member lines.
 
 - **Member lines, one per member. No pooled line.** Pooling is deferred — we do not
@@ -379,7 +379,7 @@ second sentinel member, `'market'`, in v1.51.0.)
   A dry run reports `{written: 0, dryRun: N}` — **never** `written: N`. A dry run that
   claims writes is precisely the output that makes someone trust a dry run they
   shouldn't.
-- Does **not** proxy through the Oracle's `/llm`: that endpoint is capped at
+- Does **not** proxy through the Oracul's `/llm`: that endpoint is capped at
   `30/minute` and shares the budget with the user-facing LLM fallback chain.
 
 ---
@@ -449,9 +449,9 @@ Open, roughly in order of value:
 
 - **Graduate a source (the "AS SOurce" payoff).** Today an LLM is only *measured*. Once
   the leaderboard shows a model reliably beating the crowd on a topic, wire it back in as
-  an actual input — most naturally as the **Oracle's ungrounded prior before it searches**,
+  an actual input — most naturally as the **Oracul's ungrounded prior before it searches**,
   or its per-topic best model. This is the reverse of today's wiring (LASSO contains the
-  Oracle; here the Oracle would consume LASSO) and it lives in `retro/`, not daatan. It is
+  Oracul; here the Oracul would consume LASSO) and it lives in `retro/`, not daatan. It is
   the reason the name is "as SOurce" and not "vs humans" — see the cross-repo note in
   `Daatan/docs/lasso.md`.
 - **Pooling** — one blended LASSO line from the members (log-odds median + a fitted

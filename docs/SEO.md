@@ -132,7 +132,7 @@ These anti-patterns previously starved (or destroyed) the pre-render; all are fi
   `formatDisplayDateTime` helpers (`src/lib/utils/date.ts`), which pin a fixed `en-US`
   locale + `timeZone: 'UTC'` so server and client emit identical text (no mismatch, no gate).
 - **Collapsed-by-default `{open && …}` conditional rendering** — the resolution rules and the
-  whole AI-context card (summary, AI estimate, reasoning, Oracle sources) were *absent from
+  whole AI-context card (summary, AI estimate, reasoning, Oracul sources) were *absent from
   the DOM* until expanded. They now always render into the DOM and collapse via a CSS `hidden`
   class instead of being removed, so crawlers see them (content inside collapsed/hidden
   accordions is indexed under mobile-first).

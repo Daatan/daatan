@@ -151,7 +151,7 @@ Return the public context timeline for a forecast (list of dated context snapsho
   "externalProbability": 64,                          // 0–100, or null
   "externalReasoning": "TruthMachine Oracle (...)",   // or null
   "origin": "analyze",                                // which path wrote it: creation | analyze | news-indexer | backfill | clock; null on pre-funnel rows
-  "articlesUsed": 3,                                  // Oracle evidence volume, or null (legacy / LLM fallback / clock)
+  "articlesUsed": 3,                                  // Oracul evidence volume, or null (legacy / LLM fallback / clock)
   "oracleSnapshot": {                                 // null when LLM-fallback path was used
     "mean": 64,                                       // 0–100 percent, all rows (historical stance-scale rows normalized 2026-07-08 — see docs/DATABASE.md)
     "std": 6,                                         // 0–100 percent spread
@@ -191,7 +191,7 @@ The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMac
 ---
 
 ### `POST /api/forecasts/[id]/research` — Auth
-AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracle → 3-way parallel local fallback; the window extends 3 days past the deadline to catch post-event confirmation coverage), always adds LLM-generated targeted queries on top — raw-claim searches tend to surface roundups whose snippets omit the specific entity (daatan#1467) — then asks an LLM to suggest a resolution outcome and evidence links. Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
+AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracul → 3-way parallel local fallback; the window extends 3 days past the deadline to catch post-event confirmation coverage), always adds LLM-generated targeted queries on top — raw-claim searches tend to surface roundups whose snippets omit the specific entity (daatan#1467) — then asks an LLM to suggest a resolution outcome and evidence links. Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
 
 **Response**
 
@@ -268,7 +268,7 @@ Estimate the probability that a given claim will resolve YES, based on supplied 
 
 **Response** `{ probability: number, reasoning: string }` (probability is `0–100`).
 
-Same Oracle-first → LLM-fallback logic as `POST /api/forecasts/[id]/context` above.
+Same Oracul-first → LLM-fallback logic as `POST /api/forecasts/[id]/context` above.
 
 ---
 
@@ -439,10 +439,10 @@ List the forecast's evidence pool (`evidence_pool_articles`) — every article `
 Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Excluded rows are dropped from the pool aggregate on every path, so the toggle genuinely moves the estimate.
 
 ### `POST /api/admin/evidence-pool/retry` — Admin or `x-cron-secret`
-Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back null twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. Both strikes must be **attributable**: only `oracle_abstain`/`oracle_no_articles` count, i.e. the Oracle actually ran and declined. A timeout, network or HTTP failure retires nothing — one call carries up to 15 rows, so a single client-side failure used to stamp the whole batch terminal on no information at all (daatan#1253). See [DATABASE.md](./DATABASE.md). `?limit=N` predictions per call (default 3, max 10 — each is one full Oracle analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow — scheduled weekly (Mondays 06:30 UTC, against production) plus manual dispatch.
+Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back null twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. Both strikes must be **attributable**: only `oracle_abstain`/`oracle_no_articles` count, i.e. the Oracul actually ran and declined. A timeout, network or HTTP failure retires nothing — one call carries up to 15 rows, so a single client-side failure used to stamp the whole batch terminal on no information at all (daatan#1253). See [DATABASE.md](./DATABASE.md). `?limit=N` predictions per call (default 3, max 10 — each is one full Oracul analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow — scheduled weekly (Mondays 06:30 UTC, against production) plus manual dispatch.
 
 ### `POST /api/admin/evidence-pool/remediate` — Admin or `x-cron-secret`
-Re-extract the named forecasts' strongest evidence rows against the *current* extractor and re-publish their estimates — the backward half of the estimation-quality plan's Track A ([daatan#1493](https://github.com/Daatan/daatan/issues/1493)), for readings taken before the retro#549 fact/stance sign-error guard and the extractor prompt fix landed. **Body** `{ ids: string[], mode?: 'dry-run' | 'apply' }`. Targets current-version *usable* pool rows with `|stance| >= 0.7` **and** `certainty >= 0.7` (search-redirect URLs excluded — there is no article behind them to re-read), batched at 15 rows per Oracle analysis. **`mode` defaults to `dry-run`**: it reports the target set, usable pool size and published confidence, and writes nothing. Max 10 ids per call.
+Re-extract the named forecasts' strongest evidence rows against the *current* extractor and re-publish their estimates — the backward half of the estimation-quality plan's Track A ([daatan#1493](https://github.com/Daatan/daatan/issues/1493)), for readings taken before the retro#549 fact/stance sign-error guard and the extractor prompt fix landed. **Body** `{ ids: string[], mode?: 'dry-run' | 'apply' }`. Targets current-version *usable* pool rows with `|stance| >= 0.7` **and** `certainty >= 0.7` (search-redirect URLs excluded — there is no article behind them to re-read), batched at 15 rows per Oracul analysis. **`mode` defaults to `dry-run`**: it reports the target set, usable pool size and published confidence, and writes nothing. Max 10 ids per call.
 
 Each batch has its rows' `contentHash` nulled first, which is load-bearing rather than incidental — with the stored hash in place the claim gate takes its same-content arm and re-claims the row *in place*, overwriting the reading being remediated; nulled, it supersedes-and-inserts, so every prior reading survives as a superseded version and the run is reversible. A non-zero `unchanged` tally in the response means a batch's claim gate refused, i.e. the mechanism failed rather than the extraction returning nothing. Deliberately **not** scheduled: the plan's human-review gate — previewing the swings and approving them — sits in front of this route, not inside it.
 
@@ -450,7 +450,7 @@ Each batch has its rows' `contentHash` nulled first, which is load-bearing rathe
 One-off action (daatan#1522): stamp every `FAILED` row whose `statusReason` is the legacy `oracle_null` (pre-#1231, before terminal reasons existed) with the terminal `retired_legacy` reason. Those rows sit in neither `TERMINAL_POOL_REASONS` nor `ATTRIBUTABLE_NULL_REASONS`, so they retry forever via the retry sweep and reclaim path and can never earn the two-strike finalization real `oracle_null_final` rows get — permanent zombies until retired explicitly. **Body** `{ mode?: 'dry-run' | 'apply' }`, defaulting to `dry-run` (counts the target set, writes nothing). Not scheduled — a single pass covers the whole (fixed, pre-#1231) target set.
 
 ### `POST /api/admin/forecasts/republish` — Admin or `x-cron-secret`
-Re-publish the named forecasts' estimates from the evidence pool they **already** have ([daatan#1508](https://github.com/Daatan/daatan/issues/1508)): one compute-only Oracle `/pool/aggregate` per forecast (`resolvePooledEstimate`), written through `recordEstimate` under the `republish` origin — no search, no extractor, no LLM, and the pool itself is never mutated. **Body** `{ forecastIds: string[], mode?: 'dry-run' | 'apply' }`. **`mode` defaults to `dry-run`**, which computes every would-be number and writes nothing. Max 50 ids per call.
+Re-publish the named forecasts' estimates from the evidence pool they **already** have ([daatan#1508](https://github.com/Daatan/daatan/issues/1508)): one compute-only Oracul `/pool/aggregate` per forecast (`resolvePooledEstimate`), written through `recordEstimate` under the `republish` origin — no search, no extractor, no LLM, and the pool itself is never mutated. **Body** `{ forecastIds: string[], mode?: 'dry-run' | 'apply' }`. **`mode` defaults to `dry-run`**, which computes every would-be number and writes nothing. Max 50 ids per call.
 
 The `republish` origin's policy is the point: `kind: 'evidence'` so an apply re-anchors the temporal clock (stopping a glide decaying from a stale anchor), and `canSettle: false` so an operator run can never latch `Prediction.settled` — if the pool genuinely settles, the ordinary push path pins it. A re-publish that reproduces the published number is reported `unchanged` (still written, but non-material, so the glide clock is unmoved). Per-forecast failures (`not_found`, `not_active`, `empty_pool`, `pool_unreadable`, the pool's own insufficiency reason) never abort the batch; response is `{ mode, ok, unchanged, failed, forecasts: [{ predictionId, claimText, status, reason, poolSize, usableSize, confidenceBefore, confidenceAfter }] }`.
 
@@ -461,7 +461,7 @@ LLM-generate resolution rules for all forecasts that are missing them. Long-runn
 Generate vector embeddings (gemini-embedding-2, 768 dims) for predictions that don't yet have one. Used to power similar-forecasts lookup. Long-running.
 
 ### `GET /api/admin/oracle-stats` — Admin
-Oracle usage statistics for the admin **Oracle** tab. Every Oracle call (all call types, success **and** failure) is recorded in `OracleCallLog` with its `callType` (SEARCH, FORECAST, LEADERBOARD, HEALTH, SEARCH_HEALTH, LLM, FETCH_URL), `source` (the Daatan workflow that triggered it — e.g. `context-update`, `bot-voting`, `express-creation`), `status` (OK/EMPTY/ERROR), search engine, latency, and the triggering user/bot. A FORECAST call also records `failureReason` when it failed/came back empty — transport failures are daatan-derived (`timeout`, `network`, `http_5xx`, `http_4xx`); EMPTY responses pass through the Oracle's own `reason` (`no_search_results`, `all_articles_off_topic`, `no_usable_weight`, `no_decisive_signal`, `all_fetches_failed`, `extraction_errors`, `no_usable_predictions`, `no_result`, `oracle_timeout`). When the caller abandons the Oracle result and uses the LLM fallback, `fellBackToLlm` is set and `fallbackProbability` records the 0–100 the LLM produced. The log self-prunes to 30 days.
+Oracul usage statistics for the admin **Oracul** tab. Every Oracul call (all call types, success **and** failure) is recorded in `OracleCallLog` with its `callType` (SEARCH, FORECAST, LEADERBOARD, HEALTH, SEARCH_HEALTH, LLM, FETCH_URL), `source` (the Daatan workflow that triggered it — e.g. `context-update`, `bot-voting`, `express-creation`), `status` (OK/EMPTY/ERROR), search engine, latency, and the triggering user/bot. A FORECAST call also records `failureReason` when it failed/came back empty — transport failures are daatan-derived (`timeout`, `network`, `http_5xx`, `http_4xx`); EMPTY responses pass through the Oracul's own `reason` (`no_search_results`, `all_articles_off_topic`, `no_usable_weight`, `no_decisive_signal`, `all_fetches_failed`, `extraction_errors`, `no_usable_predictions`, `no_result`, `oracle_timeout`). When the caller abandons the Oracul result and uses the LLM fallback, `fellBackToLlm` is set and `fallbackProbability` records the 0–100 the LLM produced. The log self-prunes to 30 days.
 Query: `?windowDays=` (1–30, default 30). Response: `{ windowDays, totals: { totalCalls, errorCalls, errorRate, avgDurationMs }, bySource[], byCallType[], byEngine[], byStatus[], byFailureReason[], fallback: { count, rate, avgProbability, extremeCount }, recent[] }` — each breakdown row is `{ key, callCount, errorCount, avgDurationMs, lastSeenAt }`; `byFailureReason` rows are `{ key, callCount }`; `fallback.rate` is the share of FORECAST calls that fell back, `extremeCount` counts fallbacks above 85% or below 10%.
 
 ### `POST /api/admin/oracle-v2/forecast` · `GET /api/admin/oracle-v2/jobs/[id]` — Admin
@@ -566,7 +566,7 @@ All four reject an `[id]` / `[aliasId]` that is not a UUID with `400` before bui
 Server-side proxy routes for the IBI retro analysis tool at `/ibi`. All three routes require an authenticated ADMIN session. Oracle calls are made server-side using `ORACLE_API_KEY` — the key is never exposed to the browser.
 
 ### `POST /api/ibi/fetch-url` — Admin
-Fetch and extract text/title/date from a URL. Proxies to Oracle `/fetch-url`.
+Fetch and extract text/title/date from a URL. Proxies to Oracul `/fetch-url`.
 
 **Body** `{ "url": "https://..." }`
 
@@ -575,14 +575,14 @@ Fetch and extract text/title/date from a URL. Proxies to Oracle `/fetch-url`.
 **Safe URL fetching (SSRF).** Any server-side URL fetch goes through `assertSafeUrl` in `src/lib/utils/scraper.ts`: HTTPS-only, and after DNS resolution it rejects private, loopback, link-local, and IMDS (`169.254.0.0/16`) addresses. Redirects are followed manually (`redirect: 'manual'`) with the safety check re-run on every hop, so a public host cannot 30x-redirect into an internal target.
 
 ### `POST /api/ibi/search` — Admin
-Article search via Oracle's provider fallback chain. Proxies to Oracle `/search`.
+Article search via Oracul's provider fallback chain. Proxies to Oracul `/search`.
 
 **Body** `{ "query": "string", "limit": 10, "date_to": "YYYY-MM-DD" }`
 
 **Response** `{ "results": [{ "title", "url", "snippet", "source", "published_date" }] }`
 
 ### `POST /api/ibi/llm` — Admin
-LLM call proxied to the Oracle `/llm` endpoint (AWS Bedrock / Amazon Nova via litellm). `model` is a litellm ID and defaults to the Oracle's configured Bedrock model when omitted.
+LLM call proxied to the Oracul `/llm` endpoint (AWS Bedrock / Amazon Nova via litellm). `model` is a litellm ID and defaults to the Oracul's configured Bedrock model when omitted.
 
 **Body** `{ "model": "bedrock/amazon.nova-pro-v1:0", "messages": [{ "role": "user", "content": "..." }], "temperature": 0.1 }`
 
@@ -602,7 +602,7 @@ Trigger the bot runner. Used by the GitHub Actions cron workflow.
 ## System
 
 ### `GET /api/meta/timings`
-Returns average server-side timing samples for the context-analysis pipeline (search → LLM → Oracle) aggregated over the last 30 days. The client uses these estimates to drive step-progress labels ("Searching… 10s → Analyzing… 12s → Estimating… 8s"). Public — no auth required.
+Returns average server-side timing samples for the context-analysis pipeline (search → LLM → Oracul) aggregated over the last 30 days. The client uses these estimates to drive step-progress labels ("Searching… 10s → Analyzing… 12s → Estimating… 8s"). Public — no auth required.
 
 **Response**
 
@@ -646,7 +646,7 @@ Liveness probe used by external monitoring. Verifies app + DB and emits a metric
 Periodic search-provider health check. Triggers a Telegram alert if a provider is degraded.
 
 ### `GET /api/cron/oracle-health`
-Checks Oracle API reachability and version compatibility. Fires a Telegram alert (`notifyOracleForecastUnavailable`) when the Oracle is down. Rate-limited to one alert per 5-minute window. Intended to run every 30 minutes via EC2 crontab.
+Checks Oracul API reachability and version compatibility. Fires a Telegram alert (`notifyOracleForecastUnavailable`) when the Oracul is down. Rate-limited to one alert per 5-minute window. Intended to run every 30 minutes via EC2 crontab.
 
 **EC2 crontab:** `0,30 * * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/oracle-health`
 
@@ -747,7 +747,7 @@ EC2 crontab.
 
 ### `POST /api/cron/requote`
 Temporal-clock daily driver: pure-arithmetic glide requote per open forecast
-(no Oracle/search/LLM call except the bounded self-heal classification pass).
+(no Oracul/search/LLM call except the bounded self-heal classification pass).
 Auth: `x-cron-secret` header. JSON body `{ archetypes?: string[], dryRun?:
 boolean }` — archetypes defaults to `["diffuse"]` and comes from the
 `TEMPORAL_CLOCK_ARCHETYPES` repo variable; `TEMPORAL_CLOCK_DISABLED=true` on

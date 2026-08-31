@@ -47,7 +47,7 @@ docker compose -f docker-compose.selfhost.yml up -d --build
 
 ## Layer 2 — Edition behavior (local, the core)
 
-A fresh self-host with **no** Google/AWS/Oracle/LLM/search and AI off by default.
+A fresh self-host with **no** Google/AWS/Oracul/LLM/search and AI off by default.
 
 Automated slice — `npm run test:e2e:selfhost` (uses `playwright.selfhost.config.ts`, which boots the app with `DAATAN_EDITION=self_hosted`, `APP_NAME="Acme Forecasting"`, AI unset):
 
