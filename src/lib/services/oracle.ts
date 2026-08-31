@@ -225,19 +225,21 @@ export type OracleClaimDetail = {
     as_of?: string | null
   } | null
   /** EXPERIMENTAL shadow (retro#763): what this claim's position RESTS ON — the reason,
-   *  not the direction. `kind` is a closed pick (a milestone, a statement, a market or
-   *  poll figure, an inference, a precedent, the writer's own judgement); `basis` is the
-   *  short phrase naming it, and is the half that lets two "official_statement" claims be
-   *  recognised as the SAME statement. Not `evidence_class`: that is the route the
-   *  information took, this is what was seen. */
+   *  not the direction. `kind` is a closed pick (an event, an authority's statement, a
+   *  market or poll number, an expert inference, a historical base rate, the writer's own
+   *  assertion); `basis` is the short phrase naming it, and is the half that lets two
+   *  "authority_asserted" claims be recognised as the SAME statement. Not `evidence_class`:
+   *  that is the route the information took, this is what was seen. Renamed from
+   *  `observed_milestone`/`official_statement`/etc. in v12d — the old names collided
+   *  lexically with `evidence_class` and leaked into it on the live rater. */
   grounds?: {
     kind:
-      | 'observed_milestone'
-      | 'official_statement'
-      | 'market_or_poll_figure'
-      | 'analyst_inference'
-      | 'precedent_or_base_rate'
-      | 'authors_judgement'
+      | 'event_observed'
+      | 'authority_asserted'
+      | 'market_or_poll_number'
+      | 'expert_inference'
+      | 'historical_base_rate'
+      | 'writer_assertion'
     basis?: string | null
   } | null
 }

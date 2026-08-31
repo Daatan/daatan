@@ -304,21 +304,21 @@ describe('notifyNewsArticleMatched', () => {
         title: 'T',
         url: 'https://x.com/a',
         source: 'Ynet',
-        grounds: { kind: 'official_statement', basis: "the ministry's 12 March statement" },
+        grounds: { kind: 'authority_asserted', basis: "the ministry's 12 March statement" },
       },
       MATCH,
       ESTIMATE,
     )
-    expect(sentMessage()).toContain("<b>grounds</b>  official statement · the ministry's 12 March statement")
+    expect(sentMessage()).toContain("<b>grounds</b>  authority asserted · the ministry's 12 March statement")
 
     vi.mocked(global.fetch).mockClear()
     await notifyNewsArticleMatched(
       PREDICTION,
-      { title: 'T', url: 'https://x.com/a', source: 'Ynet', grounds: { kind: 'authors_judgement' } },
+      { title: 'T', url: 'https://x.com/a', source: 'Ynet', grounds: { kind: 'writer_assertion' } },
       MATCH,
       ESTIMATE,
     )
-    expect(sentMessage()).toContain('<b>grounds</b>  authors judgement')
+    expect(sentMessage()).toContain('<b>grounds</b>  writer assertion')
 
     vi.mocked(global.fetch).mockClear()
     await notifyNewsArticleMatched(

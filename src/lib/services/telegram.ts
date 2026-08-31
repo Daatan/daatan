@@ -813,7 +813,7 @@ export function quantityRow(
 
 /** The `grounds` panel row (retro#763), or null when the claim carries none.
  *  Rendered as the kind, spelled out, then the basis phrase after a middle dot:
- *  "official statement · the ministry's 12 March statement". The kind alone is a
+ *  "authority asserted · the ministry's 12 March statement". The kind alone is a
  *  category a rater can check at a glance; the basis is the half that says whether
  *  two articles are repeating ONE reason, which is the field's whole purpose. */
 export function groundsRow(
