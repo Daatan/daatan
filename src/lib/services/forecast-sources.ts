@@ -109,6 +109,10 @@ type ArticleMeta = {
   requestedUrl: string
   author: string | null
   publishedAt: string | null
+  /** Where news-indexer resolved `publishedAt` from — `page` | `feed` | `pushed` | `archive`,
+   *  null when unknown (news-indexer#426 / daatan#1679 item 2). Optional: an older
+   *  news-indexer omits it entirely, which reads the same as null. */
+  publishedAtSource?: string | null
   title: string | null
   source: string | null
   // Resolved cross-platform identity (news-indexer person). Present since the by-url identity
