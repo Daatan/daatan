@@ -41,7 +41,7 @@ S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h).
 | `AiEstimate.probability` (LASSO panel members) | **0–100**, null = abstention | Int? |
 | `AiMemberScore.brierScore` | 0.0–1.0 (Brier, lower = better) | Float |
 
-Conversion happens once, at the Oracle boundary (`stanceToPercent` in
+Conversion happens once, at the Oracul boundary (`stanceToPercent` in
 `src/lib/services/oracle-snapshot.ts`). Rows written before v1.31.2 originally
 carried `mean`/`std` on the raw stance scale; a one-time prod data fix
 (2026-07-08) normalized them all to percent (`mean → (m+1)/2·100`, `std → ·50`),
@@ -74,11 +74,11 @@ The central table (`Prediction`). Field groups:
   organic estimates (set while `confidence` ≥ 90 or ≤ 10, recomputed on every
   write, never sticky) and only affects the Awaiting-Resolution tab, never
   `status`. A **settlement pin** is its own class (daatan#1248): its
-  `confidence` is the Oracle's `settlement_stance` constant (~97), not a level,
+  `confidence` is the Oracul's `settlement_stance` constant (~97), not a level,
   so a pinned write enters the band only when its snapshot pool carries ≥2
   settling votes — an unverifiable pin sets the flag false and skips the
   high-confidence Telegram alert.
-- **Settlement latch**: `settled`/`settledAt` — set when the Oracle reports the
+- **Settlement latch**: `settled`/`settledAt` — set when the Oracul reports the
   outcome as an accomplished fact (≥2 independent sources). **One-way**: only
   ever set true by the funnel; a later unsettled run does not clear it; human
   resolution supersedes. As of PR #1020, `settled` no longer locks commitments
@@ -145,7 +145,7 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | `externalProbability` | the estimate (0–100) or null when the run produced no number |
 | `origin` | which path wrote it: `creation` \| `analyze` \| `news-indexer` \| `backfill` \| `clock`; **null = pre-funnel row** (guess from `externalReasoning` marker strings) |
 | `kind` | pricing semantics: `evidence` (default) vs `clock` (daily glide requote). Clock rows are excluded from the public timeline, the glide anchor, and push dedup (`NOT_CLOCK` filters) |
-| `articlesUsed` | Oracle evidence volume; null on legacy/LLM-fallback/clock rows |
+| `articlesUsed` | Oracul evidence volume; null on legacy/LLM-fallback/clock rows |
 | `oracleSnapshot` | full Oracle payload (see scale table above); null on the LLM-fallback path |
 | `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
 | `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}`; when the estimate came from a pool aggregate, `{pool: {evidenceMass, nEff, ageAdjustedMass}}` (retro#458 Phase 2 diagnostics, daatan#1563) — the two can appear together on the same row |
@@ -174,7 +174,7 @@ only), which is what the UI reads.
 Known bypass: bot creation (`bots/stake.ts`) still writes predictions directly.
 
 Supporting tables: `context_timings` (per-analyze phase latencies),
-`oracle_call_logs` (every Oracle API call: type, source workflow, provider
+`oracle_call_logs` (every Oracul API call: type, source workflow, provider
 chain, failure reason, LLM-fallback flag, and — for FORECAST/LLM calls, once
 retro reports it — per-call LLM token usage (`promptTokens`…`cacheWriteTokens`,
 docs#57 item 3) — the observability layer for the search/forecast chain).
@@ -196,7 +196,7 @@ answering 50%; CI-width-vs-error correlation −0.07).
 | column | what |
 |---|---|
 | `p_final`, `p_final_at`, `p_final_kind`, `p_final_origin` | the last published probability before resolution, 0–100. **Includes `kind='clock'`** — the glide's requote is what the page showed, and scoring the system means scoring what it said. The kind/origin columns are what let a fit separate clock from evidence afterwards. |
-| `ci_low`, `ci_high`, `settled_at_final` | the Oracle's interval at that instant (percent) and whether it was a settlement pin. The CI-honesty check is the point — audit F16 predicts these widths carry no risk information. |
+| `ci_low`, `ci_high`, `settled_at_final` | the Oracul's interval at that instant (percent) and whether it was a settlement pin. The CI-honesty check is the point — audit F16 predicts these widths carry no risk information. |
 | `p_7d`, `p_30d` (+ `_at`) | the same published number as of 7/30 days before resolution — Brier-by-horizon. Null when the forecast had said nothing that far back. |
 | `clock_snapshots`, `evidence_snapshots` | the denominator for the glide backtest. |
 | `disputed`, `dispute_note` | set when the resolver knowingly overrode a contradicting settlement pin / extreme AI confidence (daatan#1234 check #3, gated by `resolutionOverrodePin` on the prediction — see `detectPinContradiction`), so the pair can be excluded from a fit instead of silently poisoning it. **Create-only**: `recordCalibration()`'s upsert never touches either column on an existing row — only a future manual admin action should change them once set. |
@@ -208,7 +208,7 @@ the defect this codebase keeps finding elsewhere.
 Backfill: `npx tsx scripts/backfill-calibration-records.ts [--dry-run]`,
 idempotent, and it reuses the live writer's own selection rules rather than
 reimplementing them. Expect many rows with `p_final = null` — most resolutions
-predate Oracle snapshot coverage, and a null record is the honest way to say
+predate Oracul snapshot coverage, and a null record is the honest way to say
 "not scorable".
 
 ## Evidence pool (foundation layer) — `evidence_pool_articles`
@@ -246,7 +246,7 @@ batch to the extractor regardless, re-extracting and overwriting
 content-unchanged articles right alongside genuinely new ones.
 `analyze` additionally had no gate at all before this fix. All three call
 sites (`analyze`, `news-indexer`, `backfill`/`retry`) now filter to only the
-newly-claimed articles before calling the Oracle; a batch where nothing is new
+newly-claimed articles before calling the Oracul; a batch where nothing is new
 reads the existing pool aggregate directly instead of extracting or falling
 back to an ungrounded LLM guess. Elections' display-only trailing-median
 smoothing (`combined-chart.ts`) remains in place as defense-in-depth, but the
@@ -295,7 +295,7 @@ distinguishes *new evidence* from *a retry*:
   a client timeout does not. retro does not cancel on disconnect, so the run we
   abandoned very likely completed and is sitting in its `forecast_cache` for an hour —
   and a 1 h cache against a 24 h floor can never overlap, which is exactly what made
-  daatan#1262 impossible by construction. 60 s rather than 0 so a hard-down Oracle
+  daatan#1262 impossible by construction. 60 s rather than 0 so a hard-down Oracul
   still cannot be hot-looped by the re-push cycle. This arm only ever *widens* the
   window: the 24 h arms already matched these rows, since a transport reason is not
   terminal.
@@ -304,11 +304,11 @@ distinguishes *new evidence* from *a retry*:
 This used to be a bare `{ status: 'FAILED' }` arm: no age gate, no reason filter. Since
 news-indexer re-pushes the same article set on every poll cycle while its 5-minute
 cooldown rolls, an always-null article looped `FAILED → PENDING → FAILED`, burning a
-full Oracle run (fetch + gatekeeper + extractor) every few minutes — and "terminal" was
+full Oracul run (fetch + gatekeeper + extractor) every few minutes — and "terminal" was
 true of the sweep but false of every organic re-push, because only `pool-retry` honoured
 it. The schema comment "eligible for retry once stale" was stricter than the code.
 
-**The null family** (daatan#1231) — the Oracle produced no forecast, split by WHY.
+**The null family** (daatan#1231) — the Oracul produced no forecast, split by WHY.
 This used to be one string, `oracle_null`, covering six different situations: 73% of
 the 200 most recent pool fetches (2026-07-31) carried it, and because
 `getOracleForecast` never throws, a 12-second client timeout and a deliberate
@@ -317,11 +317,11 @@ only in `OracleCallLog.failureReason`, which the retry sweep never reads.
 
 | reason | meaning |
 |---|---|
-| `oracle_abstain` | the Oracle RAN and declined (`insufficient_data`) — usually its gatekeeper rejecting every article |
+| `oracle_abstain` | the Oracul RAN and declined (`insufficient_data`) — usually its gatekeeper rejecting every article |
 | `oracle_timeout` | no answer within daatan's client budget (30 s on the background paths since daatan#1254; 12 s before, against a server whose measured p99 is 25 s — that inversion recorded 15.3% of news-indexer forecasts as failures at exactly 12,002 ms). retro does **not** cancel, so a timeout here does not mean the forecast was never produced |
 | `oracle_network` | transport failure other than a timeout |
 | `oracle_http` | retro answered non-OK |
-| `oracle_unconfigured` | no Oracle URL/key on this deployment — says nothing about the article |
+| `oracle_unconfigured` | no Oracul URL/key on this deployment — says nothing about the article |
 | `oracle_placeholder` | retro returned its stub response |
 | `oracle_no_articles` | ran, but produced no usable mean / zero articles used |
 | `oracle_null` | residual, and every row written before the split |
@@ -369,7 +369,7 @@ which after `REASK_DELAY_MS` (120 s) re-drives the run through `refreshOracleSna
   ContextSnapshot reads as a background refresh rather than a news-indexer match, and no
   Telegram notification fires.
 
-Other reasons: `oracle_omitted` (the Oracle ran but its gatekeeper dropped the
+Other reasons: `oracle_omitted` (the Oracul ran but its gatekeeper dropped the
 article — terminal), `oracle_null_final` (two consecutive **attributable** null runs —
 terminal, stamped by the retry sweep's attempt cap), `reextract_no_signal`,
 `stale_published_date` (terminal, **and `excluded: true`**: the publish-date admission
@@ -390,7 +390,7 @@ op-ed reached 2026 election forecasts at stance 1.00).
 
 **"Attributable" is the load-bearing word (daatan#1253).** Only
 `ATTRIBUTABLE_NULL_REASONS` — `oracle_abstain` and `oracle_no_articles` — retire a
-row: those mean the Oracle received the articles, ran, and produced nothing anyway.
+row: those mean the Oracul received the articles, ran, and produced nothing anyway.
 `oracle_timeout` / `oracle_network` / `oracle_http` / `oracle_unconfigured` /
 `oracle_placeholder` are facts about the wire, not the evidence, and legacy
 `oracle_null` (pre-#1231, before the six causes were split out) conflates all six
@@ -401,12 +401,12 @@ finalization real split-cause rows get, and until daatan#1522 it wasn't in
 them `retired_legacy` — a new entry in `TERMINAL_POOL_REASONS` — to close that gap.
 Both strikes are checked:
 the row's prior reason AND this run's failure class. This matters because one sweep
-call carries up to `DEFAULT_MAX_ARTICLES` (15) rows on a **single** Oracle call — a
+call carries up to `DEFAULT_MAX_ARTICLES` (15) rows on a **single** Oracul call — a
 lone client timeout used to stamp the whole batch terminal on zero information about
 any article in it (94.9% of terminal rows were retired in multi-row groups). Since
 `oracle_null_final` is in `TERMINAL_POOL_REASONS`, that loss was silent and beyond
 the sweep's reach. Pre-split `oracle_null` rows consequently no longer reach the cap
-via the sweep — deliberate: one extra Oracle look a day is far cheaper than a
+via the sweep — deliberate: one extra Oracul look a day is far cheaper than a
 wrongly-retired article.
 `extractor_error` is **no longer written**: it was stamped in a `catch` around
 `getOracleForecast`, which never throws, so the branch was dead code (removed in
@@ -460,13 +460,13 @@ recompute path (no LLM call ran there). Rows that completed extraction
 before these columns existed were one-time backfilled to the literal
 sentinel `"pre-v1"` (migration `20260824130000`, `status = COMPLETE` rows
 only — PENDING/FAILED rows stay null) rather than a date-inferred guess:
-Oracle's SIGHUP-reload deploys and live/batch checkout drift make a merge
+Oracul's SIGHUP-reload deploys and live/batch checkout drift make a merge
 timestamp an unreliable proxy for which prompt actually ran, so a specific
 historical version/hash was deliberately not invented — `"pre-v1"` means
 only "predates provenance capture." Lets a since-fixed prompt bug be traced
 in stored data instead of being invisible.
 `oracleVersion`/`oracleGitSha` (daatan#1669, umbrella Daatan/retro#742) record
-which Oracle *build* produced the row — retro's `provenance.oracle` on the
+which Oracul *build* produced the row — retro's `provenance.oracle` on the
 `/forecast` response (`version` is `/version`'s `{base}+build.{n}`, e.g.
 `1.4.0+build.38912`; `git_sha` the deployed commit). Prompt version alone can't
 say this: prompt PRs are sequential but the code between them is not, and the
@@ -633,16 +633,16 @@ Aggregating the pool puts a single bad extraction in proportion to the evidence 
 The shared decision (`resolvePooledEstimate` in `pooled-estimate.ts`) has **three** outcomes,
 and the two "no pool number" cases are deliberately different:
 - **pool** — the aggregate is the estimate.
-- **single-run fallback** — the pool could not be *read* (Oracle unreachable, nothing usable
-  pooled yet, transport error). Fall back to this run's `/forecast` so a flaky Oracle degrades
+- **single-run fallback** — the pool could not be *read* (Oracul unreachable, nothing usable
+  pooled yet, transport error). Fall back to this run's `/forecast` so a flaky Oracul degrades
   the estimate rather than dropping it.
 - **abstain** — the pool *was* aggregated and returned `insufficient_data`. In prod there are
   two reasons: `all_articles_off_topic` (every article scored below `relevance_weight_floor`)
-  and, since the Oracle's 2026-08-01 R3 release, `no_usable_weight` (rows exist but every one
+  and, since the Oracul's 2026-08-01 R3 release, `no_usable_weight` (rows exist but every one
   of them carries zero aggregation weight — blocked by credibility, zeroed by relevance, or
-  both; the Oracle used to answer such a pool with equal weights instead). Thin-but-on-topic
+  both; the Oracul used to answer such a pool with equal weights instead). Thin-but-on-topic
   pools are still NOT insufficient — `defer_on_thin_evidence` is off, so they get their CI
-  inflated instead. Treat the reason as an opaque string: it is the Oracle's to extend. The run records an **abstention** — no number persisted, the
+  inflated instead. Treat the reason as an opaque string: it is the Oracul's to extend. The run records an **abstention** — no number persisted, the
   snapshot flagged `insufficientData: true` and carrying `meta.abstain = {reason, poolSize}`,
   no notification, excluded from the glide anchor and history chart (both filter
   `insufficientData: false`) — rather than fall back to a single run over the *same*

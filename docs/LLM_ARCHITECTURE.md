@@ -6,7 +6,7 @@ The application uses a **Resilient LLM Service** that abstracts the underlying A
 
 ## Provider Chain
 
-The main `llmService` tries providers in this order; each leg is **registered only when it's configured**, so a call is never single-provider in practice. The fallbacks are deliberately cross-vendor — a Google/Gemini outage takes down neither the Oracle (AWS Bedrock) nor the OpenRouter free Llama leg.
+The main `llmService` tries providers in this order; each leg is **registered only when it's configured**, so a call is never single-provider in practice. The fallbacks are deliberately cross-vendor — a Google/Gemini outage takes down neither the Oracul (AWS Bedrock) nor the OpenRouter free Llama leg.
 
 1.  **Primary**: **Gemini via Vertex AI** (`gemini-2.5-flash`) — #1472
     *   Same model and the same schemas as the leg below; only the **billing surface** differs. Google is forcing the Gemini *Developer* API from Postpay to **Prepay** (deadline **2026-09-14**), which introduces a prepaid balance that can hit zero and stop extraction. Vertex (`aiplatform.googleapis.com`) stays on GCP Postpay and draws the credits billing account directly, so there is no balance to keep funded.
@@ -15,11 +15,11 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 2.  **Fallback 0**: **Google Gemini, Developer API** (`gemini-2.5-flash`) — *self-host only*
     *   The original key-based leg. Requires `GEMINI_API_KEY` (skipped in CI/test where it's unset).
-    *   **Not registered on daatan.com since #1472**: Vertex was verified in production (v1.65.192) and `GEMINI_API_KEY` was then removed from the prod and staging bundles, so the SaaS chain now falls from Vertex straight through to the Oracle/Bedrock leg — a *different vendor*, which is the more useful fallback anyway. The key was the last thing tying the SaaS to the Developer API's forced-Prepay balance.
+    *   **Not registered on daatan.com since #1472**: Vertex was verified in production (v1.65.192) and `GEMINI_API_KEY` was then removed from the prod and staging bundles, so the SaaS chain now falls from Vertex straight through to the Oracul/Bedrock leg — a *different vendor*, which is the more useful fallback anyway. The key was the last thing tying the SaaS to the Developer API's forced-Prepay balance.
     *   The leg stays in the code for the **self-host** edition, where an AI Studio key is the easy path and a GCP service account is not available. See [SELF_HOSTING.md](SELF_HOSTING.md).
 
-3.  **Fallback 1**: **Oracle `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
-    *   Calls the retro Oracle's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.
+3.  **Fallback 1**: **Oracul `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
+    *   Calls the retro Oracul's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.
     *   Registered whenever the Oracle is configured (`ORACLE_URL` + `ORACLE_API_KEY`) — a no-op otherwise (e.g. self-host installs that don't reach Daatan's Oracle).
     *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON).
 
@@ -37,14 +37,14 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 ### Failure notifications
 
-A single provider failing is **logged but not paged** — a later leg may still succeed, and a fallback that rescues the call is silent. Telegram is paged (via `notifyLlmError`) **only when the whole chain fails**, with the attempted provider chain (e.g. `Gemini → Oracle → OpenRouter`) and the last error. See `docs/TELEGRAM_NOTIFICATIONS.md`.
+A single provider failing is **logged but not paged** — a later leg may still succeed, and a fallback that rescues the call is silent. Telegram is paged (via `notifyLlmError`) **only when the whole chain fails**, with the attempted provider chain (e.g. `Gemini → Oracul → OpenRouter`) and the last error. See `docs/TELEGRAM_NOTIFICATIONS.md`.
 
 ## Code Structure
 
 *   **`src/lib/llm/types.ts`**: Interfaces for `LLMProvider`, `LLMRequest`, `LLMResponse`.
 *   **`src/lib/llm/providers/`**: Implementations for specific services.
     *   `gemini.ts`: Wrapper for Google Generative AI SDK.
-    *   `oracle.ts`: HTTP client for the Oracle `/llm` endpoint (Bedrock/Nova) — main-chain fallback.
+    *   `oracle.ts`: HTTP client for the Oracul `/llm` endpoint (Bedrock/Nova) — main-chain fallback.
     *   `ollama.ts`: HTTP client for Ollama API.
     *   `openrouter.ts`: HTTP client for OpenRouter API (main-chain fallback + bots).
 *   **`src/lib/llm/service.ts`**: `ResilientLLMService` class that handles the retry/fallback logic.
@@ -83,7 +83,7 @@ The model must not invent dates for scheduled events (elections, rulings, statut
 
 ## Usage
 
-### Standard requests (Gemini → Oracle → OpenRouter → Ollama fallback)
+### Standard requests (Gemini → Oracul → OpenRouter → Ollama fallback)
 
 Instead of importing `GoogleGenerativeAI` directly, use the service:
 
@@ -113,13 +113,13 @@ const response = await botLlm.generateContent({ prompt: "..." })
 1.  Create a class in `src/lib/llm/providers/` implementing `LLMProvider`.
 2.  Add it to the initialization list in `src/lib/llm/index.ts`.
 
-## Oracle API Integration
+## Oracul API Integration
 
 Calibrated probability estimates for binary forecast questions come from the **TruthMachine Oracle API** (`oracle.daatan.com`) — a FastAPI microservice in the [retro repo](https://github.com/Daatan/retro) that runs a multi-source article ingest + gatekeeper + extractor pipeline with credibility-weighted aggregation.
 
 ### Client
 
-*   **`src/lib/services/oracle.ts`**: Oracle client.
+*   **`src/lib/services/oracle.ts`**: Oracul client.
     *   `getOracleForecast(question)` → `OracleForecastResponse | null`. Returns the full payload (`mean`, `std`, `ci_low`, `ci_high`, `articles_used`, `sources[]` with per-source `stance` / `certainty` / `credibility_weight` / `claims`) so callers can surface provenance alongside the probability. Never throws; returns `null` on any failure so callers can fall back silently.
     *   `getOracleProbability(question)` → `number | null` in `[0, 1]`. Thin wrapper around `getOracleForecast` for callers that only need the scaled probability.
     *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version's major component is one of the accepted ones (`EXPECTED_API_MAJOR_VERSIONS`, `['0', '1']` while retro moves from 0.4.x to generation-based 1.4.x — daatan#1668, umbrella Daatan/retro#742) — a strict `0.1` prefix check went stale as retro shipped 0.2–0.4.x and was silently failing every call (daatan#1563).
@@ -141,24 +141,24 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 
 ### Fallback chain for forecast "AI %"
 
-1.  **Oracle** (`POST /forecast`) — calibrated multi-source estimate. The client budget is
+1.  **Oracul** (`POST /forecast`) — calibrated multi-source estimate. The client budget is
     per path, not global (`src/lib/services/oracle.ts`): **30 s** by default for
     server-to-server/background callers (news-indexer push, the retry sweep), **20 s** for
     bot voting, **12 s** (`INTERACTIVE_FORECAST_TIMEOUT_MS`) for the two interactive callers,
-    which race the Oracle against their own wall clock and fall back to the LLM.
+    which race the Oracul against their own wall clock and fall back to the LLM.
     Every budget must stay strictly above the server budget it waits on: retro does not
     cancel on client disconnect, so aborting early discards a forecast already paid for and
     records it as a failure. 30 s is derived from retro's own server-side latency (p99 25.0 s,
     clamped by its `per_article_timeout_seconds = 25`), not from its nominal
     `forecast_timeout_seconds = 90`, which has fired once in 93 days. See daatan#1254.
-2.  **LLM `guessChances`** (Gemini → Oracle → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracle path is not configured, times out, returns a placeholder response, or has zero usable articles.
+2.  **LLM `guessChances`** (Gemini → Oracul → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracul path is not configured, times out, returns a placeholder response, or has zero usable articles.
 
 ### Call sites
 
 *   `POST /api/forecasts/[id]/context` — step 3 "AI probability" in the context analysis route.
 *   `POST /api/forecasts/express/guess` — the express forecast guess endpoint.
 
-In both routes, Oracle is tried first; if it returns `null`, the existing `guessChances` path runs unchanged.
+In both routes, Oracul is tried first; if it returns `null`, the existing `guessChances` path runs unchanged.
 
 ### Configuration
 

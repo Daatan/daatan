@@ -40,7 +40,7 @@ Seeking a full-time position as a senior software developer.
 
 ### 2006—2007: Artis Ltd
 **Software Developer** (Document management tool)
-- Team Leader developing and integrating a product for an insurance company (Delphi, ASP, JavaScript, XSLT, Oracle PL/SQL).
+- Team Leader developing and integrating a product for an insurance company (Delphi, ASP, JavaScript, XSLT, Oracul PL/SQL).
 
 ### 2000—2002: vTrails Ltd.
 **Software Developer** (P2P audio streaming startup)

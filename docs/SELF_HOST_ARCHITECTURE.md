@@ -4,7 +4,7 @@ Maintainer reference for how the self-hosted edition works. Operator-facing setu
 
 ## Goal
 
-Sell Daatan as a single-organization, self-hosted internal forecasting tool (corp/gov/NGO in their own VPC, not air-gapped). v1 is a **pure manual forecasting tool** — create questions, commit, resolve, per-person calibration/reputation (Brier/Glicko/ELO) — white-labelled, behind the org's SSO. Oracle / web search / LLM / external markets are **opt-in add-ons, off by default**.
+Sell Daatan as a single-organization, self-hosted internal forecasting tool (corp/gov/NGO in their own VPC, not air-gapped). v1 is a **pure manual forecasting tool** — create questions, commit, resolve, per-person calibration/reputation (Brier/Glicko/ELO) — white-labelled, behind the org's SSO. Oracul / web search / LLM / external markets are **opt-in add-ons, off by default**.
 
 ## Core principle: one codebase, runtime edition flag
 

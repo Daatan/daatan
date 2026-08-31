@@ -132,7 +132,7 @@ git push origin v1.1.1
 | [POST_MORTEM.md](./POST_MORTEM.md) | Incident history and retrospectives |
 | [docs/bots.md](./docs/bots.md) | Autonomous bot system design and usage |
 | [docs/BOT_APPROVAL_WORKFLOW.md](./docs/BOT_APPROVAL_WORKFLOW.md) | Bot approval workflow (v1.7.31+) |
-| [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) | LLM provider chain, Bedrock prompts, Oracle integration |
+| [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) | LLM provider chain, Bedrock prompts, Oracul integration |
 | [docs/API.md](./docs/API.md) | HTTP API reference |
 | [docs/DATABASE.md](./docs/DATABASE.md) | Database map: tables by domain, probability scales, estimate stream, gotchas |
 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Deployment pipeline (canonical) |

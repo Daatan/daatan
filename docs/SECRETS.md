@@ -117,7 +117,7 @@ Staging cannot read prod. That is the boundary that matters and it holds. (Until
   Secrets Manager, going forward, or migrate the read path the same way `ORACLE_API_KEY`
   was.
 - **`truthmachine-ec2-role` has `daatan/*` and `openclaw/*` wildcards.** It can read
-  `openclaw/github-pat` and `openclaw/gcp-service-account-key`, which the Oracle does not
+  `openclaw/github-pat` and `openclaw/gcp-service-account-key`, which the Oracul does not
   use. Narrow to the paths it reads. Its role is not managed by Terraform at all.
 - **Five `openclaw/*` secrets are duplicated into `us-east-1`** and are free to diverge.
   Pick an authoritative region and delete the rest.
