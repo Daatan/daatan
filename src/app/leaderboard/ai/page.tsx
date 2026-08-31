@@ -88,7 +88,7 @@ export default async function AiLeaderboardPage() {
                     <span className="text-white font-medium">{m.label}</span>
                     {m.isOracle && (
                       <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
-                        {t('oracleBadge')}
+                        {t('oraculBadge')}
                       </span>
                     )}
                     {m.isMarket && (

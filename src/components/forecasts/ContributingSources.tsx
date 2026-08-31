@@ -192,7 +192,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
   }
 
   const originText = (origin: ContributingSource['origin']): string | null => {
-    if (origin === 'oracle') return t('originOracle')
+    if (origin === 'oracle') return t('originOracul')
     if (origin === 'both') return t('originBoth')
     if (origin === 'indexer') return t('originIndexer')
     return null
