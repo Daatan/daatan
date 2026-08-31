@@ -76,6 +76,13 @@ const articleItemSchema = z.object({
   snippet: z.string(),
   source: z.string().nullable().optional(),
   publishedAt: z.string().nullable().optional(),
+  /** Where news-indexer resolved `publishedAt` from — `page` | `feed` | `pushed` | `url`, null
+   *  when unknown (news-indexer#426 / daatan#1679 item 2). Persisted onto the pool row beside
+   *  the date: the date on its own can't be audited, since one read off the article page and one
+   *  inherited from a mislabelled feed entry are the same string. Not validated against the
+   *  vocabulary — a value this side doesn't recognise is still more information than null, and
+   *  rejecting it would fail a whole push over a field nothing gates on. */
+  publishedAtSource: z.string().max(16).nullable().optional(),
   similarity: z.number().min(0).max(1).optional(),
   /** The article body news-indexer already holds in S3 (news-indexer#201). Forwarded to the
    *  Oracle as `ArticleInput.text`, which it has always accepted — "if omitted, oracle fetches
@@ -120,6 +127,8 @@ const bodySchema = z
     articleSnippet: z.string().optional(),
     articleSource: z.string().nullable().optional(),
     publishedAt: z.string().nullable().optional(),
+    // Same field as in articleItemSchema above, top-level on the legacy single-article body.
+    publishedAtSource: z.string().max(16).nullable().optional(),
     similarity: z.number().min(0).max(1).optional(),
     // The legacy body spells its fields `article*`; inside `articles[]` the same value is
     // plain `text`. news-indexer sends whichever matches the shape it is sending.
@@ -182,6 +191,7 @@ export async function POST(request: NextRequest) {
               snippet: body.articleSnippet ?? '',
               source: body.articleSource ?? null,
               publishedAt: body.publishedAt ?? null,
+              publishedAtSource: body.publishedAtSource ?? null,
               similarity: body.similarity,
               text: body.articleText ?? null,
               language: body.articleLanguage ?? null,
@@ -250,6 +260,7 @@ export async function POST(request: NextRequest) {
       snippet: a.snippet,
       source: a.source ?? null,
       publishedAt: a.publishedAt ?? null,
+      publishedAtSource: a.publishedAtSource ?? null,
     }))
     const claimResults = await claimArticlesForExtraction(prediction.id, claimableItems, 'news-indexer', {
       claimCreatedAt: prediction.createdAt,

@@ -517,6 +517,46 @@ describe('POST /api/news-indexer/context', () => {
       expect(snapshotSources()[0]).toMatchObject({ personId: 'person-2', outletId: 'outlet-2' })
     })
 
+    // daatan#1679 item 2. The claim call is what writes the pool row, so asserting on it is
+    // the only check that the field actually reaches storage rather than merely surviving Zod.
+    it('carries publishedAtSource from articles[] through to the pool claim', async () => {
+      await POST(
+        post('test-secret', {
+          predictionId: 'pred-1',
+          articles: [
+            {
+              url: 'https://bbc.com/news/x',
+              title: 'Headline',
+              snippet: 's',
+              publishedAt: '2026-06-10T00:00:00Z',
+              publishedAtSource: 'feed',
+            },
+          ],
+        }),
+      )
+
+      expect(vi.mocked(claimArticlesForExtraction).mock.calls[0][1][0]).toMatchObject({
+        publishedAt: '2026-06-10T00:00:00Z',
+        publishedAtSource: 'feed',
+      })
+    })
+
+    it('carries publishedAtSource from the legacy flat body through to the pool claim', async () => {
+      await POST(post('test-secret', { ...VALID_BODY, publishedAtSource: 'page' }))
+
+      expect(vi.mocked(claimArticlesForExtraction).mock.calls[0][1][0]).toMatchObject({
+        publishedAtSource: 'page',
+      })
+    })
+
+    it('claims with a null provenance when the push omits it (a pre-#426 news-indexer)', async () => {
+      await POST(post('test-secret', VALID_BODY))
+
+      expect(vi.mocked(claimArticlesForExtraction).mock.calls[0][1][0]).toMatchObject({
+        publishedAtSource: null,
+      })
+    })
+
     it('calls the by-url lookup even when every article carries identity from the push, and takes names/author from it while the push ids win', async () => {
       // daatan#1463: the push carries ids only, so skipping the lookup here left every
       // pool row's person_name/outlet_name/author NULL forever.

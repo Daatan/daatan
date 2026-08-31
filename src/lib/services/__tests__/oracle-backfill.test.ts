@@ -470,7 +470,9 @@ describe('refreshOracleSnapshot', () => {
 
       expect(mockClaim).toHaveBeenCalledWith(
         'p1',
-        [{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedAt: '2026-07-01' }],
+        // publishedAtSource is null on this lane: Oracle search results carry a date but never
+        // say where it came from, and null means "unknown" (daatan#1679 item 2).
+        [{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedAt: '2026-07-01', publishedAtSource: null }],
         'backfill',
         // The publish-date gate (daatan#1651) needs the forecast's creation date; this
         // fixture has none, and the gate must then stay off rather than guess.

@@ -198,6 +198,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             snippet: r.snippet,
             source: r.source ?? null,
             publishedAt: r.publishedDate ?? null,
+            // Oracle search results carry a date but never say where it came from, so this lane
+            // genuinely has no provenance to record (daatan#1679 item 2). Null, not a guess.
+            publishedAtSource: null,
         }))
         const claimResults = await claimArticlesForExtraction(prediction.id, claimableResults, 'analyze', {
           claimCreatedAt: prediction.createdAt,
