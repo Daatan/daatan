@@ -15,7 +15,7 @@ const MAX_PER_CALL = 25
  * ACTIVE, public forecasts with no context snapshot carrying an oracleSnapshot.
  *
  * isPublic:true excludes forecasts flagged private for moderation reasons
- * (daatan#1603) — this route spends real Oracle calls per candidate, so a
+ * (daatan#1603) — this route spends real Oracul calls per candidate, so a
  * flagged low-value forecast shouldn't consume backfill slots.
  */
 const NO_ORACLE_SNAPSHOT: Prisma.PredictionWhereInput = {
@@ -64,10 +64,10 @@ const authed = withAuth(async (request: NextRequest) => {
 }, { roles: ['ADMIN'] })
 
 /**
- * One-time-ish backfill: populate the Oracle source roster for ACTIVE forecasts that
- * have no Oracle snapshot yet (created before per-source capture existed). Bounded per
+ * One-time-ish backfill: populate the Oracul source roster for ACTIVE forecasts that
+ * have no Oracul snapshot yet (created before per-source capture existed). Bounded per
  * call (?limit=N, default 10, max 25) so a single request can't run unbounded; re-call
- * until `remaining` is 0. Each forecast runs a full search + Oracle analysis, so it's paced.
+ * until `remaining` is 0. Each forecast runs a full search + Oracul analysis, so it's paced.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header so the
  * backfill workflow can drive it headlessly — same pattern as the cron routes.

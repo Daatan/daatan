@@ -9,8 +9,8 @@ import { Prisma } from '@prisma/client'
 const log = createLogger('external-markets')
 
 /** Percentage-point gap between a linked market's implied YES probability and
- *  our Oracle estimate above which we alert — the two disagreeing enough to be
- *  worth a human look (mispriced market, stale Oracle read, or a real edge). */
+ *  our Oracul estimate above which we alert — the two disagreeing enough to be
+ *  worth a human look (mispriced market, stale Oracul read, or a real edge). */
 const MARKET_DIVERGENCE_THRESHOLD_PTS = 20
 /** Re-arm only once the gap falls back to this (lower) bar, not merely below
  *  MARKET_DIVERGENCE_THRESHOLD_PTS — the buffer stops a gap oscillating right
@@ -891,7 +891,7 @@ type DivergenceCandidate = {
 /**
  * For every prediction linked to a just-synced market, compare the market's
  * implied probability (inverted per-prediction if the link asks the opposite
- * question) against our latest Oracle estimate. Alerts once when the gap first
+ * question) against our latest Oracul estimate. Alerts once when the gap first
  * crosses MARKET_DIVERGENCE_THRESHOLD_PTS, then stays quiet until the gap
  * closes — re-arming for a later re-crossing. Best-effort, never throws.
  */

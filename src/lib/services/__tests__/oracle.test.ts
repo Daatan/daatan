@@ -2,7 +2,7 @@
  * @jest-environment node
  *
  * Unit tests for the TruthMachine Oracle client. All network calls to the
- * Oracle API are mocked with vi.stubGlobal('fetch', ...).
+ * Oracul API are mocked with vi.stubGlobal('fetch', ...).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -144,7 +144,7 @@ describe('getOracleForecast', () => {
     const [, init] = fetchMock.mock.calls[0]
     const body = JSON.parse(init.body as string)
     expect(body.articles[0].published_date).toBe('2026-06-14')
-    // the camelCase key must not leak through to the Oracle
+    // the camelCase key must not leak through to the Oracul
     expect(body.articles[0].publishedDate).toBeUndefined()
   })
 
@@ -159,7 +159,7 @@ describe('getOracleForecast', () => {
     const body = JSON.parse(init.body as string)
     expect(body.articles[0].relevance).toBe(0.83)
     expect(body.articles[0].is_prediction).toBe(true)
-    // the camelCase key must not leak through to the Oracle
+    // the camelCase key must not leak through to the Oracul
     expect(body.articles[0].isPrediction).toBeUndefined()
   })
 
@@ -193,7 +193,7 @@ describe('getOracleForecast', () => {
   it('flags insufficientData (and returns null) when the Oracle abstains', async () => {
     // _empty_response carries insufficient_data:true (and placeholder:true); the
     // abstention check runs first so the caller can distinguish "no evidence bears
-    // on the claim" from "Oracle unavailable" and avoid an ungrounded LLM guess.
+    // on the claim" from "Oracul unavailable" and avoid an ungrounded LLM guess.
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -633,7 +633,7 @@ describe('forecast request timeout', () => {
 
   it('interactive callers fit inside the 15s estimation race they run under', async () => {
     // forecasts/[id]/context races the whole estimation at ESTIMATION_TIMEOUT_MS=15s.
-    // An Oracle budget above that is abandoned one level up while still running — the
+    // An Oracul budget above that is abandoned one level up while still running — the
     // same inversion, one hop further in. Keep them consistent.
     const ESTIMATION_TIMEOUT_MS = 15_000
     expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(ESTIMATION_TIMEOUT_MS)

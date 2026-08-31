@@ -48,7 +48,7 @@ export async function getElectionMatrix(): Promise<ElectionMatrix> {
   })
 
   // A cell aggregates the author's full usable pool for the event, not just the
-  // articles the last Oracle run happened to cite. Stance-less rows (extraction
+  // articles the last Oracul run happened to cite. Stance-less rows (extraction
   // still pending) can't color a cell, so they're filtered at the query.
   const poolRows = await prisma.evidencePoolArticle.findMany({
     where: {

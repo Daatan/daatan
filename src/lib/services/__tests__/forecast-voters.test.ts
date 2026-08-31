@@ -1,8 +1,8 @@
 /**
  * @jest-environment node
  *
- * getForecastVoters merges the Oracle-snapshot stream and the news-indexer stream,
- * deduping by canonical URL (Oracle stance wins on overlap, origins union).
+ * getForecastVoters merges the Oracul-snapshot stream and the news-indexer stream,
+ * deduping by canonical URL (Oracul stance wins on overlap, origins union).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -82,8 +82,8 @@ describe('getForecastVoters', () => {
     const out = await getForecastVoters('fc-1')
     expect(out).toHaveLength(1)
     expect(out[0].origin).toBe('both')
-    expect(out[0].stance).toBe(0.5) // Oracle wins
-    expect(out[0].author).toBe('Jane Doe') // filled from indexer (Oracle had null)
+    expect(out[0].stance).toBe(0.5) // Oracul wins
+    expect(out[0].author).toBe('Jane Doe') // filled from indexer (Oracul had null)
     expect(out[0].publishedAt).toBe('2026-06-18')
   })
 

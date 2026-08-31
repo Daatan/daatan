@@ -8,8 +8,8 @@
  * 3. Deduplicates against existing forecast titles (LLM-based)
  * 4. Generates and posts a new forecast (with 🤖 in title)
  * 5. Stakes on the forecast immediately (or defers if requireApprovalForForecasts)
- * 6. Optionally votes on existing ACTIVE forecasts (informed by the Oracle's
- *    P(YES) estimate when the Oracle is configured and reachable)
+ * 6. Optionally votes on existing ACTIVE forecasts (informed by the Oracul's
+ *    P(YES) estimate when the Oracul is configured and reachable)
  * 7. Logs all actions to BotRunLog
  *
  * The per-stage logic lives in sibling modules: forecastCreate (news-anchored),
@@ -163,7 +163,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
     // ── Forecast creation ────────────────────────────────────────────────
     if (bot.canCreateForecasts) {
       const allSources = bot.newsSources as string[]
-      // `oracle: <query>` entries route through the paid Oracle /search; everything
+      // `oracle: <query>` entries route through the paid Oracul /search; everything
       // else (RSS URLs and `Search:` Google News queries) goes through fetchRssFeeds.
       const isOracle = (s: string) => s.trim().toLowerCase().startsWith('oracle:')
       const oracleQueries = allSources
@@ -176,7 +176,7 @@ async function runBot(bot: BotWithUser, dryRun: boolean, isManual: boolean = fal
       if ((feedUrls.length > 0 || oracleQueries.length > 0) && initialForecastCount < bot.maxForecastsPerDay) {
         const metrics = startMetrics()
 
-        // Cap paid Oracle searches per run; extras are ignored until the next run.
+        // Cap paid Oracul searches per run; extras are ignored until the next run.
         const cappedOracleQueries = oracleQueries.slice(0, MAX_ORACLE_SOURCES_PER_RUN)
         if (oracleQueries.length > cappedOracleQueries.length) {
           log.info(

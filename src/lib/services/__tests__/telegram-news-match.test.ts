@@ -46,7 +46,7 @@ describe('notifyNewsArticleMatched', () => {
   })
 
   it('reports the move, and what the article said (stance/relevance) as table rows', async () => {
-    // The numbers that make a match legible: which way the article argues, whether the Oracle
+    // The numbers that make a match legible: which way the article argues, whether the Oracul
     // judged it to bear on the claim at all, and how far the estimate moved. Without stance
     // and relevance the message says the number changed but never why.
     await notifyNewsArticleMatched(
@@ -118,7 +118,7 @@ describe('notifyNewsArticleMatched', () => {
   })
 
   it('omits stance/relevance rows when unknown rather than printing null', async () => {
-    // An older Oracle response may carry neither. The table must degrade to fewer rows,
+    // An older Oracul response may carry neither. The table must degrade to fewer rows,
     // not render "stance null".
     await notifyNewsArticleMatched(
       PREDICTION,

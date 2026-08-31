@@ -9,7 +9,7 @@ const log = createLogger('cron-requote')
 /**
  * POST /api/cron/requote
  * The temporal-model daily driver (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage
- * 0): pure arithmetic per open forecast, no Oracle/search/LLM call except the
+ * 0): pure arithmetic per open forecast, no Oracul/search/LLM call except the
  * bounded self-heal classification pass. Protected by x-cron-secret (same
  * secret as BOT_RUNNER_SECRET) — the same auth pattern as every other cron
  * route, first one to read a JSON body instead of query params.

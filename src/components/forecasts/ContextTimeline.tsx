@@ -59,7 +59,7 @@ export function groupSources(sources: Source[]): GroupedSource[] {
   }))
 }
 
-/** Single source entry within an Oracle forecast snapshot (camelCase variant used in UI). */
+/** Single source entry within an Oracul forecast snapshot (camelCase variant used in UI). */
 type OracleSnapshotSource = {
   sourceId: string
   sourceName: string
@@ -75,16 +75,16 @@ type OracleSnapshotSource = {
   settled?: boolean | null
 }
 
-/** Full Oracle payload persisted alongside a context snapshot when the Oracle path is taken. */
+/** Full Oracul payload persisted alongside a context snapshot when the Oracul path is taken. */
 type OracleSnapshot = {
-  /** Probability percent [0, 100] — converted from the Oracle's raw stance mean. */
+  /** Probability percent [0, 100] — converted from the Oracul's raw stance mean. */
   mean: number
   /** Spread, on the same percent scale as `mean`/`ciLow`/`ciHigh`. */
   std: number
   ciLow: number
   ciHigh: number
   articlesUsed: number
-  /** Settlement pin (#1250): the Oracle read the question as already decided and
+  /** Settlement pin (#1250): the Oracul read the question as already decided and
    *  REPLACED the pooled estimate with a pinned constant — a different epistemic
    *  regime, not a confident average. Surfaced in the UI, never restyled away. */
   settled?: boolean
@@ -96,7 +96,7 @@ export type AiEstimate = {
   probability: number | null
   ciLow?: number
   ciHigh?: number
-  /** The Oracle had no evidence bearing on the claim — show "Insufficient evidence". */
+  /** The Oracul had no evidence bearing on the claim — show "Insufficient evidence". */
   abstained?: boolean
   /** The estimate is a settlement pin, not a pooled average (see OracleSnapshot.settled). */
   settled?: boolean
@@ -130,7 +130,7 @@ type Props = {
   onAiEstimate?: (value: AiEstimate | null) => void
 }
 
-/** Map a snapshot's persisted probability + Oracle CI (if any) into the callback shape. */
+/** Map a snapshot's persisted probability + Oracul CI (if any) into the callback shape. */
 const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
   if (!snap) return null
   // The latest run abstained — surface "Insufficient evidence", not a stale number.

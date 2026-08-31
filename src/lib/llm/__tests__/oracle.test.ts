@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the Oracle client so the provider never touches prisma/env/network.
+// Mock the Oracul client so the provider never touches prisma/env/network.
 vi.mock('@/lib/services/oracleClient', () => ({
   oracleFetch: vi.fn(),
 }))

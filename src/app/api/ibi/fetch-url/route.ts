@@ -11,7 +11,7 @@ export const POST = withAuth(async (request, user) => {
     const body = await request.json()
     const { url } = schema.parse(body)
 
-    // This endpoint is unauthenticated on the Oracle side (no x-api-key).
+    // This endpoint is unauthenticated on the Oracul side (no x-api-key).
     const baseUrl = getOracleBaseUrl()
     if (!baseUrl) return NextResponse.json({ error: 'Oracle not configured' }, { status: 503 })
 

@@ -48,7 +48,7 @@ export interface RemediationForecast {
   claimText: string
   /** Rows matching {@link remediableWhere} — what this run re-extracts. */
   targetRows: number
-  /** Oracle calls: one per DEFAULT_MAX_ARTICLES-row batch. */
+  /** Oracul calls: one per DEFAULT_MAX_ARTICLES-row batch. */
   batches: number
   /** Usable pool size before/after — the gauge for rows the gatekeeper drops on re-extraction. */
   poolBefore: number

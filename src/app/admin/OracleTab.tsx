@@ -261,7 +261,7 @@ export function formatProviderChain(chain: string[]): string {
   return chain.length > 0 ? chain.join(' → ') : ''
 }
 
-// Column-header tooltips that make the Oracle vocabulary self-explanatory.
+// Column-header tooltips that make the Oracul vocabulary self-explanatory.
 const HEADER_HINTS = {
   type: 'Oracle call type — FORECAST: AI probability estimate; SEARCH: article retrieval; LEADERBOARD/HEALTH/LLM/FETCH_URL: support calls.',
   source: 'Daatan workflow that triggered this Oracle call (e.g. context-update, research, express-creation).',
@@ -365,7 +365,7 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
 
 export default function OracleTab() {
   const { selfHosted } = useCapabilities()
-  // 'bot-voting' is a SaaS-only Oracle caller — drop it from the filter on self-host.
+  // 'bot-voting' is a SaaS-only Oracul caller — drop it from the filter on self-host.
   const sourceOptions = selfHosted ? SOURCE_OPTIONS.filter(s => s !== 'bot-voting') : SOURCE_OPTIONS
   const [stats, setStats] = useState<OracleStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)

@@ -122,7 +122,7 @@ describe('high-confidence crossing alert', () => {
 
   it('an organic 97 with settling rows in the pool alerts as unsettled', async () => {
     // settled=false: the rows' flags alone are not a pin — the gate keys on
-    // the Oracle's settled verdict, not on row inspection.
+    // the Oracul's settled verdict, not on row inspection.
     mockPrevious(70)
     await saveNewsIndexerMatch({
       ...matchInput(97),

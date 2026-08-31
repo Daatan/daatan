@@ -1,5 +1,5 @@
 /**
- * When the Oracle abstained on a forecast (latest ContextSnapshot.insufficientData),
+ * When the Oracul abstained on a forecast (latest ContextSnapshot.insufficientData),
  * a commit with null Prediction.confidence must NOT trigger the LLM base-rate
  * backfill — the UI shows no AI estimate, so manufacturing one to grade the user's
  * aiScore against would defeat the abstention. Leaving aiProbabilityAtCommit null

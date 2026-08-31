@@ -41,7 +41,7 @@ const authed = withAuth(async (request: NextRequest) => {
  * the flag cannot remediate by accident. **`scope` defaults to `a6`** (the narrow
  * over-extraction signature); `usable` targets the whole currently-usable pool for a
  * blanket recompute (retro#626) instead of an A6-only remediation. Each forecast costs
- * one Oracle analysis per 15 target rows, so this is driven by hand over a reviewed
+ * one Oracul analysis per 15 target rows, so this is driven by hand over a reviewed
  * list, not on a schedule — the plan's human-review gate sits in front of it, not
  * inside it.
  *

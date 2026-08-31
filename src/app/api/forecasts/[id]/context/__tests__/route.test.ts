@@ -185,7 +185,7 @@ describe('POST /api/forecasts/[id]/context', () => {
 
     it('asks the Oracle with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
       // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (15s), so the
-      // Oracle call must fit inside it. The service default is 30s — sized for the
+      // Oracul call must fit inside it. The service default is 30s — sized for the
       // background push/sweep paths — and inheriting it here would mean the race abandons
       // a call that is still running: the same timeout inversion, one hop further in.
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([

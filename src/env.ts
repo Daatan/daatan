@@ -74,7 +74,7 @@ export const env = createEnv({
     ALLOWED_EMAIL_DOMAINS: z.string().min(1).optional(),
 
     // Optional add-on features, OFF BY DEFAULT for the self_hosted edition (SaaS
-    // is always on). AI = Oracle co-forecaster + web/news search + LLM estimates
+    // is always on). AI = Oracul co-forecaster + web/news search + LLM estimates
     // (Analyze, Express, Guess Chances, AI extract/tag-suggest). External markets
     // = Polymarket/Kalshi import + suggest-similar. Opt in per gate via 'true'.
     ENABLE_AI_FEATURES: z.enum(['true', 'false']).optional(),
@@ -142,7 +142,7 @@ export const env = createEnv({
     // Bot system limits
     MAX_BOTS: z.coerce.number().default(50),
 
-    // Oracle API — TruthMachine probability estimates
+    // Oracul API — TruthMachine probability estimates
     ORACLE_URL: z.string().url().optional(),
     ORACLE_API_KEY: z.string().min(1).optional(),
 

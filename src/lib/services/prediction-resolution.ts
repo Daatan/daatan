@@ -206,7 +206,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
           eloRating: commitment.user.eloRating,
         })
 
-        // Matched-time Brier for each panel member (and the Oracle) on this commitment.
+        // Matched-time Brier for each panel member (and the Oracul) on this commitment.
         // Isolation: written to ai_member_scores only; never touches this user's score.
         //
         // BINARY only, sentinels included. Panel members estimate P(claim) and only ever

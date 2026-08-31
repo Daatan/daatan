@@ -222,7 +222,7 @@ describe('retryPoolExtractions', () => {
     it.each(['oracle_timeout', 'oracle_network', 'oracle_http', 'oracle_unconfigured', 'oracle_placeholder'])(
       'does NOT finalize when THIS run failed with %s, however many prior strikes',
       async (failureClass) => {
-        // The headline bug (daatan#1253): one Oracle call carries up to
+        // The headline bug (daatan#1253): one Oracul call carries up to
         // DEFAULT_MAX_ARTICLES rows, so a single client timeout used to stamp the whole
         // batch terminal on zero information about any article in it. 94.9% of terminal
         // rows were retired in multi-row groups; 24% of the calls behind them were

@@ -57,7 +57,7 @@ const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
 /**
  * Committing after the resolution deadline is a free-points exploit: rsChange =
  * (0.25 − brier) × 100 has no time discount, so a sure-thing commit yields ~+25
- * RS risk-free. An Oracle settlement pin (prediction.settled) does NOT lock
+ * RS risk-free. An Oracul settlement pin (prediction.settled) does NOT lock
  * commitments — it's classifier-derived and can misfire on contradictory source
  * evidence, so it's surfaced only as a notification/banner, never a hard block.
  *
@@ -276,7 +276,7 @@ export async function createCommitment(
       include: {
         options: true,
         // confidence needed for aiProbabilityAtCommit snapshot; the latest
-        // snapshot's insufficientData tells us whether the Oracle abstained, so we
+        // snapshot's insufficientData tells us whether the Oracul abstained, so we
         // don't manufacture an LLM estimate to grade an abstained forecast against.
         // Excludes kind='clock' rows — a clock tick carries no insufficientData
         // signal of its own and would mask the real latest abstention state.
@@ -320,7 +320,7 @@ export async function createCommitment(
     const abstained = prediction.contextSnapshots?.[0]?.insufficientData ?? false
     if (commitment.aiProbabilityAtCommit == null && !abstained) {
       // confidence was null at commit. That's either "not analysed yet" (ask the
-      // LLM for a base-rate estimate to grade against) or "the Oracle abstained —
+      // LLM for a base-rate estimate to grade against) or "the Oracul abstained —
       // insufficient evidence". For the latter (abstained) we must NOT manufacture
       // a number: the UI honestly shows no AI estimate, so grading the user's
       // aiScore against an LLM guess would defeat the abstention. Leaving

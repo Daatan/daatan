@@ -9,7 +9,7 @@ const log = createLogger('search-query')
  * Raised from 2s (daatan#1225): 2 of 4 prod analyze runs over 7 days blew the old budget —
  * one measured Gemini call took 3.8s — and the fallback is not a cheap degradation. It
  * searches on the raw claim *sentence*, which retrieves generically (7 off-topic Putin
- * articles for an illness claim), so the Oracle then correctly abstains and the whole
+ * articles for an illness claim), so the Oracul then correctly abstains and the whole
  * analyze run publishes "Insufficient evidence". A few seconds here costs little — the
  * search phase runs before the LLM summary and the route streams — while the fallback
  * costs the run.

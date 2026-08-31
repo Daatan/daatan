@@ -337,7 +337,7 @@ export default function ForecastDetailClient({
 
   // Mirrors getCommitmentLockReason server-side (client clock is fine — the
   // server re-validates and returns 409 with the human-readable reason).
-  // Note: an Oracle settlement pin (prediction.settled) is notification-only —
+  // Note: an Oracul settlement pin (prediction.settled) is notification-only —
   // it does not lock commitments, only the deadline arms below do.
   const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
   const nowMs = Date.now()
@@ -541,7 +541,7 @@ export default function ForecastDetailClient({
           // hide the needle and show "Insufficient evidence".
           const aiAbstained = aiEstimate ? !!aiEstimate.abstained : !!initialContextSnapshots?.[0]?.insufficientData
           const aiVal = aiAbstained ? null : (aiEstimate?.probability ?? prediction.confidence ?? null)
-          // Settlement pin (#1250): the Oracle read the question as already
+          // Settlement pin (#1250): the Oracul read the question as already
           // decided and REPLACED the pooled estimate with a pinned constant.
           // Same freshness rule as aiAbstained — an in-page analyze run's
           // aiEstimate overrides the server-prefetched latest snapshot.

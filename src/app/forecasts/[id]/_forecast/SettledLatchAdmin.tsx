@@ -14,7 +14,7 @@ interface Props {
 }
 
 /**
- * Admin-only override for a false-positive Oracle settlement pin (the
+ * Admin-only override for a false-positive Oracul settlement pin (the
  * 2026-07-08 F-35 incident was fixed by hand via a prod DB UPDATE — this is
  * that fix, self-service). recordEstimate can only ever set `settled: true`
  * (docs/DATABASE.md "Settlement latch"); this is the only way to clear it.

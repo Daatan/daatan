@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * Unit tests for the shared Oracle HTTP client helpers.
+ * Unit tests for the shared Oracul HTTP client helpers.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 

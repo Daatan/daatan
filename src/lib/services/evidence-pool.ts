@@ -107,7 +107,7 @@ export async function addArticlesToPool(
         facet: s.facet,
         // F1/F15 — deliberately `undefined` (= leave the column alone), NOT
         // DbNull. A path that re-touches a pool row without carrying per-claim
-        // data (a recompute, an older Oracle build, a partial response) must
+        // data (a recompute, an older Oracul build, a partial response) must
         // not erase per-claim data we already hold: it is unrecoverable, since
         // there is no backfill. This is the daatan#1237 failure mode — "re-
         // extraction nulls fields the response merely omitted" — which the
@@ -192,7 +192,7 @@ export function hashArticleContent(title: string, snippet: string): string {
 
 /** A PENDING claim older than this is treated as abandoned (crashed request,
  *  process killed mid-extraction) and eligible for a fresh claim — comfortably
- *  past the Oracle's own p99 latency (~226s) so it never preempts a genuinely
+ *  past the Oracul's own p99 latency (~226s) so it never preempts a genuinely
  *  in-flight call. */
 const PENDING_CLAIM_STALE_MS = 10 * 60 * 1000
 
@@ -203,7 +203,7 @@ const PENDING_CLAIM_STALE_MS = 10 * 60 * 1000
  * There used to be no gate at all: `{ status: 'FAILED' }` was its own OR-arm, so a row
  * that failed was immediately re-claimable. news-indexer re-pushes the same article set
  * on every poll cycle while its 5-minute cooldown rolls, so an article that always nulls
- * looped FAILED → PENDING → FAILED, burning a full Oracle run (fetch + gatekeeper +
+ * looped FAILED → PENDING → FAILED, burning a full Oracul run (fetch + gatekeeper +
  * extractor) each time. The schema's own comment — "eligible for retry once stale" — was
  * stricter than the code implementing it.
  *
@@ -232,7 +232,7 @@ const FAILED_RECLAIM_BACKOFF_MS = 24 * 60 * 60 * 1000
  * impossible by construction, since the cache TTL is 1h and the earliest re-ask on
  * either retry surface was 24h — the two windows could never overlap.
  *
- * 60s rather than zero so a hard-down Oracle still can't be hot-looped by
+ * 60s rather than zero so a hard-down Oracul still can't be hot-looped by
  * news-indexer's re-push cycle, and comfortably shorter than `REASK_DELAY_MS`
  * (120s) so our own scheduled re-ask is never refused by this gate as `unchanged`.
  */
@@ -241,7 +241,7 @@ const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
 /**
  * Reasons that mean "stop asking about this row" — a verdict, not a transient miss.
  *
- * - `oracle_omitted`: the Oracle ran and its gatekeeper dropped the article. Re-asking
+ * - `oracle_omitted`: the Oracul ran and its gatekeeper dropped the article. Re-asking
  *   burns an LLM call to hear "no" again.
  * - `oracle_null_final`: two independent null runs a day apart (`pool-retry`'s attempt cap).
  *
@@ -703,7 +703,7 @@ export async function getPoolArticles(
 
 /**
  * Top pool rows for the resolution-research LLM context: the pool is the
- * Oracle's curated, stance-scored evidence for exactly this claim — better
+ * Oracul's curated, stance-scored evidence for exactly this claim — better
  * grounded than fresh search snippets, and the only place settlement
  * assertions live. Settled rows first (they assert the resolving event
  * itself), then by evidence weight. Looser than USABLE_POOL_ROW_WHERE on
@@ -830,7 +830,7 @@ export interface PublicSourceArticle {
  * leaderboard row for this pair only exists because at least one row here contributed to
  * it, so this never spuriously comes back empty for a page that's actually linked to.
  *
- * Public-safe projection only: excludes the Oracle-estimator shadow-lane fields
+ * Public-safe projection only: excludes the Oracul-estimator shadow-lane fields
  * (stance/authorLean/factSignal/etc.) that live on the same row but were never meant for
  * public display.
  *
@@ -931,7 +931,7 @@ interface PoolAggregateApiResponse {
 
 /**
  * An aggregate over a forecast's whole evidence pool. `mean`/`std`/`ciLow`/`ciHigh`
- * are in the Oracle's stance space [-1, 1] — the same scale `/forecast` returns, so
+ * are in the Oracul's stance space [-1, 1] — the same scale `/forecast` returns, so
  * callers convert with `stanceToPercent`/`stanceStdToPercent` exactly as they do for
  * a single-run forecast.
  */
@@ -1069,13 +1069,13 @@ function auditAlreadyOccurredAtCreation(
  * Aggregate a forecast's entire evidence pool into one estimate, via retro's
  * `/pool/aggregate` (retro docs/ORACLE_VARIABLES.md §6).
  *
- * This is what an Oracle estimate *should* be: a credibility-weighted aggregate over
+ * This is what an Oracul estimate *should* be: a credibility-weighted aggregate over
  * every article we have on the claim. A single `/forecast` run only scores the articles
  * handed to it, so on the news-indexer push path — which usually carries exactly one
  * freshly-matched article — its `mean` is little more than that one article's stance
  * rescaled, and the persisted estimate lurches to wherever the newest article points.
  *
- * Returns null when no aggregate can be formed (Oracle unconfigured, no usable pooled
+ * Returns null when no aggregate can be formed (Oracul unconfigured, no usable pooled
  * articles, transport error, non-200). Never throws: callers fall back to the single-run
  * forecast rather than dropping the estimate entirely. Call it *after* `addArticlesToPool`
  * resolves, so this run's own articles are already in the pool it reads.

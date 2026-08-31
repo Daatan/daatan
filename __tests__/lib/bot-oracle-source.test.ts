@@ -4,7 +4,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
-// Mock the Oracle search client and the DEFAULT_MAX_ARTICLES budget so this test
+// Mock the Oracul search client and the DEFAULT_MAX_ARTICLES budget so this test
 // stays isolated from the prisma-backed oracle client module graph.
 const mockOracleSearch = vi.fn()
 vi.mock('@/lib/services/oracleSearch', () => ({

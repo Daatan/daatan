@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // Same playground as /admin/oracle-v2, without the app chrome (Sidebar hides
 // itself and MainContent drops its margin for this route — see Sidebar.tsx /
-// MainContent.tsx). Still ADMIN-gated: it drives paid Oracle LLM calls.
+// MainContent.tsx). Still ADMIN-gated: it drives paid Oracul LLM calls.
 export default async function OracleV2StandalonePage() {
   const session = await auth()
   if (!session?.user || session.user.role !== 'ADMIN') redirect('/')

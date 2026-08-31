@@ -5,7 +5,7 @@ import { canonicalKey } from '@/lib/utils/canonical-url'
 const log = createLogger('forecast-sources')
 
 /**
- * A publication that fed the Oracle for a forecast — one delivered article
+ * A publication that fed the Oracul for a forecast — one delivered article
  * (a news-indexer `forecast_match`), shown on the forecast page like a
  * forecaster with its own stance on the claim.
  */
@@ -21,13 +21,13 @@ export type ContributingSource = {
   /** [0, 1] — how confident this source is. */
   certainty: number | null
   claim: string | null
-  /** Oracle's per-article probability, 0–100. */
+  /** Oracul's per-article probability, 0–100. */
   oracleProbability: number | null
   /** YES | NO | ANNULLED once the forecast resolves, else null. */
   outcome: string | null
   /** Which stream surfaced this source. 'both' = analysed AND indexed. */
   origin?: 'oracle' | 'indexer' | 'both'
-  /** This source reported the outcome as already decided — it supports the Oracle's
+  /** This source reported the outcome as already decided — it supports the Oracul's
    *  settlement pin (#1250). Only oracle-origin rows carry it; null = unknown. */
   settled?: boolean | null
   /** Resolved outlet identity (news-indexer outlet.name), for linking to /sources/[name] —
@@ -88,7 +88,7 @@ export async function getContributingSources(forecastId: string): Promise<Contri
  * notFound() — so the panel only links bylines whose profile page actually resolves.
  * One batched board fetch covers the whole roster (the board IS the row set that page
  * searches), skipped entirely when no row carries a resolved identity pair — the common
- * case while the board is sparse (#1213). Fails open: an unreachable Oracle returns an
+ * case while the board is sparse (#1213). Fails open: an unreachable Oracul returns an
  * empty board, so every flag stays unset and bylines just render unlinked.
  */
 async function markLinkableAuthors(rows: ContributingSource[]): Promise<ContributingSource[]> {
@@ -128,7 +128,7 @@ type ArticleMeta = {
  * Author (and date/title) for a batch of article URLs, from news-indexer's
  * `/articles/by-url`. The map is keyed by the URL as passed in (`requestedUrl`).
  * Best-effort: returns an empty map when news-indexer is unconfigured or
- * unreachable — used to enrich the Oracle's sources, which it must never block.
+ * unreachable — used to enrich the Oracul's sources, which it must never block.
  */
 export async function getArticleMetaByUrl(urls: string[]): Promise<Map<string, ArticleMeta>> {
   const out = new Map<string, ArticleMeta>()
@@ -153,9 +153,9 @@ export async function getArticleMetaByUrl(urls: string[]): Promise<Map<string, A
 }
 
 /**
- * The merged source-voter roster for a forecast: the Oracle's analysed sources
+ * The merged source-voter roster for a forecast: the Oracul's analysed sources
  * (from the latest ContextSnapshot) plus news-indexer's matched articles, deduped
- * by canonical URL. On overlap the Oracle's stance/certainty win, display fields
+ * by canonical URL. On overlap the Oracul's stance/certainty win, display fields
  * are unioned, and the origin becomes 'both'. Both reads are best-effort.
  */
 export async function getForecastVoters(forecastId: string): Promise<ContributingSource[]> {
@@ -169,7 +169,7 @@ export async function getForecastVoters(forecastId: string): Promise<Contributin
   const oracle = oracleSnapshotToContributingSources(snapshot?.oracleSnapshot)
 
   const merged = new Map<string, ContributingSource>()
-  // Oracle first — it wins stance/certainty on overlap.
+  // Oracul first — it wins stance/certainty on overlap.
   for (const s of oracle) merged.set(canonicalKey(s.url), s)
   for (const s of indexer) {
     const key = canonicalKey(s.url)

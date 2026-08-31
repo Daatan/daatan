@@ -33,7 +33,7 @@ const authed = withAuth(async (request: NextRequest) => {
 /**
  * Re-publish the named forecasts' estimates from the evidence pool they already
  * have — see forecast-republish.ts (daatan#1508). No search, no extractor, no LLM:
- * one compute-only Oracle aggregation per forecast, written through recordEstimate
+ * one compute-only Oracul aggregation per forecast, written through recordEstimate
  * under the `republish` origin (which can never latch settlement).
  *
  * `{ "forecastIds": [...], "mode": "apply" }`; **`mode` defaults to `dry-run`**, which

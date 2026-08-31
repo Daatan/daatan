@@ -89,7 +89,7 @@ function post(secret: string | null, body: unknown = VALID_BODY) {
 
 const ACTIVE_PREDICTION = { id: 'pred-1', claimText: 'Will X happen?', status: 'ACTIVE', confidence: 65 }
 
-// One caller article in, so the Oracle returns exactly one source whose url
+// One caller article in, so the Oracul returns exactly one source whose url
 // echoes the pushed article (search is skipped — see forecaster.py:506).
 const ORACLE_WITH_SOURCE = {
   question: 'Will X happen?',
@@ -307,7 +307,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('passes the Oracle relevance through to news-indexer instead of dropping it', async () => {
-    // The Oracle grades every article's claim-aware relevance and its SQUARE weights the article
+    // The Oracul grades every article's claim-aware relevance and its SQUARE weights the article
     // in aggregation — but this route used to drop the field (exactly as it once dropped `author`),
     // so news-indexer could record THAT an article counted and never WHY.
     vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
@@ -374,7 +374,7 @@ describe('POST /api/news-indexer/context', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
 
-    // Oracle saw both articles (aggregation, not last-write-wins).
+    // Oracul saw both articles (aggregation, not last-write-wins).
     const [, opts] = vi.mocked(getOracleForecast).mock.calls[0]
     expect(opts?.articles).toHaveLength(2)
 
@@ -389,7 +389,7 @@ describe('POST /api/news-indexer/context', () => {
   })
 
   it('reports NO top-level signal when the Oracle omitted the trigger article (daatan#1252)', async () => {
-    // The trigger is dropped by the Oracle (gate-rejected / extraction failed) while a neighbour
+    // The trigger is dropped by the Oracul (gate-rejected / extraction failed) while a neighbour
     // in the same evidence set survives. news-indexer writes these top-level fields into
     // forecast_match FOR THE TRIGGER, under the trigger's person_id, and that row feeds
     // source_accuracy and the public by-source panel — so echoing the neighbour's numbers here
@@ -427,7 +427,7 @@ describe('POST /api/news-indexer/context', () => {
 
   describe('author passthrough', () => {
     // Downstream (elections.daatan.com) matches tracked commentators on
-    // `oracleSnapshot.sources[].author`; the Oracle response never carries one.
+    // `oracleSnapshot.sources[].author`; the Oracul response never carries one.
     beforeEach(() => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
     })
@@ -1229,7 +1229,7 @@ describe('POST /api/news-indexer/context', () => {
     // stance/certainty/claim/probability/previousProbability/relevance null meaning "unscored,
     // retry" (news-indexer#293). The inference is a heuristic over six fields that a genuine,
     // recorded verdict can satisfy in full — an abstention on a forecast with no prior
-    // confidence, whose trigger article the Oracle dropped, is all-null and gets retried
+    // confidence, whose trigger article the Oracul dropped, is all-null and gets retried
     // anyway. The field says it outright instead.
     it('is true when the Oracle produced an estimate and it was stored', async () => {
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
@@ -1371,9 +1371,9 @@ describe('POST /api/news-indexer/context', () => {
     it('forwards the pre-fetched article body to the Oracle', async () => {
       // news-indexer#201 / daatan#1255. `z.object().parse()` STRIPS unknown keys, so before this
       // the body was dropped silently at the boundary — news-indexer could have been sending it
-      // for months with no error anywhere and no effect. The Oracle has always accepted
+      // for months with no error anywhere and no effect. The Oracul has always accepted
       // `ArticleInput.text` ("if omitted, oracle fetches via trafilatura"); daatan was the
-      // missing link. Measured: 1.5% of 88,033 Oracle article reads were pre-fetched, 19.0%
+      // missing link. Measured: 1.5% of 88,033 Oracul article reads were pre-fetched, 19.0%
       // fell through to the extractor running over title+snippet.
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
@@ -1454,7 +1454,7 @@ describe('POST /api/news-indexer/context', () => {
     it('never emits a lone surrogate when the cap falls mid-emoji', async () => {
       // The cap is a fixed UTF-16 offset, so an emoji straddling it is cut in half. The lone
       // high surrogate left behind survives JSON.stringify but is not UTF-8-encodable, so the
-      // Oracle would raise UnicodeEncodeError on a body we already told the producer we took —
+      // Oracul would raise UnicodeEncodeError on a body we already told the producer we took —
       // reintroducing the dropped-delivery failure daatan#1278 removed. The emoji test above
       // happens to cut on an even offset and never sees this.
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
@@ -1479,8 +1479,8 @@ describe('POST /api/news-indexer/context', () => {
 
     it('forwards the language hint to the Oracle alongside the body', async () => {
       // daatan#1290 / news-indexer#210. news-indexer knows the language per-source but never
-      // sent it, so the Oracle stances raw Hebrew/Russian with English prompts. Inert at the
-      // Oracle until retro#417 adds the field (its pydantic model ignores extras).
+      // sent it, so the Oracul stances raw Hebrew/Russian with English prompts. Inert at the
+      // Oracul until retro#417 adds the field (its pydantic model ignores extras).
       vi.mocked(getOracleForecast).mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_abstain' } as never)
 
       await POST(

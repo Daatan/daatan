@@ -1,6 +1,6 @@
 /**
  * Bot voting: for each open binary forecast the bot hasn't voted on, ask the
- * LLM (optionally informed by the Oracle's P(YES) estimate) whether and how to
+ * LLM (optionally informed by the Oracul's P(YES) estimate) whether and how to
  * vote, then stake.
  */
 import { prisma } from '@/lib/prisma'
@@ -11,9 +11,9 @@ import { createCommitment } from '@/lib/services/commitment'
 import { voteDecisionSchema } from '@/lib/llm/schemas'
 import { type BotWithUser, log, callLLMWithTimeout, logBotAction, randomInt } from './shared'
 
-// Per-run cap on Oracle consultations during voting. Each getOracleProbability
-// call hits the Oracle's /forecast endpoint (article search + analysis), which
-// runs sequentially here, so cap × timeout bounds the Oracle time per bot run.
+// Per-run cap on Oracul consultations during voting. Each getOracleProbability
+// call hits the Oracul's /forecast endpoint (article search + analysis), which
+// runs sequentially here, so cap × timeout bounds the Oracul time per bot run.
 // We use the longer BOT_FORECAST_TIMEOUT_MS (20s) to let slow-but-valid calls
 // finish instead of aborting at 12s, and lower the cap to keep the product
 // (cap × timeout = 60s) within the run's cron budget. Remaining candidates vote
@@ -69,16 +69,16 @@ export async function runVoting(
         biasHint,
       })
 
-      // ── Oracle signal ──────────────────────────────────────────────────
+      // ── Oracul signal ──────────────────────────────────────────────────
       // Consult the TruthMachine Oracle for an external P(YES) estimate and
       // surface it to the LLM. Appended in code rather than via a {{oracleHint}}
       // template placeholder so it works regardless of whether the template is
       // served from Bedrock or the local fallback. getOracleProbability never
-      // throws and returns null when the Oracle is unconfigured/unavailable, so
+      // throws and returns null when the Oracul is unconfigured/unavailable, so
       // this is fail-open: no signal → unchanged behaviour.
       if (oracleConsults < MAX_ORACLE_CONSULTS_PER_VOTE_RUN) {
         oracleConsults++
-        // Strip the 🤖 author prefix; it's noise in the Oracle's search query.
+        // Strip the 🤖 author prefix; it's noise in the Oracul's search query.
         const oracleQuestion = forecast.claimText.replace(/^🤖\s*/, '')
         const oracleProbability = await getOracleProbability(
           oracleQuestion,

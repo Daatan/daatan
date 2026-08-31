@@ -25,19 +25,19 @@ export const dynamic = 'force-dynamic'
 /**
  * Wire cap on a forwarded article body.
  *
- * Matches the Oracle's own `max_article_chars` (4000): it truncates to that the moment it
+ * Matches the Oracul's own `max_article_chars` (4000): it truncates to that the moment it
  * accepts the body, so a longer payload is discarded on arrival having crossed two hops.
  *
  * This was a schema `.max()` until daatan#1278 — the argument being that a producer sending 10 MB
  * bodies should learn it from a 400 rather than have it quietly trimmed. That reasoning was sound
  * for 10 MB and wrong for 8 characters. `text` is an OPTIONAL enrichment on a path that fails open
- * everywhere else (no body ⇒ the Oracle fetches the origin), but a `.max()` violation rejected the
+ * everywhere else (no body ⇒ the Oracul fetches the origin), but a `.max()` violation rejected the
  * entire request — so one over-long article dropped a whole 8-article push, including the seven
  * that were fine. It fired on the first real payload: news-indexer caps in Python code points
  * while Zod counts UTF-16 units, so an emoji-bearing Telegram body measured 4008 here
  * (news-indexer#207).
  *
- * We now truncate and log instead. Oversized input still cannot reach the Oracle, and a
+ * We now truncate and log instead. Oversized input still cannot reach the Oracul, and a
  * misbehaving producer is still visible — but never at the cost of a delivery.
  */
 const ARTICLE_TEXT_MAX_CHARS = 4000
@@ -61,7 +61,7 @@ const capArticleText = (
   const cut = text.slice(0, ARTICLE_TEXT_MAX_CHARS)
   // Cutting at a fixed UTF-16 offset can land between the two halves of a surrogate pair. The
   // resulting lone surrogate survives JSON.stringify (as a \udXXX escape) but is not encodable
-  // as UTF-8, so the Oracle raises UnicodeEncodeError on a body we said we had accepted — the
+  // as UTF-8, so the Oracul raises UnicodeEncodeError on a body we said we had accepted — the
   // same "one bad article kills the push" failure this function exists to prevent, in the very
   // character class (emoji) that triggered news-indexer#207.
   const last = cut.charCodeAt(cut.length - 1)
@@ -85,14 +85,14 @@ const articleItemSchema = z.object({
   publishedAtSource: z.string().max(16).nullable().optional(),
   similarity: z.number().min(0).max(1).optional(),
   /** The article body news-indexer already holds in S3 (news-indexer#201). Forwarded to the
-   *  Oracle as `ArticleInput.text`, which it has always accepted — "if omitted, oracle fetches
+   *  Oracul as `ArticleInput.text`, which it has always accepted — "if omitted, oracle fetches
    *  via trafilatura" — and which nothing ever filled: 1.5% of its 88,033 article reads were
    *  pre-fetched, and 19% fell through to running the extractor over title+snippet (~215 chars).
    *  Length is enforced by truncation, not rejection — see ARTICLE_TEXT_MAX_CHARS. */
   text: z.string().nullable().optional(),
   /** The article's language (short tag, e.g. ISO 639-1 "he"/"ru"), known per-source on the
    *  news-indexer side (daatan#1290 / news-indexer#210). Forwarded as `ArticleInput.language`;
-   *  inert at the Oracle until retro#417 adds the field. */
+   *  inert at the Oracul until retro#417 adds the field. */
   language: z.string().max(16).nullable().optional(),
   /** Cross-platform person/outlet identity news-indexer already resolved for this article
    *  (worker/matcher.py). Until daatan#1349 these were silently stripped by `.parse()` — the
@@ -142,7 +142,7 @@ const bodySchema = z
     outletName: z.string().nullable().optional(),
     author: z.string().nullable().optional(),
     // Trigger article's gatekeeper verdict (news-indexer's POST /relevance result), top-level in
-    // both body shapes. Threaded into the Oracle ArticleInput so it can reuse the verdict instead
+    // both body shapes. Threaded into the Oracul ArticleInput so it can reuse the verdict instead
     // of re-judging. Optional: the matcher fast-path push omits it. See MATCHING_ARCHITECTURE.md §3.
     relevance: z.number().min(0).max(1).nullable().optional(),
     isPrediction: z.boolean().nullable().optional(),
@@ -223,13 +223,13 @@ export async function POST(request: NextRequest) {
       publishedDate: a.publishedAt ?? undefined,
       // The body news-indexer archived at ingest (news-indexer#201 / daatan#1255). Absent — which
       // is every push until news-indexer's `PUSH_ARTICLE_TEXT` is on, and afterwards any article
-      // with nothing in S3 — leaves the Oracle fetching the origin exactly as it does today.
+      // with nothing in S3 — leaves the Oracul fetching the origin exactly as it does today.
       text: capArticleText(a.text, overCap, a.url),
       language: a.language ?? undefined,
       // Reuse the gatekeeper verdict news-indexer already computed for the TRIGGER article, so the
-      // Oracle skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
+      // Oracul skips re-judging it (pairs with retro's reuse_supplied_relevance flag). Only the
       // trigger carries a verdict — the evidence neighbours were never judged. Fail-open: absent
-      // verdict, or the Oracle flag off, and it judges exactly as today.
+      // verdict, or the Oracul flag off, and it judges exactly as today.
       ...(a.url === triggerUrl && body.relevance != null && body.isPrediction != null
         ? { relevance: body.relevance, isPrediction: body.isPrediction }
         : {}),
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     // extractor and both persist a snapshot. If every article in this push is
     // either already-extracted-with-identical-content or claimed by another
     // still-fresh in-flight request, there is nothing new to extract — skip
-    // the Oracle call entirely rather than paying for a redundant/racy run.
+    // the Oracul call entirely rather than paying for a redundant/racy run.
     const claimableItems = items.map((a) => ({
       url: a.url,
       title: a.title,
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
     let poolSize: number | null = null
     let usableSize: number | null = null
 
-    // Per-article enrichment from the Oracle, keyed by url, so news-indexer can map
+    // Per-article enrichment from the Oracul, keyed by url, so news-indexer can map
     // each article in the set back to its own forecast_match row.
     const enrichedSources = (oracleForecast?.sources ?? []).map((s) => ({
       url: s.url,
@@ -362,20 +362,20 @@ export async function POST(request: NextRequest) {
       quantity: s.claims_detail?.[0]?.quantity ?? null,
       // retro#763, same claim again: what the quoted claim's position rests on.
       grounds: s.claims_detail?.[0]?.grounds ?? null,
-      // The Oracle's claim-aware relevance for this article. It was being dropped here — the same
+      // The Oracul's claim-aware relevance for this article. It was being dropped here — the same
       // way `author` was, before #1067 — so news-indexer could never see WHY an article counted,
       // only that it did. It is the one number that explains a match: the embedding cosine says
       // how similar the text looks, this says whether it actually bears on the claim.
       relevance: s.relevance_score ?? null,
       // Judgment-lane signals (Signal Lanes): un-fused from `stance` upstream, shadow-only —
-      // nothing in the Oracle's own aggregation reads them yet. Threaded through here so a human
+      // nothing in the Oracul's own aggregation reads them yet. Threaded through here so a human
       // reading the match notification can see WHY, the same rationale as `relevance` above.
       authorLean: s.author_lean ?? null,
       authorLeanCertainty: s.author_lean_certainty ?? null,
       consensusView: s.consensus_view ?? null,
       factSignal: s.fact_signal ?? null,
       evidenceClass: s.evidence_class ?? null,
-      // 1.0 is the neutral default the Oracle returns while the credibility cutover flag is OFF —
+      // 1.0 is the neutral default the Oracul returns while the credibility cutover flag is OFF —
       // not a real signal, so callers should treat it as absent rather than display "1.00" as if
       // it meant something.
       credibilityWeight: s.credibility_weight !== 1 ? s.credibility_weight : null,
@@ -383,11 +383,11 @@ export async function POST(request: NextRequest) {
 
     // The article that triggered this push — its enrichment is what both the Telegram
     // notification and the top-level (single-article, back-compat) response fields report.
-    // NO fallback to enrichedSources[0]. If the trigger article isn't in the Oracle's sources it
+    // NO fallback to enrichedSources[0]. If the trigger article isn't in the Oracul's sources it
     // wasn't extracted, and the honest answer is "no signal" — not a neighbour's. The fallback
     // that used to sit here was unreachable while PUSH_EVIDENCE_COUNT was 1; prod runs 8, so a
     // push carries the trigger plus up to 7 neighbours and the trigger is routinely the one the
-    // Oracle drops. news-indexer writes these top-level fields into forecast_match FOR THE
+    // Oracul drops. news-indexer writes these top-level fields into forecast_match FOR THE
     // TRIGGER, under the trigger's person_id — so the neighbour's stance was being recorded, and
     // then scored, against a journalist who never made that claim (daatan#1252). Measured before
     // the fix: Telegram ledger rows carrying a stance 2,092 vs 767 articles actually extracted
@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
       const urlsNeedingLookup = oracleForecast.sources
         .map((s) => s.url)
         .filter((url) => itemsByUrl.get(url)?.author === undefined)
-      // Attach authors to the Oracle's sources (it omits them); best-effort, never blocks the
+      // Attach authors to the Oracul's sources (it omits them); best-effort, never blocks the
       // estimate. Mirrors /api/forecasts/[id]/context. Without this the snapshot records the
       // outlet but no byline, and every consumer of `oracleSnapshot.sources[].author` — notably
       // elections.daatan.com's tracked commentators — can never match a person.
@@ -476,7 +476,7 @@ export async function POST(request: NextRequest) {
         oracleForecast.provenance?.oracle ?? null,
       )
 
-      // The Oracle run above is an EXTRACTION step, not the estimate. A push usually
+      // The Oracul run above is an EXTRACTION step, not the estimate. A push usually
       // carries a single freshly-matched article, and `/forecast` over one article returns
       // little more than that article's stance rescaled — so trusting it made the persisted
       // estimate lurch to wherever the newest article pointed (one live forecast swung
@@ -495,7 +495,7 @@ export async function POST(request: NextRequest) {
         // daatan#1223's rating prompt just doesn't get sent for this push.
         evidencePoolArticleId = claimedArticleIdByUrl.get(triggerUrl) ?? null
         // The pool write above flips this run's extracted claims to COMPLETE. Anything
-        // this run claimed that the Oracle omitted from its sources (gatekeeper-rejected,
+        // this run claimed that the Oracul omitted from its sources (gatekeeper-rejected,
         // most commonly) would otherwise stay PENDING forever: news-indexer dedups its
         // matches, so no later push comes along to re-claim it — 985 such rows had
         // accumulated by 2026-07-16. failClaimedArticles only touches rows still
@@ -557,7 +557,7 @@ export async function POST(request: NextRequest) {
 
       if (est.insufficientData) {
         // The whole pool is off-topic — abstain rather than persist a number built from
-        // articles the Oracle judged irrelevant. `probability` stays null so the notify
+        // articles the Oracul judged irrelevant. `probability` stays null so the notify
         // block below is skipped. Any confidence/CI already published survives (daatan#1473):
         // a forecast with prior on-topic evidence shouldn't be able to reach here at all —
         // those rows keep their relevance in the accumulating pool — so an abstention on one
@@ -640,7 +640,7 @@ export async function POST(request: NextRequest) {
             articlesUsed: est.articlesUsed,
             singleRunMean: est.singleRunMean,
             singleRunDelta: est.estimateSource === 'pool' ? Math.abs(est.singleRunMean - est.mean) : null,
-            // How many of THIS push's Oracle sources carried a byline — the signal that makes
+            // How many of THIS push's Oracul sources carried a byline — the signal that makes
             // per-commentator attribution possible downstream. 0 means the lookup found none.
             bylines: oracleSources.filter((s) => s.author != null).length,
             oracleSources: oracleSources.length,
@@ -703,7 +703,7 @@ export async function POST(request: NextRequest) {
 
     // Notify only when the push produced an estimate AND it was actually stored.
     // news-indexer re-pushes the same article set on every poll cycle while its
-    // cooldown rolls — the Oracle-null case is one such retry (no estimate to
+    // cooldown rolls — the Oracul-null case is one such retry (no estimate to
     // report yet), and a repeat push that lands on an identical measurement is
     // another (saveNewsIndexerMatch's dedup catches that one, hence `wasStored`).
     // Skipping both means every notification reflects a real change.
@@ -714,7 +714,7 @@ export async function POST(request: NextRequest) {
           title: triggerItem.title,
           url: triggerItem.url,
           source: triggerItem.source ?? null,
-          // What the Oracle actually read out of the article — the claim its numbers scored.
+          // What the Oracul actually read out of the article — the claim its numbers scored.
           // Falls back to the raw snippet when extraction produced no claim text.
           extract: triggerEnrich?.claim ?? (triggerItem.snippet || null),
           stance: triggerEnrich?.stance ?? null,
@@ -743,10 +743,10 @@ export async function POST(request: NextRequest) {
     // single-article contract); `sources` carries the whole set for the multi push.
     return NextResponse.json({
       ok: true,
-      // daatan#1461: say outright whether the Oracle leg ran AND its result was recorded,
+      // daatan#1461: say outright whether the Oracul leg ran AND its result was recorded,
       // instead of making news-indexer infer it from an all-null payload (news-indexer#293).
       // True on both recorded outcomes — an estimate and an abstention — because both are a
-      // verdict this push produced; false only when nothing was written: the Oracle returned
+      // verdict this push produced; false only when nothing was written: the Oracul returned
       // null (transport/timeout, worth a retry) or every article was already claimed. The
       // null-shape inference stays valid for older daatan versions, so this is additive.
       scored: wasStored,

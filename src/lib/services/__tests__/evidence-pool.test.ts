@@ -350,7 +350,7 @@ describe('addArticlesToPool', () => {
 
   it('never NULLS stored claimsDetail on an update that merely omits it', async () => {
     // The daatan#1237 failure mode, deliberately not repeated here: a re-touch that
-    // carries no per-claim data (a recompute, an older Oracle build, a partial
+    // carries no per-claim data (a recompute, an older Oracul build, a partial
     // response) must leave what we already hold alone. `undefined` tells Prisma to
     // skip the column; there is no backfill, so an erased row is gone for good.
     await addArticlesToPool('pred-1', [source()], 'analyze', idFor('https://reuters.com/a'))
@@ -749,7 +749,7 @@ describe('recomputeFromPool', () => {
   })
 
   // Both failure paths return null rather than throwing: the caller falls back to its
-  // single-run forecast, so a flaky Oracle degrades the estimate instead of dropping it.
+  // single-run forecast, so a flaky Oracul degrades the estimate instead of dropping it.
   it('returns null (never throws) on a non-OK status', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOracleFetch.mockResolvedValue({ ok: false, status: 503 } as never)
@@ -1306,7 +1306,7 @@ describe('claimArticleForExtraction', () => {
       // The FAILED arm used to be a bare `{ status: 'FAILED' }` — no age gate, no reason
       // filter. news-indexer re-pushes the same set every poll cycle while its 5-minute
       // cooldown rolls, so an always-null article looped FAILED → PENDING → FAILED, burning
-      // a full Oracle run (fetch + gatekeeper + extractor) each time (daatan#1232). The
+      // a full Oracul run (fetch + gatekeeper + extractor) each time (daatan#1232). The
       // schema's own comment, "eligible for retry once stale", was stricter than the code.
       updateMany.mockResolvedValue({ count: 1 })
 

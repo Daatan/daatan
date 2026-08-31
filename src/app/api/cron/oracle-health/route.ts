@@ -12,7 +12,7 @@ const log = createLogger('cron-oracle-health')
  *
  * Checks the TruthMachine Oracle /health endpoint and fires a Telegram alert
  * when unreachable or failing. The existing search-health cron covers search
- * provider credits; this covers the forecast Oracle itself.
+ * provider credits; this covers the forecast Oracul itself.
  *
  * Uses the same Telegram cooldown mechanism as other alerts (5-min window), so
  * running this hourly will fire at most one alert per incident.

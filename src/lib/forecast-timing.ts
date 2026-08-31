@@ -14,7 +14,7 @@ const DEFAULTS = {
   'resolve-scoring': 1200,
   'resolve-updating': 800,
   // Admin "Run now" bot-run phases (daatan#1139), mirroring runner.ts's
-  // RunMetrics stages: RSS/Oracle fetch, hot-topic detection, dedup+LLM
+  // RunMetrics stages: RSS/Oracul fetch, hot-topic detection, dedup+LLM
   // generation, then staking. The single POST /api/admin/bots/[id]/run call
   // is not broken into server-timed sub-phases, so these defaults just seed
   // the client-side split before real elapsed time calibrates them.

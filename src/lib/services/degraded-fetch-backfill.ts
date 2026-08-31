@@ -7,7 +7,7 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('degraded-fetch-backfill')
 
 /**
- * daatan#1446. The 11 domains retro#520/#521 fixed (the Oracle's second-visit fetch
+ * daatan#1446. The 11 domains retro#520/#521 fixed (the Oracul's second-visit fetch
  * used to fall back to a ~200-char title+snippet on these). This is the SAME list
  * the issue was scoped to — not the wider off-list population (Telegram, timesofisrael.com,
  * washingtonpost.com, reliefweb.int, aljazeera.com without the .net) the 17:41 comment
@@ -36,7 +36,7 @@ export const CONFIRMED_DEGRADED_CUTOFF = new Date('2026-08-12T00:00:00.000Z')
 
 /**
  * The domain+date+status shape the 432-row confirmed population was drawn from —
- * NOT the row-level join itself. The join lives in `oracle_log.txt` on the Oracle
+ * NOT the row-level join itself. The join lives in `oracle_log.txt` on the Oracul
  * EC2 box (md5(url) keyed on `using=fallback`) and isn't queryable from inside this
  * worktree, so this filter is a **broader, unconfirmed superset**: every row that
  * COULD be one of the 432, not a re-derivation of which ones actually are. Expect
@@ -111,7 +111,7 @@ export interface PredictionSnapshotPair {
 }
 
 export interface DegradedFetchSweepResult {
-  /** Predictions this call ran the Oracle for. */
+  /** Predictions this call ran the Oracul for. */
   processed: number
   /** Rows re-driven through extraction across those predictions. */
   rowsRetried: number

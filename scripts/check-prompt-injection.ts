@@ -6,7 +6,7 @@
  *   --query Parameter.Value --output text)" npx tsx scripts/check-prompt-injection.ts
  *
  * Costs live LLM calls (7 cases x 2 arms x 3 runs), so it is manual, like retro's
- * A/B harness. It goes through the Oracle `/llm` leg with the same request shape
+ * A/B harness. It goes through the Oracul `/llm` leg with the same request shape
  * `src/lib/llm/providers/oracle.ts` uses, so it exercises a path that really serves
  * these prompts.
  *

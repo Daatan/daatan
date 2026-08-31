@@ -33,7 +33,7 @@ export interface OracleSearchHealthResponse {
 }
 
 /**
- * Fetch provider health from the Oracle's /search/health endpoint.
+ * Fetch provider health from the Oracul's /search/health endpoint.
  * Returns null if oracle is not configured or the request fails.
  * Never throws.
  */
@@ -80,7 +80,7 @@ interface OracleSearchResponse {
 }
 
 /**
- * Search via the Oracle's /search endpoint, sharing the oracle's provider
+ * Search via the Oracul's /search endpoint, sharing the oracle's provider
  * fallback chain and quota counter with the oracle's own forecast calls.
  *
  * Returns null if:

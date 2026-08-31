@@ -26,14 +26,14 @@ const log = createLogger('oracle')
 const EXPECTED_API_MAJOR_VERSIONS = ['1']
 
 /**
- * Default Oracle budget: server-to-server and background callers (the news-indexer
+ * Default Oracul budget: server-to-server and background callers (the news-indexer
  * push route, the retry sweep). A client budget must be strictly LARGER than the
  * server budget it waits on, and retro does not cancel on client disconnect —
  * `_run_forecast_inner` runs to completion and writes into `forecast_cache`. Aborting
  * early therefore saves nothing: we pay for the extraction, discard the answer, and
  * label the row a failure.
  *
- * Derived from retro's OWN server-side `phase=total` log (Oracle box
+ * Derived from retro's OWN server-side `phase=total` log (Oracul box
  * i-00ac444b94c5ff9b2, n=17,006 over 93 days), NOT from daatan's numbers — those are
  * censored by this very timeout and cannot show what they truncate. On the push path
  * (`provider=caller`, n=13,688):
@@ -62,15 +62,15 @@ export const FORECAST_TIMEOUT_MS = 30_000
  * a new background caller silently discarding completed work (the bug above, invisible
  * for months) is worse than a new interactive caller waiting too long (visible at once).
  *
- * Both current interactive callers race the Oracle against their own wall-clock budget,
- * so a longer Oracle wait would only be abandoned one level up: `forecasts/[id]/context`
+ * Both current interactive callers race the Oracul against their own wall-clock budget,
+ * so a longer Oracul wait would only be abandoned one level up: `forecasts/[id]/context`
  * races the whole estimation at `ESTIMATION_TIMEOUT_MS` (15s), and `express/guess`
  * answers a user typing a claim.
  */
 export const INTERACTIVE_FORECAST_TIMEOUT_MS = 12_000
 
 // Bot voting runs in a background cron (bots.yml, ~270s budget) where latency is
-// not user-facing, so it tolerates a longer Oracle wait than the interactive
+// not user-facing, so it tolerates a longer Oracul wait than the interactive
 // paths. Consultations are sequential and capped per run (see voting.ts); that
 // cap is lowered in step so cap × timeout stays within the run budget. Deliberately
 // left at 20s rather than raised to FORECAST_TIMEOUT_MS: cap × timeout must stay
@@ -90,7 +90,7 @@ export interface ArticleInput {
   snippet: string
   source?: string
   publishedDate?: string
-  /** Pre-fetched article body. The Oracle's `ArticleInput.text` — "if omitted, oracle fetches
+  /** Pre-fetched article body. The Oracul's `ArticleInput.text` — "if omitted, oracle fetches
    *  via trafilatura" — has been wired to its extractor from the start and was never populated
    *  by anything: only 1.5% of its 88,033 article reads were pre-fetched, and 19.0% fell through
    *  to `return fallback`, i.e. the extractor running over title+snippet (~215 chars) instead of
@@ -100,16 +100,16 @@ export interface ArticleInput {
    *  from are computed off one sentence.
    *
    *  Only the news-indexer push path fills this (news-indexer#201); search-derived articles have
-   *  no archived body to offer. Absent ⇒ the Oracle fetches the origin, exactly as today. */
+   *  no archived body to offer. Absent ⇒ the Oracul fetches the origin, exactly as today. */
   text?: string
   /** The article's language (short tag, e.g. ISO 639-1 "he", "ru"). news-indexer knows it
-   *  per-source (sources.yaml / telegram config) but never sent it, so the Oracle stances raw
+   *  per-source (sources.yaml / telegram config) but never sent it, so the Oracul stances raw
    *  Hebrew/Russian with English prompts and no signal about the input language (daatan#1290).
    *  Forwarded on the wire as `language`; retro's ArticleInput ignores unknown fields until
    *  retro#417 adds it, so sending it now is inert there and safe. */
   language?: string
   /** Gatekeeper verdict news-indexer already computed for this article (its POST /relevance
-   *  result). When both are set AND the Oracle's reuse_supplied_relevance flag is on, the Oracle
+   *  result). When both are set AND the Oracul's reuse_supplied_relevance flag is on, the Oracul
    *  reuses them instead of re-judging (kills the double-judge; see MATCHING_ARCHITECTURE.md §3).
    *  Only the trigger article carries a verdict; both together or neither. */
   relevance?: number | null
@@ -117,7 +117,7 @@ export interface ArticleInput {
 }
 
 /** Stored claim metadata, as read off `Prediction`. Optional on every
- *  Oracle call site — retro's direction guard (#244) is fail-open without it.
+ *  Oracul call site — retro's direction guard (#244) is fail-open without it.
  *  `claimCreatedAt`/`claimArchetype` bound the settlement window on retro's
  *  side (a 'scheduled' claim can't be settled by an event predating its own
  *  creation — an earlier instance of the recurring event); fail-open too.
@@ -154,8 +154,8 @@ export function claimArchetypeParam(
   return undefined
 }
 
-/** Per-source signal returned by the Oracle's /forecast endpoint. */
-/** One extracted claim as the Oracle emits it (retro's `ClaimDetail`, retro#364) —
+/** Per-source signal returned by the Oracul's /forecast endpoint. */
+/** One extracted claim as the Oracul emits it (retro's `ClaimDetail`, retro#364) —
  *  the per-claim layer every article-level scalar on `OracleSource` is a reduction
  *  OF. Values are post-resolution: the numbers retro's fusion actually consumed,
  *  so the article-level scalars stay derivable from them.
@@ -279,7 +279,7 @@ export interface OracleSource {
    *  +1 the author expects it to happen, -1 they expect it will NOT, 0 they weigh
    *  both sides; null when the author only reports facts. Deliberately SEPARATE
    *  from `stance`/the estimate — carried only for daatan's author-scoring lane;
-   *  nothing in the Oracle's aggregation reads it. */
+   *  nothing in the Oracul's aggregation reads it. */
   author_lean?: number | null
   /** How firmly the author commits to `author_lean` [0,1]; null when it is null. */
   author_lean_certainty?: number | null
@@ -288,14 +288,14 @@ export interface OracleSource {
    *  that is what the byline thinks, this is what the byline says everyone else
    *  thinks. Consumer is Phase 3 S2's shared-information detector — the GAP
    *  between a source's stated consensus and the pool is the shared component
-   *  (Palley & Satopää 2023). Nothing in the Oracle's aggregation reads it. */
+   *  (Palley & Satopää 2023). Nothing in the Oracul's aggregation reads it. */
   consensus_view?: 'expects_yes' | 'expects_no' | 'divided' | null
   /** The FACT-lane counterpart of `stance` (retro #313, Phase 2 un-fusing): what
    *  the REPORTED FACTS alone imply about the event [-1,1], un-fused from author
    *  assertion/framing — a claim-weighted MEAN over the article's fact-bearing
    *  claims (same reduction as `stance`). null on pure opinion. Deliberately
    *  SEPARATE from the estimate: carried only for daatan persistence + the offline
-   *  backtest; nothing in the Oracle's aggregation reads it. */
+   *  backtest; nothing in the Oracul's aggregation reads it. */
   fact_signal?: number | null
   /** WHO acts in the fact behind `fact_signal`, from the dominant (max |fact_signal|)
    *  claim — for the estimator's actor-pair (dyad) check. null when `fact_signal` is. */
@@ -330,11 +330,11 @@ export interface OracleForecastResponse {
   ci_high: number
   articles_used: number
   sources: OracleSource[]
-  /** True if the Oracle couldn't produce a real forecast (stub response). */
+  /** True if the Oracul couldn't produce a real forecast (stub response). */
   placeholder: boolean
-  /** True when the Oracle ran but had no usable articles (mean/ci are not a real estimate). */
+  /** True when the Oracul ran but had no usable articles (mean/ci are not a real estimate). */
   insufficient_data?: boolean
-  /** Why the Oracle couldn't answer; see the failure-reason vocabulary on OracleCallLog. */
+  /** Why the Oracul couldn't answer; see the failure-reason vocabulary on OracleCallLog. */
   reason?: string
   /** Search provider that served the underlying article search (retro /forecast & /search; may be 'caller'/'search_cache'/'none'). */
   provider?: string
@@ -407,7 +407,7 @@ export interface OracleForecastResponse {
      *  (rule-derived) one. */
     method?: 'live' | 'pool' | 'propagated' | 'logical' | null
     models?: OracleProvenanceModels | null
-    /** Which Oracle BUILD produced this result (retro#593) — persisted per pool
+    /** Which Oracul BUILD produced this result (retro#593) — persisted per pool
      *  row as `oracleVersion`/`oracleGitSha` (daatan#1669) so a harvest can be
      *  sliced by build, not just by prompt version. */
     oracle?: OracleProvenanceOracle | null
@@ -441,7 +441,7 @@ export interface OracleProvenanceModels {
  * survived only in `OracleCallLog.failureReason` — which the retry sweep never reads.
  *
  * They are not the same fact and they do not deserve the same retry:
- * - `oracle_abstain` — the Oracle RAN and deliberately declined (`insufficient_data`),
+ * - `oracle_abstain` — the Oracul RAN and deliberately declined (`insufficient_data`),
  *   most often the gatekeeper rejecting every article. Re-asking with identical input
  *   buys the same answer.
  * - `oracle_timeout` / `oracle_network` — we never got an answer. Worth retrying, but
@@ -451,7 +451,7 @@ export interface OracleProvenanceModels {
  *   exactly 12,002ms — a real share of what looked like "the extractor produced
  *   nothing" was pure latency. Now 30s; expect this class to shrink sharply.
  * - `oracle_http` — retro answered non-OK. Worth retrying; a 4xx repeatedly is a bug.
- * - `oracle_unconfigured` — no Oracle URL/key here. Says nothing about the article.
+ * - `oracle_unconfigured` — no Oracul URL/key here. Says nothing about the article.
  * - `oracle_placeholder` — retro returned its stub response.
  * - `oracle_no_articles` — ran, but no usable mean / zero articles used.
  *
@@ -491,7 +491,7 @@ export const ORACLE_NULL_REASONS: readonly string[] = [
 
 /**
  * The subset of {@link ORACLE_NULL_REASONS} that says something about the ARTICLES
- * rather than about the wire: the Oracle received them, ran, and produced no
+ * rather than about the wire: the Oracul received them, ran, and produced no
  * estimate anyway. Only these justify retiring a row (daatan#1253).
  *
  * Everything excluded here is a fact about us, not about the evidence:
@@ -503,7 +503,7 @@ export const ORACLE_NULL_REASONS: readonly string[] = [
  * unknown cause, and "unknown" is not "attributable".
  *
  * Consequence worth knowing: pre-split rows can no longer reach
- * `oracle_null_final` through the sweep. They keep costing one Oracle look a day
+ * `oracle_null_final` through the sweep. They keep costing one Oracul look a day
  * until they earn a classified reason. That is the deliberate direction — an
  * extra look costs a fraction of a cent, a wrongly-retired article is lost
  * silently and forever.
@@ -546,7 +546,7 @@ export function isTransportNullReason(reason: string | null | undefined): boolea
 export interface OracleForecastResult {
   forecast: OracleForecastResponse | null
   logId: string | null
-  /** True when the Oracle ran but deliberately abstained (insufficient_data): the
+  /** True when the Oracul ran but deliberately abstained (insufficient_data): the
    *  evidence didn't bear on the claim. Distinct from `forecast: null` due to a
    *  transport error / not-configured. Callers should surface "insufficient
    *  evidence" rather than substituting an ungrounded estimate. */
@@ -583,7 +583,7 @@ function outcomeCountsOf(data: OracleForecastResponse): Record<string, number> |
 }
 
 /**
- * Map the Oracle's `reason` (EMPTY responses) onto the OracleCallLog vocabulary.
+ * Map the Oracul's `reason` (EMPTY responses) onto the OracleCallLog vocabulary.
  * Retro's internal `timeout` is renamed to `oracle_timeout` so it never collides
  * with a daatan-side client/transport timeout. */
 function emptyFailureReason(reason: string | undefined): string {
@@ -605,7 +605,7 @@ interface OracleHealthResponse {
   leaderboard_sources?: number
 }
 
-/** One entry in the Oracle leaderboard. */
+/** One entry in the Oracul leaderboard. */
 export interface OracleLeaderboardEntry {
   id: string
   name?: string
@@ -647,7 +647,7 @@ export interface OracleAuthorShadowResponse {
  * Call the TruthMachine Oracle API and return the full forecast payload plus the
  * id of the logged call.
  *
- * `forecast` is `null` if the Oracle is not configured, returned a placeholder
+ * `forecast` is `null` if the Oracul is not configured, returned a placeholder
  * response, had no usable articles, or failed for any reason (timeout,
  * non-OK status, network error). `logId` is the OracleCallLog row id (null when
  * unconfigured or the log write failed) so a caller that then takes the LLM
@@ -703,8 +703,8 @@ export const getOracleForecast = async (
         // rather than defaulted, so retro's cache key (retro#510) separates
         // rules-bearing from rules-less traffic instead of merging them.
         ...(options?.resolutionRules ? { resolution_criteria: options.resolutionRules } : {}),
-        // Oracle's ArticleInput uses snake_case `published_date`; map from our
-        // camelCase `publishedDate` so recency weighting on the Oracle side
+        // Oracul's ArticleInput uses snake_case `published_date`; map from our
+        // camelCase `publishedDate` so recency weighting on the Oracul side
         // actually receives the date (otherwise it's dropped and treated as now).
         ...(options?.articles?.length
           ? {
@@ -714,18 +714,18 @@ export const getOracleForecast = async (
                 snippet: a.snippet,
                 source: a.source,
                 published_date: a.publishedDate,
-                // Skips the Oracle's own trafilatura fetch for this article. Omitted (not sent
-                // as null) when we have no body: the Oracle branches on falsiness, so either
+                // Skips the Oracul's own trafilatura fetch for this article. Omitted (not sent
+                // as null) when we have no body: the Oracul branches on falsiness, so either
                 // spelling works, but omitting keeps an un-archived article's payload
                 // byte-identical to what it sends today.
                 ...(a.text ? { text: a.text } : {}),
-                // Language hint for the Oracle's gatekeeper/extractor prompts. retro's pydantic
+                // Language hint for the Oracul's gatekeeper/extractor prompts. retro's pydantic
                 // ArticleInput has no `language` field yet and ignores extras (default
                 // extra="ignore"), so this is inert on the wire until retro#417 lands.
                 ...(a.language ? { language: a.language } : {}),
                 // Reuse the caller-supplied gatekeeper verdict (both fields, or neither) so the
-                // Oracle can skip re-judging — see ArticleInput. Inert until the Oracle's
-                // reuse_supplied_relevance flag is on; absent → the Oracle judges as today.
+                // Oracul can skip re-judging — see ArticleInput. Inert until the Oracul's
+                // reuse_supplied_relevance flag is on; absent → the Oracul judges as today.
                 ...(a.relevance != null && a.isPrediction != null
                   ? { relevance: a.relevance, is_prediction: a.isPrediction }
                   : {}),
@@ -755,7 +755,7 @@ export const getOracleForecast = async (
     // which workflow, produced it.
     const logCtx = { predictionId: meta.predictionId ?? null, source: meta.source }
 
-    // The Oracle deliberately abstained: it ran but the evidence didn't bear on
+    // The Oracul deliberately abstained: it ran but the evidence didn't bear on
     // the claim (off-topic, all-hedged, or too thin). Signal this distinctly so
     // the caller can show "insufficient evidence" instead of guessing a number.
     if (data.insufficient_data) {
@@ -805,7 +805,7 @@ export const getOracleForecast = async (
 
 /**
  * Thin back-compat wrapper: returns just the scaled probability in [0, 1],
- * or null if the Oracle path wasn't usable. Prefer `getOracleForecast` when
+ * or null if the Oracul path wasn't usable. Prefer `getOracleForecast` when
  * you also want the sources, confidence interval, or the log id.
  */
 export const getOracleProbability = async (
@@ -828,10 +828,10 @@ export const getOracleProbability = async (
 }
 
 /**
- * Fetch the live source credibility leaderboard from the Oracle API.
+ * Fetch the live source credibility leaderboard from the Oracul API.
  *
- * The Oracle refreshes this from disk every N seconds, so the data is always
- * current without requiring a server redeploy.  Returns null if the Oracle is
+ * The Oracul refreshes this from disk every N seconds, so the data is always
+ * current without requiring a server redeploy.  Returns null if the Oracul is
  * not configured or the request fails.  Never throws.
  */
 export const getOracleLeaderboard = async (
@@ -861,7 +861,7 @@ export const getOracleLeaderboard = async (
  * computed from `author_lean` extractions, resolved against outcomes (retro PR #315). Shadow
  * scoring — informational only, never feeds the live forecast estimate.
  *
- * Returns null if the Oracle is not configured or the request fails. Never throws.
+ * Returns null if the Oracul is not configured or the request fails. Never throws.
  */
 export const getAuthorShadowLeaderboard = async (
   meta: OracleCallMeta = { source: 'source-leaderboard' },
@@ -886,8 +886,8 @@ export const getAuthorShadowLeaderboard = async (
 }
 
 /**
- * Check Oracle API health and version compatibility.
- * Returns true if Oracle is reachable and version-compatible.
+ * Check Oracul API health and version compatibility.
+ * Returns true if Oracul is reachable and version-compatible.
  * Never throws.
  */
 export const checkOracleHealth = async (

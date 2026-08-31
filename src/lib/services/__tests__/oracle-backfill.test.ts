@@ -178,7 +178,7 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
   })
 
   it('a re-ask that times out again does not chain a third', async () => {
-    // Depth guard. Without `reask: false` on the inner call, a hard-down Oracle turns
+    // Depth guard. Without `reask: false` on the inner call, a hard-down Oracul turns
     // every push into an unbounded 2-minute retry chain.
     mockForecast.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_timeout' })
 
@@ -248,7 +248,7 @@ describe('re-ask after a run we hung up on (daatan#1261/#1262)', () => {
   })
 
   it('drops re-asks past the concurrency cap rather than queueing them', async () => {
-    // These are background promises nothing blocks on, so an Oracle that is hard-down
+    // These are background promises nothing blocks on, so an Oracul that is hard-down
     // would otherwise turn every push into another queued 90s call.
     for (let i = 0; i < 12; i++) {
       scheduleOracleReask({ id: `p${i}`, claimText: 'q' }, supplied, 'news-indexer')
@@ -289,7 +289,7 @@ describe('refreshOracleSnapshot', () => {
 
   it('surfaces WHY the run produced nothing, not just that it did', async () => {
     // daatan#1253: the class was computed here to stamp the pool rows but thrown away
-    // on the way out, so the retry sweep could not tell "the Oracle judged these and
+    // on the way out, so the retry sweep could not tell "the Oracul judged these and
     // declined" from "we hung up" — and retired whole batches on the latter.
     mockSearch.mockResolvedValue([{ url: 'https://a.com/1', title: 't', snippet: 's' }])
     mockForecast.mockResolvedValue({ forecast: null, failureClass: 'oracle_timeout' })
@@ -470,7 +470,7 @@ describe('refreshOracleSnapshot', () => {
 
       expect(mockClaim).toHaveBeenCalledWith(
         'p1',
-        // publishedAtSource is null on this lane: Oracle search results carry a date but never
+        // publishedAtSource is null on this lane: Oracul search results carry a date but never
         // say where it came from, and null means "unknown" (daatan#1679 item 2).
         [{ url: 'https://a.com/1', title: 't', snippet: 's', source: 'a.com', publishedAt: '2026-07-01', publishedAtSource: null }],
         'backfill',

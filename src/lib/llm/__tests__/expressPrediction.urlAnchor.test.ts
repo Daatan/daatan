@@ -72,7 +72,7 @@ describe('generateExpressPrediction — the user-supplied URL is always the news
 
   it('URL + text: anchors on the pasted URL, never on a search result (Bug: Ynet replaced Walla)', async () => {
     vi.mocked(fetchUrlContent).mockResolvedValue('Likud Leads In New Poll. Body of the article continues here.')
-    // The Oracle returns a different outlet — it must NOT become the anchor.
+    // The Oracul returns a different outlet — it must NOT become the anchor.
     vi.mocked(oracleSearch).mockResolvedValue([
       { title: 'Ynet coverage', url: YNET, snippet: 's', source: 'ynet.co.il', publishedDate: undefined },
     ])
@@ -85,7 +85,7 @@ describe('generateExpressPrediction — the user-supplied URL is always the news
   })
 
   it('bare URL whose scrape fails (bot-blocked) still anchors on the URL — no NoArticlesFoundError', async () => {
-    // Walla blocks scrapers; the Oracle finds nothing related. Andrej's exact case.
+    // Walla blocks scrapers; the Oracul finds nothing related. Andrej's exact case.
     vi.mocked(fetchUrlContent).mockRejectedValue(new Error('403 Forbidden'))
     vi.mocked(oracleSearch).mockResolvedValue([])
 

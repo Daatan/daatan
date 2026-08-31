@@ -56,7 +56,7 @@ vi.mock('@/lib/services/bots/rss', async (importActual) => {
   return { ...actual, fetchRssFeeds: vi.fn(), detectHotTopics: vi.fn() }
 })
 
-// ─── Oracle source mock ──────────────────────────────────────────────────────
+// ─── Oracul source mock ──────────────────────────────────────────────────────
 // Default: no oracle items. The exported cap constant must be preserved so the
 // runner's slice(0, MAX_ORACLE_SOURCES_PER_RUN) behaves like production.
 vi.mock('@/lib/services/bots/oracleSource', () => ({
@@ -70,8 +70,8 @@ vi.mock('@/lib/services/commitment', () => ({
   emitCreateCommitmentSideEffects: vi.fn(),
 }))
 
-// ─── Oracle mock ─────────────────────────────────────────────────────────────
-// Default: Oracle unconfigured/unavailable → null → no behaviour change.
+// ─── Oracul mock ─────────────────────────────────────────────────────────────
+// Default: Oracul unconfigured/unavailable → null → no behaviour change.
 // Individual tests override with mockResolvedValueOnce. clearAllMocks() keeps
 // this factory implementation (it clears call history, not implementations).
 vi.mock('@/lib/services/oracle', () => ({
@@ -1376,7 +1376,7 @@ describe('runDueBots — voting', () => {
 
     await runDueBots()
 
-    // Oracle was asked about the claim with the 🤖 prefix stripped, with the
+    // Oracul was asked about the claim with the 🤖 prefix stripped, with the
     // longer bot-voting timeout passed through.
     expect(getOracleProbability).toHaveBeenCalledWith(
       'Bitcoin tops $100k',

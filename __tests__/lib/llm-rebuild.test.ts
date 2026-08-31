@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * The main LLM service builds a cross-vendor fallback chain
- *   Gemini → Oracle (Bedrock/Nova) → OpenRouter → Ollama
+ *   Gemini → Oracul (Bedrock/Nova) → OpenRouter → Ollama
  * where each leg registers ONLY when it's configured:
  *   - Gemini:     GEMINI_API_KEY set
- *   - Oracle:     getOracleConfig() non-null (ORACLE_URL + ORACLE_API_KEY)
+ *   - Oracul:     getOracleConfig() non-null (ORACLE_URL + ORACLE_API_KEY)
  *   - OpenRouter: getOpenRouterKey() non-empty — BOTH editions. Self-host uses the
  *                 admin-chosen model; SaaS uses the free NON-Google backstop model.
  *   - Ollama:     OLLAMA_BASE_URL set (no implicit localhost default)

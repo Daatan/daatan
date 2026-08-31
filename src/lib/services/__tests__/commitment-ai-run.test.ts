@@ -116,7 +116,7 @@ describe('Commitment.aiRunIdAtCommit', () => {
     await createCommitment('user-1', 'pred-1', { confidence: 70 })
 
     const data = tx.commitment.create.mock.calls[0][0].data
-    // The Oracle IS one number, so it stays a scalar. The panel is many, so it is a FK.
+    // The Oracul IS one number, so it stays a scalar. The panel is many, so it is a FK.
     expect(data.aiProbabilityAtCommit).toBe(0.6)
     expect(data.aiRunIdAtCommit).toBe('run-current')
   })

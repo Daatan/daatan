@@ -2,7 +2,7 @@
 
 /**
  * Oracle 2.0 playground (retro#595) inside the admin panel. Same trace format
- * as retro's public `oracle-v2-test.html`, but the Oracle key stays on the
+ * as retro's public `oracle-v2-test.html`, but the Oracul key stays on the
  * server: calls go through /api/admin/oracle-v2/* (ADMIN-only proxies).
  * Graph is plain SVG — no graph dependency (node_modules is tracked in git).
  */

@@ -47,7 +47,7 @@ export interface RepublishResult {
  *
  * Defaults to dry-run, which computes every would-be number and writes nothing —
  * no estimate, no snapshot, no notification. Per-forecast failures (unknown id,
- * inactive forecast, empty pool, unreadable Oracle, off-topic pool) are reported
+ * inactive forecast, empty pool, unreadable Oracul, off-topic pool) are reported
  * in the result and never abort the batch.
  *
  * The `republish` origin's `canSettle: false` means an apply can never latch
@@ -100,7 +100,7 @@ export async function republishForecasts(predictionIds: string[], apply: boolean
     }
 
     try {
-      // Distinguish "nothing usable pooled" from "the Oracle was unreachable" up
+      // Distinguish "nothing usable pooled" from "the Oracul was unreachable" up
       // front — resolvePooledEstimate collapses both into its fallback branch.
       const usable = await countUsableEvidence(p.id)
       if (usable === 0) {

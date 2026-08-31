@@ -5,7 +5,7 @@ import { getAuthorShadowRowsForOutlet } from '@/lib/services/sourceLeaderboard'
 
 /** Admin-only: this outlet's rows on retro's author-shadow scoring board (retro PR #315),
  *  for the "Author scoring" section of the outlet detail page. Fails open to `[]` — the
- *  underlying service never throws on a misconfigured/unreachable Oracle. */
+ *  underlying service never throws on a misconfigured/unreachable Oracul. */
 export const GET = withAuth(async (_request, _user, { params }) => {
   try {
     const rows = await getAuthorShadowRowsForOutlet(params.name)

@@ -748,7 +748,7 @@ export function notifyDailySummary(stats: {
 }
 
 /**
- * A news-indexer push landed a new Oracle read. Fires PER SOURCE ARTICLE, to the
+ * A news-indexer push landed a new Oracul read. Fires PER SOURCE ARTICLE, to the
  * NOISY channel — not to be confused with news-indexer's own hourly "N new
  * articles per source" digest, which is a separate repo/mechanism entirely
  * (news-indexer/src/news_indexer/worker/digest.py + notifier.py). ONE fresh
@@ -768,7 +768,7 @@ export function notifyDailySummary(stats: {
  * route.ts's `wasStored`.
  */
 /** Heading the article-match panel puts above the shadow-lane rows (daatan#1661): every row
- *  under it is captured and shown but NOT read by the Oracle's estimate. Exported for tests. */
+ *  under it is captured and shown but NOT read by the Oracul's estimate. Exported for tests. */
 export const SHADOW_MARKER = '<i>not in estimate:</i>'
 
 /** The `reader_confidence` panel row (retro#681), or null when the claim carries none.
@@ -889,9 +889,9 @@ export async function notifyNewsArticleMatched(
   const cert = (v: number | null | undefined) => (v != null ? ` (cert ${v.toFixed(2)})` : '')
 
   // Every number this push produced, one per row, null-omitted rather than printed as "null"
-  // (an older Oracle response, or a daatan prod that predates a given passthrough, must
+  // (an older Oracul response, or a daatan prod that predates a given passthrough, must
   // degrade to a shorter panel). The panel is split in two (daatan#1661): the rows the
-  // Oracle's aggregation actually reads, then — under a "not in estimate" marker — the
+  // Oracul's aggregation actually reads, then — under a "not in estimate" marker — the
   // shadow-lane fields it captures but does not read yet. That split is the ONE place the
   // live/shadow boundary is spelled out for readers; when Oracle 1.5 graduates a field, move
   // its row from `shadowRows` to `liveRows` and update /help/rating-numbers + docs/ — nothing
@@ -899,13 +899,13 @@ export async function notifyNewsArticleMatched(
   //
   //   stance      [-1,1] — which way the article argues; signed, so -0.72 reads as "argues NO".
   //                        The extractor's certainty about that reading rides along.
-  //   relevance   [0,1]  — the Oracle's claim-aware judgment; its SQUARE weights the article
+  //   relevance   [0,1]  — the Oracul's claim-aware judgment; its SQUARE weights the article
   //                        in aggregation, so 0.5 counts a quarter as much as 1.0.
   //   range              — omitted when under 2 points wide (display noise) or when a bound is
   //                        missing (older snapshots predate ciLow/ciHigh).
   //   author_lean/fact_signal/credibility/class/consensus/report_kind/reader/quantity —
   //                        judgment-lane and elicited shadow fields (Signal Lanes, retro#686,
-  //                        #681, #683): nothing in the Oracle's own aggregation reads them, so
+  //                        #681, #683): nothing in the Oracul's own aggregation reads them, so
   //                        this panel is the only place they're visible at all.
   //                        `credibilityWeight` is pre-filtered to null at the caller while the
   //                        credibility cutover flag is OFF (1.0 is a neutral default, not a
@@ -958,7 +958,7 @@ export async function notifyNewsArticleMatched(
   const shadow = renderRows(shadowRows)
   const panel = [...live, ...(shadow.length ? [SHADOW_MARKER, ...shadow] : [])].join('\n')
 
-  // A short quote of what was actually judged: the Oracle's extracted claim when it produced
+  // A short quote of what was actually judged: the Oracul's extracted claim when it produced
   // one (that's the text the numbers scored), the raw article snippet otherwise.
   const extractLine = article.extract ? `<i>«${truncate(article.extract, 200)}»</i>` : null
 
@@ -1027,7 +1027,7 @@ function buildRatingButtons(counts?: number[]) {
  * Fired by every path that writes a new confidence value (news-indexer pushes,
  * user-triggered "analyze context", admin backfill) — the crossing check lives
  * in `context.ts`, so a forecast hovering at 82 doesn't re-alert on each push.
- * `settled` marks the Oracle's settlement detection: enough sources reported
+ * `settled` marks the Oracul's settlement detection: enough sources reported
  * the outcome as an accomplished fact, so the forecast is a resolution candidate.
  */
 export function notifyHighConfidence(
@@ -1197,9 +1197,9 @@ export function notifyDeadlineDivergence(
 }
 
 /**
- * A linked prediction market's implied probability and our Oracle estimate
+ * A linked prediction market's implied probability and our Oracul estimate
  * disagree by more than the divergence threshold — worth a human look
- * (mispriced market, stale Oracle estimate, or a real edge).
+ * (mispriced market, stale Oracul estimate, or a real edge).
  */
 export function notifyMarketDivergence(
   prediction: { id: string; claimText: string; slug?: string | null },

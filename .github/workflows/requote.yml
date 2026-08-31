@@ -3,7 +3,7 @@ name: Temporal Requote
 # Daily trigger for /api/cron/requote, the temporal-model daily driver (retro
 # docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0): pure arithmetic per open forecast
 # (the zero-parameter constant-hazard glide + impossibility pin), no
-# Oracle/search/LLM call except a bounded self-heal classification pass.
+# Oracul/search/LLM call except a bounded self-heal classification pass.
 #
 # WHERE THIS RUNS:
 #   A GitHub Actions runner makes the HTTP request; the EC2 app process does

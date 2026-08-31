@@ -1,12 +1,12 @@
 name: Backfill Oracle Sources
 
-# Populates the Oracle source roster (the "sources behind the AI estimate" panel)
+# Populates the Oracul source roster (the "sources behind the AI estimate" panel)
 # for ACTIVE forecasts created before per-source capture existed. Drives the
 # admin route POST /api/admin/forecasts/backfill-oracle-sources in bounded rounds
 # until `remaining` reaches 0. Auth is the x-cron-secret (BOT_RUNNER_SECRET) header,
 # same as the cron routes — the secret only ever lives in the Actions runner.
 #
-# Manual, on-demand: Actions → Backfill Oracle Sources → Run workflow.
+# Manual, on-demand: Actions → Backfill Oracul Sources → Run workflow.
 
 on:
   workflow_dispatch:

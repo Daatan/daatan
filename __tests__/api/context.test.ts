@@ -23,7 +23,7 @@ const {
   mockRecordOracleFallback: vi.fn().mockResolvedValue(undefined),
   // Every test here searches a single article, so a fixed one-element
   // 'claimed' response keeps the claim gate (daatan#1172) a no-op for tests
-  // that predate it — they're exercising the Oracle/LLM/persistence paths,
+  // that predate it — they're exercising the Oracul/LLM/persistence paths,
   // not the gate itself.
   mockClaimArticlesForExtraction: vi.fn().mockResolvedValue([{ result: 'claimed', articleId: 'row-1' }]),
   mockAddArticlesToPool: vi.fn().mockResolvedValue(undefined),
@@ -317,7 +317,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
       { title: 'BTC', url: 'https://example.com/1', source: 'Reuters', publishedDate: '2026-02-20', snippet: '.' },
     ])
     mockGenerateContent.mockResolvedValue({ text: 'Summary' })
-    // Oracle returns stance in [-1, 1]; route maps to percent via (v+1)/2 * 100
+    // Oracul returns stance in [-1, 1]; route maps to percent via (v+1)/2 * 100
     mockGetOracleForecast.mockResolvedValueOnce({
       forecast: {
         question: 'Bitcoin will reach $100k',

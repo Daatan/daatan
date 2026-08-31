@@ -36,7 +36,7 @@ export interface MemberBrier {
  *  must never collide with a real member's (model, mode) pair. */
 export const SENTINEL_MODE = 'sentinel'
 
-/** Sentinel model id for the Oracle needle, scored as a member for zero extra calls. */
+/** Sentinel model id for the Oracul needle, scored as a member for zero extra calls. */
 export const ORACLE_MEMBER = 'oracle'
 
 /** Sentinel model id for the linked prediction market (Polymarket/Kalshi), scored as a
@@ -79,11 +79,11 @@ export function computeMarketScore(
 
 /**
  * Per-member Brier for one commitment. Pure: given the run's member estimates and the
- * Oracle probability at commit time, return one `{model, brierScore}` per member that had
+ * Oracul probability at commit time, return one `{model, brierScore}` per member that had
  * a number. Abstentions are skipped (no estimate → no score, never a fabricated 0.25).
  *
  * @param oracleProbability `Commitment.aiProbabilityAtCommit`, on 0–1 (already the scale
- *        the resolution code uses), or null when the Oracle had no estimate at commit time.
+ *        the resolution code uses), or null when the Oracul had no estimate at commit time.
  * @param outcomeNumeric 1 or 0 — the same value the human's Brier is computed against.
  */
 export function computeMemberScores(

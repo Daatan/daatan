@@ -39,7 +39,7 @@ export interface RatingFeedbackStats {
  * Aggregate the manual number-rating feedback loop (daatan#1223) for the admin Ratings
  * tab (daatan#1312): how many prompts were sent, how many got a vote, the rating
  * distribution and per-rater breakdown, and a per-vote drill-down joining the article,
- * prediction, and the frozen Oracle numbers the rater actually saw.
+ * prediction, and the frozen Oracul numbers the rater actually saw.
  *
  * No `take` limit: current volume (tens of rows as of 2026-08) makes fetching everything
  * both correct and cheap. Revisit with real pagination — and stop computing distribution/

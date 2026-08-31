@@ -260,7 +260,7 @@ describe('generateExpressPrediction', () => {
 
     it('keeps the user URL as the anchor when the fetch fails (no search-result substitution)', async () => {
       // Bot-blocked/paywalled pages (e.g. Walla) fail to scrape; the user's link must
-      // still anchor the forecast rather than being replaced by the first Oracle hit.
+      // still anchor the forecast rather than being replaced by the first Oracul hit.
       mockFetchUrlContent.mockRejectedValue(new Error('Network error'))
       mockOracleSearch.mockResolvedValue(mockArticles)
 

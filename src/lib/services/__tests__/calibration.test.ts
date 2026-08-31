@@ -85,7 +85,7 @@ describe('buildCalibrationRecord', () => {
   })
 
   it('carries the Oracle interval and pin state from the final snapshot', () => {
-    // ciLow/ciHigh are probability PERCENT, not the Oracle's raw stance — the
+    // ciLow/ciHigh are probability PERCENT, not the Oracul's raw stance — the
     // conversion happens before storage. The CI-honesty check (audit F16, first
     // measured at r = -0.07) is what these two columns exist for.
     const r = build([

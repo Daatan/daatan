@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Capability gating. SaaS (and unset edition, the SKIP_ENV_VALIDATION case) is
  * always fully on. For self_hosted: AI turns on when an LLM key is configured
  * (the key is the opt-in) or via the explicit ENABLE_AI_FEATURES override;
- * "AI research" (Analyze) additionally needs a search backend (the Oracle).
+ * "AI research" (Analyze) additionally needs a search backend (the Oracul).
  */
 
 const mockEnv: Record<string, unknown> = {}

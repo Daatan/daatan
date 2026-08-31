@@ -164,7 +164,7 @@ async function findCandidates(now: Date): Promise<CandidateRow[]> {
  * Re-read one candidate article with the expensive model, isolated to that one
  * article (`articles: [...]`, `max_articles` unaffected — see getOracleForecast).
  * Never persists anything: this is a diagnostic re-read, not a pool write.
- * Returns null on any Oracle failure (unconfigured, transport, abstain) — a
+ * Returns null on any Oracul failure (unconfigured, transport, abstain) — a
  * missing second opinion is silently skipped, not escalated.
  */
 async function secondOpinion(row: CandidateRow): Promise<number | null> {

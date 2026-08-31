@@ -83,7 +83,7 @@ describe('getOracleForecast', () => {
   })
 
   it('sends text and language per article when present, omits them when absent', async () => {
-    // daatan#1290: `text` skips the Oracle's own fetch; `language` is a prompt hint retro's
+    // daatan#1290: `text` skips the Oracul's own fetch; `language` is a prompt hint retro's
     // pydantic model ignores until retro#417 lands (default extra="ignore" — safe to send).
     const articles = [
       { url: 'https://example.com/1', title: 'A', snippet: 's', text: 'the body', language: 'he' },

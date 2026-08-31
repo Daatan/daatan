@@ -89,7 +89,7 @@ const MAX_KEY_SOURCE_LEN = 150
 /**
  * TruthMachine batch-loop liveness (retro#556).
  *
- * The batch tree on the Oracle box ran stale code twice (six weeks once) with
+ * The batch tree on the Oracul box ran stale code twice (six weeks once) with
  * zero detection; retro PR#555 makes a failed sync refuse the cycle, but that is
  * only visible in `pipeline_log.txt` on the box. The loop's one externally
  * visible heartbeat is the `atlas:` / `progress:` commits it pushes to
