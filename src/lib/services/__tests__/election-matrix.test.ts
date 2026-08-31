@@ -95,3 +95,20 @@ describe('getElectionMatrix (pool-fed, Phase 2.3)', () => {
     expect(matrix.authors.every((a) => a.cells['p1'] === undefined)).toBe(true)
   })
 })
+
+describe('getElectionMatrix — superseded rows (daatan#1699)', () => {
+  it('asks the pool for current readings only, not every reading ever taken', async () => {
+    mockPredictions.mockResolvedValue([predictionRow()] as never)
+    mockPoolRows.mockResolvedValue([] as never)
+
+    await getElectionMatrix()
+
+    // The mock ignores `where`, so this asserts on the query itself — a missing
+    // predicate can only be pinned by the predicate. Measured on prod 2026-08-31:
+    // without it, 946 of the 1,858 rows this aggregated were superseded duplicates.
+    const where = mockPoolRows.mock.calls[0][0]!.where as Record<string, unknown>
+    expect(where.status).toBe('COMPLETE')
+    expect(where.excluded).toBe(false)
+    expect(where.supersededAt).toBeNull()
+  })
+})

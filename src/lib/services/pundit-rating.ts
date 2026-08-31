@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
 import { calculateEloUpdates } from '@/lib/services/elo'
 import { glicko2Update } from '@/lib/services/expertise'
 
@@ -37,6 +38,10 @@ async function loadResolvedPunditStances(tagSlug: string): Promise<Map<string, P
       stance: { not: null },
       status: 'COMPLETE',
       excluded: false,
+      // A superseded row is a replaced reading: averaging it in alongside its
+      // replacement skews the pundit's stance toward what the OLD extraction
+      // said, and with it their Brier score (daatan#1699).
+      ...CURRENT_VERSION_ONLY,
       prediction: {
         outcomeType: 'BINARY',
         status: { in: ['RESOLVED_CORRECT', 'RESOLVED_WRONG'] },

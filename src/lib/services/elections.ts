@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { poolArticleToEnrichedSource } from '@/lib/services/oracle-snapshot'
+import { CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
 import { buildElectionMatrix, type ElectionMatrix, type ElectionEventInput, type ElectionSourceInput } from '@/lib/elections/matrix'
 
 /** slugify('Israeli Elections 2026') — the tag that labels an election forecast. */
@@ -56,6 +57,10 @@ export async function getElectionMatrix(): Promise<ElectionMatrix> {
       status: 'COMPLETE',
       excluded: false,
       stance: { not: null },
+      // "Full usable pool" means the CURRENT reading of each article, not every
+      // reading ever taken of it. Without this, 946 of the 1,858 rows this
+      // aggregated on prod were superseded duplicates — 50.9% (daatan#1699).
+      ...CURRENT_VERSION_ONLY,
     },
   })
   const sourcesByPrediction = new Map<string, ElectionSourceInput[]>()

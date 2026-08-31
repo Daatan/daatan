@@ -17,9 +17,16 @@ const log = createLogger('evidence-pool')
  * outbound push (daatan#1382). See the schema's `supersededAt` doc comment.
  * Not used by `getPoolThroughput` (deliberately counts every extraction
  * attempt, superseded or not) or the admin evidence-pool listing (deliberately
- * shows the full correction history, daatan#1383).
+ * shows the full correction history, daatan#1383). The repair/backfill/retry
+ * paths (`pool-retry`, `degraded-fetch-backfill`, the degraded-fetch sweep)
+ * likewise need to see superseded rows — don't "fix" those by adding it.
+ *
+ * Exported because two consumers outside this module aggregate the pool and
+ * were silently double-counting without it (daatan#1699): the elections grid
+ * in `elections.ts` (measured 946 of 1,858 rows superseded — 50.9%) and
+ * pundit Brier scoring in `pundit-rating.ts`.
  */
-const CURRENT_VERSION_ONLY = { supersededAt: null } as const
+export const CURRENT_VERSION_ONLY = { supersededAt: null } as const
 
 /**
  * The per-forecast evidence pool (retro docs/ORACLE_VARIABLES.md §6 part 2).

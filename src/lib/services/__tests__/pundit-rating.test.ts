@@ -125,7 +125,7 @@ describe('replayPunditGlickoHistory', () => {
     expect(ratings.get('a')!.personName).toBe('A')
   })
 
-  it('excludes rows with no personId, no stance, non-COMPLETE status, or excluded', async () => {
+  it('excludes rows with no personId, no stance, non-COMPLETE status, excluded, or superseded', async () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([])
 
@@ -137,6 +137,10 @@ describe('replayPunditGlickoHistory', () => {
     expect(whereClause.stance).toEqual({ not: null })
     expect(whereClause.status).toBe('COMPLETE')
     expect(whereClause.excluded).toBe(false)
+    // daatan#1699 — a superseded row is a replaced reading; averaging it in
+    // alongside its replacement skews the pundit's stance, and their Brier score,
+    // toward whatever the old extraction said.
+    expect(whereClause.supersededAt).toBeNull()
     expect(whereClause.prediction.outcomeType).toBe('BINARY')
     expect(whereClause.prediction.tags).toEqual({ some: { slug: 'israeli-elections-2026' } })
   })
