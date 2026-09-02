@@ -170,6 +170,20 @@ describe('resolvePooledEstimate', () => {
     expect((await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)).insufficientData).toBe(false)
   })
 
+  it('reports pool-unavailable (not single-run) when the aggregate call itself failed', async () => {
+    // daatan#1693: a timeout or non-2xx from /pool/aggregate is transient load, not a
+    // structurally unreadable pool — it must be distinguishable so a caller can retry it.
+    mockRecompute.mockResolvedValue({ kind: 'unavailable' })
+
+    const out = await resolvePooledEstimate('p1', SINGLE_RUN, FALLBACK_SOURCES, null, null)
+
+    expect(out.estimateSource).toBe('pool-unavailable')
+    expect(out.insufficientData).toBe(false)
+    expect(out.mean).toBe(0.5) // falls back to the single run, same as structural-null does
+    expect(out.snapshotSources).toBe(FALLBACK_SOURCES)
+    expect(out.poolSize).toBeNull()
+  })
+
   it('never throws — a recompute that throws degrades to the single run', async () => {
     mockRecompute.mockRejectedValue(new Error('pool read failed'))
 

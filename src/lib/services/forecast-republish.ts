@@ -20,7 +20,9 @@ export interface RepublishForecast {
   claimText: string | null
   status: 'ok' | 'unchanged' | 'failed'
   /** Why a forecast failed: `not_found`, `not_active`, `empty_pool`, `pool_unreadable`,
-   *  the pool's own insufficiency reason (e.g. `all_articles_off_topic`), or `error`. */
+   *  `aggregate_unavailable` (transient — the aggregate call itself failed; safe to retry,
+   *  see daatan#1693), the pool's own insufficiency reason (e.g. `all_articles_off_topic`),
+   *  or `error`. */
   reason: string | null
   poolSize: number | null
   usableSize: number | null
@@ -123,10 +125,18 @@ export async function republishForecasts(predictionIds: string[], apply: boolean
       base.usableSize = resolved.usableSize
 
       if (resolved.estimateSource !== 'pool') {
-        // 'single-run' = the pool could not be read (this path has no real single run
-        // to fall back on); 'pool-insufficient' = the aggregate found no usable signal.
-        // Neither writes: an operator tool re-publishes real aggregates or nothing.
-        report({ ...base, reason: resolved.insufficientData ? (resolved.reason ?? 'insufficient') : 'pool_unreadable' })
+        // 'single-run' = the pool is structurally unreadable (not configured, or zero usable
+        // rows — this path has no real single run to fall back on); 'pool-unavailable' = the
+        // aggregate call itself failed (timeout / non-2xx, typically transient load — daatan#1693,
+        // safe to retry); 'pool-insufficient' = the aggregate ran fine and found no usable
+        // signal. None of the three write: an operator tool re-publishes real aggregates or
+        // nothing.
+        const reason = resolved.insufficientData
+          ? (resolved.reason ?? 'insufficient')
+          : resolved.estimateSource === 'pool-unavailable'
+            ? 'aggregate_unavailable'
+            : 'pool_unreadable'
+        report({ ...base, reason })
         continue
       }
 

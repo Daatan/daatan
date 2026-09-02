@@ -276,11 +276,11 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     new Map(), prediction.createdAt, prediction.claimArchetype,
                     prediction.claimText,
                 )
-                if (resolved.estimateSource === 'single-run') {
-                    // The pool itself couldn't be read either (rare — e.g. Oracul
-                    // unreachable) and there's no fresh run to fall back to since we
-                    // deliberately skipped one. Report nothing this round rather than
-                    // the placeholder zero-value noNewRun above.
+                if (resolved.estimateSource === 'single-run' || resolved.estimateSource === 'pool-unavailable') {
+                    // The pool itself couldn't be read either (not configured / empty) or the
+                    // aggregate call failed (timeout / non-2xx — daatan#1693), and there's no
+                    // fresh run to fall back to since we deliberately skipped one. Report
+                    // nothing this round rather than the placeholder zero-value noNewRun above.
                     log.info({ predictionId: prediction.id, path: 'unchanged_pool_unreadable' }, 'context.ai_estimate')
                     return {
                         externalProbability: null,

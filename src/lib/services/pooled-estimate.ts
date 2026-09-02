@@ -1,5 +1,5 @@
 import type { ClaimArchetype, ClaimDirection } from '@prisma/client'
-import { recomputeFromPool, type PoolRecompute } from '@/lib/services/evidence-pool'
+import { recomputeFromPool, type PoolRecompute, type PoolUnavailable } from '@/lib/services/evidence-pool'
 import {
   poolArticleToEnrichedSource,
   oracleSnapshotToContributingSources,
@@ -28,7 +28,7 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
    * — the caller's single-run sources on the fallback, and empty when `insufficientData`.
    */
   snapshotSources: EnrichedOracleSource[]
-  estimateSource: 'pool' | 'single-run' | 'pool-insufficient'
+  estimateSource: 'pool' | 'single-run' | 'pool-insufficient' | 'pool-unavailable'
   /**
    * The pool aggregated but returned no usable estimate — in prod either
    * `all_articles_off_topic` or `no_usable_weight` (see `reason`; the Oracul may add more,
@@ -87,6 +87,10 @@ export interface ResolvedPoolEstimate extends SingleRunEstimate {
  * `reason=no_question` — so the cost of forgetting it is silent, which is exactly why every
  * caller threads it.
  */
+function isPoolUnavailable(p: PoolRecompute | PoolUnavailable | null): p is PoolUnavailable {
+  return p !== null && 'kind' in p
+}
+
 export async function resolvePooledEstimate(
   predictionId: string,
   singleRun: SingleRunEstimate,
@@ -98,13 +102,35 @@ export async function resolvePooledEstimate(
   claimArchetype: ClaimArchetype | null = null,
   claimText: string | null = null,
 ): Promise<ResolvedPoolEstimate> {
-  let pool: PoolRecompute | null = null
+  let pool: PoolRecompute | PoolUnavailable | null = null
   try {
     pool = await recomputeFromPool(predictionId, claimDirection, claimDeadline, claimCreatedAt, claimArchetype, claimText)
   } catch {
-    // recomputeFromPool already swallows transport/non-200 into null; this guards only an
-    // unexpected throw (e.g. the pool read itself failing) so a caller never loses its estimate.
+    // recomputeFromPool already swallows transport/non-200 into PoolUnavailable; this guards
+    // only an unexpected throw (e.g. the pool read itself failing) so a caller never loses its
+    // estimate. Genuinely unknown, so fold into the structural-null branch below rather than
+    // claiming it was a transient aggregate failure specifically.
     pool = null
+  }
+
+  // The aggregate call itself failed (transport error or non-2xx from a saturated Oracul) —
+  // distinct from `pool === null` (nothing to aggregate: no config, or zero usable rows) and
+  // from insufficientData below (aggregated fine, found no usable signal). A caller reporting
+  // a reason string (daatan#1693) must be able to tell "retry this" from "this pool is empty".
+  if (isPoolUnavailable(pool)) {
+    return {
+      ...singleRun,
+      snapshotSources: fallbackSources,
+      estimateSource: 'pool-unavailable',
+      insufficientData: false,
+      reason: null,
+      poolSize: null,
+      usableSize: null,
+      singleRunMean: singleRun.mean,
+      evidenceMass: null,
+      nEff: null,
+      ageAdjustedMass: null,
+    }
   }
 
   // The pool aggregated but has no usable signal (off-topic) — abstain, don't fall back to a
