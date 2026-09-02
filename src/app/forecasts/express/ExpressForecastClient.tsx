@@ -353,7 +353,9 @@ export default function ExpressForecastClient({
           source: (finalData.newsAnchor || finalData.externalMarketId) ? undefined : 'manual',
           externalMarketId: finalData.externalMarketId || undefined,
           isPublic,
-          confidence: finalData.probabilitySuggestion || undefined,
+          // A legitimate 0% suggestion is falsy but valid — only null/undefined
+          // (no suggestion, or the model abstained per #1657) means "no estimate".
+          confidence: finalData.probabilitySuggestion ?? undefined,
         }),
       })
 
@@ -992,6 +994,10 @@ export default function ExpressForecastClient({
                 <span>{isPublic ? t('visibilityPublic') : t('visibilityUnlisted')}</span>
                 {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
+            )}
+
+            {!isEditing && generated?.probabilitySuggestion == null && (
+              <p className="text-xs text-amber-500 -mt-2">{t('noAiEstimateWarning')}</p>
             )}
 
             <div className="flex gap-3">

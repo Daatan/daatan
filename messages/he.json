@@ -728,6 +728,7 @@
     "guessChances": "נחש סיכויים",
     "recalculate": "חשב מחדש",
     "probabilityHint": "תנו ל-AI לנתח את המקורות ולהציע הסתברות התחלתית.",
+    "noAiEstimateWarning": "מתפרסם ללא הערכת הסתברות מבינה מלאכותית.",
     "guessError": "נכשל קבלת הצעת הסתברות",
     "marketLinked": "שוק מקושר",
     "newsAnchor": "עוגן חדשותי",
