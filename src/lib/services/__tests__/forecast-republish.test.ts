@@ -175,6 +175,19 @@ describe('republishForecasts', () => {
     expect(mockRecord).not.toHaveBeenCalled()
   })
 
+  it('reports aggregate_unavailable, not pool_unreadable, when the aggregate call itself failed (daatan#1693)', async () => {
+    // Transient load (timeout / non-2xx from a saturated Oracul) must be distinguishable
+    // from a genuinely unreadable pool, so a corpus-wide sweep knows which ones to retry.
+    mockResolve.mockResolvedValue(
+      poolResolved({ estimateSource: 'pool-unavailable', poolSize: null, usableSize: null }) as never,
+    )
+
+    const r = await republishForecasts(['p1'], true)
+
+    expect(r.forecasts[0]).toMatchObject({ status: 'failed', reason: 'aggregate_unavailable' })
+    expect(mockRecord).not.toHaveBeenCalled()
+  })
+
   it('reports an insufficient (off-topic) pool with its own reason and writes nothing', async () => {
     mockResolve.mockResolvedValue(
       poolResolved({ estimateSource: 'pool-insufficient', insufficientData: true, reason: 'all_articles_off_topic' }) as never,

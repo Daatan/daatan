@@ -65,6 +65,13 @@ import {
   retireLegacyNullRows,
 } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
+import type { PoolRecompute } from '../evidence-pool'
+
+// Every test in this file mocks oracleFetch to return `ok: true`, so recomputeFromPool
+// never actually produces the PoolUnavailable branch here — narrow it away for the
+// property-access assertions below (daatan#1693 added that branch to the return type).
+const recomputeOk = async (...args: Parameters<typeof recomputeFromPool>) =>
+  (await recomputeFromPool(...args)) as PoolRecompute | null
 
 const findMany = vi.mocked(prisma.evidencePoolArticle.findMany)
 const findFirst = vi.mocked(prisma.evidencePoolArticle.findFirst)
@@ -551,7 +558,7 @@ describe('recomputeFromPool', () => {
       json: async () => ({ ...AGGREGATE, evidence_mass: 3.42, n_eff: 2.1, age_adjusted_mass: 3.9 }),
     } as never)
 
-    const out = await recomputeFromPool('pred-1', null, null)
+    const out = await recomputeOk('pred-1', null, null)
 
     expect(out?.evidenceMass).toBe(3.42)
     expect(out?.nEff).toBe(2.1)
@@ -577,7 +584,7 @@ describe('recomputeFromPool', () => {
     ] as never)
     mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
-    const out = await recomputeFromPool('pred-1', null, null)
+    const out = await recomputeOk('pred-1', null, null)
 
     const posted = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body).sources
     expect(out?.usableArticles).toHaveLength(posted.length)
@@ -748,19 +755,20 @@ describe('recomputeFromPool', () => {
     expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
-  // Both failure paths return null rather than throwing: the caller falls back to its
-  // single-run forecast, so a flaky Oracul degrades the estimate instead of dropping it.
-  it('returns null (never throws) on a non-OK status', async () => {
+  // Both failure paths degrade the caller to its single-run forecast rather than throwing,
+  // but as PoolUnavailable, not null — distinct from a structurally empty/unconfigured pool,
+  // so a reporting caller can tell "retry this" from "nothing to aggregate" (daatan#1693).
+  it('returns PoolUnavailable (never throws) on a non-OK status', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOraculFetch.mockResolvedValue({ ok: false, status: 503 } as never)
-    await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
+    await expect(recomputeFromPool('pred-1', null, null)).resolves.toEqual({ kind: 'unavailable' })
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 
-  it('returns null (never throws) when the fetch rejects', async () => {
+  it('returns PoolUnavailable (never throws) when the fetch rejects', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOraculFetch.mockRejectedValue(new Error('network down'))
-    await expect(recomputeFromPool('pred-1', null, null)).resolves.toBeNull()
+    await expect(recomputeFromPool('pred-1', null, null)).resolves.toEqual({ kind: 'unavailable' })
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 
@@ -833,7 +841,7 @@ describe('recomputeFromPool', () => {
       )
       mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
 
-      const out = await recomputeFromPool('pred-1', null, null, claimCreatedAt)
+      const out = await recomputeOk('pred-1', null, null, claimCreatedAt)
 
       expect(out?.mean).toBe(AGGREGATE.mean)
     })

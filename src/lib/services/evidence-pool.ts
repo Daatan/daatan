@@ -1005,6 +1005,19 @@ export async function countUsableEvidence(predictionId: string): Promise<number>
   })
 }
 
+/**
+ * `recomputeFromPool` returns this instead of `null` when the aggregate call itself
+ * failed (transport error, timeout, or a non-2xx from `/pool/aggregate`) — as opposed to
+ * `null`, which means there was structurally nothing to aggregate (no Oracle configured,
+ * or zero usable rows). Both `null` and `PoolUnavailable` fall back to the caller's
+ * single run, but they are NOT the same failure and callers that report a reason string
+ * (daatan#1693) must not collapse them: an overloaded Oracul is a retry, an empty pool
+ * with no config is not.
+ */
+export interface PoolUnavailable {
+  readonly kind: 'unavailable'
+}
+
 export interface PoolRecompute {
   mean: number
   std: number
@@ -1094,7 +1107,7 @@ export async function recomputeFromPool(
   claimCreatedAt: Date | null = null,
   claimArchetype: ClaimArchetype | null = null,
   claimText: string | null = null,
-): Promise<PoolRecompute | null> {
+): Promise<PoolRecompute | PoolUnavailable | null> {
   const cfg = getOracleConfig()
   if (!cfg) return null
 
@@ -1170,12 +1183,16 @@ export async function recomputeFromPool(
       timeoutMs: 10_000,
     })
   } catch (err) {
+    // Transport failure (timeout, connection reset) — the aggregate could not be reached,
+    // not that there was nothing to aggregate. Distinct from PoolUnavailable in nothing but
+    // where it's reported: see PoolUnavailable's doc comment.
     log.warn({ predictionId, err }, 'event=pool_recompute_failed')
-    return null
+    return { kind: 'unavailable' }
   }
   if (!res.ok) {
+    // Non-2xx from a saturated or erroring Oracul — same transient bucket as the throw above.
     log.warn({ predictionId, status: res.status }, 'event=pool_recompute_failed')
-    return null
+    return { kind: 'unavailable' }
   }
 
   const agg: PoolAggregateApiResponse = await res.json()
