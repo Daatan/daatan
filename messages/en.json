@@ -728,6 +728,7 @@
     "guessChances": "Guess chances",
     "recalculate": "Recalculate",
     "probabilityHint": "Let AI analyze the gathered sources to suggest a starting probability.",
+    "noAiEstimateWarning": "Publishing without an AI probability estimate.",
     "guessError": "Failed to get probability suggestion",
     "marketLinked": "Linked Market",
     "newsAnchor": "News Anchor",
