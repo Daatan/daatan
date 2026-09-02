@@ -41,20 +41,34 @@ const EXPECTED_API_MAJOR_VERSIONS = ['1']
  *   all-time   p50 7.8s · p95 23.1s · p99 25.0s   >12s 17.31%  >30s 0.32%
  *   last 7d    p50 5.7s · p95 12.4s · p99 25.0s   >12s  5.59%  >30s 0.00%  max 25.6s
  *
- * The knee just above 25s is retro's `per_article_timeout_seconds = 25`; its declared
- * `forecast_timeout_seconds = 90` has fired exactly once in those 93 days, so 90 is
- * the wrong number to size against. 30s clears the real clamp with headroom and covers
- * 99.7% of all-time / 100% of the last 7 days.
+ * The knee just above 25s was retro's `per_article_timeout_seconds = 25`; its declared
+ * `forecast_timeout_seconds = 90` had fired exactly once in those 93 days, so 90 was
+ * the wrong number to size against. 30s cleared that clamp with headroom and covered
+ * 99.7% of all-time / 100% of the last 7 days — AT THE TIME.
  *
  * What the old 12s cost: 2,106 ERROR/`timeout` rows at a mean of 12,002ms in 30 days of
  * prod `oracle_call_logs` — 15.3% of all news-indexer forecasts — with a 2,236-row spike
  * in the [12000,12183] bucket against 673 in [11000,11999]. That is right-censoring, not
  * failure: the work completed on retro's side. See daatan#1254.
  *
+ * retro#760 (2026-08-30) raised `per_article_timeout_seconds` 25 -> 35 after the v11
+ * extractor (#697/#759) started losing whole batches to the old 25s clamp; retro's own
+ * PR notes 35s "keeps primary + relaxed retry inside the 90s forecast budget." The knee
+ * this constant was sized against moved with it, so 30s now clips exactly what it was
+ * built to clear. Confirmed against prod `oracle_call_logs` (5d, `source=context-update`,
+ * background/no-userId): OK calls already ran up to a right-censored 29.0s (p95 23.6s,
+ * n=31), while 283 of the 380 background calls in that window landed ERROR at ~30.0s —
+ * an 83% timeout rate on the dominant (non-interactive) lane, up from the near-zero rate
+ * this constant was tuned for. Re-applying the same margin (30s over a 25s clamp) to the
+ * new 35s clamp gives 40s. This is a first-order correction, not a fresh derivation from
+ * retro's server-side `phase=total` log — re-run that measurement (as in the block above)
+ * next time this needs retuning.
+ *
  * Callers that outlast this one must move with it: news-indexer's push client
- * (`matcher.PUSH_TIMEOUT_SECONDS`, 45s) wraps this whole route.
+ * (`matcher.PUSH_TIMEOUT_SECONDS`, 45s) wraps this whole route. 40s stays under that with
+ * 5s of margin; do not raise this past ~40s without raising `PUSH_TIMEOUT_SECONDS` too.
  */
-export const FORECAST_TIMEOUT_MS = 30_000
+export const FORECAST_TIMEOUT_MS = 40_000
 
 /**
  * Interactive budget: a user's request is blocked on the answer, so this stays short

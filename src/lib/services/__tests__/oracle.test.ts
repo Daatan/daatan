@@ -609,21 +609,23 @@ describe('forecast request timeout', () => {
     timeoutSpy.mockRestore()
   })
 
-  it('defaults to the 30s background budget, not the interactive one', async () => {
-    // daatan#1254. The default serves the server-to-server callers (news-indexer push,
-    // oracle-backfill sweep); retro's p99 on that path is 25.0s, so the old 12s default
-    // discarded 15.3% of forecasts it had already paid for. The default is deliberately
-    // the LONG one: a new background caller silently censoring completed work is worse
+  it('defaults to the background budget, not the interactive one', async () => {
+    // daatan#1254, re-tuned after retro#760. The default serves the server-to-server
+    // callers (news-indexer push, oracle-backfill sweep); retro raised its own
+    // per_article_timeout_seconds 25 -> 35 (retro#760), which re-introduced the same
+    // censoring this constant was first raised to fix (30s cleared a 25s clamp with
+    // headroom; it now clips a 35s clamp instead). The default is deliberately the
+    // LONG one: a new background caller silently censoring completed work is worse
     // than a new interactive caller waiting too long.
     await getOraculForecast('Q?')
-    expect(timeoutSpy).toHaveBeenCalledWith(30_000)
+    expect(timeoutSpy).toHaveBeenCalledWith(FORECAST_TIMEOUT_MS)
   })
 
   it('keeps the background budget above the measured retro ceiling', () => {
-    // retro's per_article_timeout_seconds=25 is the real clamp (its declared
-    // forecast_timeout_seconds=90 fired once in 93 days). A background budget at or
-    // below 25s re-introduces the censoring this issue fixed.
-    const RETRO_MEASURED_CEILING_MS = 25_000
+    // retro#760 raised per_article_timeout_seconds 25 -> 35; that's the real clamp now
+    // (retro's declared forecast_timeout_seconds=90 had fired once in 93 days pre-#760).
+    // A background budget at or below 35s re-introduces the censoring this issue fixed.
+    const RETRO_MEASURED_CEILING_MS = 35_000
     expect(FORECAST_TIMEOUT_MS).toBeGreaterThan(RETRO_MEASURED_CEILING_MS)
     // The two short budgets are deliberate opt-outs, both raced against a caller-side
     // wall clock. Ordering them here pins the intent: interactive < bot < background.
