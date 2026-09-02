@@ -8,6 +8,13 @@ const DEFAULT_MU = 1500
 const DEFAULT_SIGMA = 350
 const DEFAULT_VOLATILITY = 0.06
 
+// A stance the extractor itself flagged as barely-confident shouldn't move a
+// pundit's track record — unlike REMEDIATE_MIN_CERTAINTY (pool-remediate.ts),
+// which targets high-certainty rows for re-extraction, this is a low-end
+// exclusion. The Oracle's own aggregate (evidence-pool.ts) is untouched by
+// this: it still uses every non-null-certainty reading, low or high.
+export const MIN_JUDGED_CERTAINTY = 0.3
+
 // Same mapping prediction-resolution.ts uses for a user's binary confidence
 // (p = (confidence + 100) / 200): stance is already normalized to [-1, 1], the
 // same scale confidence/100 would be, so the formula is identical.
@@ -36,6 +43,7 @@ async function loadResolvedPunditStances(tagSlug: string): Promise<Map<string, P
     where: {
       personId: { not: null },
       stance: { not: null },
+      certainty: { gte: MIN_JUDGED_CERTAINTY },
       status: 'COMPLETE',
       excluded: false,
       // A superseded row is a replaced reading: averaging it in alongside its

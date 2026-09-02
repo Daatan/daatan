@@ -129,12 +129,16 @@ describe('replayPunditGlickoHistory', () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([])
 
-    const { replayPunditGlickoHistory } = await import('../pundit-rating')
+    const { replayPunditGlickoHistory, MIN_JUDGED_CERTAINTY } = await import('../pundit-rating')
     await replayPunditGlickoHistory('israeli-elections-2026')
 
     const whereClause = vi.mocked(prisma.evidencePoolArticle.findMany).mock.calls[0][0]!.where as any
     expect(whereClause.personId).toEqual({ not: null })
     expect(whereClause.stance).toEqual({ not: null })
+    // A stance the extractor itself flagged as barely-confident shouldn't
+    // move a pundit's track record. The Oracle's own aggregate (evidence-pool.ts)
+    // is a separate query and is unaffected by this floor.
+    expect(whereClause.certainty).toEqual({ gte: MIN_JUDGED_CERTAINTY })
     expect(whereClause.status).toBe('COMPLETE')
     expect(whereClause.excluded).toBe(false)
     // daatan#1699 — a superseded row is a replaced reading; averaging it in
