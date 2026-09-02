@@ -497,9 +497,22 @@ describe('/api/forecasts', () => {
             vi.mocked(prisma.prediction.findUnique).mockResolvedValue(newForecast as any)
             vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
 
+            // A fixed calendar date decays into the past and starts tripping the
+            // route's own `resolveByDatetime <= now` rejection (daatan#1705) —
+            // derive one a year out so this test stays evergreen.
+            const future = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December',
+            ]
+            const day = future.getUTCDate()
+            const month = monthNames[future.getUTCMonth()]
+            const year = future.getUTCFullYear()
+            const resolveByDatetime = new Date(Date.UTC(year, future.getUTCMonth(), day, 23, 59, 59)).toISOString()
+
             const body = {
-                claimText: 'Rockets or drones are launched directly from Israel to Iran, or from Iran to Israel, by 31 August 2026.',
-                resolveByDatetime: '2026-08-31T23:59:59Z',
+                claimText: `Rockets or drones are launched directly from Israel to Iran, or from Iran to Israel, by ${day} ${month} ${year}.`,
+                resolveByDatetime,
                 outcomeType: 'BINARY',
                 resolutionRules: 'Resolves YES if the event occurs as described.',
             }
