@@ -27,6 +27,11 @@ vi.mock('@/lib/services/telegram', () => ({ notifyNewCommitment: vi.fn(), notify
 vi.mock('@/lib/services/notification', () => ({ createNotification: vi.fn() }))
 vi.mock('@/lib/services/ai-estimate', () => ({ triggerAiProbabilityEstimate: vi.fn() }))
 
+const { mockLog } = vi.hoisted(() => ({
+  mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}))
+vi.mock('@/lib/logger', () => ({ createLogger: () => mockLog }))
+
 import { prisma } from '@/lib/prisma'
 import { createCommitment } from '../commitment'
 
@@ -124,5 +129,17 @@ describe('Commitment.polymarketPrice', () => {
 
     expect(tx.externalMarketPriceSnapshot.findFirst).toHaveBeenCalledTimes(1)
     expect(tx.commitment.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs a warning on the eligible-but-missed case (linked market, no snapshot yet) since it is never back-filled', async () => {
+    predictionFindUnique.mockResolvedValue(prediction({ externalMarketId: 'market-1' }) as never)
+    tx.externalMarketPriceSnapshot.findFirst.mockResolvedValue(null)
+
+    await createCommitment('user-1', 'pred-1', { confidence: 70 })
+
+    expect(mockLog.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ predictionId: 'pred-1', marketId: 'market-1' }),
+      expect.stringContaining('no price snapshot yet'),
+    )
   })
 })
