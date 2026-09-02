@@ -203,6 +203,14 @@ const writeCommitmentInTx = async (
     if (latestMarketSnapshot) {
       polymarketPrice =
         marketDisplayProbability(latestMarketSnapshot.probability, prediction.externalMarketInverted) / 100
+    } else {
+      // Never back-filled (schema comment), so a miss here is permanent for this
+      // commitment — surface it instead of letting it read identically to the
+      // legitimate unlinked/no-snapshot-yet case (daatan#1702).
+      log.warn(
+        { predictionId, marketId: prediction.externalMarketId },
+        'Commitment created on a linked market with no price snapshot yet — polymarketPrice will stay null',
+      )
     }
   }
 
