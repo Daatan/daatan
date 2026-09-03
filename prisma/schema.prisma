@@ -435,10 +435,10 @@ model Prediction {
   // walks SETTLED_DRIFT_PTS away from the value its settlement pin published,
   // cleared once the gap closes. Deliberately not settledAt — recordEstimate
   // re-stamps that on every settled write, so it dates the last one, not the pin.
-  settledDriftAlertAt DateTime? @map("settled_drift_alert_at")
+  settledDriftAlertAt         DateTime? @map("settled_drift_alert_at")
   // Mirror of the above (daatan#1498): the latest evidence snapshot asserts
   // settlement while `settled` is false. Same fire/re-arm idiom.
-  unlatchedPinAlertAt DateTime? @map("unlatched_pin_alert_at")
+  unlatchedPinAlertAt         DateTime? @map("unlatched_pin_alert_at")
   // Human dismissal from the Awaiting Resolution queue (daatan#1659). recordEstimate
   // recomputes awaitingAiResolution from the bare probability on every write, so a
   // clear alone is undone by the next requote. While set, the flag stays false as
@@ -468,11 +468,11 @@ model Prediction {
   // still published (no hard block on a transient provider error) but flagged
   // so an admin can manually review it — checkContent() never silently treats
   // an error as "checked and clean".
-  moderationCheckFailed Boolean @default(false) @map("moderation_check_failed")
+  moderationCheckFailed  Boolean @default(false) @map("moderation_check_failed")
   // The linked market asks the OPPOSITE question (e.g. claim "X will not win" vs
   // market "Will X win?"). Per-prediction, not per-market: two forecasts may link
   // the same market in opposite directions. UI plots 100 − price when set.
-  externalMarketInverted   Boolean         @default(false) @map("external_market_inverted")
+  externalMarketInverted Boolean @default(false) @map("external_market_inverted")
 
   // Phase 2 of the expertise-rating plan (docs/EXPERTISE_RATING_SYSTEM.md, daatan#1138).
   // Reserved for a denormalized "current" market price (0-1, polarity-adjusted),
@@ -483,20 +483,20 @@ model Prediction {
   polymarketPrice Float? @map("polymarket_price")
 
   // Relations
-  options          PredictionOption[]
-  commitments      Commitment[]
-  comments         Comment[]
-  contextSnapshots ContextSnapshot[]
-  relationsFrom    QuestionRelation[]      @relation("QuestionRelationFrom")
-  relationsTo      QuestionRelation[]      @relation("QuestionRelationTo")
-  promotedFromLatentNodes LatentNode[]     @relation("LatentNodePromoted")
-  evidencePool     EvidencePoolArticle[]
-  translations     PredictionTranslation[]
-  slugAliases      PredictionSlugAlias[]
-  oracleCallLogs   OracleCallLog[]
-  aiEstimateRuns   AiEstimateRun[]
-  aiMemberScores   AiMemberScore[]
-  calibrationRecord CalibrationRecord?
+  options                 PredictionOption[]
+  commitments             Commitment[]
+  comments                Comment[]
+  contextSnapshots        ContextSnapshot[]
+  relationsFrom           QuestionRelation[]      @relation("QuestionRelationFrom")
+  relationsTo             QuestionRelation[]      @relation("QuestionRelationTo")
+  promotedFromLatentNodes LatentNode[]            @relation("LatentNodePromoted")
+  evidencePool            EvidencePoolArticle[]
+  translations            PredictionTranslation[]
+  slugAliases             PredictionSlugAlias[]
+  oracleCallLogs          OracleCallLog[]
+  aiEstimateRuns          AiEstimateRun[]
+  aiMemberScores          AiMemberScore[]
+  calibrationRecord       CalibrationRecord?
 
   @@index([status])
   @@index([authorId])
@@ -544,12 +544,12 @@ model ContextSnapshot {
   // from the visible timeline, from anchor selection, and from the
   // article-dedup check (retro docs/TEMPORAL_MODEL_PLAN.md #4 Stage 0).
   // String, not an enum — Stage D adds more kinds later.
-  kind String @default("evidence") @db.VarChar(32)
+  kind          String  @default("evidence") @db.VarChar(32)
   // Which path wrote this snapshot: 'creation' | 'analyze' | 'news-indexer' |
   // 'backfill' | 'clock' (the recordEstimate funnel — retro docs/ORACLE_VARIABLES.md
   // §6). Pure provenance; `kind` keeps the pricing semantics (evidence vs clock).
   // Null = row written before the funnel existed.
-  origin String? @db.VarChar(32)
+  origin        String? @db.VarChar(32)
   // Which engine produced this estimate: 'v1' | 'v2', mirroring retro's
   // `Provenance.engine` (api/src/forecast_api/models.py). Stepping stone for the
   // paired v1/v2 scoring plan (daatan#1617, `Daatan/docs planning/
@@ -557,7 +557,7 @@ model ContextSnapshot {
   // M4/daatan#1558), so this column changes nothing about current behavior.
   // Defaulted, unlike `origin`, so every existing and future row reads as v1
   // without a backfill: no engine other than v1 has ever produced a forecast.
-  engine String? @default("v1") @db.VarChar(16)
+  engine        String? @default("v1") @db.VarChar(16)
   // retro's `Provenance.schema_version` ("1.0" today) — the wire schema shape a
   // future v2 reader should gate on, per daatan#1617, rather than retro's
   // free-form `/version` semver. Null on every row written before this column
@@ -566,12 +566,12 @@ model ContextSnapshot {
   schemaVersion String? @map("schema_version") @db.VarChar(16)
   // Oracle articles_used behind this estimate — evidence volume for a future
   // overwrite policy. Null when unknown (legacy, LLM-fallback, clock rows).
-  articlesUsed Int? @map("articles_used")
+  articlesUsed  Int?    @map("articles_used")
   // Provenance for kind='clock': { engineVersion, cause, pLast, tLast, tEff, c, direction }.
   // On an abstention (any kind): { abstain: { reason, poolSize } } — why the run declined and
   // over how big a pool (daatan#1473). Both were previously produced and only logged, so an
   // abstention could not be diagnosed after the fact.
-  meta Json?
+  meta          Json?
 
   // F17 (daatan#1236): true when this write's probability moved by at least
   // MATERIAL_CHANGE_PTS from the current evidence anchor (or there is no prior
@@ -665,8 +665,8 @@ model CalibrationRecord {
   /// deadline, where a confident pin was recorded as a catastrophic miss on a
   /// question that was ambiguous rather than mis-forecast. Such pairs must be
   /// annotatable and excludable from fits instead of silently poisoning them.
-  disputed     Boolean @default(false)
-  disputeNote  String? @map("dispute_note") @db.Text
+  disputed    Boolean @default(false)
+  disputeNote String? @map("dispute_note") @db.Text
 
   createdAt DateTime @default(now())
 
@@ -696,26 +696,26 @@ model EvidencePoolArticle {
   predictionId String
   prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
 
-  url     String @db.VarChar(2000)
-  urlHash String @map("url_hash") @db.VarChar(64) // hashUrl() — same normalization as NewsAnchor
-  title   String? @db.VarChar(500)
-  source  String? @db.VarChar(200) // outlet/domain, e.g. "reuters.com"
+  url                 String  @db.VarChar(2000)
+  urlHash             String  @map("url_hash") @db.VarChar(64) // hashUrl() — same normalization as NewsAnchor
+  title               String? @db.VarChar(500)
+  source              String? @db.VarChar(200) // outlet/domain, e.g. "reuters.com"
   // Resolved author identity from news-indexer (/articles/by-url): the byline plus the
   // cross-platform person it resolves to. Lets elections attribute a source to a tracked
   // commentator by joining on personId/personName instead of re-matching author strings
   // (Phase 2, docs/MATCHING_ARCHITECTURE.md). All nullable; forward-populated on write,
   // backfilled separately. personName is news-indexer's person.canonical_name.
-  author     String? @db.VarChar(200)
-  personId   String? @map("person_id") @db.VarChar(64)
-  personName String? @map("person_name") @db.VarChar(200)
+  author              String? @db.VarChar(200)
+  personId            String? @map("person_id") @db.VarChar(64)
+  personName          String? @map("person_name") @db.VarChar(200)
   // Resolved outlet identity from news-indexer (/articles/by-url), same shape and provenance
   // as personId/personName above — an exact match against news-indexer's outlet.name (no
   // alias table on that side; sources.yaml's `name` IS the outlet's canonical identity). Lets
   // elections attribute a source to a tracked outlet by joining on outletId instead of
   // re-matching TRACKED_SOURCES. All nullable; forward-populated on write, backfilled separately.
-  outletId   String? @map("outlet_id") @db.VarChar(64)
-  outletName String? @map("outlet_name") @db.VarChar(200)
-  publishedDate String? @map("published_date") // as reported by the source; not always a full ISO date
+  outletId            String? @map("outlet_id") @db.VarChar(64)
+  outletName          String? @map("outlet_name") @db.VarChar(200)
+  publishedDate       String? @map("published_date") // as reported by the source; not always a full ISO date
   // Where `publishedDate` came from, as reported by news-indexer (`article.published_at_source`,
   // news-indexer#426): `page` (read off the article), `feed` (the RSS/Atom pubDate), `pushed`
   // (MTProto message date / tweet timestamp), `url` (parsed from a dated URL path — backfill
@@ -732,7 +732,7 @@ model EvidencePoolArticle {
   // live-blog update), legitimately new evidence." Null on rows written
   // before this field existed; treated as always-changed on next encounter,
   // no backfill needed (the gap self-heals, 286 rows at introduction).
-  contentHash String? @map("content_hash") @db.VarChar(64)
+  contentHash  String?            @map("content_hash") @db.VarChar(64)
   // The snippet the discovering path pushed, kept so a RETRY can re-send the same
   // text the original attempt had (daatan#1232). Without it the retry sweep re-pushed
   // title-only (`snippet: ''`), i.e. strictly LESS text than the attempt that already
@@ -740,7 +740,7 @@ model EvidencePoolArticle {
   // null near-deterministic, and the terminal `oracle_null_final` stamp a self-fulfilling
   // prophecy rather than a genuine re-test. Nullable; rows written before this existed
   // stay null and the sweep falls back to title-only for them, exactly as before.
-  snippet String? @db.VarChar(2000)
+  snippet      String?            @db.VarChar(2000)
   // Claim/completion lifecycle for the atomic extraction gate (evidence-pool.ts
   // claimArticleForExtraction/completeArticleExtraction/failArticleExtraction).
   // Lets two near-simultaneous discoveries of the same (predictionId, url) —
@@ -755,11 +755,11 @@ model EvidencePoolArticle {
 
   // Extracted signal, same shape as EnrichedOracleSource — stance/certainty stay on
   // the Oracle's raw [-1,1]/[0,1] scale (see oracle-snapshot.ts), not converted here.
-  stance               Float?
-  certainty            Float?
-  credibilityWeight    Float?  @map("credibility_weight")
-  claims               Json    @default("[]")
-  settled              Boolean?
+  stance                  Float?
+  certainty               Float?
+  credibilityWeight       Float?   @map("credibility_weight")
+  claims                  Json     @default("[]")
+  settled                 Boolean?
   // The settlement anchor (retro PR #291): strict YYYY-MM-DD as emitted and
   // validated by retro's extractor — the outcome's occurrence date for a
   // positive settlement, the foreclosing event's date for a negative one, null
@@ -767,19 +767,19 @@ model EvidencePoolArticle {
   // /pool/aggregate so aggregation-time revalidation can re-check the
   // settlement vote on every recompute; a plain String pass-through like
   // publishedDate — daatan imposes no date semantics of its own.
-  settlementEventDate String? @map("settlement_event_date")
-  quantitativeEstimate Float?  @map("quantitative_estimate")
+  settlementEventDate     String?  @map("settlement_event_date")
+  quantitativeEstimate    Float?   @map("quantitative_estimate")
   // Retro's resolved evidence_class weight (S2 cutover, retro PR #249/#251) —
   // the `class_weight[evidence_class]`/certainty-fallback value already
   // computed server-side. Nothing reads this yet; without it a future
   // recompute-over-pool cutover would silently fall back to certainty for
   // every already-pooled article.
-  evidenceWeight Float? @map("evidence_weight")
+  evidenceWeight          Float?   @map("evidence_weight")
   // Graded topic relevance [0,1] the gatekeeper assigned (retro
   // SourceSignal.relevance_score) — its square multiplies aggregation weight
   // (Layer C). Never previously captured anywhere in daatan's pipeline; without
   // it a recompute would treat every pooled article as fully on-topic.
-  relevanceScore Float? @map("relevance_score")
+  relevanceScore          Float?   @map("relevance_score")
   // The per-article relevance bar in force when this row was admitted
   // (retro#393/#394, ForecastResponse.relevance_bar, PR retro#404) — 0.0 means
   // no bar was applied, which is /forecast's behaviour today. SHADOW / storage
@@ -790,7 +790,7 @@ model EvidencePoolArticle {
   // `/pool/aggregate` recompute path (compute-only, never re-extracts, and the
   // bar isn't returned there). No backfill: the value was never recorded and
   // must not be invented.
-  relevanceBar Float? @map("relevance_bar")
+  relevanceBar            Float?   @map("relevance_bar")
   // Which model/prompt produced this row's stance/certainty (daatan#1604/retro#627) —
   // retro's ProvenanceModels on the /forecast response that wrote this row. Model fields
   // are litellm ids (e.g. "claude-haiku-4-5"); *PromptVersion is a hand-bumped human label
@@ -806,18 +806,18 @@ model EvidencePoolArticle {
   // SIGHUP-reload deploys and live/batch checkout drift make "merge date" an unreliable
   // proxy for "which prompt actually ran," so a specific historical version/hash was
   // deliberately not invented. "pre-v1" means only "predates provenance capture."
-  extractorModel          String? @map("extractor_model")
-  extractorPromptVersion  String? @map("extractor_prompt_version")
-  extractorPromptHash     String? @map("extractor_prompt_hash")
-  gatekeeperModel         String? @map("gatekeeper_model")
-  gatekeeperPromptVersion String? @map("gatekeeper_prompt_version")
-  gatekeeperPromptHash    String? @map("gatekeeper_prompt_hash")
+  extractorModel          String?  @map("extractor_model")
+  extractorPromptVersion  String?  @map("extractor_prompt_version")
+  extractorPromptHash     String?  @map("extractor_prompt_hash")
+  gatekeeperModel         String?  @map("gatekeeper_model")
+  gatekeeperPromptVersion String?  @map("gatekeeper_prompt_version")
+  gatekeeperPromptHash    String?  @map("gatekeeper_prompt_hash")
   // Which Oracle BUILD produced this row — retro's `provenance.oracle` on the response
   // (`{base}+build.{n}` as /version reports it, plus the deployed commit). Prompt version
   // alone can't say that: prompt PRs are sequential but code between them is not.
   // Null = predates the stamp (daatan#1669, umbrella Daatan/retro#742); no backfill.
-  oracleVersion           String? @map("oracle_version")
-  oracleGitSha            String? @map("oracle_git_sha") @db.VarChar(40)
+  oracleVersion           String?  @map("oracle_version")
+  oracleGitSha            String?  @map("oracle_git_sha") @db.VarChar(40)
   // The article's most common evidence_class among its extracted claims
   // (retro PR #255) — reported_fact | cited_probability | cited_share |
   // reporting | opinion, or null if unclassified. Needed by the credibility
@@ -825,7 +825,7 @@ model EvidencePoolArticle {
   // resolution-outcome signal (evidence_weight alone can't distinguish
   // opinion from a low-certainty unclassified article). Plain string, not a
   // Prisma enum — matches `origin`'s convention for this model.
-  evidenceClass String? @map("evidence_class") @db.VarChar(32)
+  evidenceClass           String?  @map("evidence_class") @db.VarChar(32)
 
   // The BYLINE author's OWN directional forecast of the event (retro #308/#309):
   // authorLean ∈ [-1,1] (+1 the author expects it to happen, -1 expects not, 0
@@ -944,11 +944,11 @@ model EvidencePoolArticle {
   // pool" must filter to `supersededAt: null` (evidence-pool.ts's
   // CURRENT_VERSION_ONLY) or a superseded row double-counts alongside its
   // replacement.
-  supersedesId String?              @map("supersedes_id")
-  supersedes   EvidencePoolArticle? @relation("EvidencePoolArticleSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersedesId String?               @map("supersedes_id")
+  supersedes   EvidencePoolArticle?  @relation("EvidencePoolArticleSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
   supersededBy EvidencePoolArticle[] @relation("EvidencePoolArticleSupersedes")
-  version      Int                  @default(1)
-  supersededAt DateTime?            @map("superseded_at")
+  version      Int                   @default(1)
+  supersededAt DateTime?             @map("superseded_at")
 
   // Manual number-rating feedback (daatan#1223)
   ratingPrompts ArticleRatingPrompt[]
@@ -997,8 +997,8 @@ model ArticleRatingPrompt {
   evidencePoolArticleId String
   evidencePoolArticle   EvidencePoolArticle @relation(fields: [evidencePoolArticleId], references: [id], onDelete: Cascade)
   predictionId          String // denormalized — lets "all prompts for prediction X" skip a join
-  contextSnapshotId     String? @map("context_snapshot_id") // ContextSnapshot has no back-relation; plain id
-  snapshotSimilarity    Float?  @map("snapshot_similarity")
+  contextSnapshotId     String?             @map("context_snapshot_id") // ContextSnapshot has no back-relation; plain id
+  snapshotSimilarity    Float?              @map("snapshot_similarity")
 
   messageChatId String @map("message_chat_id")
   messageId     Int    @map("message_id")
@@ -1077,7 +1077,7 @@ model EvidencePoolArticleFeedback {
   // for the later analysis pass. Validated in the webhook (1-5) before this is written.
   rating        Int
   flaggedFields NumberFeedbackField[] @default([]) @map("flagged_fields")
-  note          String?              @db.Text // captured via reply-to-message text
+  note          String?               @db.Text // captured via reply-to-message text
 
   // private DM to the rater, sent only when rating <= 2 (see LOW_RATING_THRESHOLD)
   drilldownChatId    String? @map("drilldown_chat_id")
@@ -1094,6 +1094,16 @@ model EvidencePoolArticleFeedback {
 // EXTERNAL PREDICTION MARKETS (Polymarket / Kalshi link + price history)
 // ============================================
 
+/// Structural fence for daatan#1641 (§6 of the market-anchor-index design doc): the
+/// Metaculus Bot Benchmarking Tier is under a non-commercial data-sharing agreement and
+/// must never reach Oracul's production forecast path. Every row the general-purpose
+/// crawler ingests is GENERAL by default; BOT_BENCHMARKING is set only by the
+/// bot/backtest ingest path, never by the crawler.
+enum MarketUsageScope {
+  GENERAL
+  BOT_BENCHMARKING
+}
+
 enum MarketProvider {
   POLYMARKET
   KALSHI
@@ -1103,12 +1113,13 @@ enum MarketProvider {
 /// Daatan forecasts link to. Metadata + price are refreshed by the
 /// external-market-sync cron. `embedding` powers suggest-on-create (Phase D).
 model ExternalMarket {
-  id         String         @id @default(cuid())
-  provider   MarketProvider @default(POLYMARKET)
-  externalId String         @map("external_id") // provider's stable id (Polymarket conditionId / Kalshi ticker)
-  slug       String         @map("slug") // URL slug / ticker
-  url        String         @map("url") // canonical market URL
-  question   String         @db.Text
+  id         String           @id @default(cuid())
+  provider   MarketProvider   @default(POLYMARKET)
+  usageScope MarketUsageScope @default(GENERAL) @map("usage_scope")
+  externalId String           @map("external_id") // provider's stable id (Polymarket conditionId / Kalshi ticker)
+  slug       String           @map("slug") // URL slug / ticker
+  url        String           @map("url") // canonical market URL
+  question   String           @db.Text
 
   outcomes Json // e.g. ["Yes","No"] — outcome labels in price order
 
@@ -1199,9 +1210,9 @@ model AiEstimate {
 
   /// OpenRouter slug, e.g. "x-ai/grok-4.3". String, not enum — adding a member
   /// must never require a migration.
-  model String @db.VarChar(64)
+  model         String @db.VarChar(64)
   /// 'ungrounded', or 'grounded-indexer' for the news-fed twins (docs/LASSO.md §9a).
-  mode  String @db.VarChar(16)
+  mode          String @db.VarChar(16)
   /// Fingerprint of the prompt template behind this estimate. Member identity is
   /// (model, mode, promptVersion): change the prompt and prior Brier scores stop
   /// being comparable, so this must be stored rather than inferred.
@@ -1215,7 +1226,7 @@ model AiEstimate {
   /// True when the CALL threw (timeout, provider 5xx, IAM) — the model never saw the
   /// claim. False on a deliberate null: the model answered "too vague". Per-member
   /// stats must not blend provider reliability into model calibration.
-  callFailed Boolean @default(false) @map("call_failed")
+  callFailed       Boolean @default(false) @map("call_failed")
 
   promptTokens     Int? @map("prompt_tokens")
   completionTokens Int? @map("completion_tokens")
@@ -1248,12 +1259,12 @@ model AiMemberScore {
   commitmentId String     @map("commitment_id")
   commitment   Commitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
 
-  model      String @db.VarChar(64)
+  model         String  @db.VarChar(64)
   // Member identity's mode axis: a grounded-indexer twin shares its sibling's model
   // string, so model alone would collide. 'sentinel' for the oracle/market benchmark
   // rows — not null, because a nullable member of a compound unique breaks upsert.
-  mode       String @default("ungrounded") @db.VarChar(16)
-  brierScore Float  @map("brier_score") // (probability − outcome)², both on 0–1
+  mode          String  @default("ungrounded") @db.VarChar(16)
+  brierScore    Float   @map("brier_score") // (probability − outcome)², both on 0–1
   // Part of member identity (docs/LASSO.md §6): scores from different prompt versions
   // are not comparable and the leaderboard groups by it. Null for the 'oracle'/'market'
   // sentinels, which have no prompt.
@@ -1346,7 +1357,7 @@ model Commitment {
   // p·log(p/q) + (1-p)·log((1-p)/(1-q)), p = user's stated probability, q =
   // polymarketPrice. Rewards surprising-but-correct calls relative to the market
   // consensus. Not yet wired into any ranking formula — storage only (daatan#1138).
-  klDivergence Float? @map("kl_divergence")
+  klDivergence    Float? @map("kl_divergence")
 
   // The AI-panel run current at commit time — matched-time Brier (docs/LASSO.md §7).
   // A run FK, NOT a scalar: `aiProbabilityAtCommit` above collapses the Oracle to one
@@ -1354,8 +1365,8 @@ model Commitment {
   // scalar here would destroy per-model scoring at the exact instant we capture it.
   // Null for commits placed before the panel's first run — those drop out of the
   // aggregates the same way a null `brierScore` already does.
-  aiRunIdAtCommit String?        @map("ai_run_id_at_commit")
-  aiRunAtCommit   AiEstimateRun? @relation(fields: [aiRunIdAtCommit], references: [id], onDelete: SetNull)
+  aiRunIdAtCommit String?              @map("ai_run_id_at_commit")
+  aiRunAtCommit   AiEstimateRun?       @relation(fields: [aiRunIdAtCommit], references: [id], onDelete: SetNull)
   aiMemberScores  AiMemberScore[]
   revisions       CommitmentRevision[]
 
@@ -1980,10 +1991,10 @@ model LatentNode {
   // Provenance of the first admitting claim. Maintained by the linking
   // pipeline (v2 steps 2–4, not built yet) — null for nodes created directly
   // through the admin create endpoint.
-  fanIn                     Int       @default(0) @map("fan_in")
-  firstClaimArticleId       String?   @map("first_claim_article_id")
-  firstClaimIndex           Int?      @map("first_claim_index")
-  lastSeenAt                DateTime? @map("last_seen_at")
+  fanIn               Int       @default(0) @map("fan_in")
+  firstClaimArticleId String?   @map("first_claim_article_id")
+  firstClaimIndex     Int?      @map("first_claim_index")
+  lastSeenAt          DateTime? @map("last_seen_at")
 
   status       LatentNodeStatus @default(OPEN)
   mergedIntoId String?          @map("merged_into_id")
@@ -2000,14 +2011,14 @@ model LatentNode {
   priceVar  Float?    @map("price_var")
   pricedAt  DateTime? @map("priced_at")
 
-  origin  LatentNodeOrigin
+  origin              LatentNodeOrigin
   // Variants (complement/alias/nested_deadline of an existing forecast) point
   // at the relation row that makes them so — they price off the logical edge,
   // not search, and resolve when the parent resolves.
   variantOfRelationId String?           @map("variant_of_relation_id")
   variantOfRelation   QuestionRelation? @relation("LatentNodeVariantOf", fields: [variantOfRelationId], references: [id])
   // user id, 'model', or 'bot' — free-form, unlike QuestionRelationOrigin.
-  createdBy String? @map("created_by")
+  createdBy           String?           @map("created_by")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
