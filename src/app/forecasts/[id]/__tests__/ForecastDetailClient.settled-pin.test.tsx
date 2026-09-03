@@ -75,7 +75,7 @@ const wrap = (ui: React.ReactElement) => (
 const globalFetch = global.fetch
 afterEach(() => { global.fetch = globalFetch })
 
-describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250)', () => {
+describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250, narrowed by #1718)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useSession).mockReturnValue({
@@ -85,11 +85,32 @@ describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250)', () 
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => prediction })
   })
 
-  it('renders the pin notice and names the settling sources when the latest snapshot is settled', async () => {
+  it('daatan#1718: hides the pin notice while the forecast is still ACTIVE and open to commitments, even though it is pinned', async () => {
     await act(async () => {
       render(wrap(
         <ForecastDetailClient
+          // Default makePrediction(): status ACTIVE, resolveByDatetime far in the
+          // future — still open to new commitments. Naming the settling sources
+          // here is exactly the free-points exploit tell #1718 closes.
           initialData={makePrediction() as never}
+          initialContextSnapshots={makeSnapshots(true)}
+        />,
+      ))
+    })
+    expect(screen.queryByTestId('settled-pin-notice')).not.toBeInTheDocument()
+  })
+
+  it('renders the pin notice and names the settling sources once commitments are locked (deadline passed) — #1250 behavior restored', async () => {
+    // The component always re-fetches /api/forecasts/:id on mount and replaces
+    // `initialData` with the response (SSR-seed-then-refresh pattern) — the mock
+    // must reflect the same closed state as initialData, or the effect's
+    // overwrite silently reverts the scenario back to the beforeEach default.
+    const closed = makePrediction({ resolveByDatetime: '2020-01-01T00:00:00.000Z' })
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => closed })
+    await act(async () => {
+      render(wrap(
+        <ForecastDetailClient
+          initialData={closed as never}
           initialContextSnapshots={makeSnapshots(true)}
         />,
       ))
@@ -101,6 +122,21 @@ describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250)', () 
     expect(notice).toHaveTextContent('RFE/RL')
     expect(notice).toHaveTextContent('pravda.com.ua')
     expect(notice).not.toHaveTextContent('Reuters')
+  })
+
+  it('renders the pin notice once the forecast has moved off ACTIVE (e.g. resolved) even with a future resolveByDatetime — #1250 behavior restored', async () => {
+    const resolved = makePrediction({ status: 'RESOLVED_CORRECT' })
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => resolved })
+    await act(async () => {
+      render(wrap(
+        <ForecastDetailClient
+          initialData={resolved as never}
+          initialContextSnapshots={makeSnapshots(true)}
+        />,
+      ))
+    })
+    const notice = screen.getByTestId('settled-pin-notice')
+    expect(notice).toHaveTextContent(enMessages.forecast.settledPinNotice)
   })
 
   it('renders no notice when the latest snapshot is not settled', async () => {
