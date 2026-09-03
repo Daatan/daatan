@@ -99,6 +99,7 @@ export function glicko2Update(
 export async function replayGlicko2History(tagSlug?: string): Promise<Map<string, { mu: number; sigma: number; volatility: number; count: number }>> {
   const rows = await prisma.commitment.findMany({
     where: {
+      userId: { not: null },
       brierScore: { not: null },
       prediction: {
         status: { in: ['RESOLVED_CORRECT', 'RESOLVED_WRONG'] },
@@ -117,11 +118,14 @@ export async function replayGlicko2History(tagSlug?: string): Promise<Map<string
   const ratings = new Map<string, { mu: number; sigma: number; volatility: number }>()
   const counts = new Map<string, number>()
 
+  // userId is never actually null here (filtered in the query above) — the `!`
+  // just satisfies the schema's now-nullable Commitment.userId type.
   for (const row of rows) {
-    const prev = ratings.get(row.userId) ?? { mu: 1500, sigma: 350, volatility: 0.06 }
+    const userId = row.userId!
+    const prev = ratings.get(userId) ?? { mu: 1500, sigma: 350, volatility: 0.06 }
     const updated = glicko2Update(prev.mu, prev.sigma, prev.volatility, 1 - row.brierScore!)
-    ratings.set(row.userId, { mu: updated.mu, sigma: updated.phi, volatility: updated.volatility })
-    counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1)
+    ratings.set(userId, { mu: updated.mu, sigma: updated.phi, volatility: updated.volatility })
+    counts.set(userId, (counts.get(userId) ?? 0) + 1)
   }
 
   return new Map([...ratings].map(([id, r]) => [id, { mu: r.mu, sigma: r.sigma, volatility: r.volatility, count: counts.get(id) ?? 0 }]))

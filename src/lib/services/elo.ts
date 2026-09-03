@@ -49,6 +49,7 @@ export async function replayEloHistory(tagSlug?: string): Promise<Map<string, nu
   // We need predictionId + resolvedAt for chronological ordering.
   const rows = await prisma.commitment.findMany({
     where: {
+      userId: { not: null },
       brierScore: { not: null },
       prediction: {
         status: { in: ['RESOLVED_CORRECT', 'RESOLVED_WRONG'] },
@@ -64,12 +65,14 @@ export async function replayEloHistory(tagSlug?: string): Promise<Map<string, nu
     orderBy: { prediction: { resolvedAt: 'asc' } },
   })
 
-  // Group by predictionId, preserving order
+  // Group by predictionId, preserving order. A row's userId/brierScore are
+  // never actually null here (filtered in the query above) — the `!` just
+  // satisfies the schema's now-nullable Commitment.userId type.
   const byPrediction = new Map<string, { userId: string; brierScore: number }[]>()
   for (const row of rows) {
     const id = row.prediction.id
     if (!byPrediction.has(id)) byPrediction.set(id, [])
-    byPrediction.get(id)!.push({ userId: row.userId, brierScore: row.brierScore! })
+    byPrediction.get(id)!.push({ userId: row.userId!, brierScore: row.brierScore! })
   }
 
   // Replay in chronological order — all start at 1500

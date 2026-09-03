@@ -8,6 +8,7 @@ import { LanguagePicker } from '@/components/LanguagePicker'
 import AiPanelPreference from '@/components/settings/AiPanelPreference'
 import NotificationPreferences from '@/components/settings/NotificationPreferences'
 import DeleteAccountSection from '@/components/settings/DeleteAccountSection'
+import ForgetHistorySection from '@/components/settings/ForgetHistorySection'
 
 export default function SettingsPage() {
   const { status } = useSession({
@@ -60,7 +61,10 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-red-400 mb-1">{t('dangerZone')}</h2>
           <p className="text-sm text-gray-500">{t('dangerZoneDescription')}</p>
         </div>
-        <DeleteAccountSection />
+        <div className="divide-y divide-red-900/50">
+          <ForgetHistorySection />
+          <DeleteAccountSection />
+        </div>
       </div>
     </div>
   )

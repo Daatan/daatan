@@ -1311,9 +1311,15 @@ model PredictionOption {
 model Commitment {
   id String @id @default(cuid())
 
-  // User making commitment
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // User making commitment. Nullable (daatan#1701 "Forget History"): once a
+  // prediction resolves, forgetHistory() can detach the user from their own
+  // resolved commitments (sets userId to null) without deleting the rows —
+  // pool/leaderboard aggregates and other users' ELO history stay intact, but
+  // nothing traces back to the forgetting user. The FK stays onDelete: Cascade
+  // — deleting an account is unaffected by this, since a forgotten commitment
+  // has already lost its reference to that user by the time deletion happens.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Prediction being committed to
   predictionId String

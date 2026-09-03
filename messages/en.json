@@ -397,7 +397,15 @@
     "deleting": "Deleting...",
     "confirmDelete": "Yes, delete everything",
     "deleteSuccess": "Account deleted",
-    "deleteError": "Failed to delete account. Please try again."
+    "deleteError": "Failed to delete account. Please try again.",
+    "forgetHistory": "Forget my history",
+    "forgetHistoryDescription": "Detach your name from your resolved commitments. They stay on the site and count toward pool totals, but show as Anonymous and no longer count toward your reputation.",
+    "forgetHistoryWarning": "Your resolved commitments will be permanently detached from your account and shown as Anonymous. Your reputation, rating, and prediction counts will reset to zero. This cannot be undone.",
+    "forgettingHistory": "Forgetting...",
+    "confirmForgetHistory": "Yes, forget my history",
+    "forgetHistorySuccess": "History forgotten",
+    "forgetHistoryError": "Failed to forget history. Please try again.",
+    "forgetHistoryBlocked": "You have commitments on active or pending forecasts — wait until they resolve before forgetting your history."
   },
   "profile": {
     "title": "Profile",
