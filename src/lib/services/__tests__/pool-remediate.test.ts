@@ -20,6 +20,8 @@ import {
   remediatePool,
   remediableWhere,
   usablePoolWhere,
+  amnestyWhere,
+  AMNESTY_CUTOFF,
   REMEDIATE_MIN_ABS_STANCE,
   REMEDIATE_MIN_CERTAINTY,
 } from '../pool-remediate'
@@ -202,6 +204,31 @@ describe('remediatePool', () => {
         relevanceScore: { not: null },
       })
       expect(where.OR).toBeUndefined()
+    })
+
+    it('still skips search-redirect URLs', () => {
+      expect(where.NOT).toEqual({ url: { contains: 'google.com/goto' } })
+    })
+  })
+
+  describe('amnestyWhere', () => {
+    const where = amnestyWhere()
+
+    it('targets pre-cutoff oracle_null_final rows, current-version only', () => {
+      // Deliberately NOT spread from USABLE_POOL_ROW_WHERE — these rows are terminal
+      // oracle_null_final by definition, so they never had a usable stance/certainty
+      // reading (daatan#1547).
+      expect(where).toMatchObject({
+        supersededAt: null,
+        statusReason: 'oracle_null_final',
+        updatedAt: { lt: AMNESTY_CUTOFF },
+      })
+      expect(where).not.toHaveProperty('status')
+      expect(where).not.toHaveProperty('excluded')
+    })
+
+    it('scopes to ACTIVE predictions with a future resolveByDatetime', () => {
+      expect(where.prediction).toEqual({ status: 'ACTIVE', resolveByDatetime: { gt: expect.any(Date) } })
     })
 
     it('still skips search-redirect URLs', () => {

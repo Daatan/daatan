@@ -7,6 +7,7 @@ vi.mock('@/lib/services/pool-remediate', () => ({
   remediatePool: vi.fn(),
   remediableWhere: () => ({ scope: 'a6' }),
   usablePoolWhere: () => ({ scope: 'usable' }),
+  amnestyWhere: () => ({ scope: 'amnesty' }),
 }))
 
 import { remediatePool } from '@/lib/services/pool-remediate'
@@ -54,6 +55,12 @@ describe('POST /api/admin/evidence-pool/remediate', () => {
     await POST(req({ ids: ['p1'], scope: 'usable' }))
 
     expect(remediate).toHaveBeenCalledWith(['p1'], false, { scope: 'usable' })
+  })
+
+  it('targets the amnesty scope on scope=amnesty', async () => {
+    await POST(req({ ids: ['p1'], scope: 'amnesty' }))
+
+    expect(remediate).toHaveBeenCalledWith(['p1'], false, { scope: 'amnesty' })
   })
 
   it('rejects an unrecognised scope', async () => {

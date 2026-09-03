@@ -3,7 +3,7 @@ import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError, apiError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
-import { remediatePool, remediableWhere, usablePoolWhere } from '@/lib/services/pool-remediate'
+import { remediatePool, remediableWhere, usablePoolWhere, amnestyWhere } from '@/lib/services/pool-remediate'
 
 const MAX_IDS_PER_CALL = 10
 
@@ -17,10 +17,10 @@ async function run(request: NextRequest) {
   if (body.mode !== undefined && body.mode !== 'dry-run' && body.mode !== 'apply') {
     return apiError("mode must be 'dry-run' or 'apply'", 400)
   }
-  if (body.scope !== undefined && body.scope !== 'a6' && body.scope !== 'usable') {
-    return apiError("scope must be 'a6' or 'usable'", 400)
+  if (body.scope !== undefined && body.scope !== 'a6' && body.scope !== 'usable' && body.scope !== 'amnesty') {
+    return apiError("scope must be 'a6', 'usable', or 'amnesty'", 400)
   }
-  const target = body.scope === 'usable' ? usablePoolWhere() : remediableWhere()
+  const target = body.scope === 'usable' ? usablePoolWhere() : body.scope === 'amnesty' ? amnestyWhere() : remediableWhere()
   return NextResponse.json(await remediatePool(ids, body.mode === 'apply', target))
 }
 
@@ -40,10 +40,11 @@ const authed = withAuth(async (request: NextRequest) => {
  * `dry-run`**, which reads the target set and writes nothing, so a call that forgets
  * the flag cannot remediate by accident. **`scope` defaults to `a6`** (the narrow
  * over-extraction signature); `usable` targets the whole currently-usable pool for a
- * blanket recompute (retro#626) instead of an A6-only remediation. Each forecast costs
- * one Oracul analysis per 15 target rows, so this is driven by hand over a reviewed
- * list, not on a schedule — the plan's human-review gate sits in front of it, not
- * inside it.
+ * blanket recompute (retro#626) instead of an A6-only remediation; `amnesty` targets the
+ * one-time pre-08-05 `oracle_null_final` re-drive (daatan#1547) — the timeout-retirement
+ * regime's terminal stamps, not genuine null verdicts. Each forecast costs one Oracul
+ * analysis per 15 target rows, so this is driven by hand over a reviewed list, not on a
+ * schedule — the plan's human-review gate sits in front of it, not inside it.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header — same
  * pattern as the retry route.
