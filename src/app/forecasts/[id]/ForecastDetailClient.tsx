@@ -548,6 +548,8 @@ export default function ForecastDetailClient({
           const latestOracul = initialContextSnapshots?.[0]?.oracleSnapshot ?? null
           const aiSettled = !aiAbstained && (aiEstimate ? !!aiEstimate.settled : !!latestOracul?.settled)
           const settlerNames = aiSettled ? settlingSourceNames(latestOracul) : []
+          // daatan#1718 — gates the settled-pin banner below
+          const commitmentsOpen = prediction.status === 'ACTIVE' && !commitmentsLocked
 
           return (
             <div className="flex flex-col items-center">
@@ -591,9 +593,13 @@ export default function ForecastDetailClient({
                   )}
                 </div>
 
-                {/* Settlement-pin indicator (#1250): the AI number above is a pin,
-                    not a pooled average — say so, and name the settling sources. */}
-                {aiSettled && (
+                {/* Settlement-pin indicator (#1250, narrowed by #1718): the AI number
+                    above is a pin, not a pooled average — say so, and name the
+                    settling sources, but only once the forecast is settled or
+                    closed to new commitments. While it's still open, showing this
+                    publicly is a free-points tell (#1718), so the banner stays
+                    hidden until commitmentsOpen goes false. */}
+                {aiSettled && !commitmentsOpen && (
                   <div
                     className="mt-4 w-full flex items-start gap-2 text-left text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2"
                     data-testid="settled-pin-notice"
