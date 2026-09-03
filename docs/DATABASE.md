@@ -754,6 +754,15 @@ YES price, and since v1.32.x are written **only on a real price change** — the
 newest snapshot's `createdAt` is the last *change*, not the last sync
 (`lastSyncedAt` on the market is the freshness signal).
 
+`usage_scope` (`MarketUsageScope`: `GENERAL` default, `BOT_BENCHMARKING`;
+daatan#1641) is a structural fence, not a query filter yet — no existing
+query reaches Oracul's forecast path with a broad `external_markets` scan
+(`syncLinkedMarkets` is scoped to linked rows, `storedEmbeddings` does exact
+lookups only), so there's nothing to gate today. It exists so the market
+anchor index crawler (PR-2, gated on a venue ToS read) can mark Metaculus
+Bot Benchmarking Tier rows — under a non-commercial data-sharing agreement —
+as ineligible for that path the moment it starts writing them.
+
 ## Question relations — `question_relations` (daatan#1555, #1556)
 
 Oracle 2.0 storage layer **M1**: a declared relation between two questions —
