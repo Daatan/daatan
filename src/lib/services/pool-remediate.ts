@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
-import { USABLE_POOL_ROW_WHERE } from '@/lib/services/evidence-pool'
+import { USABLE_POOL_ROW_WHERE, CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
 
@@ -41,6 +41,38 @@ export function remediableWhere(): Prisma.EvidencePoolArticleWhereInput {
  */
 export function usablePoolWhere(): Prisma.EvidencePoolArticleWhereInput {
   return { ...USABLE_POOL_ROW_WHERE, title: { not: null }, NOT: { url: { contains: NON_ARTICLE_URL_FRAGMENT } } }
+}
+
+/**
+ * daatan#1547's one-time amnesty cutoff: rows stamped `oracle_null_final` before the
+ * pre-#1253 12s-timeout + title-only-retry + retire-on-timeout regime was fixed carry an
+ * unknown-but-plausibly-large share of client-side timeouts wearing a terminal "null
+ * verdict" stamp, not a genuine one. Hardcoded rather than a body param — this scope
+ * exists for one bounded re-drive, not a recurring policy.
+ */
+export const AMNESTY_CUTOFF = new Date('2026-08-05T00:00:00Z')
+
+/**
+ * daatan#1547's amnesty target: pre-cutoff `oracle_null_final` rows on forecasts where a
+ * corrected verdict could still matter (ACTIVE, deadline not yet passed). Deliberately
+ * does not spread {@link USABLE_POOL_ROW_WHERE} — these rows are `oracle_null_final` by
+ * definition, so they never had a usable stance/certainty reading to begin with.
+ *
+ * The ACTIVE + future-deadline constraint lives in this `where` (via the `prediction`
+ * relation), not left to the caller's `predictionIds` list — `predictionIds` is
+ * `remediatePool`'s batching window (≤10 ids/call), not a scope definition, and the
+ * issue's own scoping count (2,687 rows / 121 predictions) was computed with this
+ * constraint applied.
+ */
+export function amnestyWhere(): Prisma.EvidencePoolArticleWhereInput {
+  return {
+    ...CURRENT_VERSION_ONLY,
+    statusReason: 'oracle_null_final',
+    updatedAt: { lt: AMNESTY_CUTOFF },
+    title: { not: null },
+    NOT: { url: { contains: NON_ARTICLE_URL_FRAGMENT } },
+    prediction: { status: 'ACTIVE', resolveByDatetime: { gt: new Date() } },
+  }
 }
 
 export interface RemediationForecast {
@@ -87,7 +119,12 @@ export interface RemediationResult {
  * so the comparison against the read-only preview is like-for-like.
  *
  * `target` defaults to {@link remediableWhere} (the A6 signature); pass
- * {@link usablePoolWhere} for a blanket recompute of everything currently usable.
+ * {@link usablePoolWhere} for a blanket recompute of everything currently usable, or
+ * {@link amnestyWhere} for the one-time pre-08-05 `oracle_null_final` re-drive
+ * (daatan#1547). Nulling `contentHash` unconditionally routes a claim through the
+ * supersede-and-insert arm of `claimArticleForExtraction` regardless of the superseded
+ * row's `status`/`statusReason` — so a terminal `oracle_null_final` stamp does not need
+ * its own carve-out in the claim gate to be re-claimable here.
  */
 export async function remediatePool(
   predictionIds: string[],
