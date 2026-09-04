@@ -37,6 +37,9 @@ services:
       - "3000"
     environment:
       - NODE_ENV=production
+      # Heap cap (#1725): V8 otherwise sizes it from host RAM (2108 MB on the 3.7 GiB box).
+      # Must match blue-green-deploy.sh, which is what actually starts this container.
+      - NODE_OPTIONS=--max-old-space-size=1280
       - APP_ENV=production
       - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
