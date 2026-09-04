@@ -169,6 +169,34 @@ Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
 run in parallel with live traffic. If anything in Phases 3–5 fails, the old container
 is untouched and the new container is removed.
 
+### Memory budget of the app container (since #1725)
+
+The app is started by a bare `docker run` in `scripts/blue-green-deploy.sh` (both the
+Phase 3 start and the rollback), **not** by `docker-compose.prod.yml` — resource limits
+must live in the script or they silently never apply. Both `docker run` calls pass:
+
+| Setting | Value | Why |
+|---|---|---|
+| `NODE_OPTIONS=--max-old-space-size=1280` | 1280 MB heap | V8 sizes its default heap limit from **host** RAM (2108 MB on the 3.7 GiB prod box, shared with the `elections` container and postgres). With the cap V8 collects earlier and a runaway dies with a heap-OOM trace instead of dragging the host into an hour of page-cache thrash. |
+| `--memory 2g --memory-swap 2g` | cgroup hard limit, no swap | A runaway kills only this container. Equal swap value keeps it off swap should the host get some (#1726). |
+| `--memory-reservation 1g` | soft limit | Kernel reclaims from this container first under host pressure. |
+
+Sized from measurements: fresh container ~380 MB RSS, day-old plateau ~1.4 GB, bursts
+to ~1.85 GB under scanner traffic. `/api/health` now returns `memory` (rss, heapUsed,
+heapTotal, heapLimit, external in MB) and the app logs the same once a minute
+(`[memory] process.memoryUsage`), so the plateau question can be answered from logs.
+
+These land on prod only with the next tagged release (the script runs at deploy time);
+until then the same cgroup limits can be applied to a running container with
+`docker update --memory 2g --memory-swap 2g --memory-reservation 1g daatan-app`
+(non-disruptive) — the heap cap needs a container recreate.
+
+nginx pairs this with a `page_limit` zone on `location /` of daatan.com and
+elections.daatan.com (`infra/nginx/nginx-prod-ssl.conf`: 120 r/m, burst 200, 429 on
+excess; `/_next/static/` is outside the budget). A backup-file scanner sent 4 078
+requests in 3 min on 2026-09-04, each a full root-layout render of a 404, and that was
+the burst behind one of the kills.
+
 ### The dedicated migrations container (since v1.8.32)
 
 Migrations no longer run inside the app container. Instead, a dedicated short-lived

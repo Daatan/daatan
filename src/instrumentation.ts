@@ -1,6 +1,9 @@
 import { createLogger } from '@/lib/logger'
+import { memoryUsageMb, toMb } from '@/lib/memory'
 
 const log = createLogger('startup')
+
+const MEMORY_LOG_INTERVAL_MS = 60_000
 
 /**
  * Next.js instrumentation hook — runs once on server startup.
@@ -53,6 +56,20 @@ export async function register() {
   }
 
   if (process.env.NODE_ENV !== 'production') return
+
+  // Memory curve, once a minute (#1725): the prod host was OOM-killed four times on
+  // 2026-09-02/04 and the open question is whether the app's day-old ~1.4 GB plateau is
+  // live objects or uncollected garbage — see src/lib/memory.ts for how to read it. The
+  // heap limit is logged once because it is the number that decides whether the process
+  // can ever exceed the box: V8 sizes it from host RAM unless NODE_OPTIONS says otherwise.
+  // `v8` stays a dynamic import here for the same reason as `crypto` below.
+  try {
+    const { getHeapStatistics } = await import('v8')
+    log.info({ heapLimit: toMb(getHeapStatistics().heap_size_limit), ...memoryUsageMb() }, '[startup] memory')
+  } catch (err) {
+    log.warn({ err }, '[startup] Could not read V8 heap statistics')
+  }
+  setInterval(() => log.info(memoryUsageMb(), '[memory] process.memoryUsage'), MEMORY_LOG_INTERVAL_MS).unref()
 
   // Google LLM + embeddings reach production through Vertex, not the Developer
   // API (#1472) — GEMINI_API_KEY is no longer supplied to the SaaS containers, so

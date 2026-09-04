@@ -37,6 +37,8 @@ services:
       - "3000"
     environment:
       - NODE_ENV=production
+      # Heap cap (#1725); must match blue-green-deploy.sh, which is what starts this container.
+      - NODE_OPTIONS=--max-old-space-size=1280
       - APP_ENV=staging
       - DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
