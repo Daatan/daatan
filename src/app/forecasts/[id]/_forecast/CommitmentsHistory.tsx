@@ -51,6 +51,7 @@ function VoterRow({
   return (
     <div className={`p-3 rounded-lg ${isCurrentUser ? 'bg-blue-900/10 border border-blue-800/30' : 'bg-navy-800/40'}`}>
       <div className="flex items-center justify-between gap-2">
+        {commitment.user ? (
         <UserLink
           userId={commitment.user.id}
           username={commitment.user.username}
@@ -73,6 +74,11 @@ function VoterRow({
             )}
           </div>
         </UserLink>
+        ) : (
+          <div className="flex items-center gap-1.5 min-w-0 text-gray-500 text-sm italic truncate">
+            {t('anonymous')}
+          </div>
+        )}
 
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-sm font-bold text-gray-200">{pct}%</span>
@@ -147,8 +153,8 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
 
   if (isBinary) {
     const sortByConfidence = (a: Commitment, b: Commitment, ascending = false) => {
-      if (a.user.id === currentUserId) return -1
-      if (b.user.id === currentUserId) return 1
+      if (a.user?.id === currentUserId) return -1
+      if (b.user?.id === currentUserId) return 1
       const diff = toPct(b.cuCommitted) - toPct(a.cuCommitted)
       return ascending ? -diff : diff
     }
@@ -188,10 +194,10 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
                     key={c.id}
                     commitment={c}
                     pct={toPct(c.cuCommitted)}
-                    isCurrentUser={c.user.id === currentUserId}
-                    isAuthor={c.user.id === authorId}
-                    canRemove={c.user.id === currentUserId && prediction.status === 'ACTIVE' && !!onRemove}
-                    isConfirming={isConfirming && c.user.id === currentUserId}
+                    isCurrentUser={c.user?.id === currentUserId}
+                    isAuthor={c.user?.id === authorId}
+                    canRemove={c.user?.id === currentUserId && prediction.status === 'ACTIVE' && !!onRemove}
+                    isConfirming={isConfirming && c.user?.id === currentUserId}
                     isRemoving={isRemoving}
                     removeError={removeError}
                     onStartConfirm={() => setIsConfirming(true)}
@@ -223,10 +229,10 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
                     key={c.id}
                     commitment={c}
                     pct={toPct(c.cuCommitted)}
-                    isCurrentUser={c.user.id === currentUserId}
-                    isAuthor={c.user.id === authorId}
-                    canRemove={c.user.id === currentUserId && prediction.status === 'ACTIVE' && !!onRemove}
-                    isConfirming={isConfirming && c.user.id === currentUserId}
+                    isCurrentUser={c.user?.id === currentUserId}
+                    isAuthor={c.user?.id === authorId}
+                    canRemove={c.user?.id === currentUserId && prediction.status === 'ACTIVE' && !!onRemove}
+                    isConfirming={isConfirming && c.user?.id === currentUserId}
                     isRemoving={isRemoving}
                     removeError={removeError}
                     onStartConfirm={() => setIsConfirming(true)}
@@ -245,8 +251,8 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
 
   // Multiple choice — flat list unchanged
   const sorted = [...prediction.commitments].sort((a, b) => {
-    if (a.user.id === currentUserId) return -1
-    if (b.user.id === currentUserId) return 1
+    if (a.user?.id === currentUserId) return -1
+    if (b.user?.id === currentUserId) return 1
     return 0
   })
 
@@ -258,7 +264,7 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
       </h2>
       <div className="border border-navy-600 rounded-lg divide-y divide-navy-600">
         {sorted.map((commitment) => {
-          const isCurrentUser = commitment.user.id === currentUserId
+          const isCurrentUser = commitment.user?.id === currentUserId
           const pct = Math.round(commitment.cuCommitted)
           const direction = commitment.option?.text ?? ''
           const rsChange = commitment.rsChange
@@ -267,6 +273,7 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
           return (
             <div key={commitment.id} className="p-4">
               <div className="flex items-center justify-between gap-4">
+                {commitment.user ? (
                 <UserLink
                   userId={commitment.user.id}
                   username={commitment.user.username}
@@ -289,6 +296,9 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
                     )}
                   </div>
                 </UserLink>
+                ) : (
+                  <div className="text-gray-500 text-sm italic">{t('anonymous')}</div>
+                )}
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <span className="text-sm font-semibold text-cobalt-light">{direction}</span>

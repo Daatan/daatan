@@ -161,7 +161,16 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     // Per-commitment: Brier, RS, peer score, AI score
     const eloInputs: { userId: string; brierScore: number; eloRating: number }[] = []
 
-    for (const commitment of prediction.commitments) {
+    // A commitment only loses its userId once its prediction has resolved
+    // (daatan#1701 "Forget History" detaches resolved commitments) — an
+    // ACTIVE/PENDING prediction reaching this point can't legitimately carry
+    // one, but the schema makes userId/user nullable so this narrows the type.
+    const commitments = prediction.commitments.filter(
+      (c): c is typeof c & { userId: string; user: NonNullable<typeof c.user> } =>
+        c.userId !== null && c.user !== null,
+    )
+
+    for (const commitment of commitments) {
       let rsChange = 0
       let brierScore: number | null = null
       let peerScore: number | null = null
@@ -296,7 +305,7 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
         })
       }
 
-      for (const commitment of prediction.commitments) {
+      for (const commitment of commitments) {
         const delta = eloDeltas.get(commitment.userId)
         if (delta !== undefined) {
           await tx.commitment.update({

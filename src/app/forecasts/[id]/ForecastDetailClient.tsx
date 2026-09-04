@@ -911,7 +911,7 @@ export default function ForecastDetailClient({
 
       {/* Author credit. If the author also voted, they're already tagged
           "author" in the Forecasts History list above, so skip this. */}
-      {!prediction.commitments.some(c => c.user.id === prediction.author.id) && (
+      {!prediction.commitments.some(c => c.user?.id === prediction.author.id) && (
         <div className="mt-8 flex items-center gap-2.5 text-sm text-gray-400">
           <span className="text-xs font-medium uppercase tracking-wide text-gray-500 shrink-0">
             {t('author')}

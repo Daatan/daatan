@@ -897,6 +897,20 @@ in-place UPDATE — the commitment row is the current state, revisions are the
 prior trajectory. Storage-only (nothing reads it); no backfill (history before
 the table existed was never recorded); cascades away with its commitment.
 
+`Commitment.userId` is nullable (daatan#1701, "Forget History"); the FK stays
+`onDelete: Cascade`. A user can call `forgetHistory()`
+(`src/lib/services/user.ts`) to detach from their own already-resolved
+commitments — `userId` is set to `null` — without deleting the rows, so pool
+totals and other users' scoring stay intact. Because the row's `userId` is
+already null by the time this happens, deleting the account afterward is a
+no-op for it; account deletion (`deleteAccount()`) is otherwise unaffected —
+a user's still-attached commitments cascade away exactly as before.
+`forgetHistory()` refuses while the user holds a commitment on a non-terminal
+prediction (anything but `RESOLVED_CORRECT`/`RESOLVED_WRONG`/`VOID`/
+`UNRESOLVABLE` — this includes `PENDING_APPROVAL`, since an author can stake
+on their own forecast before it's approved), since detaching those would
+sever a commitment that can still resolve later.
+
 Ratings live on `users` (`rs` reputation, Glicko-2 `mu/sigma/volatility`, ELO
 `eloRating`) with per-tag variants in `user_tag_ratings`. All are **replayable
 projections** of resolved commitments (`replayGlicko2History`,

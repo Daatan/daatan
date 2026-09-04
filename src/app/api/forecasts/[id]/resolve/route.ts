@@ -63,7 +63,11 @@ export const POST = withAuth(async (request, user, { params }) => {
   }
 
   const forecastLink = `/forecasts/${prediction.slug || prediction.id}`
+  // A commitment only loses its userId once its prediction has resolved
+  // (daatan#1701 "Forget History"), so nothing here is anonymized yet — but
+  // the schema's now-nullable Commitment.userId still needs this guard.
   for (const commitment of prediction.commitments) {
+    if (!commitment.userId) continue
     createNotification({
       userId: commitment.userId,
       type: 'COMMITMENT_RESOLVED',

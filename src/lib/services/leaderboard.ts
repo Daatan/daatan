@@ -123,31 +123,35 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
   ])
 
   // --- Build lookup maps ---
+  // Every query above filters `userId: { in: userIds }` (all real, non-null ids),
+  // so an anonymized commitment (daatan#1701, userId: null) never matches — Postgres
+  // NULL never satisfies IN(...). The `!` below only satisfies the schema's now-nullable
+  // Commitment.userId type; these rows are never actually null here.
 
-  const cuByUser = new Map(cuSums.map(s => [s.userId, s._sum.cuCommitted ?? 0]))
-  const rsGainByUser = new Map(rsGainSums.map(s => [s.userId, s._sum.rsChange ?? 0]))
+  const cuByUser = new Map(cuSums.map(s => [s.userId!, s._sum.cuCommitted ?? 0]))
+  const rsGainByUser = new Map(rsGainSums.map(s => [s.userId!, s._sum.rsChange ?? 0]))
 
   const resolvedByUser = new Map<string, { total: number; correct: number }>()
   for (const c of resolvedCommitments) {
-    const entry = resolvedByUser.get(c.userId) ?? { total: 0, correct: 0 }
+    const entry = resolvedByUser.get(c.userId!) ?? { total: 0, correct: 0 }
     entry.total++
     if ((c.rsChange ?? 0) > 0) entry.correct++
-    resolvedByUser.set(c.userId, entry)
+    resolvedByUser.set(c.userId!, entry)
   }
 
-  const brierByUser = new Map(brierScoreSums.map(s => [s.userId, {
+  const brierByUser = new Map(brierScoreSums.map(s => [s.userId!, {
     avg: s._avg.brierScore,
     count: s._count.brierScore,
   }]))
 
-  const peerScoreByUser = new Map(peerScoreSums.map(s => [s.userId, {
+  const peerScoreByUser = new Map(peerScoreSums.map(s => [s.userId!, {
     sum: s._sum.peerScore ?? null,
     count: s._count.peerScore,
   }]))
 
-  const aiScoreByUser = new Map(aiScoreSums.map(s => [s.userId, s._sum.aiScore ?? null]))
+  const aiScoreByUser = new Map(aiScoreSums.map(s => [s.userId!, s._sum.aiScore ?? null]))
 
-  const rsChangeByUser = new Map(rsChangeSums.map(s => [s.userId, {
+  const rsChangeByUser = new Map(rsChangeSums.map(s => [s.userId!, {
     sum: s._sum.rsChange ?? 0,
     count: s._count.rsChange,
   }]))
@@ -158,11 +162,11 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
     if (!row.prediction.resolvedAt) continue
     const days = (now - row.prediction.resolvedAt.getTime()) / 86_400_000
     const w = DECAY ** (days / 30)
-    const entry = wpAccum.get(row.userId) ?? { wSum: 0, wTotal: 0, count: 0 }
+    const entry = wpAccum.get(row.userId!) ?? { wSum: 0, wTotal: 0, count: 0 }
     entry.wSum += row.peerScore! * w
     entry.wTotal += w
     entry.count++
-    wpAccum.set(row.userId, entry)
+    wpAccum.set(row.userId!, entry)
   }
   const weightedPeerScoreByUser = new Map<string, number | null>()
   for (const [userId, { wSum, wTotal, count }] of wpAccum) {

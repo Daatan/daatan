@@ -397,7 +397,15 @@
     "deleting": "Forigante...",
     "confirmDelete": "Jes, forigi ĉion",
     "deleteSuccess": "Konto forigita",
-    "deleteError": "Malsukcesis forigi konton. Provu denove."
+    "deleteError": "Malsukcesis forigi konton. Provu denove.",
+    "forgetHistory": "Forgesi mian historion",
+    "forgetHistoryDescription": "Malligi vian nomon de viaj solvitaj engaĝiĝoj. Ili restas sur la retejo kaj daŭre kalkuliĝas en la komunaj sumoj, sed montriĝas kiel Anonima kaj ne plu kalkuliĝas por via reputacio.",
+    "forgetHistoryWarning": "Viaj solvitaj engaĝiĝoj estos porĉiame malligitaj de via konto kaj montriĝos kiel Anonima. Via reputacio, takso, kaj nombroj de prognozoj rekomenciĝos je nulo. Ĉi tio ne estas malfarebla.",
+    "forgettingHistory": "Forgesante...",
+    "confirmForgetHistory": "Jes, forgesi mian historion",
+    "forgetHistorySuccess": "Historio forgesita",
+    "forgetHistoryError": "Malsukcesis forgesi historion. Provu denove.",
+    "forgetHistoryBlocked": "Vi havas engaĝiĝojn pri aktivaj aŭ pritraktataj prognozoj — atendu ĝis ili solviĝos antaŭ ol forgesi vian historion."
   },
   "profile": {
     "title": "Profilo",

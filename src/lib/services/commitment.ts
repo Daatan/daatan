@@ -250,16 +250,21 @@ export const emitCreateCommitmentSideEffects = (
     ? commitment.option?.text ?? 'option'
     : data.confidence >= 0 ? 'Yes' : 'No'
 
-  notifyNewCommitment(prediction, commitment.user, data.confidence, choiceLabel)
+  // A commitment always has its own user at creation time — only a later
+  // forgetHistory() (daatan#1701) detaches it from an already-resolved
+  // prediction. `!` just satisfies the schema's now-nullable Commitment.user type.
+  const committer = commitment.user!
+
+  notifyNewCommitment(prediction, committer, data.confidence, choiceLabel)
 
   createNotification({
     userId: prediction.authorId,
     type: 'NEW_COMMITMENT',
     title: 'New commitment on your forecast',
-    message: `${commitment.user.name || commitment.user.username || 'Someone'} committed with ${data.confidence > 0 ? '+' : ''}${data.confidence} confidence (${choiceLabel}) on "${prediction.claimText.substring(0, 80)}"`,
+    message: `${committer.name || committer.username || 'Someone'} committed with ${data.confidence > 0 ? '+' : ''}${data.confidence} confidence (${choiceLabel}) on "${prediction.claimText.substring(0, 80)}"`,
     link: `/forecasts/${prediction.slug || prediction.id}`,
     predictionId: prediction.id,
-    actorId: commitment.userId,
+    actorId: committer.id,
   })
 }
 

@@ -50,6 +50,55 @@ export const deleteAccount = async (userId: string) => {
   await prisma.user.delete({ where: { id: userId } })
 }
 
+// Terminal prediction statuses — anything else (including PENDING_APPROVAL, which
+// already accepts the author's own stake) could still resolve later, so
+// forgetHistory() must refuse while a commitment sits on a non-terminal prediction:
+// detaching now would sever a commitment that later resolves and can no longer
+// notify or attribute back to this user.
+const TERMINAL_PREDICTION_STATUSES = ['RESOLVED_CORRECT', 'RESOLVED_WRONG', 'VOID', 'UNRESOLVABLE'] as const
+
+/**
+ * "Forget History" (daatan#1701): detach a user from their own already-resolved
+ * commitments (userId -> null) and reset their derived scoring fields to schema
+ * defaults. The commitment rows, and every other user's scoring that was computed
+ * against them, are left untouched — only this user's link to their own history
+ * is severed.
+ */
+export const forgetHistory = async (userId: string) => {
+  const openCount = await prisma.commitment.count({
+    where: { userId, prediction: { status: { notIn: [...TERMINAL_PREDICTION_STATUSES] } } },
+  })
+  if (openCount > 0) {
+    return {
+      ok: false as const,
+      error: 'Cannot forget history while you have commitments on active or pending forecasts',
+      status: 400,
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.commitment.updateMany({
+      where: { userId },
+      data: { userId: null },
+    }),
+    prisma.userTagRating.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        rs: 100,
+        mu: 1500,
+        sigma: 350,
+        volatility: 0.06,
+        eloRating: 1500,
+        totalPredictions: 0,
+        correctPredictions: 0,
+      },
+    }),
+  ])
+
+  return { ok: true as const, status: 200 }
+}
+
 export async function findUserByEmail(email: string) {
   return prisma.user.findUnique({ where: { email }, select: { id: true } })
 }

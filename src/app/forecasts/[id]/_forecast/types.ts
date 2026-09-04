@@ -67,12 +67,14 @@ export type Prediction = {
     createdAt: string
     rsChange?: number | null
     probability?: number | null
+    // null once forgetHistory() (daatan#1701) detaches a resolved commitment
+    // from the user who made it — the row and its scoring history stay.
     user: {
       id: string
       name: string | null
       username?: string | null
       image?: string | null
-    }
+    } | null
     option?: {
       id: string
       text: string
