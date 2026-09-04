@@ -358,6 +358,40 @@ resource "aws_cloudwatch_metric_alarm" "ec2_autorecover" {
 }
 
 # --------------------------------------------------------------------
+# Auto-reboot — prod only, on the INSTANCE status check (guest OS/network
+# hangs, as opposed to ec2_autorecover's host-hardware SYSTEM check above).
+# daatan#1726 (2026-09-04): the guest lost its network while the kernel and
+# Postgres stayed alive, so StatusCheckFailed_System never left OK and
+# ec2:recover never fired; the box sat unreachable for 3 h until a manual
+# reboot. ec2:reboot is an ACPI soft reboot, so Postgres shuts down cleanly
+# if the OS is still alive, as it was here — this doesn't replace
+# ec2_autorecover, it covers the other half of the failure space.
+# treat_missing_data = "missing" (not "breaching"): unlike the status-check
+# alarm above, a gap in this metric isn't itself evidence of a failed guest.
+# --------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "prod_ec2_autoreboot" {
+  alarm_name          = "prod-ec2-autoreboot"
+  alarm_description   = "Production EC2 instance status check failed — auto-rebooting instance"
+  metric_name         = "StatusCheckFailed_Instance"
+  namespace           = "AWS/EC2"
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 3
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "missing"
+  alarm_actions = [
+    "arn:aws:automate:${var.aws_region}:ec2:reboot",
+    aws_sns_topic.infra_alerts.arn,
+  ]
+  ok_actions = [aws_sns_topic.infra_alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.production.id
+  }
+}
+
+# --------------------------------------------------------------------
 # CPU high — all monitored instances (default EC2 metric)
 # --------------------------------------------------------------------
 resource "aws_cloudwatch_metric_alarm" "ec2_cpu_high" {
@@ -418,6 +452,36 @@ resource "aws_cloudwatch_metric_alarm" "staging_memory_high" {
 
   dimensions = {
     InstanceId = aws_instance.staging.id
+  }
+}
+
+# --------------------------------------------------------------------
+# CWAgent silence — prod only. daatan#1726: during the 2026-09-04 page-cache
+# thrash, the agent was starved and daatan-prod-memory-high went
+# OK -> INSUFFICIENT_DATA (treat_missing_data = "missing" there is correct
+# for that alarm's own purpose — it shouldn't cry wolf on routine agent
+# restarts), so the exact moment memory pressure was worst produced no
+# alarm at all. This is a dedicated alarm on the agent itself falling
+# silent, kept separate from mem/disk/swap-high (an agent outage would
+# otherwise trip all three at once, which is noise, and conflates "no
+# data" with "bad data").
+# --------------------------------------------------------------------
+resource "aws_cloudwatch_metric_alarm" "prod_cwagent_silent" {
+  alarm_name          = "prod-cwagent-silent"
+  alarm_description   = "Production CloudWatch agent has stopped reporting mem_used_percent"
+  metric_name         = "mem_used_percent"
+  namespace           = "CWAgent"
+  statistic           = "SampleCount"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.infra_alerts.arn]
+  ok_actions          = [aws_sns_topic.infra_alerts.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.production.id
   }
 }
 
