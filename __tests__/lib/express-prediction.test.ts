@@ -1,7 +1,7 @@
 // Note: humanizeISODates is tested thoroughly in src/lib/llm/__tests__/humanizeISODates.test.ts
 
 import { describe, it, expect } from 'vitest'
-import { expressPredictionSchema, getFiveYearsFromNow } from '@/lib/llm/expressPrediction'
+import { expressPredictionSchema, getFiveYearsFromNow, normalizeDateBasis } from '@/lib/llm/expressPrediction'
 import { SchemaType } from '@google/generative-ai'
 
 describe('expressPredictionSchema', () => {
@@ -38,6 +38,32 @@ describe('expressPredictionSchema', () => {
     for (const field of requiredFields) {
       expect(schema.required).toContain(field)
     }
+  })
+
+  it('includes dateBasis field and requires it (#1706)', () => {
+    expect(schema.properties).toHaveProperty('dateBasis')
+    expect(schema.properties.dateBasis).toEqual({
+      type: SchemaType.STRING,
+      description: expect.stringContaining('explicit_in_claim'),
+    })
+    expect(schema.required).toContain('dateBasis')
+  })
+})
+
+describe('normalizeDateBasis', () => {
+  it('passes through a valid enum value unchanged', () => {
+    expect(normalizeDateBasis('explicit_in_claim')).toBe('explicit_in_claim')
+    expect(normalizeDateBasis('from_sources')).toBe('from_sources')
+    expect(normalizeDateBasis('assumed')).toBe('assumed')
+  })
+
+  it('falls back to "assumed" when the value is absent', () => {
+    expect(normalizeDateBasis(undefined)).toBe('assumed')
+  })
+
+  it('falls back to "assumed" for an unrecognized string (fallback provider drift)', () => {
+    expect(normalizeDateBasis('guessed')).toBe('assumed')
+    expect(normalizeDateBasis('')).toBe('assumed')
   })
 })
 

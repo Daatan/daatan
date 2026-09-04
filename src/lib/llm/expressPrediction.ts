@@ -78,8 +78,12 @@ export const expressPredictionSchema: Schema = {
       items: { type: SchemaType.NUMBER },
       description: "1-based indices of the [Article N] entries above that are genuinely about this claim's topic. Empty array if none of the articles are relevant.",
     },
+    dateBasis: {
+      type: SchemaType.STRING,
+      description: "How resolveByDatetime was determined: \"explicit_in_claim\" if the user's own input states the date, \"from_sources\" if a provided article states it, or \"assumed\" if neither does (including the rule 3/3a default fallback).",
+    },
   },
-  required: ["claimText", "resolveByDatetime", "detailsText", "tags", "resolutionRules", "outcomeType", "options", "probabilitySuggestion", "probabilityReasoning", "relevantArticleIndices"],
+  required: ["claimText", "resolveByDatetime", "detailsText", "tags", "resolutionRules", "outcomeType", "options", "probabilitySuggestion", "probabilityReasoning", "relevantArticleIndices", "dateBasis"],
 }
 
 export const guessChancesSchema: Schema = {
@@ -139,6 +143,17 @@ export interface ExpressPredictionResult {
   // nowhere in the user's input or the source articles — the signature of a
   // hallucinated scheduled-event date (#1086). The review screen warns on these.
   ungroundedYears: string[]
+  // Self-reported provenance of resolveByDatetime (#1706), normalized fail-closed
+  // to "assumed" when the model omits it or a fallback provider doesn't honor the
+  // schema. "assumed" also covers the deliberate rule 3/3a default horizons.
+  dateBasis: DateBasis
+  // True when resolveByDatetime exactly matches this call's own computed rule
+  // 3/3a default (end-of-year or +5-year horizon) — computed here, not on the
+  // client, since the "+5 years" calendar math is timezone-sensitive and only
+  // this function's own inputs are guaranteed to agree with what it prompted
+  // the model with. The review screen uses this to suppress the "assumed date"
+  // warning for the deliberate defaults, which aren't the #1706 failure mode.
+  isDefaultHorizonDate: boolean
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -159,6 +174,18 @@ interface ParsedPrediction {
   // Required in the schema, but optional here: an absent value means "no judgment"
   // (fall back to retrieval order) vs an explicit [] meaning "none relevant".
   relevantArticleIndices?: number[]
+  // Required in the schema, but optional here: fallback providers (Nova/OpenRouter/
+  // Ollama) may not honor it — normalizeDateBasis fails closed to "assumed".
+  dateBasis?: DateBasis
+}
+
+export const DATE_BASIS_VALUES = ['explicit_in_claim', 'from_sources', 'assumed'] as const
+export type DateBasis = typeof DATE_BASIS_VALUES[number]
+
+/** Unknown provenance is treated as "assumed" — fail closed, since an unlabeled
+ *  date is exactly the case #1706 wants surfaced, not silently trusted. */
+export function normalizeDateBasis(value: unknown): DateBasis {
+  return (DATE_BASIS_VALUES as readonly unknown[]).includes(value) ? (value as DateBasis) : 'assumed'
 }
 
 // Prompt rule 3a's default horizon for relative-timing claims ("will A happen
@@ -300,7 +327,18 @@ export async function generateExpressPrediction(
       `${userInput}\n${articlesText}`,
       now,
     )
-    return { ...prediction, newsAnchor: null, additionalLinks: [], externalMarketId: null, market: null, ungroundedYears, localized }
+    const isDefaultHorizonDate = prediction.resolveByDatetime === endOfYear || prediction.resolveByDatetime === fiveYearsFromNow
+    return {
+      ...prediction,
+      dateBasis: normalizeDateBasis(prediction.dateBasis),
+      isDefaultHorizonDate,
+      newsAnchor: null,
+      additionalLinks: [],
+      externalMarketId: null,
+      market: null,
+      ungroundedYears,
+      localized,
+    }
   }
 
   // Honor a source URL pasted anywhere in the input, not only when the entire
@@ -625,6 +663,8 @@ URL: ${article.url}
 
   return {
     ...prediction,
+    dateBasis: normalizeDateBasis(prediction.dateBasis),
+    isDefaultHorizonDate: prediction.resolveByDatetime === endOfYear || prediction.resolveByDatetime === fiveYearsFromNow,
     newsAnchor: anchorArticle
       ? {
         url: anchorArticle.url,

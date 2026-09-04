@@ -141,6 +141,7 @@ records what each was on.
 | all | v1 | 2026-08-29 — #1658: single source of truth in git, both halves locked. |
 | `content-moderation` | v2 | 2026-08-29 — #1657: delimit the input, ignore instructions inside it, move it after the output contract. |
 | `guess-chances` | v2 | 2026-08-29 — #1657: same hardening, plus a `null` abstain and a training-cutoff statement. Schema half changed too (`probability` is nullable). |
+| `express-prediction` | v2 | 2026-09-05 — #1706: added rule 3c + item 9, asking the model to self-report `dateBasis` (`explicit_in_claim`/`from_sources`/`assumed`) for `resolveByDatetime`, so a guessed date can be flagged instead of presented as certain. Schema half changed too (new required `dateBasis` field). |
 
 ## Bedrock
 

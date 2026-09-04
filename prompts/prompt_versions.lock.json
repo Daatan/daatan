@@ -58,12 +58,12 @@
       "schema_chars": null
     },
     "express-prediction": {
-      "version": "v1",
-      "hash": "dec51daa94315ebc",
-      "chars": 4903,
+      "version": "v2",
+      "hash": "34c4b2ec5509f645",
+      "chars": 5437,
       "schema": "expressPredictionSchema",
-      "schema_hash": "c1bd735fc2ad4c94",
-      "schema_chars": 1756
+      "schema_hash": "8b36b61e9de060eb",
+      "schema_chars": 2040
     },
     "extract-prediction": {
       "version": "v1",
