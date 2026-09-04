@@ -226,10 +226,23 @@ else
     IMAGE_NAME="daatan-app:latest"
 fi
 
+# Memory budget (#1725). The prod host is a 3.7 GiB t3.medium shared with the elections
+# container and postgres; V8 sizes its default heap limit from HOST RAM (2108 MB here),
+# so with no cap the app could grow past what the box holds and the kernel OOM killer —
+# after up to an hour of page-cache thrash that also broke networkd (2026-09-04) — was
+# the only thing pushing back. The heap cap makes V8 collect earlier and die with a
+# heap-OOM trace instead of taking the host down; the cgroup limit makes a runaway kill
+# only this container. --memory-swap equal to --memory keeps the container off swap
+# should the host ever get some (#1726). Measured: fresh ~380 MB, day-old plateau ~1.4 GB,
+# bursts to ~1.85 GB under scanner traffic — 1280 MB heap + 2 GB cgroup leaves headroom
+# for buffers/sharp while holding the worst case inside the box.
+RESOURCE_ARGS=(--memory 2g --memory-swap 2g --memory-reservation 1g)
+
 # Get environment variables from the compose file for the new container
 # We run the new container directly (not via compose) to avoid name conflicts
 ENV_ARGS=()
 ENV_ARGS+=(-e "NODE_ENV=production")
+ENV_ARGS+=(-e "NODE_OPTIONS=--max-old-space-size=1280")
 ENV_ARGS+=(-e "APP_ENV=${ENVIRONMENT}")
 ENV_ARGS+=(-e "NEXTAUTH_SECRET=${NEXTAUTH_SECRET}")
 ENV_ARGS+=(-e "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}")
@@ -312,6 +325,7 @@ docker run -d \
     --name "$CONTAINER_NEW" \
     --network "$NETWORK" \
     --restart unless-stopped \
+    "${RESOURCE_ARGS[@]}" \
     "${ENV_ARGS[@]}" \
     "$IMAGE_NAME"
 
@@ -428,6 +442,7 @@ else
             --name "$CONTAINER" \
             --network "$NETWORK" \
             --restart unless-stopped \
+            "${RESOURCE_ARGS[@]}" \
             "${ENV_ARGS[@]}" \
             "$OLD_IMAGE"
         docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
