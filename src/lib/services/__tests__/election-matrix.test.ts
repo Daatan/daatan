@@ -126,13 +126,15 @@ describe('getElectionMatrix — latest snapshot per forecast', () => {
 
     // Prisma 7 emits no LIMIT for a nested `take`, so the winner has to be chosen in SQL.
     // The mock ignores the SQL, so the query shape is pinned here: one winning id per
-    // forecast chosen without reading `oracle_snapshot`, the blob joined in only for those.
+    // forecast chosen without reading `oracle_snapshot`; the mean comes from the scalar
+    // mirror column, so the blob is never projected.
     expect(mockQueryRaw).toHaveBeenCalledTimes(1)
     const sql = rawSql(mockQueryRaw.mock.calls[0])
     expect(sql).toContain('DISTINCT ON ("predictionId") id')
     expect(sql).toContain("kind = 'evidence'")
     expect(sql).toContain('ORDER BY "predictionId", "createdAt" DESC')
-    expect(sql).toContain("jsonb_typeof(s.oracle_snapshot -> 'mean') = 'number'")
+    expect(sql).toContain('s.oracle_mean AS mean')
+    expect(sql).not.toContain("oracle_snapshot ->")
     expect(sql).not.toContain('LIMIT')
     // The IN-list is the forecasts just loaded, joined as one bound list.
     const inList = mockQueryRaw.mock.calls[0][1] as { values?: unknown[] }

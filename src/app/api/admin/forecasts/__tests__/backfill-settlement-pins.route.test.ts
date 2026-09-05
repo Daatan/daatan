@@ -105,7 +105,7 @@ describe('POST /api/admin/forecasts/backfill-settlement-pins', () => {
             some: {
               kind: { not: 'clock' },
               insufficientData: false,
-              oracleSnapshot: { path: ['settled'], equals: true },
+              oracleSettled: true,
             },
           },
         }),

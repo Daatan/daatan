@@ -533,6 +533,22 @@ model ContextSnapshot {
   // per-source `stance`/`certainty` inside `sources[]` stay on the raw Oracle scale.
   // Null when the LLM-fallback path was taken or Oracle is not configured.
   oracleSnapshot Json? @map("oracle_snapshot")
+  // Scalar mirrors of the three things read paths pull out of `oracleSnapshot`
+  // (query audit 2026-09-05). The column is ~1 GB of TOAST on prod; every
+  // `oracleSnapshot: { path: ['settled'] }` predicate detoasted a forecast's whole
+  // history to test one boolean, and elections' chart projected `mean` and five keys
+  // per source out of the same blob on every request. Derived, never written by app code:
+  // the BEFORE INSERT OR UPDATE OF oracle_snapshot trigger `context_snapshot_mirrors`
+  // (migration 20260905000000) fills them on every write, so they cannot drift from the
+  // blob whoever writes it. `oracleSettled` <=> `oracleSnapshot.settled === true`,
+  // `oracleMean` is `oracleSnapshot.mean` when it is a JSON number, `sourcesSummary` is
+  // `oracleSnapshot.sources` reduced to { author, sourceName, stance, url, publishedAt }.
+  // The partial index `context_snapshots_settled_pin_idx ("predictionId", "createdAt" DESC)
+  // WHERE oracle_settled` lives in migration SQL only — Prisma cannot declare it (same as
+  // the pool's partial unique index in 20260811120000).
+  oracleSettled  Boolean @default(false) @map("oracle_settled")
+  oracleMean     Float?  @map("oracle_mean")
+  sourcesSummary Json?   @map("sources_summary")
 
   // True when this run abstained: the Oracle had no evidence bearing on the claim
   // (off-topic / all-hedged / too thin), so no probability was produced. The UI
@@ -961,6 +977,11 @@ model EvidencePoolArticle {
   @@index([predictionId, supersededAt])
   @@index([supersedesId])
   @@index([predictionId])
+  // Query audit 2026-09-05: `getPublicArticlesByAuthorOutlet` filters on (author, outletName)
+  // and orders by addedAt desc, and `getPoolThroughput` counts rows by addedAt window — both
+  // were sequential scans over the whole table (no index started with either column).
+  @@index([author, outletName, addedAt(sort: Desc)])
+  @@index([addedAt])
   @@map("evidence_pool_articles")
 }
 
