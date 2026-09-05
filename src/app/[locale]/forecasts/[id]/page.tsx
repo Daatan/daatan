@@ -194,9 +194,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    // Entities come from the *English* claim (Hebrew has no case to lift them by);
-    // tags and the locale generics carry the rest.
-    keywords: buildForecastKeywords(prediction.claimText, prediction.tags, locale),
+    // Translated claim first (Cyrillic has case, so RU pages lead with Russian
+    // names — Yandex is why the tag exists), English claim second as the fallback
+    // Hebrew needs (no case to lift entities by). Tags + locale generics fill in.
+    keywords: buildForecastKeywords([title, prediction.claimText], prediction.tags, locale),
     ...(!hasTranslation ? { robots: { index: false, follow: false } } : {}),
     alternates: {
       canonical: `${metaAppUrl}/${locale}/forecasts/${slug}`,

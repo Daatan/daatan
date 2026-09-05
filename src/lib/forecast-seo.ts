@@ -115,6 +115,10 @@ const CLAIM_STOPWORDS = new Set([
   'end', 'more', 'less', 'no', 'yes', 'this', 'that', 'its', 'their', 'over',
   'under', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
   'september', 'october', 'november', 'december', 'q1', 'q2', 'q3', 'q4',
+  // Russian: sentence-initial verbs/particles and month names are capitalised too.
+  'будет', 'будут', 'ли', 'станет', 'останется', 'сможет', 'к', 'в', 'до', 'на', 'по',
+  'и', 'или', 'не', 'что', 'кто', 'когда', 'января', 'февраля', 'марта', 'апреля', 'мая',
+  'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
 ])
 // Lower-case connectors allowed *inside* a multi-word entity ("Winds of Winter").
 const ENTITY_CONNECTORS = new Set(['of', 'the', 'and', 'de', 'la', 'al', 'von', 'van', 'du'])
@@ -165,11 +169,12 @@ export function extractClaimEntities(claim: string): string[] {
 
 /**
  * Keywords for one forecast page: tag names first (curated, highest signal),
- * then entities lifted from the claim, then a couple of locale-generic terms.
+ * then entities lifted from the claim(s) — pass the translated claim first and the
+ * English one second so a RU page leads with Cyrillic names — then locale generics.
  * Deduped case-insensitively and capped, so a stuffed list is impossible.
  */
 export function buildForecastKeywords(
-  claimText: string,
+  claimText: string | readonly string[],
   tags: ReadonlyArray<{ name: string }>,
   locale: string = 'en',
 ): string[] {
@@ -184,7 +189,8 @@ export function buildForecastKeywords(
     out.push(v)
   }
   tags.forEach((t) => push(t.name))
-  extractClaimEntities(claimText).forEach(push)
+  const claims = typeof claimText === 'string' ? [claimText] : claimText
+  claims.forEach((c) => extractClaimEntities(c).forEach(push))
   PER_FORECAST_GLOBALS[loc].forEach(push)
   return out
 }

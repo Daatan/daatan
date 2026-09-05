@@ -130,3 +130,22 @@ describe('extractClaimEntities — sentence-initial The', () => {
     expect(extractClaimEntities('The global fertility rate in 2050 will be less than 2')).toEqual([])
   })
 })
+
+describe('Russian claims', () => {
+  it('lifts Cyrillic names and drops sentence-initial verbs and month names', () => {
+    expect(extractClaimEntities('Будет ли мобилизация в России к 5 сентября 2026 года')).toEqual(['России'])
+    expect(extractClaimEntities('Владимир Путин не будет президентом России к 8 мая 2027')).toEqual([
+      'Владимир Путин',
+      'России',
+    ])
+  })
+
+  it('leads with the translated claim when several are passed', () => {
+    const kws = buildForecastKeywords(
+      ['Владимир Путин не будет президентом России к 8 мая 2027', 'Vladimir Putin will not be the president of Russia by May 8, 2027'],
+      [{ name: 'Russia' }],
+      'ru',
+    )
+    expect(kws).toEqual(['Russia', 'Владимир Путин', 'России', 'Vladimir Putin', 'прогноз', 'предсказание'])
+  })
+})
