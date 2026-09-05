@@ -17,6 +17,7 @@ const tx = {
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     prediction: { findUnique: vi.fn() },
+    contextSnapshot: { findFirst: vi.fn() },
     user: { findUnique: vi.fn() },
     commitment: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -54,8 +55,7 @@ function prediction(overrides: Record<string, unknown> = {}) {
     resolveByDatetime: new Date('2030-01-01'),
     claimDeadline: null,
     options: [],
-    contextSnapshots: [],
-    externalMarketId: null,
+      externalMarketId: null,
     externalMarketInverted: false,
     ...overrides,
   }
@@ -64,6 +64,7 @@ function prediction(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   userFindUnique.mockResolvedValue({ id: 'user-1', rs: 100 } as never)
+  vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null)
   commitmentFindUnique.mockResolvedValue(null)
   tx.commitment.findMany.mockResolvedValue([])
   tx.aiEstimateRun.findFirst.mockResolvedValue(null)

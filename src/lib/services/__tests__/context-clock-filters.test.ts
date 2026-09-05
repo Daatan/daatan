@@ -26,13 +26,12 @@ const findFirstSnapshot = vi.mocked(prisma.contextSnapshot.findFirst)
 describe('kind=clock exclusion filters', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('getContextTimeline filters clock rows out of the contextSnapshots include', async () => {
-    findFirstPrediction.mockResolvedValue({} as never)
+  it('getContextTimeline filters clock rows out of the snapshot reads', async () => {
+    findFirstPrediction.mockResolvedValue({ id: 'pred-1' } as never)
+    findManySnapshots.mockResolvedValue([])
     await getContextTimeline('pred-1')
-    const call = findFirstPrediction.mock.calls[0][0] as {
-      select: { contextSnapshots: { where?: Record<string, unknown> } }
-    }
-    expect(call.select.contextSnapshots.where).toEqual({ kind: { not: 'clock' } })
+    const call = findManySnapshots.mock.calls[0][0] as { where: Record<string, unknown> }
+    expect(call.where).toMatchObject({ predictionId: 'pred-1', kind: { not: 'clock' } })
   })
 
   it('listContextSnapshots filters clock rows out', async () => {

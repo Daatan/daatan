@@ -283,23 +283,22 @@ export async function createCommitment(
 ): Promise<ServiceResult<CommitmentRow>> {
   const db = options?.tx ?? prisma
 
-  const [prediction, user] = await Promise.all([
+  const [prediction, latestSnapshot, user] = await Promise.all([
     db.prediction.findUnique({
       where: { id: predictionId },
-      include: {
-        options: true,
-        // confidence needed for aiProbabilityAtCommit snapshot; the latest
-        // snapshot's insufficientData tells us whether the Oracul abstained, so we
-        // don't manufacture an LLM estimate to grade an abstained forecast against.
-        // Excludes kind='clock' rows — a clock tick carries no insufficientData
-        // signal of its own and would mask the real latest abstention state.
-        contextSnapshots: {
-          where: { kind: { not: 'clock' } },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { insufficientData: true },
-        },
-      },
+      include: { options: true },
+    }),
+    // confidence needed for aiProbabilityAtCommit snapshot; the latest
+    // snapshot's insufficientData tells us whether the Oracul abstained, so we
+    // don't manufacture an LLM estimate to grade an abstained forecast against.
+    // Excludes kind='clock' rows — a clock tick carries no insufficientData
+    // signal of its own and would mask the real latest abstention state.
+    // A top-level findFirst so the LIMIT reaches Postgres: nested inside the
+    // prediction include, Prisma 7 emits none and reads every snapshot row.
+    db.contextSnapshot.findFirst({
+      where: { predictionId, kind: { not: 'clock' } },
+      orderBy: { createdAt: 'desc' },
+      select: { insufficientData: true },
     }),
     db.user.findUnique({
       where: { id: userId },
@@ -330,7 +329,7 @@ export async function createCommitment(
     )
     emitCreateCommitmentSideEffects(prediction, commitment, data)
 
-    const abstained = prediction.contextSnapshots?.[0]?.insufficientData ?? false
+    const abstained = latestSnapshot?.insufficientData ?? false
     if (commitment.aiProbabilityAtCommit == null && !abstained) {
       // confidence was null at commit. That's either "not analysed yet" (ask the
       // LLM for a base-rate estimate to grade against) or "the Oracul abstained —

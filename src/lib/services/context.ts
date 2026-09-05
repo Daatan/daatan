@@ -557,38 +557,63 @@ export async function dismissAwaitingResolution(predictionId: string, dismissedB
  *  otherwise grow with a forecast's entire update history. */
 const CONTEXT_TIMELINE_HEAVY_LIMIT = 25
 
+/** Every ContextSnapshot column except the two heavy JSON blobs. */
+const LIGHT_SNAPSHOT_SELECT = {
+  id: true,
+  predictionId: true,
+  summary: true,
+  externalProbability: true,
+  externalReasoning: true,
+  insufficientData: true,
+  kind: true,
+  origin: true,
+  meta: true,
+  articlesUsed: true,
+  materialChange: true,
+  evidenceAt: true,
+  engine: true,
+  schemaVersion: true,
+  createdAt: true,
+} satisfies Prisma.ContextSnapshotSelect
+
 /**
- * Drop the heavy `sources[]` / `oracleSnapshot` blobs from all but the most-recent
- * `keepHeavy` snapshots (input must be newest-first). The probability chart reads only
- * `createdAt` + `externalProbability`, so its full history is untouched — only a deep-
- * scrolled timeline row loses its source chips. This is what keeps the timeline read
- * from growing unboundedly with a long-lived forecast's snapshot count.
+ * A forecast's non-clock snapshots newest-first: the `CONTEXT_TIMELINE_HEAVY_LIMIT` most
+ * recent rows in full, every older row without its `sources[]` / `oracleSnapshot` blobs.
+ * The probability chart reads only `createdAt` + `externalProbability`, so its full
+ * history is untouched — only a deep-scrolled timeline row loses its source chips.
+ *
+ * Two statements instead of one plus an in-memory strip: `oracle_snapshot` averages
+ * ~60 kB per row on prod (128 MB for the largest forecast), and Postgres detoasts every
+ * blob it returns, so the strip used to run after the whole history had already been
+ * read and shipped. The tail query never names the JSON columns, so they are never read.
+ * The tail is keyed on the head's last row (not `skip`), so a snapshot inserted between
+ * the two statements cannot duplicate or drop a row at the boundary.
  */
-function stripHeavyTail(
-  snapshots: ContextSnapshot[],
-  keepHeavy = CONTEXT_TIMELINE_HEAVY_LIMIT,
-): ContextSnapshot[] {
-  return (snapshots ?? []).map((snap, i): ContextSnapshot =>
-    i < keepHeavy ? snap : { ...snap, sources: [], oracleSnapshot: null },
-  )
+async function loadTimelineSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
+  const head = await prisma.contextSnapshot.findMany({
+    where: { predictionId, ...NOT_CLOCK },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: CONTEXT_TIMELINE_HEAVY_LIMIT,
+  })
+  if (head.length < CONTEXT_TIMELINE_HEAVY_LIMIT) return head
+  const tail = await prisma.contextSnapshot.findMany({
+    where: { predictionId, ...NOT_CLOCK },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    cursor: { id: head[head.length - 1].id },
+    skip: 1,
+    select: LIGHT_SNAPSHOT_SELECT,
+  })
+  return [...head, ...tail.map((snap): ContextSnapshot => ({ ...snap, sources: [], oracleSnapshot: null }))]
 }
 
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
 export async function getContextTimeline(idOrSlug: string) {
   const prediction = await prisma.prediction.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: {
-      id: true,
-      detailsText: true,
-      contextUpdatedAt: true,
-      contextSnapshots: {
-        where: NOT_CLOCK,
-        orderBy: { createdAt: 'desc' },
-      },
-    },
+    select: { id: true, detailsText: true, contextUpdatedAt: true },
   })
   if (!prediction) return prediction
-  return { ...prediction, contextSnapshots: stripHeavyTail(prediction.contextSnapshots) }
+  return { ...prediction, contextSnapshots: await loadTimelineSnapshots(prediction.id) }
 }
 
 /** Fetch prediction with newsAnchor for the POST context-update endpoint. */
@@ -749,11 +774,7 @@ export async function saveNewsIndexerMatch(
 
 /** Fetch the context snapshot timeline for a prediction (heavy tail stripped). */
 export async function listContextSnapshots(predictionId: string) {
-  const snapshots = await prisma.contextSnapshot.findMany({
-    where: { predictionId, ...NOT_CLOCK },
-    orderBy: { createdAt: 'desc' },
-  })
-  return stripHeavyTail(snapshots)
+  return loadTimelineSnapshots(predictionId)
 }
 
 /**

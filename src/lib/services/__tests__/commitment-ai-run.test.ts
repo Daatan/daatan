@@ -20,6 +20,7 @@ const tx = {
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     prediction: { findUnique: vi.fn() },
+    contextSnapshot: { findFirst: vi.fn() },
     user: { findUnique: vi.fn() },
     commitment: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -51,13 +52,13 @@ const PREDICTION = {
   resolveByDatetime: new Date('2030-01-01'),
   claimDeadline: null,
   options: [],
-  contextSnapshots: [],
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   predictionFindUnique.mockResolvedValue(PREDICTION as never)
   userFindUnique.mockResolvedValue({ id: 'user-1', rs: 100 } as never)
+  vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null)
   commitmentFindUnique.mockResolvedValue(null)
   tx.commitment.findMany.mockResolvedValue([])
   tx.commitment.create.mockResolvedValue({
