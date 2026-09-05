@@ -448,6 +448,59 @@ describe('ExpressForecastClient', () => {
       expect(screen.getByText('Unverified date: 2027')).toBeInTheDocument()
     })
 
+    it('shows the assumed-date warning when dateBasis is "assumed" and the date is not a default horizon (#1706)', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        resolveByDatetime: '2027-06-15T23:59:59Z',
+        dateBasis: 'assumed',
+        isDefaultHorizonDate: false,
+      })
+
+      expect(screen.getByText('Assumed resolution date')).toBeInTheDocument()
+    })
+
+    it('suppresses the assumed-date warning when the server flags the date as its own rule 3/3a default horizon', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        dateBasis: 'assumed',
+        isDefaultHorizonDate: true,
+      })
+
+      expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
+    })
+
+    it('shows no assumed-date warning when dateBasis is explicit_in_claim or from_sources', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        resolveByDatetime: '2027-06-15T23:59:59Z',
+        dateBasis: 'from_sources',
+        isDefaultHorizonDate: false,
+      })
+
+      expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
+    })
+
+    it('reclassifies dateBasis to explicit_in_claim once the author edits the resolve date, clearing the warning', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        resolveByDatetime: '2027-06-15T23:59:59Z',
+        dateBasis: 'assumed',
+        isDefaultHorizonDate: false,
+      })
+      expect(screen.getByText('Assumed resolution date')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      const dateInput = screen.getByDisplayValue('15/06/2027') as HTMLInputElement
+      fireEvent.change(dateInput, { target: { value: '20/06/2027' } })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
+    })
+
     it('reverts button when publish API fails', async () => {
       await renderInReviewState()
 

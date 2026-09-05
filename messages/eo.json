@@ -752,7 +752,9 @@
     "publishFailed": "Kreita kiel malneto, sed malsukcesis publikigi",
     "publishError": "Malsukcesis publikigi prognozon",
     "dateWarningTitle": "Nekonfirmita dato: {years}",
-    "dateWarningHint": "La AI mem konkludis ĉi tiun daton — ĝi aperas nek en via enigo nek en la fontoj. Kontrolu la realan planon antaŭ publikigo, aŭ redaktu la prognozon por korekti ĝin."
+    "dateWarningHint": "La AI mem konkludis ĉi tiun daton — ĝi aperas nek en via enigo nek en la fontoj. Kontrolu la realan planon antaŭ publikigo, aŭ redaktu la prognozon por korekti ĝin.",
+    "dateBasisWarningTitle": "Supozita fina dato",
+    "dateBasisWarningHint": "La AI elektis ĉi tiun daton sen deklarita bazo en via enigo aŭ la fontoj. Konfirmu ke ĝi ĝustas antaŭ publikigo, aŭ redaktu la prognozon por korekti ĝin."
   },
   "admin": {
     "panel": "Administra Panelo",

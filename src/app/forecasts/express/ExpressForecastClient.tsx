@@ -10,6 +10,7 @@ import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecasts
 import { WarningBanner } from '@/components/ui/WarningBanner'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput } from '@/lib/utils/date'
+import type { DateBasis } from '@/lib/llm/expressPrediction'
 
 const log = createClientLogger('ExpressForecast')
 
@@ -48,6 +49,11 @@ export interface GeneratedPrediction {
     probability: number | null
   } | null
   ungroundedYears?: string[]
+  dateBasis?: DateBasis
+  // Whether resolveByDatetime is the server's own rule 3/3a default (end-of-year
+  // or +5-year horizon), computed server-side in expressPrediction.ts — the
+  // +5-year calendar math is timezone-sensitive, so it must not be recomputed here.
+  isDefaultHorizonDate?: boolean
   localized?: {
     language: string
     claimText: string
@@ -393,7 +399,12 @@ export default function ExpressForecastClient({
       const ungroundedYears = (generated?.ungroundedYears ?? []).filter(
         y => editForm.claimText.includes(y) || editForm.resolveByDatetime.startsWith(y),
       )
-      setGenerated({ ...editForm, ungroundedYears })
+      // A date the author sets by hand is explicit by definition, same reasoning
+      // as the ungroundedYears filter above.
+      const dateBasis: DateBasis = editForm.resolveByDatetime !== generated?.resolveByDatetime
+        ? 'explicit_in_claim'
+        : (generated?.dateBasis ?? 'assumed')
+      setGenerated({ ...editForm, ungroundedYears, dateBasis })
       setIsEditing(false)
     }
   }
@@ -718,6 +729,16 @@ export default function ExpressForecastClient({
                 title={t('dateWarningTitle', { years: generated.ungroundedYears.join(', ') })}
               >
                 <p className="text-xs text-gray-500">{t('dateWarningHint')}</p>
+              </WarningBanner>
+            )}
+
+            {!isEditing && generated.dateBasis === 'assumed'
+              && !generated.isDefaultHorizonDate && (
+              <WarningBanner
+                icon={<AlertCircle className="w-4 h-4" />}
+                title={t('dateBasisWarningTitle')}
+              >
+                <p className="text-xs text-gray-500">{t('dateBasisWarningHint')}</p>
               </WarningBanner>
             )}
 
