@@ -287,9 +287,43 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
+      # SSM's own send-command dispatches without awaiting delivery: if the agent is
+      # unreachable, the two script steps below still exit 0 having done nothing (this
+      # is exactly what happened during the 2026-09-04 outage — the watchdog run just
+      # "failed" with no diagnostic). Alerts on every run while down, not only on the
+      # transition, since SSM's own console gives no other signal an agent went dark.
+      - name: Check SSM agent connectivity (prod)
+        if: matrix.env.tag == 'prod'
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=prod" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+
+          if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
+            echo "⚠️ No prod instance found — skipping SSM connectivity check"
+            exit 0
+          fi
+
+          PING_STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query "InstanceInformationList[0].PingStatus" \
+            --output text)
+
+          echo "SSM PingStatus for $INSTANCE_ID: $PING_STATUS"
+
+          if [ "$PING_STATUS" != "Online" ]; then
+            CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
+            CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
+            MSG="🔌 <b>[production] SSM agent unreachable</b>%0AInstance: <code>$INSTANCE_ID</code>%0APingStatus: <b>${PING_STATUS:-None}</b>%0ADisk/system-health checks below will silently no-op until this recovers."
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=$CHAT_ID" \
+              -d "text=$MSG" \
+              -d "parse_mode=HTML" \
+              -d "disable_web_page_preview=true"
+          fi
+
       - name: Run Disk Check via SSM
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=${{ matrix.env.tag }}" \
@@ -303,7 +337,12 @@ jobs:
 
           echo "Found Instance: $INSTANCE_ID"
 
-          RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
+          # Ship the script's own content — already on this runner via actions/checkout
+          # — instead of having the box curl it back from GitHub with a token embedded
+          # in the SSM command. That token was readable to anyone with ssm:ListCommands
+          # (daatan#1726); the script itself carries no secrets (it sources .env on the
+          # box for Telegram creds), so shipping its source is safe to expose.
+          SCRIPT_B64=$(base64 -w 0 scripts/check-disk-space.sh)
 
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
@@ -313,15 +352,13 @@ jobs:
               "set -e",
               "mkdir -p ~/app/scripts",
               "cd ~/app",
-              "curl -sfL -H \"Authorization: token '"$GH_TOKEN"'\" \"'"$RAW_BASE"'/scripts/check-disk-space.sh\" -o \"scripts/check-disk-space.sh\"",
+              "echo '"$SCRIPT_B64"' | base64 -d > scripts/check-disk-space.sh",
               "chmod +x scripts/check-disk-space.sh",
               "./scripts/check-disk-space.sh '"${{ matrix.env.name }}"'"
             ]' \
             --output text
 
       - name: Run System Health Check via SSM
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=${{ matrix.env.tag }}" \
@@ -335,7 +372,9 @@ jobs:
 
           echo "Found Instance: $INSTANCE_ID"
 
-          RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
+          # See "Run Disk Check via SSM" above: ship the script's own content instead
+          # of a GH-token-bearing curl, so nothing secret sits in an SSM parameter.
+          SCRIPT_B64=$(base64 -w 0 scripts/check-system-health.sh)
 
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
@@ -345,7 +384,7 @@ jobs:
               "set -e",
               "mkdir -p ~/app/scripts",
               "cd ~/app",
-              "curl -sfL -H \"Authorization: token '"$GH_TOKEN"'\" \"'"$RAW_BASE"'/scripts/check-system-health.sh\" -o \"scripts/check-system-health.sh\"",
+              "echo '"$SCRIPT_B64"' | base64 -d > scripts/check-system-health.sh",
               "chmod +x scripts/check-system-health.sh",
               "./scripts/check-system-health.sh '"${{ matrix.env.name }}"'"
             ]' \

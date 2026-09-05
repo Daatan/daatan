@@ -36,6 +36,7 @@ Sent directly by `watchdog.yml` from the **GitHub Actions runner**. Both `produc
 | Any health check fails | 🚨 | clean (prod) / noisy (staging) | `[env] Health check FAILED` — list of failing checks, health endpoint link |
 | Staging version newer than prod | ⚠️ | clean | `[prod] Version drift: prod is running vX but staging has vY — consider deploying` |
 | CloudWatch alarm(s) firing | 🚨 | clean | `CloudWatch alarm(s) firing` — alarm name + state reason per line |
+| Prod SSM agent unreachable | 🔌 | clean | `[production] SSM agent unreachable` — instance id, PingStatus; re-fires every run while down (daatan#1726) |
 
 **Health checks performed:**
 - `Health (app+db)` — `/api/health` → `status: "ok"`
@@ -52,6 +53,8 @@ Any unexpected redirect also counts as a failure (guards against redirect loops)
 **Job status reflects the alert:** the `Check production`/`Check staging` job now fails (non-zero conclusion) whenever the Telegram alert fires — previously the job always showed `success` even mid-outage, since the check script only recorded failures into an output variable without exiting non-zero.
 
 **Version drift dedup:** at most one alert per production version. Once notified that prod=vX is behind, no further alerts fire until prod itself advances to a new version.
+
+**SSM connectivity check (no dedup):** runs in `disk-watchdog`, prod only, before the SSM script steps below — `send-command` dispatches without awaiting delivery, so an unreachable agent otherwise leaves those steps silently exiting 0. Unlike version drift, this alerts on every run while the agent stays offline (there's no other signal it recovered).
 
 ### Disk / CPU / Memory checks (EC2)
 
