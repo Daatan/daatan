@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
-import { buildForecastDescription } from '@/lib/forecast-seo'
+import { buildForecastDescription, buildForecastKeywords } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
@@ -148,6 +148,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       isPublic: true,
       status: true,
       resolveByDatetime: true,
+      tags: { select: { name: true } },
       _count: { select: { commitments: true } },
     },
   })
@@ -193,6 +194,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Translated claim first (Cyrillic has case, so RU pages lead with Russian
+    // names — Yandex is why the tag exists), English claim second as the fallback
+    // Hebrew needs (no case to lift entities by). Tags + locale generics fill in.
+    keywords: buildForecastKeywords([title, prediction.claimText], prediction.tags, locale),
     ...(!hasTranslation ? { robots: { index: false, follow: false } } : {}),
     alternates: {
       canonical: `${metaAppUrl}/${locale}/forecasts/${slug}`,

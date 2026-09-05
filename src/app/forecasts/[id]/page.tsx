@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { buildForecastDescription } from '@/lib/forecast-seo'
+import { buildForecastDescription, buildForecastKeywords } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
@@ -164,6 +164,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       resolveByDatetime: true,
       resolutionOutcome: true,
       resolvedAt: true,
+      tags: { select: { name: true } },
       _count: { select: { commitments: true } },
     },
   })
@@ -207,6 +208,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: prediction.claimText,
     description,
+    keywords: buildForecastKeywords(prediction.claimText, prediction.tags, 'en'),
     alternates: {
       canonical: `${metaAppUrl}/forecasts/${slug}`,
       languages: {

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { globalKeywords } from '@/lib/forecast-seo'
 import { NextIntlClientProvider } from 'next-intl'
 import type { Metadata } from 'next'
 import { getAppUrl } from '@/lib/branding'
@@ -31,6 +32,9 @@ export async function generateMetadata({
   const { locale } = await params
   const appUrl = getAppUrl()
   return {
+    // Locale-specific site keywords; without this every /he/* and /ru/* page that
+    // doesn't set its own would inherit the root layout's English set.
+    keywords: globalKeywords(locale),
     // eo is supported for UI purposes but excluded from Google indexing
     ...(locale === 'eo' ? { robots: { index: false, follow: false } } : {}),
     alternates: {

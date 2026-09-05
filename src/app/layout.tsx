@@ -28,6 +28,7 @@ import type { Locale } from '@/i18n/config'
 
 import { env } from '@/env'
 import { getAppName, getAppUrl, getVerificationTokens, shouldIndex, getBranding } from '@/lib/branding'
+import { globalKeywords } from '@/lib/forecast-seo'
 
 export async function generateMetadata(): Promise<Metadata> {
   // SaaS keeps the literal DAATAN identity (these resolve byte-identically when
@@ -47,6 +48,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${appName}`,
     },
     description,
+    keywords: globalKeywords('en'),
     icons: {
       icon: [
         { url: '/favicon.ico', sizes: 'any' },
