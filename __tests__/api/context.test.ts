@@ -116,8 +116,9 @@ describe('GET /api/forecasts/[id]/context', () => {
       id: 'pred1',
       detailsText: 'Latest update',
       contextUpdatedAt: new Date(),
-      contextSnapshots: snapshots,
     })
+    // Snapshots are read by prediction id in a separate statement (heavy head, light tail).
+    mockPrisma.contextSnapshot.findMany.mockResolvedValue(snapshots)
 
     const res = await GET(makeRequest('pred1'), routeParams('pred1'))
     expect(res.status).toBe(200)

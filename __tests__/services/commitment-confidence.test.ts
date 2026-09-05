@@ -24,6 +24,8 @@ vi.mock('@/lib/prisma', () => {
     prisma: {
       commitment: { findUnique: vi.fn() },
       prediction: { findUnique: vi.fn() },
+      // Latest non-clock snapshot (abstention flag) is its own findFirst now, not a nested take.
+      contextSnapshot: { findFirst: vi.fn() },
       user: { findUnique: vi.fn() },
       $transaction: vi.fn().mockImplementation((cb: (tx: typeof txClient) => unknown) => cb(txClient)),
       _txClient: txClient,

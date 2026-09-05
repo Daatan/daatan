@@ -20,6 +20,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     // AI panel: the commit path snapshots the run current at commit time.
     aiEstimateRun: { findFirst: vi.fn() },
+    contextSnapshot: { findFirst: vi.fn() },
     $transaction: vi.fn((callback) => callback(prisma)),
   },
 }))

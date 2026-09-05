@@ -20,6 +20,8 @@ vi.mock('@/lib/prisma', () => {
     prisma: {
       commitment: { findUnique: vi.fn() },
       prediction: { findUnique: vi.fn() },
+      // Latest non-clock snapshot (abstention flag) is its own findFirst now, not a nested take.
+      contextSnapshot: { findFirst: vi.fn() },
       user: { findUnique: vi.fn() },
       $transaction: vi.fn().mockImplementation((cb: (tx: typeof txClient) => unknown) => cb(txClient)),
       _txClient: txClient,
@@ -34,7 +36,7 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-function makePrediction(contextSnapshots: Array<{ insufficientData: boolean }>) {
+function makePrediction() {
   return {
     id: 'pred-1',
     status: 'ACTIVE',
@@ -45,7 +47,6 @@ function makePrediction(contextSnapshots: Array<{ insufficientData: boolean }>) 
     lockedAt: null,
     confidence: null,
     options: [],
-    contextSnapshots,
   }
 }
 
@@ -68,7 +69,9 @@ async function commit(contextSnapshots: Array<{ insufficientData: boolean }>) {
   const { prisma } = await import('@/lib/prisma')
   const { createCommitment } = await import('@/lib/services/commitment')
 
-  vi.mocked(prisma.prediction.findUnique).mockResolvedValue(makePrediction(contextSnapshots) as any)
+  vi.mocked(prisma.prediction.findUnique).mockResolvedValue(makePrediction() as any)
+  // The service reads only the newest non-clock snapshot: `findFirst` hands back the head.
+  vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue((contextSnapshots[0] ?? null) as any)
   vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user-1', rs: 100 } as any)
   vi.mocked(prisma.commitment.findUnique).mockResolvedValue(null)
 
