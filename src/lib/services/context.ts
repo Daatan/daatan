@@ -557,7 +557,9 @@ export async function dismissAwaitingResolution(predictionId: string, dismissedB
  *  otherwise grow with a forecast's entire update history. */
 const CONTEXT_TIMELINE_HEAVY_LIMIT = 25
 
-/** Every ContextSnapshot column except the two heavy JSON blobs. */
+/** Every ContextSnapshot column except the JSON blobs (`sources`, `oracleSnapshot` and
+ *  its per-source `sourcesSummary` mirror). The two scalar mirrors are narrow, so they ride
+ *  along. */
 const LIGHT_SNAPSHOT_SELECT = {
   id: true,
   predictionId: true,
@@ -574,6 +576,8 @@ const LIGHT_SNAPSHOT_SELECT = {
   engine: true,
   schemaVersion: true,
   createdAt: true,
+  oracleSettled: true,
+  oracleMean: true,
 } satisfies Prisma.ContextSnapshotSelect
 
 /**
@@ -603,7 +607,10 @@ async function loadTimelineSnapshots(predictionId: string): Promise<ContextSnaps
     skip: 1,
     select: LIGHT_SNAPSHOT_SELECT,
   })
-  return [...head, ...tail.map((snap): ContextSnapshot => ({ ...snap, sources: [], oracleSnapshot: null }))]
+  return [
+    ...head,
+    ...tail.map((snap): ContextSnapshot => ({ ...snap, sources: [], oracleSnapshot: null, sourcesSummary: null })),
+  ]
 }
 
 /** Fetch prediction with context snapshots for the GET timeline endpoint. */
@@ -864,7 +871,7 @@ export async function getSettlementPinProbability(predictionId: string): Promise
       predictionId,
       externalProbability: { not: null },
       insufficientData: false,
-      oracleSnapshot: { path: ['settled'], equals: true },
+      oracleSettled: true,
       ...NOT_CLOCK,
     },
     orderBy: { createdAt: 'desc' },
@@ -900,7 +907,7 @@ export async function latestEvidenceAssertsSettlement(
       where: {
         predictionId,
         insufficientData: false,
-        oracleSnapshot: { path: ['settled'], equals: true },
+        oracleSettled: true,
         ...NOT_CLOCK,
       },
       orderBy: { createdAt: 'desc' },

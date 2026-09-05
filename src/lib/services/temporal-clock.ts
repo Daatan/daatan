@@ -550,7 +550,7 @@ async function alertUnlatchedPins(now: Date, summary: RequoteSummary): Promise<v
           some: {
             kind: { not: 'clock' },
             insufficientData: false,
-            oracleSnapshot: { path: ['settled'], equals: true },
+            oracleSettled: true,
           },
         },
       },

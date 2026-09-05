@@ -111,15 +111,15 @@ export async function getElectionMatrix(): Promise<ElectionMatrix> {
  * trims in memory), which on prod meant reading ~1,700 rows / ~315 MB of `oracle_snapshot`
  * per render to use 12 of them — the same shape that OOM'd elections (elections#186).
  * The inner DISTINCT ON picks the winning ids without touching the JSON column; the outer
- * join detoasts `oracle_snapshot` only for those ids and pulls one scalar out of it.
+ * join reads `oracle_mean`, the trigger-maintained scalar mirror of `oracle_snapshot.mean`
+ * (migration 20260905000000), so the JSON column is never detoasted here at all.
  */
 async function latestEvidenceByPrediction(ids: string[]): Promise<Map<string, LatestEvidenceRow>> {
   if (ids.length === 0) return new Map()
   const rows = await prisma.$queryRaw<LatestEvidenceRow[]>`
     SELECT s."predictionId",
            s.external_probability AS "externalProbability",
-           CASE WHEN jsonb_typeof(s.oracle_snapshot -> 'mean') = 'number'
-                THEN (s.oracle_snapshot ->> 'mean')::float8 END AS mean
+           s.oracle_mean AS mean
     FROM (
       SELECT DISTINCT ON ("predictionId") id
       FROM context_snapshots

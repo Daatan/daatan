@@ -1253,7 +1253,7 @@ async function getSettlementPinSnapshot(
       kind: { not: 'clock' },
       insufficientData: false,
       createdAt: { lte: resolvedAt },
-      oracleSnapshot: { path: ['settled'], equals: true },
+      oracleSettled: true,
     },
     orderBy: { createdAt: 'desc' },
     select: { oracleSnapshot: true },
