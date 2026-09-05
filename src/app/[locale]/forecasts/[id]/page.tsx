@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
-import { buildForecastDescription } from '@/lib/forecast-seo'
+import { buildForecastDescription, buildForecastKeywords } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
@@ -148,6 +148,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       isPublic: true,
       status: true,
       resolveByDatetime: true,
+      tags: { select: { name: true } },
       _count: { select: { commitments: true } },
     },
   })
@@ -193,6 +194,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Entities come from the *English* claim (Hebrew has no case to lift them by);
+    // tags and the locale generics carry the rest.
+    keywords: buildForecastKeywords(prediction.claimText, prediction.tags, locale),
     ...(!hasTranslation ? { robots: { index: false, follow: false } } : {}),
     alternates: {
       canonical: `${metaAppUrl}/${locale}/forecasts/${slug}`,

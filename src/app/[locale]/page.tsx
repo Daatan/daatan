@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import FeedClient from '@/app/FeedClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
+import { globalKeywords } from '@/lib/forecast-seo'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,7 @@ export async function generateMetadata({
   return {
     title: meta.title,
     description: meta.description,
+    keywords: globalKeywords(locale),
     alternates: {
       canonical: `${appUrl}/${locale}`,
       languages: {
