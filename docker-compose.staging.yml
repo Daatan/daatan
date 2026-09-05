@@ -178,6 +178,26 @@ services:
     image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
     container_name: daatan-postgres-staging
     restart: unless-stopped
+    # Same settings as prod (docker-compose.prod.yml) so staging exercises the same
+    # planner and the same pg_stat_statements view. Restarts postgres once on deploy.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - jit=off
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - log_min_duration_statement=500
     expose:
       - "5432"
     environment:

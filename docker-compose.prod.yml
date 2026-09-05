@@ -110,6 +110,33 @@ services:
     image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
     container_name: daatan-postgres
     restart: unless-stopped
+    # Query audit 2026-09-05. The image ships stock defaults (128 MB shared_buffers,
+    # 4 MB work_mem, effective_cache_size 4 GB on a 3.7 GiB box, planner costed for
+    # spinning disks, no statement stats). Sized for the t3.medium that also runs the app
+    # (two V8 heaps) and nginx: ~2.5 GB stays available, so 2 GB is what the planner may
+    # assume is cached. gp3 is SSD, so random_page_cost ~ seq. jit off: every query here
+    # is short, JIT only adds compile latency. pg_stat_statements needs the preload, which
+    # is why this restarts postgres once on deploy (scripts/blue-green-deploy.sh Phase 1
+    # re-creates the service when its definition changes). Any later edit here restarts
+    # it again.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - jit=off
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - log_min_duration_statement=500
     expose:
       - "5432"
     environment:
