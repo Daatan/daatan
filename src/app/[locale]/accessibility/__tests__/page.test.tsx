@@ -7,6 +7,7 @@ const NAMESPACES: Record<string, Record<string, string>> = {
     metaDescription: 'DAATAN accessibility statement',
     lastReviewed: 'Last reviewed: {date}',
     body: "We're working toward <wcag>WCAG 2.0</wcag> AA. Email <email>{emailAddress}</email> for help.",
+    scope: 'Also covers <elections>elections.daatan.com</elections>.',
   },
 }
 
@@ -60,6 +61,15 @@ describe('LocaleAccessibilityPage', () => {
 
     const emailLink = container.querySelector('a[href^="mailto:"]')
     expect(emailLink?.textContent).toBe('office@daatan.com')
+  })
+
+  it('names the election-forecast subdomain the statement also covers, as a link', async () => {
+    // elections.daatan.com links here from every page (elections#194); the statement must
+    // say it applies there, or the link asserts an audit that site never had.
+    const page = await LocaleAccessibilityPage({ params: Promise.resolve({ locale: 'he' }) })
+    const { container } = render(page)
+    const link = container.querySelector('a[href="https://elections.daatan.com"]')
+    expect(link?.textContent).toBe('elections.daatan.com')
   })
 
   it('sets dir=rtl for locale=he and dir=ltr otherwise', async () => {

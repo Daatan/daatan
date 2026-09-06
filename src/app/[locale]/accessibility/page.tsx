@@ -4,7 +4,9 @@ import { getTranslations } from 'next-intl/server'
 import LegalPage from '@/components/LegalPage'
 import { getAppUrl, getContactEmail } from '@/lib/branding'
 
-const LAST_REVIEWED = 'August 23, 2026'
+const LAST_REVIEWED = 'September 6, 2026'
+/** The election-forecast site links back to this statement from every page. */
+const ELECTIONS_URL = 'https://elections.daatan.com'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
@@ -48,6 +50,16 @@ export default async function LocaleAccessibilityPage({ params }: { params: Prom
               </a>
             ),
             emailAddress: contactEmail,
+          })}
+        </p>
+
+        <p>
+          {t.rich('scope', {
+            elections: (chunks) => (
+              <a href={ELECTIONS_URL} className="text-cobalt-light hover:underline">
+                {chunks}
+              </a>
+            ),
           })}
         </p>
       </LegalPage>

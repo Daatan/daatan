@@ -1196,6 +1196,7 @@
   "accessibility": {
     "title": "Accessibility Statement",
     "metaDescription": "DAATAN's accessibility statement: our WCAG 2.0 AA / IS 5568 conformance status, known limitations, and how to report an accessibility issue.",
+    "scope": "This statement also covers our election-forecast site, <elections>elections.daatan.com</elections>. That site has not been audited separately yet; report a barrier there to the same address.",
     "lastReviewed": "Last reviewed: {date}",
     "body": "We're working toward <wcag>WCAG 2.0</wcag> Level AA conformance (the basis of Israeli Standard IS 5568), but we're not there yet — we'd call it partially conformant. So far we've added a skip-to-content link, visible keyboard-focus indicators, labels for screen readers on form controls and icon buttons, fixed several color-contrast issues, and re-enabled pinch-to-zoom on mobile, but plenty of the site hasn't been individually audited yet. If you hit a barrier, please tell us — email our accessibility coordinator at <email>{emailAddress}</email> and we'll look into it."
   },
