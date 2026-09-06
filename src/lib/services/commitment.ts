@@ -193,22 +193,32 @@ const writeCommitmentInTx = async (
   // null) for forecasts with no linked market. 0-1 scale, polarity-adjusted,
   // matching aiProbabilityAtCommit/communityProbabilityAtCommit above so
   // resolution-time KL-divergence can compare them directly.
+  //
+  // Re-read the link fields fresh here rather than trusting the `prediction`
+  // param: `createCommitment` fetches it before opening this transaction, and
+  // an admin can link (or re-link) the market in that window (daatan#1702).
+  // A stale externalMarketId would otherwise silently persist a null or
+  // wrong-polarity price with no warning.
+  const linkedMarket = await tx.prediction.findUnique({
+    where: { id: predictionId },
+    select: { externalMarketId: true, externalMarketInverted: true },
+  })
   let polymarketPrice: number | null = null
-  if (prediction.externalMarketId) {
+  if (linkedMarket?.externalMarketId) {
     const latestMarketSnapshot = await tx.externalMarketPriceSnapshot.findFirst({
-      where: { marketId: prediction.externalMarketId },
+      where: { marketId: linkedMarket.externalMarketId },
       orderBy: { createdAt: 'desc' },
       select: { probability: true },
     })
     if (latestMarketSnapshot) {
       polymarketPrice =
-        marketDisplayProbability(latestMarketSnapshot.probability, prediction.externalMarketInverted) / 100
+        marketDisplayProbability(latestMarketSnapshot.probability, linkedMarket.externalMarketInverted) / 100
     } else {
       // Never back-filled (schema comment), so a miss here is permanent for this
       // commitment — surface it instead of letting it read identically to the
       // legitimate unlinked/no-snapshot-yet case (daatan#1702).
       log.warn(
-        { predictionId, marketId: prediction.externalMarketId },
+        { predictionId, marketId: linkedMarket.externalMarketId },
         'Commitment created on a linked market with no price snapshot yet — polymarketPrice will stay null',
       )
     }
