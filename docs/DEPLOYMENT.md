@@ -197,6 +197,34 @@ excess; `/_next/static/` is outside the budget). A backup-file scanner sent 4 07
 requests in 3 min on 2026-09-04, each a full root-layout render of a 404, and that was
 the burst behind one of the kills.
 
+**Swap (proposal 2)**: `terraform/ec2.tf`'s prod `user_data` now provisions a 2 GiB
+swapfile on first boot — a shock absorber, not a leak fix, so `prod-ec2-swap-high`
+(≥25% for 15 min, `terraform/monitoring.tf`) gets a chance to fire as an early warning
+instead of the box going straight from healthy to OOM-killed. `ignore_changes = [ami,
+user_data]` on that resource means this never touches the already-running prod
+instance — to add swap there now, run this once over SSM (`aws ssm send-command`,
+document root or the `/ssm` skill):
+
+```bash
+if [ ! -f /swapfile ]; then
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+fi
+free -m
+```
+
+**Recycle on sustained memory pressure (proposal 5)**: `/api/health` returns HTTP 503
+with `status: "memory-pressure"` once RSS crosses 1600 MB (`src/app/api/health/route.ts`)
+— below the 2048 MB cgroup limit, above the ~1.4 GB day-old plateau. This alone changes
+nothing: Docker's `--restart unless-stopped` restarts on process *exit*, not on a failed
+healthcheck. `.github/workflows/watchdog.yml`'s disk-watchdog job is what closes the
+loop — it checks `daatan-app`'s Docker health status over SSM each run and issues
+`docker restart daatan-app` when it's `unhealthy`, which sends SIGTERM (graceful,
+drains in-flight requests) before SIGKILL, well ahead of the cgroup's hard 2 GiB limit.
+
 ### The dedicated migrations container (since v1.8.32)
 
 Migrations no longer run inside the app container. Instead, a dedicated short-lived

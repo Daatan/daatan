@@ -64,3 +64,53 @@ if [ "$(echo "$LOAD1 > $LOAD_THRESHOLD" | bc)" -eq 1 ]; then
 else
     echo "✅ CPU load OK"
 fi
+
+# ── App container memory-pressure restart (daatan#1725 proposal 5) ──────────
+# /api/health returns status:"memory-pressure" (HTTP 503) once RSS crosses
+# 1600 MB (src/app/api/health/route.ts) -- below the 2 GiB cgroup limit
+# (blue-green-deploy.sh's `docker run --memory 2g`). That alone changes
+# nothing: `--restart unless-stopped` restarts on process *exit*, not on a
+# failed check, so this is the piece that closes the loop. `docker restart`
+# sends SIGTERM first (graceful, drains in-flight requests) before SIGKILL,
+# well ahead of the cgroup's hard limit.
+#
+# Scoped to memory-pressure only: a plain "degraded" status means the DB
+# check failed, which restarting the app container cannot fix and could
+# turn into a restart loop for no benefit.
+#
+# Requires 2 consecutive 5-min readings (a state file surviving between runs,
+# reset by a healthy reading or after acting) before restarting, so one
+# transient GC-pause spike doesn't recycle the app for nothing.
+case "$ENVIRONMENT" in
+    production) CONTAINER=daatan-app ;;
+    staging)    CONTAINER=daatan-app-staging ;;
+    *)          CONTAINER="" ;;
+esac
+
+if [ -n "$CONTAINER" ]; then
+    STATE_FILE="/tmp/daatan-${ENVIRONMENT}-memory-pressure-count"
+    HEALTH_BODY=$(curl -s --max-time 5 http://127.0.0.1:3000/api/health || echo "")
+    HEALTH_STATUS=$(echo "$HEALTH_BODY" | grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/')
+
+    echo "App health status (${CONTAINER}): ${HEALTH_STATUS:-unreachable}"
+
+    if [ "$HEALTH_STATUS" = "memory-pressure" ]; then
+        COUNT=$(( $(cat "$STATE_FILE" 2>/dev/null || echo 0) + 1 ))
+        echo "$COUNT" > "$STATE_FILE"
+        echo "⚠️ Memory pressure observed (${COUNT} consecutive reading(s))"
+
+        if [ "$COUNT" -ge 2 ]; then
+            echo "⚠️ Sustained memory pressure — restarting ${CONTAINER}..."
+            rm -f "$STATE_FILE"
+            if docker restart "$CONTAINER" > /dev/null; then
+                MSG="♻️ <b>[${ENVIRONMENT}] Restarted ${CONTAINER}</b>%0AReason: sustained memory pressure (RSS above 1600 MB for 2 consecutive checks)%0AInstance: <code>${INSTANCE_ID}</code>"
+                send_alert "$MSG"
+            else
+                MSG="🔴 <b>[${ENVIRONMENT}] Failed to restart ${CONTAINER}</b>%0AMemory pressure persists and the restart itself failed — manual intervention needed.%0AInstance: <code>${INSTANCE_ID}</code>"
+                send_alert "$MSG"
+            fi
+        fi
+    else
+        rm -f "$STATE_FILE"
+    fi
+fi
