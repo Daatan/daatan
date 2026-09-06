@@ -89,7 +89,11 @@ esac
 
 if [ -n "$CONTAINER" ]; then
     STATE_FILE="/tmp/daatan-${ENVIRONMENT}-memory-pressure-count"
-    HEALTH_BODY=$(curl -s --max-time 5 http://127.0.0.1:3000/api/health || echo "")
+    # daatan-app runs on a private Docker bridge network with no published host
+    # port, so a curl from the EC2 host itself always gets connection-refused --
+    # exec into the container's own network namespace instead, same as
+    # blue-green-deploy.sh's own working health check.
+    HEALTH_BODY=$(docker exec "$CONTAINER" wget -qO- --timeout=5 http://127.0.0.1:3000/api/health 2>/dev/null || echo "")
     HEALTH_STATUS=$(echo "$HEALTH_BODY" | grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/')
 
     echo "App health status (${CONTAINER}): ${HEALTH_STATUS:-unreachable}"
