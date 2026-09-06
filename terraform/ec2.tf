@@ -72,12 +72,27 @@ resource "aws_instance" "production" {
     systemctl enable docker
     systemctl start docker
 
+    # Swap (daatan#1725 proposal 2): a shock absorber, not a leak fix. Turns "instant
+    # page-cache thrash into a global OOM kill" into "gradual slowdown", giving
+    # prod-ec2-swap-high (terraform/monitoring.tf, >=25% for 15 min) time to actually
+    # fire as an early warning instead of the box going straight from healthy to
+    # OOM-killed. This block only runs for an instance created fresh from this
+    # user_data (ignore_changes below means it never touches the running instance);
+    # see the swap-now runbook in docs/DEPLOYMENT.md for applying it to a live box.
+    if [ ! -f /swapfile ]; then
+      fallocate -l 2G /swapfile
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+
     # --- Zero Touch Setup ---
 
     # 1. Setup App Directory
     mkdir -p /home/ubuntu/app
     chown ubuntu:ubuntu /home/ubuntu/app
-    
+
     # 2. Retrieve Secrets
     REGION="${var.aws_region}"
     SECRET_ENV_Name="${aws_secretsmanager_secret.env_vars.name}"
