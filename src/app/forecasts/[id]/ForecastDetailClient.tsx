@@ -511,6 +511,7 @@ export default function ForecastDetailClient({
         canAnalyze={!!session?.user && prediction.status === 'ACTIVE'}
         newsAnchor={prediction.newsAnchor}
         onAiEstimate={setAiEstimate}
+        commitmentsOpen={prediction.status === 'ACTIVE' && !commitmentsLocked}
       />
 
       {/* Resolution Rules */}
