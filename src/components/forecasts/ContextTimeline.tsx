@@ -128,6 +128,11 @@ type Props = {
   canAnalyze: boolean
   newsAnchor?: NewsAnchor | null
   onAiEstimate?: (value: AiEstimate | null) => void
+  /** daatan#1718 — mirrors ForecastDetailClient's `commitmentsOpen`: while the
+   *  forecast is still ACTIVE and not locked, the settled-pin note below must
+   *  stay hidden (same free-points exposure the banner in that component
+   *  already gates via #1722). */
+  commitmentsOpen: boolean
 }
 
 /** Map a snapshot's persisted probability + Oracul CI (if any) into the callback shape. */
@@ -166,6 +171,7 @@ export default function ContextTimeline({
   canAnalyze,
   newsAnchor,
   onAiEstimate,
+  commitmentsOpen,
 }: Props) {
   const hasInitialSnapshots = initialSnapshots != null
   const [currentContext, setCurrentContext] = useState(initialContext || null)
@@ -474,7 +480,11 @@ export default function ContextTimeline({
                       </span>
                     )}
                   </p>
-                  {oracle?.settled && (() => {
+                  {/* daatan#1718: narrows the same way ForecastDetailClient's
+                      settled-pin-notice does (#1722) — naming settling sources
+                      while the forecast is still open to commitments is the
+                      free-points tell this issue describes. */}
+                  {oracle?.settled && !commitmentsOpen && (() => {
                     const names = settlingSourceNames(oracle)
                     return (
                       <p className="text-xs text-amber-300/90 mt-1 leading-relaxed" data-testid="settled-pin-note">

@@ -35,21 +35,21 @@ describe('ContextTimeline', () => {
 
   it('renders section header', async () => {
     await act(async () => {
-      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />)
+      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} commitmentsOpen={false} />)
     })
     expect(screen.getByText(enMessages.context.title)).toBeInTheDocument()
   })
 
   it('shows the update-context button when canAnalyze is true', async () => {
     await act(async () => {
-      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />)
+      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} commitmentsOpen={false} />)
     })
     expect(screen.getByText(enMessages.context.analyze)).toBeInTheDocument()
   })
 
   it('hides the update-context button when canAnalyze is false', async () => {
     await act(async () => {
-      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+      renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
     })
     expect(screen.queryByText(enMessages.context.analyze)).not.toBeInTheDocument()
   })
@@ -57,7 +57,7 @@ describe('ContextTimeline', () => {
   it('has no automatically detectable a11y violations, with the update-context button visible', async () => {
     let container: HTMLElement
     await act(async () => {
-      ;({ container } = renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />))
+      ;({ container } = renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} commitmentsOpen={false} />))
     })
     expect(await axe(container!)).toHaveNoViolations()
   })
@@ -65,7 +65,7 @@ describe('ContextTimeline', () => {
   it('shows short context directly under the heading, with no "See more" needed', async () => {
     await act(async () => {
       renderWithIntl(
-        <ContextTimeline predictionId="p1" initialContext="Current situation summary" initialSnapshots={[]} canAnalyze={false} />
+        <ContextTimeline predictionId="p1" initialContext="Current situation summary" initialSnapshots={[]} canAnalyze={false} commitmentsOpen={false} />
       )
     })
     expect(screen.getByText('Current situation summary')).toBeInTheDocument()
@@ -82,7 +82,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/p1/context')
@@ -96,7 +96,7 @@ describe('ContextTimeline', () => {
   it('shows a truncated preview with "See more" when context is long, and never cuts mid-sentence', async () => {
     await act(async () => {
       renderWithIntl(
-        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} />
+        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} commitmentsOpen={false} />
       )
     })
 
@@ -125,7 +125,7 @@ describe('ContextTimeline', () => {
   it('expands to show the full text and "See less" when "See more" is clicked', async () => {
     await act(async () => {
       renderWithIntl(
-        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} />
+        <ContextTimeline predictionId="p1" initialContext={LONG_CONTEXT} initialSnapshots={[]} canAnalyze={false} commitmentsOpen={false} />
       )
     })
 
@@ -144,6 +144,7 @@ describe('ContextTimeline', () => {
           initialContext={LONG_CONTEXT}
           initialSnapshots={[]}
           canAnalyze={false}
+          commitmentsOpen={false}
           newsAnchor={{ title: 'Original article', url: 'https://example.com/a', source: 'Example News' }}
         />
       )
@@ -171,7 +172,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => {
       expect(screen.getByText('1 previous update')).toBeInTheDocument()
@@ -191,7 +192,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => {
       expect(screen.getByText('1 previous update')).toBeInTheDocument()
@@ -212,7 +213,7 @@ describe('ContextTimeline', () => {
       json: () => Promise.resolve({ currentContext: null, contextUpdatedAt: null, snapshots: [] }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={true} commitmentsOpen={false} />)
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/p1/context')
@@ -292,7 +293,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
@@ -346,7 +347,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
@@ -357,6 +358,47 @@ describe('ContextTimeline', () => {
     expect(note).toHaveTextContent(enMessages.context.settledNote)
     expect(note).toHaveTextContent('RFE/RL')
     expect(note).not.toHaveTextContent('Reuters')
+  })
+
+  it('daatan#1718: hides the settled-pin note (but keeps the badge) while the forecast is still open to commitments', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        currentContext: 'Pinned context',
+        contextUpdatedAt: '2026-08-01T10:00:00Z',
+        snapshots: [
+          {
+            id: 's1',
+            summary: 'Pinned context',
+            sources: [],
+            createdAt: '2026-08-01T10:00:00Z',
+            externalProbability: 97,
+            externalReasoning: 'TruthMachine Oracle (calibrated multi-source estimate)',
+            oracleSnapshot: {
+              mean: 97,
+              std: 3,
+              ciLow: 91,
+              ciHigh: 100,
+              articlesUsed: 12,
+              settled: true,
+              sources: [
+                { sourceId: 'a', sourceName: 'RFE/RL', url: 'https://rferl.org/x', stance: 0.9, certainty: 0.9, credibilityWeight: 1, claims: [], settled: true },
+              ],
+            },
+          },
+        ],
+      }),
+    })
+
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={true} />)
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+
+    await waitFor(() => {
+      expect(screen.getByText(enMessages.context.settledBadge)).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('settled-pin-note')).not.toBeInTheDocument()
+    expect(screen.queryByText('RFE/RL')).toBeNull()
   })
 
   it('omits the Oracul sources sub-section when oracleSnapshot is null', async () => {
@@ -379,7 +421,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
@@ -404,7 +446,7 @@ describe('ContextTimeline', () => {
       }),
     })
 
-    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} />)
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
 
     await waitFor(() => {
       expect(screen.getByText('2 previous updates')).toBeInTheDocument()
