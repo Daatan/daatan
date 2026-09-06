@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   alternates: { canonical: '/accessibility' },
 }
 
-const LAST_REVIEWED = 'August 23, 2026'
+const LAST_REVIEWED = 'September 6, 2026'
+/** The election-forecast site links back to this statement from every page. */
+const ELECTIONS_URL = 'https://elections.daatan.com'
 
 export default function AccessibilityPage() {
   const contactEmail = getContactEmail()
@@ -30,6 +32,12 @@ export default function AccessibilityPage() {
         accessibility coordinator at{' '}
         <a href={`mailto:${contactEmail}`} className="text-cobalt-light hover:underline">{contactEmail}</a>{' '}
         and we&apos;ll look into it.
+      </p>
+
+      <p>
+        This statement also covers our election-forecast site,{' '}
+        <a href={ELECTIONS_URL} className="text-cobalt-light hover:underline">elections.daatan.com</a>.
+        That site has not been audited separately yet; report a barrier there to the same address.
       </p>
     </LegalPage>
   )
