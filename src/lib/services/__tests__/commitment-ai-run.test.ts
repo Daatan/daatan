@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const tx = {
   commitment: { findMany: vi.fn(), create: vi.fn() },
   aiEstimateRun: { findFirst: vi.fn() },
-  prediction: { update: vi.fn() },
+  prediction: { findUnique: vi.fn(), update: vi.fn() },
 }
 
 vi.mock('@/lib/prisma', () => ({
@@ -61,6 +61,7 @@ beforeEach(() => {
   vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null)
   commitmentFindUnique.mockResolvedValue(null)
   tx.commitment.findMany.mockResolvedValue([])
+  tx.prediction.findUnique.mockResolvedValue({ externalMarketId: null, externalMarketInverted: false })
   tx.commitment.create.mockResolvedValue({
     id: 'c-1',
     userId: 'user-1',
