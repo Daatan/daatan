@@ -80,6 +80,9 @@ The model must not invent dates for scheduled events (elections, rulings, statut
 
 1. **Prompt rule 3b** in `express-prediction`: a specific event date may appear in the claim or resolution date only when the user's input or the retrieved articles state it; otherwise the claim omits the event date and the deterministic defaults apply (end of current year, or +5 years for relative-timing claims).
 2. **`findUngroundedYears()`** (`src/lib/llm/expressPrediction.ts`): after generation, any future year in the claim or resolution date that appears nowhere in the user input or article text — and isn't one of the two defaults — is returned as `ungroundedYears` on the result. The Express review screen renders these as an "Unverified date" warning; editing the claim or the date clears it.
+3. **`findClaimTextDeadlineMismatch()`** (`src/lib/utils/extractDatesFromText.ts`, #1706 proposal 5): the same deterministic regex cross-check `POST /api/forecasts` runs to hard-block a claim-text/deadline mismatch at creation (#1404) runs here too and is returned as `claimDeadlineMismatch` — an ISO date, or `null` when the claim has no explicit date phrase or it agrees with `resolveByDatetime`. The review screen renders it as a warning before the author ever reaches the creation endpoint that would reject it.
+
+`dateBasis` (#1706 proposal 1) is a fourth, softer signal in the same family: a self-reported `"explicit_in_claim" | "from_sources" | "assumed"` flag on the schema, surfaced as an "Assumed resolution date" warning when the model couldn't ground the date in anything at all — narrower than `ungroundedYears` (which only fires on an invented year) and orthogonal to `claimDeadlineMismatch` (which only fires when the claim's own text disagrees with the stored deadline).
 
 ## Usage
 

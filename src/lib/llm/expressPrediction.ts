@@ -13,6 +13,7 @@ import { STANDARD_TAGS } from '@/lib/constants'
 import { checkContent } from '../services/moderation'
 import { localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
+import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 
 const log = createLogger('express-prediction')
 
@@ -154,6 +155,13 @@ export interface ExpressPredictionResult {
   // the model with. The review screen uses this to suppress the "assumed date"
   // warning for the deliberate defaults, which aren't the #1706 failure mode.
   isDefaultHorizonDate: boolean
+  // #1706 proposal 5: the same claim-text/deadline cross-check POST /api/forecasts
+  // runs at creation (#1404, extractDatesFromText.ts) run here too, so a mismatch
+  // surfaces on the review screen instead of only at the moment the author tries
+  // to publish. ISO string of the conflicting date extracted from the claim text,
+  // or null when the claim has no explicit date phrase or it agrees with
+  // resolveByDatetime.
+  claimDeadlineMismatch: string | null
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -328,6 +336,10 @@ export async function generateExpressPrediction(
       now,
     )
     const isDefaultHorizonDate = prediction.resolveByDatetime === endOfYear || prediction.resolveByDatetime === fiveYearsFromNow
+    const claimDeadlineMismatch = findClaimTextDeadlineMismatch(
+      prediction.claimText,
+      new Date(prediction.resolveByDatetime),
+    )
     return {
       ...prediction,
       dateBasis: normalizeDateBasis(prediction.dateBasis),
@@ -337,6 +349,7 @@ export async function generateExpressPrediction(
       externalMarketId: null,
       market: null,
       ungroundedYears,
+      claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
       localized,
     }
   }
@@ -661,6 +674,8 @@ URL: ${article.url}
     userInput,
   )
 
+  const claimDeadlineMismatch = findClaimTextDeadlineMismatch(prediction.claimText, new Date(prediction.resolveByDatetime))
+
   return {
     ...prediction,
     dateBasis: normalizeDateBasis(prediction.dateBasis),
@@ -684,6 +699,7 @@ URL: ${article.url}
       `${userInput}\n${articlesText}`,
       now,
     ),
+    claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
     localized,
   }
 }

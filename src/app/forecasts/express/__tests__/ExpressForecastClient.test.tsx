@@ -501,6 +501,65 @@ describe('ExpressForecastClient', () => {
       expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
     })
 
+    it('shows the claim/date mismatch warning when the server flags one (#1706 proposal 5)', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        claimText: 'Israel will hold Knesset elections by June 15, 2027',
+        resolveByDatetime: '2027-12-31T23:59:59Z',
+        claimDeadlineMismatch: '2027-06-15T23:59:59.999Z',
+      })
+
+      expect(screen.getByText('Claim/date mismatch: Jun 15, 2027')).toBeInTheDocument()
+      expect(screen.getByText(/names a different date than the resolution date/)).toBeInTheDocument()
+    })
+
+    it('shows no mismatch warning when claimDeadlineMismatch is absent or null', async () => {
+      await renderInReviewState({ ...generatedData, claimDeadlineMismatch: null })
+
+      expect(screen.queryByText(/Claim\/date mismatch/)).not.toBeInTheDocument()
+    })
+
+    it('surfaces a mismatch introduced by editing the claim text to name a conflicting date', async () => {
+      await renderInReviewState({ ...generatedData, claimDeadlineMismatch: null })
+      expect(screen.queryByText(/Claim\/date mismatch/)).not.toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      fireEvent.change(screen.getByLabelText('Claim text'), {
+        target: { value: 'Bitcoin will reach $100k by June 15, 2027' },
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      // generatedData's resolveByDatetime (2026-12-31) still disagrees with the
+      // newly-typed June 2027 date — the edit must not silently keep the stale
+      // (null) flag from generation.
+      expect(screen.getByText('Claim/date mismatch: Jun 15, 2027')).toBeInTheDocument()
+    })
+
+    it('clears the mismatch warning once the author edits the date to agree with the claim text', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        claimText: 'Israel will hold Knesset elections by June 15, 2027',
+        resolveByDatetime: '2027-12-31T23:59:59Z',
+        claimDeadlineMismatch: '2027-06-15T23:59:59.999Z',
+      })
+      expect(screen.getByText('Claim/date mismatch: Jun 15, 2027')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      const dateInput = screen.getByDisplayValue('31/12/2027') as HTMLInputElement
+      fireEvent.change(dateInput, { target: { value: '15/06/2027' } })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.queryByText(/Claim\/date mismatch/)).not.toBeInTheDocument()
+    })
+
     it('reverts button when publish API fails', async () => {
       await renderInReviewState()
 
