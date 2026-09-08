@@ -1134,6 +1134,33 @@ export function notifyUnlatchedPin(
   sendChannelNotification(msg, 'clean')
 }
 
+/**
+ * The born-true research leg (daatan#1511/#1515, normally only run by a resolver)
+ * was re-run right after this forecast was created and came back decisive — meaning
+ * the claim was already true or false before the forecast ever went live (daatan#1747,
+ * retro#776: "Chess.com will have more than 500,000 registered users by 2030",
+ * created while the real count was already 250M+). Decide-and-record: review, then
+ * correct or delete the forecast — nothing here mutates it automatically.
+ */
+export function notifyBornTrueAtCreation(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  outcome: 'correct' | 'wrong',
+  reasoning: string,
+  evidenceLinks: string[],
+): void {
+  if (isDevEnv()) return
+
+  const msg = [
+    `🍼 <b>Forecast may already be resolved at creation</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Research run immediately after creation already came back "${outcome}": ${truncate(reasoning, 300)}`,
+    evidenceLinks.length ? `Evidence: ${evidenceLinks.slice(0, 3).map(escapeHtml).join(', ')}` : '',
+    `<a href="${forecastUrl(prediction)}">View forecast →</a> — correct or delete it if the claim was already decided before creation.`,
+  ].filter(Boolean).join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
 export function notifyPendingPastDeadline(
   prediction: { id: string; claimText: string; slug?: string | null },
   deadline: Date,

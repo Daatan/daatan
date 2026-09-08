@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractKeyTerms, composeResearchResults } from '../helpers'
+import { extractKeyTerms, composeResearchResults } from '@/lib/services/resolutionResearch'
 
 // ---------------------------------------------------------------------------
 // extractKeyTerms

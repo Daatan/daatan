@@ -45,6 +45,8 @@ Create a new prediction (status = DRAFT).
 
 **Response** `201` — created prediction with author, newsAnchor, options
 
+**Side effect (daatan#1747):** `createForecast()` schedules a fire-and-forget born-true check (`scheduleBornTrueCheck()`, `src/lib/services/bornTrueCheck.ts`) after persisting — off this response path, so it never adds latency here. It re-runs the same research leg `POST /api/forecasts/[id]/research` uses (see below) and, when the verdict comes back decisive (`correct`/`wrong`) this soon after creation, posts a Telegram review row rather than blocking or mutating the forecast — see `docs/TELEGRAM_NOTIFICATIONS.md`.
+
 ---
 
 ### `GET /api/forecasts/[id]`
