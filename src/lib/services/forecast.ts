@@ -6,6 +6,7 @@ import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
+import { scheduleBornTrueCheck } from '@/lib/services/bornTrueCheck'
 import { createLogger } from '@/lib/logger'
 import { auditResolveByDatetime, auditClaimDeadlineMismatch } from '@/lib/services/deadline-normalisation'
 import { notifySearchEngines } from '@/lib/services/indexnow'
@@ -393,6 +394,13 @@ export async function createForecast(input: CreateForecastInput) {
     resolveByDatetime: new Date(input.resolveByDatetime),
     outcomeType: input.outcomeType,
   }).catch((err) => log.error({ err, id: prediction.id }, 'temporal classification failed'))
+
+  // Fire-and-forget: re-run the born-true research leg right after creation
+  // (daatan#1747) — catches a claim that was already true/false against
+  // present-day reality before it ever went live (retro#776, the Chess.com
+  // 500k-users incident). Off the interactive path; only ever posts a
+  // Telegram review row, never blocks or mutates the forecast.
+  scheduleBornTrueCheck(prediction.id)
 
   if (input.outcomeType === 'MULTIPLE_CHOICE') {
     const payload = input.outcomePayload as { options?: string[] } | undefined

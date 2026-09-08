@@ -30,6 +30,7 @@ import {
   notifyNewsArticleMatched,
   notifyBackupVerificationFailed,
   notifySecurityError,
+  notifyBornTrueAtCreation,
 } from '@/lib/services/telegram'
 
 describe('Telegram notification service', () => {
@@ -367,6 +368,66 @@ describe('Telegram channel routing (clean vs noisy)', () => {
     expect(texts[1]).not.toContain('articles')
     expect(texts[2]).toContain('· 3 articles')
     expect(texts[2]).not.toContain('match') // cosine is no longer a row (daatan#1661)
+  })
+})
+
+/**
+ * daatan#1747: the born-true research leg re-run right after creation came back
+ * decisive, meaning the claim may have already been true/false at creation time
+ * (retro#776, the Chess.com 500k-users incident). Decide-and-record: a review row
+ * on the clean channel, never an automatic mutation.
+ */
+describe('notifyBornTrueAtCreation', () => {
+  const originalEnv = process.env
+
+  beforeEach(() => {
+    process.env = { ...originalEnv }
+    process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+    process.env.TELEGRAM_CHAT_ID = '-100noisy'
+    process.env.TELEGRAM_CLEAN_CHAT_ID = '-100clean'
+    process.env.APP_ENV = 'production'
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 555 } }),
+    } as Response)
+    mockCreate.mockReset().mockResolvedValue({})
+  })
+
+  afterEach(() => {
+    process.env = originalEnv
+    vi.restoreAllMocks()
+  })
+
+  it('routes to the clean channel and links back to the forecast', async () => {
+    notifyBornTrueAtCreation(
+      { id: 'pred-1', claimText: 'Chess.com will have more than 500,000 registered users by Dec 31 2030', slug: 'chess-com-users' },
+      'correct',
+      'Chess.com already reports over 250 million registered users as of 2026.',
+      ['https://chess.com/about'],
+    )
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.chat_id).toBe('-100clean')
+    expect(body.text).toContain('already be resolved at creation')
+    expect(body.text).toContain('"correct"')
+    expect(body.text).toContain('250 million registered users')
+    expect(body.text).toContain('https://chess.com/about')
+    expect(body.text).toContain('http://localhost:3000/forecasts/chess-com-users')
+  })
+
+  it('reports a "wrong" outcome the same way', async () => {
+    notifyBornTrueAtCreation(
+      { id: 'pred-2', claimText: 'x' },
+      'wrong',
+      'The event was already reported as cancelled before this forecast was created.',
+      [],
+    )
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body.text).toContain('"wrong"')
+    expect(body.text).not.toContain('Evidence:')
   })
 })
 

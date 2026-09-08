@@ -15,6 +15,7 @@ export interface OracleConfig {
 export type OracleCallSource =
   | 'context-update'
   | 'research'
+  | 'born-true-check'
   | 'bot-voting'
   | 'bot-sourcing'
   | 'express-guess'
