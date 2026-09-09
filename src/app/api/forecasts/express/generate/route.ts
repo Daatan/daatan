@@ -78,7 +78,11 @@ export const POST = withAuth(async (request, user) => {
         // Send final result
         const finalMessage = JSON.stringify({ stage: 'complete', data: result }) + '\n'
         controller.enqueue(encoder.encode(finalMessage))
-        recordAttempt(user.id, userInput, isUrl, ForecastAttemptOutcome.SUCCESS, { skipSources })
+        recordAttempt(user.id, userInput, isUrl, ForecastAttemptOutcome.SUCCESS, {
+          skipSources,
+          dateBasis: result.dateBasis,
+          isDefaultHorizonDate: result.isDefaultHorizonDate,
+        })
         controller.close()
       } catch (error) {
         if (error instanceof NoArticlesFoundError) {

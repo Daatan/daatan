@@ -955,8 +955,10 @@ rows on every summary rewrite) and `comment_translations`.
 one per BOT user), `bot_run_logs` (every run: action, trigger news, generated
 text, dry-run flag), `bot_rejected_topics` (admin-rejected topics with keyword
 sets to stop re-suggestion), `forecast_creation_attempts` (express-forecast
-audit log incl. moderation/search failures). See [bots.md](./bots.md) and
-[BOT_APPROVAL_WORKFLOW.md](./BOT_APPROVAL_WORKFLOW.md).
+audit log incl. moderation/search failures; a `SUCCESS` row's `details` also
+carries `dateBasis`/`isDefaultHorizonDate` — #1706's measurement of how often
+`resolveByDatetime` is assumed rather than grounded in the claim/sources).
+See [bots.md](./bots.md) and [BOT_APPROVAL_WORKFLOW.md](./BOT_APPROVAL_WORKFLOW.md).
 
 ## News anchors
 

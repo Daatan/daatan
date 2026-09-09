@@ -1802,7 +1802,7 @@ model ForecastCreationAttempt {
   userInput String                 @db.Text
   isUrl     Boolean                @default(false)
   outcome   ForecastAttemptOutcome
-  details   Json? // outcome-specific: {searchedFor,isNonLatin} | {moderationReason} | {searchErrorCode} | {errorMessage}
+  details   Json? // outcome-specific: {skipSources,dateBasis,isDefaultHorizonDate} | {searchedFor,isNonLatin} | {moderationReason} | {searchErrorCode} | {errorMessage}
 
   createdAt DateTime @default(now())
 
