@@ -82,6 +82,29 @@ describe('POST /api/forecasts/express/generate — attempt persistence', () => {
     )
   })
 
+  it('records dateBasis + isDefaultHorizonDate in SUCCESS details (#1706)', async () => {
+    mockGenerateExpress.mockResolvedValue({
+      claimText: 'X',
+      resolveByDatetime: '2027-01-01',
+      dateBasis: 'assumed',
+      isDefaultHorizonDate: true,
+    })
+    const res = await callPOST(makeRequest({ userInput: 'Bitcoin will reach $100k' }))
+    await consumeStream(res)
+
+    expect(mockCreateAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: 'SUCCESS',
+          details: expect.objectContaining({
+            dateBasis: 'assumed',
+            isDefaultHorizonDate: true,
+          }),
+        }),
+      }),
+    )
+  })
+
   it('records NO_ARTICLES attempt with searchedFor + isNonLatin in details', async () => {
     mockGenerateExpress.mockRejectedValue(
       new NoArticlesFoundError({ searchedFor: 'кто-то', isUrl: false, isNonLatin: true }),
