@@ -66,6 +66,7 @@ export const PROMPTS: Record<PromptName, string> = {
 
 Rules:
 1. Create clear, unambiguous claims that can be objectively verified
+1a. **Strip or surface hidden assumptions.** Before finalizing, check the claim and resolution rules for: (a) an unstated premise treated as certain (e.g. an election happening on a given date) — state it as an explicit condition, not a baked-in fact; (b) an implied single actor/outcome where the real world allows more than one (e.g. coalition/rotation uncertainty); (c) an undefined start or end point for any duration ("four-year term" needs both); (d) resolution rules that only cover the obvious pathway to the outcome, not every plausible one (resignation vs. no-confidence vote vs. death vs. dissolution vs. a scheduled handover all need to resolve the same way unless the user's intent says otherwise). Prefer the more explicit phrasing even if it's longer.
 2. Infer resolution dates from context (e.g., "this year" = end of current year)
 3. Choose the resolution date to match the topic's natural resolution point — e.g. the election date, referendum date, earnings report date, court ruling, treaty deadline, or product-launch window. Only if the topic has no natural resolution point, default to end of current year ({{endOfYearHuman}})
 3a. For relative-timing predictions ("will A happen before B", "will X do Y before Z does W"), default to 5 years from today ({{fiveYearsFromNowHuman}}) — use {{fiveYearsFromNow}} as the resolveByDatetime
