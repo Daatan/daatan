@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.65.333",
+  "version": "1.65.334",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
@@ -45,7 +45,7 @@
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.564.0",
-    "next": "15.5.23",
+    "next": "15.5.25",
     "next-auth": "5.0.0-beta.32",
     "next-intl": "^4.8.2",
     "pg": "^8.20.0",
