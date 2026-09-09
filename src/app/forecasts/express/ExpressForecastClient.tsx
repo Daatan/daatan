@@ -9,7 +9,8 @@ import { DateTimeField } from '@/components/ui/DateTimeField'
 import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecastsWarning'
 import { WarningBanner } from '@/components/ui/WarningBanner'
 import { createClientLogger } from '@/lib/client-logger'
-import { toLocalDatetimeInput } from '@/lib/utils/date'
+import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
+import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
 import type { DateBasis } from '@/lib/llm/expressPrediction'
 
 const log = createClientLogger('ExpressForecast')
@@ -54,6 +55,11 @@ export interface GeneratedPrediction {
   // or +5-year horizon), computed server-side in expressPrediction.ts — the
   // +5-year calendar math is timezone-sensitive, so it must not be recomputed here.
   isDefaultHorizonDate?: boolean
+  // #1706 proposal 5: ISO date extracted from claimText that disagrees with
+  // resolveByDatetime (POST /api/forecasts' #1404 cross-check, run here too so
+  // it surfaces on the review screen instead of only at publish time). Null when
+  // the claim has no explicit date phrase or it agrees with resolveByDatetime.
+  claimDeadlineMismatch?: string | null
   localized?: {
     language: string
     claimText: string
@@ -404,7 +410,13 @@ export default function ExpressForecastClient({
       const dateBasis: DateBasis = editForm.resolveByDatetime !== generated?.resolveByDatetime
         ? 'explicit_in_claim'
         : (generated?.dateBasis ?? 'assumed')
-      setGenerated({ ...editForm, ungroundedYears, dateBasis })
+      // Recomputed fresh rather than filtered like ungroundedYears above: an edit
+      // to either the claim text or the date can newly introduce OR resolve a
+      // mismatch, so the flag from generation is stale either way.
+      const claimDeadlineMismatch = editForm.resolveByDatetime
+        ? findClaimTextDeadlineMismatch(editForm.claimText, new Date(editForm.resolveByDatetime))?.toISOString() ?? null
+        : null
+      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch })
       setIsEditing(false)
     }
   }
@@ -739,6 +751,15 @@ export default function ExpressForecastClient({
                 title={t('dateBasisWarningTitle')}
               >
                 <p className="text-xs text-gray-500">{t('dateBasisWarningHint')}</p>
+              </WarningBanner>
+            )}
+
+            {!isEditing && generated.claimDeadlineMismatch && (
+              <WarningBanner
+                icon={<AlertCircle className="w-4 h-4" />}
+                title={t('claimDeadlineMismatchWarningTitle', { date: formatDisplayDate(generated.claimDeadlineMismatch) })}
+              >
+                <p className="text-xs text-gray-500">{t('claimDeadlineMismatchWarningHint')}</p>
               </WarningBanner>
             )}
 
