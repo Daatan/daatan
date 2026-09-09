@@ -1,26 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3B82F6"/>
-      <stop offset="100%" style="stop-color:#1D4ED8"/>
+    <linearGradient id="iconBaseGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#1D4ED8"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="iconAccentGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#38BDF8"/>
+      <stop offset="100%" style="stop-color:#7DD3FC"/>
     </linearGradient>
   </defs>
-  
-  <!-- Circle background -->
-  <circle cx="32" cy="32" r="30" fill="url(#iconGrad)"/>
-  
-  <!-- Stylized "D" made of prediction bars - also resembles Hebrew ד -->
-  <g transform="translate(14, 14)">
-    <!-- Vertical bar of D -->
-    <rect x="0" y="0" width="8" height="36" rx="2" fill="#FFFFFF"/>
-    
-    <!-- Horizontal bars forming prediction chart / top of D -->
-    <rect x="10" y="0" width="6" height="20" rx="2" fill="#FFFFFF" opacity="0.7"/>
-    <rect x="18" y="0" width="6" height="28" rx="2" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="26" y="0" width="6" height="36" rx="2" fill="#FFFFFF"/>
-    
-    <!-- Curved connection (bottom of D) -->
-    <path d="M8 32 Q20 38 32 32" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.5"/>
-  </g>
-</svg>
 
+  <!-- Outer ring: full circle minus the sweep-arc gap, leaving a small exposed-spoke notch at top -->
+  <path d="M 44.43 21.93 A 16 16 0 1 1 28.13 16.48"
+        stroke="url(#iconBaseGrad)" stroke-width="1.75" stroke-linecap="round" fill="none"/>
+
+  <!-- Sweep-arc highlight, thicker than the ring, same outer edge -->
+  <path d="M 30.99 17.54 A 14.5 14.5 0 0 1 43.27 22.87"
+        stroke="url(#iconAccentGrad)" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Middle ring -->
+  <circle cx="32" cy="32" r="10" stroke="url(#iconBaseGrad)" stroke-width="1" fill="none"/>
+
+  <!-- Crosshair spokes -->
+  <line x1="32" y1="16" x2="32" y2="48" stroke="url(#iconBaseGrad)" stroke-width="0.9"/>
+  <line x1="16" y1="32" x2="48" y2="32" stroke="url(#iconBaseGrad)" stroke-width="0.9"/>
+
+  <!-- Needle -->
+  <line x1="32" y1="32" x2="43.15" y2="21.96" stroke="url(#iconAccentGrad)" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="32" cy="32" r="4" fill="url(#iconBaseGrad)"/>
+</svg>

@@ -1,43 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
   <defs>
-    <!-- Gradient for the main circle -->
-    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3B82F6"/>
-      <stop offset="100%" style="stop-color:#1D4ED8"/>
+    <linearGradient id="iconBaseGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#1D4ED8"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
     </linearGradient>
-    <!-- Gradient for the prediction bars -->
-    <linearGradient id="barGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#60A5FA"/>
-      <stop offset="100%" style="stop-color:#FFFFFF"/>
+    <linearGradient id="iconAccentGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#38BDF8"/>
+      <stop offset="100%" style="stop-color:#7DD3FC"/>
     </linearGradient>
   </defs>
-  
-  <!-- Main circle background -->
-  <circle cx="100" cy="100" r="90" fill="url(#circleGrad)"/>
-  
-  <!-- Inner circle (representing knowledge/eye) -->
-  <circle cx="100" cy="100" r="70" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.3"/>
-  
-  <!-- Prediction bars rising (like a chart, also resembles the Hebrew letter ד) -->
-  <g transform="translate(55, 60)">
-    <!-- Bar 1 - shortest -->
-    <rect x="0" y="50" width="18" height="40" rx="4" fill="url(#barGrad)" opacity="0.9"/>
-    <!-- Bar 2 - medium -->
-    <rect x="24" y="30" width="18" height="60" rx="4" fill="url(#barGrad)" opacity="0.95"/>
-    <!-- Bar 3 - tallest (the peak prediction) -->
-    <rect x="48" y="10" width="18" height="80" rx="4" fill="#FFFFFF"/>
-    <!-- Bar 4 - medium -->
-    <rect x="72" y="35" width="18" height="55" rx="4" fill="url(#barGrad)" opacity="0.95"/>
-  </g>
-  
-  <!-- Upward arrow/trend line suggesting growth and foresight -->
-  <path d="M60 145 L100 105 L140 125" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
-  
-  <!-- Small dot at the peak (the prediction point) -->
-  <circle cx="100" cy="105" r="5" fill="#FFFFFF"/>
-  
-  <!-- Subtle neem leaf shapes (Indian reference) as decorative elements -->
-  <ellipse cx="45" cy="100" rx="8" ry="3" fill="#FFFFFF" opacity="0.15" transform="rotate(-45 45 100)"/>
-  <ellipse cx="155" cy="100" rx="8" ry="3" fill="#FFFFFF" opacity="0.15" transform="rotate(45 155 100)"/>
-</svg>
 
+  <!-- Same radar-icon glyph as logo-icon.svg, scaled from its native 64x64 coordinate space -->
+  <g transform="scale(3.125)">
+    <!-- Outer ring: full circle minus the sweep-arc gap, leaving a small exposed-spoke notch at top -->
+    <path d="M 44.43 21.93 A 16 16 0 1 1 28.13 16.48"
+          stroke="url(#iconBaseGrad)" stroke-width="1.75" stroke-linecap="round" fill="none"/>
+
+    <!-- Sweep-arc highlight, thicker than the ring, same outer edge -->
+    <path d="M 30.99 17.54 A 14.5 14.5 0 0 1 43.27 22.87"
+          stroke="url(#iconAccentGrad)" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+
+    <!-- Middle ring -->
+    <circle cx="32" cy="32" r="10" stroke="url(#iconBaseGrad)" stroke-width="1" fill="none"/>
+
+    <!-- Crosshair spokes -->
+    <line x1="32" y1="16" x2="32" y2="48" stroke="url(#iconBaseGrad)" stroke-width="0.9"/>
+    <line x1="16" y1="32" x2="48" y2="32" stroke="url(#iconBaseGrad)" stroke-width="0.9"/>
+
+    <!-- Needle -->
+    <line x1="32" y1="32" x2="43.15" y2="21.96" stroke="url(#iconAccentGrad)" stroke-width="2.2" stroke-linecap="round"/>
+
+    <!-- Center dot -->
+    <circle cx="32" cy="32" r="4" fill="url(#iconBaseGrad)"/>
+  </g>
+</svg>
