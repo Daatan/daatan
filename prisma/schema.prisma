@@ -201,7 +201,6 @@ model NewsAnchor {
   // Relations
   predictions Prediction[]
 
-  @@index([createdAt])
   @@map("news_anchors")
 }
 
@@ -686,7 +685,6 @@ model CalibrationRecord {
 
   createdAt DateTime @default(now())
 
-  @@index([resolvedAt])
   @@map("calibration_records")
 }
 
@@ -1159,7 +1157,6 @@ model ExternalMarket {
   snapshots   ExternalMarketPriceSnapshot[]
 
   @@unique([provider, externalId])
-  @@index([slug])
   @@map("external_markets")
 }
 
@@ -1428,7 +1425,6 @@ model CommitmentRevision {
 
   supersededAt DateTime @default(now()) @map("superseded_at")
 
-  @@index([commitmentId, supersededAt])
   @@map("commitment_revisions")
 }
 
@@ -1508,7 +1504,6 @@ model CommentReaction {
   // Each user can only have one reaction per comment
   @@unique([userId, commentId])
   @@index([commentId])
-  @@index([userId])
   @@map("comment_reactions")
 }
 
@@ -1558,7 +1553,6 @@ model CommentTranslation {
   createdAt      DateTime @default(now())
 
   @@unique([commentId, language])
-  @@index([language])
   @@map("comment_translations")
 }
 
@@ -1756,7 +1750,6 @@ model BotRunLog {
   error         String?   @db.Text
 
   @@index([botId])
-  @@index([runAt])
   @@index([botId, action, isDryRun, runAt]) // admin bot-log queries
   @@map("bot_run_logs")
 }
@@ -1777,8 +1770,6 @@ model BotRejectedTopic {
   rejectedBy   User     @relation(fields: [rejectedById], references: [id], onDelete: Cascade)
   rejectedAt   DateTime @default(now())
 
-  @@index([botId])
-  @@index([rejectedAt])
   @@map("bot_rejected_topics")
 }
 
@@ -1806,8 +1797,6 @@ model ForecastCreationAttempt {
 
   createdAt DateTime @default(now())
 
-  @@index([userId])
-  @@index([outcome])
   @@index([createdAt(sort: Desc)])
   @@map("forecast_creation_attempts")
 }
@@ -1899,7 +1888,6 @@ model OracleCallLog {
   @@index([callType])
   @@index([source])
   @@index([status])
-  @@index([userId])
   @@index([predictionId])
   @@map("oracle_call_logs")
 }
@@ -1973,8 +1961,6 @@ model QuestionRelation {
   @@unique([fromPredictionId, toPredictionId, kind])
   @@index([toPredictionId, status])
   @@index([fromPredictionId])
-  @@index([toLatentNodeId, status])
-  @@index([fromLatentNodeId])
   @@map("question_relations")
 }
 
@@ -2053,7 +2039,5 @@ model LatentNode {
   relationsFrom QuestionRelation[] @relation("QuestionRelationFromLatent")
   relationsTo   QuestionRelation[] @relation("QuestionRelationToLatent")
 
-  @@index([status])
-  @@index([mergedIntoId])
   @@map("latent_nodes")
 }
