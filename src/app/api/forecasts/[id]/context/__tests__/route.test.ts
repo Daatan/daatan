@@ -351,6 +351,22 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(guessChances).toHaveBeenCalledTimes(1)
     })
 
+    it('releases the claims on an Oracul abstention without falling back to the LLM guess', async () => {
+      vi.mocked(getOraculForecast).mockResolvedValue({
+        forecast: null, logId: 'log-1', insufficientData: true, failureClass: 'oracle_abstain',
+      } as never)
+
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      expect(failClaimedArticles).toHaveBeenCalledWith(
+        'pred-1',
+        ['https://a.com/1', 'https://b.com/2'],
+        'oracle_abstain',
+      )
+      expect(addArticlesToPool).not.toHaveBeenCalled()
+      expect(guessChances).not.toHaveBeenCalled()
+    })
+
     it('only releases the rows this run actually claimed, not the unchanged ones', async () => {
       vi.mocked(claimArticlesForExtraction).mockResolvedValue([
         { result: 'unchanged', articleId: 'row-1' },
