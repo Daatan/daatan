@@ -55,6 +55,7 @@ vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   addArticlesToPool: vi.fn(),
   claimArticlesForExtraction: vi.fn(),
+  failClaimedArticles: vi.fn(),
 }))
 vi.mock('@/lib/services/pooled-estimate', () => ({ resolvePooledEstimate: vi.fn() }))
 
@@ -70,7 +71,7 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
-import { POST } from '../route'
+import { POST, CONTEXT_SEARCH_WINDOW_DAYS } from '../route'
 import {
   getForecastForContextUpdate,
   countUserContextUpdates,
@@ -81,7 +82,7 @@ import { oracleSearch } from '@/lib/services/oracleSearch'
 import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOraculForecast, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { guessChances } from '@/lib/llm/expressPrediction'
-import { addArticlesToPool, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
+import { addArticlesToPool, claimArticlesForExtraction, failClaimedArticles } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
 
 // ---------------------------------------------------------------------------
@@ -144,6 +145,7 @@ describe('POST /api/forecasts/[id]/context', () => {
     vi.mocked(oracleSearch).mockResolvedValue(SEARCH_RESULTS as never)
     generateContentMock.mockResolvedValue({ text: 'A fresh summary.' })
     vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
+    vi.mocked(failClaimedArticles).mockResolvedValue(undefined)
     vi.mocked(saveContextUpdate).mockResolvedValue({ id: 'snap-1' } as never)
     vi.mocked(listContextSnapshots).mockResolvedValue([] as never)
     // Default: everything searched is newly claimed — existing (pre-fix)
@@ -300,6 +302,66 @@ describe('POST /api/forecasts/[id]/context', () => {
         // daatan#1651: the claim step gates on publish date relative to the forecast's creation.
         { claimCreatedAt: expect.toSatisfy((v: unknown) => v === undefined || v === null || v instanceof Date) },
       )
+    })
+  })
+
+  describe('search window + claim release (daatan#1754)', () => {
+    it('bounds the search to the last CONTEXT_SEARCH_WINDOW_DAYS days', async () => {
+      const before = Date.now()
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      const [, , options] = vi.mocked(oracleSearch).mock.calls[0]
+      const dateFrom = options?.dateFrom
+      expect(dateFrom).toBeInstanceOf(Date)
+      const ageMs = before - (dateFrom as Date).getTime()
+      const windowMs = CONTEXT_SEARCH_WINDOW_DAYS * 24 * 60 * 60 * 1000
+      expect(ageMs).toBeGreaterThanOrEqual(windowMs - 1)
+      expect(ageMs).toBeLessThan(windowMs + 5_000)
+      expect(options?.dateTo).toBeUndefined()
+    })
+
+    it('releases the claims the Oracul omitted after pooling a successful run', async () => {
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      expect(addArticlesToPool).toHaveBeenCalledTimes(1)
+      expect(failClaimedArticles).toHaveBeenCalledWith(
+        'pred-1',
+        ['https://a.com/1', 'https://b.com/2'],
+        'oracle_omitted',
+      )
+      const poolOrder = vi.mocked(addArticlesToPool).mock.invocationCallOrder[0]
+      const releaseOrder = vi.mocked(failClaimedArticles).mock.invocationCallOrder[0]
+      expect(releaseOrder).toBeGreaterThan(poolOrder)
+    })
+
+    it('releases the claims with the failure class when the Oracul returns null, then still falls back to the LLM guess', async () => {
+      vi.mocked(getOraculForecast).mockResolvedValue({
+        forecast: null, logId: 'log-1', failureClass: 'oracle_timeout',
+      } as never)
+      vi.mocked(guessChances).mockResolvedValue({ probability: 55, reasoning: 'guess' } as never)
+
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      expect(failClaimedArticles).toHaveBeenCalledWith(
+        'pred-1',
+        ['https://a.com/1', 'https://b.com/2'],
+        'oracle_timeout',
+      )
+      expect(addArticlesToPool).not.toHaveBeenCalled()
+      expect(guessChances).toHaveBeenCalledTimes(1)
+    })
+
+    it('only releases the rows this run actually claimed, not the unchanged ones', async () => {
+      vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+        { result: 'unchanged', articleId: 'row-1' },
+        { result: 'claimed', articleId: 'row-2' },
+      ] as never)
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: null, logId: 'log-1' } as never)
+      vi.mocked(guessChances).mockResolvedValue({ probability: 55, reasoning: 'guess' } as never)
+
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://b.com/2'], 'oracle_null')
     })
   })
 })
