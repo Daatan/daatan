@@ -62,6 +62,7 @@ vi.mock('@/lib/services/evidence-pool', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/evidence-pool')>()),
   claimArticlesForExtraction: (...args: unknown[]) => mockClaimArticlesForExtraction(...args),
   addArticlesToPool: (...args: unknown[]) => mockAddArticlesToPool(...args),
+  failClaimedArticles: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/lib/services/oracleSearch', () => ({
@@ -298,7 +299,8 @@ it('returns 400 when prediction is not ACTIVE', async () => {
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1)
 
     // Verify search used claimText (not newsAnchor title)
-    expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, undefined, expect.objectContaining({ source: 'context-update' }))
+    // daatan#1754: the context search is bounded to the last CONTEXT_SEARCH_WINDOW_DAYS days.
+    expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, { dateFrom: expect.any(Date) }, expect.objectContaining({ source: 'context-update' }))
   })
 
   it('denormalizes Oracul CI bounds onto Prediction when Oracul path runs', async () => {

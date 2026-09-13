@@ -10,7 +10,7 @@ import { buildSearchQuery } from '@/lib/llm/searchQuery'
 import { getOraculForecast, recordOraculFallback, DEFAULT_MAX_ARTICLES, INTERACTIVE_FORECAST_TIMEOUT_MS } from '@/lib/services/oracle'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
-import { addArticlesToPool, articleIdsByUrl, claimArticlesForExtraction } from '@/lib/services/evidence-pool'
+import { addArticlesToPool, articleIdsByUrl, claimArticlesForExtraction, failClaimedArticles } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate, type SingleRunEstimate } from '@/lib/services/pooled-estimate'
 import { createLogger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
@@ -27,6 +27,16 @@ const log = createLogger('forecast-context')
 
 /** Per-forecast cooldown between context updates (hours). */
 const CONTEXT_UPDATE_COOLDOWN_HOURS = 1
+
+/**
+ * How far back the context-update search may reach (days). "Update Context" means
+ * "what happened lately", so the search is bounded rather than left to whichever
+ * provider answers first: news-indexer's monitored tier is already fresh, but the
+ * moment it is under its min-hits bar the Oracul falls through to GDELT/SERP with
+ * no bound at all and can pool a years-old page (daatan#1754). Undated hits still
+ * pass the Oracul's post-filter; the claim step excludes those downstream.
+ */
+export const CONTEXT_SEARCH_WINDOW_DAYS = 2
 
 export const dynamic = 'force-dynamic'
 
@@ -105,8 +115,14 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
         const searchQuery = await buildSearchQuery(rawQuery)
         let searchResults: SearchResult[]
         const t0 = Date.now()
+        const searchDateFrom = new Date(t0 - CONTEXT_SEARCH_WINDOW_DAYS * 24 * 60 * 60 * 1000)
         try {
-            searchResults = (await oracleSearch(searchQuery, DEFAULT_MAX_ARTICLES, undefined, { source: 'context-update', userId: user.id, predictionId: prediction.id })) ?? []
+            searchResults = (await oracleSearch(
+                searchQuery,
+                DEFAULT_MAX_ARTICLES,
+                { dateFrom: searchDateFrom },
+                { source: 'context-update', userId: user.id, predictionId: prediction.id },
+            )) ?? []
         } catch (err) {
             log.warn(
                 { predictionId: prediction.id, searchQuery, err },
@@ -120,6 +136,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             {
                 predictionId: prediction.id,
                 searchQuery,
+                dateFrom: searchDateFrom.toISOString().slice(0, 10),
                 resultCount: searchResults.length,
                 resultDomains: searchResults.map((r) => {
                     try { return new URL(r.url).hostname } catch { return r.url }
@@ -303,7 +320,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 return toEstimationResult(resolved)
             }
 
-            const { forecast: oracleForecast, logId: oracleLogId, insufficientData } = await getOraculForecast(prediction.claimText, {
+            const { forecast: oracleForecast, logId: oracleLogId, insufficientData, failureClass } = await getOraculForecast(prediction.claimText, {
                 articles: articlesToScore.map(r => ({
                     url: r.url,
                     title: r.title,
@@ -372,6 +389,10 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 // search, no LLM), so awaiting it inside the ESTIMATION_TIMEOUT_MS budget is cheap;
                 // on any failure resolvePooledEstimate falls back to this single run.
                 await addArticlesToPool(prediction.id, enrichedSources, 'analyze', claimedArticleIdByUrl)
+                // Whatever this run claimed but the Oracul's gatekeeper dropped would otherwise sit
+                // PENDING forever (the backfill path has released these since day one; this one
+                // never did — daatan#1754). `oracle_omitted` is terminal, so the retry sweep skips it.
+                await failClaimedArticles(prediction.id, articlesToScore.map((r) => r.url), 'oracle_omitted')
                 const resolved = await resolvePooledEstimate(
                     prediction.id,
                     {
@@ -410,6 +431,11 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 )
                 return toEstimationResult(resolved, oracleForecast.provenance)
             }
+
+            // The Oracul returned nothing (timeout, transport, placeholder) — release this run's
+            // claims with the failure class so the weekly sweep can retry them, rather than
+            // leaving them PENDING with no owner (daatan#1754).
+            await failClaimedArticles(prediction.id, articlesToScore.map((r) => r.url), failureClass ?? 'oracle_null')
 
             const articlesMapped = searchResults.map((r: SearchResult) => ({
                 title: r.title,
