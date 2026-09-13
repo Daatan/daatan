@@ -343,6 +343,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             // the abstention and do NOT fall back to an LLM guess, which would just
             // re-introduce an ungrounded number from the same off-topic articles.
             if (insufficientData) {
+                // An abstention still returns `forecast: null` — release this run's claims
+                // here too, or they never reach the null-path release below (daatan#1754).
+                await failClaimedArticles(prediction.id, articlesToScore.map((r) => r.url), failureClass ?? 'oracle_abstain')
                 log.info(
                     { predictionId: prediction.id, path: 'abstain' },
                     'context.ai_estimate',
