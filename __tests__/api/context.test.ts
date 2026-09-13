@@ -300,7 +300,7 @@ it('returns 400 when prediction is not ACTIVE', async () => {
 
     // Verify search used claimText (not newsAnchor title)
     // daatan#1754: the context search is bounded to the last CONTEXT_SEARCH_WINDOW_DAYS days.
-    expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, { dateFrom: expect.any(Date) }, expect.objectContaining({ source: 'context-update' }))
+    expect(mockOraculSearch).toHaveBeenCalledWith('Bitcoin will reach $100k', 30, { dateFrom: expect.any(Date), minResults: expect.any(Number) }, expect.objectContaining({ source: 'context-update' }))
   })
 
   it('denormalizes Oracul CI bounds onto Prediction when Oracul path runs', async () => {

@@ -37,6 +37,10 @@ const CONTEXT_UPDATE_COOLDOWN_HOURS = 1
  * pass the Oracul's post-filter; the claim step excludes those downstream.
  */
 export const CONTEXT_SEARCH_WINDOW_DAYS = 2
+// Ask the Oracul to fill the set from paid providers whenever the news-indexer alone can't
+// (daatan#1757): the point of Update Context is sources the index does *not* already hold.
+// Lower this to trade non-indexed sources for latency — every top-up is a SERP round trip.
+export const CONTEXT_SEARCH_MIN_RESULTS = DEFAULT_MAX_ARTICLES
 
 export const dynamic = 'force-dynamic'
 
@@ -120,7 +124,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             searchResults = (await oracleSearch(
                 searchQuery,
                 DEFAULT_MAX_ARTICLES,
-                { dateFrom: searchDateFrom },
+                { dateFrom: searchDateFrom, minResults: CONTEXT_SEARCH_MIN_RESULTS },
                 { source: 'context-update', userId: user.id, predictionId: prediction.id },
             )) ?? []
         } catch (err) {
@@ -137,6 +141,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 predictionId: prediction.id,
                 searchQuery,
                 dateFrom: searchDateFrom.toISOString().slice(0, 10),
+                minResults: CONTEXT_SEARCH_MIN_RESULTS,
                 resultCount: searchResults.length,
                 resultDomains: searchResults.map((r) => {
                     try { return new URL(r.url).hostname } catch { return r.url }

@@ -181,6 +181,8 @@ Return the public context timeline for a forecast (list of dated context snapsho
 ### `POST /api/forecasts/[id]/context` — Auth
 Refresh the AI context for a forecast: fetches web articles for the claim, asks an LLM to summarise them, computes an "AI %" probability, and appends a new snapshot to the context timeline. Author-only and rate-limited to once per 24h per forecast.
 
+**Article search** goes through the Oracul `POST /search` with the last `CONTEXT_SEARCH_WINDOW_DAYS` (2) days as `date_from` (daatan#1754) and `min_results = CONTEXT_SEARCH_MIN_RESULTS` (= the 15-article budget, daatan#1757): when the Oracul's news-indexer alone serves fewer hits than that, it tops the set up from the paid providers (dedup by URL) so the update also sees sources the index does not hold. Both constants live in `src/app/api/forecasts/[id]/context/route.ts`.
+
 **Probability source (tried in order):**
 
 1. **TruthMachine Oracle API** (`POST ${ORACLE_URL}/forecast`) — calibrated multi-source estimate. Used when `ORACLE_URL` and `ORACLE_API_KEY` are set and the Oracle returns a non-placeholder response with at least one usable article. See [docs/LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md#oracle-api-integration). When this path is taken, the full Oracle payload (mean, std, 95% CI, per-source stance/certainty/credibility) is persisted on the snapshot in the `oracleSnapshot` field and surfaced in the UI.
