@@ -93,7 +93,17 @@ interface OracleSearchResponse {
 export async function oracleSearch(
   query: string,
   limit: number = 20, // default for ad-hoc calls; use DEFAULT_MAX_ARTICLES for consistent budgets
-  options?: { dateFrom?: Date; dateTo?: Date },
+  options?: {
+    dateFrom?: Date
+    dateTo?: Date
+    /**
+     * Top-up floor (Daatan/retro#822): when the Oracul's news-indexer serves fewer hits than
+     * this, it also runs the paid providers and appends their new URLs (dedup by URL, up to
+     * `limit`); `provider` then reads `news_indexer+<paid>`. Omit / 0 = first non-empty
+     * provider wins.
+     */
+    minResults?: number
+  },
   meta: OracleCallMeta = { source: 'other' },
 ): Promise<SearchResult[] | null> {
   const cfg = getOracleConfig()
@@ -102,6 +112,7 @@ export async function oracleSearch(
   const body: Record<string, unknown> = { query, limit }
   if (options?.dateFrom) body.date_from = options.dateFrom.toISOString().slice(0, 10)
   if (options?.dateTo) body.date_to = options.dateTo.toISOString().slice(0, 10)
+  if (options?.minResults) body.min_results = options.minResults
 
   const t0 = Date.now()
   try {

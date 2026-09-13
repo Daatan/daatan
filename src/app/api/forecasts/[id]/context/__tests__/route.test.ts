@@ -71,7 +71,7 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
-import { POST, CONTEXT_SEARCH_WINDOW_DAYS } from '../route'
+import { POST, CONTEXT_SEARCH_WINDOW_DAYS, CONTEXT_SEARCH_MIN_RESULTS } from '../route'
 import {
   getForecastForContextUpdate,
   countUserContextUpdates,
@@ -318,6 +318,15 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(ageMs).toBeGreaterThanOrEqual(windowMs - 1)
       expect(ageMs).toBeLessThan(windowMs + 5_000)
       expect(options?.dateTo).toBeUndefined()
+    })
+
+    it('asks the Oracul to top thin news-indexer results up to the article budget (daatan#1757)', async () => {
+      await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+      const [, limit, options] = vi.mocked(oracleSearch).mock.calls[0]
+      expect(CONTEXT_SEARCH_MIN_RESULTS).toBeGreaterThan(0)
+      expect(options?.minResults).toBe(CONTEXT_SEARCH_MIN_RESULTS)
+      expect(options?.minResults).toBeLessThanOrEqual(limit as number)
     })
 
     it('releases the claims the Oracul omitted after pooling a successful run', async () => {

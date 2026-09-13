@@ -55,6 +55,21 @@ describe('oracleSearch — usage logging', () => {
     })
   })
 
+  it('sends min_results only when a top-up floor is given (Daatan/retro#822)', async () => {
+    const empty = { ok: true, status: 200, json: async () => ({ query: 'q', count: 0, provider: 'none', provider_chain: [], results: [] }) } as never
+    mockFetch.mockResolvedValue(empty)
+
+    await oracleSearch('q', 15, { dateFrom: new Date('2026-09-11T12:00:00Z'), minResults: 15 }, { source: 'context-update' })
+    await oracleSearch('q', 15, { dateFrom: new Date('2026-09-11T12:00:00Z') }, { source: 'context-update' })
+
+    expect(JSON.parse(mockFetch.mock.calls[0][2].body as string)).toEqual({
+      query: 'q', limit: 15, date_from: '2026-09-11', min_results: 15,
+    })
+    expect(JSON.parse(mockFetch.mock.calls[1][2].body as string)).toEqual({
+      query: 'q', limit: 15, date_from: '2026-09-11',
+    })
+  })
+
   it('logs an ERROR call (with http status) on a non-OK response', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 503, text: async () => 'down' } as never)
 
