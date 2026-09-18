@@ -737,6 +737,9 @@ model EvidencePoolArticle {
   // predates the news-indexer field. Read null as "no information", never as a defect — the
   // point of the column is that a date read off a page and a date inherited from a mislabelled
   // feed entry are the same string with very different credibility (daatan#1679 item 2).
+  // One writer infers rather than relays: `scripts/copy-down-published-dates.ts` stamps `pushed`
+  // on a `t.me` row news-indexer has no record of (its by-url store never holds Telegram posts),
+  // from the URL alone — the 3,460-row pre-provenance Telegram cohort, dates spot-checked real.
   publishedDateSource String? @map("published_date_source") @db.VarChar(16)
 
   // Content fingerprint (hash of title+snippet as pushed by the discovering
