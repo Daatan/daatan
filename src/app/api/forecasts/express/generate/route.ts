@@ -82,6 +82,7 @@ export const POST = withAuth(async (request, user) => {
           skipSources,
           dateBasis: result.dateBasis,
           isDefaultHorizonDate: result.isDefaultHorizonDate,
+          groundedDate: result.groundedDate,
         })
         controller.close()
       } catch (error) {

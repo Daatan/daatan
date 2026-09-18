@@ -255,6 +255,8 @@ Return translated version of the forecast in the user's language preference. Rat
 ### `POST /api/forecasts/express/generate` — Auth
 Generate an "express" forecast via AI from a URL or topic.
 
+When the first draft reports its resolution date as `assumed` (#1706), one extra call asks Gemini on Vertex, with the native `googleSearch` tool, for the date of the scheduled event the forecast hinges on (`src/lib/llm/groundedDateLookup.ts`). A found date is put in front of the model as a `[Reference]` block and the forecast is drafted again, so the claim text, rules and `resolveByDatetime` stay coherent and `dateBasis` comes back `from_sources`. Vertex only — the lookup bypasses the LLM fallback chain, which has no grounding; with no Vertex credentials, a failed call, or no scheduled date found, the first draft is returned unchanged with its "assumed date" warning. Adds ~5–10 s and one re-draft on the assumed path only. The result's `groundedDate` field records what happened.
+
 ---
 
 ### `POST /api/forecasts/express/guess` — Auth

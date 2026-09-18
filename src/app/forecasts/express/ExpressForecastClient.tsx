@@ -11,7 +11,7 @@ import { WarningBanner } from '@/components/ui/WarningBanner'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
-import type { DateBasis } from '@/lib/llm/expressPrediction'
+import type { DateBasis, GroundedDateOutcome } from '@/lib/llm/expressPrediction'
 
 const log = createClientLogger('ExpressForecast')
 
@@ -55,6 +55,10 @@ export interface GeneratedPrediction {
   // or +5-year horizon), computed server-side in expressPrediction.ts — the
   // +5-year calendar math is timezone-sensitive, so it must not be recomputed here.
   isDefaultHorizonDate?: boolean
+  // #1706 option 2: set when the resolution date came from the web-grounded event-date
+  // lookup. The lookup names the event it dated, and that is what the author has to
+  // check — it can date a real event that isn't the one this forecast hinges on.
+  groundedDate?: GroundedDateOutcome
   // #1706 proposal 5: ISO date extracted from claimText that disagrees with
   // resolveByDatetime (POST /api/forecasts' #1404 cross-check, run here too so
   // it surfaces on the review screen instead of only at publish time). Null when
@@ -416,7 +420,11 @@ export default function ExpressForecastClient({
       const claimDeadlineMismatch = editForm.resolveByDatetime
         ? findClaimTextDeadlineMismatch(editForm.claimText, new Date(editForm.resolveByDatetime))?.toISOString() ?? null
         : null
-      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch })
+      // Once the author moves the date it is no longer the looked-up one.
+      const groundedDate = editForm.resolveByDatetime !== generated?.resolveByDatetime
+        ? undefined
+        : generated?.groundedDate
+      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate })
       setIsEditing(false)
     }
   }
@@ -751,6 +759,19 @@ export default function ExpressForecastClient({
                 title={t('dateBasisWarningTitle')}
               >
                 <p className="text-xs text-gray-500">{t('dateBasisWarningHint')}</p>
+              </WarningBanner>
+            )}
+
+            {!isEditing && generated.groundedDate?.fired
+              && generated.groundedDate.status === 'found' && generated.groundedDate.adopted && (
+              <WarningBanner
+                icon={<AlertCircle className="w-4 h-4" />}
+                title={t('groundedDateNoticeTitle', {
+                  event: generated.groundedDate.event,
+                  date: formatDisplayDate(`${generated.groundedDate.date}T23:59:59Z`),
+                })}
+              >
+                <p className="text-xs text-gray-500">{t('groundedDateNoticeHint')}</p>
               </WarningBanner>
             )}
 

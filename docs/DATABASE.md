@@ -957,7 +957,11 @@ text, dry-run flag), `bot_rejected_topics` (admin-rejected topics with keyword
 sets to stop re-suggestion), `forecast_creation_attempts` (express-forecast
 audit log incl. moderation/search failures; a `SUCCESS` row's `details` also
 carries `dateBasis`/`isDefaultHorizonDate` — #1706's measurement of how often
-`resolveByDatetime` is assumed rather than grounded in the claim/sources).
+`resolveByDatetime` is assumed rather than grounded in the claim/sources — and
+`groundedDate`, what the web-grounded event-date lookup did on that draft:
+`{fired:false}`, `{fired:true,status:"no_date"|"unavailable"}`, or
+`{fired:true,status:"found",event,date,sourceUrl,adopted}`; `dateBasis` is the
+value *after* the lookup, so `found`+`adopted` rows read `from_sources`).
 See [bots.md](./bots.md) and [BOT_APPROVAL_WORKFLOW.md](./BOT_APPROVAL_WORKFLOW.md).
 
 ## News anchors
