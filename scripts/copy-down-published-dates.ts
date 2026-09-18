@@ -28,6 +28,13 @@
  *                   be able to settle anything.
  *   not found       news-indexer has evicted it. Leave it: we have no better answer, and
  *                   inventing one is the bug.
+ *   not found,      A Telegram post. news-indexer's /articles/by-url reads the crawl store, and
+ *   t.me URL        Telegram posts never enter it (the listener pushes them straight through), so
+ *                   "not found" is the only answer these will ever get — it is not an eviction.
+ *                   The URL alone says what the row is: stamp `pushed` and keep the date, exactly
+ *                   as the `pushed` branch does. Measured on prod 2026-09-18: all 3,460 rows still
+ *                   matching the signature are t.me, and 9/9 sampled carry a date within 0.6 min
+ *                   of the post's own timestamp on t.me. Without this branch they match forever.
  *
  * The `pushed` branch is the reason item 2 had to land first. Without provenance this pass
  * cannot tell a fabricated web date from a genuine Telegram post time, and the only options
@@ -80,6 +87,12 @@ const BATCH = 50
 const TRUSTWORTHY_AS_IS = new Set(['pushed'])
 
 /**
+ * Hosts with no article page behind the push, so the push IS the post. t.me only: X is not
+ * ingested (news-indexer#220), and guessing at hosts here stamps provenance nobody reported.
+ */
+const PUSHED_ONLY_URL = /^https?:\/\/(www\.)?t\.me\//i
+
+/**
  * The fabrication signature: sub-second precision on `published_date`. Exact, per ni#166 — a
  * date reported by a source is never microsecond-precise; an ingest timestamp always is.
  *
@@ -92,7 +105,7 @@ const FABRICATED_SIGNATURE = `
   AND published_date ~ '\\.\\d+'
 `
 
-export type CopyDownAction = 'copied' | 'nulled' | 'kept_pushed' | 'not_found' | 'unchanged'
+export type CopyDownAction = 'copied' | 'nulled' | 'kept_pushed' | 'pushed_no_meta' | 'not_found' | 'unchanged'
 
 export interface CopyDownDecision {
   action: CopyDownAction
@@ -108,9 +121,18 @@ export interface CopyDownDecision {
 export function decideCopyDown(
   currentDate: string,
   meta: { publishedAt: string | null; publishedAtSource?: string | null } | undefined,
+  url: string,
 ): CopyDownDecision {
-  // news-indexer has evicted the article. We have no better answer, and inventing one is the bug.
-  if (!meta) return { action: 'not_found', data: null }
+  if (!meta) {
+    // A Telegram post is never in the store /articles/by-url reads, so there is no metadata to
+    // wait for. Counted apart from `kept_pushed` because the provenance is inferred from the URL
+    // here, not reported by news-indexer.
+    if (PUSHED_ONLY_URL.test(url)) {
+      return { action: 'pushed_no_meta', data: { publishedDateSource: 'pushed' } }
+    }
+    // news-indexer has evicted the article. We have no better answer, and inventing one is the bug.
+    return { action: 'not_found', data: null }
+  }
 
   const source = meta.publishedAtSource ?? null
 
@@ -170,7 +192,7 @@ async function main() {
   console.log(`${rows.length} pool rows carry the fabricated-date signature`)
 
   const counts: Record<CopyDownAction, number> = {
-    copied: 0, nulled: 0, kept_pushed: 0, not_found: 0, unchanged: 0,
+    copied: 0, nulled: 0, kept_pushed: 0, pushed_no_meta: 0, not_found: 0, unchanged: 0,
   }
 
   for (let i = 0; i < rows.length; i += BATCH) {
@@ -178,7 +200,7 @@ async function main() {
     const meta = await getArticleMetaByUrl(chunk.map((r) => r.url))
 
     for (const row of chunk) {
-      const { action, data } = decideCopyDown(row.published_date, meta.get(row.url))
+      const { action, data } = decideCopyDown(row.published_date, meta.get(row.url), row.url)
       counts[action]++
       if (APPLY && data) {
         await prisma.evidencePoolArticle.update({ where: { id: row.id }, data: data as never })
