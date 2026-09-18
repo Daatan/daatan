@@ -14,6 +14,7 @@ import { checkContent } from '../services/moderation'
 import { localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
+import { lookupGroundedEventDate } from './groundedDateLookup'
 
 const log = createLogger('express-prediction')
 
@@ -155,6 +156,10 @@ export interface ExpressPredictionResult {
   // the model with. The review screen uses this to suppress the "assumed date"
   // warning for the deliberate defaults, which aren't the #1706 failure mode.
   isDefaultHorizonDate: boolean
+  // #1706 option 2: what the web-grounded event-date lookup did on this draft. Not
+  // shown to the author — persisted with the attempt so the assumed-date rate and the
+  // lookup's hit rate can be read off `forecast_creation_attempts`.
+  groundedDate: GroundedDateOutcome
   // #1706 proposal 5: the same claim-text/deadline cross-check POST /api/forecasts
   // runs at creation (#1404, extractDatesFromText.ts) run here too, so a mismatch
   // surfaces on the review screen instead of only at the moment the author tries
@@ -194,6 +199,63 @@ export type DateBasis = typeof DATE_BASIS_VALUES[number]
  *  date is exactly the case #1706 wants surfaced, not silently trusted. */
 export function normalizeDateBasis(value: unknown): DateBasis {
   return (DATE_BASIS_VALUES as readonly unknown[]).includes(value) ? (value as DateBasis) : 'assumed'
+}
+
+/** What the #1706 grounded event-date lookup did on one draft. */
+export type GroundedDateOutcome =
+  /** The first draft's date already had a stated basis — no lookup. */
+  | { fired: false }
+  /** Looked, and either found no scheduled date or couldn't look (no Vertex, call failed). */
+  | { fired: true; status: 'no_date' | 'unavailable' }
+  /** `adopted`: the re-draft's resolveByDatetime landed on the looked-up day. */
+  | { fired: true; status: 'found'; event: string; date: string; sourceUrl: string; adopted: boolean }
+
+/**
+ * Draft, and when the draft admits its resolution date is "assumed", look the deciding
+ * event's date up on the web and draft again with it in front of the model (#1706).
+ *
+ * The date goes in as text ahead of the articles rather than being written over
+ * `resolveByDatetime`: rule 3b already tells the model to use a date its sources state,
+ * so the re-draft keeps claim text, rules and deadline coherent and reports
+ * `from_sources` on its own — and `findUngroundedYears`, which reads the same text,
+ * doesn't flag a looked-up 2027 as a hallucinated one.
+ */
+async function draftWithGroundedDate(
+  userInput: string,
+  articlesText: string,
+  now: Date,
+  draft: (articlesText: string) => Promise<ParsedPrediction>,
+  onProgress?: (stage: string, data?: Record<string, unknown>) => void,
+): Promise<{ prediction: ParsedPrediction; articlesText: string; groundedDate: GroundedDateOutcome }> {
+  const first = await draft(articlesText)
+  if (normalizeDateBasis(first.dateBasis) !== 'assumed') {
+    return { prediction: first, articlesText, groundedDate: { fired: false } }
+  }
+
+  onProgress?.('analyzing', { message: 'Looking up the date of the deciding event…' })
+  const lookup = await lookupGroundedEventDate(userInput, first.claimText, now)
+  if (lookup.status !== 'found') {
+    return { prediction: first, articlesText, groundedDate: { fired: true, status: lookup.status } }
+  }
+
+  const withReference =
+    `[Reference — scheduled event date, from a web lookup]\nEvent: ${lookup.event}\nDate: ${lookup.date}\n` +
+    (lookup.sourceUrl ? `Source: ${lookup.sourceUrl}\n` : '') +
+    'This date is stated by a reference source; treat it like a date stated in the provided articles.\n\n' +
+    articlesText
+  const found = { fired: true, status: 'found', event: lookup.event, date: lookup.date, sourceUrl: lookup.sourceUrl } as const
+  try {
+    const second = await draft(withReference)
+    return {
+      prediction: second,
+      articlesText: withReference,
+      groundedDate: { ...found, adopted: second.resolveByDatetime?.startsWith(lookup.date) ?? false },
+    }
+  } catch (error) {
+    // The first draft is a complete forecast; losing the re-draft only loses the date.
+    log.warn({ err: error }, 'Re-draft with the grounded event date failed; keeping the first draft')
+    return { prediction: first, articlesText, groundedDate: { ...found, adopted: false } }
+  }
 }
 
 // Prompt rule 3a's default horizon for relative-timing claims ("will A happen
@@ -271,29 +333,35 @@ export async function generateExpressPrediction(
     const endOfYearHuman = `December 31, ${currentYear}`
     const { iso: fiveYearsFromNow, human: fiveYearsFromNowHuman } = getFiveYearsFromNow(now)
 
-    const articlesText = `[User Input]\n${userInput}`
     const template = await getPromptTemplate('express-prediction')
-    const prompt = fillPrompt(template, {
-      userInput,
-      articlesText,
-      endOfYear,
-      endOfYearHuman,
-      fiveYearsFromNow,
-      fiveYearsFromNowHuman,
-      currentYear,
-      currentDate: now.toISOString().split('T')[0],
-      STANDARD_TAGS: STANDARD_TAGS.join(', '),
-    })
-
-    let prediction: ParsedPrediction
-    try {
+    const draft = async (text: string): Promise<ParsedPrediction> => {
       const result = await llmService.generateContent({
-        prompt,
+        prompt: fillPrompt(template, {
+          userInput,
+          articlesText: text,
+          endOfYear,
+          endOfYearHuman,
+          fiveYearsFromNow,
+          fiveYearsFromNowHuman,
+          currentYear,
+          currentDate: now.toISOString().split('T')[0],
+          STANDARD_TAGS: STANDARD_TAGS.join(', '),
+        }),
         schema: expressPredictionSchema,
         temperature: 0.2,
       })
-      prediction = JSON.parse(result.text)
-      prediction.claimText = humanizeISODates(prediction.claimText)
+      const parsed: ParsedPrediction = JSON.parse(result.text)
+      parsed.claimText = humanizeISODates(parsed.claimText)
+      return parsed
+    }
+
+    let prediction: ParsedPrediction
+    let articlesText: string
+    let groundedDate: GroundedDateOutcome
+    try {
+      ;({ prediction, articlesText, groundedDate } = await draftWithGroundedDate(
+        userInput, `[User Input]\n${userInput}`, now, draft, onProgress,
+      ))
       onProgress?.('prediction_formed', {
         message: 'Forecast drafted — finalising…',
         preview: {
@@ -344,6 +412,7 @@ export async function generateExpressPrediction(
       ...prediction,
       dateBasis: normalizeDateBasis(prediction.dateBasis),
       isDefaultHorizonDate,
+      groundedDate,
       newsAnchor: null,
       additionalLinks: [],
       externalMarketId: null,
@@ -530,7 +599,7 @@ export async function generateExpressPrediction(
     ? `[Market Prior]\n${marketPriorLine} Treat this as one signal among the sources below, not a substitute for reading them.\n\n`
     : ''
 
-  const articlesText = marketPriorBlock + searchResults
+  const searchedArticlesText = marketPriorBlock + searchResults
     .map((article, i) => {
       // For the primary fetched article, include more content
       const snippet = (article === primaryArticle && article.snippet.length > 200)
@@ -560,29 +629,37 @@ URL: ${article.url}
   const { iso: fiveYearsFromNow, human: fiveYearsFromNowHuman } = getFiveYearsFromNow(now)
 
   const template = await getPromptTemplate('express-prediction')
-  const prompt = fillPrompt(template, {
-    userInput,
-    articlesText,
-    endOfYear,
-    endOfYearHuman,
-    fiveYearsFromNow,
-    fiveYearsFromNowHuman,
-    currentYear,
-    currentDate: now.toISOString().split('T')[0],
-    STANDARD_TAGS: STANDARD_TAGS.join(', '),
-  })
-
-  let prediction: ParsedPrediction
-  try {
+  const draft = async (text: string): Promise<ParsedPrediction> => {
     const result = await llmService.generateContent({
-      prompt,
+      prompt: fillPrompt(template, {
+        userInput,
+        articlesText: text,
+        endOfYear,
+        endOfYearHuman,
+        fiveYearsFromNow,
+        fiveYearsFromNowHuman,
+        currentYear,
+        currentDate: now.toISOString().split('T')[0],
+        STANDARD_TAGS: STANDARD_TAGS.join(', '),
+      }),
       schema: expressPredictionSchema,
       temperature: 0.2, // Slightly creative but structured
     })
-    prediction = JSON.parse(result.text)
-
+    const parsed: ParsedPrediction = JSON.parse(result.text)
     // Post-process: replace any ISO timestamps that leaked into claimText
-    prediction.claimText = humanizeISODates(prediction.claimText)
+    parsed.claimText = humanizeISODates(parsed.claimText)
+    return parsed
+  }
+
+  let prediction: ParsedPrediction
+  let articlesText: string
+  let groundedDate: GroundedDateOutcome
+  try {
+    // The reference block is prepended, so [Article N] numbering — and with it
+    // relevantArticleIndices — is the same in both drafts.
+    ;({ prediction, articlesText, groundedDate } = await draftWithGroundedDate(
+      userInput, searchedArticlesText, now, draft, onProgress,
+    ))
   } catch (error) {
     log.error({ err: error }, 'Failed to generate express prediction')
     throw error
@@ -680,6 +757,7 @@ URL: ${article.url}
     ...prediction,
     dateBasis: normalizeDateBasis(prediction.dateBasis),
     isDefaultHorizonDate: prediction.resolveByDatetime === endOfYear || prediction.resolveByDatetime === fiveYearsFromNow,
+    groundedDate,
     newsAnchor: anchorArticle
       ? {
         url: anchorArticle.url,

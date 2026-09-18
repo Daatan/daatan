@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
+import type { GroundedDateOutcome } from '@/lib/llm/expressPrediction'
 import ExpressForecastClient, { type GeneratedPrediction } from '../ExpressForecastClient'
 import messages from '../../../../../messages/en.json'
 
@@ -499,6 +500,48 @@ describe('ExpressForecastClient', () => {
       })
 
       expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
+    })
+
+    it('names the event behind a looked-up resolution date so the author can check it is the right one (#1706 option 2)', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        resolveByDatetime: '2026-10-28T23:59:59Z',
+        dateBasis: 'from_sources',
+        groundedDate: { fired: true, status: 'found', event: 'FOMC meeting', date: '2026-10-28', sourceUrl: '', adopted: true },
+      })
+
+      expect(screen.getByText('Date looked up: FOMC meeting — Oct 28, 2026')).toBeInTheDocument()
+      expect(screen.queryByText('Assumed resolution date')).not.toBeInTheDocument()
+    })
+
+    it.each<[string, GroundedDateOutcome]>([
+      ['the lookup did not fire', { fired: false }],
+      ['the lookup found nothing', { fired: true, status: 'no_date' }],
+      ['the re-draft ignored the looked-up date', { fired: true, status: 'found', event: 'FOMC meeting', date: '2026-10-28', sourceUrl: '', adopted: false }],
+    ])('shows no looked-up-date notice when %s', async (_label, groundedDate) => {
+      await renderInReviewState({ ...generatedData, groundedDate })
+
+      expect(screen.queryByText(/Date looked up/)).not.toBeInTheDocument()
+    })
+
+    it('drops the looked-up-date notice once the author edits the resolve date', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        resolveByDatetime: '2027-06-15T23:59:59Z',
+        dateBasis: 'from_sources',
+        groundedDate: { fired: true, status: 'found', event: 'Some summit', date: '2027-06-15', sourceUrl: '', adopted: true },
+      })
+      expect(screen.getByText(/Date looked up: Some summit/)).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      fireEvent.change(screen.getByDisplayValue('15/06/2027'), { target: { value: '20/06/2027' } })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.queryByText(/Date looked up/)).not.toBeInTheDocument()
     })
 
     it('shows the claim/date mismatch warning when the server flags one (#1706 proposal 5)', async () => {
