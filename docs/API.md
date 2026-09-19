@@ -673,11 +673,14 @@ a source that went silent while the rest kept flowing, an ACTIVE forecast whose 
 holds no `COMPLETE`-with-a-stance row, or a pipeline-wide move in failed share (≥15pp)
 or ingestion volume (<35% of the baseline rate). Also watches the TruthMachine batch
 loop's external heartbeat (retro#556): the newest `Daatan/retro` commit touching
-`data/progress.json` — the `atlas:`/`progress:` commits only the batch loop pushes —
-must be under 12h old (a healthy loop commits every few minutes), else a
+`factum_atlas.html` — the rendered atlas, i.e. the loop's published output — must be
+under 12h old (a healthy loop commits it every few minutes), else a
 `batch-heartbeat-stale` page fires on the clean channel; an unreachable GitHub API
 fires the weaker `batch-heartbeat-unreachable` (noisy) instead, never a false
-"loop dead". Auth: `x-cron-secret` header
+"loop dead". The watched path is deliberately the atlas and not `data/progress.json`:
+`ec2_run.sh` pushes progress through a forgiving path that survives a broken cycle,
+so during the 27-day retro#838 outage progress kept committing while the atlas was
+dead — the old path reported green, then flapped (retro#838). Auth: `x-cron-secret` header
 (`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the check itself fails, so a run that
 couldn't read the data never reports a clean pipeline. Returns
 `{ ok, recentDays, baselineDays, recentRows, recentFailedPct, baselineFailedPct, suppressed, fired[] }`

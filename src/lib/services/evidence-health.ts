@@ -92,19 +92,32 @@ const MAX_KEY_SOURCE_LEN = 150
  * The batch tree on the Oracul box ran stale code twice (six weeks once) with
  * zero detection; retro PR#555 makes a failed sync refuse the cycle, but that is
  * only visible in `pipeline_log.txt` on the box. The loop's one externally
- * visible heartbeat is the `atlas:` / `progress:` commits it pushes to
- * `Daatan/retro` `main` — every batch touches `data/progress.json`, and nothing
- * else ever commits that path. "Newest commit touching that path is too old" is
- * therefore the outermost liveness signal: it catches a crashed loop, a wedged
- * `.git/index.lock`, and PR#555's stale-code refusal (which stops commits
- * entirely) alike. retro itself has no alerting surface, which is why the check
- * lives here.
+ * visible heartbeat is the commits it pushes to `Daatan/retro` `main`. retro
+ * itself has no alerting surface, which is why the check lives here.
+ *
+ * The watched path is the **rendered atlas**, not `data/progress.json` — that
+ * choice is the whole point of the check, so do not "simplify" it back
+ * (retro#838). This check originally watched `data/progress.json` on the
+ * assumption that both paths move together. They do not: `ec2_run.sh` pushes
+ * progress through a forgiving path that survives a broken cycle, while the
+ * atlas goes through `commit_and_push`, which returns early when the rebase
+ * fails. When a stale `.git/rebase-merge` wedged the loop on 2026-08-23, the
+ * atlas stopped dead for 27 days while progress kept committing — so
+ * `progress.json` was not the outermost signal but the innermost, and it did
+ * worse than stay silent: it flapped (gaps on 09-03→09-11, 09-12→09-14,
+ * 09-14→09-16 each fired, then self-cleared when the next progress commit
+ * landed), which the wholesale re-arm below turns into separate short blips
+ * instead of one continuous 27-day outage. Watching the atlas would have fired
+ * on 08-24 and stayed on. It is also the published product: if it is not
+ * moving, nothing the loop does downstream reached a reader.
  */
 export const BATCH_HEARTBEAT_REPO = 'Daatan/retro'
-export const BATCH_HEARTBEAT_PATH = 'data/progress.json'
+export const BATCH_HEARTBEAT_PATH = 'factum_atlas.html'
 /**
- * A healthy loop commits every few minutes (measured 2026-08-20: 30 commits in
- * ~35 min), so any hours-scale threshold is >100× the normal gap; the binding
+ * A healthy loop commits the atlas every few minutes (measured 2026-09-20 over
+ * the 4,000 atlas commits from 08-16 to 09-19: exactly two gaps above 12h — a
+ * 55.9h one on 08-17 and the 657.7h retro#838 outage itself), so any hours-scale
+ * threshold is >100× the normal gap; the binding
  * constraint is instead this check's own daily sampling. 12h keeps ordinary
  * quiet stretches (API-quota pauses, empty ingest batches) far below the bar
  * while still flagging a dead loop on the next daily run — worst case ~36h
