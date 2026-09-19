@@ -304,7 +304,16 @@ describe('checkEvidenceHealth', () => {
       stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, { 'ynet.co.il': { total: 400, failed: 100 } })
     })
 
-    it('asks GitHub for the newest commit touching the batch loop progress file', async () => {
+    // retro#838: the loop wedged on a stale `.git/rebase-merge` on 2026-08-23 and
+    // the atlas stopped for 27 days, while `data/progress.json` kept committing
+    // through `ec2_run.sh`'s forgiving push path — so the old watched path both
+    // missed the outage and flapped. Pin the path itself: a revert to
+    // `data/progress.json` restores a check that reports green through a dead loop.
+    it('watches the rendered atlas, not the progress file', () => {
+      expect(BATCH_HEARTBEAT_PATH).toBe('factum_atlas.html')
+    })
+
+    it('asks GitHub for the newest commit touching the watched batch-loop file', async () => {
       await checkEvidenceHealth()
 
       expect(fetchMock).toHaveBeenCalledWith(
