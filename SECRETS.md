@@ -31,7 +31,6 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `SERPER_API_KEY` | ✅ | — | Serper.dev — Express Forecast web search |
 | `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping |
 | `SERPAPI_API_KEY` | ✅ | — | SerpAPI (fallback search) |
-| `SCRAPINGBEE_API_KEY` | ✅ | — | ScrapingBee (fallback fetch) |
 | `ORACLE_URL` | ✅ | — | TruthMachine Oracle base URL (typically `https://oracle.daatan.com`) |
 | `ORACLE_API_KEY` | ✅ | — | Shared `x-api-key` for the Oracle; canonical copy at `openclaw/oracle-api-key` (legacy naming — OpenClaw is decommissioned, prefix retained for back-compat) |
 | `NEWS_INDEXER_SECRET` | ✅ | — | Inbound: shared secret validating the news-indexer → Daatan freshness push (`x-news-indexer-secret`) |

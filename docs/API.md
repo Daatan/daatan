@@ -640,7 +640,7 @@ Liveness + readiness probe. Returns `200` when the DB is reachable, `503` when i
 Auth subsystem health check.
 
 ### `GET /api/health/search`
-Search provider health check. Returns credit/status for Serper, SerpAPI, and ScrapingBee.
+Search provider health check. Returns credit/status for Serper and SerpAPI.
 
 ### `GET /api/cron/cleanup`
 Clean up expired/stale data. Intended for cron use.

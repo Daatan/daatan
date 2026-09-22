@@ -48,39 +48,19 @@ async function checkSerpApi(): Promise<ProviderStatus> {
   }
 }
 
-async function checkScrapingBee(): Promise<ProviderStatus> {
-  const apiKey = process.env.SCRAPINGBEE_API_KEY
-  if (!apiKey) return { configured: false, status: 'not_configured' }
-
-  try {
-    const res = await fetch(`https://app.scrapingbee.com/api/v1/usage?api_key=${apiKey}`)
-    if (!res.ok) {
-      return { configured: true, status: 'error', error: `HTTP ${res.status}` }
-    }
-    const data = await res.json() as { max_api_credit?: number; used_api_credit?: number }
-    const credits = data.max_api_credit !== undefined && data.used_api_credit !== undefined
-      ? data.max_api_credit - data.used_api_credit
-      : undefined
-    return { configured: true, status: 'ok', credits }
-  } catch (e) {
-    return { configured: true, status: 'error', error: e instanceof Error ? e.message : 'unknown' }
-  }
-}
-
 export async function GET() {
-  const [serper, serpapi, scrapingbee] = await Promise.all([checkSerper(), checkSerpApi(), checkScrapingBee()])
+  const [serper, serpapi] = await Promise.all([checkSerper(), checkSerpApi()])
 
   const allConfiguredProvidersFailed =
     (serper.configured && serper.status !== 'ok') &&
-    (serpapi.configured && serpapi.status !== 'ok') &&
-    (scrapingbee.configured && scrapingbee.status !== 'ok')
+    (serpapi.configured && serpapi.status !== 'ok')
 
-  const anyOk = serper.status === 'ok' || serpapi.status === 'ok' || scrapingbee.status === 'ok' ||
-    (!serper.configured && !serpapi.configured && !scrapingbee.configured) // DDG fallback always available
+  const anyOk = serper.status === 'ok' || serpapi.status === 'ok' ||
+    (!serper.configured && !serpapi.configured) // DDG fallback always available
 
   // One grouped alert for any low/failed configured providers (was 3 separate sends).
   const issues: SearchHealthIssue[] = []
-  for (const [name, p] of [['Serper', serper], ['SerpAPI', serpapi], ['ScrapingBee', scrapingbee]] as const) {
+  for (const [name, p] of [['Serper', serper], ['SerpAPI', serpapi]] as const) {
     if (!p.configured) continue
     if (p.status === 'error') {
       issues.push({ provider: name, kind: 'exhausted' })
@@ -89,14 +69,13 @@ export async function GET() {
     }
   }
   // DDG is always available, so there's always ≥1 usable provider here.
-  const usableCount = [serper, serpapi, scrapingbee].filter((p) => p.status === 'ok').length + 1
+  const usableCount = [serper, serpapi].filter((p) => p.status === 'ok').length + 1
   notifySearchHealthDigest({ issues, overall: anyOk ? 'degraded' : 'unhealthy', usableCount })
 
   return NextResponse.json(
     {
       serper,
       serpapi,
-      scrapingbee,
       ddg: { configured: true, status: 'ok', credits: 'unlimited' },
       overall: anyOk ? 'ok' : 'degraded',
       allConfiguredProvidersFailed,
