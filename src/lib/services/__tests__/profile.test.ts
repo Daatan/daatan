@@ -5,14 +5,27 @@ import { loadProfileScores, loadProfileTab, PAGE_SIZE } from '@/lib/services/pro
 // Prisma mock
 // ---------------------------------------------------------------------------
 
-const { mockAggregate, mockCommitmentFindMany, mockPredictionFindMany, mockCount, mockTagFindMany } =
-  vi.hoisted(() => ({
-    mockAggregate: vi.fn(),
-    mockCommitmentFindMany: vi.fn(),
-    mockPredictionFindMany: vi.fn(),
-    mockCount: vi.fn(),
-    mockTagFindMany: vi.fn(),
-  }))
+const {
+  mockAggregate,
+  mockCommitmentFindMany,
+  mockPredictionFindMany,
+  mockCount,
+  mockTagFindMany,
+  mockTagFindUnique,
+  mockUserFindUnique,
+  mockTagRatingFindUnique,
+  mockEnsureTagRatingsSeeded,
+} = vi.hoisted(() => ({
+  mockAggregate: vi.fn(),
+  mockCommitmentFindMany: vi.fn(),
+  mockPredictionFindMany: vi.fn(),
+  mockCount: vi.fn(),
+  mockTagFindMany: vi.fn(),
+  mockTagFindUnique: vi.fn(),
+  mockUserFindUnique: vi.fn(),
+  mockTagRatingFindUnique: vi.fn(),
+  mockEnsureTagRatingsSeeded: vi.fn(),
+}))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -27,8 +40,19 @@ vi.mock('@/lib/prisma', () => ({
     },
     tag: {
       findMany: mockTagFindMany,
+      findUnique: mockTagFindUnique,
+    },
+    user: {
+      findUnique: mockUserFindUnique,
+    },
+    userTagRating: {
+      findUnique: mockTagRatingFindUnique,
     },
   },
+}))
+
+vi.mock('@/lib/services/tag-ratings', () => ({
+  ensureTagRatingsSeeded: mockEnsureTagRatingsSeeded,
 }))
 
 // ---------------------------------------------------------------------------
@@ -51,6 +75,64 @@ function makeAggregateResult(overrides: Record<string, unknown> = {}) {
 describe('loadProfileScores', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUserFindUnique.mockResolvedValue({ eloRating: 1500 })
+    mockTagFindUnique.mockResolvedValue({ id: 'tag-1' })
+    mockTagRatingFindUnique.mockResolvedValue(null)
+    mockEnsureTagRatingsSeeded.mockResolvedValue(undefined)
+  })
+
+  it('returns the global ELO when no tag is selected, without touching tag ratings', async () => {
+    mockAggregate.mockResolvedValue(makeAggregateResult())
+    mockCommitmentFindMany.mockResolvedValue([])
+    mockTagFindMany.mockResolvedValue([])
+    mockUserFindUnique.mockResolvedValue({ eloRating: 1587.4 })
+
+    const scores = await loadProfileScores({ userId: 'u1', selectedTag: null })
+
+    expect(scores.elo).toBe(1587.4)
+    expect(mockEnsureTagRatingsSeeded).not.toHaveBeenCalled()
+    expect(mockTagRatingFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('returns the materialized per-tag ELO when a tag is selected, seeding the tag first', async () => {
+    mockAggregate.mockResolvedValue(makeAggregateResult())
+    mockCommitmentFindMany.mockResolvedValue([])
+    mockTagFindMany.mockResolvedValue([])
+    mockTagFindUnique.mockResolvedValue({ id: 'tag-politics' })
+    mockTagRatingFindUnique.mockResolvedValue({ elo: 1642 })
+
+    const scores = await loadProfileScores({ userId: 'u1', selectedTag: 'politics' })
+
+    expect(scores.elo).toBe(1642)
+    expect(mockEnsureTagRatingsSeeded).toHaveBeenCalledWith('tag-politics', 'politics')
+    expect(mockTagRatingFindUnique).toHaveBeenCalledWith({
+      where: { userId_tagId: { userId: 'u1', tagId: 'tag-politics' } },
+      select: { elo: true },
+    })
+    expect(mockUserFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('returns null ELO for a tag the user never resolved in (no row) — not the global value', async () => {
+    mockAggregate.mockResolvedValue(makeAggregateResult())
+    mockCommitmentFindMany.mockResolvedValue([])
+    mockTagFindMany.mockResolvedValue([])
+    mockTagRatingFindUnique.mockResolvedValue(null)
+
+    const scores = await loadProfileScores({ userId: 'u1', selectedTag: 'politics' })
+
+    expect(scores.elo).toBeNull()
+  })
+
+  it('returns null ELO for an unknown tag slug', async () => {
+    mockAggregate.mockResolvedValue(makeAggregateResult())
+    mockCommitmentFindMany.mockResolvedValue([])
+    mockTagFindMany.mockResolvedValue([])
+    mockTagFindUnique.mockResolvedValue(null)
+
+    const scores = await loadProfileScores({ userId: 'u1', selectedTag: 'nope' })
+
+    expect(scores.elo).toBeNull()
+    expect(mockEnsureTagRatingsSeeded).not.toHaveBeenCalled()
   })
 
   it('returns null scores when no data', async () => {

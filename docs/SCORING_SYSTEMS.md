@@ -2,7 +2,9 @@
 
 ## Overview
 
-DAATAN supports multiple scoring systems for ranking predictors on the leaderboard. Each system measures a different aspect of forecasting skill. Systems are tag-filterable — the leaderboard can rank users within a specific topic using the `?tag=` parameter.
+DAATAN computes multiple scoring systems for ranking predictors. Each system measures a different aspect of forecasting skill. Systems are tag-filterable — the leaderboard can rank users within a specific topic using the `?tag=` parameter.
+
+**What the UI shows (since 2026-09-23):** ELO is the headline rating. The leaderboard page offers three sort tabs — ELO (default), Accuracy, Brier Score — and always shows those three columns; the profile header card is ELO and the profile scores grid is Accuracy + Brier + the calibration chart. Every other system below is still computed and reachable through `GET /api/leaderboard?sortBy=` but is not rendered anywhere user-facing. The `N RS` chips (sidebar, forecast author line, activity feed, profile OG image) were replaced by ELO at the same time.
 
 The scoring architecture is defined in `src/lib/services/scoring-systems.ts`. Adding a new scoring system requires only:
 1. Adding its key to `SortBy`
@@ -71,6 +73,8 @@ Head-to-head competitive rating. When two users commit to the same prediction, t
 
 **Global:** stored incrementally on `User.eloRating`, updated at each resolution.  
 **Per-tag:** stored in `UserTagRating.elo` — one row per `(userId, tagId)`. Updated incrementally inside the resolution transaction via `updateTagRatingsInTx` in `src/lib/services/tag-ratings.ts`. Seeded lazily on the first leaderboard request for a tag via `ensureTagRatingsSeeded` (which calls `replayEloHistory(tagSlug)` once and writes the results). All users start at 1500 within each tag scope.
+
+**Per-tag with no row:** a user with no `UserTagRating` row for the selected tag never resolved a forecast in it, so the tag leaderboard returns `eloRating: null` for them (sorted last, rendered `—`) rather than falling back to their global value — otherwise the board would not change with the tag for those users. The profile does the same (`ProfileScores.elo === null`).
 
 **Update formula:** K=32 pairwise:
 ```
@@ -186,9 +190,7 @@ Requires minimum 3 resolved predictions. Computed at query time from `Commitment
 
 4. **Update the API route**: `SortBy` is re-exported from `leaderboard.ts`, so no change needed if it's already in `scoring-systems.ts`.
 
-5. **Update the UI** in `src/app/leaderboard/page.tsx`: add to `SORT_OPTIONS`, `getHighlightValue`, `getHighlightLabel`, `getHighlightColor`, and `LeaderboardUser` type.
-
-6. **Add i18n keys** for `sortBy.mySystem` and `legend.mySystemTitle/Desc` in all 4 language files (`en.json`, `ru.json`, `he.json`, `eo.json`).
+5. **Decide whether it is user-facing.** The leaderboard page deliberately renders only ELO, Accuracy and Brier (`SORT_OPTIONS` in `src/app/leaderboard/page.tsx`); a new system is API-only unless that decision is revisited. If it is surfaced, add a fixed column, a legend card, and i18n keys for `sortBy.mySystem` and `legend.mySystemTitle/Desc` in all 4 language files (`en.json`, `ru.json`, `he.json`, `eo.json`).
 
 ---
 
@@ -215,7 +217,7 @@ ELO and Glicko-2 per-tag ratings start all users at default values within each t
 
 **Note:** Per-tag Glicko-2 requires ≥3 resolved predictions in the tag before a score is surfaced; users with fewer appear at the bottom (same as ROI and TruthScore). ELO has no minimum threshold.
 
-**Profile page vs leaderboard:** The profile scores grid (`ScoresGrid.tsx`) shows ELO and Glicko-2 from the globally stored `User.eloRating` / `User.mu` / `User.sigma` — it does not read from `UserTagRating`. Per-tag materialized values are leaderboard-only.
+**Profile page vs leaderboard:** The profile header card shows ELO from `ProfileScores.elo` (`loadProfileScores` in `src/lib/services/profile.ts`): the global `User.eloRating` with no tag, or the materialized `UserTagRating.elo` row when `?tag=` is set (seeding the tag via `ensureTagRatingsSeeded` first, exactly like the leaderboard). Glicko-2 is not shown on the profile.
 
 ---
 
@@ -229,9 +231,9 @@ ELO and Glicko-2 per-tag ratings start all users at default values within each t
 | `src/lib/services/elo.ts` | `calculateEloUpdates`, `replayEloHistory(tagSlug?)` |
 | `src/lib/services/expertise.ts` | `glicko2Update`, `applyGlicko2Update`, `replayGlicko2History(tagSlug?)` |
 | `src/lib/services/tag-ratings.ts` | `ensureTagRatingsSeeded(tagId, tagSlug)` — lazy seed; `updateTagRatingsInTx(tx, tags, commitments)` — incremental update at resolution |
-| `src/app/leaderboard/page.tsx` | Client UI, sort tabs, tag filter, display columns |
+| `src/app/leaderboard/page.tsx` | Client UI — ELO / Accuracy / Brier tabs and columns, tag filter, legend |
 | `src/app/api/leaderboard/route.ts` | `GET /api/leaderboard?sortBy=&tag=&limit=` |
-| `src/components/profile/ScoresGrid.tsx` | Profile page scores grid — renders all metrics for a single user |
+| `src/components/profile/ScoresGrid.tsx` | Profile page scores grid — Accuracy + Brier cards with explanations, calibration chart |
 
 See also: [`docs/PROFILE_PAGE.md`](./PROFILE_PAGE.md) for the profile page architecture and per-user score display.
 

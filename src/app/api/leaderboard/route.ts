@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
-    const sortBy = (searchParams.get('sortBy') || 'rs') as SortBy
+    const sortBy = (searchParams.get('sortBy') || 'elo') as SortBy
     const tagSlug = searchParams.get('tag') ?? undefined
     const leaderboard = await getCachedLeaderboard(limit, sortBy, tagSlug)
     return NextResponse.json({ leaderboard })

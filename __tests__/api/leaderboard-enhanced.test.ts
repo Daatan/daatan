@@ -100,7 +100,7 @@ describe('GET /api/leaderboard (enhanced)', () => {
 
   })
 
-  it('returns leaderboard sorted by RS (default)', async () => {
+  it('returns leaderboard sorted by ELO (default)', async () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any)
 
@@ -110,6 +110,18 @@ describe('GET /api/leaderboard (enhanced)', () => {
 
     expect(response.status).toBe(200)
     expect(data.leaderboard).toHaveLength(2)
+    expect(data.leaderboard[0].username).toBe('bob') // elo=1520 > 1500
+    expect(data.leaderboard[1].username).toBe('alice')
+  })
+
+  it('still sorts by RS when asked explicitly', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any)
+
+    const request = new NextRequest('http://localhost/api/leaderboard?sortBy=rs')
+    const response = await GET(request)
+    const data = await response.json()
+
     expect(data.leaderboard[0].username).toBe('alice') // rs=120 > 100
     expect(data.leaderboard[1].username).toBe('bob')
   })
@@ -227,6 +239,25 @@ describe('GET /api/leaderboard (enhanced)', () => {
     expect(prisma.userTagRating.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ tagId: 'tag-crypto' }) }),
     )
+  })
+
+  it('gives a null per-tag ELO (sorted last) to users with no row in that tag, not their global value', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any)
+    vi.mocked(prisma.tag.findUnique).mockResolvedValue({ id: 'tag-crypto' } as any)
+    // Only Alice ever resolved a crypto forecast; Bob's global 1520 must not leak into the tag board.
+    vi.mocked(prisma.userTagRating.findMany).mockResolvedValueOnce([
+      { userId: 'u1', elo: 1480, mu: 1500, sigma: 350 },
+    ] as any)
+
+    const request = new NextRequest('http://localhost/api/leaderboard?sortBy=elo&tag=crypto')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(data.leaderboard[0].username).toBe('alice')
+    expect(data.leaderboard[0].eloRating).toBe(1480)
+    expect(data.leaderboard[1].username).toBe('bob')
+    expect(data.leaderboard[1].eloRating).toBeNull()
   })
 
   it('handles database errors gracefully', async () => {

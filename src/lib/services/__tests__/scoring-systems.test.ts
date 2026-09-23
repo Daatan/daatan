@@ -138,13 +138,18 @@ describe('SCORING_SYSTEMS registry', () => {
   })
 
   describe('elo', () => {
-    it('falls back to the user column when no per-tag replay exists', () => {
-      expect(system('elo').compute('u1', makeUser({ eloRating: 1620 }), makeContext())).toBe(1620)
-    })
-
-    it('prefers the context (tag-replayed) value over the user column', () => {
+    it('reads the context value (global or materialized per-tag) — never the user column', () => {
       const ctx = makeContext({ eloByUser: new Map([['u1', 1710]]) })
       expect(system('elo').compute('u1', makeUser({ eloRating: 1500 }), ctx)).toBe(1710)
+    })
+
+    it('returns null when the context holds null (tag selected, user has no row there)', () => {
+      const ctx = makeContext({ eloByUser: new Map([['u1', null]]) })
+      expect(system('elo').compute('u1', makeUser({ eloRating: 1620 }), ctx)).toBeNull()
+    })
+
+    it('returns null when the context has no entry at all', () => {
+      expect(system('elo').compute('u1', makeUser({ eloRating: 1620 }), makeContext())).toBeNull()
     })
   })
 

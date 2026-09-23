@@ -69,7 +69,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
                   <RoleBadge role={prediction.author.role} size="sm" />
                 )}
               </span>
-              <span className="text-xs text-gray-500 shrink-0">{t('reputationShort')} {prediction.author.rs.toFixed(0)}</span>
+              <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Math.round(prediction.author.eloRating)}</span>
             </UserLink>
           </div>
         )}

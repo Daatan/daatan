@@ -41,6 +41,7 @@ export type Prediction = {
     username?: string | null
     image?: string | null
     rs: number
+    eloRating: number
     role?: UserRole
   }
   newsAnchor?: {

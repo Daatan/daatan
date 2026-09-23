@@ -367,9 +367,11 @@ move slowly (only on resolution events), so this avoids the full multi-query agg
 
 | Query | Type | Default | Description |
 |-------|------|---------|-------------|
-| `sortBy` | enum | `rs` | One of: `rs`, `accuracy`, `totalCorrect`, `cuCommitted`, `brierScore`, `peerScore`, `aiScore`, `elo`, `glicko`, `roi`, `truthScore`, `weightedPeerScore`. See `docs/SCORING_SYSTEMS.md`. |
+| `sortBy` | enum | `elo` | One of: `rs`, `accuracy`, `totalCorrect`, `cuCommitted`, `brierScore`, `peerScore`, `aiScore`, `elo`, `glicko`, `roi`, `truthScore`, `weightedPeerScore`. See `docs/SCORING_SYSTEMS.md`. |
 | `tag` | string | – | Filter by tag slug. When provided, ELO and Glicko-2 are read from the materialized `UserTagRating` table (seeded lazily on first request for that tag); other sorts are filtered to commitments on predictions tagged with the slug. |
 | `limit` | int | `50` | Max users to return (capped server-side). |
+
+With `tag`, `eloRating` is `null` for users with no resolved forecast in that tag (they sort last); without `tag` it is always a number. The leaderboard page only uses `elo`, `accuracy` and `brierScore`; the other sorts remain available here.
 
 ### `GET /api/top-reputation`
 Top users by reputation for sidebar widget. Public. Rate-limited to 60 requests/hour per IP.

@@ -8,17 +8,17 @@ import { getAppUrl } from '@/lib/branding'
 // Docker image build. Route stays dynamic; the DB call below is cached.
 export const dynamic = 'force-dynamic'
 
-// Top 10 by RS moves slowly; 5min TTL is plenty fresh and avoids a DB
+// Top 10 by ELO moves slowly; 5min TTL is plenty fresh and avoids a DB
 // hit on every leaderboard request.
 const fetchTopUsersForJsonLd = unstable_cache(
-  async () => (await getLeaderboard(10, 'rs')) ?? [],
-  ['leaderboard-jsonld-top10-rs'],
+  async () => (await getLeaderboard(10, 'elo')) ?? [],
+  ['leaderboard-jsonld-top10-elo'],
   { revalidate: 300, tags: ['leaderboard'] },
 )
 
 export const metadata: Metadata = {
-  title: 'Leaderboard — Top Forecasters by Accuracy & Reputation',
-  description: 'See who leads on DAATAN. Rankings by Reputation Score, Brier calibration, ELO, peer score, and more — across all forecasts and filtered by topic.',
+  title: 'Leaderboard — Top Forecasters by ELO Rating',
+  description: 'See who leads on DAATAN. Forecasters ranked by ELO rating, with accuracy and Brier calibration alongside — across all forecasts and filtered by topic.',
   alternates: { canonical: '/leaderboard' },
   openGraph: { url: '/leaderboard', type: 'website' },
 }
@@ -35,7 +35,7 @@ export default async function LeaderboardLayout({ children }: { children: React.
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: 'DAATAN Leaderboard',
-    description: 'Top forecasters on DAATAN ranked by reputation score.',
+    description: 'Top forecasters on DAATAN ranked by ELO rating.',
     numberOfItems: topUsers.length,
     itemListElement: topUsers.map((u, i) => ({
       '@type': 'ListItem',

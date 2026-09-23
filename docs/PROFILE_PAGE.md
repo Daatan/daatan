@@ -21,12 +21,11 @@ Switching a tag resets page to 1. Switching a tab resets page to 1 but preserves
 ```
 ProfilePage (Server Component — page.tsx)
   └── UserProfileView (Server Component)
-        ├── Profile header (avatar, name, RS card, CU balance)
+        ├── Profile header (avatar, name, ELO card — per-tag when a tag is selected)
         ├── TagFilter (Client Component — useSearchParams)
         ├── ScoresGrid (Server Component)
-        │     ├── Score cards (10+ metrics)
-        │     ├── GlickoChart
-        │     └── TopicBreakdown (when no tag selected)
+        │     ├── Accuracy + Brier cards, each with a visible explanation
+        │     └── CalibrationChart
         └── ProfileTabs (Client Component — usePathname + useSearchParams)
               └── {children} — server-rendered tab content (CreatedList / CommitmentList)
 ```
@@ -39,10 +38,11 @@ Server components render the full page with no client-side data fetching. `Profi
 
 ### `loadProfileScores({ userId, selectedTag }): Promise<ProfileScores>`
 
-Runs 8 parallel DB queries to compute all scoring metrics for the scores grid. Returns `ProfileScores`:
+Runs the metric queries in parallel and returns `ProfileScores`. Only `elo`, `accuracy`, `avgBrierScore` and `calibration` are rendered today; the rest are still computed so the other scoring systems can be re-surfaced without a service change.
 
 | Field | Description |
 |-------|-------------|
+| `elo` | Global `User.eloRating`, or the materialized `UserTagRating.elo` when a tag is selected (`null` = no resolved forecast in that tag) |
 | `avgBrierScore` | Average (p − outcome)² across resolved commitments |
 | `brierCount` | Number of resolved commitments with a Brier score |
 | `peerScoreSum` | Sum of peer scores (you vs community consensus) |
@@ -81,11 +81,9 @@ Returns counts for all three tabs plus the items for the active tab (20 per page
 
 ## Scores Grid
 
-See `docs/SCORING_SYSTEMS.md` for full descriptions of each metric. The grid renders ELO and Glicko-2 from the global stored values on `User`; per-tag replays (using `replayEloHistory` / `replayGlicko2History`) are **not** performed on the profile page — those are leaderboard-only for performance reasons.
+See `docs/SCORING_SYSTEMS.md` for full descriptions of each metric. ELO is the headline rating and lives in the profile header card; with `?tag=` it reads the materialized `UserTagRating` row (seeded lazily via `ensureTagRatingsSeeded`, the same path the leaderboard uses — no replay on the request path after the first visit to a tag).
 
-The `ScoresGrid` component also renders:
-- **GlickoChart** — Glicko-2 μ ± σ history via `GET /api/profile/[id]/glicko-history`
-- **TopicBreakdown** — a table of per-tag peer score averages (hidden when a tag is already selected)
+The grid itself shows two plain-language checks on ELO — Accuracy and Brier Score — each with a visible one-line explanation, plus the calibration chart. Glicko-2, peer/AI/truth scores, ROI, RS and the topic breakdown are hidden (not deleted: `loadProfileScores` still computes them and `GlickoChart` / `GET /api/profile/[id]/glicko-history` still exist).
 
 ## Implementation Files
 

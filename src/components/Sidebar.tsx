@@ -418,9 +418,9 @@ const Sidebar = () => {
                     )}
                   </div>
                   <p className="text-xs text-text-subtle truncate mb-1">{session.user.email}</p>
-                  <div className="flex items-center gap-1 text-xs font-medium text-teal bg-navy-700 px-2 py-0.5 rounded-full w-fit">
-                    <span className="w-3 h-3 rounded-full border border-teal flex items-center justify-center text-[8px] font-bold">R</span>
-                    {session.user.rs ?? 0} RS
+                  <div className="flex items-center gap-1 text-xs font-medium text-teal bg-navy-700 px-2 py-0.5 rounded-full w-fit" title="ELO rating">
+                    <span className="w-3 h-3 rounded-full border border-teal flex items-center justify-center text-[8px] font-bold">E</span>
+                    {Math.round(session.user.eloRating ?? 1500)} ELO
                   </div>
                 </div>
               </UserLink>

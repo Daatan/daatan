@@ -68,6 +68,7 @@ async function getPrediction(idOrSlug: string) {
           username: true,
           image: true,
           rs: true,
+          eloRating: true,
           role: true,
           twitterHandle: true,
         },

@@ -48,10 +48,10 @@ function HeMethodologyPage() {
         </div>
         <div className="p-6 space-y-3 text-text-secondary">
           <p>
-            דעתן מדרג מתחזתים לפי אחת עשרה שיטות ניקוד שונות, וכל אחת בודקת היבט אחר של יכולת
-            חיזוי: דיוק גולמי, כיול (Brier Score), עוצמה מול יריב (ELO), ורמת ביטחון מותאמת אי-ודאות
-            (Glicko-2). כל שיטה, חוץ מ&quot;ניקוד המוניטין&quot; המקורי, אפשר לסנן לפי נושא אחד בלוח
-            המובילים.
+            הדירוג הראשי של דעתן הוא ELO: לוח המובילים וכל פרופיל מתחילים בו. לצידו האתר מציג
+            שתי בדיקות פשוטות — דיוק גולמי וכיול (Brier Score). שאר השיטות בעמוד הזה, ובראשן
+            Glicko-2, עדיין מחושבות וזמינות דרך ה-API אך אינן מוצגות יותר. כל שיטה, חוץ
+            מ&quot;ניקוד המוניטין&quot; המקורי, אפשר לסנן לפי נושא אחד בלוח המובילים.
           </p>
         </div>
       </div>
@@ -152,11 +152,12 @@ function RuMethodologyPage() {
         </div>
         <div className="p-6 space-y-3 text-text-secondary">
           <p>
-            Daatan ранжирует прогнозистов по одиннадцати разным системам подсчёта очков, каждая
-            из которых проверяет свой аспект способности прогнозировать: точность, калибровку
-            (Brier Score), силу относительно соперника (ELO) и степень уверенности с учётом
-            неопределённости (Glicko-2). Любую систему, кроме исходного «рейтинга репутации»,
-            можно отфильтровать по одной теме в таблице лидеров.
+            Основной рейтинг Daatan — ELO: с него начинаются и таблица лидеров, и каждый профиль.
+            Рядом с ним сайт показывает две простые проверки — точность и калибровку
+            (Brier Score). Остальные системы на этой странице, в первую очередь Glicko-2,
+            по-прежнему считаются и доступны через API, но больше не отображаются. Любую систему,
+            кроме исходного «рейтинга репутации», можно отфильтровать по одной теме в таблице
+            лидеров.
           </p>
         </div>
       </div>
@@ -266,11 +267,12 @@ function EoMethodologyPage() {
         </div>
         <div className="p-6 space-y-3 text-text-secondary">
           <p>
-            Daatan rangigas prognozistojn laŭ dek unu malsamaj poentaj sistemoj, ĉiu kontrolanta
-            alian aspekton de prognoza kapablo: kruda precizeco, kalibrado (Brier-Poentaro),
-            forto kompare al kontraŭulo (ELO), kaj necerteco-adaptita grado de certeco (Glicko-2).
-            Ĉiu metodo, krom la origina &quot;Reputacia Poentaro&quot;, estas filtrebla laŭ unu
-            temo en la estrolisto.
+            La ĉefa takso de Daatan estas ELO: per ĝi komenciĝas kaj la estrolisto kaj ĉiu
+            profilo. Apud ĝi la retejo montras du simplajn kontrolojn — krudan precizecon kaj
+            kalibradon (Brier-Poentaro). La aliaj sistemoj sur ĉi tiu paĝo, unuavice Glicko-2,
+            ankoraŭ estas kalkulataj kaj atingeblaj per la API, sed ne plu montrataj. Ĉiu metodo,
+            krom la origina &quot;Reputacia Poentaro&quot;, estas filtrebla laŭ unu temo en la
+            estrolisto.
           </p>
         </div>
       </div>

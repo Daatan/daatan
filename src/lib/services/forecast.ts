@@ -42,6 +42,7 @@ const PREDICTION_AUTHOR_SELECT = {
   username: true,
   image: true,
   rs: true,
+  eloRating: true,
   role: true,
 } as const
 
