@@ -31,9 +31,42 @@ export interface AnalysisData {
   }
   detailedAnalysis?: AnalysisSection[]
   citations?: string[]
+  reportHref?: string
 }
 
 export const analyses: AnalysisData[] = [
+  {
+    id: 'ukraine-2022',
+    tag: 'CASE E01 · 913 RATED STATEMENTS',
+    title: 'Who Saw the Invasion of Ukraine Coming',
+    description: "The three months before Russia's full-scale invasion on 24 February 2022. Every statement was rated on how likely its speaker thought a full-scale invasion was, on the day it was published. Western governments averaged 80%. Russian officials said no in 80% of their statements, and Ukrainian officials in 40%.",
+    reportHref: '/retroanalysis/ukraine-2022',
+    leftColumn: {
+      label: 'YES / INVASION',
+      outcome: 'CORRECT',
+      sublabel: 'EXPECTED A FULL-SCALE INVASION',
+      color: 'teal',
+      items: [
+        { source: 'INTERFAX', headline: 'Kyrylo Budanov, head of Ukrainian military intelligence', date: 'Nov 21, 2021', quote: 'Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.' },
+        { source: 'THE WASHINGTON POST', headline: "Rob Lee, King's College London", date: 'Jan 21, 2022', quote: 'A Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.' },
+        { source: 'THE NEW YORK TIMES', headline: 'Joe Biden, US President', date: 'Feb 02, 2022', quote: 'My guess is he will move in. He has to do something.' },
+        { source: 'PBS NEWSHOUR', headline: 'Jonathan Finer, US Deputy National Security Adviser', date: 'Feb 04, 2022', quote: "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we're actually seeing with our own eyes." },
+      ]
+    },
+    rightColumn: {
+      label: 'NO / BLUFF',
+      outcome: 'WRONG',
+      sublabel: 'DISMISSED A FULL-SCALE INVASION',
+      color: 'rose',
+      items: [
+        { source: 'IZVESTIA', headline: 'Dmitry Peskov, Kremlin spokesman', date: 'Nov 29, 2021', quote: 'Слова о якобы планируемом Россией нападении абсолютно беспочвенны.' },
+        { source: 'INSTITUTE FOR THE STUDY OF WAR', headline: "Putin's Likely Courses of Action in Ukraine, Part 2", date: 'Dec 12, 2021', quote: 'Putin does not, in fact, intend to invade unoccupied Ukraine this winter despite the continued build-up of Russian forces in preparation to do so.' },
+        { source: 'UNIAN', headline: "Oleksiy Danilov, Secretary of Ukraine's Security Council", date: 'Dec 30, 2021', quote: 'Сейчас угрозы открытой агрессии Российской Федерации против Украины не наблюдается… Поэтому отдыхайте спокойно, празднуйте.' },
+        { source: 'CARNEGIE MOSCOW CENTER', headline: 'Are We On the Brink of War? An Interview With Dmitri Trenin', date: 'Jan 20, 2022', quote: 'In the immediate future, say, the coming month, I think the answer is no.' },
+        { source: 'FOREIGN POLICY', headline: 'Jeff Hawn, London School of Economics', date: 'Jan 24, 2022', quote: 'While a full-scale invasion across Ukraine remains highly unlikely, there are a range of other options open to Russia.' },
+      ]
+    }
+  },
   {
     id: 'maduro-extraction',
     tag: 'POLITICAL FORECAST MARKET #882-VZ',

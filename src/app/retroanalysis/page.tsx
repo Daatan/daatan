@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { analyses } from './data'
@@ -17,6 +18,7 @@ export default function RetroanalysisPage() {
 
   const getNavLabel = (id: string) => {
     switch (id) {
+      case 'ukraine-2022': return 'Ukraine 2022'
       case 'maduro-extraction': return 'Venezuela 2026'
       case 'trump-wars': return 'War Watch 2025'
       case 'energy-volatility-2026': return 'Energy 2026'
@@ -55,6 +57,14 @@ export default function RetroanalysisPage() {
           <p className="text-gray-500 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
             {activeAnalysis.description}
           </p>
+          {activeAnalysis.reportHref && (
+            <Link
+              href={activeAnalysis.reportHref}
+              className="inline-block mt-6 px-5 py-2.5 rounded-full bg-gray-900 text-white text-xs font-bold tracking-wide hover:bg-gray-700 transition-colors"
+            >
+              Full report: chart, method and all 200 articles →
+            </Link>
+          )}
         </div>
 
         {/* Two Column Layout */}
