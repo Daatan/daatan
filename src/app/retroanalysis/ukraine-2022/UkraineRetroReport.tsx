@@ -166,7 +166,7 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{rows.length} articles</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. The score is an inverted Brier score: the closer to 100, the better the voice called the outcome. See <a href="#numbers" className="underline">how to read the numbers</a>.</p>
+          <p className="mt-2 max-w-2xl text-gray-600">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. See <a href="#numbers" className="underline">how to read P</a>.</p>
           <ArticleTable rows={rows} />
         </section>
 
@@ -176,7 +176,6 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
             <Method title="Search">GDELT GKG via BigQuery over 122 domains: the sources news-indexer monitors, plus major world, Russian and Ukrainian outlets and think tanks. That gave 105,001 URLs. Gaps were filled from the Wayback archive, and key sceptics were found by hand.</Method>
             <Method title="Filter">Title keywords kept 5,007 candidates, and Claude Haiku kept 2,432 of those on title alone. Full texts then dropped irrelevant pieces, repeats of one speaker on one day, and anything edited after 24 February. Dates were checked against the page itself.</Method>
             <Method title="Rating" formula="P = 0.5 + 0.5 × stance">The model reads the text as of its publication date and returns the main voice&apos;s stance from −1 to +1, confidence, expected scope and a verbatim quote. Expecting a Donbas-only operation caps P at 0.35, and limited strikes cap it at 0.45.</Method>
-            <Method title="Score" formula="score = 100 × (1 − (1 − P)²)">An inverted Brier score for the outcome “the invasion happened”. P = 0.5 scores 75, a confident “no” scores about 0–10, and a confident “yes” about 100. The score belongs to the voice, not the outlet: a Reuters piece relaying Biden gets Biden&apos;s score.</Method>
           </div>
           <h3 className="mt-10 text-lg font-extrabold text-gray-900">What is missing</h3>
           <ul className="mt-2 list-disc pl-5 space-y-1.5 text-gray-600 max-w-3xl">
@@ -201,23 +200,13 @@ const SCALE_MARKS: [number, string, string][] = [
   [0.78, 'Biden', '“he will move in”'],
   [0.93, 'Budanov', '“late Jan or early Feb”'],
 ]
-const SCORE_ROWS: [number, string][] = [
-  [1, 'certain it will happen'],
-  [0.9, 'very likely'],
-  [0.75, 'likely'],
-  [0.5, 'coin flip'],
-  [0.25, 'unlikely'],
-  [0.1, 'very unlikely'],
-  [0, 'certain it won’t'],
-]
-const scoreOf = (p: number) => Math.round(100 * (1 - (1 - p) ** 2))
 
 function NumbersGuide() {
   return (
     <section id="numbers" className="mt-12 scroll-mt-6">
-      <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">How to read the numbers</h2>
-      <p className="mt-2 max-w-2xl text-gray-600">Every article gets two numbers. <b className="text-gray-900">P</b> is what the speaker said at the time. The <b className="text-gray-900">score</b> is how well that held up once we know the invasion happened.</p>
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">How to read P</h2>
+      <p className="mt-2 max-w-2xl text-gray-600">Every article gets one number, <b className="text-gray-900">P</b>: what its main voice expected at the time, before anyone knew the outcome.</p>
+      <div className="mt-6 max-w-3xl">
         <div className="bg-white border border-gray-200 rounded-xl p-5 md:p-6">
           <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">P</span><span className="text-sm text-gray-500">0 to 1 · what the speaker expected</span></div>
           <p className="mt-3 text-[15px] text-gray-600 leading-relaxed">The probability of a <b className="text-gray-900">full-scale</b> invasion that the article&apos;s main voice expressed on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.</p>
@@ -238,28 +227,6 @@ function NumbersGuide() {
             <li>Expecting only a Donbas operation caps P at 0.35, and limited strikes cap it at 0.45. Those speakers did not predict what actually happened.</li>
             <li>P ≥ 0.6 counts as “expects it” and P ≤ 0.4 as “doesn’t”. <b className="text-gray-900">Mean P</b> is the average over a group’s statements.</li>
           </ul>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-5 md:p-6">
-          <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">Score</span><span className="text-sm text-gray-500">0 to 100 · how well it held up</span></div>
-          <p className="mt-3 text-[15px] text-gray-600 leading-relaxed">An inverted Brier score, the standard accuracy measure for probability forecasts, taken against the real outcome: the invasion happened.</p>
-          <div className="mt-3 inline-block font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900">score = 100 × (1 − (1 − P)²)</div>
-          <table className="mt-4 w-full text-sm">
-            <thead><tr className="font-mono text-[11px] uppercase tracking-wider text-gray-400 text-left"><th className="py-1 font-medium">P</th><th className="py-1 font-medium">Speaker said</th><th className="py-1 font-medium text-right">Score</th><th className="py-1 w-[38%]" /></tr></thead>
-            <tbody>
-              {SCORE_ROWS.map(([p, said]) => {
-                const s = scoreOf(p)
-                return (
-                  <tr key={p} className="border-t border-gray-100">
-                    <td className="py-1.5 pr-3 font-mono tabular-nums">{p.toFixed(2)}</td>
-                    <td className="py-1.5 text-gray-600">{said}</td>
-                    <td className="py-1.5 text-right font-mono font-medium tabular-nums">{s}</td>
-                    <td className="py-1.5 pl-3"><span className="block h-1.5 rounded bg-gray-100"><span className={`block h-1.5 rounded ${s >= 75 ? 'bg-teal-600' : 'bg-rose-500'}`} style={{ width: `${s}%` }} /></span></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">The penalty grows with confidence. A hedged 0.4 still scores 64, while a confident 0.1 scores 19. <b className="text-gray-900">Below 75 is worse than a coin flip.</b></p>
         </div>
       </div>
     </section>
@@ -311,7 +278,7 @@ function VoiceColumn({ title, range, tone, voices, byN }: { title: string; range
           <article key={v.n} className="grid grid-cols-[64px_1fr] gap-x-4 py-4 border-b border-gray-200">
             <div className={`row-span-3 text-2xl font-black tabular-nums ${tone === 'hit' ? 'text-teal-700' : 'text-rose-700'}`}>
               {r.p_full.toFixed(2)}
-              <span className="block mt-1 font-mono text-[10px] font-normal text-gray-400">score {r.score}</span>
+              <span className="block mt-1 font-mono text-[10px] font-normal text-gray-400">P invasion</span>
             </div>
             <div className="font-mono text-xs text-gray-400">{r.date.split('-').reverse().join('.')} · <a href={r.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700">{r.domain}</a></div>
             <div className="font-bold text-gray-900 leading-snug">{v.name}<span className="block font-normal text-sm text-gray-500">{v.role}</span></div>
@@ -474,7 +441,7 @@ function ChartTip({ tip, day, roll }: { tip: Tip; day: number; roll: Record<Grou
   )
 }
 
-type SortKey = 'n' | 'date' | 'voice_name' | 'p_full' | 'predicted_scope' | 'score'
+type SortKey = 'n' | 'date' | 'voice_name' | 'p_full' | 'predicted_scope'
 
 function ArticleTable({ rows }: { rows: ReportRow[] }) {
   const [fGroup, setFGroup] = useState('')
@@ -496,7 +463,7 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
 
   const sortBy = (k: SortKey) => {
     if (k === sortK) setDir(-dir)
-    else { setSortK(k); setDir(k === 'score' || k === 'p_full' ? -1 : 1) }
+    else { setSortK(k); setDir(k === 'p_full' ? -1 : 1) }
   }
   const th = (k: SortKey, label: string, right = false) => (
     <th className={`sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
@@ -521,7 +488,7 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
           <thead><tr>
             {th('n', '#', true)}{th('date', 'Date')}
             <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Article</th>
-            {th('voice_name', 'Main voice')}{th('p_full', 'P invasion')}{th('predicted_scope', 'Scope')}{th('score', 'Score', true)}
+            {th('voice_name', 'Main voice')}{th('p_full', 'P invasion')}{th('predicted_scope', 'Scope')}
             <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Summary & quote</th>
           </tr></thead>
           <tbody>
@@ -545,7 +512,6 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
                   <div className="mt-0.5 font-mono text-xs text-gray-400">confidence {(r.claim_strength ?? 0).toFixed(2)}</div>
                 </td>
                 <td className="px-3 py-2.5">{SCOPE[r.predicted_scope ?? ''] ?? r.predicted_scope}<div className="font-mono text-xs text-gray-400">{r.timeframe}</div></td>
-                <td className="px-3 py-2.5 text-right font-mono tabular-nums">{r.score}</td>
                 <td className="px-3 py-2.5 min-w-[260px] max-w-[420px]">
                   <details>
                     <summary className="cursor-pointer text-[13px] text-gray-600 leading-snug">{r.summary}</summary>
