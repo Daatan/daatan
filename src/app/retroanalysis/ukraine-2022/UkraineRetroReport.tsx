@@ -113,6 +113,8 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
           </div>
         </header>
 
+        <NumbersGuide />
+
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Three months of argument in one chart</h2>
           <p className="mt-2 max-w-2xl text-gray-600">Each dot is one article, placed at the invasion probability its main voice expressed. Each line is that group&apos;s mean over the previous 14 days: what a reader could have seen at the time, without hindsight.</p>
@@ -164,7 +166,7 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{rows.length} articles</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. The score is an inverted Brier score: the closer to 100, the better the voice called the outcome.</p>
+          <p className="mt-2 max-w-2xl text-gray-600">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. The score is an inverted Brier score: the closer to 100, the better the voice called the outcome. See <a href="#numbers" className="underline">how to read the numbers</a>.</p>
           <ArticleTable rows={rows} />
         </section>
 
@@ -189,6 +191,78 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
         <div className="mt-16 text-center text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold">DAATAN Retro-Analysis Archive · E01 · built 23 Sep 2026</div>
       </div>
     </div>
+  )
+}
+
+const SCALE_MARKS: [number, string, string][] = [
+  [0.075, 'Peskov', '“groundless”'],
+  [0.35, 'Trenin', '“not this month”'],
+  [0.5, 'Coin flip', 'no view either way'],
+  [0.78, 'Biden', '“he will move in”'],
+  [0.93, 'Budanov', '“late Jan or early Feb”'],
+]
+const SCORE_ROWS: [number, string][] = [
+  [1, 'certain it will happen'],
+  [0.9, 'very likely'],
+  [0.75, 'likely'],
+  [0.5, 'coin flip'],
+  [0.25, 'unlikely'],
+  [0.1, 'very unlikely'],
+  [0, 'certain it won’t'],
+]
+const scoreOf = (p: number) => Math.round(100 * (1 - (1 - p) ** 2))
+
+function NumbersGuide() {
+  return (
+    <section id="numbers" className="mt-12 scroll-mt-6">
+      <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">How to read the numbers</h2>
+      <p className="mt-2 max-w-2xl text-gray-600">Every article gets two numbers. <b className="text-gray-900">P</b> is what the speaker said at the time. The <b className="text-gray-900">score</b> is how well that held up once we know the invasion happened.</p>
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 md:p-6">
+          <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">P</span><span className="text-sm text-gray-500">0 to 1 · what the speaker expected</span></div>
+          <p className="mt-3 text-[15px] text-gray-600 leading-relaxed">The probability of a <b className="text-gray-900">full-scale</b> invasion that the article&apos;s main voice expressed on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.</p>
+          <div className="relative mt-20 mb-16 mx-2">
+            <div className="h-2 rounded-full bg-gradient-to-r from-rose-500 via-gray-300 to-teal-600" />
+            {SCALE_MARKS.map(([p, who, what], i) => (
+              <div key={who} className={`absolute flex flex-col w-28 ${p < 0.15 ? '-translate-x-[6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
+                <span className="w-px h-2.5 bg-gray-500" />
+                <span className="font-mono text-[11px] text-gray-900 font-medium">{p.toFixed(2)} {who}</span>
+                <span className="text-[11px] leading-tight text-gray-500">{what}</span>
+              </div>
+            ))}
+            <span className="absolute -left-2 top-3 font-mono text-[11px] text-gray-400">0</span>
+            <span className="absolute -right-2 top-3 font-mono text-[11px] text-gray-400">1</span>
+          </div>
+          <ul className="space-y-1.5 text-[14px] text-gray-600 leading-relaxed list-disc pl-5">
+            <li>The model rates the speaker&apos;s stance from −1 to +1, and <span className="font-mono text-gray-900">P = 0.5 + 0.5 × stance</span>.</li>
+            <li>Expecting only a Donbas operation caps P at 0.35, and limited strikes cap it at 0.45. Those speakers did not predict what actually happened.</li>
+            <li>P ≥ 0.6 counts as “expects it” and P ≤ 0.4 as “doesn’t”. <b className="text-gray-900">Mean P</b> is the average over a group’s statements.</li>
+          </ul>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-5 md:p-6">
+          <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">Score</span><span className="text-sm text-gray-500">0 to 100 · how well it held up</span></div>
+          <p className="mt-3 text-[15px] text-gray-600 leading-relaxed">An inverted Brier score, the standard accuracy measure for probability forecasts, taken against the real outcome: the invasion happened.</p>
+          <div className="mt-3 inline-block font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900">score = 100 × (1 − (1 − P)²)</div>
+          <table className="mt-4 w-full text-sm">
+            <thead><tr className="font-mono text-[11px] uppercase tracking-wider text-gray-400 text-left"><th className="py-1 font-medium">P</th><th className="py-1 font-medium">Speaker said</th><th className="py-1 font-medium text-right">Score</th><th className="py-1 w-[38%]" /></tr></thead>
+            <tbody>
+              {SCORE_ROWS.map(([p, said]) => {
+                const s = scoreOf(p)
+                return (
+                  <tr key={p} className="border-t border-gray-100">
+                    <td className="py-1.5 pr-3 font-mono tabular-nums">{p.toFixed(2)}</td>
+                    <td className="py-1.5 text-gray-600">{said}</td>
+                    <td className="py-1.5 text-right font-mono font-medium tabular-nums">{s}</td>
+                    <td className="py-1.5 pl-3"><span className="block h-1.5 rounded bg-gray-100"><span className={`block h-1.5 rounded ${s >= 75 ? 'bg-teal-600' : 'bg-rose-500'}`} style={{ width: `${s}%` }} /></span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">The penalty grows with confidence. A hedged 0.4 still scores 64, while a confident 0.1 scores 19. <b className="text-gray-900">Below 75 is worse than a coin flip.</b></p>
+        </div>
+      </div>
+    </section>
   )
 }
 
