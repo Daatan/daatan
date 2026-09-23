@@ -23,7 +23,6 @@ export interface ReportRow {
   predicted_scope: string | null
   timeframe: string | null
   p_full: number
-  score: number
   side: Side
   key_quote: string | null
   key_quote_en: string | null
