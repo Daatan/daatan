@@ -174,13 +174,15 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
   }
 
   // ELO + Glicko-2: per-tag from materialized table when tag selected; stored global otherwise.
-  // Falls back to global values for users with no per-tag row.
+  // A user with no per-tag row never resolved a forecast in this tag: their ELO is null there
+  // (sorted last, rendered "—") rather than their global value, so the tag board really
+  // changes with the tag. Glicko keeps its global fallback.
   const tagRatingByUser = tagRatingRows
     ? new Map(tagRatingRows.map(r => [r.userId, r]))
     : null
 
-  const eloByUser = new Map(
-    users.map(u => [u.id, tagRatingByUser?.get(u.id)?.elo ?? u.eloRating]),
+  const eloByUser = new Map<string, number | null>(
+    users.map(u => [u.id, tagRatingByUser ? (tagRatingByUser.get(u.id)?.elo ?? null) : u.eloRating]),
   )
 
   const glickoByUser = new Map<string, { mu: number; sigma: number }>(
@@ -210,7 +212,7 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
     const ps = peerScoreByUser.get(user.id)
     const rsc = rsChangeByUser.get(user.id)
     const g = glickoByUser.get(user.id) ?? { mu: user.mu, sigma: user.sigma }
-    const elo = eloByUser.get(user.id) ?? user.eloRating
+    const elo = eloByUser.get(user.id) ?? null
 
     return {
       id: user.id,
@@ -248,7 +250,7 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
 
   // Sort using the active system's comparator from the registry
   leaderboard.sort((a, b) => {
-    const minUser = (u: typeof a) => ({ id: u.id, rs: u.rs, mu: u.mu, sigma: u.sigma, eloRating: u.eloRating })
+    const minUser = (u: typeof a) => ({ id: u.id, rs: u.rs, mu: u.mu, sigma: u.sigma })
     const va = activeSystem.compute(a.id, minUser(a), ctx)
     const vb = activeSystem.compute(b.id, minUser(b), ctx)
     if (va == null && vb == null) return 0

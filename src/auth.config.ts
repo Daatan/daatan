@@ -73,6 +73,7 @@ export default {
         session.user.role = token.role ?? 'USER'
         session.user.username = token.username ?? undefined
         session.user.rs = token.rs
+        session.user.eloRating = token.eloRating
         if (token.name) session.user.name = token.name
         if (token.picture) session.user.image = token.picture as string
       }
@@ -84,6 +85,7 @@ export default {
         token.role = user.role
         token.username = user.username
         token.rs = user.rs
+        token.eloRating = user.eloRating
       }
       return token
     },

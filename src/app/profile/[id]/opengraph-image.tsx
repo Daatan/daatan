@@ -16,7 +16,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       name: true,
       username: true,
       image: true,
-      rs: true,
+      eloRating: true,
       _count: { select: { predictions: true, commitments: true } },
     },
   })
@@ -76,10 +76,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             <div style={{ display: 'flex', gap: '48px' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#7A9CC0', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-                  Reputation
+                  ELO rating
                 </span>
                 <span style={{ fontSize: '48px', fontWeight: 'bold', color: '#2F6BFF' }}>
-                  {Math.round(user.rs)}
+                  {Math.round(user.eloRating)}
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>

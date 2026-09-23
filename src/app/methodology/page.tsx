@@ -92,9 +92,10 @@ export default function MethodologyPage() {
       <section>
         <p className="text-white font-medium mb-2">In short:</p>
         <p>
-          DAATAN ranks forecasters with eleven scoring systems, each measuring a different
-          facet of skill: raw accuracy, calibration (Brier Score), head-to-head strength (ELO),
-          and uncertainty-adjusted skill (Glicko-2) chief among them. Every system except
+          DAATAN&apos;s headline rating is ELO: the leaderboard and every profile lead with it.
+          Alongside it the site shows two plain-language checks — raw accuracy and calibration
+          (Brier Score). The other systems on this page, Glicko-2 chief among them, are still
+          computed and available through the API but are no longer displayed. Every system except
           Reputation Score can be filtered to a single topic via the leaderboard&apos;s{' '}
           <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
             ?tag=

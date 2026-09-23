@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { ensureTagRatingsSeeded } from '@/lib/services/tag-ratings'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
 
 const DECAY = 0.95
@@ -32,6 +33,9 @@ export interface CalibrationPoint {
 }
 
 export interface ProfileScores {
+  /** Global ELO, or the materialized per-tag ELO when a tag is selected.
+   *  null = tag selected and the user never resolved a forecast in it. */
+  elo: number | null
   avgBrierScore: number | null
   brierCount: number
   peerScoreSum: number | null
@@ -75,6 +79,21 @@ const predictionInclude = {
   _count: { select: { commitments: true } },
 } as const
 
+async function loadElo(userId: string, selectedTag: string | null): Promise<number | null> {
+  if (!selectedTag) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { eloRating: true } })
+    return user?.eloRating ?? null
+  }
+  const tag = await prisma.tag.findUnique({ where: { slug: selectedTag }, select: { id: true } })
+  if (!tag) return null
+  await ensureTagRatingsSeeded(tag.id, selectedTag)
+  const row = await prisma.userTagRating.findUnique({
+    where: { userId_tagId: { userId, tagId: tag.id } },
+    select: { elo: true },
+  })
+  return row?.elo ?? null
+}
+
 export async function loadProfileScores({
   userId,
   selectedTag,
@@ -90,6 +109,7 @@ export async function loadProfileScores({
     : {}
 
   const [
+    elo,
     brierStats,
     rsTagStats,
     peerScoreStats,
@@ -100,6 +120,7 @@ export async function loadProfileScores({
     topicStats,
     calibrationRows,
   ] = await Promise.all([
+    loadElo(userId, selectedTag),
     prisma.commitment.aggregate({
       where: { userId, brierScore: { not: null as null }, ...tagFilter },
       _avg: { brierScore: true },
@@ -257,6 +278,7 @@ export async function loadProfileScores({
     .map(b => ({ predicted: b.midpoint, actual: b.sum / b.count, count: b.count }))
 
   return {
+    elo,
     avgBrierScore,
     brierCount: brierStats._count.brierScore,
     peerScoreSum,

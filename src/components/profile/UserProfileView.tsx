@@ -1,6 +1,6 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import Image from 'next/image'
-import { TrendingUp, Award, Settings, Globe, Twitter, Sparkles, Activity } from 'lucide-react'
+import { TrendingUp, Award, Settings, Globe, Twitter, Sparkles, Swords } from 'lucide-react'
 import { ShareProfileButton } from '@/components/profile/ShareProfileButton'
 import ForecastCard, { type Prediction } from '@/components/forecasts/ForecastCard'
 import Link from 'next/link'
@@ -145,33 +145,31 @@ export async function UserProfileView({
             <TagFilter tags={userTags} selectedTag={selectedTag} totalCount={user._count.commitments} />
           </div>
 
-          {/* Skill Rating card */}
-          <div className="bg-gray-900 text-white p-6 rounded-3xl shadow-lg text-center flex-shrink-0 w-full md:w-auto md:min-w-[148px]">
+          {/* ELO card — the headline rating; per-tag when a tag is selected */}
+          <div className="bg-gray-900 text-white p-6 rounded-3xl shadow-lg text-center flex-shrink-0 w-full md:w-auto md:min-w-[148px] md:max-w-[220px]">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <Activity className="w-4 h-4 text-blue-400" />
+              <Swords className="w-4 h-4 text-orange-400" />
               <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                {t('skillRating')}
+                {t('eloRating')}
               </span>
             </div>
-            <p className="text-3xl font-black" title={t('skillMuTitle')}>
-              {Math.round(user.mu)}
+            <p className="text-3xl font-black" title={t('eloTitle')}>
+              {scores.elo !== null ? Math.round(scores.elo) : '—'}
             </p>
-            <p className="text-xs text-gray-400 mt-1" title={t('skillSigmaTitle')}>
-              {t('uncertainty', { sigma: Math.round(user.sigma) })}
+            <p className="text-xs text-gray-400 mt-1">
+              {tagName
+                ? scores.elo !== null
+                  ? t('eloTagSub', { tag: tagName })
+                  : t('eloNoTagData', { tag: tagName })
+                : t('eloSub')}
             </p>
-            <p className="text-[10px] text-gray-600 mt-0.5">{t('glickoAvg')}</p>
+            <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">{t('eloDesc')}</p>
           </div>
         </div>
       </div>
 
       {/* Scores section */}
-      <ScoresGrid
-        scores={scores}
-        user={user}
-        userId={user.id}
-        selectedTag={selectedTag}
-        tagName={tagName}
-      />
+      <ScoresGrid scores={scores} tagName={tagName} />
 
       {/* Tabbed forecast lists */}
       <ProfileTabs

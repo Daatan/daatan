@@ -457,7 +457,7 @@ export async function getRecentActivity(limit: number) {
       prediction: { isPublic: true },
     },
     include: {
-      user: { select: { id: true, name: true, username: true, image: true, rs: true } },
+      user: { select: { id: true, name: true, username: true, image: true, rs: true, eloRating: true } },
       prediction: { select: { id: true, slug: true, claimText: true, status: true, outcomeType: true } },
       option: { select: { id: true, text: true } },
     },

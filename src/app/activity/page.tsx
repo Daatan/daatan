@@ -22,6 +22,7 @@ interface ActivityItem {
     username: string | null
     image: string | null
     rs: number
+    eloRating: number
   }
   prediction: {
     id: string
@@ -188,7 +189,7 @@ export default function ActivityFeedPage() {
 
                       <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
                         <TrendingUp className="w-3 h-3" />
-                        <span>RS: {item.user.rs.toFixed(0)}</span>
+                        <span>ELO {Math.round(item.user.eloRating)}</span>
                       </div>
                     </div>
                   )

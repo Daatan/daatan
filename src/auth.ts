@@ -65,6 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           username: user.username,
           rs: user.rs,
+          eloRating: user.eloRating,
         }
       }
     }),
@@ -99,6 +100,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: user.role,
             username: user.username,
             rs: user.rs,
+            eloRating: user.eloRating,
           }
         }
       })
@@ -165,7 +167,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.sub },
-            select: { role: true, username: true, name: true, image: true, avatarUrl: true, rs: true },
+            select: { role: true, username: true, name: true, image: true, avatarUrl: true, rs: true, eloRating: true },
           })
 
           if (!dbUser) {
@@ -178,6 +180,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.name = dbUser.name ?? token.name
           token.picture = dbUser.avatarUrl || dbUser.image || token.picture
           token.rs = dbUser.rs
+          token.eloRating = dbUser.eloRating
           token.cachedAt = Date.now()
           token.userDeleted = undefined
         } catch (error) {

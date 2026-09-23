@@ -93,6 +93,7 @@ describe('UserProfileView Component', () => {
   }
 
   const mockScores: ProfileScores = {
+    elo: 1520,
     avgBrierScore: null,
     brierCount: 0,
     peerScoreSum: null,
@@ -135,7 +136,7 @@ describe('UserProfileView Component', () => {
 
     expect(screen.getByText('Test User')).toBeInTheDocument()
     expect(screen.getByText('@testuser')).toBeInTheDocument()
-    expect(screen.getByText('1500')).toBeInTheDocument() // Glicko-2 μ in skill card
+    expect(screen.getByText('1520')).toBeInTheDocument() // ELO in the header card
   })
 
   it('renders "Edit profile" link only for own profile', async () => {
@@ -188,7 +189,7 @@ describe('UserProfileView Component', () => {
     expect(screen.getByText('Forecast 1')).toBeInTheDocument()
   })
 
-  it('shows Glicko-2 skill rating and no CU balance', async () => {
+  it('shows the ELO rating as the headline and no CU balance', async () => {
     const component = await UserProfileView({
       user: mockUser,
       isOwnProfile: false,
@@ -199,8 +200,36 @@ describe('UserProfileView Component', () => {
     })
 
     render(component)
-    expect(screen.getByText('1500')).toBeInTheDocument() // Glicko-2 μ
-    expect(screen.getByText(/Skill Rating/i)).toBeInTheDocument()
+    expect(screen.getByText('1520')).toBeInTheDocument() // ELO
+    expect(screen.getByText(/ELO Rating/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Glicko/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Skill Rating/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/CU/)).not.toBeInTheDocument()
+  })
+
+  it('shows per-tag ELO with the tag name, and a placeholder when the user has no rating there', async () => {
+    const withTag = await UserProfileView({
+      user: mockUser,
+      isOwnProfile: false,
+      userTags: [{ name: 'Politics', slug: 'politics', count: 4 }],
+      selectedTag: 'politics',
+      scores: { ...mockScores, elo: 1610 },
+      tabData: mockTabData,
+    })
+    const { rerender } = render(withTag)
+    expect(screen.getByText('1610')).toBeInTheDocument()
+    expect(screen.getByText(/Politics only/i)).toBeInTheDocument()
+
+    const noRating = await UserProfileView({
+      user: mockUser,
+      isOwnProfile: false,
+      userTags: [{ name: 'Politics', slug: 'politics', count: 4 }],
+      selectedTag: 'politics',
+      scores: { ...mockScores, elo: null },
+      tabData: mockTabData,
+    })
+    rerender(noRating)
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText(/no resolved forecasts in Politics/i)).toBeInTheDocument()
   })
 })

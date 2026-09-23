@@ -36,8 +36,9 @@ export interface ScoringContext {
   rsChangeByUser: Map<string, { sum: number; count: number }>
   /** Metaculus-style exponential decay: recent predictions weighted more heavily. */
   weightedPeerScoreByUser: Map<string, number | null>
-  /** Global stored value (no tag) or tag-replayed ELO (when tag selected). */
-  eloByUser: Map<string, number>
+  /** Global stored value (no tag) or materialized per-tag ELO (when tag selected).
+   *  null = no per-tag row, i.e. the user never resolved a forecast in this tag → placed last. */
+  eloByUser: Map<string, number | null>
   /** Global stored value (no tag) or tag-replayed Glicko-2 (when tag selected).
    *  count is present only in per-tag replays; undefined = stored global (no min threshold). */
   glickoByUser: Map<string, { mu: number; sigma: number; count?: number }>
@@ -48,7 +49,6 @@ type MinimalUser = {
   rs: number
   mu: number
   sigma: number
-  eloRating: number
 }
 
 export interface ScoringSystem {
@@ -98,7 +98,7 @@ export const SCORING_SYSTEMS: ScoringSystem[] = [
   },
   {
     key: 'elo',
-    compute: (userId, user, ctx) => ctx.eloByUser.get(userId) ?? user.eloRating,
+    compute: (userId, _, ctx) => ctx.eloByUser.get(userId) ?? null,
   },
   {
     key: 'glicko',
