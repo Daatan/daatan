@@ -71,7 +71,7 @@ export const analyses: AnalysisData[] = [
     id: 'israel-2022',
     tag: 'CASE E02 · 1,170 RATED STATEMENTS',
     title: 'Who Saw 64 Seats Coming',
-    description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats all year, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is the probability of a 61+ majority a speaker expressed, from 0 to 1.",
+    description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats throughout the campaign, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is the probability of a 61+ majority a speaker expressed, from 0 to 1.",
     reportHref: '/retroanalysis/israel-2022',
     leftColumn: {
       label: 'YES / 61+',
