@@ -157,7 +157,7 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Who got it right, who didn&apos;t</h2>
           <p className="mt-2 max-w-2xl text-gray-600">The clearest calls on both sides. The number is the probability we assigned. Quotes are checked against the article text; Hebrew and Arabic ones are translated.</p>
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <VoiceColumn title="Expected 61+" range="P ≥ 0.75" tone="hit" voices={HIT} byN={byN} />
+            <VoiceColumn title="Expected 61+" range="P ≥ 0.6" tone="hit" voices={HIT} byN={byN} />
             <VoiceColumn title="Did not expect it" range="P ≤ 0.25" tone="miss" voices={MISS} byN={byN} />
           </div>
         </section>
