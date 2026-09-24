@@ -44,17 +44,16 @@ const EVENTS: [string, string][] = [
 
 interface Voice { n: number; name: string; role: string; quote: string; note?: string }
 const HIT: Voice[] = [
-  { n: 208, name: 'Nadav Eyal', role: 'Yedioth Ahronoth, translated in Al-Quds Al-Arabi', quote: 'Since the start of the campaign, Netanyahu has not been closer to victory than he is now, thanks to Sami Abu Shehada and his colleagues, of course.', note: 'Written three days after Balad left the Joint List. Balad fell below the threshold, and the wasted votes helped the bloc to its majority.' },
-  { n: 241, name: 'Amit Segal', role: 'Yedioth Ahronoth, reported by Kikar HaShabbat', quote: 'Netanyahu could theoretically reach 63 seats even if his camp wins less than half the votes.', note: 'He described the mechanism exactly. In the same piece he reported internal polls giving Netanyahu 59 (Lapid’s pollster) and 60.5 (Netanyahu’s own).' },
-  { n: 278, name: 'Yuval Karni', role: 'Yedioth Ahronoth, translated in Al-Quds Al-Arabi', quote: 'A 61-seat government headed by Netanyahu is the scenario with the highest likelihood of materializing.', note: 'Four days before the vote. His six scenarios also included deadlock and a sixth election.' },
-  { n: 101, name: 'Joel Rosenberg', role: 'Editor-in-chief, All Israel News', quote: "If I were a betting man at one of Trump's casinos, I would probably put my money 60-40 on Netanyahu to come back.", note: 'One of the few explicit odds in the corpus, given in July, right after the Knesset dissolved.' },
+  { n: 203, name: 'Nadav Eyal', role: 'Yedioth Ahronoth, translated in Al-Quds Al-Arabi', quote: 'Since the start of the campaign, Netanyahu has not been closer to victory than he is now, thanks to Sami Abu Shehada and his colleagues, of course.', note: 'Written three days after Balad left the Joint List. Balad fell below the threshold, and the wasted votes helped the bloc to its majority.' },
+  { n: 235, name: 'Amit Segal', role: 'Yedioth Ahronoth, reported by Kikar HaShabbat', quote: 'Netanyahu could theoretically reach 63 seats even if his camp wins less than half the votes.', note: 'He described the mechanism exactly. In the same piece he reported internal polls giving Netanyahu 59 (Lapid’s pollster) and 60.5 (Netanyahu’s own).' },
+  { n: 275, name: 'Yuval Karni', role: 'Yedioth Ahronoth, translated in Al-Quds Al-Arabi', quote: 'A 61-seat government headed by Netanyahu is the scenario with the highest likelihood of materializing.', note: 'Four days before the vote. His six scenarios also included deadlock and a sixth election.' },
+  { n: 90, name: 'Joel Rosenberg', role: 'Editor-in-chief, All Israel News', quote: "If I were a betting man at one of Trump's casinos, I would probably put my money 60-40 on Netanyahu to come back.", note: 'One of the few explicit odds in the corpus, given in July, right after the Knesset dissolved. That is why P is 0.60.' },
 ]
 const MISS: Voice[] = [
-  { n: 51, name: 'Noga Tarnopolsky', role: 'Journalist, Atlantic Council', quote: 'Netanyahu has no evident path back... the most likely outcome should the Bennett-Lapid coalition fall [is] additional cycles of inconclusive elections.', note: 'Published three days before the coalition did fall.' },
-  { n: 25, name: 'Neri Zilber', role: 'Washington Institute', quote: 'A third comeback is looking less and less possible.', note: 'The argument at the time was that the Bennett–Lapid coalition had passed a budget and would last until 2025. It collapsed a month later.' },
-  { n: 176, name: 'Ze’ev Elkin', role: 'New Hope, National Unity', quote: 'Netanyahu almost never reaches 61 seats in any poll... Netanyahu will not get 61 seats this time.', note: 'The core message of the Gantz–Sa’ar campaign. Said in Russian to Channel 7.' },
-  { n: 288, name: 'Bobby Ghosh', role: 'Bloomberg, translated in Al-Quds Al-Arabi', quote: 'The closest bet is holding a sixth election.', note: 'The day before the vote.' },
-  { n: 290, name: 'Shalom Lipner', role: 'Atlantic Council, in Foreign Policy', quote: "Even more likely than this bleak scenario materializing is the correspondingly precarious outcome of Israelis being dragged to another sixth ballot in a few months' time.", note: 'The “bleak scenario” is a Netanyahu government with Ben-Gvir. Published 31 October.' },
+  { n: 37, name: 'Noga Tarnopolsky', role: 'Journalist, Atlantic Council', quote: 'Netanyahu has no evident path back... the most likely outcome should the Bennett-Lapid coalition fall [is] additional cycles of inconclusive elections.', note: 'Published three days before the coalition did fall.' },
+  { n: 171, name: 'Ze’ev Elkin', role: 'New Hope, National Unity', quote: 'Netanyahu almost never reaches 61 seats in any poll... Netanyahu will not get 61 seats this time.', note: 'The core message of the Gantz–Sa’ar campaign. Said in Russian to Channel 7.' },
+  { n: 285, name: 'Bobby Ghosh', role: 'Bloomberg, translated in Al-Quds Al-Arabi', quote: 'The closest bet is holding a sixth election.', note: 'The day before the vote.' },
+  { n: 287, name: 'Shalom Lipner', role: 'Atlantic Council, in Foreign Policy', quote: "Even more likely than this bleak scenario materializing is the correspondingly precarious outcome of Israelis being dragged to another sixth ballot in a few months' time.", note: 'The “bleak scenario” is a Netanyahu government with Ben-Gvir. Published 31 October.' },
 ]
 
 interface Agg { n: number; p: number; y: number; u: number; no: number }
@@ -189,14 +188,14 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Method</h2>
           <div className="mt-5 grid gap-x-10 gap-y-6" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
             <Method title="Search">A seed list of 326 domains: news-indexer sources, the Israeli press in Hebrew, English, Russian and Arabic, world outlets, think tanks and pollsters. GDELT GKG via BigQuery returned 20,245 URLs from 157 of them. Israel Hayom, Haaretz English, NewsRu.co.il, INSS, JPPI and others missing from GDELT were added from the Wayback archive.</Method>
-            <Method title="Filter">Keywords in four languages, then Claude Haiku on titles: 2,261 of 8,780 candidates kept. Full texts then dropped irrelevant pieces, repeats of one speaker on one day, repeats of one pollster in one week, and anything edited after 1 November. Dates were checked against the page itself.</Method>
-            <Method title="Rating" formula="P = 0.5 + 0.5 × stance">The model reads the text as of its publication date and returns the main voice&apos;s stance from −1 to +1, confidence, the bloc&apos;s seat total if given, and a verbatim quote. For seat polls the stance follows a fixed rule: ≤58 seats −0.6, 59 −0.4, 60 −0.2, 61–62 +0.3, ≥63 +0.6. The article&apos;s framing can shift it by up to 0.2.</Method>
+            <Method title="Filter">Keywords in four languages, then Claude Haiku on titles: 2,261 of 8,780 candidates kept. Full texts then dropped irrelevant pieces, repeats of one speaker on one day, repeats of one pollster in one week, and anything edited after 1 November. Articles whose page date falls in an earlier campaign (2019–2021) were dropped, 37 of them. A second pass dropped 33 spring-2022 articles where “61” was about the current Knesset (no-confidence votes, defections, an alternative government), not the election. Dates were checked against the page itself.</Method>
+            <Method title="Rating" formula="P = 0.5 + 0.5 × stance">The model reads the text as of its publication date and returns the main voice&apos;s stance from −1 to +1, confidence, the bloc&apos;s seat total if given, and a verbatim quote. For seat polls the stance follows a fixed rule: ≤58 seats −0.6, 59 −0.4, 60 −0.2, 61–62 +0.3, ≥63 +0.6. The article&apos;s framing can shift it by up to 0.2. The main voice is whoever the article quotes on the question, not the author.</Method>
           </div>
           <h3 className="mt-10 text-lg font-extrabold text-gray-900">What is missing</h3>
           <ul className="mt-2 list-disc pl-5 space-y-1.5 text-gray-600 max-w-3xl">
             <li>N12, Kan and Channel 13 are barely represented: their sites are absent from GDELT and Wayback lists their articles without titles. Israeli TV, where much of the forecasting happened, is not covered.</li>
             <li>About two thirds of Hebrew Israel Hayom articles for the window were fetched. Hebrew Haaretz, Walla and Ynet appear only through GDELT.</li>
-            <li>256 texts come from live pages and 44 from Wayback snapshots taken before 1 November.</li>
+            <li>253 texts come from live pages and 47 from Wayback snapshots taken before 1 November.</li>
             <li>{unverified} of {rows.length} quotes were not found verbatim in the text. They are model paraphrases and are flagged in the table.</li>
             <li>Ratings are by the model. It sometimes misplaces a speaker&apos;s camp or reads a conditional “if Netanyahu gets 61” as a forecast, so some table rows are wrong. The cards above and about 40 rows were checked by hand.</li>
           </ul>
@@ -480,10 +479,10 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
     if (k === sortK) setDir(-dir)
     else { setSortK(k); setDir(k === 'p61' ? -1 : 1) }
   }
-  const th = (k: SortKey, label: string, right = false) => (
+  const th = (k: SortKey, label: string, right = false, sub?: string) => (
     <th className={`sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
       aria-sort={sortK === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}>
-      <button type="button" onClick={() => sortBy(k)} className="uppercase">{label}{sortK === k ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>
+      <button type="button" onClick={() => sortBy(k)} className="uppercase">{label}{sortK === k ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>{sub && <span className="block normal-case tracking-normal font-sans text-[11px] font-normal text-gray-400">{sub}</span>}
     </th>
   )
   const sel = 'bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-sm text-gray-800 min-w-[150px]'
@@ -503,7 +502,7 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
           <thead><tr>
             {th('n', '#', true)}{th('date', 'Date')}
             <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Article</th>
-            {th('voice_name', 'Main voice')}{th('p61', 'P 61+')}{th('projected_bloc_seats', 'Bloc seats', true)}
+            {th('voice_name', 'Main voice', false, 'quoted speaker, not the author')}{th('p61', 'P 61+')}{th('projected_bloc_seats', 'Bloc seats', true)}
             <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Summary & quote</th>
           </tr></thead>
           <tbody>
