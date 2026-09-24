@@ -41,7 +41,7 @@ const EVENTS: [string, string][] = [
 interface Voice { n: number; name: string; role: string; quote: string; note?: string }
 const HIT: Voice[] = [
   { n: 1, name: 'Kyrylo Budanov', role: 'Head of Ukrainian military intelligence (GUR)', quote: 'Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.', note: 'Described a multi-axis assault three months out. Off on timing by about three weeks, right on scale.' },
-  { n: 126, name: 'Rob Lee', role: "King's College London", quote: '…believes that a Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.', note: 'The Washington Post paraphrasing his view. Lee tracked the buildup through open-source data.' },
+  { n: 125, name: 'Rob Lee', role: "King's College London", quote: '…believes that a Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.', note: 'The Washington Post paraphrasing his view. Lee tracked the buildup through open-source data.' },
   { n: 151, name: 'Joe Biden', role: 'US President, quoted in The New York Times', quote: 'My guess is he will move in. He has to do something.', note: 'From the same 19 January press conference as the “minor incursion” remark.' },
   { n: 158, name: 'Jonathan Finer', role: 'US Deputy National Security Adviser', quote: "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we're actually seeing with our own eyes." },
 ]
@@ -49,7 +49,7 @@ const MISS: Voice[] = [
   { n: 17, name: 'Dmitry Peskov', role: 'Kremlin spokesman', quote: 'Слова о якобы планируемом Россией нападении абсолютно беспочвенны.', note: '“Talk of an allegedly planned Russian attack is absolutely groundless.” The line held until 21 February.' },
   { n: 48, name: 'Institute for the Study of War', role: 'Washington think tank', quote: 'Putin does not, in fact, intend to invade unoccupied Ukraine this winter despite the continued build-up of Russian forces in preparation to do so.', note: 'One of the few Western think tanks to say no outright.' },
   { n: 86, name: 'Oleksiy Danilov', role: "Secretary of Ukraine's National Security and Defence Council", quote: 'Сейчас угрозы открытой агрессии Российской Федерации против Украины не наблюдается… Поэтому отдыхайте спокойно, празднуйте.', note: '“There is no threat of open aggression… So rest easy and celebrate.” A month earlier he had disputed Budanov’s warning.' },
-  { n: 121, name: 'Dmitri Trenin', role: 'Carnegie Moscow Center', quote: 'In the immediate future, say, the coming month, I think the answer is no.', note: 'Said on 20 January. The month ran out on 20 February, four days before the invasion.' },
+  { n: 120, name: 'Dmitri Trenin', role: 'Carnegie Moscow Center', quote: 'In the immediate future, say, the coming month, I think the answer is no.', note: 'Said on 20 January. The month ran out on 20 February, four days before the invasion.' },
   { n: 129, name: 'Jeff Hawn', role: 'London School of Economics, in Foreign Policy', quote: 'While a full-scale invasion across Ukraine remains highly unlikely, there are a range of other options open to Russia.', note: 'The typical sceptic case: recognition of the republics or limited strikes would serve Moscow better.' },
 ]
 

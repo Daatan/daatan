@@ -37,7 +37,7 @@ export interface AnalysisData {
 export const analyses: AnalysisData[] = [
   {
     id: 'ukraine-2022',
-    tag: 'CASE E01 · 913 RATED STATEMENTS',
+    tag: 'CASE E01 · 910 RATED STATEMENTS',
     title: 'Who Saw the Invasion of Ukraine Coming',
     description: "The three months before Russia's full-scale invasion on 24 February 2022. Every statement was rated on how likely its speaker thought a full-scale invasion was, on the day it was published. Western governments averaged 80%. Russian officials said no in 80% of their statements, and Ukrainian officials in 40%. P is the invasion probability a speaker expressed, from 0 to 1.",
     reportHref: '/retroanalysis/ukraine-2022',
