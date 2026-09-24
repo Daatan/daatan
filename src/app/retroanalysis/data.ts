@@ -69,7 +69,7 @@ export const analyses: AnalysisData[] = [
   },
   {
     id: 'israel-2022',
-    tag: 'CASE E02 · 1,170 RATED STATEMENTS',
+    tag: 'CASE E02 · 1,100 RATED STATEMENTS',
     title: 'Who Saw 64 Seats Coming',
     description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats throughout the campaign, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is the probability of a 61+ majority a speaker expressed, from 0 to 1.",
     reportHref: '/retroanalysis/israel-2022',
@@ -91,9 +91,9 @@ export const analyses: AnalysisData[] = [
       sublabel: 'EXPECTED NO MAJORITY',
       color: 'rose',
       items: [
-        { source: 'WASHINGTON INSTITUTE', headline: 'Neri Zilber', date: 'May 24, 2022', quote: 'A third comeback is looking less and less possible.' },
         { source: 'ATLANTIC COUNCIL', headline: 'Noga Tarnopolsky', date: 'Jun 17, 2022', quote: 'Netanyahu has no evident path back...' },
         { source: 'CHANNEL 7 (RUSSIAN)', headline: 'Ze’ev Elkin, New Hope', date: 'Aug 29, 2022', quote: 'Нетаньяху почти ни в одном опросе не доходит до 61 мандата... Нетаньяху на этот раз не получит 61 место' },
+        { source: 'AL-QUDS AL-ARABI', headline: 'Bobby Ghosh, Bloomberg (translated)', date: 'Oct 31, 2022', quote: 'The closest bet is holding a sixth election.' },
         { source: 'FOREIGN POLICY', headline: 'Shalom Lipner, Atlantic Council', date: 'Oct 31, 2022', quote: "Even more likely than this bleak scenario materializing is the correspondingly precarious outcome of Israelis being dragged to another sixth ballot in a few months' time." },
       ]
     }
