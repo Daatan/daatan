@@ -63,7 +63,7 @@ export default function RetroanalysisPage() {
               href={activeAnalysis.reportHref}
               className="inline-block mt-6 px-5 py-2.5 rounded-full bg-gray-900 text-white text-xs font-bold tracking-wide hover:bg-gray-700 transition-colors"
             >
-              Full report: chart, method and all 200 articles →
+              Full report: chart, method and every rated article →
             </Link>
           )}
         </div>
@@ -107,8 +107,8 @@ export default function RetroanalysisPage() {
                     <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
                     {item.quote && (
                       <div className="mt-3 p-3 bg-teal-600 rounded-md text-white text-xs shadow-inner">
-                        <p className="text-teal-100 text-[9px] font-black uppercase tracking-widest mb-1">EXACT QUOTE</p>
-                        <p className="italic leading-relaxed">&quot;{item.quote}&quot;</p>
+                        <p className="text-teal-100 text-[9px] font-black uppercase tracking-widest mb-1">QUOTE</p>
+                        <p className="italic leading-relaxed">&quot;<bdi>{item.quote}</bdi>&quot;</p>
                       </div>
                     )}
                   </div>
@@ -154,8 +154,8 @@ export default function RetroanalysisPage() {
                     <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
                     {item.quote && (
                       <div className="mt-3 p-3 bg-rose-600 rounded-md text-white text-xs shadow-inner">
-                        <p className="text-rose-100 text-[9px] font-black uppercase tracking-widest mb-1">EXACT QUOTE</p>
-                        <p className="italic leading-relaxed">&quot;{item.quote}&quot;</p>
+                        <p className="text-rose-100 text-[9px] font-black uppercase tracking-widest mb-1">QUOTE</p>
+                        <p className="italic leading-relaxed">&quot;<bdi>{item.quote}</bdi>&quot;</p>
                       </div>
                     )}
                   </div>
