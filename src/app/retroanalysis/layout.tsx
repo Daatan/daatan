@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Retro Analysis',
   description:
-    "Retrospective analyses on DAATAN: how real-world events resolved versus the community's forecasts, scored for accuracy across politics, war, and energy.",
+    "Retrospective case studies on DAATAN: who saw a real event coming, rated from what each speaker published at the time.",
   alternates: { canonical: '/retroanalysis' },
   openGraph: { url: '/retroanalysis', type: 'website' },
 }
