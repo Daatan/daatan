@@ -19,6 +19,7 @@ export default function RetroanalysisPage() {
   const getNavLabel = (id: string) => {
     switch (id) {
       case 'ukraine-2022': return 'Ukraine 2022'
+      case 'israel-2022': return 'Israel 2022'
       case 'maduro-extraction': return 'Venezuela 2026'
       case 'trump-wars': return 'War Watch 2025'
       case 'energy-volatility-2026': return 'Energy 2026'
