@@ -1,7 +1,7 @@
 # DAATAN Product Documentation
 
 > Product vision, features, and roadmap for the reputation-based prediction platform.
-> Last updated: January 2026
+> Last updated: September 2026
 
 ---
 
@@ -87,19 +87,22 @@ Every feature must pass ALL checks before implementation:
 
 ## Core Concepts
 
+### ELO Rating (headline rating)
+Since #1764, **ELO is the one rating shown to users**: the leaderboard (default sort), profile header, sidebar pill, forecast author line, activity feed and profile OG image all lead with `User.eloRating` (per-tag value when a tag is selected). The only other user-facing scores are **Accuracy** and **Brier**. Glicko, RS, peer/AI/truth scores and ROI are still computed but hidden. See [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md).
+
 ### Reputation Score (RS)
-A user's long-term credibility/accuracy score based on past resolved predictions. Updates over time in an ELO-like way (expected outcome vs. actual outcome). Can increase or decrease (including becoming negative).
+A user's long-term credibility/accuracy score based on past resolved predictions. Updates over time in an ELO-like way (expected outcome vs. actual outcome). Can increase or decrease (including becoming negative). Still computed (`User.rs`), but no longer displayed since ELO became the headline rating.
 
 ### Confidence Units (CU)
-A limited per-period budget of "confidence" a user can allocate across predictions. CU represent intensity/conviction but:
-- Have no monetary value
+As implemented, a commitment carries a **confidence value from −100 to +100** (stored in `Commitment.cuCommitted`; the sign picks the side, the magnitude is conviction). There is no CU balance or per-period budget. Confidence:
+- Has no monetary value
 - Cannot be transferred
 - Cannot be bought
 
 ### Prediction Weight
 The influence/strength of a specific prediction in scoring/visibility calculations.
 
-**Formula:** `Weight = RS × CU`
+**Formula:** `Weight = RS × CU` (design concept — current scoring does not compute a combined weight; see [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md))
 
 ---
 
@@ -116,13 +119,13 @@ The influence/strength of a specific prediction in scoring/visibility calculatio
 ### Prediction Lifecycle
 
 ```
-[News Anchor] → [Draft] → [Define Outcome] → [Commit CU] → [Active] → [Resolution]
+[News Anchor] → [Draft] → [Define Outcome] → [Commit Confidence] → [Active] → [Resolution]
 ```
 
 1. **Select News Anchor** — Pick a news story to attach the prediction to
 2. **Write Prediction** — Create a testable forecast statement
 3. **Define Outcome** — Choose type (binary/MC/numeric) and deadline
-4. **Commit CU** — Allocate confidence units and publish
+4. **Publish + Commit** — Publish, then commit a confidence value (−100..+100)
 5. **Resolution** — System/moderator resolves based on evidence
 
 ### Resolution Outcomes
@@ -140,6 +143,25 @@ for the full formulas.
 
 ---
 
+## Current Features (September 2026)
+
+Shipped on `main` for the SaaS edition; pointers to the owning code or doc:
+
+- **Two creation flows** — Express (type an idea; the AI drafts claim, deadline, resolution rules and tags from a web/news search) and the step-by-step wizard (`src/components/forecasts/ForecastWizard.tsx`). See [FORECASTS_FLOW.md](./FORECASTS_FLOW.md).
+- **Prediction-market links** — Polymarket/Kalshi markets can be imported in the wizard or pasted into Express (#1545); the linked market's live price is shown on the forecast and fed to the AI as a prior. Linked prices refresh hourly (`external-market-sync.yml`).
+- **AI estimate** — each forecast gets a calibrated probability from the Oracul evidence pool, plus a multi-model AI panel with its own leaderboard (`/leaderboard/ai`).
+- **Ratings** — ELO headline rating, Accuracy and Brier (#1764); global and per-tag leaderboards.
+- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); sources with fewer than 5 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]`, pundit pages at `/authors/[author]`.
+- **Retroanalysis case studies** — `/retroanalysis` (SaaS-only): Ukraine 2022 and Israel 2022 election (E02) reports rating what commentators said before the outcome (#1765–#1773).
+- **Forget History** — in Settings, a user can detach themselves from their own already-resolved commitments without deleting the rows (so other users' scoring is unchanged); refused while they hold a commitment on an unresolved forecast (#1701, #1724). `POST /api/account/forget-history`.
+- **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page.
+- **Social** — comments with reactions, share cards (OG images), notifications (in-app, email, browser push, Telegram).
+- **Languages** — English, Hebrew, Russian, Esperanto.
+- **Elections** — in-app `/elections` matrix of forecasts tagged "Israeli Elections 2026"; the sidebar also links to the separate `elections.daatan.com` app.
+- **Android app** — TWA wrapper in `android/` (Play Store listing: `android/STORE_LISTING.md`).
+
+---
+
 ## Feature Roadmap
 
 ### Phase 1: Core Web App (Weeks 1-4)
@@ -148,18 +170,18 @@ for the full formulas.
 - ✅ Prediction feed
 - ✅ LLM-assisted prediction creation
 - ✅ One-click prediction flow
-- ✅ Coin economy basics
+- ✅ Coin economy basics (superseded: confidence is a −100..+100 value, no coin balance)
 - ✅ Personal leaderboards
 
 ### Phase 2: Widget & Sharing (Weeks 5-8)
 - ⏳ Embeddable widget for publishers
-- ⏳ Sharing cards with OG images
+- ✅ Sharing cards with OG images
 - ⏳ Social platform integrations
 - ⏳ Invite to bet functionality
 
 ### Phase 3: Adjudication & Pilot (Weeks 9-12)
-- ⏳ AI evidence-sourcing pipeline
-- ⏳ Human adjudication UI
+- ✅ AI evidence-sourcing pipeline (Oracul evidence pool, AI resolution research)
+- ✅ Human adjudication UI (moderator/resolver resolution on the forecast page)
 - ⏳ Publisher pilot program
 - ⏳ Feedback iteration
 
@@ -182,17 +204,16 @@ for the full formulas.
 
 ### New User Flow
 1. Discover DAATAN (via shared prediction, widget, or direct)
-2. Sign in with Google
-3. Receive initial CU balance (100 CU)
-4. Browse prediction feed
-5. Create first prediction or commit to existing one
-6. Build reputation over time
+2. Sign in (Google or email/password)
+3. Browse prediction feed
+4. Create first prediction or commit to existing one
+5. Build reputation over time
 
 ### Power User Flow
 1. Monitor news for prediction opportunities
 2. Create well-researched predictions
-3. Commit CU strategically across predictions
-4. Track RS growth over time
+3. Commit with calibrated confidence across predictions
+4. Track ELO growth over time
 5. Build domain expertise (e.g., "Top Middle East Predictor")
 6. Share predictions to build following
 
@@ -201,7 +222,7 @@ for the full formulas.
 ## Gamification Elements
 
 ### Serving Measurement (Allowed)
-- Reputation Score display
+- ELO rating display (headline), plus Accuracy and Brier
 - Domain-specific leaderboards
 - Accuracy badges
 - Streak tracking (for engagement, not scoring)

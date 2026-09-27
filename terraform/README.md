@@ -56,3 +56,9 @@ terraform init -backend-config=backend-prod.hcl
 terraform plan  -var="environment=prod"
 terraform apply -var="environment=prod"
 ```
+
+In practice, never run a blanket `apply`: add `-target=<resource>` to both `plan` and `apply`
+and read the whole plan (see the targeted example in [`docs/SECRETS.md`](../docs/SECRETS.md#adding-a-secret)).
+Always pass `-var="environment=..."` explicitly — it defaults to `prod`, and a local
+gitignored `terraform.tfvars` is auto-loaded — and run `terraform init -reconfigure
+-backend-config=...` when switching between the two backends.

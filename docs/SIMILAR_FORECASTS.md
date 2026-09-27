@@ -23,6 +23,11 @@ Single-vector dense retrieval:
 
 Same path, same `0.75` threshold, serves both discovery and dedup.
 
+> Update (2026-09-27): since 2026-06-28 (c98ac349) step 2 also carries a **hard shared-tag
+> gate** — when the query has tags, a candidate must share at least one (`EXISTS` over
+> `_PredictionToTag`); with no tags it is pure cosine. Problem 2 below predates that: tags
+> now filter, but still don't enter the score. Current SQL is in [`EMBEDDINGS.md`](./EMBEDDINGS.md).
+
 ## Problems with the baseline
 
 1. **The date is embedded as text.** `claimText` carries the timeframe ("within 90 days", "by 2026"), so it lands in the vector — and the authoritative `resolveByDatetime` is **only SELECTed for display**, never used in scoring. Embedding the date as tokens fails in two opposite directions:

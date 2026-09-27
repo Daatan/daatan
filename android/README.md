@@ -31,7 +31,7 @@ echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_HOME\"}" > ~/.bu
 ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin" "$ANDROID_HOME/bin"
 
 cd android
-export BUBBLEWRAP_KEYSTORE_PASSWORD=...   # from AWS Secrets Manager, see below
+export BUBBLEWRAP_KEYSTORE_PASSWORD=...   # from SSM Parameter Store, see below
 export BUBBLEWRAP_KEY_PASSWORD=...
 npx @bubblewrap/cli build
 ```

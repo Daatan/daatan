@@ -24,7 +24,7 @@ The main `llmService` tries providers in this order; each leg is **registered on
     *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON).
 
 4.  **Fallback 2**: **OpenRouter**
-    *   Registered whenever a key is configured (admin setting → env), for **both** editions.
+    *   Registered whenever a key is configured (admin setting → SSM `OPENROUTER_API_KEY` → env, `getOpenRouterKey()`), for **both** editions.
     *   **SaaS**: added only as a last-resort backstop, so it uses the free **non-Google** model `meta-llama/llama-3.3-70b-instruct:free` (an OpenRouter *Gemini* model would still hit Google's backend and die in the same outage).
     *   **Self-host**: runs as a primary user-facing provider on the admin-chosen `getOpenRouterModel()`.
 
@@ -33,7 +33,11 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 **Embeddings** do not go through this chain at all — `src/lib/services/embedding.ts` calls `gemini-embedding-2` directly, preferring Vertex on the same credentials and falling back to the Developer API. See [EMBEDDINGS.md](EMBEDDINGS.md).
 
-**Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above.
+**Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above — its direct-Gemini legs still use the Developer API key (`GEMINI_API_KEY`), not Vertex, so where that key is unset (daatan.com since #1472) bots run on OpenRouter alone.
+
+**The AI panel (LASSO)** does not use this chain either: `src/lib/llm/panel/client.ts` calls each roster member (`src/lib/llm/panel/roster.ts`) on its own route — `openrouter`, `bedrock`, or `vertex` (the Gemini member moved from an OpenRouter `google-vertex` pin to direct Vertex in #1600). See [LASSO.md](LASSO.md).
+
+**The express grounded-date lookup** (`src/lib/llm/groundedDateLookup.ts`, #1706) is also deliberately outside the chain: it needs Gemini's `googleSearch` tool, which no fallback leg has, so it calls Vertex directly and is skipped when Vertex isn't configured. See [Express prediction date grounding](#express-prediction-date-grounding-1086) below.
 
 ### Failure notifications
 
@@ -43,13 +47,16 @@ A single provider failing is **logged but not paged** — a later leg may still 
 
 *   **`src/lib/llm/types.ts`**: Interfaces for `LLMProvider`, `LLMRequest`, `LLMResponse`.
 *   **`src/lib/llm/providers/`**: Implementations for specific services.
-    *   `gemini.ts`: Wrapper for Google Generative AI SDK.
+    *   `vertex.ts`: REST client for Gemini on Vertex AI (primary leg; also exports `vertexEnv()` / `vertexEndpoint()` / `vertexAccessToken()` for the panel and the grounded-date lookup).
+    *   `gemini.ts`: Wrapper for Google Generative AI SDK (Developer API leg).
     *   `oracle.ts`: HTTP client for the Oracul `/llm` endpoint (Bedrock/Nova) — main-chain fallback.
     *   `ollama.ts`: HTTP client for Ollama API.
     *   `openrouter.ts`: HTTP client for OpenRouter API (main-chain fallback + bots).
 *   **`src/lib/llm/service.ts`**: `ResilientLLMService` class that handles the retry/fallback logic.
-*   **`src/lib/llm/bedrock-prompts.ts`**: the `PROMPTS` record and `getPromptTemplate()` / `fillPrompt()`. (Name kept from when it fetched from Bedrock; 39 call sites.)
+*   **`src/lib/llm/bedrock-prompts.ts`**: the `PROMPTS` record and `getPromptTemplate()` / `fillPrompt()`. (Name kept from when it fetched from Bedrock; ~26 `getPromptTemplate` call sites.)
 *   **`src/lib/llm/index.ts`**: Instantiates and exports `llmService` and `createBotLLMService`.
+*   **`src/lib/llm/panel/`**: the AI panel (LASSO) — `roster.ts` (members), `client.ts` (per-route calls), `context.ts` (grounded-indexer snippets).
+*   **`src/lib/llm/groundedDateLookup.ts`**: the web-grounded scheduled-event date lookup used by express prediction (#1706).
 
 ## Prompts
 
@@ -83,6 +90,8 @@ The model must not invent dates for scheduled events (elections, rulings, statut
 3. **`findClaimTextDeadlineMismatch()`** (`src/lib/utils/extractDatesFromText.ts`, #1706 proposal 5): the same deterministic regex cross-check `POST /api/forecasts` runs to hard-block a claim-text/deadline mismatch at creation (#1404) runs here too and is returned as `claimDeadlineMismatch` — an ISO date, or `null` when the claim has no explicit date phrase or it agrees with `resolveByDatetime`. The review screen renders it as a warning before the author ever reaches the creation endpoint that would reject it.
 
 `dateBasis` (#1706 proposal 1) is a fourth, softer signal in the same family: a self-reported `"explicit_in_claim" | "from_sources" | "assumed"` flag on the schema, surfaced as an "Assumed resolution date" warning when the model couldn't ground the date in anything at all — narrower than `ungroundedYears` (which only fires on an invented year) and orthogonal to `claimDeadlineMismatch` (which only fires when the claim's own text disagrees with the stored deadline).
+
+**Grounded date lookup** (#1706 option 2, `draftWithGroundedDate` in `expressPrediction.ts`): when the first draft reports `dateBasis: "assumed"`, `lookupGroundedEventDate()` (`src/lib/llm/groundedDateLookup.ts`) makes one separate Vertex `gemini-2.5-flash` call with the `googleSearch` tool (15 s budget) to find the date of the officially scheduled event the forecast hinges on. If it finds one, the date is prepended to the articles text as a reference and the forecast is drafted again, so rule 3b can use it like any sourced date. The outcome is returned as `groundedDate` (`{ fired: false }`, `{ fired: true, status: 'no_date' | 'unavailable' }`, or `status: 'found'` with `event`/`date`/`sourceUrl`/`adopted`), recorded in the `ForecastCreationAttempt` details by `POST /api/forecasts/express/generate`, and shown on the review screen as a notice when the re-draft adopted the date. No Vertex, a failed call or no date found all keep the first draft and its "assumed" warning.
 
 ## Usage
 
@@ -123,13 +132,13 @@ Calibrated probability estimates for binary forecast questions come from the **T
 ### Client
 
 *   **`src/lib/services/oracle.ts`**: Oracul client.
-    *   `getOracleForecast(question)` → `OracleForecastResponse | null`. Returns the full payload (`mean`, `std`, `ci_low`, `ci_high`, `articles_used`, `sources[]` with per-source `stance` / `certainty` / `credibility_weight` / `claims`) so callers can surface provenance alongside the probability. Never throws; returns `null` on any failure so callers can fall back silently.
-    *   `getOracleProbability(question)` → `number | null` in `[0, 1]`. Thin wrapper around `getOracleForecast` for callers that only need the scaled probability.
-    *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version's major component is one of the accepted ones (`EXPECTED_API_MAJOR_VERSIONS`, `['0', '1']` while retro moves from 0.4.x to generation-based 1.4.x — daatan#1668, umbrella Daatan/retro#742) — a strict `0.1` prefix check went stale as retro shipped 0.2–0.4.x and was silently failing every call (daatan#1563).
+    *   `getOraculForecast(question, options?, meta?)` → `OracleForecastResult` (`{ forecast: OracleForecastResponse | null, logId, insufficientData?, failureClass?, outcomeCounts? }`). `forecast` is the full payload (`mean`, `std`, `ci_low`, `ci_high`, `articles_used`, `sources[]` with per-source `stance` / `certainty` / `credibility_weight` / `claims`) so callers can surface provenance alongside the probability. Never throws; `forecast` is `null` on any failure (with `failureClass` saying why) so callers can fall back silently.
+    *   `getOraculProbability(question, meta?, options?)` → `number | null` in `[0, 1]`. Thin wrapper around `getOraculForecast` for callers that only need the scaled probability.
+    *   `checkOracleHealth()` → `boolean`. Verifies the API is reachable and its version's major component is one of the accepted ones (`EXPECTED_API_MAJOR_VERSIONS`, `['1']` — retro's generation-based 1.4.x, umbrella Daatan/retro#742; the transitional `'0'` added in daatan#1668 was dropped in daatan#1673) — a strict `0.1` prefix check went stale as retro shipped 0.2–0.4.x and was silently failing every call (daatan#1563).
 
 ### Funnel diagnostics: `outcomeCounts`
 
-Every `/forecast` response carries retro's per-article stage histogram (`outcome_counts` — `gate_rejected`, `gate_error`, `empty_text`, `extract_error`, `unhandled_error`, `ok`, …). `getOracleForecast` hoists it onto its result as `outcomeCounts` and emits it at **INFO** on all four post-response paths (success, abstain, placeholder, no-usable-articles), alongside `predictionId` and `source`, so a thin pool's cause is queryable in CloudWatch:
+Every `/forecast` response carries retro's per-article stage histogram (`outcome_counts` — `gate_rejected`, `gate_error`, `empty_text`, `extract_error`, `unhandled_error`, `ok`, …). `getOraculForecast` hoists it onto its result as `outcomeCounts` and emits it at **INFO** on all four post-response paths (success, abstain, placeholder, no-usable-articles), alongside `predictionId` and `source`, so a thin pool's cause is queryable in CloudWatch:
 
 ```
 fields @timestamp, predictionId, source, reason, outcomeCounts
@@ -145,15 +154,17 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 ### Fallback chain for forecast "AI %"
 
 1.  **Oracul** (`POST /forecast`) — calibrated multi-source estimate. The client budget is
-    per path, not global (`src/lib/services/oracle.ts`): **30 s** by default for
+    per path, not global (`src/lib/services/oracle.ts`): **40 s** (`FORECAST_TIMEOUT_MS`) by default for
     server-to-server/background callers (news-indexer push, the retry sweep), **20 s** for
     bot voting, **12 s** (`INTERACTIVE_FORECAST_TIMEOUT_MS`) for the two interactive callers,
     which race the Oracul against their own wall clock and fall back to the LLM.
     Every budget must stay strictly above the server budget it waits on: retro does not
     cancel on client disconnect, so aborting early discards a forecast already paid for and
-    records it as a failure. 30 s is derived from retro's own server-side latency (p99 25.0 s,
+    records it as a failure. The original 30 s was derived from retro's own server-side latency (p99 25.0 s,
     clamped by its `per_article_timeout_seconds = 25`), not from its nominal
-    `forecast_timeout_seconds = 90`, which has fired once in 93 days. See daatan#1254.
+    `forecast_timeout_seconds = 90`, which had fired once in 93 days (daatan#1254). retro#760 raised
+    that clamp to 35 s, so the same margin gives 40 s (#1709). news-indexer's push client
+    (`PUSH_TIMEOUT_SECONDS`, 45 s) wraps this route, so don't raise it past ~40 s without raising that too.
 2.  **LLM `guessChances`** (Gemini → Oracul → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracul path is not configured, times out, returns a placeholder response, or has zero usable articles.
 
 ### Call sites

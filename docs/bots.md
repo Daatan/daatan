@@ -35,10 +35,12 @@ DAATAN ships with 6 standard bot personas that seed initial market activity.
 
 ### Scheduling
 
-Bots run via a **GitHub Actions cron job** that calls `POST /api/bots/run` every 5 minutes.
+Bots run via a **GitHub Actions workflow** (`.github/workflows/bots.yml`) that calls `POST /api/bots/run` on staging (`STAGING_URL`).
+
+> **The schedule is currently stopped.** The `*/5 * * * *` cron in `bots.yml` has been commented out since 2026-08-04 (and the workflow disabled at the Actions API), because staging's `ORACLE_URL` points at the production Oracul and every bot forecast triggered a paid Oracul search+extract. Only `workflow_dispatch` remains; the comment in `bots.yml` gives the restart steps and the precondition. Its `dry_run` input is sent in the request body but `/api/bots/run` ignores it (always `runDueBots(false)`) — use `POST /api/admin/bots/:id/run?dry=true` for a real dry run.
 
 ```
-GitHub Actions (every 5 min)
+GitHub Actions (every 5 min when scheduled)
        │
        ▼
 POST /api/bots/run
@@ -74,7 +76,7 @@ The `/api/bots/run` route is **not authenticated via NextAuth**. Instead it requ
 x-bot-runner-secret: <BOT_RUNNER_SECRET>
 ```
 
-Set `BOT_RUNNER_SECRET` in your environment (see `SECRETS.md`). The secret is validated at startup via `src/env.ts`; a missing value is caught before the server accepts requests. The comparison uses `crypto.timingSafeEqual()` to prevent timing-based enumeration. Missing or wrong secrets return `401 Unauthorized`.
+Set `BOT_RUNNER_SECRET` in your environment (see `SECRETS.md`). It is declared **optional** in `src/env.ts`: when it is unset the route rejects every call with `401` rather than failing at startup. The comparison hashes both values with SHA-256 and uses `crypto.timingSafeEqual()` to prevent timing-based enumeration. Missing or wrong secrets return `401 Unauthorized`. The route is also blocked on self-host installs (`blockedOnSelfHost()`).
 
 ### Active Hours Gate
 
@@ -116,9 +118,9 @@ Each bot is a `BotConfig` record linked 1:1 to a bot `User` account (`isBot=true
 | `tagFilter` | string[] | `[]` | If non-empty, the LLM is instructed to only create forecasts matching one of these tag slugs. Topics that don't match are skipped. |
 | `autoApprove` | boolean | `false` | See [Approval Flags](#approval-flags). |
 | `requireApprovalForForecasts` | boolean | `false` | See [Approval Flags](#approval-flags). |
-| `enableSentimentExtraction` | boolean | `false` | Extract sentiment/confidence from cluster articles before forecast creation. |
-| `enableRejectionTracking` | boolean | `false` | Track rejected topics in `BotRejectedTopic` to prevent the LLM from re-suggesting them. |
-| `showMetadataOnForecast` | boolean | `false` | Render extracted metadata (sentiment, entities, consensus line) on the forecast detail page when status is `PENDING_APPROVAL`. |
+| `enableSentimentExtraction` | boolean | `false` | Intended to extract sentiment/confidence from cluster articles before forecast creation. **Currently inert** — stored and editable, but no runner code reads it (see [BOT_APPROVAL_WORKFLOW.md](./BOT_APPROVAL_WORKFLOW.md#3-metadata-extraction)). |
+| `enableRejectionTracking` | boolean | `false` | Skip a new news-anchored forecast whose claim matches ≥ 50% of the keywords of one of the bot's 20 most recent `BotRejectedTopic` rows (keyword match, no LLM). Rejections are recorded regardless of this flag. |
+| `showMetadataOnForecast` | boolean | `false` | Intended to gate the extracted-metadata block on the `PENDING_APPROVAL` detail page. **Currently inert** — the block renders whenever the fields are populated, regardless of this flag. |
 | `maxForecastsPerHour` | int ≥ 0 | `0` | Hourly rate limit for forecast creation (`0` = unlimited). Per-day cap still applies via `maxForecastsPerDay`. |
 
 ### Voting
@@ -143,7 +145,7 @@ The bot always commits YES (`binaryChoice = true`, positive confidence). Confide
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `modelPreference` | string | `google/gemini-2.5-flash-preview:free` | OpenRouter model slug used for all LLM calls. |
+| `modelPreference` | string | `google/gemini-2.5-flash-preview:free` | OpenRouter model slug used for all LLM calls (`createBotLLMService` in `src/lib/llm/index.ts`). Stale Gemini slugs are aliased to current ones; a Gemini preference tries direct Gemini first when `GEMINI_API_KEY` is set, and on OpenRouter is replaced by the free non-Google `meta-llama/llama-3.3-70b-instruct:free` (OpenRouter has no free Gemini). |
 
 ---
 
@@ -232,7 +234,7 @@ All runtime configuration lives in one of three places:
 
 ### 1. Environment Variables (`.env` / Docker secrets / GitHub Actions secrets)
 
-Sensitive credentials and infrastructure endpoints. Never stored in the DB or SSM.
+Sensitive credentials and infrastructure endpoints. Not stored in the DB or SSM, except `OPENROUTER_API_KEY` as noted.
 
 | Variable | Where set | Purpose |
 |----------|-----------|---------|
@@ -241,9 +243,9 @@ Sensitive credentials and infrastructure endpoints. Never stored in the DB or SS
 | `NEXTAUTH_URL` | `.env` / Docker | Public app URL |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `.env` / Docker | Google OAuth |
 | `GOOGLE_VERTEX_PROJECT_ID` / `_CLIENT_EMAIL` / `_PRIVATE_KEY` | `.env` / Docker | Primary LLM (Gemini via Vertex AI) |
-| `OPENROUTER_API_KEY` | `.env` / Docker | Bot LLM (OpenRouter) |
+| `OPENROUTER_API_KEY` | `.env` / Docker, or SSM `/daatan/{env}/secrets/` | OpenRouter. The main LLM chain resolves it admin setting → SSM → env (`getOpenRouterKey()`); `createBotLLMService` reads only `process.env.OPENROUTER_API_KEY` |
 | `OLLAMA_BASE_URL` | `.env` / Docker | Fallback LLM |
-| `BOT_RUNNER_SECRET` | `.env` / Docker + GitHub Actions | Shared secret for `/api/bots/run` |
+| `BOT_RUNNER_SECRET` | `.env` / Docker + GitHub Actions | Shared secret for `/api/bots/run` (`x-bot-runner-secret`); also the `x-cron-secret` every `/api/cron/*` workflow sends |
 | `TELEGRAM_BOT_TOKEN` | `.env` / Docker | Telegram deployment notifications |
 | `TELEGRAM_CHAT_ID` | `.env` / Docker | Telegram target channel |
 | `AWS_REGION` | `.env` / Docker | AWS region (used for Bedrock + SSM) |

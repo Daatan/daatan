@@ -61,7 +61,7 @@ Manual / extended (checklist):
 - [ ] Create a forecast via the manual wizard (no news anchor).
 - [ ] Commit confidence units; another user commits the other side.
 - [ ] Resolve it → reputation / Brier / Glicko / ELO update on the profile.
-- [ ] Boot with `APP_NAME` unset → app **fails fast** with a clear "APP_NAME is required" error.
+- [ ] Boot with `APP_NAME` unset → app boots branded **"Forecasting"**; boot with both `APP_URL` and `NEXTAUTH_URL` unset → app **fails fast** with a clear "APP_URL (or NEXTAUTH_URL) is required" error.
 
 **Pass criteria:** the Playwright spec passes; the manual checklist is fully ticked.
 
@@ -96,9 +96,9 @@ Checklist:
 
 ## Layer 4 — Opt-in add-ons (prove they can be turned on)
 
-- [ ] `ENABLE_AI_FEATURES=true` + `GEMINI_API_KEY` (or `OLLAMA_BASE_URL`) → Express / Analyze / Guess / Magic-Extract reappear and function; AI routes no longer 404.
+- [ ] An LLM key (`GEMINI_API_KEY`, `OLLAMA_BASE_URL`, or an OpenRouter key in Admin → Settings) — or `ENABLE_AI_FEATURES=true` — → Express / Guess / Magic-Extract reappear and function; AI routes no longer 404.
 - [ ] `ENABLE_EXTERNAL_MARKETS=true` → pasting a Polymarket/Kalshi URL prefills the forecast.
-- [ ] `ORACLE_URL`/`ORACLE_API_KEY` set → Analyze uses the Oracle estimate; unset → falls back to LLM.
+- [ ] `ORACLE_URL`/`ORACLE_API_KEY` set (plus an LLM) → "Analyze" and resolve-time AI research appear; unset → they stay hidden (`aiResearchEnabled()`).
 
 **Pass criteria:** each add-on activates with its flag and degrades gracefully without its backing service.
 

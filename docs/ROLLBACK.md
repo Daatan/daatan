@@ -17,6 +17,8 @@ Roll back immediately if you observe any of the following:
 
 A rollback does **not** fix the underlying bug. It only restores a known-good version while you prepare a proper fix.
 
+A rollback also does **not** revert database migrations. Neither `rollback.yml` nor the manual commands below pull a migrations image, so Phase 5 of `blue-green-deploy.sh` runs whatever `daatan-migrations:latest` (prod) / `daatan-migrations:staging-latest` (staging) is already on the host — i.e. the newer schema stays. Rolling back across a migration the old code can't handle needs a hand-written down-migration.
+
 ---
 
 ## Finding the right version to roll back to
@@ -44,7 +46,7 @@ aws ecr describe-images \
 git log --oneline -20
 ```
 
-Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the version number from `package.json` at build time.
+Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the version number from `package.json` at build time — pushed on every merge to `main`, not only on releases, so a staging-only version is also a valid rollback target. The workflow's "List available versions" step prints the newest ones.
 
 ---
 
@@ -59,6 +61,7 @@ Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the v
 4. Click **Run workflow**
 5. Monitor the run — it will:
    - Verify the ECR image exists before touching the server
+   - For staging, wake the instance if it is asleep (see the staging sleep schedule in `docs/DEPLOYMENT.md`)
    - Pull the image and run `blue-green-deploy.sh` with `SKIP_BUILD=true`
    - Send a Telegram notification on success or failure
 
@@ -67,7 +70,9 @@ Total time: ~5–8 minutes.
 ### Triggering it from Telegram (`/rollback`)
 
 The same workflow can be started from Telegram with `/rollback 1.7.x` (or
-`/rollback staging 1.7.x`), handled by `POST /api/telegram/rollback`.
+`/rollback staging 1.7.x`), handled by `POST /api/telegram/rollback`. The same
+bot answers `/status` (versions running on prod and staging) and `/versions`
+(available ECR tags).
 
 **The endpoint fails closed.** It only acts on requests carrying the matching
 `x-telegram-bot-api-secret-token` header, so it is inert unless

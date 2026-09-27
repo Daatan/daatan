@@ -25,7 +25,7 @@ The Next.js app sends via the `resend` SDK:
 - `src/lib/services/email.ts` — opt-in notifications (`dispatchEmail`)
 - `src/lib/services/auth-email.ts` — mandatory auth mail (verification, password reset)
 
-Controlled by env: `RESEND_API_KEY`, `EMAIL_FROM`. **`EMAIL_FROM` must be on `daatan.com`** (the verified domain). The code defaults to `Daatan <noreply@daatan.com>` — do **not** use `daatan.app` (it is not a verified sending domain anywhere).
+Controlled by env: `RESEND_API_KEY`, `EMAIL_FROM`. **`EMAIL_FROM` must be on `daatan.com`** (the verified domain). When `EMAIL_FROM` is unset the code (`src/lib/branding.ts`) defaults to `Daatan <noreply@daatan.com>` for the SaaS edition — do **not** use `daatan.app` (it is not a verified sending domain anywhere).
 
 > **Migration note / tech debt:** the *infrastructure* is fully on SES, but the *app code* still uses Resend (SPF authorizes both during transition). Pick one source of truth: either migrate `email.ts` / `auth-email.ts` to `@aws-sdk/client-sesv2` and drop the `resend` dependency, or keep Resend deliberately and document why. Until then, both must stay in SPF.
 

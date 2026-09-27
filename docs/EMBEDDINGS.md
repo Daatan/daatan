@@ -1,12 +1,12 @@
 # Embeddings & Similar-Forecasts
 
-Vector embeddings power the "similar forecasts" lookup on the forecast detail page and feed (replacing the old Jaccard text similarity). This doc covers the model, schema, query path, and backfill flow.
+Vector embeddings power the "similar forecasts" lookup on the forecast detail page and the create-time duplicate warning (`SimilarForecastsWarning`, in the express and manual create flows) (replacing the old Jaccard text similarity). This doc covers the model, schema, query path, and backfill flow.
 
 ## Stack
 
 - **Model:** `gemini-embedding-2`, served via Vertex AI (Developer API fallback is self-host only — see below)
 - **Dimensionality:** `768` (set via `outputDimensionality=768` request parameter; the model natively emits 3072 dims)
-- **Storage:** PostgreSQL with the `pgvector` extension, `vector(768)` column on `predictions`
+- **Storage:** PostgreSQL with the `pgvector` extension, `vector(768)` column on `predictions` (also on `external_markets` and `latent_nodes` — see Generation)
 - **Index:** HNSW with cosine operator (`vector_cosine_ops`)
 - **Distance metric:** Cosine; threshold `>= 0.75` for "similar"
 
@@ -29,10 +29,12 @@ ordinary GCP service. See [LLM_ARCHITECTURE.md](LLM_ARCHITECTURE.md).
 
 Request body includes `outputDimensionality: 768`. The 768-dim output matches the column definition; do not change one without the other (changing dims requires re-running the migration with a new column type and full backfill). A response of any other length is rejected before it can reach the column.
 
-The text being embedded is the prediction's `claimText` plus `detailsText` if present.
+The text being embedded is the prediction's `claimText` alone (`embedAndStoreForecast(id, claimText)` — every call site passes only the claim).
+
+The same `embedText()` also fills the other two `vector(768)` columns, in the same vector space: `latent_nodes.embedding` from `text_en` (`embedAndStoreLatentNode`, on admin create) and `external_markets.embedding` from the market `question` (`embedAndStoreExternalMarket`; backfill via `POST /api/admin/backfill-market-embeddings`, ADMIN, batches of 10, `embedding IS NULL` only). Only `predictions.embedding` has an HNSW index. Besides similar-forecasts, `predictions.embedding` is read by the Oracle 2.0 relation typer's candidate-pair search (`src/lib/services/relation-typer.ts`).
 
 Required env: all three of `GOOGLE_VERTEX_PROJECT_ID` / `GOOGLE_VERTEX_CLIENT_EMAIL` /
-`GOOGLE_VERTEX_PRIVATE_KEY` — or, on **self-host**, `GEMINI_API_KEY` instead (a
+`GOOGLE_VERTEX_PRIVATE_KEY` (optional `GOOGLE_VERTEX_LOCATION`, default `global`) — or, on **self-host**, `GEMINI_API_KEY` instead (a
 self-hoster has no GCP service account). Daatan's own prod and staging bundles no longer
 carry `GEMINI_API_KEY` at all (#1472).
 
@@ -57,7 +59,7 @@ is the `vertex-embed-failed` error log — grep for it before assuming the Verte
 
 ## Schema
 
-`prisma/schema.prisma:329` (Prediction model):
+`prisma/schema.prisma` (Prediction model):
 
 ```prisma
 embedding Unsupported("vector(768)")?
@@ -80,23 +82,33 @@ Prereq: the postgres image must include pgvector. Production now uses `pgvector/
 
 ## Similar-forecasts query
 
-`GET /api/forecasts/similar?id=<id>&limit=3` (or `?q=<text>&tags=<csv>&limit=3`).
+`GET /api/forecasts/similar?id=<id>&limit=3` (or `?q=<text>&tags=<csv>&limit=3`). `limit` is capped at 10; an optional `language=<locale>` overlays cached claim translations (a cache miss keeps English and reports `translated: false`). Returns `{ similar: [] }` when AI features are off (`aiFeaturesEnabled()`, the self-host default). With `id`, the forecast's own `claimText` is re-embedded at request time (the stored vector is not reused) and its tags are used.
 
-The route delegates to `findSimilarForecasts()` in `src/lib/services/forecast.ts:344`. Core SQL:
+The route delegates to `findSimilarForecasts()` in `src/lib/services/forecast.ts`. Core SQL:
 
 ```sql
-SELECT p.id, p.claim_text, ...,
-       (1 - (p.embedding <=> $vector::vector))::float AS score
+SELECT p.id, p.slug, p."claimText", ...,
+       (1 - (p.embedding <=> $vector::vector))::float AS score,
+       array_agg(t.name) FILTER (WHERE t.name IS NOT NULL) AS "tagNames"
 FROM predictions p
-WHERE p.embedding IS NOT NULL
+JOIN users u ON u.id = p."authorId"
+LEFT JOIN "_PredictionToTag" pt ON pt."A" = p.id
+LEFT JOIN tags t ON t.id = pt."B"
+WHERE p.status IN ('ACTIVE', 'PENDING_APPROVAL')
+  AND p.embedding IS NOT NULL
   AND p.id != $excludeId
-  AND p.status = 'ACTIVE'
+  -- only when the source forecast has tags: candidate must share at least one
+  AND EXISTS (SELECT 1 FROM "_PredictionToTag" pt2 JOIN tags t2 ON t2.id = pt2."B"
+              WHERE pt2."A" = p.id AND lower(t2.name) = ANY($tags))
+GROUP BY p.id, u.name, u.username, p.embedding
 HAVING (1 - (p.embedding <=> $vector::vector)) >= 0.75
 ORDER BY p.embedding <=> $vector::vector
-LIMIT $limit
+LIMIT $limit * 5
 ```
 
-`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing the constant in `forecast.ts:320`.
+The app then sorts by score, breaking ties by shared-tag count, and keeps the top `limit`. The tag gate exists because short claim embeddings cluster by sentence structure more than topic; with no tags (e.g. the create-time duplicate check before tags are picked) it falls back to pure cosine.
+
+`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing `COSINE_THRESHOLD` in `forecast.ts`.
 
 > **Known limitation / planned redesign:** this matches on `claimText` alone, so the
 > deadline is embedded as text while the structured `resolveByDatetime` is unused —
@@ -122,12 +134,12 @@ Added in #1369. Before that the route existed but had no scheduler — the docst
 
 ### One-time script
 
-`scripts/backfill-embeddings.ts` — for the initial mass backfill. Batch size 20, 500ms inter-batch delay (rate-limit safety). **Note:** this script currently calls `text-embedding-004` (the older model), not `gemini-embedding-2`. The two models are dimensionally compatible at 768 but not interchangeable for similarity scoring. If re-running, port the call site to `embeddingService.embed()` so all rows share the same vector space. New rows created after the model migration use `gemini-embedding-2` via `embedding.ts`.
+`scripts/backfill-embeddings.ts` (`npx tsx scripts/backfill-embeddings.ts`) — for the initial mass backfill, or a database the app isn't serving. Batch size 20, 500ms inter-batch delay (rate-limit safety). It delegates to `embedText()` in `embedding.ts`, so it uses `gemini-embedding-2` and the same Vertex / `GEMINI_API_KEY` credentials as the app. (It used to call `text-embedding-004` through its own client — rows written that way are not comparable with `gemini-embedding-2` vectors.) Prefer the two in-app routes above unless you need to run outside the app.
 
 ## When to re-embed
 
 - **New forecast created:** automatic (called from the forecast-creation flow)
-- **Forecast claimText edited:** automatic since #1368, on both edit paths — `directUpdateForecast()` for English, `saveOriginalLanguageEdit()` for a forecast authored in another language. Only `claimText` matters here: the vector is built from the claim alone, so editing `detailsText` or `resolutionRules` cannot stale it
+- **Forecast claimText edited:** automatic since #1368, on both edit paths — `directUpdateForecast()` for English, `saveOriginalLanguageEdit()` for a forecast authored in another language. Only `claimText` matters here: the vector is built from the claim alone, so editing `detailsText` or `resolutionRules` cannot stale it. The two admin one-offs that rewrite `claimText` also re-embed at the call site: `canonicalizeForecastToEnglish()` and the question→statement rephrase (`POST /api/admin/forecasts/rephrase-questions`, `rephrase-question-forecasts.ts`)
 - **Model upgrade:** every existing row needs a re-embed (vector spaces are not portable across models)
 
 > A **stale** embedding is invisible to both backfill paths above — they select on `embedding IS NULL`, and a vector describing the old wording is not null. Nothing sweeps it up, so any new write path that changes `claimText` must re-embed at the call site or the drift is permanent. This is what #1368 fixed for the English edit path.
@@ -136,4 +148,4 @@ Added in #1369. Before that the route existed but had no scheduler — the docst
 
 - Gemini 401 / quota errors **on create** → forecast still saves; embedding stays NULL → forecast simply won't appear in similarity results until backfilled
 - Gemini 401 / quota errors **on edit** → the edit still saves, but the *previous* vector survives, so the forecast keeps matching on wording it no longer has. Worse than the create case: not being NULL, it is invisible to both backfills and nothing retries it. The re-embed is deliberately non-fatal (logged, not thrown) so a Gemini outage can't block a claim correction — the trade is that the drift is silent
-- pgvector extension missing → migration fails (P3009). Recovery: see the prod incident in `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` and the resolved runbook for swapping to `pgvector/pgvector:pg16`
+- pgvector extension missing → migration fails (P3009). Recovery: swap to the `pgvector/pgvector:pg16` image and re-run — the migration is `IF NOT EXISTS` idempotent; the 2026-05-03 prod incident and how its rolled-back `_prisma_migrations` row reads today are in [`DATABASE.md`](./DATABASE.md) (Cross-cutting gotchas #7)

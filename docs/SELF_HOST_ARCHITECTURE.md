@@ -27,13 +27,13 @@ A fresh checkout boots with no Google, no AWS, no daatan.com — given only DB +
 - **Closed signup + invites** (`src/lib/auth/access.ts`, `src/lib/services/invite.ts`): public credentials signup is closed by default on self-host (`isOpenSignupEnabled`); `SELF_HOST_OPEN_SIGNUP=true` re-opens. Single-use `Invite` model (token = SHA-256 hex; consumed atomically) issued from `/api/admin/invites` + Admin → Invites UI.
 
 ### 3. AI/add-ons off by default (PR #957)
-`src/lib/capabilities.ts` — `aiFeaturesEnabled()` / `externalMarketsEnabled()`: `saas`/unset ⇒ on; `self_hosted` ⇒ on only when `ENABLE_AI_FEATURES` / `ENABLE_EXTERNAL_MARKETS` === `'true'`. The server snapshot `getCapabilities()` is handed to the client via `CapabilitiesProvider` (`useCapabilities()` hook; all-on default so provider-less tests are unchanged).
+`src/lib/capabilities.ts` — `aiFeaturesEnabled()` / `aiResearchEnabled()` / `externalMarketsEnabled()`: `saas`/unset ⇒ on; `self_hosted` ⇒ AI on when an LLM is configured (OpenRouter key from Admin → Settings or env, `GEMINI_API_KEY`, or `OLLAMA_BASE_URL`) or `ENABLE_AI_FEATURES === 'true'`; search-backed AI ("Analyze", resolve-time research) additionally needs `ORACLE_URL` + `ORACLE_API_KEY`; external markets only when `ENABLE_EXTERNAL_MARKETS === 'true'`. The server snapshot `getCapabilities()` is handed to the client via `CapabilitiesProvider` (`useCapabilities()` hook; all-on default so provider-less tests are unchanged).
 - **UI gated** when off: Express toggle + `/forecasts/express`, "Analyze" (ContextTimeline), "Guess Chances", AI Magic-Extract & tag-suggest (wizard steps), AI-assist-on-resolve (ResolutionForm); Polymarket/Kalshi import + suggest-similar.
 - **API defense-in-depth:** `context`/`research`/`express/*`/`ai/*` → 404 when AI off; `similar` → `[]`; `import-market` → 404, `suggest-market` → `{match:null}` when markets off.
 
 ### 4. White-label (Phase 3 — PRs #958, #960)
 `src/lib/branding.ts` is the single source of identity.
-- `getAppName()` / `getAppUrl()` — **required** for `self_hosted` (throw/fail-fast if missing); `saas`/unset returns the `DAATAN` / `https://daatan.com` literals (ignoring `NEXTAUTH_URL`, so prod+staging stay byte-identical).
+- `getAppName()` — for `self_hosted`: admin setting (DB) → `APP_NAME` env → the neutral default `"Forecasting"`. `getAppUrl()` — for `self_hosted`: `APP_URL` → `NEXTAUTH_URL`, and **throws** (fail-fast) if neither is set. `saas`/unset returns the `DAATAN` / `https://daatan.com` literals (ignoring `NEXTAUTH_URL`, so prod+staging stay byte-identical).
 - `shouldIndex()` — self-host is always `noindex`; SaaS indexes in production only. Drives `layout.tsx` robots, `robots.ts`, `sitemap.ts`.
 - `getVerificationTokens()` — the exact Google/Bing tokens for SaaS; `null` (suppressed) for self-host.
 - `getBranding()` → `BrandingProvider` (`useBranding()`); `BrandLogo` renders the bundled asset via `next/image` (no override) or a plain `<img>` when `APP_LOGO_URL` is set (avoids next/image remote-pattern config). Sidebar + auth screens consume it.
@@ -44,11 +44,11 @@ A fresh checkout boots with no Google, no AWS, no daatan.com — given only DB +
 
 ## Env surface (self-host)
 
-Required: `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION=self_hosted`, `APP_NAME`, `APP_URL`.
+Required: `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION=self_hosted`, `APP_URL` (falls back to `NEXTAUTH_URL`).
 Auth: `OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET/PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, optional `GOOGLE_*`.
 Storage: `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`.
-Add-ons (off by default): `ENABLE_AI_FEATURES`, `ENABLE_EXTERNAL_MARKETS`, then `GEMINI_API_KEY`/`OLLAMA_BASE_URL`/`ORACLE_URL`/`ORACLE_API_KEY`.
-Branding: `APP_LOGO_URL`, `EMAIL_FROM`.
+Add-ons (off by default; an LLM key is the switch): `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`/`GEMINI_API_KEY`/`OLLAMA_BASE_URL`, `ORACLE_URL`/`ORACLE_API_KEY`, `ENABLE_AI_FEATURES` (override), `ENABLE_EXTERNAL_MARKETS`.
+Branding (optional seeds, editable in Admin → Settings): `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`.
 
 ## Deferred / not in v1
 
@@ -56,9 +56,8 @@ Branding: `APP_LOGO_URL`, `EMAIL_FROM`.
 - Content pages (`about`, `privacy`) + OG-image routes still say DAATAN.
 - SAML — via a BoxyHQ Jackson sidecar that exposes SAML *as* OIDC (the app only ever speaks OIDC).
 - License-key gate (ed25519-signed `LICENSE_KEY`, warn-only) — issuance tooling lives out of repo.
-- Gating the admin-only bot system (LLM-dependent).
 
-> Done since: admin **About** panel (`/admin/about` + `/api/admin/about`) reports edition/version/capabilities/integrations (booleans, no secrets); `ADMIN_EMAIL` env seeds the first admin in `prisma/seed.ts` (falls back to the SaaS owners when unset).
+> Done since: admin **About** panel (`/admin/about` + `/api/admin/about`) reports edition/version/capabilities/integrations (booleans, no secrets); `ADMIN_EMAIL` env seeds the first admin in `prisma/seed.ts` (falls back to the SaaS owners when unset); the bot system is SaaS-only — its API routes return 404 on self-host via `src/lib/api-edition-guard.ts`.
 
 ## Phase / PR history
 

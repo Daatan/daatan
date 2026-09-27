@@ -56,7 +56,6 @@
 
 ## Interactive Commands
 - NEVER run commands that require user input (password prompts, interactive menus, etc.)
-- SSH: Always use SSH keys configured in `~/.ssh/config`, never password authentication
+- Server access: SSH port 22 is closed on the EC2 hosts; use AWS SSM (`aws ssm send-command`), never SSH
 - Linters: Skip or use `--fix` flag if linter requires interactive setup
 - If a command prompts for input, stop and inform the user what needs to be configured
-- For server access, use the `daatan` SSH alias (configured with key-based auth)

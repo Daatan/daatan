@@ -46,12 +46,12 @@ DAaTAn is a reputation-based product that enables testing understanding and fore
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS |
 | Database | PostgreSQL 16 + Prisma 7.x |
-| Auth | NextAuth.js (Google OAuth) |
+| Auth | Auth.js v5 / NextAuth (Google OAuth + email/password; OIDC for self-host) |
 | Hosting | AWS EC2 (eu-central-1) |
 | Storage | AWS S3 (avatars) |
-| LLM | Gemini (primary), Ollama (fallback), OpenRouter (bots) |
-| Forecast Oracle | TruthMachine Oracle API (`oracle.daatan.com`) — calibrated multi-source probability estimates |
-| Prompt Mgmt | AWS Bedrock Prompt Management |
+| LLM | Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also powers bots |
+| Forecast Oracul | TruthMachine Oracul API (`oracle.daatan.com`) — calibrated multi-source probability estimates |
+| Prompts | In git: `src/lib/llm/bedrock-prompts.ts` + `prompts/*.txt`, pinned by `prompts/prompt_versions.lock.json` |
 | Container | Docker + Nginx |
 | CI/CD | GitHub Actions |
 | SSL | Let's Encrypt |
@@ -61,8 +61,11 @@ DAaTAn is a reputation-based product that enables testing understanding and fore
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install dependencies (postinstall runs `prisma generate`)
 npm install
+
+# Configure env — only DATABASE_URL, NEXTAUTH_URL and NEXTAUTH_SECRET are required
+cp .env.example .env
 
 # Run development server
 npm run dev
@@ -82,6 +85,10 @@ npm run analyze    # Build with @next/bundle-analyzer reports (.next/analyze/*.h
 npm run lint       # Run linter
 npm run typecheck  # Type check
 npm test           # Run unit tests
+npm run test:related      # Tests related to changed files
+npm run test:coverage     # Unit tests with coverage
+npm run test:integration  # Integration tests (test Postgres on :5433 — docker-compose.test.yml)
+npm run test:e2e          # Playwright E2E
 ```
 
 ### Operations
@@ -107,7 +114,7 @@ git push origin v1.1.1
 
 1. **Local dev:** `npm run dev`.
 2. **Commit:** a husky pre-commit hook runs `scripts/check-version-bump.sh` and `lint-staged` (ESLint `--fix` on staged TS/TSX).
-3. **Push:** a husky pre-push hook runs `tsc --noEmit` (typecheck) and `vitest run --changed` (tests related to changed files; integration tests excluded).
+3. **Push:** a husky pre-push hook runs `npm run typecheck` and `scripts/run-related-tests.sh origin/main` (`vitest related` on changed files; integration tests excluded).
 4. **Deploy staging:** push to `main`.
 5. **Deploy production:** run `./scripts/release.sh` to tag `vX.Y.Z` and create a GitHub release.
 
@@ -132,7 +139,7 @@ git push origin v1.1.1
 | [POST_MORTEM.md](./POST_MORTEM.md) | Incident history and retrospectives |
 | [docs/bots.md](./docs/bots.md) | Autonomous bot system design and usage |
 | [docs/BOT_APPROVAL_WORKFLOW.md](./docs/BOT_APPROVAL_WORKFLOW.md) | Bot approval workflow (v1.7.31+) |
-| [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) | LLM provider chain, Bedrock prompts, Oracul integration |
+| [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) | LLM provider chain, prompts, Oracul integration |
 | [docs/API.md](./docs/API.md) | HTTP API reference |
 | [docs/DATABASE.md](./docs/DATABASE.md) | Database map: tables by domain, probability scales, estimate stream, gotchas |
 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Deployment pipeline (canonical) |
@@ -146,8 +153,8 @@ git push origin v1.1.1
 
 1. Create a feature branch: `git checkout -b feature/my-feature`
 2. Validate against [DAATAN_CORE.md](./DAATAN_CORE.md)
-3. Make changes and commit
-4. Push and create a Pull Request
+3. Make changes and commit — bump `package.json` `version` past `origin/main` (enforced by the pre-commit hook and the `version.yml` PR check)
+4. Push and create a Pull Request (never push directly to `main`)
 5. **Never merge without explicit approval**
 
 ---

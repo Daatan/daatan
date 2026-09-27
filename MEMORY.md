@@ -12,7 +12,7 @@
 - **Primary Branch:** main
 - **Local DB Port:** 5432
 - **Production:** AWS EC2 (Ubuntu), Docker
-- **Staging:** Same EC2, different container
+- **Staging:** Separate EC2 instance (`staging.daatan.com`), same Docker layout
 
 ## Key Files
 - Database schema: `prisma/schema.prisma`
@@ -22,7 +22,7 @@
 - Deployment: `docker-compose.prod.yml`, `.github/workflows/deploy.yml`
 
 ## Deployment Notes
-- Push to main → auto-deploys to staging
+- PR merged to main → auto-deploys to staging (never push to main directly)
 - Push tag v* → auto-deploys to production
 - Rollback: `./scripts/rollback.sh [production|staging]`
 - Zero-downtime: `./scripts/blue-green-deploy.sh`

@@ -15,8 +15,8 @@ isolation you already have, and would make the genuinely-shared values worse.
 
 ## Rotating an app secret
 
-No redeploy. The app caches for 5 minutes, and the AI-panel cron refreshes before each
-sweep.
+No redeploy. The app caches for 5 minutes (warmed at boot in `src/instrumentation.ts`), and
+the AI-panel sweep re-warms the cache before it runs if that TTL has expired.
 
 ```bash
 # Put the raw value in a file so it never appears in argv, `ps`, or shell history.
@@ -64,6 +64,13 @@ falls back to the env var, so a parameter that does not exist yet changes nothin
 
 ## Adding a secret
 
+Per-env secrets (`/daatan/<env>/secrets/<NAME>`, today only `OPENROUTER_API_KEY`) follow the
+steps below. A **shared** secret (`/daatan/shared/secrets/<NAME>`, today only
+`ORACLE_API_KEY`) is instead added to `SHARED_SECRET_NAMES` in `src/lib/aws/secrets.ts`, and
+its parameter is created by hand with `aws ssm put-parameter` — not by Terraform, since both
+envs' states would otherwise try to own it (`terraform/secrets_ssm.tf` already grants both
+roles read on `/daatan/shared/secrets/*`).
+
 1. Add the name to `local.app_secret_names` in `terraform/secrets_ssm.tf`.
 2. Add it to `AWS_SECRET_NAMES` in `src/lib/aws/secrets.ts`.
 3. Apply, **staging first**, targeted — never a blanket apply:
@@ -73,8 +80,10 @@ falls back to the env var, so a parameter that does not exist yet changes nothin
    terraform plan  -var environment=staging -target='aws_ssm_parameter.app_secrets["NAME"]'
    terraform apply -var environment=staging -target='aws_ssm_parameter.app_secrets["NAME"]'
    ```
-   `var.environment` defaults to `"prod"` and there are no tfvars — **omitting
-   `-var environment=staging` writes prod resources from the staging state file.**
+   `var.environment` defaults to `"prod"` and no tfvars are committed (`*.tfvars` is
+   gitignored; a local `terraform.tfvars`, if present, is auto-loaded and outranks the
+   default) — **omitting `-var environment=staging` writes prod resources from the staging
+   state file.** Use `init -reconfigure` whenever you switch between the two backends.
 4. Set the value with the rotation recipe above. Terraform creates it at `PLACEHOLDER`,
    which the app reads as "not configured" (`ignore_changes = [value]` means an apply will
    never overwrite a live credential).
@@ -82,6 +91,8 @@ falls back to the env var, so a parameter that does not exist yet changes nothin
 ## Precedence
 
 `getOpenRouterKey()` resolves: **admin setting (DB) → SSM SecureString → env var**.
+`getOracleApiKey()` (`src/lib/services/oracleClient.ts`) resolves: **SSM shared parameter →
+env var**.
 
 The DB setting stays first so a self-host operator's admin panel works. `env` stays last
 for local dev, CI and self-host. An unwarmed or unreachable SSM reads as `''` and falls
@@ -91,12 +102,13 @@ through — SSM being down must never take the app down.
 
 | Role | Scope |
 |---|---|
-| `daatan-ec2-role-<env>` | `daatan-env-<env>`, `daatan-github-token`, and `/daatan/<env>/secrets/*` |
+| `daatan-ec2-role-<env>` | `daatan-env-<env>`, `daatan-github-token`, `/daatan/<env>/secrets/*`, and `/daatan/shared/secrets/*` |
 | `truthmachine-ec2-role` (retro) | `daatan/*`, `openclaw/*` — **wildcards, wider than it needs** |
 | `news-indexer-ec2-role` | `news-indexer-env`, `daatan-github-token*` |
 | `openclaw-ec2-role` | `openclaw/*` |
 
-Staging cannot read prod. That is the boundary that matters and it holds. (Until
+Staging cannot read prod. That is the boundary that matters and it holds (the shared path is
+the one deliberate exception — both envs read the same value there). (Until
 2026-07-10 the **prod** role could read `daatan-env-staging` via a hardcoded ARN in
 `terraform/iam_ssm.tf`; removed.)
 

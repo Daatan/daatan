@@ -38,7 +38,7 @@ curl -s "https://daatan.com/api/health/auth" | jq .
 ```
 
 - **200 + `"status":"ok"`** → App has valid-looking `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`. It does **not** check that the redirect URI is allowed in Google.
-- **Non-200 or errors in JSON** → Env missing or invalid on that server; fix `.env` and restart the app container.
+- **Non-200 or errors in JSON** → Env missing or invalid on that server; fix it in the secret and redeploy (see §5).
 
 Compare `NEXTAUTH_URL` in the response to the environment you’re testing (staging vs prod).
 
@@ -57,7 +57,7 @@ instance ID: `i-04ea44d4243d35624`).
    aws ssm send-command \
      --instance-ids i-04ea44d4243d35624 \
      --document-name AWS-RunShellScript \
-     --parameters ‘commands=["grep -E \"^GOOGLE_CLIENT_ID=|^GOOGLE_CLIENT_SECRET=|^NEXTAUTH_URL=\" ~/app/.env"]’
+     --parameters 'commands=["grep -E \"^GOOGLE_CLIENT_ID=|^GOOGLE_CLIENT_SECRET=|^NEXTAUTH_URL=\" ~/app/.env"]'
    ```
    - `GOOGLE_CLIENT_ID` must look like `…something….apps.googleusercontent.com`.
    - `GOOGLE_CLIENT_SECRET` must be a long string (no placeholders like `your-google-client-secret`).
@@ -86,25 +86,16 @@ If you use **separate** OAuth clients for staging and prod, the production serve
 
 ---
 
-## 5. Restart the app after config changes
+## 5. Apply config changes
 
-After changing **only** `.env` on the server (no code deploy), restart via SSM:
+`~/app/.env` is **regenerated on every deploy** by `scripts/fetch-secrets.sh` from the
+Secrets Manager bundle (`daatan-env-prod` / `daatan-env-staging`), so a hand edit on the
+server is overwritten by the next deploy. Fix the value in the secret (see
+[SECRETS.md](../SECRETS.md)), then redeploy: **Actions → CI/CD Pipeline → Run workflow**
+with the target environment. The blue-green deploy recreates the app container, which is
+what picks up the new env — a plain `docker restart` does not re-read `.env`.
 
-```bash
-# Production instance
-aws ssm send-command \
-  --instance-ids i-04ea44d4243d35624 \
-  --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd ~/app && docker compose -f docker-compose.prod.yml restart app"]'
-
-# Staging instance (if you changed staging .env)
-aws ssm send-command \
-  --instance-ids i-0406d237ca5d92cdf \
-  --document-name AWS-RunShellScript \
-  --parameters 'commands=["cd ~/app && docker compose -f docker-compose.prod.yml restart app-staging"]'
-```
-
-After a **code/image deploy**, the deploy process already restarts the container; no extra step needed.
+After a **code/image deploy**, the deploy process already recreates the container; no extra step needed.
 
 ---
 
@@ -121,7 +112,6 @@ After a **code/image deploy**, the deploy process already restarts the container
        --document-name AWS-RunShellScript \
        --parameters 'commands=["docker logs daatan-app --tail 100 2>&1"]'
      ```
-     Or use the `/logs prod` slash command in Claude Code.
    - Look for NextAuth/OAuth or `Configuration` errors (and ensure no secrets are shared when pasting logs).
 
 With the exact error (e.g. `redirect_uri_mismatch`, `invalid_client`, or our `error=OAuthSignin`/`Configuration`) and the checks above, you can usually narrow it to: wrong/missing redirect URI, wrong client ID/secret on the server, or cookie/URL building (the codebase now sets `AUTH_TRUST_HOST` and explicit cookies for prod as well as staging to reduce that class of issue).

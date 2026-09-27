@@ -54,7 +54,8 @@ Out of scope:
 
 Operators running their own fork should review:
 
-- [SECRETS.md](./SECRETS.md) — how secrets are stored (AWS Secrets Manager bundles, pulled at deploy time).
+- [SECRETS.md](./SECRETS.md) — how secrets are stored (AWS Secrets Manager bundles, pulled at deploy time) and [docs/SECRETS.md](./docs/SECRETS.md) — per-item SSM SecureStrings and who can read what.
+- [docs/SELF_HOSTING.md](./docs/SELF_HOSTING.md) — the self-hosted edition (`DAATAN_EDITION=self_hosted`), for running your own install.
 - [INFRASTRUCTURE_SPLIT.md](./INFRASTRUCTURE_SPLIT.md) — EC2 access is SSM-only; port 22 is closed.
 - [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) — GitHub OIDC role assumption, no long-lived AWS keys in CI.
 - [docs/ROLLBACK.md](./docs/ROLLBACK.md) — rollback workflow for incident response.

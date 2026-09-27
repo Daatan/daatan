@@ -31,16 +31,26 @@ chore: Update dependencies        → 1.0.1 (patch bump)
 
 ## How to Bump
 
-Version bumps are **manual** and done explicitly when releasing:
+Bump the version on **every commit on a non-`main` branch** — not at release time:
 
-1. Update `package.json` → `"version"` field
-2. Commit: `git commit -m "chore: bump version to v1.x.x"`
-3. Run `./scripts/release.sh` to tag and trigger production deploy
+1. Update `package.json` → `"version"` field and run `npm install` so `package-lock.json` picks it up
+   (or `npm version patch --no-git-tag-version`, which does both without creating a commit or tag)
+2. Commit it with the change
+
+This is enforced: `.husky/pre-commit` runs `scripts/check-version-bump.sh`, which requires the
+branch's version to be strictly **greater** than `origin/main`'s (not merely different), and
+`.github/workflows/version.yml` (the `Version bump` check) re-runs the same script on every PR's
+merge commit — so two concurrent branches that both bump X → Y can't both merge. After a rebase,
+re-check: a rebase can silently drop an identical bump.
+
+Releasing is separate: `./scripts/release.sh` only creates and pushes a `v*` tag plus a GitHub
+release (it offers `package.json`'s current version as option 0); it does not bump anything.
+Pushing the tag triggers the production deploy.
 
 ## Where the Version Lives
 
 - **Source of truth**: `package.json` → `"version"`
 - **Runtime**: `NEXT_PUBLIC_APP_VERSION` build arg (baked by CI from `package.json`)
-- **Display**: sidebar logo, `/api/health` response, About page
+- **Display**: sidebar logo, `/api/health` response, About page, staging/next banners
 - **Git tags**: each production release creates a tag `vMAJOR.MINOR.PATCH`
 

@@ -28,7 +28,7 @@ of truth.
 
 This is the part worth internalising, and the reason the lock exists.
 
-Thirteen of the twenty prompts ship with a response schema. Those schemas' `description`
+Fourteen of the twenty prompts ship with a response schema (thirteen distinct schemas — the two bot forecast prompts share `forecastBatchSchema`). Those schemas' `description`
 fields are not documentation — they are instructions the model reads, in the same request,
 with the same effect as a sentence in the prose. retro measured the schema half at **27% of
 its extractor prompt** (retro#700).
@@ -62,6 +62,18 @@ Adding a prompt: add the `PromptName` member, the `PROMPTS` entry, the `.txt`, a
 `PROMPT_SCHEMAS` (`null` if it has no schema). The last one is a type error until you do it,
 which is the cheapest moment to notice a new prompt nothing watches.
 
+### Prompts outside the lock
+
+A few short prompts are still built inline in code rather than in `PROMPTS`, so neither
+`promptSync.test.ts` nor `promptLock.test.ts` covers them — review them like any other code:
+
+| Where | What |
+|---|---|
+| `src/lib/llm/searchQuery.ts` (`EXTRACTION_PROMPT`) | claim → 3–8-word search query |
+| `src/lib/services/ai-estimate.ts` | bare 0–100 estimate backfilled onto a commitment's `aiProbabilityAtCommit` |
+| `src/lib/services/translation.ts` | forecast/comment translation and normalise-to-English |
+| `src/lib/llm/groundedDateLookup.ts` | the #1706 web-grounded event-date lookup (Vertex `googleSearch`, outside `llmService`) |
+
 ## The prompts
 
 `schema: —` means the prompt's output contract is prose: `forecast-quality-validation` asks
@@ -77,16 +89,16 @@ returns a phrase. Those still lock their prose.
 | `bot-vote-decision` | `voteDecisionSchema` | `bots/voting.ts` |
 | `content-moderation` | `moderationSchema` | `services/moderation.ts` — forecast + comment creation |
 | `dedupe-check` | — | `bots/forecastCreate.ts`, `bots/sourceless.ts` |
-| `express-prediction` | `expressPredictionSchema` | `/api/forecasts/express` |
-| `extract-prediction` | `predictionSchema` | `llm/gemini.ts` — forecast import |
+| `express-prediction` | `expressPredictionSchema` | `/api/forecasts/express/generate` |
+| `extract-prediction` | `predictionSchema` | `llm/gemini.ts` — forecast import (`/api/ai/extract`) |
 | `forecast-quality-validation` | — | `bots/forecastCreate.ts`, `bots/sourceless.ts` |
-| `guess-chances` | `guessChancesSchema` | `/api/forecasts/express/guess` |
+| `guess-chances` | `guessChancesSchema` | `/api/forecasts/express/guess`, `/api/forecasts/[id]/context` (LLM fallback) |
 | `panel-estimate` | — | `services/ai-panel.ts` (docs/LASSO.md) |
 | `panel-estimate-grounded` | — | `services/ai-panel.ts` (docs/LASSO.md) |
-| `relation-typer` | `relationTyperSchema` | `/api/cron/relation-typer` |
-| `research-query-generation` | `queryGenerationSchema` | `/api/forecasts/[id]/research` |
-| `resolution-research` | `researchSchema` | `/api/forecasts/[id]/research` |
-| `suggest-tags` | `suggestTagsSchema` | tag suggestion API |
+| `relation-typer` | `relationTyperSchema` | `services/relation-typer.ts` — `/api/cron/relation-typer` |
+| `research-query-generation` | `queryGenerationSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
+| `resolution-research` | `researchSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
+| `suggest-tags` | `suggestTagsSchema` | `llm/gemini.ts` — `/api/ai/suggest-tags` |
 | `temporal-classifier` | `temporalClassifierSchema` | `services/temporal-classifier.ts` |
 | `topic-extraction` | — | `llm/expressPrediction.ts` — article → search query |
 | `update-context` | — | `/api/forecasts/[id]/context` |

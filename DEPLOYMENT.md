@@ -18,11 +18,11 @@
 # 1. Local sanity
 npm run typecheck && npm test && npm run build
 
-# 2. Deploy to staging — push to main
-git push origin main
+# 2. Deploy to staging — merge a PR into main (never push to main directly)
+gh pr merge <n> --squash
 
 # 3. Deploy to production — tag and push
-./scripts/release.sh        # interactive; bumps version, tags, pushes
+./scripts/release.sh        # interactive; tags + creates the GitHub release (no version bump — that happens per-PR)
 
 # 4. Verify
 curl https://staging.daatan.com/api/health

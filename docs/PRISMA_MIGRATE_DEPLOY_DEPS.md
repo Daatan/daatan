@@ -2,6 +2,7 @@
 
 > **Status: RESOLVED** — Fixed in PR #620 (v1.8.32) via dedicated migrations container.
 > This document is kept as a record of the root cause and decision history.
+> Current state (verified 2026-09-27): Option C is what runs — the `Dockerfile`'s `FROM builder AS migrations` stage, executed with `docker run --rm` in `scripts/blue-green-deploy.sh` Phase 5; the "Self-Validation Step" and "Current Staging State" sections below describe the pre-fix state (the runner stage now only checks `@prisma/adapter-pg`).
 
 ## Summary
 

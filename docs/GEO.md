@@ -44,6 +44,11 @@ industry, July 2026). Key takeaways that drove the backlog:
   - Some "AI bot" hits are spoofed vulnerability scanners (fake `ChatGPT-User`/`PerplexityBot`
     UAs probing `/app/.git/HEAD`, `/secrets.json`) — noise, not a GEO signal, ignore when
     reading future citation stats.
+- **[2026-08-08] `public/llms.txt` + FAQPage JSON-LD on forecast pages** (#1295, PR #1314) — a
+  plain-text site description for AI crawlers that don't render JS, and a question-form
+  `FAQPage` block per public forecast aimed at answer-engine extraction. See
+  [`docs/SEO.md`](./SEO.md). (The visible on-page question/answer line added alongside it was
+  removed again in PR #1635; the JSON-LD stays.)
 
 ## Backlog (not yet implemented, roughly prioritized)
 

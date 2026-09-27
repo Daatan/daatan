@@ -17,7 +17,7 @@ GitHub → CI/CD (GitHub Actions) → ECR → EC2 via SSM → Blue-green swap �
 | Environment | URL                        | Trigger              | Image tag         | EC2 Instance            |
 |-------------|----------------------------|----------------------|-------------------|-------------------------|
 | Staging     | https://staging.daatan.com | Push to `main`       | `staging-latest`  | `i-0406d237ca5d92cdf`   |
-| Production  | https://daatan.com         | Git tag `v*`         | `1.30.X`          | `i-04ea44d4243d35624`   |
+| Production  | https://daatan.com         | Git tag `v*`         | `X.Y.Z` (from tag) | `i-04ea44d4243d35624`   |
 
 Each environment has its own EC2 instance, Postgres container, nginx, and SSL certificate.
 
@@ -49,12 +49,16 @@ When staging looks good, push a version tag:
 
 ```bash
 git checkout main && git pull
-git tag v1.30.X
-git push origin v1.30.X
+git tag vX.Y.Z        # the version in package.json
+git push origin vX.Y.Z
 ```
 
-This triggers the `deploy-production` job which:
-1. Verifies staging is running the same version
+(`./scripts/release.sh` does the same interactively and also creates the GitHub release.)
+
+The tag push re-runs the pipeline on the tagged commit — images are rebuilt and tagged
+`X.Y.Z` / `X.Y.Z-migrations`, `deploy-staging` runs first — and then the
+`deploy-production` job:
+1. Verifies staging reports a version ≥ the tag (polling up to 10 min while staging deploys)
 2. Pulls the versioned app + migrations images from ECR
 3. Runs the full blue-green deploy on production
 
@@ -73,10 +77,15 @@ This triggers the `deploy-production` job which:
 ### Bump commands
 
 ```bash
-npm version patch   # 1.30.8 → 1.30.9  (bug fixes, small changes)
-npm version minor   # 1.30.9 → 1.31.0  (new features)
-npm version major   # 1.31.0 → 2.0.0   (breaking changes)
+npm version patch --no-git-tag-version   # 1.30.8 → 1.30.9  (bug fixes, small changes)
+npm version minor --no-git-tag-version   # 1.30.9 → 1.31.0  (new features)
+npm version major --no-git-tag-version   # 1.31.0 → 2.0.0   (breaking changes)
 ```
+
+`--no-git-tag-version` matters: plain `npm version` also creates a commit **and a `v*` git
+tag**, and pushing a `v*` tag is a production deploy. The bump is required on every commit on
+a non-`main` branch (see [VERSIONING.md](../VERSIONING.md)); CI's `Version bump` check
+(`.github/workflows/version.yml`) re-runs `check-version-bump.sh` on each PR.
 
 ---
 
@@ -85,27 +94,39 @@ npm version major   # 1.31.0 → 2.0.0   (breaking changes)
 ### Jobs
 
 ```
-build ──┬──► deploy-staging    (on push to main)
-        └──► deploy-production (on tag push v*)
+typecheck ─┐
+lint ──────┼──► build ──┬──► build-app-image ────────┬──► deploy-staging ──► deploy-production
+unit-test* ┘            └──► build-migrations-image ─┘    (push to main,       (tag push v* only)
+                                                           and tag push v*)
 
-integration   (parallel with build, on all pushes and PRs — runs
+unit-test*  = `unit-test` on PRs (related tests only, scripts/run-related-tests.sh)
+              or `unit-test-full` on push/tag (full suite, 4 shards)
+
+integration   (independent, on all pushes and PRs — runs
                `npm run test:integration` against the dockerized
                test postgres from docker-compose.test.yml)
 ```
 
+The image builds and deploys are skipped on PRs. The `Version bump` check is a separate
+workflow (`.github/workflows/version.yml`).
+
 ### `build` job
 
-1. Install dependencies, type-check, lint
-2. Run unit tests
-3. Build Next.js app (with dummy DB URL)
-4. Security audit
-5. Check env var parity between `blue-green-deploy.sh` and `docker-compose.prod.yml`
+1. Build Next.js app with a dummy DB URL — **PRs only** (on push/tag the Docker build does it)
+2. Security audit (`npm audit --audit-level=critical`)
+3. Check env var parity between `blue-green-deploy.sh` and `docker-compose.prod.yml`
    (`scripts/check-env-parity.sh` — extracts `-e KEY` tokens from `blue-green-deploy.sh`'s
    `ENV_ARGS` bash array and compares against the compose file's `environment:` block per
    service; doesn't catch a var missing from *both*, only drift between them)
-6. Build and push **app image** (`staging-latest`) to ECR
-7. Build and push **migrations image** (`staging-latest-migrations`) to ECR
-   - Reuses all cached layers from step 6 — adds ~30–60s to CI time
+4. Resolve `NEXT_PUBLIC_APP_VERSION` (tag name on `v*` pushes, else `package.json`)
+
+### `build-app-image` / `build-migrations-image` jobs
+
+Run in parallel after `build` (push/tag/dispatch only):
+- **app image** (`staging-latest`, `sha-<commit>`, and `X.Y.Z` — `package.json`'s version on
+  `main` pushes, the tag's version on `v*` pushes) — the only one that writes the BuildKit cache
+- **migrations image** (`staging-latest-migrations` + `<version>-migrations`, `migrations`
+  Dockerfile target) — reads the cache only
 
 ### `deploy-staging` job
 
@@ -124,14 +145,14 @@ integration   (parallel with build, on all pushes and PRs — runs
 
 1. Configure AWS credentials
 2. Resolve version from tag name
-3. Verify staging version ≥ production target (safety gate)
+3. Verify staging version ≥ production target (safety gate; polls up to 10 min)
 4. Check EC2 SSM health (`Environment=prod` instance)
 5. SSM command:
-   - Pull versioned app image (`1.30.X`) from ECR
-   - Pull versioned migrations image (`1.30.X-migrations`) from ECR
+   - Pull versioned app image (`X.Y.Z`) from ECR
+   - Pull versioned migrations image (`X.Y.Z-migrations`) from ECR
    - Run `blue-green-deploy.sh production`
 6. Poll + verify (via `.github/actions/ssm-deploy`)
-7. Send Telegram notification
+7. Send Telegram notification (to `TELEGRAM_CLEAN_CHAT_ID`, falling back to `TELEGRAM_CHAT_ID`)
 
 ### Composite action: `.github/actions/ssm-deploy`
 
@@ -154,6 +175,7 @@ Inputs: `command-id`, `health-url`, `app-version`.
                            │ Phase 6: alias swap
                            ▼
 Phase 1  DB up       postgres-staging (always running)
+Phase 1b Certbot     docker compose up -d certbot (re-asserts the TLS renewal loop; non-fatal)
 Phase 2  Skip build  (SKIP_BUILD=true, image pre-pulled)
 Phase 3  Start new   daatan-app-staging-new  (no alias, no traffic)
 Phase 4  Health ✓    curl 127.0.0.1:3000/api/health inside new container
@@ -162,7 +184,8 @@ Phase 5b Seed        docker exec daatan-app-staging-new node prisma/seed.js
 Phase 6  Swap        alias moves: nginx now resolves to new container
 Phase 7  Verify      curl https://staging.daatan.com/api/health
 Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
-         Rollback?   if Phase 7/8 fails → restart old image, swap back
+         Rollback?   if Phase 7 fails → restart old image, swap back
+                     (Phase 8 failure: one service restart + re-check, then exit 1 — no rollback)
 ```
 
 **Zero-downtime guarantee**: old container serves all traffic until Phase 6. Phases 3–5
@@ -220,10 +243,13 @@ free -m
 with `status: "memory-pressure"` once RSS crosses 1600 MB (`src/app/api/health/route.ts`)
 — below the 2048 MB cgroup limit, above the ~1.4 GB day-old plateau. This alone changes
 nothing: Docker's `--restart unless-stopped` restarts on process *exit*, not on a failed
-healthcheck. `.github/workflows/watchdog.yml`'s disk-watchdog job is what closes the
-loop — it checks `daatan-app`'s Docker health status over SSM each run and issues
-`docker restart daatan-app` when it's `unhealthy`, which sends SIGTERM (graceful,
-drains in-flight requests) before SIGKILL, well ahead of the cgroup's hard 2 GiB limit.
+healthcheck. `.github/workflows/watchdog.yml`'s disk-watchdog job (every 5 min) is what
+closes the loop — it runs `scripts/check-system-health.sh` over SSM, which reads
+`/api/health` from inside the app container (`docker exec … wget`; the app has no published
+host port) and, after **2 consecutive** `memory-pressure` readings, issues
+`docker restart daatan-app` (`daatan-app-staging` on staging) and posts to Telegram. A
+restart sends SIGTERM (graceful, drains in-flight requests) before SIGKILL, well ahead of
+the cgroup's hard 2 GiB limit. A plain `degraded` (DB) status never triggers a restart.
 
 ### The dedicated migrations container (since v1.8.32)
 
@@ -255,8 +281,8 @@ See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` for full background.
 |---|---|---|
 | `staging-latest` | Latest staging app image | `runner` stage |
 | `staging-latest-migrations` | Latest staging migrations image | `migrations` stage |
-| `1.30.X` | Versioned production app image | `runner` stage |
-| `1.30.X-migrations` | Versioned production migrations image | `migrations` stage |
+| `X.Y.Z` | Versioned app image (pushed on `main` merges and `v*` tags; production and rollbacks pull this) | `runner` stage |
+| `X.Y.Z-migrations` | Versioned migrations image | `migrations` stage |
 | `sha-<commit>` | Per-commit reference | `runner` stage |
 | `buildcache` | BuildKit layer cache | — |
 
@@ -370,7 +396,10 @@ SECRET_NAME="daatan-env-${SECRET_SUFFIX}"
 ```
 
 See [SECRETS.md](../SECRETS.md) for the full list of variables carried
-in the bundles, the update flow, and rotation runbooks.
+in the bundles, the update flow, and rotation runbooks. A few secrets are
+instead read at runtime from SSM SecureStrings (`OPENROUTER_API_KEY` per env,
+`ORACLE_API_KEY` shared), with the bundle value as fallback — see
+[docs/SECRETS.md](./SECRETS.md).
 
 ---
 
@@ -387,16 +416,13 @@ version tag (e.g. `v1.30.9`).
 
 ### Rollback production
 
-Tag the previous known-good commit and push:
+Preferred: the GitHub Actions **Rollback** workflow (Actions → Rollback → Run workflow),
+which redeploys an existing versioned image from ECR, or the Telegram `/rollback` bot that
+triggers the same workflow. See `docs/ROLLBACK.md` for both.
 
-```bash
-git tag v1.30.X <commit-sha>
-git push origin v1.30.X
-```
-
-There are now two additional rollback paths: the GitHub Actions **Rollback**
-workflow (Actions → Rollback → Run workflow) and the Telegram `/rollback` bot for
-one-tap operator-initiated rollbacks. See `docs/ROLLBACK.md` for both.
+Tagging an older commit (`git tag vX.Y.Z <commit-sha> && git push origin vX.Y.Z`) also
+works, with two caveats: the tag name must not already exist, and a tag push rebuilds from
+that commit and runs `deploy-staging` first — so staging is rolled back to it too.
 
 ### Restarting the app on prod — do NOT force-recreate
 
@@ -406,16 +432,21 @@ It recreates the container in-place under live load and can spike CPU/memory —
 
 - **Deploy a new image:** use `scripts/blue-green-deploy.sh production` — the standard,
   health-checked, zero-downtime path.
-- **Restart the running container (no rebuild):** `docker compose restart app`.
+- **Restart the running container (no rebuild):** `docker compose restart app` (the
+  memory-pressure watchdog uses `docker restart daatan-app`). A restart keeps the
+  container's original environment — it does **not** pick up a changed `.env`; that takes
+  a redeploy (blue-green recreates the container with fresh `-e` values).
 
 ### View live logs
 
-Use the `/logs` slash command in Claude Code, or the `/prod-status` command for a
-full health check. See `.claude/commands/` for details.
+Over SSM (the `/ssm` skill in Claude Code, or `aws ssm send-command`):
+`docker logs daatan-app --tail 100`. For a quick health check, `curl -s https://daatan.com/api/health`.
 
 ---
 
 ## Required Secrets
+
+**GitHub Actions secrets** (referenced as `secrets.*` in `.github/workflows/`):
 
 | Secret                         | Used by                              |
 |--------------------------------|--------------------------------------|
@@ -423,10 +454,22 @@ full health check. See `.claude/commands/` for details.
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Baked into Docker image at build     |
 | `TELEGRAM_BOT_TOKEN`           | Deploy success/failure notifications |
 | `TELEGRAM_CHAT_ID`             | Deploy notifications target          |
-| `BOT_RUNNER_SECRET`            | Bot cron trigger (`bots.yml`)        |
-| `CRON_SECRET`                  | Heartbeat cron auth (`heartbeat.yml`) — same value as `BOT_RUNNER_SECRET` in `.env` |
+| `TELEGRAM_CLEAN_CHAT_ID`       | Prod deploy notifications + high-signal workflow alerts (falls back to `TELEGRAM_CHAT_ID`) |
+| `BOT_RUNNER_SECRET`            | Bot + cron triggers (`bots.yml`, `heartbeat.yml` and the other `/api/cron/*` workflows — all validate against the app's `BOT_RUNNER_SECRET`) |
 | `STAGING_URL`                  | Bot cron + heartbeat target URL (staging) |
-| `OPENROUTER_API_KEY`           | Bot LLM calls (staging only)         |
+| `DATABASE_URL_STAGING`         | Build arg for the NEXT testbed image (`deploy-next.yml`) |
+| `GSC_SA_KEY`, `YWM_OAUTH_TOKEN`, `CRUX_API_KEY` | SEO report (`seo-report.yml`) |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` | Android release signing (`android-release.yml`) |
+
+There is no `CRON_SECRET` GitHub secret and no code reads one (`heartbeat.yml` used to, and
+got 401s). An `OPENROUTER_API_KEY` GitHub secret is referenced by no workflow (see
+[docs/SECRETS.md](./SECRETS.md)).
+
+**App runtime env** (in the `daatan-env-<env>` bundle, passed to the container by
+`blue-green-deploy.sh` — not GitHub secrets):
+
+| Variable                       | Purpose                              |
+|--------------------------------|--------------------------------------|
 | `INDEXNOW_KEY`                 | IndexNow instant indexing (Bing/Yandex) — optional; omit to disable |
 | `TELEGRAM_WEBHOOK_SECRET`      | Shared secret for the Telegram rollback webhook — unset = fail closed |
 | `TELEGRAM_ROLLBACK_CHAT_IDS`   | Comma-separated Telegram chat IDs allowed to issue `/rollback` |

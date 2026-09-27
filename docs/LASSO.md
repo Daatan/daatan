@@ -264,8 +264,8 @@ existing precedent for an independent probability series that is charted but dri
 nothing.
 
 Member identity is `(model, mode, promptVersion)`. `promptVersion` is a fingerprint of
-the prompt template (sha256, 12 chars) rather than a Bedrock version id, so it stays
-correct when the hardcoded fallback prompt is in use. **Change the prompt and prior
+the prompt template (sha256, 12 chars, `promptVersionOf()` in `ai-panel.ts`) rather than
+the prompt lock's hand-bumped `version`, so any edit to the template text forks it. **Change the prompt and prior
 Brier scores stop being comparable** — without this column the leaderboard would
 silently average two different members.
 
@@ -430,8 +430,9 @@ leaderboard groups by it, and chart series/dataKeys are keyed by `(model, mode)`
 twin charts as its own line — "DeepSeek (news)", a deeper shade of its sibling's hue —
 and scores as its own leaderboard row, never averaged with its sibling.
 
-**Prompt.** `panel-estimate-grounded` (hardcoded fallback in `bedrock-prompts.ts`; no
-SSM parameter yet — absence falls back, same as `panel-estimate`'s PLACEHOLDER). It
+**Prompt.** `panel-estimate-grounded` (in `PROMPTS` in `bedrock-prompts.ts`, mirrored in
+`prompts/panel-estimate-grounded.txt` and locked like every other prompt — see
+[PROMPTS.md](PROMPTS.md)). It
 wraps `{{articlesBlock}}` in an ignore-instructions guard: snippets are third-party
 text and occasionally *state* the outcome — that turns the twin into a nowcaster,
 which is exactly the regime difference the mode split exists to measure, but it must
@@ -500,7 +501,7 @@ Open, roughly in order of value:
   model calibration.
 - **`ai_member_scores` stores `promptVersion`** (since v1.52.0; null for the
   `'oracle'`/`'market'` sentinels) and the leaderboard groups by
-  `(model, promptVersion)`, so a prompt change forks a member's board row instead of
+  `(model, mode, promptVersion)` (`ai-panel-leaderboard.ts`), so a prompt change forks a member's board row instead of
   silently averaging two incomparable series — closing the gap §6 warns about. Rows
   are labelled with a fingerprint suffix only when a model actually spans versions.
 - OpenRouter prices were verified live 2026-07-09/11; they move.

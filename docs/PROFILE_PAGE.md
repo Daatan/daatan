@@ -2,7 +2,7 @@
 
 ## Overview
 
-The profile page (`/profile` for own profile, `/profile/[id]` for public profiles) shows a user's complete forecasting record including all scoring metrics, tabbed forecast lists, and per-topic filtering.
+The profile page (`/profile` for own profile, `/profile/[id]` for public profiles) shows a user's forecasting record — ELO (headline), Accuracy and Brier — with tabbed forecast lists and per-topic filtering.
 
 ## URL State
 
@@ -52,10 +52,12 @@ Runs the metric queries in parallel and returns `ProfileScores`. Only `elo`, `ac
 | `rsTagDelta` | Sum of RS changes in the selected tag (null when no tag selected) |
 | `truthScore` | Average peer score per prediction (min 3, null otherwise) |
 | `weightedPeerScore` | Metaculus-style decay-weighted peer score (min 3, null otherwise) |
+| `weightedPeerCount` | Number of commitments behind `weightedPeerScore` |
 | `roi` | Average net RS change per resolved prediction (min 3, null otherwise) |
 | `accuracy` | Fraction of resolved commitments where rsChange > 0 (min 3, null otherwise) |
 | `accuracyResolved` | Raw count of resolved commitments used for accuracy |
 | `topicBreakdown` | Per-tag peer score averages (top 8 tags by count) |
+| `calibration` | Calibration buckets for `CalibrationChart` |
 
 ### `loadProfileTab({ userId, isPublic, selectedTag, tab, page }): Promise<ProfileTabResult>`
 
@@ -74,7 +76,6 @@ Returns counts for all three tabs plus the items for the active tab (20 per page
 | Feature | Own (`/profile`) | Public (`/profile/[id]`) |
 |---------|-----------------|------------------------|
 | Private predictions visible | Yes | No |
-| CU balance card | Yes | No |
 | Edit profile link | Yes | No |
 | SEO JSON-LD | No | Yes |
 | Redirect if viewing own | N/A | Redirects to `/profile` |
@@ -91,8 +92,9 @@ The grid itself shows two plain-language checks on ELO — Accuracy and Brier Sc
 |------|------|
 | `src/app/profile/page.tsx` | Own-profile page; session-gated; shows private predictions |
 | `src/app/profile/[id]/page.tsx` | Public profile; adds SEO JSON-LD; redirects if own |
+| `src/app/profile/edit/page.tsx` | Edit-profile page (linked from own profile) |
 | `src/components/profile/UserProfileView.tsx` | Shared view component (server) |
-| `src/components/profile/ScoresGrid.tsx` | Scores grid + Glicko chart + topic breakdown |
+| `src/components/profile/ScoresGrid.tsx` | Accuracy + Brier cards and the calibration chart |
 | `src/components/profile/ProfileTabs.tsx` | Tab nav + pagination (client component) |
 | `src/components/profile/TagFilter.tsx` | Tag pill filter (client component) |
 | `src/components/profile/profile-url.ts` | `buildProfileUrl()` — shared URL builder |

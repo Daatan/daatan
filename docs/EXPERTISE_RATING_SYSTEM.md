@@ -6,6 +6,8 @@ The goal is to replace the current simple Reputation Score (`rs`) with a robust 
 
 Users' predictions are compared against multiple baselines to measure true alpha, not just accuracy.
 
+> **Current state (2026-09-27):** since #1764 the user-facing headline rating is **ELO**, not Glicko-2 or RS — the leaderboard shows ELO / Accuracy / Brier and the profile shows ELO + Accuracy + Brier. Glicko-2 and the other systems below are still computed and available via `GET /api/leaderboard?sortBy=`, but are not rendered. See [SCORING_SYSTEMS.md](./SCORING_SYSTEMS.md).
+
 ---
 
 ## Benchmarks (The "Who to Beat")
@@ -84,13 +86,13 @@ The system version-controls votes rather than overwriting them (already the case
 - [x] Write Glicko-2 update function in `src/lib/services/expertise.ts`
 - [x] Call it from the prediction resolution flow
 - [x] Update leaderboard query to sort by `mu - 3 * sigma` (`GET /api/leaderboard?sortBy=glicko`)
-- [x] Display `μ ± σ` on user profile
+- [x] Display `μ ± σ` on user profile *(hidden since #1764)*
 
 ### Phase 2 — Market Baseline (later)
 
-- [ ] Add `polymarketPrice Float?` to `Commitment` and `Prediction`
-- [ ] Ingest Polymarket price at commitment time (API or manual)
-- [ ] Compute KL-divergence vs market at resolution
+- [x] Add `polymarketPrice Float?` to `Commitment` and `Prediction` (daatan#1138). `Commitment.polymarketPrice` is populated; `Prediction.polymarketPrice` has no writer yet.
+- [x] Ingest the market price at commitment time — `createCommitment` (`src/lib/services/commitment.ts`) snapshots the latest `ExternalMarketPriceSnapshot` of the forecast's linked Polymarket/Kalshi market (polarity-adjusted, 0–1); null when unlinked or no snapshot exists, never back-filled
+- [x] Compute KL-divergence vs market at resolution — `Commitment.klDivergence` (`prediction-resolution.ts`); storage only, not yet used in any ranking
 - [ ] Compute lead-lag delta
 
 ### Phase 3 — Leaderboard & UI ✅ done in v1.10.53
@@ -99,12 +101,16 @@ The system version-controls votes rather than overwriting them (already the case
 - [x] Per-tag Glicko-2 replay via `replayGlicko2History(tagSlug)` in `expertise.ts`
 - [x] Multi-system leaderboard: ELO, Brier, Peer Score, AI Score, TruthScore, ROI, Weighted Peer Score
 - [x] ScoringSystem registry in `src/lib/services/scoring-systems.ts` — adding new systems requires no core changes
-- [x] User profile: skill history chart over time — μ ± σ SVG chart, on-the-fly Glicko-2 replay, tag-filtered (v1.10.59, PR #704)
+- [x] User profile: skill history chart over time — μ ± σ SVG chart, on-the-fly Glicko-2 replay, tag-filtered (v1.10.59, PR #704) *(hidden since #1764)*
 - [x] Per-tag minimum threshold — ≥3 resolved predictions required before surfacing per-tag Glicko-2 score (v1.10.63, PR #709)
 - [x] Per-tag ELO and Glicko-2 materialized in `UserTagRating` table — eliminates full-history replay on every tag-filtered leaderboard request; seeded lazily on first access, updated incrementally at resolution (v1.10.207, PR #870)
 - [ ] "Signal vs Noise" indicator per user
 
 See `docs/SCORING_SYSTEMS.md` for the full scoring system reference and architecture guide.
+
+### Pundit (source) ratings
+
+Tracked pundits get the same Brier / ELO / Glicko-2 machinery per tag (`PunditTagRating`, #1200), computed in `src/lib/services/pundit-rating.ts` from their evidence-pool stances on resolved BINARY forecasts (stance mapped to a probability as `(stance + 1) / 2`, averaged per pundit per forecast). Only current-version, `COMPLETE`, non-excluded pool rows count (#1699), and since #1704 readings whose extraction `certainty` is below `MIN_JUDGED_CERTAINTY = 0.3` are excluded — the Oracul's own forecast aggregate still uses them. Ratings are materialized lazily (`ensurePunditTagRatingsSeeded`) and have no incremental update path: `.github/workflows/pundit-ratings-recalculate.yml` rebuilds the default tag (`israeli-elections-2026`) daily at 06:15 UTC, or rebuild a tag by hand with `POST /api/admin/pundit-ratings/recalculate?tag=<slug>` (ADMIN session or `x-cron-secret`) after a scoring change.
 
 ---
 

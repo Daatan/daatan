@@ -1,7 +1,7 @@
 # DAATAN Technical Documentation
 
 > Technical architecture, infrastructure, project structure, and development guide.
-> Last updated: August 8, 2026
+> Last updated: September 27, 2026
 
 ---
 
@@ -38,16 +38,16 @@
 | Cloud | AWS (EC2, Route 53, S3) | - |
 | IaC | Terraform | 1.x |
 | CI/CD | GitHub Actions | - |
-| AI Integration | Google Gemini API (primary), Ollama (fallback), OpenRouter (bots) | - |
-| Forecast Oracle | TruthMachine Oracle API (`oracle.daatan.com`) — calibrated multi-source probability estimates | 0.1 |
-| Prompt Management | AWS Bedrock Prompt Management | - |
+| AI Integration | Gemini `gemini-2.5-flash` via Vertex AI (primary; Developer-API key leg for self-host) → Oracul `/llm` (AWS Bedrock / Amazon Nova) → OpenRouter → Ollama; OpenRouter also powers bots | - |
+| Forecast Oracul | TruthMachine Oracul API (`oracle.daatan.com`) — calibrated multi-source probability estimates | 1.x (app accepts API major `1` only — `EXPECTED_API_MAJOR_VERSIONS` in `src/lib/services/oracle.ts`) |
+| Prompts | In-code registry `PROMPTS` in `src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/*.txt` and pinned by `prompts/prompt_versions.lock.json` (#1658) | - |
 | Email | Resend | - |
 | Push Notifications | web-push (VAPID) | - |
 | Notifications | Telegram | - |
 | i18n | next-intl | 4.x |
 | Image Processing | Sharp | - |
 
-**LLM prompts** (forecast/prediction creation) are managed via AWS Bedrock Prompt Management. See [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md).
+**LLM prompts** are served from git: `PROMPTS` in `src/lib/llm/bedrock-prompts.ts` is the source of truth (no runtime fetch, no cache), `prompts/*.txt` is the human-editable mirror kept byte-identical by a test, and `prompts/prompt_versions.lock.json` pins prose + response schema together (#1658). AWS Bedrock Prompt Management is no longer used — its Terraform was removed in #1674. See [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md).
 
 ---
 
@@ -77,7 +77,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
 │  │           │               │  │ │  │           │               │   │
 │  │           ▼               │  │ │  │           ▼               │   │
 │  │  daatan-app :3000         │  │ │  │  daatan-app-staging :3000 │   │
-│  │           │               │  │ │  │  daatan-app-next   :3000  │   │
+│  │           │               │  │ │  │  daatan-app-next :3000 (1)│   │
 │  │           ▼               │  │ │  │           │               │   │
 │  │  daatan-postgres          │  │ │  │           ▼               │   │
 │  │  (DB: daatan)             │  │ │  │  daatan-postgres-staging  │   │
@@ -97,6 +97,8 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
       └──────────────────────────────────────┘
 ```
 
+(1) `daatan-app-next` serves the manually deployed NEXT testbed (`next.daatan.com`, `deploy-next.yml`, shares the staging DB — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying.
+
 ### Request Flow
 
 1. User requests `https://daatan.com` (or `https://staging.daatan.com`).
@@ -112,11 +114,12 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
 |-----------|-------|------|---------|
 | `daatan-nginx` | `nginx:alpine` | 80, 443 | Reverse proxy, SSL termination |
 | `daatan-app` | `daatan-app:<tag>` (prod host) | 3000 (internal) | Production Next.js app |
-| `daatan-app-staging` | `daatan-app:staging-*` (staging host) | 3000 (internal) | Staging Next.js app (active colour) |
-| `daatan-app-next` | `daatan-app:staging-*` (staging host) | 3000 (internal) | Staging blue/green candidate during deploys |
+| `daatan-app-new` / `daatan-app-staging-new` | same image as the target | 3000 (internal) | Blue/green candidate, only while `scripts/blue-green-deploy.sh` runs |
+| `daatan-app-staging` | `daatan-app:staging-*` (staging host) | 3000 (internal) | Staging Next.js app |
+| `daatan-app-next` | `daatan-app:next-latest` (staging host) | 3000 (internal) | NEXT testbed (`next.daatan.com`), staging DB |
 | `daatan-postgres` | `pgvector/pgvector:pg16` (prod host) | 5432 (internal) | Production PostgreSQL (DB: `daatan`) |
 | `daatan-postgres-staging` | `pgvector/pgvector:pg16` (staging host) | 5432 (internal) | Staging PostgreSQL (DB: `daatan_staging`) |
-| `daatan-certbot` | `certbot/certbot` | - | SSL certificate renewal |
+| `daatan-certbot` | `certbot/dns-route53` (prod) / `certbot/certbot` (staging) | - | SSL certificate renewal |
 
 ### Volumes
 
@@ -138,20 +141,26 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
 ```
 daatan/
 ├── .github/                    # GitHub configuration
-│   └── workflows/              # CI/CD pipelines
-│       └── deploy.yml          # Main deployment workflow
+│   └── workflows/              # CI/CD pipelines + scheduled jobs (see CI/CD Pipeline below)
+│       └── deploy.yml          # Main CI + deployment workflow
 ├── .husky/                     # Git hooks
 │   ├── pre-commit              # check-version-bump.sh + lint-staged (ESLint --fix)
-│   └── pre-push                # tsc --noEmit + `vitest run --changed` (excluding integration)
-├── certbot/                    # SSL certificate storage
+│   └── pre-push                # typecheck + scripts/run-related-tests.sh (excluding integration)
+├── android/                    # Android (TWA) app
+├── certbot/                    # SSL certificate storage (on the servers)
 │   ├── conf/                   # Let's Encrypt certificates
 │   └── www/                    # ACME challenge files
+├── infra/nginx/                # nginx configs (see Configuration Files)
+├── messages/                   # next-intl locale files
 ├── prisma/                     # Database schema
-│   └── schema.prisma           # Prisma ORM schema
+│   ├── schema.prisma           # Prisma ORM schema
+│   └── migrations/             # Migrations (applied by the migrations container)
+├── prompts/                    # Human-editable mirror of every LLM prompt + version lock
 ├── public/                     # Static assets
 ├── scripts/                    # Operational scripts
 ├── src/                        # Application source code
 ├── terraform/                  # Infrastructure as Code
+├── tests/                      # Playwright E2E (e2e/, e2e-selfhost/) + self-host checks
 └── __tests__/                  # Test files
 ```
 
@@ -160,7 +169,8 @@ daatan/
 ```
 src/
 ├── app/                        # Next.js App Router
-│   ├── api/                    # API routes
+│   ├── api/                    # API routes (full list: docs/API.md)
+│   │   ├── account/            # forget-history — "Forget History" anonymize/detach (#1701)
 │   │   ├── admin/              # Admin-only endpoints (role: ADMIN)
 │   │   │   └── bots/           # Bot CRUD + run trigger
 │   │   │       └── [id]/       # Per-bot: PATCH, DELETE, run, logs
@@ -170,18 +180,24 @@ src/
 │   │   ├── comments/           # Comment CRUD + reactions
 │   │   ├── commitments/        # User commitment listing
 │   │   ├── forecasts/          # Forecast CRUD (new system)
-│   │   ├── health/             # Health check endpoint
+│   │   ├── health/             # Health check endpoint (version, commit, db, memory)
+│   │   ├── ibi/                # IBI tool endpoints (fetch-url, llm, search)
+│   │   ├── meta/               # timings — 30-day average context-update stage timings
 │   │   ├── news-anchors/       # News anchor management
+│   │   ├── news-indexer/       # news-indexer integration (active-forecasts, context push)
 │   │   ├── notifications/      # Notification endpoints
 │   │   ├── profile/            # User profile update
 │   │   │   └── avatar/         # Avatar upload → S3
 │   │   ├── push/               # Browser push subscription management
 │   │   ├── ai/                 # AI-powered endpoints
-│   │   ├── cron/               # Cron job endpoints (cleanup, etc.)
+│   │   ├── cron/               # Cron job endpoints hit by scheduled workflows
 │   │   ├── tags/               # Tag management
-│   │   ├── leaderboard/        # Leaderboard endpoint
+│   │   ├── telegram/           # Telegram rollback webhook
+│   │   ├── leaderboard/        # Leaderboard endpoint (+ sources/)
 │   │   ├── top-reputation/     # Top reputation endpoint (legacy)
-│   │   └── version/            # Version endpoint
+│   │   ├── uploads/            # Serves uploads from local disk (STORAGE_DRIVER=local)
+│   │   ├── user/               # User preferences
+│   │   └── well-known/         # assetlinks (Android TWA)
 │   ├── admin/                  # Admin UI pages (role: ADMIN)
 │   │   └── bots/               # Bot management dashboard (BotsTable.tsx)
 │   ├── auth/                   # Auth pages
@@ -191,12 +207,19 @@ src/
 │   │   └── error/              # Auth error page
 │   │       ├── page.tsx        # Server Component wrapper
 │   │       └── AuthErrorClient.tsx # Client Component with UI
+│   ├── [locale]/               # Localized (he/ru/eo) routes
+│   ├── authors/                # Pundit/author pages
 │   ├── create/                 # Forecast creation
-│   ├── leaderboard/            # User rankings
+│   ├── elections/              # Elections matrix
+│   ├── help/                   # Help pages (rating-numbers)
+│   ├── leaderboard/            # User rankings (+ ai/, sources/)
 │   ├── notifications/          # User notifications
 │   ├── forecasts/              # Forecast views
+│   ├── oracle-v2/              # Chrome-free Oracul 2.0 playground (admin)
 │   ├── profile/                # User profile
+│   ├── retroanalysis/          # Retroanalysis case studies
 │   ├── settings/               # User settings
+│   ├── sources/                # Per-source pages (sources/[name])
 │   ├── globals.css             # Global styles
 │   ├── layout.tsx              # Root layout
 │   └── page.tsx                # Homepage
@@ -211,11 +234,13 @@ src/
 ├── lib/                        # Shared utilities
 │   ├── llm/                    # LLM integration
 │   │   ├── providers/          # Provider implementations
-│   │   │   ├── gemini.ts       # Google Gemini
+│   │   │   ├── vertex.ts       # Gemini via Vertex AI (primary, #1472)
+│   │   │   ├── gemini.ts       # Gemini Developer API (key-based; self-host)
+│   │   │   ├── oracle.ts       # Oracul /llm — Bedrock / Amazon Nova fallback
 │   │   │   ├── ollama.ts       # Ollama (self-hosted fallback)
-│   │   │   └── openrouter.ts   # OpenRouter (bots)
-│   │   ├── bedrock-prompts.ts  # AWS Bedrock Prompt Management (5-min cache)
-│   │   ├── service.ts          # ResilientLLMService (primary + fallback)
+│   │   │   └── openrouter.ts   # OpenRouter (fallback + bots)
+│   │   ├── bedrock-prompts.ts  # In-code prompt registry (PROMPTS); name is historical (#1658)
+│   │   ├── service.ts          # ResilientLLMService (ordered provider chain)
 │   │   ├── types.ts            # LLMProvider, LLMRequest, LLMResponse
 │   │   └── index.ts            # Exports llmService, createBotLLMService
 │   ├── services/               # Business logic services
@@ -248,17 +273,26 @@ src/
 ```
 terraform/
 ├── main.tf                     # Provider configuration
-├── ec2.tf                      # EC2 instance + user data
+├── ec2.tf                      # EC2 instances (production + staging) + user data
 ├── vpc.tf                      # VPC, subnets, routing
 ├── security_groups.tf          # Firewall rules
 ├── route53.tf                  # DNS records
-├── s3.tf                       # Backup bucket + IAM
+├── s3.tf                       # Backup + upload buckets, EC2 role/profile
 ├── state.tf                    # S3 backend + DynamoDB state locking config
 ├── iam_ssm.tf                  # SSM access
+├── iam_ecr.tf / ecr.tf         # ECR repository, lifecycle policy, EC2 pull access
+├── oidc_github.tf              # GitHub Actions OIDC role (AWS_ROLE_ARN)
+├── bedrock_invoke.tf           # Bedrock invoke permission for the EC2 role (AI panel)
+├── secrets.tf / secrets_ssm.tf # Secrets Manager env bundles, SSM parameters
+├── ses.tf / iam_smtp.tf        # SES domain, mail forwarding, SMTP users
+├── monitoring.tf               # CloudWatch alarms, SNS topics, budgets
+├── telegram_alerts.tf          # Lambda forwarding infra alerts to Telegram (#1726)
+├── staging_schedule.tf         # EventBridge Scheduler off-hours staging stop/start (#1526)
 ├── variables.tf                # Input variables
 ├── outputs.tf                  # Output values
 ├── backend-staging.hcl         # Staging backend config (partial configuration)
 ├── backend-prod.hcl            # Production backend config (partial configuration)
+├── scripts/check-no-replace.sh # Pre-apply guard against instance replacement
 ├── terraform.tfvars            # Variable values (gitignored)
 └── terraform.tfvars.example    # Example variables
 ```
@@ -272,11 +306,17 @@ terraform/
 | `next.config.js` | Next.js configuration |
 | `tailwind.config.js` | Tailwind CSS configuration |
 | `vitest.config.ts` | Vitest test configuration |
+| `vitest.config.integration.ts` | Integration tests (`npm run test:integration`, real Postgres on :5433) |
+| `playwright.config.ts` / `playwright.selfhost.config.ts` | Playwright E2E (`npm run test:e2e`, `npm run test:e2e:selfhost`) |
+| `prisma.config.ts` | Prisma 7 CLI configuration |
 | `Dockerfile` | Multi-stage Docker build |
 | `docker-compose.yml` | Local development stack |
 | `docker-compose.prod.yml` | Production Docker stack |
-| `docker-compose.staging.yml` | Staging Docker stack (app-staging + app-next blue/green) |
-| `infra/nginx/nginx-ssl.conf` | Production nginx with SSL |
+| `docker-compose.staging.yml` | Staging Docker stack (app-staging + app-next NEXT testbed) |
+| `docker-compose.test.yml` | Test Postgres for integration tests |
+| `docker-compose.selfhost*.yml` | Self-hosted edition stacks (see `docs/SELF_HOSTING.md`) |
+| `infra/nginx/nginx-prod-ssl.conf` | Production nginx with SSL (mounted by `docker-compose.prod.yml`) |
+| `infra/nginx/nginx-ssl.conf` | Combined prod+staging SSL config; used by `scripts/verify-nginx-config.sh` and the security-header test |
 | `infra/nginx/nginx-staging-ssl.conf` | Staging nginx with SSL |
 | `infra/nginx/nginx.conf` | Local development nginx |
 | `infra/nginx/nginx-init.conf` | First-run nginx (HTTP-only, for cert issuance) |
@@ -301,6 +341,7 @@ terraform/
 | `PRODUCT.md` | Product documentation |
 | `TESTING.md` | Testing strategy and guidelines |
 | `docs/API.md` | HTTP API reference |
+| `docs/DATABASE.md` | Table map, probability scales, schema gotchas |
 | `docs/LLM_ARCHITECTURE.md` | LLM chain + Oracul integration |
 
 ### Testing Structure
@@ -308,9 +349,12 @@ terraform/
 ```
 __tests__/                      # Integration tests
 src/
-├── app/__tests__/              # API route tests
+├── app/__tests__/              # API route tests (also colocated __tests__/ next to routes and lib modules)
 ├── components/__tests__/       # Component tests
-└── test/setup.ts               # Vitest configuration
+└── test/setup.ts               # Vitest setup file
+tests/
+├── e2e/                        # Playwright E2E (npm run test:e2e)
+└── e2e-selfhost/               # Self-host Playwright E2E (npm run test:e2e:selfhost)
 ```
 
 ---
@@ -328,6 +372,8 @@ src/
 | S3 Bucket | Production DB backups | `daatan-db-backups-272007598366` |
 | S3 Bucket | Staging DB backups | `daatan-db-backups-staging-272007598366` |
 | S3 Bucket | Avatar/upload storage | `daatan-uploads-prod-272007598366`, `daatan-uploads-staging-272007598366` |
+| ECR | Container registry | `daatan-app` repository (app + `-migrations` images) |
+| EventBridge Scheduler | Staging off-hours sleep | Stops staging 20:00 UTC, starts 06:00 UTC on weekdays (`terraform/staging_schedule.tf`) |
 | Security Group | Firewall | HTTP, HTTPS (port 22 blocked — use SSM for server access) |
 | IAM Role | EC2 Profile (prod) | `daatan-ec2-role-prod` — SSM + S3 backup/upload access (prod buckets) + Secrets Manager (`daatan-env-prod`) |
 | IAM Role | EC2 Profile (staging) | `daatan-ec2-role-staging` — SSM + S3 backup/upload access (staging buckets) + Secrets Manager (`daatan-env-staging`) |
@@ -362,12 +408,14 @@ src/
 
 ```hcl
 # Key resources managed by Terraform
-aws_instance.backend           # EC2 instances (one per env)
-aws_eip.backend                # Elastic IPs
-aws_route53_zone.main          # DNS zone
+aws_instance.production        # Prod EC2 (both instances live in the prod state)
+aws_instance.staging           # Staging EC2 — never blanket-apply
+aws_eip.production / .staging  # Elastic IPs
+data.aws_route53_zone.main     # DNS zone (data source, not managed)
 aws_route53_record.*           # DNS records
-aws_s3_bucket.backups          # Backup buckets (prod + staging)
-aws_s3_bucket.uploads          # Upload buckets (prod + staging)
+aws_s3_bucket.backups          # Prod backup bucket
+aws_s3_bucket.backups_staging  # Staging backup bucket
+aws_s3_bucket.uploads          # Upload bucket (per env)
 aws_security_group.ec2         # Firewall rules
 aws_iam_role.ec2_role          # EC2 instance profile per env
 aws_vpc.main                   # VPC
@@ -393,7 +441,7 @@ terraform plan  -var="environment=prod"
 terraform apply -var="environment=prod"
 ```
 
-**Note:** instance-type changes are ignored in `lifecycle` to prevent accidental recreation.
+**Note:** both instances have `lifecycle { ignore_changes = [ami, user_data]; prevent_destroy = true }` to prevent accidental recreation. Prefer `-target=<resource>` applies over a blanket `apply` (e.g. the staging scheduler resources are applied by name — see the header of `terraform/staging_schedule.tf`).
 
 **Before any apply touching `aws_instance.production`/`aws_instance.staging`:** run
 `terraform/scripts/check-no-replace.sh`, which fails loudly if the plan would replace
@@ -419,17 +467,49 @@ EC2/Route53/S3 costs only — excludes LLM/Bedrock spend, which dominates actual
 
 ### GitHub Actions Workflows
 
-#### Bot Runner Workflow (cron)
+#### Bot Runner Workflow (`bots.yml`)
 
-A scheduled workflow runs every 5 minutes and calls `POST /api/bots/run` with the `x-bot-runner-secret` header. This triggers `runDueBots()` which checks all active bots and runs any that are due.
+Calls `POST /api/bots/run` with the `x-bot-runner-secret` header, which triggers `runDueBots()` to run any active bots that are due. **Its 5-minute schedule is commented out (stopped 2026-08-04) and the workflow is disabled at the Actions API** — it is `workflow_dispatch`-only; see the header of `.github/workflows/bots.yml` for why and how to restart it.
 
 **Required secret:** `BOT_RUNNER_SECRET` — must match the value of the `BOT_RUNNER_SECRET` environment variable in the running app.
 
 See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 
+#### Scheduled Workflows
+
+Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual `workflow_dispatch`. Times are UTC.
+
+| Workflow | Schedule | Purpose |
+|----------|----------|---------|
+| `watchdog.yml` | every 5 min | HTTP health + version drift, plus SSM disk/CPU/memory checks on the EC2 hosts |
+| `transition-expired-predictions.yml` | every 15 min | `/api/cron/transition-expired-predictions` |
+| `search-health.yml` | hourly | `/api/cron/search-health` |
+| `external-market-sync.yml` | hourly :17 | `/api/cron/external-market-sync` — refresh linked Polymarket/Kalshi prices |
+| `news-indexer-watchdog.yml` | every 2 h :17 | news-indexer disk + pipeline health via its `/stats` |
+| `backfill-embeddings.yml` | 02:23 daily | `/api/cron/backfill-embeddings` |
+| `backup.yml` | 04:00 + 16:00 daily | Prod DB backup to S3 (see Automated Backups) |
+| `ai-panel.yml` | 04:43 + 16:43 daily | `/api/cron/ai-panel` — multi-model estimate panel |
+| `requote.yml` | 05:31 daily | `/api/cron/requote` — temporal-model daily requote |
+| `pundit-ratings-recalculate.yml` | 06:15 daily | `/api/admin/pundit-ratings/recalculate` |
+| `cert-expiry.yml` | 06:17 daily | Served-cert expiry watch |
+| `heartbeat.yml` | 09:00 daily | `/api/cron/heartbeat` — daily "alive" signal |
+| `evidence-health.yml` | 10:23 daily | `/api/cron/evidence-health` — evidence-pipeline regression digest |
+| `relation-typer.yml` | 11:37 daily | `/api/cron/relation-typer` — types forecast pairs into `question_relations` |
+| `cost-report.yml` | 12:00 daily | Daily cost report (Telegram) |
+| `seo-report.yml` | Mon 06:00 | Weekly SEO report |
+| `retry-pool-extractions.yml` | Mon 06:30 | `/api/admin/evidence-pool/retry` — drain stuck pool rows |
+| `cost-report-weekly.yml` | Mon 12:00 | Weekly cost report |
+| `llm-waste-report.yml` | Mon 12:30 | Weekly LLM waste report |
+| `model-audit-weekly.yml` | Mon 13:07 | Weekly LLM model audit |
+| `evidence-second-opinion.yml` | Mon/Thu 09:00 | `/api/cron/evidence-second-opinion` |
+| `cost-report-monthly.yml` | 1st of month 12:00 | Monthly cost report |
+
+Manual-only workflows: `rollback.yml`, `deploy-next.yml` (NEXT testbed), `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`. `android-release.yml` runs on `android-v*` tags; `version.yml` and `terraform-validate.yml` (when `terraform/**` changes) run on pull requests.
+
 #### Deploy Workflow (`deploy.yml`)
 
 **Triggers:**
+- Pull request to `main` → checks only (no image push, no deploy)
 - Push to `main` → Deploy to Staging
 - Push tag `v*` → Deploy to Production
 - Manual dispatch → Either environment
@@ -442,15 +522,15 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-**Build Stage:**
-- Checkout code
-- Setup Node.js 24
-- Install dependencies (`npm ci`)
-- Build application
-- Run unit tests
-- Run linter
+**Build Stage** (parallel jobs, Node.js 24):
+- `Type check` and `Lint`
+- `Unit tests` — on PRs, only tests related to changed files (`scripts/run-related-tests.sh`); on push/tag, the full suite sharded 4 ways (`Unit tests (full suite)`)
+- `Integration Tests` (`npm run test:integration`)
+- `Build & Test` (`npm run build`)
+- On push/tag: `Build & Push App Image` and `Build & Push Migrations Image` to ECR in parallel; AWS access is via the OIDC role in `AWS_ROLE_ARN`
 
 **Deploy Stage (Staging):**
+- Wake the staging instance if the off-hours schedule has stopped it, and wait for SSM to come online
 - Send command via AWS SSM (SSH port 22 is blocked)
 - Download deploy scripts from GitHub at the current commit SHA
 - Pull Docker image from ECR (`staging-latest`)
@@ -464,22 +544,20 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 
 ### Required Secrets
 
+GitHub Actions secrets referenced by the workflows. Runtime app secrets (`POSTGRES_PASSWORD`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `VAPID_PRIVATE_KEY`, …) are **not** GitHub secrets — they live in the Secrets Manager bundles (see [Secrets Management](#secrets-management) and [SECRETS.md](./SECRETS.md)).
+
 | Secret | Purpose |
 |--------|---------|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | IAM credentials for SSM + ECR access |
-| `POSTGRES_PASSWORD` | Database password |
-| `NEXTAUTH_SECRET` | Auth encryption key |
-| `GOOGLE_CLIENT_ID` | OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-| `GOOGLE_VERTEX_PROJECT_ID` / `_CLIENT_EMAIL` / `_PRIVATE_KEY` | Gemini via Vertex AI — LLM + embeddings (#1472) |
-| `BOT_RUNNER_SECRET` | Shared secret for `POST /api/bots/run` (cron endpoint) |
-| `OPENROUTER_API_KEY` | OpenRouter LLM API key (used by bots) |
-| `RESEND_API_KEY` | Email delivery via Resend |
-| `VAPID_PUBLIC_KEY` | Browser push notification public key |
-| `VAPID_PRIVATE_KEY` | Browser push notification private key |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
+| `AWS_ROLE_ARN` | OIDC role assumed for ECR, SSM and the report workflows (no static AWS keys) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push public key, baked into the image at build time |
+| `BOT_RUNNER_SECRET` | Shared secret for `POST /api/bots/run` and other cron endpoints called by workflows |
+| `STAGING_URL` | Staging base URL used by scheduled workflows |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token for workflow notifications |
 | `TELEGRAM_CHAT_ID` | Telegram channel ID for notifications |
-| `STAGING_URL` | Staging URL (used by bot runner workflow) |
+| `TELEGRAM_CLEAN_CHAT_ID` | High-signal (clean) Telegram channel for reports/alerts |
+| `DATABASE_URL_STAGING` | Used by `deploy-next.yml` |
+| `GSC_SA_KEY` / `YWM_OAUTH_TOKEN` / `CRUX_API_KEY` | `seo-report.yml` data sources |
+| `ANDROID_KEYSTORE_*` / `ANDROID_KEY_PASSWORD` | `android-release.yml` signing |
 
 ---
 
@@ -491,7 +569,7 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 ┌─────────────────────────────────────────────────────────────────┐
 │                         User                                    │
 │  - id, email, name, image, isBot                                │
-│  - rs (Reputation Score)                                        │
+│  - eloRating (headline rating), rs (Reputation Score)           │
 └─────────────────────────────────────────────────────────────────┘
          │                    │                    │
          │ creates            │ commits            │ 1:1
@@ -517,20 +595,25 @@ See [docs/bots.md](./docs/bots.md) for full bot system documentation.
 
 | Model | Purpose | Key Fields |
 |-------|---------|------------|
-| User | User accounts | rs, isBot, avatarUrl, slug, username |
-| Prediction | Forecast statements | claimText, outcomeType, status, source |
+| User | User accounts | eloRating (headline rating), rs, mu/sigma (Glicko), isBot, avatarUrl, slug, username |
+| Prediction | Forecast statements | claimText, outcomeType, status, source, externalMarketId |
 | PredictionOption | Options for multiple choice | text, predictionId |
-| Commitment | Confidence + resolution record | cuCommitted (confidence), rsSnapshot, brierScore, rsChange |
+| Commitment | Confidence + resolution record | cuCommitted (confidence), probability, rsSnapshot, brierScore, rsChange, eloChange |
 | NewsAnchor | News context | url, title, source |
-| Comment | Prediction comments | content, userId, predictionId |
+| Comment | Prediction comments | text, authorId, predictionId |
 | CommentReaction | Emoji reactions on comments | type, userId, commentId |
 | Notification | User notifications | type, message, read, userId |
-| NotificationPreference | Per-channel notification settings | userId, channel, enabled |
-| PushSubscription | Browser push subscription | userId, endpoint, keys |
-| ContextSnapshot | LLM context cache | key, content, expiresAt |
+| NotificationPreference | Per-type notification settings | userId, type, inApp, email, browserPush, telegram |
+| PushSubscription | Browser push subscription | userId, endpoint, p256dh, auth |
+| ContextSnapshot | Per-forecast context/estimate history | predictionId, summary, sources, externalProbability, oracleSnapshot |
 | Tag | Prediction categories | name, slug |
 | BotConfig | Autonomous bot configuration | personaPrompt, intervalMinutes, autoApprove, tagFilter, voteBias |
 | BotRunLog | Audit log of bot actions | action (CREATED_FORECAST, VOTED, SKIPPED, ERROR), isDryRun, generatedText |
+| EvidencePoolArticle | Per-forecast evidence pool rows extracted by the Oracul | url, status, stance, certainty, extractor/oracle provenance |
+| ExternalMarket | Linked Polymarket/Kalshi markets (prices in `ExternalMarketPriceSnapshot`) | provider, usageScope, externalId, question |
+| QuestionRelation / LatentNode | Oracul 2.0 forecast-graph storage | kind, origin, status |
+
+Full table map (including `AiEstimate*`, `CalibrationRecord`, `OracleCallLog`, `PunditTagRating`, …): [docs/DATABASE.md](./docs/DATABASE.md).
 
 ### Database Operations
 
@@ -552,13 +635,13 @@ docker run --rm --network host \
   -e DATABASE_URL=postgresql://daatan:<PASS>@localhost:5432/daatan \
   daatan-migrations:staging-latest npx prisma migrate status
 
-# Manual backup (script handles this automatically)
-bash /home/ubuntu/backup-db.sh
+# Manual backup — run the backup workflow (it ships scripts/backup-db.sh via SSM)
+gh workflow run backup.yml
 ```
 
 ### Prod/Staging DB Separation
 
-Both databases run on the **same EC2 instance** in separate containers:
+Each database runs on its **own EC2 instance** (prod and staging hosts), in separate containers:
 
 | | Production | Staging |
 |---|---|---|
@@ -587,23 +670,23 @@ The staging and production databases are **fully independent**. They share no da
 
 ### NextAuth.js Configuration
 
+Auth.js v5. The config is split so middleware can run on the Edge runtime:
+
+- `src/auth.config.ts` — Edge-safe base config: Google provider (registered only when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set), optional generic OIDC provider (self-host, `OIDC_*`), `session: { strategy: 'jwt' }`, shared callbacks. Imported by `src/middleware.ts`.
+- `src/auth.ts` — Node-only: `NextAuth({ ...authConfig, adapter: PrismaAdapter(prisma), providers: [...authConfig.providers, Credentials(...)] })` exporting `handlers, auth, signIn, signOut`. The bcrypt-backed email/password Credentials provider (and a Playwright test provider in test runs) live here because they need the DB.
+
 ```typescript
-// src/auth.ts
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  session: { strategy: "jwt" },
-};
+// src/auth.ts (abridged)
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  adapter: PrismaAdapter(prisma) as Adapter,
+  providers: [...authConfig.providers, Credentials({ /* email + bcrypt password */ })],
+})
 ```
 
 ### Auth Page Architecture
 
-Auth pages use a Server/Client component split pattern for proper Next.js 14 compatibility:
+Auth pages use a Server/Client component split pattern for proper Next.js App Router compatibility:
 
 ```
 src/app/auth/
@@ -644,15 +727,13 @@ Auth pages are rendered without the sidebar: `Sidebar` returns `null` on `/auth/
 ### SSL/TLS
 
 - **Provider:** Let's Encrypt
-- **Certificate:** Wildcard for daatan.com
+- **Certificates:** Per-hostname (`daatan.com`, `elections.daatan.com` on prod; `staging.daatan.com`, `next.daatan.com` on staging — see the `ssl_certificate` paths in `infra/nginx/`). Prod renews via DNS-01 (`certbot/dns-route53`, using the EC2 role's Route 53 permissions)
 - **Renewal:** Automatic via Certbot (every 12 hours check) — no fixed expiry date to track here, since it auto-renews. `.github/workflows/cert-expiry.yml` watches the served leaf cert daily and alerts Telegram if renewal has actually failed; when TLS breaks, check the *authenticator* (e.g. DNS-01 IAM permissions), not a cached expiry.
 
 To manually renew:
 ```bash
-docker run --rm \
-  -v ~/app/certbot/www:/var/www/certbot \
-  -v ~/app/certbot/conf:/etc/letsencrypt \
-  certbot/certbot renew
+# Run inside the certbot container, which has the right plugin (dns-route53 on prod)
+docker exec daatan-certbot certbot renew
 docker compose -f ~/app/docker-compose.prod.yml restart nginx
 ```
 
@@ -676,22 +757,20 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 | `script-src` | `'self' https://www.googletagmanager.com 'unsafe-inline'` | App bundles + GA + inline GA init |
 | `style-src` | `'self' https://fonts.googleapis.com 'unsafe-inline'` | Tailwind + Google Fonts + Next.js inline |
 | `font-src` | `'self' https://fonts.gstatic.com` | Google Fonts woff2 files |
-| `img-src` | `'self' https://lh3.googleusercontent.com data:` | App images + Google OAuth avatars |
-| `connect-src` | `'self' https://www.google-analytics.com https://*.google-analytics.com` | GA event beacons |
+| `img-src` | `'self' https://lh3.googleusercontent.com https://www.googletagmanager.com data:` | App images + Google OAuth avatars + GA |
+| `connect-src` | `'self' https://www.google-analytics.com https://*.google-analytics.com https://www.google.com` | GA event beacons |
 | `frame-ancestors` | `'none'` | Blocks embedding |
 | `object-src` | `'none'` | Blocks Flash/Java plugins |
 | `base-uri` | `'self'` | Prevents `<base>` tag hijacking |
 | `form-action` | `'self'` | Forms submit to same origin only |
 | `worker-src` | `'self'` | PWA service workers |
+| `upgrade-insecure-requests` | — | Upgrade any `http:` subresource to HTTPS |
 
-**Rollout strategy:**
-- Staging/production use `Content-Security-Policy-Report-Only` — violations are logged but not blocked
-- Local dev uses enforcing `Content-Security-Policy` for early detection
-- **To enforce in production:** change `Content-Security-Policy-Report-Only` to `Content-Security-Policy` in `infra/nginx/nginx-ssl.conf` and `infra/nginx/nginx-staging-ssl.conf`
+**Enforcement:** every nginx config (`nginx.conf`, `nginx-ssl.conf`, `nginx-staging-ssl.conf`, `nginx-prod-ssl.conf`) sends the enforcing `Content-Security-Policy` header — there is no `Report-Only` rollout any more, so a missing origin breaks the resource outright.
 
 **Adding a new external resource:**
 1. Identify the directive (e.g., `script-src` for JS, `img-src` for images)
-2. Add the origin to the CSP in all 3 nginx configs
+2. Add the origin to the CSP in all 4 nginx configs under `infra/nginx/`
 3. Update test expectations in `__tests__/config/nginx-security-headers.test.ts`
 4. Deploy and verify no violations in browser console
 
@@ -718,7 +797,8 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 ```bash
 # Production
 curl https://daatan.com/api/health
-# Response: {"status":"ok","version":"<current tag>","commit":"<short sha>","timestamp":"..."}
+# Response: {"status":"ok","version":"<version>","commit":"<short sha>","timestamp":"...","env":"production","db":true,"memory":{...}}
+# status is "degraded" (DB down) or "memory-pressure" (RSS > 1600 MB) with HTTP 503
 
 # Staging
 curl https://staging.daatan.com/api/health
@@ -773,7 +853,7 @@ npm run dev
 
 ### Environment Variables
 
-Required in `.env`:
+Typical local `.env` — only `DATABASE_URL`, `NEXTAUTH_URL` and `NEXTAUTH_SECRET` (≥32 chars, not placeholder text) are required by `src/env.ts`; everything else is optional. See `.env.example` for the full template and [SECRETS.md](./SECRETS.md) for what production sets:
 
 ```bash
 DATABASE_URL=postgresql://user:password@host:5432/database
@@ -798,7 +878,7 @@ AWS_PROFILE=daatan
 
 **Pre-Push:**
 - Type check (`npm run typecheck`)
-- Targeted tests (`vitest related` on changed `.ts`/`.tsx`, excluding integration tests)
+- Targeted tests (`scripts/run-related-tests.sh origin/main` → `vitest related --run` on changed `.ts`/`.tsx`, excluding integration tests)
 - Detect auth-related changes (non-blocking warning)
 
 ### Git Workflow
@@ -818,8 +898,10 @@ AWS_PROFILE=daatan
 
 ```bash
 npm test                        # Run all tests
-npm test -- --coverage          # Run with coverage
+npm run test:coverage           # Run with coverage
 npm test -- path/to/test.ts     # Run specific test
+npm run test:integration        # Integration tests (needs test Postgres on :5433, docker-compose.test.yml)
+npm run test:e2e                # Playwright E2E
 npm run lint                    # Lint
 npx tsc --noEmit                # Type check
 ```

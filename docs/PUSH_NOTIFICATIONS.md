@@ -20,7 +20,8 @@ retry, and subscription-storage logic.
 - `src/lib/services/push/types.ts` — the `PushProvider` interface and shared payload/target
   types. A provider only has to implement `isConfigured()` and `send(target, message)`.
 - `src/lib/services/push/web-push-provider.ts` — the only provider today. Wraps the
-  `web-push` package: VAPID setup, per-subscription send with bounded retry, and
+  `web-push` package: VAPID setup (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY`, both
+  required for `isConfigured()`), per-subscription send with bounded retry (2 attempts, 500 ms apart), and
   provider-specific status-code interpretation (410/404 = stale subscription, 401/403 =
   VAPID keypair mismatch — prune and log loudly, since retrying won't help and this silently
   breaks every send until someone notices).
