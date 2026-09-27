@@ -34,7 +34,8 @@ Configured via Lambda env var `FORWARD_MAPPING` (JSON) and `CATCH_ALL_DESTINATIO
    - `From:` → `{Original Name} via Daatan <forwarder@daatan.com>`
    - `Reply-To:` → original sender address
    - `To:` → forwarding destination(s)
-   - `Return-Path:` → removed (SES adds its own)
+   - `Return-Path:`, `Sender:`, `Resent-From:`, `Resent-Sender:`, `Resent-Return-Path:` → removed (unverified addresses; SES adds its own Return-Path)
+   - `DKIM-Signature:` and `ARC-*` → removed (invalidated by the rewrite; SES re-signs)
 4. Sends via SES `SendRawEmail`.
 
 **Important**: The raw email stored in S3 has SES-prepended headers (`Received:`, `X-SES-*`, etc.) in the same header block as the original headers. Do **not** strip everything before the first blank line — that would discard all headers and cause Gmail to reject the email with "From header is missing". Strip only specific unwanted headers by name if needed.
@@ -72,7 +73,7 @@ Both Mark and Andrey can send outbound email from their `@daatan.com` addresses 
 Run the unit tests locally with:
 
 ```bash
-node --test infra/mail-forwarder/index.test.mjs
+npx vitest run infra/mail-forwarder/index.test.mjs   # also part of `npm test`
 ```
 
 ## Deploying changes
@@ -81,8 +82,12 @@ The Lambda is managed by Terraform. After editing `infra/mail-forwarder/index.mj
 
 ```bash
 cd terraform
-terraform apply -target=aws_lambda_function.forwarder
+terraform init -reconfigure -backend-config=backend-prod.hcl
+terraform plan  -var environment=prod -target=aws_lambda_function.forwarder
+terraform apply -var environment=prod -target=aws_lambda_function.forwarder
 ```
+
+(Terraform zips `index.mjs` itself via `data.archive_file.mail_forwarder`.)
 
 For urgent hotfixes, deploy directly then sync Terraform state:
 ```bash

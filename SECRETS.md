@@ -4,7 +4,7 @@
 
 ## Current Approach
 
-**Source of truth:** AWS Secrets Manager bundles — `daatan-env-prod` and `daatan-env-staging` — each holding a full `.env` blob.
+**Source of truth:** AWS Secrets Manager bundles — `daatan-env-prod` and `daatan-env-staging` — each holding a full `.env` blob. A few secrets are additionally (and preferentially) read at runtime from **SSM SecureStrings** — `/daatan/<env>/secrets/OPENROUTER_API_KEY` and the shared `/daatan/shared/secrets/ORACLE_API_KEY` — which rotate without a redeploy; new app secrets go there. See [docs/SECRETS.md](docs/SECRETS.md) for that model.
 
 On every deploy, `scripts/blue-green-deploy.sh` invokes `scripts/fetch-secrets.sh <env>` which pulls the bundle and writes it to `~/app/.env` on the instance. The container is then (re)started with those vars via `docker-compose.{prod,staging}.yml` and the `ENV_ARGS` list in `blue-green-deploy.sh`. On first boot, the EC2 user data (Terraform `ec2.tf`) performs the same pull to seed `~/app/.env`.
 
@@ -27,12 +27,12 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `GOOGLE_VERTEX_LOCATION` | ✅ | — | Vertex location; omit to default to `global` |
 | `GOOGLE_VERTEX_CLIENT_EMAIL` | ✅ | — | Vertex service-account email (needs the `Vertex AI User` role) |
 | `GOOGLE_VERTEX_PRIVATE_KEY` | ✅ | — | Vertex service-account private key (PEM; `\n`-escaped newlines are un-escaped at load) |
-| `OPENROUTER_API_KEY` | ✅ | — | LLM provider used by bots |
-| `SERPER_API_KEY` | ✅ | — | Serper.dev — Express Forecast web search |
-| `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping |
-| `SERPAPI_API_KEY` | ✅ | — | SerpAPI (fallback search) |
-| `ORACLE_URL` | ✅ | — | TruthMachine Oracle base URL (typically `https://oracle.daatan.com`) |
-| `ORACLE_API_KEY` | ✅ | — | Shared `x-api-key` for the Oracle; canonical copy at `openclaw/oracle-api-key` (legacy naming — OpenClaw is decommissioned, prefix retained for back-compat) |
+| `OPENROUTER_API_KEY` | ✅ | — | LLM provider used by bots. Resolved as admin setting (DB) → SSM `/daatan/<env>/secrets/OPENROUTER_API_KEY` → this env var (`getOpenRouterKey()`) |
+| `SERPER_API_KEY` | ✅ | — | Serper.dev — read only by the `/api/health/search` credit check; web search itself goes through the Oracul |
+| `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping — passed to the container, but no `src/` code reads it |
+| `SERPAPI_API_KEY` | ✅ | — | SerpAPI — read only by the `/api/health/search` credit check |
+| `ORACLE_URL` | ✅ | — | TruthMachine Oracul base URL (typically `https://oracle.daatan.com`) |
+| `ORACLE_API_KEY` | ✅ | — | Shared `x-api-key` for the Oracul. Canonical copy is the SSM SecureString `/daatan/shared/secrets/ORACLE_API_KEY` (#1578), read first by `getOracleApiKey()`; this env var is only the fallback |
 | `NEWS_INDEXER_SECRET` | ✅ | — | Inbound: shared secret validating the news-indexer → Daatan freshness push (`x-news-indexer-secret`) |
 | `NEWS_INDEXER_URL` | ✅ | — | Outbound: news-indexer base URL (e.g. `https://scrapper.daatan.com`) for the admin **Sources** panel + article matching |
 | `NEWS_INDEXER_API_KEY` | ✅ | — | Outbound: `x-api-key` Daatan sends to the news-indexer service |
@@ -40,13 +40,24 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `GA_MEASUREMENT_ID_STAGING` | ✅ | — | Google Analytics 4 — staging |
 | `TELEGRAM_BOT_TOKEN` | ✅ | ✅ | @DaatanClawBot token |
 | `TELEGRAM_CHAT_ID` | ✅ | ✅ | "Daatan Updates" channel ID |
-| `BOT_RUNNER_SECRET` | ✅ | ✅ | Shared secret for `POST /api/bots/run` |
-| `CRON_SECRET` | ✅ | ✅ | Shared secret for `/api/cron/cleanup` |
+| `TELEGRAM_CLEAN_CHAT_ID` | optional | ✅ | Prod-only high-signal channel for key events/alarms; falls back to `TELEGRAM_CHAT_ID` when unset |
+| `BOT_RUNNER_SECRET` | ✅ | ✅ | Shared secret for `POST /api/bots/run` (`x-bot-runner-secret`) **and** every `/api/cron/*` route (`x-cron-secret`) |
+| `CRON_SECRET` | — | — | **Not used.** No code reads it — `/api/cron/cleanup` and the other cron routes validate `x-cron-secret` against `BOT_RUNNER_SECRET` |
+| `STAGING_URL` | optional | ✅ | Staging base URL — bot/heartbeat workflow target; also read by the Telegram `/status` command (defaults to `https://staging.daatan.com`) |
+| `TELEGRAM_WEBHOOK_SECRET` | optional | — | Secret token for the Telegram `/rollback` webhook; unset = fail closed. See [docs/ROLLBACK.md](docs/ROLLBACK.md) |
+| `TELEGRAM_ROLLBACK_CHAT_IDS` | optional | — | Comma-separated chat IDs allowed to issue `/rollback` |
+| `GH_ROLLBACK_TOKEN` | optional | — | GitHub PAT with `actions:write` used by `/rollback` to trigger the Rollback workflow |
+| `TELEGRAM_ADMIN_MAP` | optional | — | JSON `{"<telegramUserId>":"<User.id>"}` enrichment for rating-feedback buttons; safe to leave unset |
+| `INDEXNOW_KEY` | optional | — | IndexNow (Bing/Yandex) instant indexing; key file must be served at `public/{key}.txt` |
+| `GOOGLE_INDEXING_CLIENT_EMAIL` / `GOOGLE_INDEXING_PRIVATE_KEY` | optional | — | Google Indexing API service account; both required, no-op otherwise |
+| `BRIGHTDATA_API_KEY`, `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | optional | — | Passed to the container, but no `src/` code reads them (search providers live in the Oracul) |
 | `RESEND_API_KEY` | ✅ | — | Email delivery |
 | `EMAIL_FROM` | ✅ | — | Default From: address |
 | `VAPID_PRIVATE_KEY` | ✅ | — | Web Push signing key (runtime-only) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | ✅ | Web Push subscription key. **GitHub secret only** — `NEXT_PUBLIC_*` is substituted into the bundle at build, so a copy in the Secrets Manager bundle would be silently ignored at runtime (see the VAPID section below) |
 | `AWS_ROLE_ARN` | — | ✅ | OIDC role the `deploy.yml` workflow assumes to reach ECR + SSM |
+
+"optional" = wired through `blue-green-deploy.sh` `ENV_ARGS` + compose and optional in `src/env.ts`; whether a given bundle carries it is not recorded here. Non-secret config passed the same way: `AI_PANEL_GROUNDED_TAG`, `TEMPORAL_CLOCK_DISABLED`, `MAX_BOTS` (default 50). `DATABASE_URL`, `NEXTAUTH_URL`, `APP_ENV`, `GA_MEASUREMENT_ID` and (non-prod) `AUTH_TRUST_HOST` are set per environment by `blue-green-deploy.sh` itself, overriding any bundle value.
 
 The three mandatory `GOOGLE_VERTEX_*` vars are **all-or-nothing**: set all three or none. A partial set registers a Vertex leg that fails every call and burns a retry before the chain falls through to the Developer-API key. See [docs/LLM_ARCHITECTURE.md](docs/LLM_ARCHITECTURE.md).
 
@@ -102,8 +113,8 @@ ls -la ~/app/.env
 
 **Rotation process:**
 1. Generate new secret
-2. Update `.env` on server
-3. Restart affected containers
+2. Update the Secrets Manager bundle (or the SSM parameter) — not `~/app/.env`, which the next deploy overwrites
+3. Redeploy (a container restart does not pick up bundle changes)
 4. Verify services work
 5. Update backup/documentation
 
@@ -140,9 +151,9 @@ aws secretsmanager put-secret-value \
 rm /tmp/daatan-env-prod.env
 ```
 
-Then redeploy (tag `v*` for prod, push to `main` for staging) — or, if you need the new value live without a redeploy, SSM in and `docker restart daatan-app` (prod) / `daatan-app-staging` (staging) after manually running `./scripts/fetch-secrets.sh production` (or `staging`) from `~/app/`.
+Then redeploy (tag `v*` for prod, merge to `main` for staging). **A `docker restart` alone does not apply the new value:** `blue-green-deploy.sh` starts the app with `docker run -e KEY=value …` (no `env_file`), and a restart keeps the container's original environment — running `./scripts/fetch-secrets.sh` first only refreshes `~/app/.env` on disk. Only a redeploy (which recreates the container) picks it up. Secrets held in SSM (see [docs/SECRETS.md](docs/SECRETS.md)) are the exception: they are re-read within 5 minutes, no redeploy.
 
-For the shared `ORACLE_API_KEY` specifically, also update the canonical copy at `openclaw/oracle-api-key` in the retro account (legacy prefix — see note above) so the retro EC2 (`oracle-api.service`) stays in sync.
+For the shared `ORACLE_API_KEY` specifically, rotate the SSM SecureString `/daatan/shared/secrets/ORACLE_API_KEY` — daatan (both envs) and retro's `duel_report.py` read that one parameter (#1578); the Oracul's own `oracle-api.service` must hold the same value.
 
 ---
 
@@ -214,6 +225,8 @@ aws ssm send-command --instance-ids i-04ea44d4243d35624 \
 **Emergency rotation:** If private key is compromised
 
 ### Grace Period Strategy (Zero Subscription Loss)
+
+> **Not implemented.** This is a plan, not a working procedure: no code reads `VAPID_PRIVATE_KEY_OLD` and `blue-green-deploy.sh` does not pass it to the container, and the Stage 2 service-worker change does not exist. Following it as written behaves like a hard rotation.
 
 VAPID keys are public-private keypairs. Unlike session tokens, rotating them requires clients to re-subscribe — but we can minimize disruption:
 
@@ -295,13 +308,7 @@ const register = async () => {
 }
 ```
 
-Redeploy (tag `v*` for prod, push to `main` for staging) so the new image is built with the new public key and the runtime reloads the new private key. To force without a full deploy:
-```bash
-aws ssm start-session --target i-04ea44d4243d35624   # prod; staging: i-0406d237ca5d92cdf
-sudo -u ubuntu -i
-cd ~/app && ./scripts/fetch-secrets.sh production    # or staging
-docker restart daatan-app                            # or daatan-app-staging
-```
+Redeploy (tag `v*` for prod, merge to `main` for staging) so the new image is built with the new public key and the runtime reloads the new private key. There is no restart-only shortcut: `fetch-secrets.sh` + `docker restart` changes neither the compiled-in public key nor the container's `-e` environment.
 
 Verify notifications still work:
 - Test push notification from admin panel
@@ -390,7 +397,7 @@ A: Only if their browser permission state is "default" (not explicitly granted).
 A: No — VAPID keys are cryptographically linked to subscription payloads. Once rotated, all old subscriptions are cryptographically invalid. The grace period just minimizes perceived disruption.
 
 **Q: What if we forget to update GitHub Secret?**
-A: The next CI build will fail at `next build` step (NEXT_PUBLIC_VAPID_PUBLIC_KEY will be undefined). App won't build. Update the secret and re-trigger CI.
+A: Nothing fails loudly. `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is optional in `src/env.ts`, so the image builds with the **old** (or an empty) public key and push breaks silently — the boot-time keypair check in `src/instrumentation.ts` is the only signal. Update the secret and rebuild.
 
 **Q: How often should we rotate?**
 A: Annually as preventative measure. Emergency rotation only if private key is leaked.
@@ -399,13 +406,13 @@ A: Annually as preventative measure. Emergency rotation only if private key is l
 **When:** if `invalid_client` errors appear in logs or the Google Cloud Console client integrity is compromised.
 1. **Generate new secret** in Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Reset Secret.
 2. **Update both Secrets Manager bundles** (`daatan-env-prod`, `daatan-env-staging`) following "Updating a Secret" above.
-3. **Redeploy** both environments (or SSM + `fetch-secrets.sh` + `docker restart` for a fast-path).
+3. **Redeploy** both environments (a `docker restart` does not pick up the new value — see "Updating a Secret").
 
 ---
 
 ## Remaining gaps
 
-- The app still reads env vars from the in-container process environment (originally sourced from `~/app/.env`), not directly from Secrets Manager at runtime. Rotations require a redeploy or SSM + `fetch-secrets.sh` + `docker restart` to take effect.
+- Bundle-held values are read from the in-container process environment (set by `docker run -e` at deploy), not directly from Secrets Manager at runtime. Rotating them requires a redeploy. Only the SSM-held secrets (`OPENROUTER_API_KEY`, `ORACLE_API_KEY` — [docs/SECRETS.md](docs/SECRETS.md)) rotate live.
 - No automated rotation (e.g. Lambda-driven password rotation for Postgres). Done manually on the schedule above.
 - The `production` → `daatan-env-prod` alias inside `fetch-secrets.sh` is load-bearing — if you ever add a new deploy env, extend the `case` statement in that script.
 
@@ -425,7 +432,7 @@ A: Annually as preventative measure. Emergency rotation only if private key is l
 1. Conduct security audit
 2. Update all documentation
 3. Review and improve security practices
-4. Consider migrating to Secrets Manager
+4. Consider moving the affected secrets out of the bundle into per-item SSM parameters ([docs/SECRETS.md](docs/SECRETS.md))
 
 ### If Server Is Compromised
 
@@ -442,6 +449,8 @@ A: Annually as preventative measure. Emergency rotation only if private key is l
 
 ### Adding a new secret
 
+New **app** secrets that should rotate independently go in SSM instead — follow "Adding a secret" in [docs/SECRETS.md](docs/SECRETS.md). The steps below are for values that must live in the `daatan-env-*` bundle.
+
 1. Add to `.env.example` with a placeholder value and a short comment.
 2. Document it in the "What We Use" table above.
 3. Reference it in `docker-compose.prod.yml` + `docker-compose.staging.yml` and in `ENV_ARGS` of `scripts/blue-green-deploy.sh` (the `scripts/check-env-parity.sh` CI step will shout if one is missing).
@@ -453,7 +462,7 @@ A: Annually as preventative measure. Emergency rotation only if private key is l
 
 1. Generate the new value at its source of truth (provider dashboard, `openssl rand -hex 32`, etc.).
 2. Update both `daatan-env-prod` and `daatan-env-staging` bundles.
-3. Deploy (preferred) or force-refresh via SSM + `fetch-secrets.sh` + `docker restart`.
+3. Deploy (a `docker restart` alone does not pick up a bundle change). For SSM-held secrets, `aws ssm put-parameter --overwrite` instead — live within 5 minutes.
 4. Verify `/api/health` returns `200`; spot-check the affected feature.
 5. Record the rotation date in your password manager.
 
@@ -462,7 +471,7 @@ A: Annually as preventative measure. Emergency rotation only if private key is l
 ## FAQ
 
 **Q: Why not use GitHub Secrets for everything?**
-A: GitHub Secrets are visible to Actions workflows and shouldn't carry runtime API keys. We use them only for values needed during the deploy workflow itself (`AWS_ROLE_ARN`, Telegram notifications) or baked into the build image (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`).
+A: GitHub Secrets are visible to Actions workflows and shouldn't carry runtime API keys. We use them only for values needed by workflows themselves (`AWS_ROLE_ARN`, Telegram notifications, `BOT_RUNNER_SECRET` + `STAGING_URL` for the cron/bot triggers, SEO-report and Android-signing credentials) or baked into the build image (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`). See the Required Secrets list in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 **Q: How do I add a new secret?**
 A: See the checklist above — short version: `.env.example` + compose + blue-green + `src/env.ts` + both Secrets Manager bundles, then deploy.
@@ -486,4 +495,4 @@ A:
 
 ---
 
-Last updated: June 24, 2026
+Last updated: September 27, 2026

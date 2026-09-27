@@ -82,10 +82,10 @@ are O(1) reads. `skipDuplicates: true` handles concurrent double-seed races.
 
 | File | Role |
 |------|------|
-| `src/lib/services/tag-ratings.ts` | `ensureTagRatingsSeeded`, `updateTagRatingsInTx` |
+| `src/lib/services/tag-ratings.ts` | `ensureTagRatingsSeeded`, `updateTagRatingsInTx` (also `ensurePunditTagRatingsSeeded`, the `pundit_tag_ratings` variant — see [DATABASE.md](./DATABASE.md)) |
 | `src/lib/services/leaderboard.ts` | Calls seed + reads `UserTagRating` |
 | `src/lib/services/prediction-resolution.ts` | Calls `updateTagRatingsInTx` in resolution tx |
-| `src/lib/services/__tests__/tag-ratings.test.ts` | 8 unit tests |
+| `src/lib/services/__tests__/tag-ratings.test.ts` | 11 unit tests (3 cover the pundit variant) |
 | `prisma/migrations/20260612000000_add_user_tag_ratings/` | SQL migration |
 
 ## What was deferred

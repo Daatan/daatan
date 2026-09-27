@@ -32,14 +32,14 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - TypeScript strict; no `as any` / `as unknown as X` in app code, except 4 documented, unavoidable cases (re-audited June 2026): the two NextAuth callback-bridging casts in `src/auth.ts`, the polymorphic `as`-prop spread in `src/components/ui/Button.tsx`, and the non-standard `navigator.standalone` read in `src/components/PwaInstaller.tsx`. Don't add new ones.
 - Default to no comments; only add when WHY is non-obvious
 - Don't add error handling, fallbacks, or validation for impossible scenarios — trust internal callers
-- Tests use vitest. Run `npm test` (no extra flags needed). 1000+ tests across two projects (node integration + happy-dom).
+- Tests use vitest. Run `npm test` (no extra flags needed) for the unit suite (happy-dom, `vitest.config.ts`, ~290 test files). The `*.integration.test.ts` files run separately in node against a real Postgres via `npm run test:integration` (`vitest.config.integration.ts`).
 - `npm run lint` and `npx tsc --noEmit` must both be clean before any commit. Note: `npm run lint` still uses `next lint`, which is deprecated and removed in Next.js 16 — migrate to the ESLint CLI before that bump.
 
 ## Where to look
 
 - Schema: [`prisma/schema.prisma`](./prisma/schema.prisma) + [`docs/DATABASE.md`](./docs/DATABASE.md) (table map, probability scales, cross-cutting gotchas)
 - Auth flow: [`src/auth.ts`](./src/auth.ts)
-- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — main chain Gemini → Oracul (Bedrock/Nova) → OpenRouter → Ollama (each leg registers only when configured); OpenRouter also powers bots. See [`docs/LLM_ARCHITECTURE.md`](./docs/LLM_ARCHITECTURE.md)
+- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — main chain Gemini (Vertex, then Developer API) → Oracul (Bedrock/Nova) → OpenRouter → Ollama (each leg registers only when configured); OpenRouter also powers bots. See [`docs/LLM_ARCHITECTURE.md`](./docs/LLM_ARCHITECTURE.md)
 - Scoring systems: [`src/lib/services/scoring-systems.ts`](./src/lib/services/scoring-systems.ts) and [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md)
 - Bot system: [`src/lib/services/bots/`](./src/lib/services/bots/) and [`docs/bots.md`](./docs/bots.md), [`docs/BOT_APPROVAL_WORKFLOW.md`](./docs/BOT_APPROVAL_WORKFLOW.md)
 - Embeddings + similar-forecasts: [`docs/EMBEDDINGS.md`](./docs/EMBEDDINGS.md)

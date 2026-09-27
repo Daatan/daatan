@@ -17,7 +17,7 @@ Forecast detail pages (`src/app/forecasts/[id]/page.tsx`) override with per-fore
 ## Structured data (JSON-LD)
 
 A forecast page emits up to five JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the
-locale-prefixed route `src/app/[locale]/forecasts/[id]/page.tsx` mirrors all five for he/ru —
+locale-prefixed route `src/app/[locale]/forecasts/[id]/page.tsx` mirrors all five for he/ru (for `eo` it emits the first four but no FAQPage — there is no eo question template; `/eo` pages are `noindex` anyway) —
 it previously emitted only Article + BreadcrumbList, fixed in #1295 so translated pages carry
 the same structured-data strength as the English canonical):
 
@@ -33,13 +33,13 @@ the same structured-data strength as the English canonical):
    - `location`: VirtualLocation pointing at the forecast URL
    - `offers`: free Offer (`price: "0"`, `InStock`) pointing at the forecast URL — Google warns "Missing field 'offers'" without it
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
-5. **FAQPage** (`schema.org/FAQPage`, public forecasts only, #1295) — one `Question`/`Answer` pair wrapping the claim in question form ("What are the chances that …?", past-tense "Did this come true: …?" once resolved), pure builders in `src/lib/forecast-seo-schema.ts`. `dateModified` is valid here because FAQPage subtypes CreativeWork. Google restricted FAQ rich results to authoritative government/health sites in Aug 2023, so this earns no Search carousel on daatan.com — it's aimed at AI-search/LLM extraction (ChatGPT, Perplexity, AI Overviews) and the visible on-page question/answer text next to it, not a Google rich result.
+5. **FAQPage** (`schema.org/FAQPage`, public forecasts only, #1295) — one `Question`/`Answer` pair wrapping the claim in question form ("What are the chances that …?", past-tense "Did this come true: …?" once resolved), pure builders in `src/lib/forecast-seo-schema.ts`. `dateModified` is valid here because FAQPage subtypes CreativeWork. Google restricted FAQ rich results to authoritative government/health sites in Aug 2023, so this earns no Search carousel on daatan.com — it's aimed at AI-search/LLM extraction (ChatGPT, Perplexity, AI Overviews), not a Google rich result. (A visible on-page question/answer line mirroring it was removed in #1635; the JSON-LD is built server-side and unaffected.)
 
 ### Freshness: `dateModified` vs. `updatedAt`
 
 `Prediction.updatedAt` is a Prisma `@updatedAt` column — it bumps on *any* row write (a
 translation-cache write, a denormalized count), not specifically a probability update. The
-FAQPage `dateModified` and the visible "Updated {date}" stamp instead use
+FAQPage `dateModified` instead uses
 `latestProbabilityUpdateISO()` (`src/lib/forecast-seo-schema.ts`): the latest `ContextSnapshot`
 that carried a probability (already fetched for the chart via `getProbabilityHistory`), falling
 back to `updatedAt` only when a forecast has no snapshots yet.
@@ -64,11 +64,19 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 
 ## Sitemap
 
-`src/app/sitemap.ts` — dynamically generates the sitemap from live DB data. Included pages:
+`src/app/sitemap.ts` — dynamically generates the sitemap from live DB data (queries cached 1h).
+It returns an empty sitemap unless `APP_ENV=production`, so staging is never submitted. Included pages:
 
-- `/` (weekly)
-- All public, non-draft forecasts (`/forecasts/[slug]`) — daily
-- Static pages (about, contact, pricing, …) — monthly
+- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity` — daily;
+  `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`, `/accessibility`, `/contact` — monthly
+- `/he` and `/ru` versions of the localized static routes (`localeStaticRoutes`; `eo` is
+  deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`)
+- Public forecasts (`/forecasts/[slug]`) with status `ACTIVE`, `PENDING`, `RESOLVED_CORRECT` or
+  `RESOLVED_WRONG` that pass the quality bar below — hourly while open, monthly once resolved
+  (`lastModified` = `resolvedAt` for resolved forecasts). `/he/…` and `/ru/…` variants are
+  listed only when a translation of the forecast exists in that language.
+- Public profiles with public activity (`/profile/[username]`) — weekly
+- Tags with at least one public forecast (`/tags/[slug]`) — daily
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 

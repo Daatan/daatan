@@ -67,7 +67,7 @@ ALWAYS run these checks locally before pushing:
 
 ## Interactive Commands
 - **NEVER** run commands that require user input.
-- SSH: Always use SSH keys; use the `daatan` alias if configured.
+- Server access: SSH port 22 is closed on the EC2 hosts; use AWS SSM (`aws ssm send-command`).
 - Git commands: Use `GIT_PAGER=cat` and `--no-pager` to prevent hangs.
 
 ## Next.js App Router Gotchas

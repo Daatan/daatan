@@ -12,6 +12,8 @@ All endpoints are prefixed with `/api`. Unless noted, protected endpoints requir
 | Admin / Approver | `role = ADMIN` or `role = APPROVER` |
 | Admin / Resolver | `role = ADMIN` or `role = RESOLVER` |
 | Bot secret | `X-Bot-Runner-Secret` header = `BOT_RUNNER_SECRET` env |
+| Cron secret | `x-cron-secret` header = `BOT_RUNNER_SECRET` env (all `/api/cron/*` routes; some admin routes accept it as an alternative to an ADMIN session) |
+| News-indexer secret | `x-news-indexer-secret` header = `NEWS_INDEXER_SECRET` env |
 
 ---
 
@@ -30,7 +32,8 @@ List predictions. Public; optional session for user-context fields.
 | `q` | string | — | Free-text search over `claimText` and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169) |
 | `page` | number | 1 | |
 | `limit` | number | 20 | max 100 |
-| `sortBy` | enum | `newest` | `newest`, `deadline`, `cu` |
+| `sortBy` | enum | `newest` | `newest`, `deadline`, `cu`, `updated` |
+| `sortOrder` | enum | `desc` | `asc`, `desc` |
 | `resolvedOnly` | bool | false | |
 | `closingSoon` | bool | false | Within 7 days |
 
@@ -57,7 +60,7 @@ Get single forecast by id or slug. Public; returns `userCommitment` if authentic
 ### `PATCH /api/forecasts/[id]` — Auth
 Update forecast (author or admin). Core fields editable only on DRAFT; `isPublic` editable on any status.
 
-**Body** — `patchPredictionSchema` (claimText, detailsText, resolutionRules, resolveByDatetime, isPublic)
+**Body** — `patchPredictionSchema` (claimText, detailsText, resolutionRules, resolveByDatetime, isPublic, options)
 
 ---
 
@@ -129,6 +132,14 @@ Create or update a commitment on a forecast.
 ```
 
 `binaryChoice` is derived server-side from the sign of `confidence` (positive = YES).
+
+---
+
+### `PATCH /api/forecasts/[id]/commit` — Auth
+Update the current user's existing commitment. **Body** — `updateCommitmentSchema` (`src/lib/validations/prediction.ts`).
+
+### `DELETE /api/forecasts/[id]/commit` — Auth
+Remove the current user's commitment (only while the forecast is not locked).
 
 ---
 
@@ -247,8 +258,13 @@ Called by the create wizard after the claim step to offer linking a "same questi
 
 ---
 
-### `GET /api/forecasts/[id]/translate` — Auth
-Return translated version of the forecast in the user's language preference. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
+### `POST /api/forecasts/import-market` — Auth
+Resolve a pasted Polymarket / Kalshi market URL into a forecast prefill for the create wizard. **Body** `{ url }`. Caches the market and returns `{ externalMarketId, provider, providerLabel, claimText, resolveByDatetime, url }` — the market question becomes the claim, the market end date (or `null`) the resolve-by date. `404` when external markets are disabled on the instance; `422` for an unsupported URL or a market that can't be loaded.
+
+---
+
+### `POST /api/forecasts/[id]/translate`
+LLM-translate the forecast's claim/details/options. Public (no session required). **Body** `{ language }` — a supported locale, else `400`. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
 
 ---
 
@@ -292,8 +308,8 @@ Aggregate stats for the current user's commitments (total, resolved, correct/wro
 
 ---
 
-### `GET /api/commitments/activity` — Auth
-Recent commitment activity feed.
+### `GET /api/commitments/activity`
+Public feed of recent commitments. `?limit=` (default 20, max 50). Returns `{ activity }`.
 
 ---
 
@@ -312,10 +328,13 @@ Edit a comment (author only).
 Delete a comment (author or admin).
 
 ### `POST /api/comments/[id]/react` — Auth
-Add or remove a reaction.
+Add or update the current user's reaction (emoji) on a comment.
 
-### `POST /api/comments/[id]/translate` — Auth
-Translate a comment. Rate-limited to 30 requests/hour per IP (429 on exceed).
+### `DELETE /api/comments/[id]/react` — Auth
+Remove the current user's reaction.
+
+### `POST /api/comments/[id]/translate`
+LLM-translate a comment. Public (no session required). **Body** `{ language }` — a supported locale, else `400`. Rate-limited to 30 requests/hour per IP (429 on exceed).
 
 ---
 
@@ -324,6 +343,9 @@ Translate a comment. Rate-limited to 30 requests/hour per IP (429 on exceed).
 ### `GET /api/notifications` — Auth
 List notifications for the current user.
 
+### `POST /api/notifications` — Auth
+Mark all of the current user's notifications as read.
+
 ### `PATCH /api/notifications/[id]` — Auth
 Mark notification as read.
 
@@ -331,7 +353,7 @@ Mark notification as read.
 Return `{ count: number }`. Rate-limited to 120 requests/minute per user (429 on exceed).
 
 ### `GET /api/notifications/preferences` — Auth
-Get notification preferences.
+Get notification preferences (per notification type: in-app, email, browser push, Telegram).
 
 ### `PATCH /api/notifications/preferences` — Auth
 Update notification preferences.
@@ -369,9 +391,12 @@ move slowly (only on resolution events), so this avoids the full multi-query agg
 |-------|------|---------|-------------|
 | `sortBy` | enum | `elo` | One of: `rs`, `accuracy`, `totalCorrect`, `cuCommitted`, `brierScore`, `peerScore`, `aiScore`, `elo`, `glicko`, `roi`, `truthScore`, `weightedPeerScore`. See `docs/SCORING_SYSTEMS.md`. |
 | `tag` | string | – | Filter by tag slug. When provided, ELO and Glicko-2 are read from the materialized `UserTagRating` table (seeded lazily on first request for that tag); other sorts are filtered to commitments on predictions tagged with the slug. |
-| `limit` | int | `50` | Max users to return (capped server-side). |
+| `limit` | int | `20` | Max users to return (capped at 100). |
 
 With `tag`, `eloRating` is `null` for users with no resolved forecast in that tag (they sort last); without `tag` it is always a number. The leaderboard page only uses `elo`, `accuracy` and `brierScore`; the other sorts remain available here.
+
+### `GET /api/leaderboard/sources`
+Author/outlet shadow-scoring leaderboard. Public. Rate-limited to 60 requests/hour per IP; cached 5 min per `(view, sortBy)`. `?view=authors|outlets` (default `authors`), `?sortBy=skillConservative|brierScore` (default `skillConservative`). Rows with fewer than 5 predictions are left out (daatan#1587).
 
 ### `GET /api/top-reputation`
 Top users by reputation for sidebar widget. Public. Rate-limited to 60 requests/hour per IP.
@@ -387,10 +412,7 @@ Skill history (μ, σ, μ−3σ) over time for the user's profile chart. Public.
 List all tags with usage counts. Public.
 
 ### `POST /api/tags` — Admin
-Create a tag.
-
-### `DELETE /api/tags/[id]` — Admin
-Delete a tag.
+Create a tag. **Body** `{ name }` (1–50 chars). `201` with the created tag.
 
 ---
 
@@ -407,26 +429,44 @@ Suggest relevant tags for a forecast. Rate-limited to 10 requests/hour per user 
 ## Push Notifications
 
 ### `POST /api/push/subscribe` — Auth
-Register a Web Push subscription.
+Register (upsert) a Web Push subscription.
+
+### `DELETE /api/push/subscribe` — Auth
+Remove a Web Push subscription.
 
 ---
 
 ## News Anchors
 
-### `GET /api/news-anchors` — Auth
-List news anchors the user has used.
+### `GET /api/news-anchors`
+Search/list news anchors. Public. `?url=`, `?search=`, `?limit=` (default 20). Returns `{ anchors }`.
+
+### `POST /api/news-anchors` — Auth
+Create a news anchor, or return the existing one. **Body** — `createNewsAnchorSchema` (`src/lib/validations/prediction.ts`).
 
 ---
 
 ## Admin
 
-All admin endpoints require `role = ADMIN`.
+All admin endpoints require `role = ADMIN` unless noted.
 
-### `GET /api/admin/forecasts`
+### `GET /api/admin/about`
+Operator self-diagnosis: version, edition, app name/URL, and booleans for which capabilities (AI, AI research, external markets), auth methods, storage driver and integrations (Gemini, Ollama, Oracul, email, Telegram, news-indexer) are configured. Never returns secret values.
+
+### `GET /api/admin/forecasts` — Admin / Resolver
 List all forecasts regardless of status.
 
-### `PATCH /api/admin/forecasts/[id]`
-Admin-level forecast update (no status restrictions).
+### `PATCH /api/admin/forecasts/[id]` — Admin / Resolver / Approver
+Set a forecast's status. **Body** `{ status }` (any `PredictionStatus`). An APPROVER may only move a `PENDING_APPROVAL` forecast to `ACTIVE` (403 otherwise). Setting `VOID`/`UNRESOLVABLE` also notifies search engines of the URL change.
+
+### `DELETE /api/admin/forecasts/[id]`
+Delete a forecast (any status). `404` if not found.
+
+### `DELETE /api/admin/forecasts/[id]/awaiting`
+Dismiss a forecast from the Awaiting Resolution queue (daatan#1659); sticky until the AI estimate actually moves (`dismissAwaitingResolution` in `src/lib/services/context.ts`). `409` if the forecast is not `ACTIVE` or not currently awaiting resolution.
+
+### `DELETE /api/admin/forecasts/[id]/settled`
+Clear a false-positive settlement latch (`Prediction.settled`, which `recordEstimate` can only ever set true — see `docs/DATABASE.md` "Settlement latch"). `409` if the forecast is not settled.
 
 ### `GET /api/admin/forecasts/[id]/external-market`
 Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search (at most 2 markets kept per source event) re-ranked by embedding similarity with a deadline-gap penalty. Only candidates whose similarity clears a relevance floor are returned, each with a `score` (0–100 match); a claim with no real equivalent returns `[]` rather than the least-bad markets, and suggestions are suppressed entirely when embeddings are unavailable. Suggestion only; an admin confirms via POST.
@@ -454,8 +494,11 @@ Re-extract the named forecasts' strongest evidence rows against the *current* ex
 
 Each batch has its rows' `contentHash` nulled first, which is load-bearing rather than incidental — with the stored hash in place the claim gate takes its same-content arm and re-claims the row *in place*, overwriting the reading being remediated; nulled, it supersedes-and-inserts, so every prior reading survives as a superseded version and the run is reversible. A non-zero `unchanged` tally in the response means a batch's claim gate refused, i.e. the mechanism failed rather than the extraction returning nothing — **except on `scope=amnesty`** (daatan#1547), where the re-claim replays each row's originally-stored `publishedDate`, and the undated/stale admission gates (daatan#1651/#1679) run ahead of the contentHash-null bypass. A pre-08-05 row whose stored date was itself fabricated or garbled — the defect this scope exists to redrive — can legitimately be refused there on re-claim; that's the gate doing its job against a bad date, not the remediation mechanism failing. So for this scope, dry-run's `targetRows` is an upper bound on what apply will actually redrive, and a non-zero `unchanged` needs a per-row date check before it's read as a mechanism failure. Deliberately **not** scheduled: the plan's human-review gate — previewing the swings and approving them — sits in front of this route, not inside it.
 
-### `POST /api/admin/evidence-pool/retire-legacy-null` — Admin
+### `POST /api/admin/evidence-pool/retire-legacy-null` — Admin or `x-cron-secret`
 One-off action (daatan#1522): stamp every `FAILED` row whose `statusReason` is the legacy `oracle_null` (pre-#1231, before terminal reasons existed) with the terminal `retired_legacy` reason. Those rows sit in neither `TERMINAL_POOL_REASONS` nor `ATTRIBUTABLE_NULL_REASONS`, so they retry forever via the retry sweep and reclaim path and can never earn the two-strike finalization real `oracle_null_final` rows get — permanent zombies until retired explicitly. **Body** `{ mode?: 'dry-run' | 'apply' }`, defaulting to `dry-run` (counts the target set, writes nothing). Not scheduled — a single pass covers the whole (fixed, pre-#1231) target set.
+
+### `GET|POST /api/admin/evidence-pool/degraded-fetch-sweep` — Admin
+Re-extract evidence-pool rows whose fetch was degraded (daatan#1446). Both methods scope to the confirmed url_hash allowlist (`src/lib/services/confirmed-degraded-urls.ts`). `GET` is a read-only preview — `{ rows, reachable, gated, predictions }`, where `reachable` rows (null `contentHash`) can actually be re-extracted and `gated` ones re-hash to themselves and no-op (daatan#1466); `?filter=domains` previews the wider legacy domain superset instead. `POST` runs the sweep (`?limit=N` predictions, default 3, max 10 — each is one full Oracul analysis) and returns its result plus a before/after movement `report`. Deliberately **no** `x-cron-secret` path: a large swing on a live forecast is a product decision, so an admin runs it by hand and reads the report.
 
 ### `POST /api/admin/forecasts/republish` — Admin or `x-cron-secret`
 Re-publish the named forecasts' estimates from the evidence pool they **already** have ([daatan#1508](https://github.com/Daatan/daatan/issues/1508)): one compute-only Oracul `/pool/aggregate` per forecast (`resolvePooledEstimate`), written through `recordEstimate` under the `republish` origin — no search, no extractor, no LLM, and the pool itself is never mutated. **Body** `{ forecastIds: string[], mode?: 'dry-run' | 'apply' }`. **`mode` defaults to `dry-run`**, which computes every would-be number and writes nothing. Max 50 ids per call.
@@ -465,8 +508,41 @@ The `republish` origin's policy is the point: `kind: 'evidence'` so an apply re-
 ### `POST /api/admin/forecasts/backfill-rules` — Admin
 LLM-generate resolution rules for all forecasts that are missing them. Long-running (up to 300s).
 
+### `POST /api/admin/forecasts/backfill-english-canonical` — Admin or `x-cron-secret`
+Canonicalize non-English forecasts to English: translate the claim, re-slug (the old slug is kept as a 308 alias) and seed the original wording. Only touches rows with `original_language IS NULL`. `?limit=N` (default 10, max 25); re-call until `remaining` is 0. Returns `{ processed, canonicalized, english, failed, skipped, remaining }`. Driven by the manual-dispatch `backfill-english-canonical.yml` workflow.
+
+### `POST /api/admin/forecasts/backfill-oracle-sources` — Admin or `x-cron-secret`
+Populate the Oracul source roster for `ACTIVE`, public forecasts that have no context snapshot with an `oracleSnapshot` yet — one full search + Oracul analysis each. `?limit=N` (default 10, max 25); re-call until `remaining` is 0. Returns `{ processed, ok, noArticles, noOracul, unchanged, insufficient, failed, remaining }`. Driven by the manual-dispatch `backfill-oracle-sources.yml` workflow.
+
+### `POST /api/admin/forecasts/backfill-settlement-pins` — Admin or `x-cron-secret`
+One-off (daatan#1451): re-push resolved binaries that carry a settled Oracul snapshot so their settlement pins land in the Oracul's settlement-pin ledger. Safe to re-run (the ledger dedups). `?limit=N` (default and max 50). Reads the ledger before and after rather than trusting its own counter; returns `{ processed, predictionIds, ledgerBefore, ledgerAfter, recorded }`.
+
+### `POST /api/admin/forecasts/backfill-temporal` — Admin or `x-cron-secret`
+Two-phase backfill for the temporal-model classifier. **Body** `{ mode: 'dry-run' | 'apply', limit?, ids?, skipIds?, force? }` (`limit` default 100, max 200). `dry-run` classifies and returns a review report sorted by confidence ascending, writing nothing; `apply` persists through the same `classifyAndStoreTemporal` path the creation hook uses. Rows that already have a `classifierVersion` are skipped unless `force`.
+
+### `POST /api/admin/forecasts/rephrase-questions` — Admin or `x-cron-secret`
+One-off (daatan#1359): rewrite question-form forecast claims into statement form from a fixed, reviewed table in the service; takes no body and leaves slugs untouched. `?dryRun=1` reports the per-forecast outcome without writing. Idempotent — a second run reports every row as `already`.
+
 ### `POST /api/admin/backfill-embeddings` — Admin
 Generate vector embeddings (gemini-embedding-2, 768 dims) for predictions that don't yet have one. Used to power similar-forecasts lookup. Long-running.
+
+### `POST /api/admin/backfill-market-embeddings` — Admin
+Same for `external_markets` rows with no embedding (chiefly those written before daatan#1640 fixed the write path). Idempotent. Returns `{ done, failed, total, elapsedMs }`.
+
+### `POST /api/admin/indexnow/resubmit` — Admin
+Bulk-submit every URL in the sitemap to IndexNow. No-op without `INDEXNOW_KEY`; the sitemap is empty off-production, so it only does real work on prod. Returns `{ success, discovered, ... }` plus the submission result. See [SEO.md](./SEO.md).
+
+### `POST /api/admin/pundit-ratings/recalculate` — Admin or `x-cron-secret`
+Recompute `PunditTagRating` for one tag: delete the tag's rows, then replay full history (`ensurePunditTagRatingsSeeded`). The only path that computes pundit ratings (daatan#1293). `?tag=` (default `israeli-elections-2026`); `404` for an unknown tag. Returns `{ tagSlug, updated, elapsedMs }`. Driven daily at 06:15 UTC by `.github/workflows/pundit-ratings-recalculate.yml`.
+
+### `GET /api/admin/rating-feedback` — Admin
+Aggregates the manual number-rating feedback loop (daatan#1223) for the admin Ratings tab: `{ promptsSent, totalVotes, responseRate, ratingDistribution, byRater, votes }`, where each vote joins the article, the forecast and the frozen Oracul numbers the rater saw.
+
+### `GET|PUT /api/admin/settings` — Admin
+Admin-editable runtime settings, self-hosted edition only (`404` otherwise). Fields: `appName`, `appLogoUrl` (relative path or http(s) URL), `aboutTitle`, `aboutBody`, `openrouterModel`, plus the OpenRouter key. `GET` never returns the key — only `openrouterKeyConfigured`. On `PUT`, a blank non-secret field reverts to the env/default; a blank or omitted `openrouterKey` keeps the existing key, and `clearOpenrouterKey: true` removes it. A key/model change rebuilds the LLM service without a restart.
+
+### `GET|POST /api/admin/invites` · `DELETE /api/admin/invites/[id]` — Admin
+Single-use signup invites (for invite-only self-host instances). `GET` → `{ invites }`; `POST` → `201 { id, url, createdAt }`, where `url` is `<APP_URL or NEXTAUTH_URL>/auth/signup?invite=<token>` (the raw token is only returned here; `GET` lists `id`/`createdAt`/`acceptedAt` only); `DELETE` revokes one (`404` if not found).
 
 ### `GET /api/admin/oracle-stats` — Admin
 Oracul usage statistics for the admin **Oracul** tab. Every Oracul call (all call types, success **and** failure) is recorded in `OracleCallLog` with its `callType` (SEARCH, FORECAST, LEADERBOARD, HEALTH, SEARCH_HEALTH, LLM, FETCH_URL), `source` (the Daatan workflow that triggered it — e.g. `context-update`, `bot-voting`, `express-creation`), `status` (OK/EMPTY/ERROR), search engine, latency, and the triggering user/bot. A FORECAST call also records `failureReason` when it failed/came back empty — transport failures are daatan-derived (`timeout`, `network`, `http_5xx`, `http_4xx`); EMPTY responses pass through the Oracul's own `reason` (`no_search_results`, `all_articles_off_topic`, `no_usable_weight`, `no_decisive_signal`, `all_fetches_failed`, `extraction_errors`, `no_usable_predictions`, `no_result`, `oracle_timeout`). When the caller abandons the Oracul result and uses the LLM fallback, `fellBackToLlm` is set and `fallbackProbability` records the 0–100 the LLM produced. The log self-prunes to 30 days.
@@ -497,22 +573,19 @@ Analytics for Express forecast creation attempts. Returns success rate, daily br
 ### `POST /api/admin/recalculate-elo` — Admin
 Replay ELO history from scratch over all resolved commitments. Used after data corrections.
 
-### `GET /api/admin/approvals`
+### `GET /api/admin/approvals` — Admin / Resolver / Approver
 List forecasts with status `PENDING_APPROVAL`.
 
 ### `GET /api/admin/users`
 List all users.
 
-### `GET /api/admin/users/[id]`
-Get user details.
-
 ### `PATCH /api/admin/users/[id]`
-Update user role.
+Update user role. **Body** `{ role }` — `USER`, `RESOLVER`, `APPROVER` or `ADMIN`. `400` when an admin tries to change their own role.
 
-### `GET /api/admin/comments`
+### `GET /api/admin/comments` — Admin / Resolver
 List all comments.
 
-### `DELETE /api/admin/comments/[id]`
+### `DELETE /api/admin/comments/[id]` — Admin / Resolver
 Delete any comment.
 
 ### `GET /api/admin/bots`
@@ -545,6 +618,9 @@ Proxy to news-indexer's `PUT /outlets/{name}` — upsert the enrichment fields. 
 ### `DELETE /api/admin/news-indexer/sources/[name]` — Admin
 Proxy to news-indexer's `DELETE /outlets/{name}` — clears an outlet's enrichment row entirely (not exposed in the current UI; available for future use).
 
+### `GET /api/admin/news-indexer/sources/[name]/shadow-score` — Admin
+This outlet's rows on the Oracul's author-shadow scoring board, for the "Author scoring" section of the outlet detail page. Returns `{ rows }`; fails open to `[]` when the Oracul is unconfigured or unreachable.
+
 ### `GET /api/admin/wikipedia-lookup?q=` — Admin
 Direct (not news-indexer-proxied) search against Wikipedia's public REST API (`en.wikipedia.org/w/rest.php/v1/search/page`), top 5 results. Backs the "Look up" button next to the Wikipedia URL field on the outlet detail page (daatan#1218) — picking a result fills the field; the admin still saves via the existing `PUT /api/admin/news-indexer/sources/[name]`. Returns `{ results: [{ title, url, description }] }`. `400` if `q` is missing, `502` on a non-OK Wikipedia response.
 
@@ -563,7 +639,13 @@ Add a byline / channel-name alias to a person. Body: `{ alias: string }`.
 ### `DELETE /api/admin/news-indexer/authors/[id]/aliases/[aliasId]` — Admin
 Remove one alias.
 
-All four reject an `[id]` / `[aliasId]` that is not a UUID with `400` before building the upstream URL, and share the `503 News-indexer not configured` behavior above. Upstream is FastAPI and reports failures as `{detail}`; the proxy rewrites that to Daatan's `{error}` shape and forwards the status.
+### `POST /api/admin/news-indexer/authors/[id]/outlets` — Admin
+Link a person to an outlet (their own channel, or one they write for); news-indexer creates the outlet row by name if it doesn't exist yet. Body is forwarded as-is.
+
+### `DELETE /api/admin/news-indexer/authors/[id]/outlets/[outletId]` — Admin
+Remove one person↔outlet link.
+
+All of these reject an `[id]` / `[aliasId]` / `[outletId]` that is not a UUID with `400` before building the upstream URL, and share the `503 News-indexer not configured` behavior above. Upstream is FastAPI and reports failures as `{detail}`; the proxy rewrites that to Daatan's `{error}` shape and forwards the status.
 
 > **Why these are proxied rather than linked.** news-indexer's own `/admin` page asks the operator to paste an API key into the browser. That key is `NEWS_INDEXER_SECRET`, which also gates `/search`, `/enqueue` and `/ledger` and authenticates news-indexer back to Daatan — so it must not reach a browser. Routing through Daatan keeps the key server-side and replaces the single shared credential with a per-user `ADMIN` check, which also gives the mutations a real audit trail (upstream can only log that *someone* with the key made a change).
 
@@ -644,17 +726,23 @@ Auth subsystem health check.
 ### `GET /api/health/search`
 Search provider health check. Returns credit/status for Serper and SerpAPI.
 
+### `GET /api/uploads/[...path]`
+Serves objects written by the local storage driver (`STORAGE_DRIVER=local`, rooted at `STORAGE_LOCAL_PATH`, default `/data/uploads`). `404` for the S3/MinIO drivers, where the object store serves directly; `403` on a path that escapes the storage root.
+
+### `GET /api/well-known/assetlinks`
+Serves `public/.well-known/assetlinks.json` for the Android TWA's Digital Asset Links check; `next.config.js` rewrites `/.well-known/assetlinks.json` here because Next's static server 404s dot-prefixed `public/` paths.
+
 ### `GET /api/cron/cleanup`
-Clean up expired/stale data. Intended for cron use.
+Deletes notifications older than 90 days. Returns `{ ok, deleted }`. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. No workflow in `.github/workflows/` calls this route; the route's own comment suggests an EC2 crontab (daily 03:00).
 
 ### `GET /api/cron/heartbeat`
-Liveness probe used by external monitoring. Verifies app + DB and emits a metric.
+Daily "server is alive" summary: counts new users, published forecasts, commitments and resolutions over the last 24h, reads the Oracul search health, and posts it to Telegram (`notifyDailySummary`). Returns `{ ok, version, newUsers, published, commitments, resolutions }`. Auth: `x-cron-secret` header. Triggered daily at 09:00 UTC by `.github/workflows/heartbeat.yml`.
 
 ### `GET /api/cron/search-health`
-Periodic search-provider health check. Triggers a Telegram alert if a provider is degraded.
+Polls the Oracul's `/search/health` and fires one grouped Telegram alert for exhausted or low-credit search providers. Returns `{ ok, skipped: true }` when the Oracul isn't configured. Auth: `x-cron-secret` header. Triggered hourly by `.github/workflows/search-health.yml` (against `STAGING_URL`).
 
 ### `GET /api/cron/oracle-health`
-Checks Oracul API reachability and version compatibility. Fires a Telegram alert (`notifyOracleForecastUnavailable`) when the Oracul is down. Rate-limited to one alert per 5-minute window. Intended to run every 30 minutes via EC2 crontab.
+Checks the Oracul `/health` endpoint. Fires a Telegram alert (`notifyOraculForecastUnavailable`) when the Oracul is down. Rate-limited to one alert per 5-minute window. Returns `{ ok, healthy }`. Auth: `x-cron-secret` header. No workflow in `.github/workflows/` calls this route; the route's own comment suggests an EC2 crontab every 30 minutes:
 
 **EC2 crontab:** `0,30 * * * * curl -sf -H "x-cron-secret: $BOT_RUNNER_SECRET" https://daatan.com/api/cron/oracle-health`
 
@@ -790,22 +878,15 @@ so a periodic sweep is safe. Auth: `x-cron-secret` header. Returns
 
 ---
 
-## Notifications
+## News-indexer (inbound)
 
-### `GET /api/notifications` — Auth
-List notifications for the current user.
+Called by the news-indexer service, not by browsers. Both require the `x-news-indexer-secret` header (= `NEWS_INDEXER_SECRET`), 401 otherwise.
 
-### `GET /api/notifications/unread-count` — Auth
-Unread count for the bell badge.
+### `GET /api/news-indexer/active-forecasts`
+The forecasts news-indexer matches articles against: every `ACTIVE`, public (`isPublic: true`, daatan#1603) forecast as `{ id, question, createdAt, claimArchetype, translations: [{ language, text }] }`. `createdAt` + `claimArchetype` feed the match-time evidence window (news-indexer#394); the `claimText` translations let it build a multilingual embedding.
 
-### `PATCH /api/notifications/[id]` — Auth
-Mark a single notification as read.
-
-### `GET /api/notifications/preferences` — Auth
-Get the user's notification preferences (email, push, telegram channels).
-
-### `PATCH /api/notifications/preferences` — Auth
-Update notification preferences.
+### `POST /api/news-indexer/context`
+Push matched articles for one forecast: `{ predictionId, articles?: [...], triggerArticleUrl?, ... }` (or the older single-article fields `articleUrl`/`articleTitle`/…) — full Zod schema in the route. Articles go into the evidence pool, newly claimed ones are extracted by the Oracul, and the pooled estimate is recorded (see [DATABASE.md](./DATABASE.md) "Evidence pool"). Over-long article `text` is truncated to 4000 chars rather than rejected. Returns `{ ok, scored, stance, certainty, claim, relevance, probability, previousProbability, sources }` — `scored` says whether this push recorded a verdict; when every article was already claimed/unchanged the response carries `skipped` (`in_flight` | `already_complete`) and `scored: false`. `404` unknown forecast, `409` forecast not `ACTIVE`.
 
 ---
 
@@ -816,33 +897,26 @@ Handles interactive Telegram commands (`/status`, `/versions`, `/rollback 1.7.x`
 
 ---
 
-## Comments (extended)
-
-### `POST /api/comments/[id]/react` — Auth
-Add or remove a reaction (emoji) on a comment.
-
-### `GET /api/comments/[id]/translate` — Auth
-LLM-translate a comment to the user's preferred language.
-
-### `GET /api/forecasts/[id]/translate` — Auth
-LLM-translate forecast claim/details/options to the user's preferred language.
-
----
-
 ## Auth
 
+### `GET|POST /api/auth/[...nextauth]`
+NextAuth handlers (sign-in, callbacks, session, sign-out) from `src/auth.ts`.
+
 ### `POST /api/auth/signup`
-Register a new account with email + password. Rate-limited to 5 requests/hour per IP.
+Register a new account with email + password. **Body** `{ name, email, password, invite? }`. Rate-limited to 5 requests/hour per IP. `403` when the email domain is not in `ALLOWED_EMAIL_DOMAINS` (self-host; no-op when unset), and — when open signup is off (self-host without `SELF_HOST_OPEN_SIGNUP`) — `403 Signup is invite-only` unless `invite` is a valid single-use invite token (see `/api/admin/invites`).
 
 ### `POST /api/auth/forgot-password`
 Send a password reset email. Rate-limited to 5 requests/hour per IP. Always returns 200 to prevent email enumeration.
 
 ### `POST /api/auth/reset-password`
-Reset password using a token from the reset email.
+Reset password using a token from the reset email. **Body** `{ email, token, password }`. Rate-limited to 5 requests/hour per IP.
 
 ---
 
 ## Account
 
-### `DELETE /api/account`
+### `DELETE /api/account` — Auth
 Delete the authenticated user's account and all associated data.
+
+### `POST /api/account/forget-history` — Auth
+"Forget History" (daatan#1701): detach the user from their own commitments (`userId` → null) and reset their derived scoring fields to schema defaults; other users' scores are untouched. `400` while any of the user's commitments sits on a forecast that isn't resolved/void/unresolvable.

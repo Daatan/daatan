@@ -53,6 +53,8 @@ consensusLine: String?          // "Based on 4 sources, 72% indicate..."
 sourceSummary: String?          // Aggregated summary from articles
 ```
 
+> **Current state:** `enableSentimentExtraction` and `showMetadataOnForecast` are stored and editable in the admin UI, but nothing reads them — the bot runner (`src/lib/services/bots/`) has no extraction step and never writes `sentiment`, `consensusLine` or `sourceSummary`, and the detail-page block below renders whenever those fields are populated, regardless of the flag. `Prediction.confidence` is not bot metadata either: it is the forecast's AI-estimate column (0–100, written by `recordEstimate` in `src/lib/services/context.ts`), so the block's "Confidence" line shows the AI estimate.
+
 ### 4. Topic Rejection Tracking
 
 Prevent bots from re-suggesting rejected topics:
@@ -72,7 +74,7 @@ model BotRejectedTopic {
 }
 ```
 
-When a user rejects a forecast, the topic is logged to prevent future duplicate suggestions.
+When a forecast is rejected via `POST /api/forecasts/[id]/reject`, a `BotRejectedTopic` row is written for the author's bot **whether or not** tracking is enabled (`rejectForecast` in `src/lib/services/forecast.ts`). `enableRejectionTracking` gates the *read*: before creating a news-anchored forecast, `src/lib/services/bots/forecastCreate.ts` checks the bot's 20 most recent rejections and skips the forecast when ≥ 50% of a rejection's keywords appear in the new claim + details (plain keyword match, no LLM). The sourceless path does not run this check.
 
 ## API Endpoints
 
@@ -111,10 +113,13 @@ When a user rejects a forecast, the topic is logged to prevent future duplicate 
 }
 ```
 
+When omitted, `keywords` defaults to the first 5 words of the claim (lower-cased) and `description` to its first 200 characters.
+
 **Behavior:**
 1. Transition forecast from `PENDING_APPROVAL` → `VOID`
 2. Create `BotRejectedTopic` entry with keywords
 3. Bot won't suggest similar topics again (if rejection tracking enabled)
+4. Send Telegram notification (`notifyBotForecastRejected`) and ping IndexNow for the voided URL
 
 **Response:**
 ```json
@@ -170,7 +175,7 @@ When a user rejects a forecast, the topic is logged to prevent future duplicate 
 
 ### Bot Configuration (Bots Tab)
 
-**File:** `src/app/admin/BotsTable.tsx`
+**File:** `src/app/admin/_bots/EditBotModal.tsx` (opened from `src/app/admin/BotsTable.tsx`)
 
 New fields in EditBotModal:
 - **Require approval for forecasts** (checkbox)
@@ -237,9 +242,11 @@ Displays `PENDING_APPROVAL` forecasts with:
 
 ### Forecast Detail Page
 
-**File:** `src/app/forecasts/[id]/page.tsx`
+**File:** `src/app/forecasts/[id]/_forecast/BotApprovalSection.tsx` (rendered by `ForecastDetailClient.tsx`)
 
-Metadata display block added to PENDING_APPROVAL approval banner:
+The PENDING_APPROVAL banner's Approve / Reject buttons do **not** call the endpoints above: they `PATCH /api/admin/forecasts/[id]` with `{ status: 'ACTIVE' | 'VOID' }`, which only changes the status — no bot stake, no `BotRejectedTopic`, no Telegram notification — and an `APPROVER` (as opposed to `ADMIN`) can only set `ACTIVE` there. Use the Pending Approvals tab for the full approve/reject behaviour.
+
+Metadata display block in the PENDING_APPROVAL approval banner:
 
 ```tsx
 {(prediction.sentiment || prediction.confidence != null) && (
@@ -253,8 +260,8 @@ Metadata display block added to PENDING_APPROVAL approval banner:
 ```
 
 **Visible only when:**
-- Forecast status is PENDING_APPROVAL
-- At least one metadata field is populated (no role restriction)
+- Forecast status is PENDING_APPROVAL and the viewer is `ADMIN` or `APPROVER` (the whole banner is gated on `canApprove`)
+- At least one of `sentiment`, `confidence`, `consensusLine` is populated
 
 ## Database Schema
 
@@ -302,17 +309,19 @@ The original monolithic `bot-runner.ts` was split into `src/lib/services/bots/{r
 
 ### Approval Workflow in stake.ts
 
+`createAndStake()` creates, publishes and (when allowed) stakes in one transaction:
+
 ```typescript
-// Immediately stake if approval NOT required
-if (!bot.requireApprovalForForecasts) {
-  // Randomize confidence within configured range (stakeMin–stakeMax)
-  const stakeAmount = randomInt(bot.stakeMin, bot.stakeMax)
-  await createCommitment(bot.userId, prediction.id, {
-    confidence: stakeAmount,  // positive = YES (binaryChoice derived server-side)
-  })
+const publishStatus = bot.requireApprovalForForecasts
+  ? 'PENDING_APPROVAL'
+  : (bot.autoApprove ? 'ACTIVE' : 'PENDING_APPROVAL')
+
+if (bot.requireApprovalForForecasts) {
+  // create + set publishStatus; no commitment — staking waits for /api/forecasts/[id]/approve
 } else {
-  // Defer staking until user approves via /api/forecasts/[id]/approve
-  log.info({ botId: bot.id }, 'Forecast created, awaiting approval')
+  const stake = randomInt(bot.stakeMin, bot.stakeMax)
+  // create + set publishStatus + createCommitment(bot.userId, pred.id, { confidence: stake }, { tx })
+  // (positive confidence = YES; a failed commitment rolls back the whole transaction)
 }
 ```
 
@@ -389,7 +398,7 @@ Current coverage:
      status = PENDING_APPROVAL
      skip staking
    } else {
-     status = ACTIVE
+     status = autoApprove ? ACTIVE : PENDING_APPROVAL
      do stake
    }
 
@@ -519,7 +528,7 @@ BotRejectedTopic
 **Solution:**
 1. Enable `enableRejectionTracking` in bot config
 2. Verify BotRejectedTopic records are created on rejection
-3. Check bot-runner: LLM similarity check against rejection list
+3. Check `src/lib/services/bots/forecastCreate.ts`: keyword-overlap check (≥ 50% of a rejection's keywords) against the 20 most recent rejections
 
 ---
 
@@ -532,7 +541,7 @@ BotRejectedTopic
 **Solution:**
 1. Check BotConfig: `enableSentimentExtraction: true`
 2. Verify forecast creator is bot (author.isBot: true)
-3. Check bot-runner: LLM extraction code is running
+3. Note: no bot code currently writes `sentiment` / `consensusLine` / `sourceSummary` (see [Metadata Extraction](#3-metadata-extraction)), so these stay null today even with the flag on
 4. Look at prediction.sentiment, prediction.confidence fields in DB
 
 ---

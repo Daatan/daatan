@@ -30,8 +30,8 @@ here.
 2. Fetches `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CLEAN_CHAT_ID` (falling back to `TELEGRAM_CHAT_ID`)
    from the app's own `daatan-env-<environment>` Secrets Manager secret — no separate secret is
    provisioned for this Lambda, and credentials are cached for the life of the warm container.
-3. Posts `🔴 ALARM: <name> (<region>)\n<reason>` or `🟢 OK: ...` to
-   `https://api.telegram.org/bot<token>/sendMessage`.
+3. Posts `🔴 ALARM: <name> (<region>)\n<reason>` or `🟢 OK: ...` (`⚪ INSUFFICIENT_DATA: ...`
+   for that state) to `https://api.telegram.org/bot<token>/sendMessage`.
 4. Rethrows on a non-2xx Telegram response, which counts against the Lambda's own `Errors` metric.
 
 ## Monitoring the forwarder itself
@@ -43,12 +43,16 @@ broken forwarder can't mask its own failure (same rationale as `docs/MAIL_FORWAR
 
 ## Deploying changes
 
+Initialise against the right backend and pass `-var environment=<env>` explicitly
+(`var.environment` defaults to `prod`; the Lambda and its role are env-suffixed and it
+reads that env's `daatan-env-<env>` secret — see `terraform/README.md`):
+
 ```bash
 cd terraform
 terraform plan  -target=aws_lambda_function.telegram_alerts -target=aws_sns_topic_subscription.infra_alerts_telegram -target=aws_cloudwatch_metric_alarm.telegram_alerts_errors -target=aws_iam_role.lambda_telegram_alerts -target=aws_iam_role_policy.lambda_telegram_alerts -target=aws_lambda_permission.allow_sns_infra_alerts
 terraform apply <same -target flags>
 ```
 
-Run tests with `npm test` (covers `infra/telegram-alerts/index.test.mjs`, same pattern as
+Run tests with `npm test`, or just this file with `npx vitest run infra/telegram-alerts/index.test.mjs` (covers `infra/telegram-alerts/index.test.mjs`, same pattern as
 `infra/mail-forwarder/index.test.mjs` — the AWS SDK import means the pure helpers are re-declared
 in the test file rather than imported from `index.mjs`).

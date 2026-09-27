@@ -30,9 +30,9 @@ If any check fails → out of scope.
 - **Frontend:** React 18, Tailwind CSS
 - **Backend:** Next.js API Routes, Node.js 24
 - **Database:** PostgreSQL 16 (Prisma 7.x ORM)
-- **Authentication:** NextAuth.js (Google OAuth)
-- **Testing:** Vitest
-- **AI Integration:** Gemini (primary), Ollama (fallback), OpenRouter (bots), AWS Bedrock (prompt management)
+- **Authentication:** Auth.js v5 / NextAuth (Google OAuth + email/password; OIDC for self-host)
+- **Testing:** Vitest, Playwright (E2E)
+- **AI Integration:** Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also powers bots; prompts live in git (`src/lib/llm/bedrock-prompts.ts`, `prompts/`); calibrated estimates from the TruthMachine Oracul (`oracle.daatan.com`)
 - **Notifications:** Resend (email), web-push (browser push), Telegram
 - **i18n:** next-intl
 - **Infrastructure:** Docker, Nginx, AWS EC2, S3 (avatars)
@@ -49,9 +49,10 @@ If any check fails → out of scope.
 - **Run Linter:** `npm run lint`
 
 ## 5. Key Concepts
-- **Reputation Score (RS):** Long-term credibility score based on resolved predictions (ELO-like)
-- **Confidence Units (CU):** Limited budget of conviction allocated across predictions (no monetary value)
-- **Prediction Weight:** `RS × CU` — influence of a specific prediction
+- **ELO Rating:** The headline user rating shown everywhere since #1764 (alongside Accuracy and Brier)
+- **Reputation Score (RS):** Long-term credibility score based on resolved predictions (ELO-like); still computed, no longer displayed
+- **Confidence Units (CU):** Conviction attached to a commitment — as implemented, a −100..+100 confidence value per commitment, with no balance or budget (no monetary value)
+- **Prediction Weight:** `RS × CU` — influence of a specific prediction (design concept; not computed by current scoring)
 - **Brier Score:** Probability calibration metric, `(probability − outcome)²` — lower is better
 
 See the [shared glossary](https://github.com/Daatan/docs/blob/main/glossary.md) for full terminology and [PRODUCT.md](./PRODUCT.md) for detailed product documentation.

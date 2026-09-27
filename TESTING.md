@@ -2,28 +2,48 @@
 
 ## Overview
 
-DAATAN uses Vitest for unit and integration testing. All tests must pass before code can be committed.
+DAATAN uses Vitest for unit and integration testing and Playwright for end-to-end tests. Tests related to your changes must pass before code can be pushed (pre-push hook), and CI must be green before merging.
 
 ## Running Tests
 
 ```bash
-# Run all tests
+# Run all unit tests (vitest.config.ts — happy-dom environment)
 npm test
 
 # Run tests in watch mode (development)
-npm test -- --watch
+npx vitest
 
 # Run specific test file
-npm test -- __tests__/api/profile.test.ts
+npm test -- __tests__/api/profile-language.test.ts
 
-# Run with coverage
-npm test -- --coverage
+# Run only tests related to given source files
+npm run test:related -- src/lib/foo.ts
+
+# Run with coverage (thresholds in vitest.config.ts)
+npm run test:coverage
+
+# Integration tests (vitest.config.integration.ts — node environment, real Postgres)
+# *.integration.test.ts files; they start the pgvector test DB from
+# docker-compose.test.yml (host port 5433) and run serially
+npm run test:integration
+
+# End-to-end (Playwright): tests/e2e (playwright.config.ts, dev server on :3000)
+npm run test:e2e
+# Self-host edition e2e: tests/e2e-selfhost (playwright.selfhost.config.ts)
+npm run test:e2e:selfhost
 ```
+
+`npm test` excludes `tests/**` and `*.integration.test.ts`; it does pick up the Lambda tests in
+`infra/**/index.test.mjs`.
 
 ## Test Structure
 
+Unit tests live in two places:
+- top-level `__tests__/{api,lib,services,config,components}/`
+- co-located `__tests__/` folders next to the code under `src/` (most of them)
+
 ### API Route Tests
-Location: `__tests__/api/`
+Location: `__tests__/api/` or `src/app/api/**/__tests__/`
 
 Example:
 ```typescript
@@ -71,14 +91,16 @@ vi.mock('@/lib/prisma', () => ({
 ```
 
 ### NextAuth
+Server-side session comes from `auth()` in `src/auth.ts` (NextAuth v5):
 ```typescript
-vi.mock('next-auth/next', () => ({
-  getServerSession: vi.fn(() => Promise.resolve({ user: { id: '123' } })),
+vi.mock('@/auth', () => ({
+  auth: vi.fn(() => Promise.resolve({ user: { id: '123' } })),
 }))
 ```
 
-### Next.js Navigation
-Already mocked globally in `src/test/setup.ts`
+### Next.js Navigation / `next-auth/react`
+Already mocked globally in `src/test/setup.ts` (which also sets dummy env vars and
+`SKIP_ENV_VALIDATION`).
 
 ## Test Coverage Requirements
 
@@ -150,21 +172,25 @@ Already mocked globally in `src/test/setup.ts`
 ## Pre-commit & Pre-push Checks
 
 The **pre-commit** hook runs fast checks only:
-1. Version-bump check (for feature/fix branches)
+1. Version-bump check (`scripts/check-version-bump.sh` — the version must advance past `origin/main`'s on any non-`main` branch)
 2. `lint-staged` (lints staged `*.{ts,tsx}` files)
 
 The **pre-push** hook runs the heavier verification:
 1. Type check (`npm run typecheck`)
-2. Targeted tests (`vitest related` on changed `.ts`/`.tsx` files, excluding integration tests)
+2. Targeted tests (`scripts/run-related-tests.sh origin/main` — `vitest related` on changed `.ts`/`.tsx` files, excluding integration tests)
 3. Auth-change detection (non-blocking warning)
 
 Full test suite + integration tests run in CI. If any blocking check fails, the commit/push is blocked.
 
 ## CI/CD Integration
 
-GitHub Actions runs the same checks on every PR:
-- Build
-- Tests
-- Linter
+GitHub Actions (`.github/workflows/deploy.yml`) runs on every PR:
+- `Type check`, `Lint`
+- `Unit tests` — related tests only, same script as pre-push (on pushes to `main`/tags the full suite runs instead, in 4 shards)
+- `Integration Tests` (`npm run test:integration`)
+- `Build & Test` — `next build`, `npm audit --audit-level=critical`, env-var parity check
+
+plus the separate `Version bump` workflow (`.github/workflows/version.yml`). Playwright e2e
+tests are not part of CI.
 
 All checks must pass before merging.

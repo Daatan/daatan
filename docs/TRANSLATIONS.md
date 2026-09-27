@@ -8,7 +8,10 @@ UI locale resolution (`src/i18n/request.ts`): `NEXT_LOCALE` cookie (set only by 
 language picker) → browser `Accept-Language` (`src/i18n/negotiate.ts`, q-values
 respected, `he-IL` matches `he`) → `en`. Detection is stateless — no cookie is
 written until the user explicitly picks. URL-prefixed pages (`/he`, `/ru`, `/eo`)
-override both for `<html lang>` (see `src/middleware.ts` / root layout).
+override both: `src/middleware.ts` sets `<html lang>` from the prefix, and since #1738
+`request.ts` honours next-intl's `requestLocale` first, so the page's messages are loaded
+for the URL locale too (previously `/he/terms` etc. served English body text to anyone
+without a Hebrew browser).
 
 ## Translation cache
 
@@ -21,7 +24,11 @@ translation (`src/lib/services/translation.ts`).
 - **On create** (`POST /api/forecasts`): `translatePredictionToAllLocales` fans out
   to the non-default locales in the background (best-effort, retried).
 - **On read**: locale pages call `getCachedPredictionTranslation` — read-only, never
-  triggers Gemini. A cache miss falls back to the English source.
+  triggers Gemini. A cache miss falls back to the English source. This read does not
+  re-check `sourceHash`; staleness is prevented on the write side instead — an edit that
+  changes the English text deletes the forecast's translation rows (`directUpdateForecast`
+  and the original-language update in `src/lib/services/forecast.ts`; a context rewrite
+  drops the `detailsText` rows in `src/lib/services/context.ts`).
 
 ## English canonicalization (non-English input)
 
@@ -83,7 +90,8 @@ their SEO are preserved. See [SEO.md](./SEO.md).
 
 `scripts/backfill-english-canonical.ts` canonicalizes existing non-Latin forecasts
 (idempotent — only touches rows with `original_language IS NULL`). Dry-run by default;
-pass `--apply` to write. Requires `GEMINI_API_KEY` + `DATABASE_URL`. For prod, drive it
+pass `--apply` to write. Requires `DATABASE_URL` plus credentials for the Google LLM leg
+(`GOOGLE_VERTEX_*` in production, `GEMINI_API_KEY` on self-host). For prod, drive it
 via the `backfill-english-canonical` admin endpoint / GitHub Actions workflow rather
 than the script.
 
@@ -107,7 +115,8 @@ URL working without needing an alias hop.
 Separate from the forecast-content translation above: `messages/{en,he,ru,eo}.json` hold the
 static UI strings. `en.json` is the source; the others are hand-maintained.
 
-`__tests__/config/i18n-completeness.test.ts` enforces three invariants — key parity, ICU
+`__tests__/config/i18n-completeness.test.ts` enforces four invariants — key parity across all
+four locales, source coverage (every static `t('key')` resolves in `en.json`), ICU
 validity (a malformed plural only throws at render time, so parity alone won't catch it), and
 placeholder parity (no locale may drop an `{arg}` that English has). `he.json` is exempt from
 the placeholder check: it predates the rule and deliberately hard-codes the singular in a few
@@ -142,6 +151,7 @@ back to confidence vocabulary.
 | Run (a program) | запуск | ruli / rulo | ~~kuri~~ (= to run on foot; intransitive) |
 | Load | загрузка | ŝargi | ~~ŝarĝi~~ (= to load cargo) |
 | Moderator | модератор | moderiganto | ~~kontrolanto~~ |
+| Oracul (brand) | Оракул | Orakulo | ~~Orakolo~~ (common noun); Hebrew is אוראקול, not ~~אורקל~~ (#1691) |
 
 Russian uses ё consistently (`произойдёт`, `завершён`) and the formal lowercase «вы».
 Esperanto uses real diacritics (ĉ ĝ ĥ ĵ ŝ ŭ) — never the x-system.

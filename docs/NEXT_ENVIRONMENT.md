@@ -20,6 +20,10 @@ Deployments to the NEXT environment are **manual** to allow for maximum flexibil
 
 The deployment uses a dedicated Docker container `daatan-app-next` and is managed by the `scripts/blue-green-deploy.sh next` command.
 
+Caveats (from `.github/workflows/deploy-next.yml`):
+- **Branch migrations do not run.** The workflow builds only the app image (`next-latest`); Phase 5 uses the existing `daatan-migrations:staging-latest` image, i.e. whatever `main` last deployed to staging. A branch that needs a schema change won't get it on NEXT — and the database is shared with staging anyway.
+- **It does not wake staging.** The staging box sleeps 20:00–06:00 UTC and on weekends (see `docs/DEPLOYMENT.md`); `deploy-next.yml` has no wake step, so start the instance (or trigger a staging deploy) first during that window.
+
 ## Technical Configuration
 - **Hostname**: `next.daatan.com`
 - **Nginx Config**: `infra/nginx/nginx-staging-ssl.conf` (proxies to `http://app-next:3000`)

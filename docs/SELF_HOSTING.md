@@ -182,7 +182,7 @@ Notes:
 - On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracul.
 - `OPENROUTER_MODEL` (or the Model field in Settings) overrides the default model (`openai/gpt-4o-mini`).
 - `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
-- Providers degrade gracefully relative to one another (Gemini → OpenRouter → Ollama).
+- Providers degrade gracefully relative to one another, in registration order: Gemini → the Oracul's `/llm` (only when `ORACLE_URL`/`ORACLE_API_KEY` are set) → OpenRouter → Ollama. Only configured legs register.
 
 > **Not in the self-hosted edition:** the automated **bot system** (LLM personas that scan news and auto-create forecasts) is SaaS-only. Its admin tab, pages, and API routes are disabled on self-host (the routes 404), and no bot sync runs at boot. Forecasts on a self-host are created by your people.
 

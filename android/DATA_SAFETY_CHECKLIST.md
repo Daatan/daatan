@@ -49,7 +49,7 @@ an oversight.
 
 ## Content Rating questionnaire (IARC)
 
-- **User-generated content: Yes.** `Comment` model (`prisma/schema.prisma:871`)
+- **User-generated content: Yes.** `Comment` model (`prisma/schema.prisma`)
   — threaded comments on predictions, visible to other users.
 - **Moderation: automated only.** `src/lib/services/moderation.ts` runs an
   LLM content check (`checkContent(text, contentType)`) pre/post-hoc against

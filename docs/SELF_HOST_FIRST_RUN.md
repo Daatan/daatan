@@ -42,7 +42,7 @@ EOF
 
 Edit `APP_URL`/`NEXTAUTH_URL` to your real hostname (or `http://localhost:3000` for a laptop test). Leave `ENABLE_AI_FEATURES`/`ENABLE_EXTERNAL_MARKETS` unset (off).
 
-> Sanity check the require-branding guard: temporarily comment out `APP_NAME`, `up`, and confirm the app **fails fast** with "APP_NAME is required". Then restore it.
+> Sanity check the required-URL guard: temporarily comment out both `APP_URL` and `NEXTAUTH_URL`, `up`, and confirm the app **fails fast** with "APP_URL (or NEXTAUTH_URL) is required". Then restore them. (`APP_NAME` is optional — unset, the app boots as "Forecasting" until an admin names it in Admin → Settings.)
 
 ---
 
@@ -125,13 +125,13 @@ Admin → **About**:
 docker compose -f docker-compose.selfhost.pull.yml up -d
 ```
 
-- [ ] Analyze / Express / Guess buttons reappear and function; About shows AI **on**.
+- [ ] Express / Guess buttons reappear and function; About shows AI **on**. ("Analyze" additionally needs `ORACLE_URL` + `ORACLE_API_KEY`.)
 
 ---
 
 ## If something fails
 
-- **App won't start, "APP_NAME/APP_URL is required"** → set them in `.env` (required for `self_hosted`).
+- **App won't start, "APP_URL (or NEXTAUTH_URL) is required"** → set `APP_URL` in `.env` (required for `self_hosted`).
 - **`migrate` exits non-zero** → check `DATABASE_URL` / `POSTGRES_PASSWORD` match; view `logs migrate`.
 - **GHCR pull denied** → the package is still private (Step 1) or you need `docker login ghcr.io`.
 - **SSO redirect mismatch** → the IdP client redirect URI must be exactly `${APP_URL}/api/auth/callback/oidc`.

@@ -15,8 +15,9 @@
 >    override guaranteed a client/server mismatch.
 >
 > **The only supported way to change the displayed version is the standard
-> CI/CD pipeline** (`deploy.yml`): bump `package.json` + `src/lib/version.ts`,
-> merge, and (for production) push a `v*` tag. See
+> CI/CD pipeline** (`deploy.yml`): bump `package.json` (`src/lib/version.ts` carries
+> no version — it only reads `NEXT_PUBLIC_APP_VERSION`), merge, and (for production)
+> push a `v*` tag. See
 > [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 The version now has exactly one source of truth per image: the

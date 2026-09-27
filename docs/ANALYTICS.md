@@ -10,7 +10,7 @@ Google Analytics 4 with GDPR/CCPA consent mode. Data is only sent after explicit
 | `GA_MEASUREMENT_ID_STAGING` | EC2 `.env` | Staging GA4 property (`G-Z4XXM7GYHW`) |
 | `GA_MEASUREMENT_ID` | docker-compose (mapped from above) | What the app container reads |
 
-`docker-compose.prod.yml` maps `GA_MEASUREMENT_ID_PROD` → `GA_MEASUREMENT_ID`; same pattern for staging. The app reads it at render time in `src/app/layout.tsx` and passes it as a prop to `GoogleAnalytics`.
+`docker-compose.prod.yml` maps `GA_MEASUREMENT_ID_PROD` → `GA_MEASUREMENT_ID`; same pattern for staging. The blue-green deploy (`scripts/blue-green-deploy.sh`, which regenerates `.env` from Secrets Manager via `scripts/fetch-secrets.sh`) does the same mapping with `-e GA_MEASUREMENT_ID=…` — the staging ID for `staging` and `next`, the prod ID otherwise. The app reads it at render time in `src/app/layout.tsx` and passes it as a prop to `GoogleAnalytics`.
 
 ## Key files
 

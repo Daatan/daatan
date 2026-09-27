@@ -23,9 +23,15 @@ S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h).
   newer fields are snake_case. Always check `@map` before writing raw SQL.
 - **Migrations are authored by hand** in
   `prisma/migrations/<timestamp>_<name>/migration.sql` (no `prisma migrate dev`).
-- **Embeddings** (`Prediction.embedding`, `ExternalMarket.embedding`) are
+- **Embeddings** (`Prediction.embedding`, `ExternalMarket.embedding`,
+  `LatentNode.embedding`) are
   `Unsupported("vector(768)")` — invisible to the Prisma client, read/written
   with raw SQL only. The postgres image must be `pgvector/pgvector:pg16`.
+- **Extensions** created by migrations: `vector` (`20260430000000`), `pg_trgm`
+  (`20260809000000` — trigram GIN indexes on `predictions."claimText"` and
+  `tags.name`), `pg_stat_statements` (`20260905000000`; the view only answers
+  when postgres runs with `shared_preload_libraries=pg_stat_statements`, which
+  `docker-compose.prod.yml` / `docker-compose.staging.yml` set).
 - The `daatan` DB user is the superuser; there is no `postgres` user. Prod
   container `daatan-postgres` (DB `daatan`), staging `daatan-postgres-staging`
   (DB `daatan_staging`).
@@ -89,7 +95,10 @@ The central table (`Prediction`). Field groups:
   (daatan#1234 check #2): null unless the pin/extreme `confidence` contradicted
   the outcome a resolver just declared — then true, since `resolvePrediction`
   rejects the request otherwise. See `detectPinContradiction` in
-  `src/lib/utils/pin-contradiction.ts`.
+  `src/lib/utils/pin-contradiction.ts`. `settledClearedAt`/`settledClearedBy`
+  (daatan#1498) are the latch's audit trail: `clearSettledLatch` nulls
+  `settledAt` along with the flag, so it stamps these instead — otherwise a
+  cleared forecast is indistinguishable from one that never latched.
 - **Awaiting Resolution dismissal** (daatan#1659): `awaitingDismissedAt` /
   `awaitingDismissedConfidence`. `awaitingAiResolution` is recomputed from the bare
   probability on every `recordEstimate` write, so a human clear alone lasts one
@@ -121,9 +130,22 @@ The central table (`Prediction`). Field groups:
 - **Alert dedup timestamps**: `deadlinePassedAlertAt`, `teffProvisionalAlertAt`,
   `divergenceAlertAt` (requote cron), `marketDivergenceAlertAt` (market-sync
   cron) — single-shot alerts re-arm by timestamp comparison, not NULL checks.
+  `settledDriftAlertAt` (daatan#1490: a latched forecast's published probability
+  has walked `SETTLED_DRIFT_PTS` away from the value its settlement pin published —
+  the requote cron flags it back into Awaiting Resolution) and
+  `unlatchedPinAlertAt` (daatan#1498: the latest evidence snapshot asserts
+  settlement while `settled` is false) use the `marketDivergenceAlertAt` idiom
+  instead: set when the condition first holds, cleared once it stops, so a
+  recurrence pages again.
 - **External market link**: `externalMarketId` (+ `LinkedAt`, `LinkMethod`
   'manual' | 'ai-confirmed' | 'imported', and `externalMarketInverted` when the
   market asks the opposite question — UI plots `100 − price`).
+  `polymarketPrice` (0–1, daatan#1138) is reserved for a denormalized current
+  market price; no writer populates it yet — the per-commit value lives on
+  `Commitment.polymarketPrice` (below).
+- **Moderation flag**: `moderationCheckFailed` (daatan#1318, also on `comments`) —
+  true when the AI moderation check threw instead of returning a verdict; the
+  content is published but flagged for manual review.
 - **Bot-creation metadata** (`source='bot'`): `sentiment`, `extractedEntities`,
   `consensusLine`, `sourceSummary`.
 - **Telegram running notification** (daatan#1215): `telegramMessageId`,
@@ -143,10 +165,13 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | column | meaning |
 |---|---|
 | `externalProbability` | the estimate (0–100) or null when the run produced no number |
-| `origin` | which path wrote it: `creation` \| `analyze` \| `news-indexer` \| `backfill` \| `clock`; **null = pre-funnel row** (guess from `externalReasoning` marker strings) |
+| `origin` | which path wrote it: `creation` \| `analyze` \| `news-indexer` \| `backfill` \| `republish` (admin re-publish from the existing pool, `POST /api/admin/forecasts/republish`, `forecast-republish.ts`, daatan#1508) \| `clock`; **null = pre-funnel row** (guess from `externalReasoning` marker strings) |
 | `kind` | pricing semantics: `evidence` (default) vs `clock` (daily glide requote). Clock rows are excluded from the public timeline, the glide anchor, and push dedup (`NOT_CLOCK` filters) |
 | `articlesUsed` | Oracul evidence volume; null on legacy/LLM-fallback/clock rows |
 | `oracleSnapshot` | full Oracle payload (see scale table above); null on the LLM-fallback path |
+| `oracleSettled` / `oracleMean` / `sourcesSummary` | scalar mirrors of `oracleSnapshot.settled`, `.mean` (when a JSON number) and `.sources` reduced to `{author, sourceName, stance, url, publishedAt}` (query audit 2026-09-05), so read paths stop detoasting the whole blob. **Derived by the DB, never written by app code**: the `BEFORE INSERT OR UPDATE OF oracle_snapshot` trigger `context_snapshot_mirrors` (migration `20260905000000`) fills them on every write, whoever writes. The partial index `context_snapshots_settled_pin_idx ("predictionId", "createdAt" DESC) WHERE oracle_settled` lives in migration SQL only |
+| `materialChange` | F17 (daatan#1236): false when this write's probability moved less than `MATERIAL_CHANGE_PTS` from the current evidence anchor — the row is still written, but excluded from anchor selection so it can't reset the glide clock. Default true (historical rows stay anchor-eligible) |
+| `evidenceAt` | F17: newest publish time among the sources behind this estimate, not the row's write time — lets the glide anchor to when the evidence happened. Null when unavailable; callers fall back to `createdAt` |
 | `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
 | `meta` | clock provenance `{engineVersion, cause, pLast, tLast, tEff, c, direction}`; on an abstention, `{abstain: {reason, poolSize}}`; when the estimate came from a pool aggregate, `{pool: {evidenceMass, nEff, ageAdjustedMass}}` (retro#458 Phase 2 diagnostics, daatan#1563) — the two can appear together on the same row |
 | `summary` / `externalReasoning` | analyze-run LLM summary / writer reasoning marker |
@@ -219,7 +244,7 @@ of the same URL collapse to one row. Started as a write-only foundation layer
 (2026-07-09, retro `docs/ORACLE_VARIABLES.md` §6 part 2); since v1.60.0 it is
 the source of truth the estimate is recomputed from (see below), and since
 2026-07-16 also what the elections consumers render (elections app #50/#51,
-daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill`/`remediate` write
+daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill`/`retry`/`remediate` (`PoolOrigin`) write
 their per-source signal here (`addArticlesToPool` in
 `src/lib/services/evidence-pool.ts`) alongside their existing
 `ContextSnapshot`/`Prediction` writes. The row IS the extraction
@@ -311,7 +336,7 @@ it. The schema comment "eligible for retry once stale" was stricter than the cod
 **The null family** (daatan#1231) — the Oracul produced no forecast, split by WHY.
 This used to be one string, `oracle_null`, covering six different situations: 73% of
 the 200 most recent pool fetches (2026-07-31) carried it, and because
-`getOracleForecast` never throws, a 12-second client timeout and a deliberate
+`getOraculForecast` never throws, a 12-second client timeout and a deliberate
 all-articles-off-topic abstention wrote byte-identical rows. The real cause survived
 only in `OracleCallLog.failureReason`, which the retry sweep never reads.
 
@@ -345,7 +370,7 @@ input still buys the same answer, so it keeps the full 24 h backoff.
 hung up on and stores it in `forecast_cache` for `cache_ttl_seconds` (3600). daatan used
 to never read it — its earliest re-ask was 24 h — so ~72 completed Claude Haiku 4.5
 extractions a day were paid for and discarded. On a transport class the push route and
-the retry sweep now schedule `scheduleOracleReask` (`src/lib/services/oracle-backfill.ts`),
+the retry sweep now schedule `scheduleOraculReask` (`src/lib/services/oracle-backfill.ts`),
 which after `REASK_DELAY_MS` (120 s) re-drives the run through `refreshOracleSnapshot`:
 
 - **The article set must be IDENTICAL.** retro keys the cache on
@@ -387,6 +412,13 @@ article is undated regardless of what it is claimed against. Equally reversible 
 un-excluding. This population used to be invisible: news-indexer#122 stamped crawl time
 on undated articles, indistinguishable from a real date, which is how a December-2022
 op-ed reached 2026 election forecasts at stance 1.00).
+`publishedDateSource` (daatan#1679 item 2) records where `publishedDate` came from, as
+news-indexer reports it (`article.published_at_source`, news-indexer#426): `page` (read
+off the article), `feed` (RSS/Atom pubDate), `pushed` (MTProto message / tweet
+timestamp), `url` (parsed from a dated URL path). Null means *unknown* — rows written
+before the column and articles predating the upstream field — never a defect; no
+backfill beyond `scripts/copy-down-published-dates.ts`, which stamps `pushed` on `t.me`
+rows news-indexer has no record of.
 
 **"Attributable" is the load-bearing word (daatan#1253).** Only
 `ATTRIBUTABLE_NULL_REASONS` — `oracle_abstain` and `oracle_no_articles` — retire a
@@ -415,7 +447,12 @@ exposed at `POST /api/admin/evidence-pool/retry`, driven by the weekly
 `Retry Pool Extractions` workflow) re-pushes retryable rows through
 `refreshOracleSnapshot`, biggest ACTIVE-forecast backlogs first, one attempt
 per row per 24 h. Terminal rows are still revivable organically: a re-push with
-changed content re-claims the row.
+changed content re-claims the row. A second, manual-only re-drive writing
+`origin: 'retry'` is the degraded-fetch sweep (`POST
+/api/admin/evidence-pool/degraded-fetch-sweep`, `degraded-fetch-backfill.ts`,
+daatan#1446): ADMIN-only, no cron-secret path, `?limit=` predictions per call — it
+re-extracts rows from the 11 domains whose Oracul fetch fell back to title+snippet
+before 2026-08-12 and returns a before/after estimate-movement report.
 
 The sweep re-pushes each row with the **stored `snippet`** (daatan#1232). It previously
 sent title-only (`snippet: ''`), because the pool never persisted the snippet — so for a
@@ -525,6 +562,9 @@ the **dominant** (max |fact_signal|) claim: `eventActors`→
 `eventTarget` name that fact's actor/target dyad (the actor-pair check, #303),
 `isOccurrence` marks the event ITSELF vs a precursor/precondition/escalation,
 `verified` marks an independently-reported fact vs an interested party's claim.
+A fifth, `facet` (`VARCHAR(16)`, retro#354 D2a, migration `20260810000000`), marks
+whether that fact ANNOUNCES the event, DENIES it, or is NEITHER — input to a possible
+future magnitude check (retro#483).
 **These are stored for a diagnostic lane, not for a pending re-pricing** (retro#533,
 2026-08-15, `Daatan/docs/decisions.md`): the estimator-cutover framing they were
 originally written for is RETIRED — corr(stance, fact_signal) measured 0.905 on
@@ -745,6 +785,36 @@ fires one `panel-payment` digest line when any row's `last_seen_at` falls inside
 nonzero count ≈ total panel outage); dedup lives in `evidence_health_alerts` above,
 under the key `panel-payment`. Rows are tiny (one per bad day) and are kept.
 
+### Second-opinion dedup — `evidence_second_opinion_alerts` (#1636)
+
+Same fire/re-arm shape as `evidence_health_alerts` (unique `key`, `fired_at`), for
+the twice-weekly "interesting cases" audit (`checkEvidenceSecondOpinion` in
+`src/lib/services/evidence-second-opinion.ts`, `GET /api/cron/evidence-second-opinion`,
+driven by the `Evidence Second Opinion` workflow, Mon/Thu 09:00 UTC). Keys are
+`model-disagreement:<articleId>` (detector 1: a stronger model — optional
+`EVIDENCE_SECOND_OPINION_MODEL` env override — re-reads an in-window, sharply deviating
+article and the cheap and expensive readings disagree) and
+`source-drift:<predictionId>:<source>:<newerDate>` (detector 2, pure SQL). Only the run
+that inserts a key reports it; keys absent from a run's findings are deleted, re-arming
+the case.
+
+### Telegram number ratings — `article_rating_prompts`, `evidence_pool_article_feedback` (#1223)
+
+Human-in-the-loop rating of the numbers on a "News article matched" notification.
+`article_rating_prompts` is one row per **sent** rating message (1–5 buttons), created
+at send time in `notifyNewsArticleMatched` — a frozen reference to what was shown:
+the pool row, the `contextSnapshotId` that push created (its `oracleSnapshot` holds the
+numbers), the match `snapshotSimilarity`, and the Telegram `(messageChatId, messageId)`
+(unique). `evidence_pool_article_feedback` is one row per (prompt, rater Telegram id):
+`rating` 1–5, `flaggedFields` (`NumberFeedbackField[]` — STANCE, RELEVANCE, SIMILARITY,
+PROBABILITY, AUTHOR_LEAN, FACT_SIGNAL, EVIDENCE_CLASS, CREDIBILITY, OTHER), an optional
+reply-to `note`, and the drill-down DM ids for low ratings. Any channel member can vote;
+`raterUserId` is optional enrichment via `TELEGRAM_ADMIN_MAP`, never a gate. Feedback is
+written by the Telegram bot webhook (`src/app/api/telegram/rollback/route.ts`, which
+also handles the rating-button callbacks), aggregated by
+`getRatingFeedbackStats()` for `GET /api/admin/rating-feedback`. Both cascade away with
+their pool row.
+
 ## External markets — `external_markets`, `external_market_price_snapshots`
 
 Cached Polymarket/Kalshi markets that forecasts link to (many-to-one).
@@ -890,6 +960,11 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 `communityProbabilityAtCommit`, `aiProbabilityAtCommit`, `aiRunIdAtCommit` —
 the LASSO run current at stake time, see above) and resolution-time
 results (`rsChange`, `brierScore`, `peerScore`, `aiScore`, `eloChange`).
+`polymarketPrice` / `klDivergence` (daatan#1138, expertise-rating Phase 2): the linked
+market's YES price (0–1, polarity-adjusted for `externalMarketInverted`) snapshotted at
+commit time from `external_market_price_snapshots` — null when unlinked or no snapshot
+yet, never backfilled — and D_KL(user ‖ market) computed at resolution when that price
+is present. Storage only: not wired into any ranking formula yet.
 
 `commitment_revisions` (daatan#1281): append-only history of the mutable
 fields, written by `updateCommitment` in the same transaction *before* each
@@ -912,7 +987,9 @@ on their own forecast before it's approved), since detaching those would
 sever a commitment that can still resolve later.
 
 Ratings live on `users` (`rs` reputation, Glicko-2 `mu/sigma/volatility`, ELO
-`eloRating`) with per-tag variants in `user_tag_ratings`. All are **replayable
+`eloRating`) with per-tag variants in `user_tag_ratings` (tags: `tags` — `name`/`slug`,
+both unique — linked to predictions through Prisma's implicit `_PredictionToTag` join
+table, columns `"A"` = prediction id, `"B"` = tag id). All are **replayable
 projections** of resolved commitments (`replayGlicko2History`,
 `replayEloHistory`) — treat them as caches, not sources of truth. Leaderboard
 sort indexes exist on each (`rs`, `eloRating`, `mu`, `correctPredictions` DESC).
@@ -923,9 +1000,13 @@ tracked pundits/outlets (news-indexer `Person`, keyed by `personId`, not a
 `users` row — pundits don't commit/stake) scored on `evidence_pool_articles`
 stance instead of `Commitment.probability`. No incremental update hook exists
 (no resolution transaction to attach to) — it's seeded lazily per tag on first
-read (`ensurePunditTagRatingsSeeded`, `src/lib/services/pundit-rating.ts`) by
+read (`ensurePunditTagRatingsSeeded`, `src/lib/services/tag-ratings.ts`, over the
+`replayPunditEloHistory`/`replayPunditGlickoHistory` replays in
+`src/lib/services/pundit-rating.ts`) by
 replaying the SAME `calculateEloUpdates`/`glicko2Update` functions used above,
-just fed evidence-pool rows. To force a recompute, delete the tag's rows.
+just fed evidence-pool rows. To force a recompute,
+`POST /api/admin/pundit-ratings/recalculate?tag=<slug>` deletes the tag's rows and
+reseeds them; the `Pundit Ratings Recalculate` workflow calls it daily (06:15 UTC).
 Elections' pundit leaderboard reads this (not `user_tag_ratings`, and not
 `getSourceLeaderboard`'s retro-backed `/leaderboard/sources` — that one is
 global/all-topics and string-keyed by `(author, outlet)`, not tag-scoped or

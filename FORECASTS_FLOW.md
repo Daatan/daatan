@@ -41,15 +41,35 @@ URL) can raise `NoArticlesFoundError`.
 
 The generated resolution deadline targets the topic's **natural resolution point**
 (e.g. the election date), falling back to end-of-year only when no such date exists
-— see the `express-prediction` prompt (Bedrock, with a repo fallback in
-`src/lib/llm/bedrock-prompts.ts`).
+— see the `express-prediction` prompt (served from git: `PROMPTS` in
+`src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/express-prediction.txt`).
+
+Other express-flow behaviour:
+
+- **Pasted market links (#1545).** A Polymarket/Kalshi URL is recognised and the
+  forecast is linked to that market (`externalMarketId`); its live price is fed to
+  the draft and to "Guess Chances" as an explicit prior alongside news search, and
+  the review screen shows a "Linked Market" card. If the market can't be resolved,
+  the URL falls back to ordinary link handling.
+- **Date basis (#1706).** The model reports `dateBasis` (`explicit_in_claim` /
+  `from_sources` / `assumed`); an assumed date that isn't one of the prompt's own
+  default horizons shows a warning on the review screen, and a claim/deadline
+  mismatch is surfaced there too. When the first draft's date is `assumed`, one
+  extra Gemini-on-Vertex call with Google Search grounding
+  (`src/lib/llm/groundedDateLookup.ts`) looks up the deciding event's date and the
+  draft is regenerated with it; any failure keeps the first draft.
+- **Hidden assumptions (#1744).** Prompt rule 1a makes the model state unstated
+  premises as explicit conditions rather than baking them in.
+- **Born-true check (#1748, every creation path via `createForecast` in `src/lib/services/forecast.ts`).** Right after creation, the resolution-research leg
+  (`src/lib/services/bornTrueCheck.ts`) runs asynchronously and posts a Telegram
+  review row if the claim is already decisively true/false.
 
 ## Step 2: Write Forecast (Draft)
 
 ### User Action
 - Enter a short, testable forecast statement (`claim_text`)
 - Optionally add details/conditions (`details_text`)
-- Choose a domain (or auto-fill from anchor)
+- Add up to 5 tags (auto-suggested; the old free-text "domain" is deprecated — `Prediction` has no domain column)
 
 ### System Storage (Minimum)
 ```
@@ -59,7 +79,7 @@ Prediction {
   news_anchor_id: string
   claim_text: string
   details_text?: string
-  domain: string
+  tags: Tag[]
 }
 ```
 
@@ -83,7 +103,7 @@ Prediction {
 ```
 Prediction {
   ...
-  outcome_type: "binary" | "multiple_choice" | "numeric"
+  outcome_type: "binary" | "multiple_choice" | "numeric_threshold"
   outcome_payload: object  // type-specific data
   resolve_by_datetime: datetime
   resolution_rules: string  // default: "resolved by official/reliable sources"
@@ -116,19 +136,20 @@ Prediction {
      cu_committed: number  // stores confidence value (-100..100 for BINARY, 1..100 for MC)
      rs_snapshot: number   // RS at commit time
      binary_choice: boolean | null  // derived server-side from sign of confidence
+     // also snapshotted: community/AI probability and linked-market price at commit time
    }
    ```
 2. Update Prediction:
    ```
    Prediction {
-     status: "active"
-     published_at: datetime
-     locked_at: datetime
+     status: "active"          // set on publish (POST /api/forecasts/[id]/publish)
+     published_at: datetime    // set on publish
+     locked_at: datetime       // set by the first commitment
    }
    ```
 
 ### Rule
-**After publish, prediction is immutable** — no edits to claim/outcome/deadline.
+**After publish, prediction is immutable for its author** — no edits to claim, details, rules, deadline or options once it is `ACTIVE`/`PENDING`/`PENDING_APPROVAL` or locked. Admins can still edit core fields (`PATCH /api/forecasts/[id]`).
 
 ---
 
@@ -139,14 +160,14 @@ Prediction {
 - Prediction text + details
 - Outcome definition (Binary/MC/Numeric)
 - Resolve-by deadline
-- Commitment details (confidence %, RS snapshot, weight) — `cuCommitted` is the underlying
+- Commitment details (confidence %) — `cuCommitted` is the underlying
   DB field name (a holdover from the original CU-staking design, see
   `.kiro/specs/prediction-commitment/`), but no "CU" label is ever shown to users; the UI
   always converts it to a confidence percentage
 - Tags (displayed as colored pills on forecast cards)
 
 ### Editing Forecasts
-- Admins can edit any forecast; authors can edit their drafts
+- Admins can edit any forecast; authors can edit their drafts (and non-core fields such as tags after publish)
 - Edit page at `/forecasts/[id]/edit` with form for:
   - Claim text, details, category, resolution rules, deadline
 - Only changed fields are sent in the PATCH request
@@ -155,12 +176,12 @@ Prediction {
 **Author-language editing.** A non-English author edits the forecast in their *own* language; the English canonical text is derived/normalized behind the scenes rather than typed by the author (see `src/lib/services/forecast.ts`, `src/lib/services/translation.ts`, and `EditForecastClient.tsx`). The forecast URL stays stable across edits — editing does not mint a new slug/id. Likewise, the express-create flow shows its preview in the author's original language.
 
 ### Feed Filtering
-The feed supports three types of filters, all persisted in URL query params:
-1. **Status** — Open, Closing Soon, Awaiting Resolution, Resolved, All
-2. **Category** — domain-based dropdown
-3. **Tags** — multi-select clickable tag chips (e.g. `?tags=AI,Crypto`)
+The feed (`src/app/FeedClient.tsx`) supports status filters, tag filters and sorting, all persisted in URL query params:
+1. **Status** — Open, Closing Soon, Awaiting Resolution, Resolved, All, plus Needs Review (bot-forecast approval queue; admins/approvers only, not on self-host)
+2. **Tags** — multi-select clickable tag chips (e.g. `?tags=AI,Crypto`)
    - Tags filter uses OR logic: predictions matching *any* selected tag are shown
-   - Standard tags: Politics, Geopolitics, Economy, Technology, AI, Crypto, Sports, Entertainment, Science, Climate, Health, Business, Conflict, Elections, US Politics, Europe, Middle East, Asia, Energy, Space
+   - Standard tags (`STANDARD_TAGS` in `src/lib/constants.ts`): Politics, Geopolitics, Economy, Technology, AI, Crypto, Sports, Entertainment, Science, Climate, Health, Business, Conflict, Elections, US Politics, Europe, Middle East, Asia, Energy, Space, Israeli Elections 2026
+3. **Sort** — Newest, By Deadline, Most Staked (`cu`), Last Updated (`?sortBy=`, `?sortOrder=`)
 
 Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so filters survive page refresh and can be shared via link.
 
@@ -169,7 +190,9 @@ Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so
 | Status | Description |
 | ------ | ----------- |
 | `draft` | Created, not published |
-| `active` | Published, awaiting resolution |
+| `active` | Published, accepting commitments |
+| `pending` | Deadline passed, awaiting resolution |
+| `pending_approval` | Bot-created, awaiting human review |
 | `resolved_correct` | Resolved as correct |
 | `resolved_wrong` | Resolved as wrong |
 | `void` | Invalidated |
@@ -180,7 +203,7 @@ Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so
 ## Step 6: Resolution Trigger
 
 Resolution starts when:
-1. `resolve_by_datetime` arrives, **OR**
+1. `resolve_by_datetime` arrives (the `transition-expired-predictions` cron, every 15 min, moves `active` → `pending`), **OR**
 2. An earlier authoritative source enables resolution
 
 ---
@@ -188,7 +211,8 @@ Resolution starts when:
 ## Step 7: Who Resolves
 
 **Core Version:**
-- System/moderator resolves based on defined rules and evidence
+- System/moderator resolves based on defined rules and evidence (users with the `RESOLVER` or `ADMIN` role, via the resolution form on the forecast page)
+- An "AI Research" action (`POST /api/forecasts/[id]/research`) drafts an outcome and evidence links for the resolver to review
 - No community voting in core implementation
 
 ---
@@ -199,7 +223,7 @@ Resolution starts when:
 ```
 Prediction {
   resolution_outcome: "correct" | "wrong" | "void" | "unresolvable"
-  evidence_link: string[]  // at least one URL
+  evidence_links: string[]  // optional in the API/UI
   resolved_at: datetime
   status: "resolved_correct" | "resolved_wrong" | "void" | "unresolvable"
 }
@@ -210,7 +234,7 @@ Prediction {
 ## Resolution Rules (Core)
 
 ### Evidence Requirements
-- Evidence is **mandatory** for every resolution (at least one link)
+- Evidence links are **expected** for every resolution; note the API (`resolvePredictionSchema`) and the resolution form accept an empty list, so this is policy, not enforced
 - Source priority: `official data > reputable news`
 
 ### Decision Logic
@@ -244,13 +268,15 @@ where `brierScore = (p − outcome)²` and outcome is 1 if the committed directi
 | `void` | No RS change (brierScore not stored) |
 | `unresolvable` | No RS change |
 
+The same resolution transaction also updates ELO (`User.eloRating`, the rating shown to users since #1764) and the other scoring systems — see [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md). RS is still computed but no longer displayed.
+
 ---
 
 ## Database Schema Reference
 
 See `prisma/schema.prisma` for full schema. Key models:
 
-- `User` — with RS (Reputation Score)
+- `User` — with ELO rating (headline) and RS (Reputation Score)
 - `NewsAnchor` — news story snapshot
 - `Prediction` — forecast statement
 - `Commitment` — confidence value + Brier score result

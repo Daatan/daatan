@@ -8,8 +8,10 @@ AWS Lambda that receives inbound email via SES → S3 and forwards it to a real 
 Inbound email → SES receipt rule → S3 (daatan-mail-inbound-prod-272007598366)
                                 → Lambda (daatan-mail-forwarder-prod)
                                         → rewrites headers
-                                        → SES SendRawEmail → komapc@gmail.com
+                                        → SES SendRawEmail → destination inbox(es) per FORWARD_MAPPING / CATCH_ALL_DESTINATIONS
 ```
+
+Current routing and the "every mail reaches Andrey" invariant: see [`docs/MAIL_FORWARDER.md`](../../docs/MAIL_FORWARDER.md#routing). Everything is defined in `terraform/ses.tf`.
 
 Raw mail is retained in S3 for **14 days** — if forwarding fails, the email can be replayed.
 
@@ -17,9 +19,9 @@ Raw mail is retained in S3 for **14 days** — if forwarding fails, the email ca
 
 | Variable | Example | Description |
 |---|---|---|
-| `FORWARD_MAPPING` | `{"mark@daatan.com":"komapc@gmail.com"}` | JSON map of `daatan address → destination` |
+| `FORWARD_MAPPING` | `{"mark@daatan.com":["komapc@gmail.com","andrey1bar@gmail.com"],"andrey@daatan.com":"andrey1bar@gmail.com"}` | JSON map of `daatan address → destination` (string or array) |
 | `VERIFIED_FROM` | `forwarder@daatan.com` | SES-verified sender identity |
-| `CATCH_ALL_DESTINATIONS` | `komapc@gmail.com` | Fallback for addresses not in FORWARD_MAPPING |
+| `CATCH_ALL_DESTINATIONS` | `komapc@gmail.com,andrey1bar@gmail.com` | Comma-separated fallback for addresses not in FORWARD_MAPPING |
 | `S3_BUCKET` | `daatan-mail-inbound-prod-272007598366` | S3 bucket where SES stores raw email |
 
 ## Header rewriting
@@ -34,7 +36,10 @@ SES rejects `SendRawEmail` if the message contains unverified addresses in certa
 
 ## Deploy
 
-The Lambda code lives entirely in `index.mjs`. To deploy a change:
+The Lambda code lives entirely in `index.mjs`. The managed path is Terraform
+(`terraform apply -target=aws_lambda_function.forwarder`, which zips `index.mjs` itself — see
+[`docs/MAIL_FORWARDER.md`](../../docs/MAIL_FORWARDER.md#deploying-changes)). For an urgent
+hotfix you can push the code directly, then re-apply Terraform to sync the state hash:
 
 ```bash
 cd infra/mail-forwarder
@@ -62,4 +67,4 @@ Known production failure modes covered by tests:
 
 - CloudWatch alarm: `daatan-mail-forwarder-errors-prod` (eu-central-1)
 - Fires when Lambda error count > 0 in a 5-minute window
-- SNS → email alert to `komapc@gmail.com`
+- SNS (`daatan-mail-forwarder-alerts-prod`) → email alert to `komapc@gmail.com` and `andrey1bar@gmail.com` (direct Gmail subscriptions, so a broken forwarder can't swallow its own alarm)

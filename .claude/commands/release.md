@@ -22,7 +22,7 @@ Run the production release checklist for the daatan project. Follow every step i
    git tag v<VERSION>
    git push origin v<VERSION>
    ```
-   This triggers the `deploy-production` job in deploy.yml.
+   This triggers deploy.yml on the tag: it rebuilds the images, runs `deploy-staging` first (staging is woken if asleep), then `deploy-production`, which waits up to 10 minutes for staging to report a version ≥ the tag before deploying.
 
 ## Monitor CI/CD
 
@@ -31,7 +31,7 @@ Run the production release checklist for the daatan project. Follow every step i
 
 ## Verify production
 
-9. Run: `curl -s https://daatan.com/api/health` and confirm the returned JSON shows the expected `version`, `env: "production"`, and `db: true` (HTTP 200; 503 if the DB is unhealthy).
+9. Run: `curl -s https://daatan.com/api/health` and confirm the returned JSON shows the expected `version`, `env: "production"`, and `db: true` (HTTP 200; 503 with `status: "degraded"` if the DB is unhealthy, or `status: "memory-pressure"` if RSS is above 1600 MB).
 10. Run: `curl -o /dev/null -s -w "%{http_code}" https://daatan.com/` and confirm HTTP 200.
 
 ## Done
