@@ -31,6 +31,8 @@ export async function createAndStake(
 ): Promise<{ prediction: { id: string }; stakeAmount: number | null }> {
   // If requireApprovalForForecasts is true, create as PENDING_APPROVAL (don't stake yet).
   // If autoApprove is true, go directly to ACTIVE. Otherwise PENDING_APPROVAL (standard bot behavior).
+  // Any PENDING_APPROVAL forecast is staked by the approve endpoint, never here: staking at
+  // creation put a bot stake on a forecast nobody had approved (daatan#1775).
   const publishStatus = bot.requireApprovalForForecasts ? 'PENDING_APPROVAL' : (bot.autoApprove ? 'ACTIVE' : 'PENDING_APPROVAL')
 
   let prediction: { id: string }
@@ -38,7 +40,7 @@ export async function createAndStake(
 
   auditResolveByDatetime('bot-create', new Date(predictionCreateData.resolveByDatetime), { authorId: bot.userId })
 
-  if (bot.requireApprovalForForecasts) {
+  if (publishStatus === 'PENDING_APPROVAL') {
     prediction = await prisma.$transaction(async (tx) => {
       const pred = await tx.prediction.create({ data: predictionCreateData })
       await tx.prediction.update({

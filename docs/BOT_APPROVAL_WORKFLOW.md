@@ -316,8 +316,10 @@ const publishStatus = bot.requireApprovalForForecasts
   ? 'PENDING_APPROVAL'
   : (bot.autoApprove ? 'ACTIVE' : 'PENDING_APPROVAL')
 
-if (bot.requireApprovalForForecasts) {
-  // create + set publishStatus; no commitment — staking waits for /api/forecasts/[id]/approve
+if (publishStatus === 'PENDING_APPROVAL') {
+  // create + set publishStatus; no commitment — staking waits for /api/forecasts/[id]/approve.
+  // Keyed on the status, not the flag: a bot with both flags off also lands in PENDING_APPROVAL,
+  // and staking it at creation put a stake on an unapproved forecast (daatan#1775).
 } else {
   const stake = randomInt(bot.stakeMin, bot.stakeMax)
   // create + set publishStatus + createCommitment(bot.userId, pred.id, { confidence: stake }, { tx })
