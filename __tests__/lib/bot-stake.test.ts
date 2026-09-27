@@ -129,3 +129,46 @@ describe('createAndStake — requireApprovalForForecasts branch (daatan#1321)', 
     expect(predictionUpdate).not.toHaveBeenCalled()
   })
 })
+
+describe('createAndStake — stake only when published ACTIVE (daatan#1775)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    transactionMock.mockImplementation(async (cb: (tx: unknown) => unknown) => {
+      const tx = { prediction: { create: predictionCreate, update: predictionUpdate } }
+      return cb(tx)
+    })
+    predictionCreate.mockResolvedValue({ id: 'pred-1' })
+    predictionUpdate.mockResolvedValue({ id: 'pred-1' })
+  })
+
+  it('does not stake a PENDING_APPROVAL forecast even when requireApprovalForForecasts is off', async () => {
+    const { createAndStake } = await import('@/lib/services/bots/stake')
+    const { createCommitment } = await import('@/lib/services/commitment')
+
+    const result = await createAndStake(
+      makeBot({ requireApprovalForForecasts: false, autoApprove: false }), PREDICTION_DATA,
+    )
+
+    expect(predictionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING_APPROVAL' }) }),
+    )
+    expect(createCommitment).not.toHaveBeenCalled()
+    expect(result.stakeAmount).toBeNull()
+  })
+
+  it('stakes at creation when autoApprove publishes straight to ACTIVE', async () => {
+    const { createAndStake } = await import('@/lib/services/bots/stake')
+    const { createCommitment } = await import('@/lib/services/commitment')
+    vi.mocked(createCommitment).mockResolvedValue({ ok: true, data: {} } as any)
+
+    const result = await createAndStake(
+      makeBot({ requireApprovalForForecasts: false, autoApprove: true }), PREDICTION_DATA,
+    )
+
+    expect(predictionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'ACTIVE' }) }),
+    )
+    expect(createCommitment).toHaveBeenCalledTimes(1)
+    expect(result.stakeAmount).toBeGreaterThanOrEqual(50)
+  })
+})
