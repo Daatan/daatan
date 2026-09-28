@@ -16,6 +16,7 @@ export type OracleCallSource =
   | 'context-update'
   | 'research'
   | 'born-true-check'
+  | 'creation-estimate'
   | 'bot-voting'
   | 'bot-sourcing'
   | 'express-guess'

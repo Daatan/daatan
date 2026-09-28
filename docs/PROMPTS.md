@@ -155,6 +155,7 @@ records what each was on.
 | `guess-chances` | v2 | 2026-08-29 — #1657: same hardening, plus a `null` abstain and a training-cutoff statement. Schema half changed too (`probability` is nullable). |
 | `express-prediction` | v2 | 2026-09-05 — #1706: added rule 3c + item 9, asking the model to self-report `dateBasis` (`explicit_in_claim`/`from_sources`/`assumed`) for `resolveByDatetime`, so a guessed date can be flagged instead of presented as certain. Schema half changed too (new required `dateBasis` field). |
 | `express-prediction` | v3 | 2026-09-08 — #1744: added rule 1a, asking the model to strip or surface hidden assumptions before finalizing (unstated premises, implied single-actor/outcome, undefined duration start/end points, resolution rules that only cover the obvious pathway). Prose only — schema half unchanged. |
+| `express-prediction` | v4 | 2026-09-28 — #1777: `probabilitySuggestion` is now nullable, and its description tells the model to return null (not a 50 placeholder) unless the articles or a linked market price bear on the outcome. Schema only — prose unchanged. The first real number now comes from the Oracul run fired right after creation. |
 
 ## Bedrock
 

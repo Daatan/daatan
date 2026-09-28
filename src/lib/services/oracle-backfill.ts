@@ -8,6 +8,7 @@ import {
   isTransportNullReason,
   type OracleFailureClass,
 } from '@/lib/services/oracle'
+import type { OracleCallSource } from '@/lib/services/oracleClient'
 import { getArticleMetaByUrl } from '@/lib/services/forecast-sources'
 import { enrichOracleSources, stanceToPercent, stanceStdToPercent } from '@/lib/services/oracle-snapshot'
 import { resolvePooledEstimate } from '@/lib/services/pooled-estimate'
@@ -81,15 +82,22 @@ export type ReaskPrediction = {
  */
 export async function refreshOracleSnapshot(
   prediction: ReaskPrediction,
-  opts?: { articles?: SuppliedArticle[]; origin?: PoolOrigin; reask?: boolean },
+  opts?: {
+    articles?: SuppliedArticle[]
+    origin?: PoolOrigin
+    reask?: boolean
+    /** `oracle_call_logs.source` for this run's search + forecast calls. */
+    source?: OracleCallSource
+  },
 ): Promise<RefreshResult> {
   const supplied = opts?.articles
   const origin: PoolOrigin = opts?.origin ?? 'backfill'
+  const source: OracleCallSource = opts?.source ?? 'context-update'
   let searchResults: SuppliedArticle[] | null = supplied ?? null
   if (!searchResults) {
     const query = await buildSearchQuery(prediction.claimText)
     searchResults = await oracleSearch(query, DEFAULT_MAX_ARTICLES, undefined, {
-      source: 'context-update',
+      source,
       predictionId: prediction.id,
     })
   }
@@ -140,7 +148,7 @@ export async function refreshOracleSnapshot(
       claimArchetype: prediction.claimArchetype,
       resolutionRules: prediction.resolutionRules,
     },
-    { source: 'context-update', predictionId: prediction.id },
+    { source, predictionId: prediction.id },
   )
   if (forecast === null) {
     // Classified, like the push path. This one matters twice over: the retry sweep runs
