@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import ScrollNav from '../ScrollNav'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group, PoolRow, Region, ReportRow, Side } from './types'
 
@@ -85,18 +86,18 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
   ]
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] text-gray-800">
+    <div className="retro-light min-h-screen bg-[#f5f7fa] text-gray-800">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
-        <Link href="/retroanalysis" className="text-xs font-bold tracking-widest uppercase text-gray-400 hover:text-gray-700">← Retro Analysis</Link>
+        <Link href="/retroanalysis" className="text-xs font-bold tracking-widest uppercase text-gray-500 hover:text-gray-700">← Retro Analysis</Link>
 
         <header className="mt-6">
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-mono uppercase tracking-widest text-gray-500">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-mono uppercase tracking-widest text-gray-600">
             <span>Case E01</span><span>Window 20 Nov 2021 → <b className="text-rose-700 font-medium">24 Feb 2022</b></span>
           </div>
           <h1 className="mt-4 text-4xl md:text-6xl font-black tracking-tight text-gray-900 leading-[1.05]">
             Who saw <span className="text-rose-700">24 February</span> coming
           </h1>
-          <p className="mt-5 max-w-2xl text-base md:text-lg text-gray-600 leading-relaxed">
+          <p className="mt-5 max-w-2xl text-base md:text-lg text-gray-700 leading-relaxed">
             The three months before Russia&apos;s full-scale invasion of Ukraine: {pool.length} statements from world, Russian and Ukrainian media, think tanks and officials.
             Each article was read in full and rated on one question: how likely did its main voice think a full-scale invasion was, on the day it was published?
           </p>
@@ -106,8 +107,8 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
                 <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-gray-700">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]}
                 </div>
-                <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ml-1.5 text-sm font-normal text-gray-500">{unit}</span></div>
-                <p className="mt-2 text-sm text-gray-600 leading-snug">{text}</p>
+                <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ml-1.5 text-sm font-normal text-gray-600">{unit}</span></div>
+                <p className="mt-2 text-sm text-gray-700 leading-snug">{text}</p>
               </div>
             ))}
           </div>
@@ -117,30 +118,30 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Three months of argument in one chart</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">Each dot is one article, placed at the invasion probability its main voice expressed. Each line is that group&apos;s mean over the previous 14 days: what a reader could have seen at the time, without hindsight.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">Each dot is one article, placed at the invasion probability its main voice expressed. Each line is that group&apos;s mean over the previous 14 days: what a reader could have seen at the time, without hindsight.</p>
           <div className="mt-5 bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
-            <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-gray-600 mb-2">
+            <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-gray-700 mb-2">
               {GROUPS.map(g => (
-                <span key={g} className="inline-flex items-center gap-2"><i className="w-3.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]} <span className="font-mono text-gray-400">{byGroup[g].n}</span></span>
+                <span key={g} className="inline-flex items-center gap-2"><i className="w-3.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]} <span className="font-mono text-gray-500">{byGroup[g].n}</span></span>
               ))}
               <span className="inline-flex items-center gap-2"><i className="w-2 h-2 rounded-full bg-gray-400/60" />one article</span>
             </div>
             <TrendChart pool={pool} />
-            <ol className="mt-4 grid gap-x-6 gap-y-1.5 text-[13px] text-gray-600" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
+            <ol className="mt-4 grid gap-x-6 gap-y-1.5 text-[13px] text-gray-700" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
               {EVENTS.map(([d, t], i) => (
                 <li key={d} className="flex gap-2.5 items-baseline">
                   <b className="flex-none inline-grid place-items-center w-5 h-5 rounded-full border border-gray-500 font-mono text-[11px] font-medium">{i + 1}</b>
-                  <span><span className="font-mono text-xs text-gray-400">{fmtDay(d)}</span> {t}</span>
+                  <span><span className="font-mono text-xs text-gray-500">{fmtDay(d)}</span> {t}</span>
                 </li>
               ))}
             </ol>
           </div>
-          <p className="mt-3 text-xs text-gray-500">Full pool after filtering, {pool.length} articles. The dashed line at 50% separates “more likely than not” from “less likely”. Hover the chart for the group means on a given day.</p>
+          <p className="mt-3 text-xs text-gray-600">Full pool after filtering, {pool.length} articles. The dashed line at 50% separates “more likely than not” from “less likely”. Hover the chart for the group means on a given day.</p>
         </section>
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Who got it right, who didn&apos;t</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">The clearest calls on both sides. The number is the invasion probability we assigned. Quotes are checked against the article text.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">The clearest calls on both sides. The number is the invasion probability we assigned. Quotes are checked against the article text.</p>
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
             <VoiceColumn title="Expected the invasion" range="P ≥ 0.75" tone="hit" voices={HIT} byN={byN} />
             <VoiceColumn title="Did not expect it" range="P ≤ 0.35" tone="miss" voices={MISS} byN={byN} />
@@ -149,24 +150,24 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Who said “yes”, who said “no”</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">Share of positions by type of voice and by the outlet&apos;s country. Russian outlets are softer than their own government because they often relayed Western warnings, if only to rebut them. Ukrainian outlets barely differ from international ones.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">Share of positions by type of voice and by the outlet&apos;s country. Russian outlets are softer than their own government because they often relayed Western warnings, if only to rebut them. Ukrainian outlets barely differ from international ones.</p>
           <div className="mt-6 grid gap-x-4 gap-y-3 items-center" style={{ gridTemplateColumns: 'minmax(140px,230px) 1fr 64px' }}>
             <SplitHeader label="By voice" />
             {GROUPS.map(g => <SplitRow key={g} label={GROUP_NAME[g]} a={byGroup[g]} />)}
             <SplitHeader label="By outlet" />
             {(['west', 'ua', 'ru'] as Region[]).map(k => <SplitRow key={k} label={REGION_NAME[k]} a={byRegion[k]} />)}
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-gray-600">
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-gray-700">
             <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-teal-600" />expects invasion, P ≥ 0.6</span>
             <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-gray-300" />unsure</span>
             <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-rose-600" />does not, P ≤ 0.4</span>
-            <span className="font-mono text-gray-400">right: mean P</span>
+            <span className="font-mono text-gray-500">right: mean P</span>
           </div>
         </section>
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{rows.length} articles</h2>
-          <p className="mt-2 max-w-2xl text-gray-600">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. See <a href="#numbers" className="underline">how to read P</a>.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. See <a href="#numbers" className="underline">how to read P</a>.</p>
           <ArticleTable rows={rows} />
         </section>
 
@@ -178,7 +179,7 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
             <Method title="Rating" formula="P = 0.5 + 0.5 × stance">The model reads the text as of its publication date and returns the main voice&apos;s stance from −1 to +1, confidence, expected scope and a verbatim quote. Expecting a Donbas-only operation caps P at 0.35, and limited strikes cap it at 0.45.</Method>
           </div>
           <h3 className="mt-10 text-lg font-extrabold text-gray-900">What is missing</h3>
-          <ul className="mt-2 list-disc pl-5 space-y-1.5 text-gray-600 max-w-3xl">
+          <ul className="mt-2 list-disc pl-5 space-y-1.5 text-gray-700 max-w-3xl">
             <li>FT, WSJ and Bloomberg are absent: GDELT lacks them for this window and they are paywalled. AP almost entirely collapsed in deduplication because it relays the same officials.</li>
             <li>We could not fetch the Metaculus forecast, Zelensky&apos;s 28 January press conference, Fiona Hill&apos;s NYT column, or Macron&apos;s 8 February statement.</li>
             <li>154 texts come from live pages and 46 from Wayback snapshots taken before 24 February. No signs of later edits were found in the live texts.</li>
@@ -187,42 +188,42 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
           </ul>
         </section>
 
-        <div className="mt-16 text-center text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold">DAATAN Retro-Analysis Archive · E01 · built 23 Sep 2026</div>
+        <div className="mt-16 text-center text-[10px] text-gray-500 uppercase tracking-[0.2em] font-bold">DAATAN Retro-Analysis Archive · E01 · built 23 Sep 2026</div>
       </div>
+      <ScrollNav />
     </div>
   )
 }
 
-const SCALE_MARKS: [number, string, string][] = [
-  [0.075, 'Peskov', '“groundless”'],
-  [0.35, 'Trenin', '“not this month”'],
-  [0.5, 'Coin flip', 'no view either way'],
-  [0.78, 'Biden', '“he will move in”'],
-  [0.93, 'Budanov', '“late Jan or early Feb”'],
+const SCALE_MARKS: [number, string][] = [
+  [0.075, 'Peskov'],
+  [0.35, 'Trenin'],
+  [0.5, 'Coin flip'],
+  [0.78, 'Biden'],
+  [0.93, 'Budanov'],
 ]
 
 function NumbersGuide() {
   return (
     <section id="numbers" className="mt-12 scroll-mt-6">
       <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">How to read P</h2>
-      <p className="mt-2 max-w-2xl text-gray-600">Every article gets one number, <b className="text-gray-900">P</b>: what its main voice expected at the time, before anyone knew the outcome.</p>
+      <p className="mt-2 max-w-2xl text-gray-700">Every article gets one number, <b className="text-gray-900">P</b>: what its main voice expected at the time, before anyone knew the outcome.</p>
       <div className="mt-6 max-w-3xl">
         <div className="bg-white border border-gray-200 rounded-xl p-5 md:p-6">
-          <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">P</span><span className="text-sm text-gray-500">0 to 1 · what the speaker expected</span></div>
-          <p className="mt-3 text-[15px] text-gray-600 leading-relaxed">The probability of a <b className="text-gray-900">full-scale</b> invasion that the article&apos;s main voice expressed on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.</p>
-          <div className="relative mt-20 mb-16 mx-2">
+          <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">P</span><span className="text-sm text-gray-600">0 to 1 · what the speaker expected</span></div>
+          <p className="mt-3 text-[15px] text-gray-700 leading-relaxed">The probability of a <b className="text-gray-900">full-scale</b> invasion that the article&apos;s main voice expressed on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.</p>
+          <div className="relative mt-14 mb-12 mx-2">
             <div className="h-2 rounded-full bg-gradient-to-r from-rose-500 via-gray-300 to-teal-600" />
-            {SCALE_MARKS.map(([p, who, what], i) => (
+            {SCALE_MARKS.map(([p, who], i) => (
               <div key={who} className={`absolute flex flex-col w-28 ${p < 0.15 ? '-translate-x-[6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
                 <span className="w-px h-2.5 bg-gray-500" />
                 <span className="font-mono text-[11px] text-gray-900 font-medium">{p.toFixed(2)} {who}</span>
-                <span className="text-[11px] leading-tight text-gray-500">{what}</span>
               </div>
             ))}
-            <span className="absolute -left-2 top-3 font-mono text-[11px] text-gray-400">0</span>
-            <span className="absolute -right-2 top-3 font-mono text-[11px] text-gray-400">1</span>
+            <span className="absolute -left-2 top-3 font-mono text-[11px] text-gray-500">0</span>
+            <span className="absolute -right-2 top-3 font-mono text-[11px] text-gray-500">1</span>
           </div>
-          <ul className="space-y-1.5 text-[14px] text-gray-600 leading-relaxed list-disc pl-5">
+          <ul className="space-y-1.5 text-[14px] text-gray-700 leading-relaxed list-disc pl-5">
             <li>The model rates the speaker&apos;s stance from −1 to +1, and <span className="font-mono text-gray-900">P = 0.5 + 0.5 × stance</span>.</li>
             <li>Expecting only a Donbas operation caps P at 0.35, and limited strikes cap it at 0.45. Those speakers did not predict what actually happened.</li>
             <li>P ≥ 0.6 counts as “expects it” and P ≤ 0.4 as “doesn’t”. <b className="text-gray-900">Mean P</b> is the average over a group’s statements.</li>
@@ -237,14 +238,14 @@ function Method({ title, formula, children }: { title: string; formula?: string;
   return (
     <div>
       <h3 className="font-bold text-gray-900">{title}</h3>
-      <p className="mt-1 text-[15px] text-gray-600 leading-relaxed">{children}</p>
+      <p className="mt-1 text-[15px] text-gray-700 leading-relaxed">{children}</p>
       {formula && <div className="mt-2 inline-block font-mono text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-900">{formula}</div>}
     </div>
   )
 }
 
 function SplitHeader({ label }: { label: string }) {
-  return <div className="col-span-3 pt-3 text-[11px] font-mono uppercase tracking-widest text-gray-400">{label}</div>
+  return <div className="col-span-3 pt-3 text-[11px] font-mono uppercase tracking-widest text-gray-500">{label}</div>
 }
 
 function SplitRow({ label, a }: { label: string; a: Agg }) {
@@ -253,13 +254,13 @@ function SplitRow({ label, a }: { label: string; a: Agg }) {
   )
   return (
     <>
-      <div className="text-sm leading-tight">{label}<span className="block font-mono text-xs text-gray-400">{a.n} articles</span></div>
+      <div className="text-sm leading-tight">{label}<span className="block font-mono text-xs text-gray-500">{a.n} articles</span></div>
       <div className="flex h-6 gap-[2px]" role="img" aria-label={`${label}: expects ${pct(a.y)}, unsure ${pct(a.u)}, does not ${pct(a.no)}`}>
         {seg('bg-teal-600 text-white', a.y, 'expects')}
         {seg('bg-gray-300 text-gray-800', a.u, 'unsure')}
         {seg('bg-rose-600 text-white', a.no, 'does not')}
       </div>
-      <div className="text-right font-mono text-[15px] font-medium tabular-nums">{a.p.toFixed(2)}<span className="block text-[11px] text-gray-400">mean P</span></div>
+      <div className="text-right font-mono text-[15px] font-medium tabular-nums">{a.p.toFixed(2)}<span className="block text-[11px] text-gray-500">mean P</span></div>
     </>
   )
 }
@@ -278,13 +279,13 @@ function VoiceColumn({ title, range, tone, voices, byN }: { title: string; range
           <article key={v.n} className="grid grid-cols-[64px_1fr] gap-x-4 py-4 border-b border-gray-200">
             <div className={`row-span-3 text-2xl font-black tabular-nums ${tone === 'hit' ? 'text-teal-700' : 'text-rose-700'}`}>
               {r.p_full.toFixed(2)}
-              <span className="block mt-1 font-mono text-[10px] font-normal text-gray-400">P invasion</span>
+              <span className="block mt-1 font-mono text-[10px] font-normal text-gray-500">P invasion</span>
             </div>
-            <div className="font-mono text-xs text-gray-400">{r.date.split('-').reverse().join('.')} · <a href={r.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700">{r.domain}</a></div>
-            <div className="font-bold text-gray-900 leading-snug">{v.name}<span className="block font-normal text-sm text-gray-500">{v.role}</span></div>
+            <div className="font-mono text-xs text-gray-500">{r.date.split('-').reverse().join('.')} · <a href={r.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700">{r.domain}</a></div>
+            <div className="font-bold text-gray-900 leading-snug">{v.name}<span className="block font-normal text-sm text-gray-600">{v.role}</span></div>
             <div>
               <blockquote className="mt-1.5 italic text-gray-800 leading-relaxed">“{v.quote}”</blockquote>
-              {v.note && <p className="mt-1.5 text-sm text-gray-500">{v.note}</p>}
+              {v.note && <p className="mt-1.5 text-sm text-gray-600">{v.note}</p>}
             </div>
           </article>
         )
@@ -357,7 +358,7 @@ function TrendChart({ pool }: { pool: PoolRow[] }) {
   return (
     <div ref={box} className="relative w-full">
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block w-full h-auto overflow-visible" role="img" aria-label="Mean invasion probability by group of voices, November 2021 to February 2022">
-        <g className="font-mono" fontSize={11.5} fill="#6b7280">
+        <g className="font-mono" fontSize={11.5} fill="#4b5563">
           {[0, 0.25, 0.5, 0.75, 1].map(p => (
             <g key={p}>
               <line x1={L} x2={x(T1)} y1={y(p)} y2={y(p)} stroke={p === 0.5 ? '#6b7280' : '#eceff3'} strokeDasharray={p === 0.5 ? '3 4' : undefined} />
@@ -427,13 +428,13 @@ function ChartTip({ tip, day, roll }: { tip: Tip; day: number; roll: Record<Grou
   const date = new Date(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   return (
     <div ref={ref} className="fixed z-20 pointer-events-none bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2.5 text-[13px] min-w-[240px]" style={pos}>
-      <div className="font-mono text-xs text-gray-500 mb-1.5">{date} · 14-day mean · {Math.round((T1 - day) / DAY)} days to go</div>
+      <div className="font-mono text-xs text-gray-600 mb-1.5">{date} · 14-day mean · {Math.round((T1 - day) / DAY)} days to go</div>
       {sorted.map(g => {
         const m = roll[g][tip.i]
         return (
           <div key={g} className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-gray-600"><i className="w-2.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]}</span>
-            <b className={`font-mono font-medium tabular-nums ${m == null ? 'text-gray-400' : ''}`}>{m == null ? 'few' : pct(m)}</b>
+            <span className="flex items-center gap-2 text-gray-700"><i className="w-2.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]}</span>
+            <b className={`font-mono font-medium tabular-nums ${m == null ? 'text-gray-500' : ''}`}>{m == null ? 'few' : pct(m)}</b>
           </div>
         )
       })}
@@ -466,13 +467,13 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
     else { setSortK(k); setDir(k === 'p_full' ? -1 : 1) }
   }
   const th = (k: SortKey, label: string, right = false) => (
-    <th className={`sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
+    <th className={`sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
       aria-sort={sortK === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}>
       <button type="button" onClick={() => sortBy(k)} className="uppercase">{label}{sortK === k ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>
     </th>
   )
   const sel = 'bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-sm text-gray-800 min-w-[150px]'
-  const lbl = 'flex flex-col gap-1 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500'
+  const lbl = 'flex flex-col gap-1 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600'
 
   return (
     <>
@@ -481,15 +482,41 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
         <label className={lbl}>Position<select className={sel} value={fSide} onChange={e => setFSide(e.target.value)}><option value="">all</option><option value="invasion">expects invasion</option><option value="uncertain">unsure</option><option value="no_invasion">does not</option></select></label>
         <label className={lbl}>Outlet<select className={sel} value={fReg} onChange={e => setFReg(e.target.value)}><option value="">all</option><option value="west">international</option><option value="ua">Ukrainian</option><option value="ru">Russian</option></select></label>
         <label className={lbl}>Search<input type="search" className={`${sel} min-w-[210px]`} placeholder="name, outlet, word" value={q} onChange={e => setQ(e.target.value)} /></label>
-        <span className="ml-auto font-mono text-xs text-gray-500">{shown.length} of {rows.length}</span>
+        <span className="ml-auto font-mono text-xs text-gray-600">{shown.length} of {rows.length}</span>
       </div>
-      <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
+      {/* Phones get stacked cards: the 7-column table needs ~1100px and made readers scroll sideways (daatan#1779). */}
+      <ul className="md:hidden space-y-3">
+        {shown.map(r => (
+          <li key={r.n} className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between gap-3 font-mono text-xs text-gray-600">
+              <span>#{r.n} · {r.date}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${SIDE_PILL[r.side]}`}>{r.p_full.toFixed(2)} {SIDE_LABEL[r.side]}</span>
+            </div>
+            <a href={r.url} target="_blank" rel="noopener noreferrer" className="mt-2 block font-semibold text-gray-900 hover:underline leading-snug">{r.title || r.url}</a>
+            <div className="mt-0.5 font-mono text-xs text-gray-500">{r.domain} · {r.article_kind}{r.text_source === 'wayback' ? ' · archived' : ''}</div>
+            <div className="mt-2 text-sm text-gray-800">
+              <span className="inline-block w-2 h-2 rounded-sm mr-1.5" style={{ background: GROUP_COLOR[r.g] }} title={GROUP_NAME[r.g]} />
+              {r.voice_name || '—'}{r.voice_affiliation && <span className="text-gray-600"> · {r.voice_affiliation}</span>}
+            </div>
+            <div className="mt-1 font-mono text-xs text-gray-600">scope: {SCOPE[r.predicted_scope ?? ''] ?? r.predicted_scope}{r.timeframe ? ` · ${r.timeframe}` : ''} · confidence {(r.claim_strength ?? 0).toFixed(2)}</div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[13px] text-gray-700 leading-snug">{r.summary}</summary>
+              <blockquote className="mt-2 pl-2.5 border-l-2 border-gray-200 italic text-[13px] text-gray-800">
+                {r.key_quote_en}
+                {r.key_quote && r.key_quote !== r.key_quote_en && <span className="block mt-1 text-gray-500">{r.key_quote}</span>}
+              </blockquote>
+              {!r.quote_verified && <div className="mt-1 font-mono text-[11px] text-amber-700">quote not found verbatim</div>}
+            </details>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block overflow-x-auto bg-white border border-gray-200 rounded-xl">
         <table className="w-full min-w-[1100px] border-collapse text-sm">
           <thead><tr>
             {th('n', '#', true)}{th('date', 'Date')}
-            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Article</th>
+            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 text-left">Article</th>
             {th('voice_name', 'Main voice')}{th('p_full', 'P invasion')}{th('predicted_scope', 'Scope')}
-            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-500 text-left">Summary & quote</th>
+            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 text-left">Summary & quote</th>
           </tr></thead>
           <tbody>
             {shown.map(r => (
@@ -498,26 +525,26 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
                 <td className="px-3 py-2.5 font-mono tabular-nums whitespace-nowrap">{r.date}</td>
                 <td className="px-3 py-2.5 min-w-[240px] max-w-[340px]">
                   <a href={r.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-900 hover:underline leading-snug">{r.title || r.url}</a>
-                  <div className="mt-0.5 font-mono text-xs text-gray-400">{r.domain} · {r.article_kind}{r.text_source === 'wayback' ? ' · archived' : ''}</div>
+                  <div className="mt-0.5 font-mono text-xs text-gray-500">{r.domain} · {r.article_kind}{r.text_source === 'wayback' ? ' · archived' : ''}</div>
                 </td>
                 <td className="px-3 py-2.5 min-w-[150px] max-w-[220px]">
                   <span className="inline-block w-2 h-2 rounded-sm mr-1.5" style={{ background: GROUP_COLOR[r.g] }} title={GROUP_NAME[r.g]} />
-                  {r.voice_name || '—'}<span className="block text-xs text-gray-400 leading-snug">{r.voice_affiliation}</span>
+                  {r.voice_name || '—'}<span className="block text-xs text-gray-500 leading-snug">{r.voice_affiliation}</span>
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2 whitespace-nowrap">
                     <span className="relative w-16 h-1.5 bg-gray-100 rounded"><span className="absolute inset-y-0 left-0 rounded bg-gray-700" style={{ width: `${r.p_full * 100}%` }} /><span className="absolute -inset-y-0.5 left-1/2 w-px bg-gray-400" /></span>
                     <span className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-medium ${SIDE_PILL[r.side]}`}>{r.p_full.toFixed(2)} {SIDE_LABEL[r.side]}</span>
                   </div>
-                  <div className="mt-0.5 font-mono text-xs text-gray-400">confidence {(r.claim_strength ?? 0).toFixed(2)}</div>
+                  <div className="mt-0.5 font-mono text-xs text-gray-500">confidence {(r.claim_strength ?? 0).toFixed(2)}</div>
                 </td>
-                <td className="px-3 py-2.5">{SCOPE[r.predicted_scope ?? ''] ?? r.predicted_scope}<div className="font-mono text-xs text-gray-400">{r.timeframe}</div></td>
+                <td className="px-3 py-2.5">{SCOPE[r.predicted_scope ?? ''] ?? r.predicted_scope}<div className="font-mono text-xs text-gray-500">{r.timeframe}</div></td>
                 <td className="px-3 py-2.5 min-w-[260px] max-w-[420px]">
                   <details>
-                    <summary className="cursor-pointer text-[13px] text-gray-600 leading-snug">{r.summary}</summary>
+                    <summary className="cursor-pointer text-[13px] text-gray-700 leading-snug">{r.summary}</summary>
                     <blockquote className="mt-2 pl-2.5 border-l-2 border-gray-200 italic text-[13px] text-gray-800">
                       {r.key_quote_en}
-                      {r.key_quote && r.key_quote !== r.key_quote_en && <span className="block mt-1 text-gray-400">{r.key_quote}</span>}
+                      {r.key_quote && r.key_quote !== r.key_quote_en && <span className="block mt-1 text-gray-500">{r.key_quote}</span>}
                     </blockquote>
                     {!r.quote_verified && <div className="mt-1 font-mono text-[11px] text-amber-700">quote not found verbatim</div>}
                   </details>

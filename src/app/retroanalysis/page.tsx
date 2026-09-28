@@ -25,7 +25,7 @@ export default function RetroanalysisPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] text-gray-800 font-sans">
+    <div className="retro-light min-h-screen bg-[#f5f7fa] text-gray-800 font-sans">
       <div className="max-w-6xl mx-auto p-4 md:p-8">
         {/* Navigation */}
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
@@ -36,7 +36,7 @@ export default function RetroanalysisPage() {
               className={`px-4 py-2 rounded-full text-xs md:text-sm font-bold transition-all ${
                 activeAnalysisId === analysis.id
                   ? 'bg-gray-900 text-white shadow-md scale-105'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
               {getNavLabel(analysis.id)}
@@ -52,7 +52,7 @@ export default function RetroanalysisPage() {
           <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight leading-tight">
             {activeAnalysis.title}
           </h1>
-          <p className="text-gray-500 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-gray-600 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
             {activeAnalysis.description}
           </p>
           {activeAnalysis.reportHref && (
@@ -85,7 +85,7 @@ export default function RetroanalysisPage() {
             </div>
             
             <div className="p-6 flex-grow">
-              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-teal-500"></span>
                 {activeAnalysis.leftColumn.sublabel}
               </p>
@@ -99,7 +99,7 @@ export default function RetroanalysisPage() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <p className="text-[10px] text-teal-700 font-black uppercase tracking-tighter">{item.source}</p>
-                      <p className="text-[10px] text-gray-400 font-bold">{item.date}</p>
+                      <p className="text-[10px] text-gray-500 font-bold">{item.date}</p>
                     </div>
                     <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
                     {item.quote && (
@@ -132,7 +132,7 @@ export default function RetroanalysisPage() {
             </div>
             
             <div className="p-6 flex-grow">
-              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                 {activeAnalysis.rightColumn.sublabel}
               </p>
@@ -146,7 +146,7 @@ export default function RetroanalysisPage() {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <p className="text-[10px] text-rose-700 font-black uppercase tracking-tighter">{item.source}</p>
-                      <p className="text-[10px] text-gray-400 font-bold">{item.date}</p>
+                      <p className="text-[10px] text-gray-500 font-bold">{item.date}</p>
                     </div>
                     <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
                     {item.quote && (
@@ -182,7 +182,7 @@ export default function RetroanalysisPage() {
                   </h3>
                   <div className="space-y-4">
                     {section.content.map((p, pIdx) => (
-                      <p key={pIdx} className="text-gray-600 leading-relaxed text-sm md:text-base">
+                      <p key={pIdx} className="text-gray-700 leading-relaxed text-sm md:text-base">
                         {p}
                       </p>
                     ))}
@@ -197,7 +197,7 @@ export default function RetroanalysisPage() {
         {activeAnalysis.citations && (activeAnalysis.citations.length > 0) && (
           <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
             <h2 className="text-lg font-black text-gray-900 uppercase tracking-widest mb-6 border-b pb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
               Works Cited
@@ -209,8 +209,8 @@ export default function RetroanalysisPage() {
                 const url = citation.includes('http') ? `http${citation.split('http')[1]}` : null;
                 
                 return (
-                  <div key={idx} className="text-[11px] leading-relaxed text-gray-600 hover:text-gray-900 transition-colors">
-                    <span className="text-gray-400 font-mono mr-2">[{String(idx + 1).padStart(2, '0')}]</span>
+                  <div key={idx} className="text-[11px] leading-relaxed text-gray-700 hover:text-gray-900 transition-colors">
+                    <span className="text-gray-500 font-mono mr-2">[{String(idx + 1).padStart(2, '0')}]</span>
                     {text}
                     {url && (
                       <a 
@@ -230,7 +230,7 @@ export default function RetroanalysisPage() {
         )}
 
         {/* Footer info */}
-        <div className="mt-12 text-center text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold">
+        <div className="mt-12 text-center text-[10px] text-gray-500 uppercase tracking-[0.2em] font-bold">
           DAATAN Retro-Analysis Archive &copy; 2026
         </div>
       </div>

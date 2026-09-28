@@ -109,6 +109,29 @@ select option {
   scrollbar-color: var(--color-navy-600) var(--color-navy-800);
 }
 
+/* The retroanalysis reports are light pages inside the dark app (daatan#1779): light
+   scrollbars for the page itself (via :has) and for any scroll box inside a report. */
+html:has(.retro-light),
+.retro-light,
+.retro-light * {
+  scrollbar-color: #b3bcc8 #e9edf2;
+}
+.retro-light {
+  color-scheme: light;
+}
+html:has(.retro-light)::-webkit-scrollbar-track,
+.retro-light ::-webkit-scrollbar-track {
+  background: #e9edf2;
+}
+html:has(.retro-light)::-webkit-scrollbar-thumb,
+.retro-light ::-webkit-scrollbar-thumb {
+  background: #b3bcc8;
+}
+html:has(.retro-light)::-webkit-scrollbar-thumb:hover,
+.retro-light ::-webkit-scrollbar-thumb:hover {
+  background: #8a95a5;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
