@@ -69,11 +69,12 @@ export const expressPredictionSchema: Schema = {
     },
     probabilitySuggestion: {
       type: SchemaType.NUMBER,
-      description: "AI's suggested probability (0-100) based on current context",
+      nullable: true,
+      description: "Suggested probability (0-100) that the claim resolves YES, or null unless the provided articles or a linked market price actually bear on the outcome. Do not return 50 as a placeholder for 'no information' — return null instead.",
     },
     probabilityReasoning: {
       type: SchemaType.STRING,
-      description: "One sentence explanation for the probability suggestion",
+      description: "One sentence explanation for the probability suggestion, or for why no estimate can be given yet",
     },
     relevantArticleIndices: {
       type: SchemaType.ARRAY,
@@ -125,7 +126,7 @@ export interface ExpressPredictionResult {
   resolutionRules: string
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE'
   options: string[] // Non-empty for MULTIPLE_CHOICE
-  probabilitySuggestion: number
+  probabilitySuggestion: number | null
   probabilityReasoning: string
   newsAnchor: {
     url: string
@@ -182,7 +183,7 @@ interface ParsedPrediction {
   resolutionRules: string
   outcomeType: 'BINARY' | 'MULTIPLE_CHOICE'
   options: string[]
-  probabilitySuggestion: number
+  probabilitySuggestion: number | null
   probabilityReasoning: string
   // Required in the schema, but optional here: an absent value means "no judgment"
   // (fall back to retrieval order) vs an explicit [] meaning "none relevant".

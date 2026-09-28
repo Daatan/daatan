@@ -44,8 +44,11 @@ export const CURRENT_VERSION_ONLY = { supersededAt: null } as const
  *
  * 'retry' marks rows whose latest signal came from the pool-retry sweep
  * (pool-retry.ts) re-driving a stuck FAILED/stale-PENDING claim through extraction.
+ *
+ * 'creation' marks rows from the first Oracul run fired right after a forecast is
+ * created (creation-estimate.ts, daatan#1777).
  */
-export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry' | 'remediate'
+export type PoolOrigin = 'analyze' | 'news-indexer' | 'backfill' | 'retry' | 'remediate' | 'creation'
 
 /**
  * Write extracted signals onto a batch of already-claimed pool rows, keyed by

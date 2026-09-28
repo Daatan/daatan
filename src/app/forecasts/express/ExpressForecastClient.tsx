@@ -952,7 +952,7 @@ export default function ExpressForecastClient({
                     <Sparkles className="w-4 h-4" />
                     {t('aiProbabilityGuess')}
                   </h3>
-                  {!generated.probabilitySuggestion && (
+                  {generated.probabilitySuggestion == null && (
                     <Button
                       onClick={handleGuessChances}
                       loading={isGuessing}
@@ -964,7 +964,7 @@ export default function ExpressForecastClient({
                     </Button>
                   )}
                 </div>
-                {generated.probabilitySuggestion ? (
+                {generated.probabilitySuggestion != null ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
                       <div className="text-3xl font-black text-purple-600">

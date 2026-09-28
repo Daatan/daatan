@@ -7,6 +7,7 @@ import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { scheduleBornTrueCheck } from '@/lib/services/bornTrueCheck'
+import { scheduleCreationEstimate } from '@/lib/services/creation-estimate'
 import { createLogger } from '@/lib/logger'
 import { auditResolveByDatetime, auditClaimDeadlineMismatch } from '@/lib/services/deadline-normalisation'
 import { notifySearchEngines } from '@/lib/services/indexnow'
@@ -389,12 +390,17 @@ export async function createForecast(input: CreateForecastInput) {
   // Fire-and-forget: classify temporal structure (deadline/direction/archetype)
   // for the requote cron. Bot-created forecasts bypass createForecast
   // (bots/stake.ts creates rows directly) — the cron's self-heal pass covers them.
+  // Then ask the Oracul for a first real estimate (daatan#1777) — chained, not
+  // parallel, because that run needs the classified direction/deadline/archetype.
+  const predictionId = prediction.id
   classifyAndStoreTemporal({
-    id: prediction.id,
+    id: predictionId,
     claimText,
     resolveByDatetime: new Date(input.resolveByDatetime),
     outcomeType: input.outcomeType,
-  }).catch((err) => log.error({ err, id: prediction.id }, 'temporal classification failed'))
+  })
+    .catch((err) => log.error({ err, id: predictionId }, 'temporal classification failed'))
+    .then(() => scheduleCreationEstimate(predictionId))
 
   // Fire-and-forget: re-run the born-true research leg right after creation
   // (daatan#1747) — catches a claim that was already true/false against
