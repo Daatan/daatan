@@ -196,11 +196,11 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
 }
 
 const SCALE_MARKS: [number, string][] = [
-  [0.075, 'Peskov'],
-  [0.35, 'Trenin'],
+  [0.075, 'Dmitry Peskov'],
+  [0.35, 'Dmitri Trenin'],
   [0.5, 'Coin flip'],
-  [0.78, 'Biden'],
-  [0.93, 'Budanov'],
+  [0.78, 'Joe Biden'],
+  [0.93, 'Kyrylo Budanov'],
 ]
 
 function NumbersGuide() {
@@ -215,7 +215,7 @@ function NumbersGuide() {
           <div className="relative mt-14 mb-12 mx-2">
             <div className="h-2 rounded-full bg-gradient-to-r from-rose-500 via-gray-300 to-teal-600" />
             {SCALE_MARKS.map(([p, who], i) => (
-              <div key={who} className={`absolute flex flex-col w-28 ${p < 0.15 ? '-translate-x-[6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
+              <div key={who} className={`absolute flex flex-col w-40 whitespace-nowrap ${p < 0.15 ? '-translate-x-[6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
                 <span className="w-px h-2.5 bg-gray-500" />
                 <span className="font-mono text-[11px] text-gray-900 font-medium">{p.toFixed(2)} {who}</span>
               </div>
