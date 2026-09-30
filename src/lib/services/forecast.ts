@@ -909,6 +909,8 @@ export async function publishForecast(id: string) {
     },
   })
   if (result.isPublic) notifySearchEngines(result.slug ?? result.id)
+  // A forecast published after its classifier finished is only picked up here (daatan#1777).
+  scheduleCreationEstimate(result.id)
   return result
 }
 
@@ -923,6 +925,8 @@ export async function approveForecast(predictionId: string) {
     },
   })
   if (result.isPublic) notifySearchEngines(result.slug ?? result.id)
+  // A forecast published after its classifier finished is only picked up here (daatan#1777).
+  scheduleCreationEstimate(result.id)
   return result
 }
 
