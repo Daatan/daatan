@@ -424,7 +424,13 @@ export default function ExpressForecastClient({
       const groundedDate = editForm.resolveByDatetime !== generated?.resolveByDatetime
         ? undefined
         : generated?.groundedDate
-      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate })
+      // The suggestion was estimated for the generated claim; once the claim
+      // changes it answers a different question (#1784). Null = "no estimate":
+      // the author can re-guess, or the server-side creation estimate fills it.
+      const claimChanged = editForm.claimText !== generated?.claimText
+      const probabilitySuggestion = claimChanged ? null : editForm.probabilitySuggestion
+      const probabilityReasoning = claimChanged ? '' : editForm.probabilityReasoning
+      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate, probabilitySuggestion, probabilityReasoning })
       setIsEditing(false)
     }
   }

@@ -603,6 +603,56 @@ describe('ExpressForecastClient', () => {
       expect(screen.queryByText(/Claim\/date mismatch/)).not.toBeInTheDocument()
     })
 
+    const publishAndReadCreateBody = async () => {
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'new-id' }), { status: 201 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'new-id', status: 'ACTIVE' }), { status: 200 }))
+      await act(async () => {
+        fireEvent.click(screen.getByText('Confirm & Publish'))
+      })
+      await vi.waitFor(() => {
+        expect(mockRouter.push).toHaveBeenCalled()
+      })
+      const createCall = vi.mocked(globalThis.fetch).mock.calls[1]
+      return JSON.parse(createCall[1]?.body as string)
+    }
+
+    it('drops the probability suggestion once the author edits the claim text (#1784)', async () => {
+      await renderInReviewState({ ...generatedData, probabilitySuggestion: 0, probabilityReasoning: 'Only 7 exist' })
+      expect(screen.getByText('0%')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      fireEvent.change(screen.getByLabelText('Claim text'), {
+        target: { value: 'Bitcoin will reach $150k' },
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.queryByText('0%')).not.toBeInTheDocument()
+      expect(screen.queryByText('Only 7 exist')).not.toBeInTheDocument()
+      expect(screen.getByText('Guess chances')).toBeInTheDocument()
+      const body = await publishAndReadCreateBody()
+      expect(body.confidence).toBeUndefined()
+    })
+
+    it('keeps the probability suggestion when an edit leaves the claim text unchanged', async () => {
+      await renderInReviewState()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save Changes'))
+      })
+
+      expect(screen.getByText('60%')).toBeInTheDocument()
+      const body = await publishAndReadCreateBody()
+      expect(body.confidence).toBe(60)
+    })
+
     it('reverts button when publish API fails', async () => {
       await renderInReviewState()
 
