@@ -160,7 +160,7 @@ say which is better. This comparison is free.
 |---|---|---|---|
 | `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | Alibaba | deterministic baseline, outage-proof |
 | `deepseek/deepseek-chat` | openrouter (`deepinfra/fp4`) | DeepSeek | |
-| `google/gemini-2.5-flash` | **vertex** | Google | direct, no OpenRouter markup (daatan#1513) |
+| `google/gemini-3.5-flash-lite` | **vertex** | Google | direct, no OpenRouter markup (daatan#1513); was `google/gemini-2.5-flash` until daatan#1763 |
 | `x-ai/grok-4.3` | openrouter (`xai`) | xAI | |
 | `google/gemma-3-4b-it` | openrouter (`deepinfra/bf16`) | Google (4B) | **control** |
 
@@ -176,6 +176,17 @@ say which is better. This comparison is free.
 >
 > **Grok honors `reasoning: {enabled: false}`** (5–6 tokens observed), so the
 > `max_tokens: 64` cap never trips on it — the concern that drove that cap is resolved.
+>
+> **Vertex Gemini 3 *Flash* is reasoning-mandatory too** (daatan#1763, measured
+> 2026-10-03). On Vertex, thought tokens count against `maxOutputTokens`, so a thinking
+> model spends the whole 64-token cap thinking and returns no text (`MAX_TOKENS`).
+> `gemini-3.8-flash` ignores `thinkingBudget: 0` and rejects `thinkingLevel: MINIMAL`
+> (HTTP 400), so it cannot sit on this panel. `gemini-2.5-flash` honoured budget 0 —
+> but the client never sent it, so the old member probably abstained from #1513 until
+> #1763 (a short-prompt smoke hit `MAX_TOKENS` 3/3; not yet confirmed against prod rows). The Vertex member is therefore
+> `gemini-3.5-flash-lite` (no thought tokens at default; price-identical to 2.5
+> Flash), with `thinkingBudget: 0` sent explicitly. A new member: its Brier series
+> starts fresh.
 
 The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
 one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in
@@ -186,8 +197,8 @@ distinct member — correct, since the weights are the same but the quantization
 
 Gemini moved to the same posture (daatan#1513): direct Vertex, authenticated with the
 app's own Google service account rather than proxied through OpenRouter's
-`google-vertex/eu` pin. Same weights, same model id family (the roster keeps the
-`google/` prefix — see `roster.ts` for why), but immune to an OpenRouter-wide 401/402
+`google-vertex/eu` pin. Same model id family (the roster keeps the `google/` prefix —
+see `roster.ts`), but immune to an OpenRouter-wide 401/402
 the way the Bedrock member is.
 
 The **control member** is a falsification check: if a deliberately weak model scores
@@ -222,7 +233,7 @@ breaks determinism at `temperature: 0`.
   the model and corrupts the per-member Brier comparison. Tags verified against
   `https://openrouter.ai/api/v1/models/{slug}/endpoints`.
 - **The panel never uses `ResilientLLMService`.** That is a *failover* wrapper: it
-  would write an `AiEstimate` row labelled `google/gemini-2.5-flash` containing Llama's
+  would write an `AiEstimate` row labelled `google/gemini-3.5-flash-lite` containing Llama's
   output. `src/lib/llm/panel/client.ts` calls OpenRouter/Bedrock/Vertex directly per
   member, and a failure is recorded as an **abstention**, never as a substitution.
 - **Dormant only when nothing can authenticate.** A missing OpenRouter key no longer
@@ -388,7 +399,7 @@ second sentinel member, `'market'`, in v1.51.0.)
 
 The first grounded variant — **our own news index, not vendor web search**. Scoped
 forecasts get three extra members (`mode: 'grounded-indexer'` in
-`GROUNDED_PANEL_MEMBERS`): the same Qwen/DeepSeek/Gemini-Flash models, same routes and
+`GROUNDED_PANEL_MEMBERS`): the same Qwen/DeepSeek/Gemini-Flash-Lite models, same routes and
 provider pins as their ungrounded siblings, differing only in mode and prompt — so the
 per-model grounded-vs-ungrounded Brier delta isolates exactly what the injected
 articles are worth. Grok is deliberately absent (it alone is ~80% of panel token cost)

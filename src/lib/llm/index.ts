@@ -4,6 +4,7 @@ import { OllamaProvider } from './providers/ollama'
 import { OpenRouterProvider } from './providers/openrouter'
 import { OracleProvider } from './providers/oracle'
 import { ResilientLLMService } from './service'
+import { GEMINI_MODEL } from './googleModel'
 import type { LLMProvider } from './types'
 import { createLogger } from '@/lib/logger'
 import { isSelfHosted } from '@/lib/edition'
@@ -14,9 +15,6 @@ const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
-
-/** One model name for both Google legs — they must not silently diverge. */
-const GEMINI_MODEL = 'gemini-2.5-flash'
 
 // The Oracul fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
 // from Google), so it can serve precisely when Gemini/Google is unavailable. We
@@ -140,9 +138,10 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
     // e.g. "google/gemini-2.0-flash:free" -> "gemini-2.0-flash"
     let directModelName = resolvedModelName.split(':').shift()?.split('/').pop() || 'gemini-1.5-flash'
 
-    // Remap legacy direct-API model names to the current stable ID
-    if (directModelName === 'gemini-2.0-flash-exp' || directModelName === 'gemini-2.5-flash-preview' || directModelName === 'gemini-1.5-flash' || directModelName === 'gemini-1.5-pro') {
-      directModelName = 'gemini-2.5-flash'
+    // Remap legacy/retired direct-API model names to the current stable ID — the
+    // bot slugs stored in the DB still name 2.x models (#1763).
+    if (/^gemini-(1\.5|2\.0|2\.5)-/.test(directModelName)) {
+      directModelName = GEMINI_MODEL
     }
 
     log.info({ modelName: resolvedModelName, directModelName }, 'Trying direct Gemini provider for bot')
@@ -161,8 +160,8 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
 
   // Final fallback: direct stable Gemini if we have a key and requested model was Gemini
   if (resolvedModelName.toLowerCase().includes('gemini') && geminiApiKey) {
-    log.info('Adding stable gemini-2.5-flash as final fallback')
-    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: 'gemini-2.5-flash' }))
+    log.info({ modelName: GEMINI_MODEL }, 'Adding stable Gemini as final fallback')
+    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: GEMINI_MODEL }))
   }
 
   if (providers.length === 0) {

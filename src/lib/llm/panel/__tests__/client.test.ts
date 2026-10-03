@@ -21,7 +21,7 @@ vi.mock('../../providers/vertex', () => ({
 }))
 
 import { callPanelMember, PanelAuthError, PanelPaymentError } from '../client'
-import type { PanelMember } from '../roster'
+import { VERTEX_PANEL_MODEL, type PanelMember } from '../roster'
 
 const MEMBER: PanelMember = {
   model: 'qwen/qwen3-235b-a22b-2507',
@@ -37,7 +37,7 @@ const BEDROCK_MEMBER: PanelMember = {
 }
 
 const VERTEX_MEMBER: PanelMember = {
-  model: 'google/gemini-2.5-flash',
+  model: VERTEX_PANEL_MODEL,
   mode: 'ungrounded',
   route: 'vertex',
 }
@@ -273,11 +273,13 @@ describe('vertex route', () => {
     // The roster keeps the `google/` prefix for Brier continuity (roster.ts); the
     // wire call must strip it back to the bare Vertex model name.
     const url = fetchMock.mock.calls[0][0] as string
-    expect(url).toContain('/models/gemini-2.5-flash:generateContent')
+    expect(url).toContain(`/models/${VERTEX_PANEL_MODEL.replace(/^google\//, '')}:generateContent`)
     expect(url).not.toContain('google/gemini')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.generationConfig.temperature).toBe(0)
     expect(body.generationConfig.maxOutputTokens).toBe(64)
+    // Thought tokens count against that cap on Vertex — thinking must be off (#1763).
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 })
     expect(body.generationConfig.responseSchema).toBeDefined()
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer fake-token')
     expect(r).toMatchObject({ probability: 61, promptTokens: 100, completionTokens: 5 })

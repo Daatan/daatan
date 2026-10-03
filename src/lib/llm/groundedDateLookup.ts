@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/logger'
 import { vertexEnv, vertexEndpoint, vertexAccessToken } from './providers/vertex'
+import { GEMINI_MODEL, joinCandidateText } from './googleModel'
 
 const log = createLogger('grounded-date-lookup')
 
@@ -26,7 +27,7 @@ const log = createLogger('grounded-date-lookup')
  * prose and parsed here.
  */
 
-const LOOKUP_MODEL = 'gemini-2.5-flash'
+const LOOKUP_MODEL = GEMINI_MODEL
 /** Measured 4.4–10.4 s. Past this the draft goes out with the "assumed" warning instead. */
 const LOOKUP_TIMEOUT_MS = 15_000
 /** A "scheduled event" further out than this is a misread, not a calendar fact. */
@@ -41,7 +42,7 @@ export type GroundedDateLookup =
   | { status: 'unavailable' }
 
 interface GroundedVertexResponse {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>
 }
 
 function buildPrompt(userInput: string, claimText: string, today: string): string {
@@ -105,7 +106,7 @@ export async function lookupGroundedEventDate(
 
     const data = (await res.json()) as GroundedVertexResponse
     // A grounded answer can arrive split across parts.
-    const text = (data.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('')
+    const text = joinCandidateText(data.candidates?.[0]?.content?.parts) ?? ''
     const json = text.match(/\{[\s\S]*\}/)
     if (!json) throw new Error('grounded date lookup returned no JSON object')
     const parsed = JSON.parse(json[0]) as { event?: unknown; date?: unknown; source_url?: unknown }

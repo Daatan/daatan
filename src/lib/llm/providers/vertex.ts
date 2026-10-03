@@ -1,5 +1,6 @@
 import type { LLMProvider, LLMRequest, LLMResponse } from '../types'
 import { googleAccessToken } from '@/lib/services/google-auth'
+import { joinCandidateText } from '../googleModel'
 
 /**
  * Gemini via Vertex AI (daatan#1472).
@@ -38,7 +39,7 @@ export interface VertexConfig extends VertexEnv {
 }
 
 interface VertexResponse {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>
   usageMetadata?: {
     promptTokenCount?: number
     candidatesTokenCount?: number
@@ -60,7 +61,7 @@ export function vertexEnv(): VertexEnv | null {
   return { projectId, clientEmail, privateKey, location: process.env.GOOGLE_VERTEX_LOCATION || 'global' }
 }
 
-/** e.g. `…/publishers/google/models/gemini-2.5-flash:generateContent`. */
+/** e.g. `…/publishers/google/models/gemini-3.8-flash:generateContent`. */
 export function vertexEndpoint(env: VertexEnv, modelName: string, method: string): string {
   // The regional host is required for regional locations; `global` is served from
   // the unprefixed host, and prefixing it 404s.
@@ -132,7 +133,8 @@ export class VertexProvider implements LLMProvider {
       }
 
       const data = (await res.json()) as VertexResponse
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+      // Gemini 3 may split the answer across parts (each with a thoughtSignature).
+      const text = joinCandidateText(data.candidates?.[0]?.content?.parts)
       // Throw rather than return '': the service treats a provider error as
       // "fall through to the next leg", and an empty string would instead be
       // handed to a JSON.parse downstream as if it were a real answer.

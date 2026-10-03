@@ -2,6 +2,7 @@ import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-r
 import { createLogger } from '@/lib/logger'
 import { getAppUrl } from '@/lib/branding'
 import { vertexEndpoint, vertexAccessToken, vertexEnv } from '../providers/vertex'
+import { joinCandidateText } from '../googleModel'
 import type { PanelMember } from './roster'
 
 const log = createLogger('ai-panel-client')
@@ -190,7 +191,7 @@ async function callBedrockMember(member: PanelMember, prompt: string): Promise<P
 }
 
 interface VertexPanelResponse {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
 }
 
@@ -229,6 +230,13 @@ async function callVertexMember(member: PanelMember, prompt: string): Promise<Pa
         generationConfig: {
           temperature: 0,
           maxOutputTokens: MAX_TOKENS,
+          // The panel is no-hidden-thinking by construction (docs/LASSO.md §5), and on
+          // Vertex thought tokens count against maxOutputTokens: a thinking model spends
+          // the whole 64-token cap thinking and returns no text (finishReason MAX_TOKENS).
+          // Measured 2026-10-03 (daatan#1763): gemini-2.5-flash honours budget 0;
+          // gemini-3.x *Flash* ignores it and rejects thinkingLevel MINIMAL (HTTP 400),
+          // so it can't sit on this panel — hence the Flash-Lite member in roster.ts.
+          thinkingConfig: { thinkingBudget: 0 },
           responseMimeType: 'application/json',
           responseSchema: VERTEX_RESPONSE_SCHEMA,
         },
@@ -241,7 +249,7 @@ async function callVertexMember(member: PanelMember, prompt: string): Promise<Pa
     }
 
     const data = (await response.json()) as VertexPanelResponse
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    const text = joinCandidateText(data.candidates?.[0]?.content?.parts)
     if (typeof text !== 'string' || text.trim() === '') {
       throw new Error(`Empty response from ${member.model}`)
     }

@@ -6,13 +6,14 @@ vi.mock('@/lib/services/google-auth', () => ({
 
 import { googleAccessToken } from '@/lib/services/google-auth'
 import { VertexProvider, vertexEnv } from '@/lib/llm/providers/vertex'
+import { GEMINI_MODEL } from '@/lib/llm/googleModel'
 
 const CONFIG = {
   projectId: 'daatan-654644841675',
   location: 'global',
   clientEmail: 'vertex@daatan.iam.gserviceaccount.com',
   privateKey: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-  modelName: 'gemini-2.5-flash',
+  modelName: GEMINI_MODEL,
 }
 
 function okResponse(body: unknown) {
@@ -49,7 +50,7 @@ describe('VertexProvider', () => {
     await new VertexProvider(CONFIG).generateContent({ prompt: 'hi' })
     expect(lastCall().url).toBe(
       'https://aiplatform.googleapis.com/v1/projects/daatan-654644841675' +
-        '/locations/global/publishers/google/models/gemini-2.5-flash:generateContent',
+        `/locations/global/publishers/google/models/${GEMINI_MODEL}:generateContent`,
     )
   })
 
@@ -97,6 +98,26 @@ describe('VertexProvider', () => {
     const res = await new VertexProvider(CONFIG).generateContent({ prompt: 'q' })
     expect(res.text).toBe('{"answer":42}')
     expect(res.usage).toEqual({ promptTokens: 11, completionTokens: 5, totalTokens: 16 })
+  })
+
+  it('joins a Gemini 3 answer split across parts and skips thought parts (#1763)', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: 'reasoning summary', thought: true },
+                { text: '{"answer":', thoughtSignature: 'sig' },
+                { text: '42}' },
+              ],
+            },
+          },
+        ],
+      }),
+    )
+    const res = await new VertexProvider(CONFIG).generateContent({ prompt: 'q' })
+    expect(res.text).toBe('{"answer":42}')
   })
 
   it('omits usage when Vertex reports none, rather than inventing zeros', async () => {
