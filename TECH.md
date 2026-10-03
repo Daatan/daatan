@@ -38,7 +38,7 @@
 | Cloud | AWS (EC2, Route 53, S3) | - |
 | IaC | Terraform | 1.x |
 | CI/CD | GitHub Actions | - |
-| AI Integration | Gemini `gemini-2.5-flash` via Vertex AI (primary; Developer-API key leg for self-host) → Oracul `/llm` (AWS Bedrock / Amazon Nova) → OpenRouter → Ollama; OpenRouter also powers bots | - |
+| AI Integration | Gemini `gemini-3.8-flash` via Vertex AI (primary; Developer-API key leg for self-host) → Oracul `/llm` (AWS Bedrock / Amazon Nova) → OpenRouter → Ollama; OpenRouter also powers bots | - |
 | Forecast Oracul | TruthMachine Oracul API (`oracle.daatan.com`) — calibrated multi-source probability estimates | 1.x (app accepts API major `1` only — `EXPECTED_API_MAJOR_VERSIONS` in `src/lib/services/oracle.ts`) |
 | Prompts | In-code registry `PROMPTS` in `src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/*.txt` and pinned by `prompts/prompt_versions.lock.json` (#1658) | - |
 | Email | Resend | - |

@@ -63,6 +63,16 @@ export interface PanelMember {
   control?: boolean
 }
 
+/**
+ * The Vertex Gemini member's model, shared by the ungrounded member and its grounded
+ * twin. Deliberately NOT `GEMINI_MODEL` (llm/googleModel.ts): the main chain can use a
+ * thinking model, the panel can't. Verified 2026-10-03 (daatan#1763): Flash-Lite
+ * answers inside the 64-token cap with zero thought tokens; gemini-3.8-flash spends
+ * the whole cap thinking and returns nothing. Price-identical to the gemini-2.5-flash
+ * it replaces ($0.30 / $2.50 per 1M on Vertex global).
+ */
+export const VERTEX_PANEL_MODEL = 'google/gemini-3.5-flash-lite'
+
 export const PANEL_MEMBERS: readonly PanelMember[] = [
   // Non-reasoning, and the most decorrelated lineage available (non-Western corpus
   // and RLHF). Doubles as the deterministic baseline: no hidden thinking tokens.
@@ -94,16 +104,19 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     providerOrder: ['deepinfra/fp4'],
   },
 
-  // Direct Vertex (daatan#1513), not proxied through OpenRouter: same Google backend
-  // the old `google-vertex/eu` OpenRouter pin used, but authenticated with the app's
-  // own service account. Model id keeps its `google/` OpenRouter-style prefix rather
-  // than switching to the bare Vertex model name — changing it would treat this as a
-  // new member and orphan its historical Brier series for no benefit, since `route`
-  // already disambiguates it from the OpenRouter-era rows. This is NOT a stack-wide
-  // residency guarantee — extraction and settlement verification (the calls that
-  // actually carry article/claim text) run on Bedrock in us-east-1 (retro#548).
+  // Direct Vertex (daatan#1513), not proxied through OpenRouter, authenticated with
+  // the app's own service account. The id keeps the `google/` OpenRouter-style prefix
+  // (client.ts strips it for the endpoint). This is NOT a stack-wide residency
+  // guarantee — extraction and settlement verification (the calls that actually
+  // carry article/claim text) run on Bedrock in us-east-1 (retro#548).
+  //
+  // Was google/gemini-2.5-flash until daatan#1763 (Vertex stops serving 2.5 on
+  // 2027-03-31). Flash-LITE, not Flash, on purpose: Gemini 3.x Flash cannot turn its
+  // thinking off (budget 0 ignored, MINIMAL rejected), and the panel is
+  // no-hidden-thinking by construction — see VERTEX_PANEL_MODEL. A new member: its
+  // Brier series starts fresh, and the roster signature change forces a new sweep.
   {
-    model: 'google/gemini-2.5-flash',
+    model: VERTEX_PANEL_MODEL,
     mode: 'ungrounded',
     route: 'vertex',
   },
@@ -128,7 +141,7 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
  * as their ungrounded counterpart, differing ONLY in mode — so the grounded-vs-ungrounded
  * Brier delta per model isolates the value of the injected articles.
  *
- * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), Gemini Flash rides
+ * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), Gemini Flash-Lite rides
  * Vertex (also AWS/GCP credits, daatan#1513), and DeepSeek is the cheapest remaining
  * OpenRouter member. Grok is deliberately absent (it alone is ~80% of panel token
  * cost) and the control stays ungrounded — a grounded control would no longer
@@ -150,7 +163,7 @@ export const GROUNDED_PANEL_MEMBERS: readonly PanelMember[] = [
     providerOrder: ['deepinfra/fp4'],
   },
   {
-    model: 'google/gemini-2.5-flash',
+    model: VERTEX_PANEL_MODEL,
     mode: 'grounded-indexer',
     route: 'vertex',
   },

@@ -112,6 +112,8 @@ export const env = createEnv({
     GOOGLE_VERTEX_LOCATION: z.string().min(1).default('global'),
     GOOGLE_VERTEX_CLIENT_EMAIL: z.string().email().optional(),
     GOOGLE_VERTEX_PRIVATE_KEY: z.string().min(1).optional(),
+    // Overrides GEMINI_MODEL (src/lib/llm/googleModel.ts) for both Google legs (#1763).
+    GOOGLE_GEMINI_MODEL: z.string().min(1).optional(),
     // LLM providers for the self-host edition. Configuring ANY of these turns on
     // AI features (Express, Guess, etc.) — the key is the opt-in. OpenRouter is
     // the easy default (one key, many models). OLLAMA_BASE_URL = a local LLM.
@@ -210,6 +212,7 @@ export const env = createEnv({
     GOOGLE_VERTEX_LOCATION: process.env.GOOGLE_VERTEX_LOCATION,
     GOOGLE_VERTEX_CLIENT_EMAIL: process.env.GOOGLE_VERTEX_CLIENT_EMAIL,
     GOOGLE_VERTEX_PRIVATE_KEY: process.env.GOOGLE_VERTEX_PRIVATE_KEY,
+    GOOGLE_GEMINI_MODEL: process.env.GOOGLE_GEMINI_MODEL,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
     OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,

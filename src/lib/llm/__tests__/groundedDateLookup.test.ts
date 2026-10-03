@@ -5,6 +5,7 @@ vi.mock('@/lib/services/google-auth', () => ({
 }))
 
 import { lookupGroundedEventDate, validEventDate } from '../groundedDateLookup'
+import { GEMINI_MODEL } from '../googleModel'
 
 // daatan#1706 option 2. The lookup is the one call in the express flow that must NOT
 // degrade through the provider chain — a fallback leg has no search tool and would hand
@@ -51,7 +52,7 @@ describe('lookupGroundedEventDate', () => {
     })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const body = JSON.parse(init.body as string)
-    expect(url).toContain('gemini-2.5-flash:generateContent')
+    expect(url).toContain(`${GEMINI_MODEL}:generateContent`)
     expect(body.tools).toEqual([{ googleSearch: {} }])
     expect(body.generationConfig.responseSchema).toBeUndefined()
     expect(body.generationConfig.responseMimeType).toBeUndefined()
