@@ -88,6 +88,21 @@ Only **acute** conditions alert. Each one starts, gets fixed, and stops, so a re
 
 ---
 
+## Oracle Jev watchdog (`oracle-jev-watchdog.yml` — hourly, at :12)
+
+Watches whether retro's oracle-api can actually reach **Jev**, its cheap pre-extraction gate (retro#850, daatan#1792). Jev is fail-open: when every call errors (a 402 from an exhausted balance or the OpenRouter key's weekly limit — the key is shared with daatan — or a provider outage) articles just go through to full Haiku extraction, so nothing breaks visibly and only cost goes up. On 2026-10-04 that ran ~6h unnoticed.
+
+Runs from the **GitHub Actions runner**: ships `scripts/check-oracle-jev.sh` to the Oracle box (`i-00ac444b94c5ff9b2`) over SSM, which read-only counts `event=jev_gate` lines in `oracle_log.txt` for the last two complete hours. An hour is **broken** at ≥3 errors that are ≥50% of its calls. Edge-triggered, **clean** channel (noisy fallback):
+
+| Event | Icon | Trigger |
+|---|---|---|
+| Jev failing | 🚨 | last hour broken and the one before was not — or still broken on a 6th hour (00/06/12/18, box time), as a reminder |
+| Jev recovered | ✅ | the hour before was broken, the last hour is not and had successful calls |
+
+A failed SSM call turns the run red instead of alerting (box health is covered by `oracle-ec2-status-check-failed`).
+
+---
+
 ## Daily summary (`heartbeat.yml` — daily 09:00 UTC)
 
 Sent by the **EC2 app process** via `GET /api/cron/heartbeat` (triggered by `heartbeat.yml`). Because the Telegram message originates from the server — not from GitHub Actions — a silent daily summary means the server itself has a problem, not just that GitHub Actions is down. The message also doubles as the liveness heartbeat (it replaced the old bare "server alive" ping).

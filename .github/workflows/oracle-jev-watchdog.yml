@@ -1,0 +1,133 @@
+name: Oracle Jev Watchdog
+#
+# Pings Telegram when the Oracle's Jev calls start failing (daatan#1792).
+#
+# Jev is the cheap pre-extraction gate in retro's oracle-api (retro#850). It is fail-open:
+# when every call errors — a 402 from an exhausted balance or a hit key limit, a provider
+# outage — articles simply go through to the full Haiku extraction. Nothing user-visible
+# breaks; the only symptom is cost, so it goes unnoticed. On 2026-10-04 TypeSafe returned
+# 402 for ~6h and it was found by hand. Jev now runs through an OpenRouter key shared with
+# daatan that has a weekly spend limit, which fails exactly the same way.
+#
+#   • Hourly. Ships scripts/check-oracle-jev.sh to the Oracle box over SSM (read-only: it
+#     counts `event=jev_gate` log lines) and reads its one-line verdict back.
+#   • Edge-triggered: one 🚨 when an hour turns mostly-errors, a reminder every 6h while it
+#     stays broken, one ✅ when it recovers. Silent otherwise. Thresholds live in the script.
+#   • Clean channel: a Jev outage needs a human (top up / raise the key limit / switch the
+#     provider with retro's infra/jev-provider.sh), so it is actionable, not noise.
+#   • If the SSM call itself fails the run goes red rather than alerting — box/agent health
+#     is watched elsewhere (oracle-ec2-status-check-failed).
+
+on:
+  schedule:
+    - cron: '12 * * * *'   # :12 past every hour, off the top-of-hour congestion
+  workflow_dispatch:
+    inputs:
+      test_message:
+        description: 'Send a sample message regardless of the verdict (to check the Telegram leg)'
+        type: choice
+        options: [none, alert, recovered]
+        default: none
+
+env:
+  ORACLE_INSTANCE_ID: i-00ac444b94c5ff9b2
+
+jobs:
+  check:
+    name: Jev health
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Run the check on the Oracle box
+        id: check
+        run: |
+          set -euo pipefail
+          # Ship the script's content (no secrets in it) rather than a token-bearing curl —
+          # same reasoning as watchdog.yml's disk check (daatan#1726).
+          SCRIPT_B64=$(base64 -w 0 scripts/check-oracle-jev.sh)
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$ORACLE_INSTANCE_ID" \
+            --comment "Oracle Jev watchdog" \
+            --parameters commands='["echo '"$SCRIPT_B64"' | base64 -d | bash"]' \
+            --query Command.CommandId --output text)
+
+          STATUS=""; OUT=""
+          for _ in $(seq 1 20); do
+            sleep 3
+            read -r STATUS < <(aws ssm list-command-invocations --command-id "$CMD_ID" \
+              --query 'CommandInvocations[0].Status' --output text)
+            case "$STATUS" in Pending|InProgress|Delayed|None|"") continue ;; esac
+            break
+          done
+          OUT=$(aws ssm list-command-invocations --command-id "$CMD_ID" --details \
+            --query 'CommandInvocations[0].CommandPlugins[0].Output' --output text)
+          echo "SSM status: $STATUS"; echo "$OUT"
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM command $CMD_ID ended $STATUS"
+            exit 1
+          fi
+
+          LINE=$(printf '%s\n' "$OUT" | grep '^JEV|' | tail -1)
+          [ -n "$LINE" ] || { echo "::error::no JEV| line in output"; exit 1; }
+          IFS='|' read -r _ ACTION HOUR ERR OK PERR POK TOP <<< "$LINE"
+          {
+            echo "action=$ACTION"
+            echo "hour=$HOUR"
+            echo "err=$ERR"; echo "ok=$OK"; echo "perr=$PERR"; echo "pok=$POK"
+            echo "top_b64=$(printf '%s' "$TOP" | base64 -w 0)"
+          } >> "$GITHUB_OUTPUT"
+          # Manual check of the Telegram leg: keep the real counts, force the message.
+          if [ "${{ inputs.test_message || 'none' }}" != "none" ]; then
+            echo "action=${{ inputs.test_message }}" >> "$GITHUB_OUTPUT"
+            echo "test=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$ACTION" = "error" ]; then
+            echo "::error::check script: $TOP"
+            exit 1
+          fi
+
+      - name: Notify Telegram
+        if: steps.check.outputs.action == 'alert' || steps.check.outputs.action == 'recovered'
+        env:
+          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CLEAN: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
+          NOISY: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ACTION: ${{ steps.check.outputs.action }}
+          HOUR: ${{ steps.check.outputs.hour }}
+          ERR: ${{ steps.check.outputs.err }}
+          OK: ${{ steps.check.outputs.ok }}
+          PERR: ${{ steps.check.outputs.perr }}
+          POK: ${{ steps.check.outputs.pok }}
+          TOP_B64: ${{ steps.check.outputs.top_b64 }}
+          TEST: ${{ steps.check.outputs.test }}
+        run: |
+          CHAT="${CLEAN:-$NOISY}"
+          # The script already strips <>&"| from the status text, so it is HTML-safe.
+          TOP=$(printf '%s' "$TOP_B64" | base64 -d)
+          if [ "$ACTION" = "alert" ]; then
+            MSG=$(printf '🚨 <b>Oracle: Jev calls are failing</b>\n\nHour %s:00 (box time): %s errors, %s ok (hour before: %s errors / %s ok).\nMost common error: <code>%s</code>\n\nFail-open, so forecasts still work, but every article now goes to full Haiku extraction (the Jev gate saves nothing).\nLikely: OpenRouter key weekly limit or balance (402), or a provider outage.\nFix: raise the limit / top up on openrouter.ai, or switch provider — retro <code>infra/jev-provider.sh</code>.' \
+              "$HOUR" "$ERR" "$OK" "$PERR" "$POK" "$TOP")
+          else
+            MSG=$(printf '✅ <b>Oracle: Jev calls recovered</b>\n\nHour %s:00 (box time): %s ok, %s errors (hour before: %s errors / %s ok).' \
+              "$HOUR" "$OK" "$ERR" "$PERR" "$POK")
+          fi
+          if [ "$TEST" = "true" ]; then
+            MSG=$(printf '🧪 TEST — manual run with real counts, ignore\n\n%s' "$MSG")
+          fi
+          curl -sf -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
+          echo "Sent: $ACTION"
