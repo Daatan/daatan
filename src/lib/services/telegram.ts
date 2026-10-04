@@ -1067,7 +1067,7 @@ export function notifyHighConfidence(
   const msg = [
     `📈 <b>High AI confidence</b>`,
     `"${truncate(prediction.claimText, 120)}"`,
-    `AI estimate: <b>${probability}%</b>${fromLine}${settledLine}`,
+    `Evidence estimate: <b>${probability}%</b>${fromLine}${settledLine}`,
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
 

@@ -971,7 +971,7 @@ export default function ForecastDetailClient({
           `${forecasters} ${forecasters === 1 ? 'forecaster' : 'forecasters'}`,
         ]
         if (consensus != null) parts.push(`community consensus ${consensus}%`)
-        if (ai != null) parts.push(`AI estimate ${ai}%`)
+        if (ai != null) parts.push(`evidence estimate ${ai}%`)
         parts.push(status)
         return (
           <p className="text-xs text-gray-500 mt-8 pt-6 border-t border-navy-600 leading-relaxed">

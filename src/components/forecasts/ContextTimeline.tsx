@@ -448,7 +448,7 @@ export default function ContextTimeline({
               return (
                 <div className="mt-3 pt-3 border-t border-navy-600">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">AI estimate</p>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Evidence estimate</p>
                     <span
                       className={
                         isOracle
