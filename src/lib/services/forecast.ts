@@ -3,7 +3,7 @@ import type { OutcomeType } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
-import { normalizeForecastTags } from '@/lib/forecast-tags'
+import { tagConnectOrCreate } from '@/lib/services/tag'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
@@ -298,6 +298,7 @@ export async function createForecast(input: CreateForecastInput) {
     .then(rows => rows.map(r => r.slug).filter((s): s is string => s !== null))
 
   let uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs)
+  const tagEntries = input.tags?.length ? await tagConnectOrCreate(input.tags) : []
   let prediction: { id: string } | null = null
   let retries = 0
 
@@ -323,15 +324,7 @@ export async function createForecast(input: CreateForecastInput) {
           externalMarketLinkMethod: input.externalMarketId ? 'imported' : undefined,
           moderationCheckFailed: input.moderationCheckFailed ?? false,
           shareToken,
-          tags: input.tags?.length
-            ? {
-              connectOrCreate: normalizeForecastTags(input.tags)
-                .map((tagName) => {
-                  const tagSlug = slugify(tagName)
-                  return { where: { slug: tagSlug }, create: { name: tagName, slug: tagSlug } }
-                }),
-            }
-            : undefined,
+          tags: tagEntries.length ? { connectOrCreate: tagEntries } : undefined,
         },
         select: { id: true },
       })

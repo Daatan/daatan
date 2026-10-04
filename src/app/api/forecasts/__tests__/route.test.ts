@@ -55,7 +55,10 @@ vi.mock('@/lib/prisma', () => ({
         },
         newsAnchor: {
             upsert: vi.fn(),
-        }
+        },
+        tag: {
+            findMany: vi.fn(async () => []),
+        },
     },
 }))
 

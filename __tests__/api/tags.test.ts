@@ -6,7 +6,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     tag: {
       findMany: vi.fn(),
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
     },
   },
@@ -151,7 +151,7 @@ describe('POST /api/tags', () => {
     const { prisma } = await import('@/lib/prisma')
 
     mockAuth.mockResolvedValue({ user: createMockUser() } as any)
-    vi.mocked(prisma.tag.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.tag.findFirst).mockResolvedValue(null)
     vi.mocked(prisma.tag.create).mockResolvedValue({
       id: 'new-tag',
       name: 'Technology',
@@ -215,7 +215,7 @@ describe('POST /api/tags', () => {
     const { prisma } = await import('@/lib/prisma')
 
     mockAuth.mockResolvedValue({ user: createMockUser() } as any)
-    vi.mocked(prisma.tag.findUnique).mockResolvedValue({
+    vi.mocked(prisma.tag.findFirst).mockResolvedValue({
       id: 'existing', createdAt: new Date(),
       name: 'Politics',
       slug: 'politics',
@@ -233,7 +233,7 @@ describe('POST /api/tags', () => {
     const { prisma } = await import('@/lib/prisma')
 
     mockAuth.mockResolvedValue({ user: createMockUser() } as any)
-    vi.mocked(prisma.tag.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.tag.findFirst).mockResolvedValue(null)
     vi.mocked(prisma.tag.create).mockResolvedValue({
       id: 'new-tag',
       name: 'Technology',
@@ -256,7 +256,7 @@ describe('POST /api/tags', () => {
     const { prisma } = await import('@/lib/prisma')
 
     mockAuth.mockResolvedValue({ user: createMockUser() } as any)
-    vi.mocked(prisma.tag.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.tag.findFirst).mockResolvedValue(null)
     vi.mocked(prisma.tag.create).mockResolvedValue({
       id: 'new-tag',
       name: 'US Politics',
@@ -280,7 +280,7 @@ describe('POST /api/tags', () => {
     const { prisma } = await import('@/lib/prisma')
 
     mockAuth.mockResolvedValue({ user: createMockUser() } as any)
-    vi.mocked(prisma.tag.findUnique).mockRejectedValue(new Error('DB error'))
+    vi.mocked(prisma.tag.findFirst).mockRejectedValue(new Error('DB error'))
 
     const request = createRequest({ name: 'Technology' })
     const response = await POST(request, { params: Promise.resolve({}) } as any)

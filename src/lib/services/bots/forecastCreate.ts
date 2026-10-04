@@ -9,6 +9,7 @@ import { createBotLLMService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { normalizeForecastTags } from '@/lib/forecast-tags'
+import { tagConnectOrCreate } from '@/lib/services/tag'
 import { forecastBatchSchema } from '@/lib/llm/schemas'
 import {
   type BotWithUser,
@@ -277,6 +278,7 @@ export async function processTopic(
     }).then(rows => rows.map(r => r.slug).filter((s): s is string => s !== null))
     const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs)
 
+    const tagEntries = await tagConnectOrCreate(forecast.tags)
     const predictionCreateData = {
       authorId: bot.userId,
       claimText: forecast.claimText.slice(0, 499),
@@ -289,20 +291,7 @@ export async function processTopic(
       source: 'bot' as const,
       status: 'DRAFT' as const,
       shareToken: crypto.randomBytes(8).toString('hex'),
-      tags: forecast.tags?.length
-        ? {
-          connectOrCreate: forecast.tags
-            .filter((t: unknown): t is string => typeof t === 'string' && t.length > 0)
-            .slice(0, 5)
-            .map((tagName: string) => {
-              const tagSlug = slugify(tagName)
-              return {
-                where: { slug: tagSlug },
-                create: { name: tagName, slug: tagSlug },
-              }
-            }),
-        }
-        : undefined,
+      tags: tagEntries.length ? { connectOrCreate: tagEntries } : undefined,
     }
 
     let prediction: { id: string }

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { slugify } from '@/lib/utils/slugify'
+import { tagSlug } from '@/lib/utils/tag-slug'
+import { normalizeForecastTags } from '@/lib/forecast-tags'
 
 export const listTags = async () => {
   const tags = await prisma.tag.findMany({
@@ -40,9 +41,9 @@ export const getVisibleTagPredictionCount = async (tagId: string) => {
 }
 
 export const createTag = async (name: string) => {
-  const slug = slugify(name)
+  const slug = tagSlug(name)
 
-  const existing = await prisma.tag.findUnique({ where: { slug } })
+  const existing = await prisma.tag.findFirst({ where: { OR: [{ slug }, { name: name.trim() }] } })
   if (existing) {
     return { ok: false as const, error: 'Tag with this name already exists', status: 409 }
   }
@@ -53,4 +54,23 @@ export const createTag = async (name: string) => {
     data: { id: tag.id, name: tag.name, slug: tag.slug },
     status: 201,
   }
+}
+
+/**
+ * `connectOrCreate` entries for a forecast's tags. A tag that already exists is matched
+ * by name first and keeps its stored slug: name is unique too, so a row whose slug was
+ * computed differently (before tagSlug, daatan#1794) would otherwise fail the create.
+ */
+export const tagConnectOrCreate = async (rawTags: readonly unknown[] | null | undefined) => {
+  const names = normalizeForecastTags(rawTags)
+  if (names.length === 0) return []
+  const existing = await prisma.tag.findMany({
+    where: { name: { in: names } },
+    select: { name: true, slug: true },
+  })
+  const slugByName = new Map(existing.map(t => [t.name, t.slug]))
+  return names.map(name => {
+    const slug = slugByName.get(name) ?? tagSlug(name)
+    return { where: { slug }, create: { name, slug } }
+  })
 }

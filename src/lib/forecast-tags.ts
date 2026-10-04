@@ -1,4 +1,4 @@
-import { slugify } from '@/lib/utils/slugify'
+import { tagSlug } from '@/lib/utils/tag-slug'
 
 export const MAX_FORECAST_TAGS = 5
 export const MAX_TAG_LENGTH = 50
@@ -17,7 +17,7 @@ export function normalizeForecastTags(tags: readonly unknown[] | null | undefine
     if (typeof raw !== 'string') continue
     const tag = raw.trim()
     if (!tag || tag.length > MAX_TAG_LENGTH) continue
-    const key = slugify(tag) || tag.toLowerCase()
+    const key = tagSlug(tag)
     if (seen.has(key)) continue
     seen.add(key)
     out.push(tag)
