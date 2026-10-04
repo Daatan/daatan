@@ -3,6 +3,7 @@ import type { OutcomeType } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
+import { normalizeForecastTags } from '@/lib/forecast-tags'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
@@ -324,8 +325,7 @@ export async function createForecast(input: CreateForecastInput) {
           shareToken,
           tags: input.tags?.length
             ? {
-              connectOrCreate: input.tags
-                .filter((t): t is string => typeof t === 'string' && t.length > 0)
+              connectOrCreate: normalizeForecastTags(input.tags)
                 .map((tagName) => {
                   const tagSlug = slugify(tagName)
                   return { where: { slug: tagSlug }, create: { name: tagName, slug: tagSlug } }

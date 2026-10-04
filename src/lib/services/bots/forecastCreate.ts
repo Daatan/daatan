@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
+import { normalizeForecastTags } from '@/lib/forecast-tags'
 import { forecastBatchSchema } from '@/lib/llm/schemas'
 import {
   type BotWithUser,
@@ -134,10 +135,7 @@ export async function processTopic(
       const jsonMatch = rawText.match(/\{[\s\S]*\}/)
       const raw = JSON.parse(jsonMatch ? jsonMatch[0] : rawText)
       // Sanitize tags at the LLM boundary — nulls in arrays crash slugify downstream
-      forecast = {
-        ...raw,
-        tags: (raw.tags ?? []).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0),
-      }
+      forecast = { ...raw, tags: normalizeForecastTags(raw.tags) }
     } catch (err) {
       log.warn({ botId: bot.id, topic: topicTitle, err, raw: response.text }, 'Failed to parse LLM forecast JSON')
       await logBotAction(bot.id, 'ERROR', { title: topicTitle, reason: 'JSON parse failed', raw: response.text }, null, 'JSON parse failed', dryRun)

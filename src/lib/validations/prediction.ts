@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import { MAX_FORECAST_TAGS, MAX_TAG_LENGTH, normalizeForecastTags } from '@/lib/forecast-tags'
+
+// Normalised before the cap is checked, so an over-long list (e.g. an LLM-drafted
+// express forecast, #1787) is trimmed to the cap instead of failing the whole forecast.
+const forecastTagsSchema = z.preprocess(
+  (v) => (Array.isArray(v) ? normalizeForecastTags(v) : v),
+  z.array(z.string().min(1).max(MAX_TAG_LENGTH)).max(MAX_FORECAST_TAGS),
+)
 
 // ============================================
 // NEWS ANCHOR SCHEMAS
@@ -52,8 +60,8 @@ export const createPredictionSchema = z.object({
   resolutionRules: z.string().min(10, 'Resolution rules must be at least 10 characters').max(2000).optional(),
   resolveByDatetime: z.string().datetime(),
 
-  // Tags (0-5 tags from STANDARD_TAGS)
-  tags: z.array(z.string().min(1).max(50)).max(5).optional(),
+  // Tags (0–MAX_FORECAST_TAGS, preferably from STANDARD_TAGS)
+  tags: forecastTagsSchema.optional(),
 
   // Visibility
   isPublic: z.boolean().optional().default(true),
@@ -105,7 +113,7 @@ export const updatePredictionSchema = z.object({
   outcomePayload: z.record(z.string(), z.unknown()).optional(),
   resolutionRules: z.string().max(2000).optional().nullable(),
   resolveByDatetime: z.string().datetime().optional(),
-  tags: z.array(z.string().min(1).max(50)).max(5).optional(),
+  tags: forecastTagsSchema.optional(),
   isPublic: z.boolean().optional(),
 })
 

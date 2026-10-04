@@ -581,6 +581,27 @@ export function notifySecurityError(
   sendChannelNotification(msg, 'clean')
 }
 
+/** Repeated validation failures by one user on the create/publish path (#1787).
+ *  Dedupe lives in stuck-user-alert.ts (per user per window). */
+export function notifyStuckUser(info: {
+  user: { id: string; name?: string | null; email?: string | null }
+  routes: string[]
+  firstIssue: string
+  count: number
+  windowMinutes: number
+}): void {
+  if (isDevEnv()) return
+  const msg = [
+    `🧱 <b>User stuck on validation</b>`,
+    `User: <b>${escapeHtml(info.user.name || '—')}</b> <code>${escapeHtml(info.user.id)}</code>`,
+    `Failures: <b>${info.count}</b> in ${info.windowMinutes} min`,
+    `Route: <code>${escapeHtml(info.routes.join(', '))}</code>`,
+    `First issue: <code>${truncate(info.firstIssue, 200)}</code>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'noisy')
+}
+
 export function notifyResourceNotFound(pathname: string, details?: string): void {
   if (isDevEnv()) return
   const key = `404:${pathname}`

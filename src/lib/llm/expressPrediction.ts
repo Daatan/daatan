@@ -1,6 +1,7 @@
 import { SchemaType, type Schema } from '@google/generative-ai'
 import { getPromptTemplate, fillPrompt } from './bedrock-prompts'
 import { llmService } from './index'
+import { normalizeForecastTags } from '@/lib/forecast-tags'
 import { oracleSearch, type SearchResult } from '../services/oracleSearch'
 import { type OracleCallMeta } from '../services/oracleClient'
 import { buildSearchQuery } from './searchQuery'
@@ -353,6 +354,7 @@ export async function generateExpressPrediction(
       })
       const parsed: ParsedPrediction = JSON.parse(result.text)
       parsed.claimText = humanizeISODates(parsed.claimText)
+      parsed.tags = normalizeForecastTags(parsed.tags)
       return parsed
     }
 
@@ -649,6 +651,9 @@ URL: ${article.url}
     const parsed: ParsedPrediction = JSON.parse(result.text)
     // Post-process: replace any ISO timestamps that leaked into claimText
     parsed.claimText = humanizeISODates(parsed.claimText)
+    // The prompt asks for 1-3 tags but nothing enforces it; an uncapped list
+    // failed the publish-time schema and blocked new users (#1787).
+    parsed.tags = normalizeForecastTags(parsed.tags)
     return parsed
   }
 

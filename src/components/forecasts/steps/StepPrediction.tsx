@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type { PredictionFormData } from '../ForecastWizard'
 import { TagSelector } from '@/components/ui/TagSelector'
+import { normalizeForecastTags } from '@/lib/forecast-tags'
 import { SimilarForecastsWarning } from '../SimilarForecastsWarning'
 import { createClientLogger } from '@/lib/client-logger'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
@@ -42,9 +43,7 @@ export const StepPrediction = ({ formData, updateFormData }: Props) => {
           if (res.ok) {
             const data = await res.json()
             if (data.tags?.length > 0) {
-              // Combine existing and new tags, unikified, max 5
-              const currentTags = formData.tags || []
-              const combined = Array.from(new Set([...currentTags, ...data.tags])).slice(0, 5)
+              const combined = normalizeForecastTags([...(formData.tags || []), ...data.tags])
               updateFormData({ tags: combined })
             }
           }
