@@ -349,6 +349,38 @@ describe('/api/forecasts', () => {
             expect(Array.isArray(createCall.data.tags.connectOrCreate)).toBe(true)
         })
 
+        it('caps an over-long tag list at 5 instead of rejecting the forecast (#1787)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            mockAuth.mockResolvedValue({
+                user: { id: 'user1', email: 'user@example.com', role: 'USER' },
+            } as any)
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user1', rs: 100 } as any)
+            const newForecast = { id: 'new-7', claimText: 'Middle East event', status: 'DRAFT', tags: [] }
+            vi.mocked(prisma.prediction.create).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findUnique).mockResolvedValue(newForecast as any)
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+
+            const request = new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify({
+                    claimText: 'A major event starting in the Middle East will reshape the economy',
+                    resolveByDatetime: '2027-12-31T23:59:59Z',
+                    outcomeType: 'BINARY',
+                    resolutionRules: 'Resolves YES if the event occurs as described.',
+                    tags: ['Middle East', 'Economy', 'Geopolitics', 'Climate', 'Science', 'Conflict', 'Energy'],
+                }),
+            })
+
+            const response = await POST(request, { params: {} } as any)
+            expect(response.status).toBe(201)
+
+            const createCall = vi.mocked(prisma.prediction.create).mock.calls[0][0] as any
+            expect(createCall.data.tags.connectOrCreate.map((c: any) => c.create.name)).toEqual(
+                ['Middle East', 'Economy', 'Geopolitics', 'Climate', 'Science'],
+            )
+        })
+
         it('creates forecast without tags when tags not provided', async () => {
             const { prisma } = await import('@/lib/prisma')
 

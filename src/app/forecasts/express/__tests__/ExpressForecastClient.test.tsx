@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import type { GroundedDateOutcome } from '@/lib/llm/expressPrediction'
-import ExpressForecastClient, { type GeneratedPrediction } from '../ExpressForecastClient'
+import ExpressForecastClient, { localizedValidationError, type GeneratedPrediction } from '../ExpressForecastClient'
 import messages from '../../../../../messages/en.json'
 
 // Mock next/navigation
@@ -340,6 +340,60 @@ describe('ExpressForecastClient', () => {
       expect(screen.getByText('Save Changes')).toBeInTheDocument()
     })
 
+    it('blocks adding a 6th tag in edit mode and shows the limit hint (#1787)', async () => {
+      await renderInReviewState({ ...generatedData, tags: ['A', 'B', 'C', 'D'] })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+      })
+
+      const input = screen.getByPlaceholderText('Add tag...')
+      await act(async () => {
+        fireEvent.change(input, { target: { value: 'E' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+      })
+
+      expect(screen.getByText('E')).toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('Add tag...')).not.toBeInTheDocument()
+      expect(screen.getByText('Maximum of 5 tags — remove one to add another.')).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Remove tag E' }))
+      })
+      expect(screen.getByPlaceholderText('Add tag...')).toBeInTheDocument()
+    })
+
+    it('never sends more than 5 tags to the create endpoint (#1787)', async () => {
+      await renderInReviewState({ ...generatedData, tags: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] })
+
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'p1' }), { status: 201 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Confirm & Publish'))
+      })
+
+      const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[1][1]?.body as string)
+      expect(body.tags).toEqual(['A', 'B', 'C', 'D', 'E'])
+    })
+
+    it('shows a localized field message instead of the raw ZodError text (#1787)', async () => {
+      await renderInReviewState()
+
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+        error: 'Validation failed: tags (Invalid input)',
+        details: [{ path: ['tags'], message: 'Invalid input' }],
+      }), { status: 400 }))
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Confirm & Publish'))
+      })
+
+      expect(await screen.findByText(/keep at most 5 tags/)).toBeInTheDocument()
+      expect(screen.queryByText(/Validation failed/)).not.toBeInTheDocument()
+    })
+
     it('hides visibility toggle during edit mode', async () => {
       await renderInReviewState()
 
@@ -670,5 +724,27 @@ describe('ExpressForecastClient', () => {
       })
       expect(screen.queryByText('Publishing...')).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('localizedValidationError (#1787)', () => {
+  const t = (key: string, values?: Record<string, string | number>) => `${key}${values ? JSON.stringify(values) : ''}`
+
+  it('maps a tags issue to the tags message', () => {
+    expect(localizedValidationError({ details: [{ path: ['tags'] }] }, t)).toBe('validationTags{"max":5}')
+  })
+
+  it('names a known field via its localized label', () => {
+    expect(localizedValidationError({ details: [{ path: ['resolutionRules'] }] }, t))
+      .toBe('validationField{"field":"resolutionRules"}')
+  })
+
+  it('falls back to the generic message for an unknown field', () => {
+    expect(localizedValidationError({ details: [{ path: ['newsAnchorUrl'] }] }, t)).toBe('validationGeneric')
+  })
+
+  it('returns null when there are no field details (non-Zod 400)', () => {
+    expect(localizedValidationError({}, t)).toBeNull()
+    expect(localizedValidationError(null, t)).toBeNull()
   })
 })

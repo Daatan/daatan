@@ -12,12 +12,13 @@ interface TagSelectorProps {
 }
 
 import { STANDARD_TAGS } from '@/lib/constants'
+import { MAX_FORECAST_TAGS } from '@/lib/forecast-tags'
 
 export function TagSelector({
     selectedTags,
     onChange,
     suggestions = STANDARD_TAGS,
-    maxTags = 5,
+    maxTags = MAX_FORECAST_TAGS,
     placeholder = "Add a tag..."
 }: TagSelectorProps) {
     const [inputValue, setInputValue] = useState('')

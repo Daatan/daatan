@@ -46,6 +46,8 @@ Create a new prediction (status = DRAFT).
 
 **Body** — `createPredictionSchema` (`src/lib/validations/prediction.ts`)
 
+`tags` is normalised before validation (`normalizeForecastTags`, `src/lib/forecast-tags.ts`). Entries are trimmed. Empty, non-string and over-50-character entries are dropped, duplicates (by slug) are removed, and the list is cut to `MAX_FORECAST_TAGS` (5). A body with too many tags is therefore accepted with the first 5 kept instead of failing with `400` (daatan#1787).
+
 **Response** `201` — created prediction with author, newsAnchor, options
 
 **Side effect (daatan#1747):** `createForecast()` schedules a fire-and-forget born-true check (`scheduleBornTrueCheck()`, `src/lib/services/bornTrueCheck.ts`) after persisting — off this response path, so it never adds latency here. It re-runs the same research leg `POST /api/forecasts/[id]/research` uses (see below) and, when the verdict comes back decisive (`correct`/`wrong`) this soon after creation, posts a Telegram review row rather than blocking or mutating the forecast — see `docs/TELEGRAM_NOTIFICATIONS.md`.

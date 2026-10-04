@@ -40,14 +40,16 @@ describe('Tags Validation', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects more than 5 tags', () => {
-      const invalidData = {
+    // #1787: an over-long list is capped, not rejected — rejecting blocked publish.
+    it('keeps the first 5 when given more than 5 tags', () => {
+      const data = {
         ...basePrediction,
         tags: ['AI', 'Technology', 'Politics', 'Economy', 'Science', 'Crypto'],
       }
 
-      const result = createPredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+      const result = createPredictionSchema.safeParse(data)
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toEqual(['AI', 'Technology', 'Politics', 'Economy', 'Science'])
     })
 
     it('accepts empty tags array', () => {
@@ -69,24 +71,16 @@ describe('Tags Validation', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects tags with empty strings', () => {
-      const invalidData = {
-        ...basePrediction,
-        tags: ['AI', ''],
-      }
-
-      const result = createPredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+    it('drops empty tags', () => {
+      const result = createPredictionSchema.safeParse({ ...basePrediction, tags: ['AI', ''] })
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toEqual(['AI'])
     })
 
-    it('rejects tags with names exceeding 50 characters', () => {
-      const invalidData = {
-        ...basePrediction,
-        tags: ['a'.repeat(51)],
-      }
-
-      const result = createPredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+    it('drops tags with names exceeding 50 characters', () => {
+      const result = createPredictionSchema.safeParse({ ...basePrediction, tags: ['a'.repeat(51), 'AI'] })
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toEqual(['AI'])
     })
 
     it('accepts tags with exactly 50 characters', () => {
@@ -138,13 +132,12 @@ describe('Tags Validation', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects more than 5 tags for update', () => {
-      const invalidData = {
+    it('keeps the first 5 when given more than 5 tags for update', () => {
+      const result = updatePredictionSchema.safeParse({
         tags: ['AI', 'Technology', 'Politics', 'Economy', 'Science', 'Crypto'],
-      }
-
-      const result = updatePredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+      })
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toHaveLength(5)
     })
 
     it('accepts empty tags array for update', () => {
@@ -165,22 +158,16 @@ describe('Tags Validation', () => {
       expect(result.success).toBe(true)
     })
 
-    it('rejects tags with empty strings for update', () => {
-      const invalidData = {
-        tags: ['AI', ''],
-      }
-
-      const result = updatePredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+    it('drops empty tags for update', () => {
+      const result = updatePredictionSchema.safeParse({ tags: ['AI', ''] })
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toEqual(['AI'])
     })
 
-    it('rejects tags with names exceeding 50 characters for update', () => {
-      const invalidData = {
-        tags: ['a'.repeat(51)],
-      }
-
-      const result = updatePredictionSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
+    it('drops tags with names exceeding 50 characters for update', () => {
+      const result = updatePredictionSchema.safeParse({ tags: ['a'.repeat(51)] })
+      expect(result.success).toBe(true)
+      expect(result.data?.tags).toEqual([])
     })
   })
 

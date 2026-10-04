@@ -11,6 +11,7 @@ import { WarningBanner } from '@/components/ui/WarningBanner'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
+import { MAX_FORECAST_TAGS, normalizeForecastTags } from '@/lib/forecast-tags'
 import type { DateBasis, GroundedDateOutcome } from '@/lib/llm/expressPrediction'
 
 const log = createClientLogger('ExpressForecast')
@@ -74,6 +75,28 @@ export interface GeneratedPrediction {
 }
 
 type Step = 'input' | 'checking' | 'searching' | 'analyzing' | 'generating' | 'review' | 'error'
+
+// Field-level ZodError details from handleRouteError → a message in the author's
+// language, instead of the raw English "Validation failed: tags (…)" (#1787).
+const VALIDATION_FIELD_LABEL_KEYS: Record<string, string> = {
+  claimText: 'forecastClaim',
+  detailsText: 'context',
+  resolutionRules: 'resolutionRules',
+  resolveByDatetime: 'resolutionDate',
+  outcomePayload: 'options',
+  tags: 'tags',
+}
+
+export function localizedValidationError(
+  errData: { details?: Array<{ path?: unknown[] }> } | null | undefined,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string | null {
+  const field = errData?.details?.[0]?.path?.[0]
+  if (typeof field !== 'string') return null
+  if (field === 'tags') return t('validationTags', { max: MAX_FORECAST_TAGS })
+  const labelKey = VALIDATION_FIELD_LABEL_KEYS[field]
+  return labelKey ? t('validationField', { field: t(labelKey) }) : t('validationGeneric')
+}
 
 export default function ExpressForecastClient({
   userId,
@@ -363,7 +386,7 @@ export default function ExpressForecastClient({
           resolveByDatetime: finalData.resolveByDatetime,
           outcomeType: finalData.outcomeType,
           outcomePayload: finalData.outcomeType === 'MULTIPLE_CHOICE' ? { options: finalData.options } : undefined,
-          tags: finalData.tags,
+          tags: normalizeForecastTags(finalData.tags),
           newsAnchorUrl: finalData.newsAnchor?.url || undefined,
           newsAnchorTitle: finalData.newsAnchor?.title || undefined,
           source: (finalData.newsAnchor || finalData.externalMarketId) ? undefined : 'manual',
@@ -377,7 +400,7 @@ export default function ExpressForecastClient({
 
       if (!createResponse.ok) {
         const errData = await createResponse.json()
-        throw new Error(errData.error || t('createFailed'))
+        throw new Error(localizedValidationError(errData, t) ?? (errData.error || t('createFailed')))
       }
 
       const prediction = await createResponse.json()
@@ -389,7 +412,7 @@ export default function ExpressForecastClient({
 
       if (!publishResponse.ok) {
         const errData = await publishResponse.json()
-        throw new Error(errData.error || t('publishFailed'))
+        throw new Error(localizedValidationError(errData, t) ?? (errData.error || t('publishFailed')))
       }
 
       // Success: redirect to the new prediction page
@@ -443,14 +466,14 @@ export default function ExpressForecastClient({
     : ''
 
   // Tag management in edit mode
+  const tagLimitReached = (editForm?.tags?.length ?? 0) >= MAX_FORECAST_TAGS
   const addTag = () => {
-    if (newTag && editForm && !editForm.tags?.includes(newTag)) {
-      setEditForm({
-        ...editForm,
-        tags: [...(editForm.tags || []), newTag]
-      })
-      setNewTag('')
-    }
+    if (!editForm || !newTag.trim() || tagLimitReached) return
+    setEditForm({
+      ...editForm,
+      tags: normalizeForecastTags([...(editForm.tags || []), newTag]),
+    })
+    setNewTag('')
   }
 
   const removeTag = (tag: string) => {
@@ -824,7 +847,12 @@ export default function ExpressForecastClient({
                     )}
                   </span>
                 ))}
-                {isEditing && (
+                {isEditing && tagLimitReached && (
+                  <p className="text-xs text-text-secondary self-center" role="status">
+                    {t('tagLimitReached', { max: MAX_FORECAST_TAGS })}
+                  </p>
+                )}
+                {isEditing && !tagLimitReached && (
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -1067,6 +1095,15 @@ export default function ExpressForecastClient({
 
             {!isEditing && generated?.probabilitySuggestion == null && (
               <p className="text-xs text-amber-500 -mt-2">{t('noAiEstimateWarning')}</p>
+            )}
+
+            {/* Publish failures were only rendered on the input/error steps, so a
+                rejected publish left the review screen unchanged (#1787). */}
+            {error && !isEditing && (
+              <div role="alert" className="bg-red-900/20 border border-red-800/50 text-red-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
             )}
 
             <div className="flex gap-3">
