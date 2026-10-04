@@ -3,7 +3,7 @@ import { useState, useId } from 'react'
 import { Loader2, Check, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { STANDARD_TAGS } from '@/lib/constants'
-import { slugify } from '@/lib/utils/slugify'
+import { tagSlug } from '@/lib/utils/tag-slug'
 import type { Bot } from './types'
 
 interface Props {
@@ -96,7 +96,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
     ...allTags,
     ...STANDARD_TAGS
       .filter(name => !allTags.some(t => t.name.toLowerCase() === name.toLowerCase()))
-      .map(name => ({ id: `std-${name}`, name, slug: slugify(name) }))
+      .map(name => ({ id: `std-${name}`, name, slug: tagSlug(name) }))
   ]
 
   const filteredTags = suggestions.filter(t =>
@@ -301,7 +301,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                     if (e.key === 'Enter') {
                       e.preventDefault()
                       if (tagInput.trim()) {
-                        const slug = tagInput.toLowerCase().replace(/\s+/g, '-')
+                        const slug = tagSlug(tagInput)
                         if (!form.tagFilter.includes(slug)) toggleTag(slug)
                         setTagInput('')
                       }

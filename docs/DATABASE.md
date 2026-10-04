@@ -995,6 +995,13 @@ projections** of resolved commitments (`replayGlicko2History`,
 sort indexes exist on each (`rs`, `eloRating`, `mu`, `correctPredictions` DESC).
 See [SCORING_SYSTEMS.md](./SCORING_SYSTEMS.md).
 
+Tag slugs come from `tagSlug()` (`src/lib/utils/tag-slug.ts`), never plain `slugify()`:
+ASCII names slugify as before, Cyrillic is transliterated (`Россия` → `rossiya`), other
+scripts get a stable `t-<hash>`. Forecast writes go through `tagConnectOrCreate()`
+(`src/lib/services/tag.ts`), which reuses an existing tag **by name** first — `name` is
+unique too, so a row with an older slug must be connected, not re-created. Before
+daatan#1794 every non-Latin tag slugified to `''` and all of them joined one row.
+
 `pundit_tag_ratings` is the same shape and formula, for a different population:
 tracked pundits/outlets (news-indexer `Person`, keyed by `personId`, not a
 `users` row — pundits don't commit/stake) scored on `evidence_pool_articles`

@@ -29,6 +29,9 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    tag: {
+      findMany: vi.fn(async () => []),
+    },
     $transaction: vi.fn(),
   },
 }))
