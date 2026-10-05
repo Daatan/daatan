@@ -800,7 +800,10 @@ the same forecast. Capped at 10 re-extractions per run (`MAX_REEXTRACTIONS_PER_R
 concurrently via `Promise.all`. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401
 otherwise; 500 if the check itself fails. `?dryRun=true` computes the report without
 posting to Telegram or touching the dedup ledger. Returns
-`{ ok, dryRun, articlesChecked, suppressed, issues[] }`. Dedup/re-arm state is the
+`{ ok, dryRun, articlesChecked, suppressed, secondOpinionFailures, issues[] }` —
+`secondOpinionFailures` counts second opinions that returned no forecast, by Oracul
+`failureClass` (daatan#1798; detector 1 was silently dead 08-27→10-04 behind a missing IAM
+grant). The workflow turns red when every candidate failed (abstains excluded). Dedup/re-arm state is the
 `evidence_second_opinion_alerts` table — same reconcile-wholesale shape as evidence-health.
 Files no GitHub issues; a human triages via `/audit` or manually. Driven Mon/Thu by
 `.github/workflows/evidence-second-opinion.yml`.

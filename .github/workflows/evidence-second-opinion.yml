@@ -79,3 +79,16 @@ jobs:
             echo "Evidence second-opinion check failed with HTTP $HTTP_CODE"
             exit 1
           fi
+
+          # daatan#1798: detector 1 was silently dead for five weeks (every second opinion
+          # failed, the run still green). Red when every candidate failed; abstains are
+          # real answers and don't count.
+          CHECKED=$(echo "$BODY" | jq -r '.articlesChecked // 0')
+          FAILED=$(echo "$BODY" | jq -r '[(.secondOpinionFailures // {}) | to_entries[] | select(.key != "oracle_abstain") | .value] | add // 0')
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::warning::second opinion failed for $FAILED/$CHECKED article(s)"
+          fi
+          if [ "$CHECKED" -gt 0 ] && [ "$FAILED" -eq "$CHECKED" ]; then
+            echo "::error::every second opinion failed ($FAILED/$CHECKED) — detector 1 is not running"
+            exit 1
+          fi

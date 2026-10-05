@@ -245,6 +245,34 @@ describe('checkEvidenceSecondOpinion — detector 2 same-source drift', () => {
   })
 })
 
+describe('checkEvidenceSecondOpinion — failed second opinions (daatan#1798)', () => {
+  it('counts a second opinion that returned no forecast by failure class', async () => {
+    const now = new Date()
+    const user = await makeUser()
+    const prediction = await makePrediction(user.id, { createdAt: now, confidence: 70 })
+    await makeArticle(prediction.id, { stance: -0.4, publishedDate: isoDate(daysAgo(1, now)) })
+    oracleMock.mockResolvedValue({ forecast: null, logId: null, failureClass: 'oracle_http' } as never)
+
+    const result = await checkEvidenceSecondOpinion(now, { dryRun: true })
+
+    expect(result.articlesChecked).toBe(1)
+    expect(result.issues).toEqual([])
+    expect(result.secondOpinionFailures).toEqual({ oracle_http: 1 })
+  })
+
+  it('reports no failures when the second opinion came back', async () => {
+    const now = new Date()
+    const user = await makeUser()
+    const prediction = await makePrediction(user.id, { createdAt: now, confidence: 70 })
+    await makeArticle(prediction.id, { stance: -0.4, publishedDate: isoDate(daysAgo(1, now)) })
+    oracleMock.mockResolvedValue(oracleResult(30) as never)
+
+    const result = await checkEvidenceSecondOpinion(now, { dryRun: true })
+
+    expect(result.secondOpinionFailures).toEqual({})
+  })
+})
+
 describe('checkEvidenceSecondOpinion — dedup + dry run', () => {
   it('dry run never writes to the dedup ledger', async () => {
     const now = new Date()
