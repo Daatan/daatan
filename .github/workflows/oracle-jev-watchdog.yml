@@ -9,10 +9,13 @@ name: Oracle Jev Watchdog
 # 402 for ~6h and it was found by hand. Jev now runs through an OpenRouter key shared with
 # daatan that has a weekly spend limit, which fails exactly the same way.
 #
-#   • Hourly. Ships scripts/check-oracle-jev.sh to the Oracle box over SSM (read-only: it
-#     counts `event=jev_gate` log lines) and reads its one-line verdict back.
-#   • Edge-triggered: one 🚨 when an hour turns mostly-errors, a reminder every 6h while it
-#     stays broken, one ✅ when it recovers. Silent otherwise. Thresholds live in the script.
+#   • Scheduled hourly, but GitHub actually runs it every 3-7h (daatan#1796). Ships
+#     scripts/check-oracle-jev.sh to the Oracle box over SSM; it counts `event=jev_gate` log
+#     lines for every hour since the previous check (state file on the box, 12h cap) and
+#     prints a one-line verdict.
+#   • Edge-triggered: one 🚨 when Jev turns mostly-errors, a reminder every 6h while it
+#     stays broken, one ✅ when it recovers, one ⚠️ for an outage that started and ended
+#     between two runs. Silent otherwise. Thresholds live in the script.
 #   • Clean channel: a Jev outage needs a human (top up / raise the key limit / switch the
 #     provider with retro's infra/jev-provider.sh), so it is actionable, not noise.
 #   • If the SSM call itself fails the run goes red rather than alerting — box/agent health
@@ -26,7 +29,7 @@ on:
       test_message:
         description: 'Send a sample message regardless of the verdict (to check the Telegram leg)'
         type: choice
-        options: [none, alert, recovered]
+        options: [none, alert, blip, recovered]
         default: none
 
 env:
@@ -81,11 +84,13 @@ jobs:
 
           LINE=$(printf '%s\n' "$OUT" | grep '^JEV|' | tail -1)
           [ -n "$LINE" ] || { echo "::error::no JEV| line in output"; exit 1; }
-          IFS='|' read -r _ ACTION HOUR ERR OK PERR POK TOP <<< "$LINE"
+          # TOP stays last so a stray '|' in it can't shift the other fields.
+          IFS='|' read -r _ ACTION HOUR ERR OK NBROKEN NHOURS FIRST LAST TOP <<< "$LINE"
           {
             echo "action=$ACTION"
             echo "hour=$HOUR"
-            echo "err=$ERR"; echo "ok=$OK"; echo "perr=$PERR"; echo "pok=$POK"
+            echo "err=$ERR"; echo "ok=$OK"
+            echo "nbroken=$NBROKEN"; echo "nhours=$NHOURS"; echo "first=$FIRST"; echo "last=$LAST"
             echo "top_b64=$(printf '%s' "$TOP" | base64 -w 0)"
           } >> "$GITHUB_OUTPUT"
           # Manual check of the Telegram leg: keep the real counts, force the message.
@@ -99,7 +104,7 @@ jobs:
           fi
 
       - name: Notify Telegram
-        if: steps.check.outputs.action == 'alert' || steps.check.outputs.action == 'recovered'
+        if: contains(fromJSON('["alert","blip","recovered"]'), steps.check.outputs.action)
         env:
           BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CLEAN: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
@@ -108,21 +113,28 @@ jobs:
           HOUR: ${{ steps.check.outputs.hour }}
           ERR: ${{ steps.check.outputs.err }}
           OK: ${{ steps.check.outputs.ok }}
-          PERR: ${{ steps.check.outputs.perr }}
-          POK: ${{ steps.check.outputs.pok }}
+          NBROKEN: ${{ steps.check.outputs.nbroken }}
+          NHOURS: ${{ steps.check.outputs.nhours }}
+          FIRST: ${{ steps.check.outputs.first }}
+          LAST: ${{ steps.check.outputs.last }}
           TOP_B64: ${{ steps.check.outputs.top_b64 }}
           TEST: ${{ steps.check.outputs.test }}
         run: |
           CHAT="${CLEAN:-$NOISY}"
           # The script already strips <>&"| from the status text, so it is HTML-safe.
           TOP=$(printf '%s' "$TOP_B64" | base64 -d)
-          if [ "$ACTION" = "alert" ]; then
-            MSG=$(printf '🚨 <b>Oracle: Jev calls are failing</b>\n\nHour %s:00 (box time): %s errors, %s ok (hour before: %s errors / %s ok).\nMost common error: <code>%s</code>\n\nFail-open, so forecasts still work, but every article now goes to full Haiku extraction (the Jev gate saves nothing).\nLikely: OpenRouter key weekly limit or balance (402), or a provider outage.\nFix: raise the limit / top up on openrouter.ai, or switch provider — retro <code>infra/jev-provider.sh</code>.' \
-              "$HOUR" "$ERR" "$OK" "$PERR" "$POK" "$TOP")
-          else
-            MSG=$(printf '✅ <b>Oracle: Jev calls recovered</b>\n\nHour %s:00 (box time): %s ok, %s errors (hour before: %s errors / %s ok).' \
-              "$HOUR" "$OK" "$ERR" "$PERR" "$POK")
-          fi
+          FIX='Likely: OpenRouter key weekly limit or balance (402), or a provider outage.\nFix: raise the limit / top up on openrouter.ai, or switch provider — retro <code>infra/jev-provider.sh</code>.'
+          case "$ACTION" in
+            alert)
+              MSG=$(printf '🚨 <b>Oracle: Jev calls are failing</b>\n\nHour %s:00 (box time): %s errors, %s ok. Broken %s of the last %s checked hours (since %s:00).\nMost common error: <code>%s</code>\n\nFail-open, so forecasts still work, but every article now goes to full Haiku extraction (the Jev gate saves nothing).\n'"$FIX" \
+                "$HOUR" "$ERR" "$OK" "$NBROKEN" "$NHOURS" "$FIRST" "$TOP") ;;
+            blip)
+              MSG=$(printf '⚠️ <b>Oracle: Jev was failing, now recovered</b>\n\nBroken %s of the last %s checked hours (%s:00 – %s:00, box time); hour %s:00 is fine again (%s ok, %s errors).\nMost common error: <code>%s</code>\n\nIf this was a 402, the key limit was hit and will be hit again.\n'"$FIX" \
+                "$NBROKEN" "$NHOURS" "$FIRST" "$LAST" "$HOUR" "$OK" "$ERR" "$TOP") ;;
+            *)
+              MSG=$(printf '✅ <b>Oracle: Jev calls recovered</b>\n\nHour %s:00 (box time): %s ok, %s errors.' \
+                "$HOUR" "$OK" "$ERR") ;;
+          esac
           if [ "$TEST" = "true" ]; then
             MSG=$(printf '🧪 TEST — manual run with real counts, ignore\n\n%s' "$MSG")
           fi

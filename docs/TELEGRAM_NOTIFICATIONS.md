@@ -88,16 +88,19 @@ Only **acute** conditions alert. Each one starts, gets fixed, and stops, so a re
 
 ---
 
-## Oracle Jev watchdog (`oracle-jev-watchdog.yml` — hourly, at :12)
+## Oracle Jev watchdog (`oracle-jev-watchdog.yml` — scheduled hourly at :12; GitHub actually runs it every 3–7h)
 
 Watches whether retro's oracle-api can actually reach **Jev**, its cheap pre-extraction gate (retro#850, daatan#1792). Jev is fail-open: when every call errors (a 402 from an exhausted balance or the OpenRouter key's weekly limit — the key is shared with daatan — or a provider outage) articles just go through to full Haiku extraction, so nothing breaks visibly and only cost goes up. On 2026-10-04 that ran ~6h unnoticed.
 
-Runs from the **GitHub Actions runner**: ships `scripts/check-oracle-jev.sh` to the Oracle box (`i-00ac444b94c5ff9b2`) over SSM, which read-only counts `event=jev_gate` lines in `oracle_log.txt` for the last two complete hours. An hour is **broken** at ≥3 errors that are ≥50% of its calls. Edge-triggered, **clean** channel (noisy fallback):
+Runs from the **GitHub Actions runner**: ships `scripts/check-oracle-jev.sh` to the Oracle box (`i-00ac444b94c5ff9b2`) over SSM, which counts `event=jev_gate` lines in `oracle_log.txt` per hour for **every complete hour since the previous check** (capped at 12h). Because GitHub's scheduler skips most hourly runs, the script keeps a small state file on the box — `/var/lib/daatan-jev-watchdog/state`: last checked hour, last state, last alert time (daatan#1796). An hour is **broken** at ≥3 errors that are ≥50% of its calls; the verdict is taken on the latest hour that had any calls (quiet hours never flip the state). Edge-triggered, **clean** channel (noisy fallback):
 
 | Event | Icon | Trigger |
 |---|---|---|
-| Jev failing | 🚨 | last hour broken and the one before was not — or still broken on a 6th hour (00/06/12/18, box time), as a reminder |
-| Jev recovered | ✅ | the hour before was broken, the last hour is not and had successful calls |
+| Jev failing | 🚨 | latest hour broken and the previous state was ok — or still broken ≥6h after the last 🚨, as a reminder |
+| Jev failed and recovered between runs | ⚠️ | previous state ok, some hour since the last check was broken, the latest hour is fine again |
+| Jev recovered | ✅ | previous state broken, the latest hour is not and had successful calls |
+
+No state file (first run, or after deleting it) means a two-hour window and "previously ok". The alert time is saved before the Telegram send, so a failed send is not retried for 6h — the red run is the signal. Manual check of the Telegram leg: dispatch with `test_message=alert|blip|recovered`.
 
 A failed SSM call turns the run red instead of alerting (box health is covered by `oracle-ec2-status-check-failed`).
 
