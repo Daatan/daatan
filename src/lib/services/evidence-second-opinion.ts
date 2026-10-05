@@ -2,7 +2,7 @@ import { Prisma, type ClaimDirection, type ClaimArchetype } from '@prisma/client
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
-import { getOraculForecast } from '@/lib/services/oracle'
+import { getOraculForecast, type OracleFailureClass } from '@/lib/services/oracle'
 import type { EvidenceSecondOpinionIssue } from '@/lib/services/telegram'
 
 const log = createLogger('evidence-second-opinion')
@@ -164,10 +164,13 @@ async function findCandidates(now: Date): Promise<CandidateRow[]> {
  * Re-read one candidate article with the expensive model, isolated to that one
  * article (`articles: [...]`, `max_articles` unaffected — see getOraculForecast).
  * Never persists anything: this is a diagnostic re-read, not a pool write.
- * Returns null on any Oracul failure (unconfigured, transport, abstain) — a
- * missing second opinion is silently skipped, not escalated.
+ * A missing second opinion is never escalated as a finding, but its failure class
+ * is returned so the run can count it (daatan#1798): detector 1 was dead for five
+ * weeks behind a missing IAM grant while every run reported success.
  */
-async function secondOpinion(row: CandidateRow): Promise<number | null> {
+async function secondOpinion(
+  row: CandidateRow,
+): Promise<{ pct: number } | { failureClass: OracleFailureClass }> {
   const result = await getOraculForecast(
     row.claim_text,
     {
@@ -189,8 +192,8 @@ async function secondOpinion(row: CandidateRow): Promise<number | null> {
     },
     { source: 'evidence-second-opinion', predictionId: row.prediction_id },
   )
-  if (!result.forecast) return null
-  return stancePct(result.forecast.mean)
+  if (!result.forecast) return { failureClass: result.failureClass ?? 'oracle_network' }
+  return { pct: stancePct(result.forecast.mean) }
 }
 
 interface ModelDisagreementFinding {
@@ -204,11 +207,22 @@ interface ModelDisagreementFinding {
  * `findCandidates`, not serialization. Sequential would risk the cron route's own
  * timeout at MAX_REEXTRACTIONS_PER_RUN x FORECAST_TIMEOUT_MS (up to 5 minutes).
  */
-async function runDetector1(candidates: CandidateRow[]): Promise<ModelDisagreementFinding[]> {
+async function runDetector1(
+  candidates: CandidateRow[],
+): Promise<{ findings: ModelDisagreementFinding[]; failures: SecondOpinionFailures }> {
+  const failures: SecondOpinionFailures = {}
   const results = await Promise.all(
     candidates.map(async (row) => {
-      const expensivePct = await secondOpinion(row)
-      if (expensivePct === null) return null
+      const opinion = await secondOpinion(row)
+      if ('failureClass' in opinion) {
+        failures[opinion.failureClass] = (failures[opinion.failureClass] ?? 0) + 1
+        log.warn(
+          { predictionId: row.prediction_id, articleId: row.article_id, failureClass: opinion.failureClass },
+          'event=second_opinion_failed',
+        )
+        return null
+      }
+      const expensivePct = opinion.pct
 
       const disagreement = Math.abs(row.stance_pct - expensivePct)
       log.info(
@@ -234,7 +248,7 @@ async function runDetector1(candidates: CandidateRow[]): Promise<ModelDisagreeme
       return finding
     }),
   )
-  return results.filter((f): f is ModelDisagreementFinding => f !== null)
+  return { findings: results.filter((f): f is ModelDisagreementFinding => f !== null), failures }
 }
 
 interface SourceDriftRow {
@@ -354,10 +368,14 @@ async function reconcileAlerts(activeKeys: string[]): Promise<Set<string>> {
   return claimed
 }
 
+/** Second opinions that returned no forecast, by Oracul failure class. */
+export type SecondOpinionFailures = Partial<Record<OracleFailureClass, number>>
+
 export interface EvidenceSecondOpinionResult {
   issues: EvidenceSecondOpinionIssue[]
   suppressed: number
   articlesChecked: number
+  secondOpinionFailures: SecondOpinionFailures
 }
 
 /**
@@ -372,22 +390,31 @@ export async function checkEvidenceSecondOpinion(
 ): Promise<EvidenceSecondOpinionResult> {
   const candidates = await findCandidates(now)
   const [detector1, detector2] = await Promise.all([runDetector1(candidates), runDetector2(now)])
+  const secondOpinionFailures = detector1.failures
 
-  const findings = [...detector1, ...detector2]
+  const findings = [...detector1.findings, ...detector2]
   const allIssues = findings.map((f) => f.issue)
 
   if (opts.dryRun) {
-    log.info({ articlesChecked: candidates.length, findings: findings.length }, 'event=evidence_second_opinion_dry_run')
-    return { issues: allIssues, suppressed: 0, articlesChecked: candidates.length }
+    log.info(
+      { articlesChecked: candidates.length, findings: findings.length, secondOpinionFailures },
+      'event=evidence_second_opinion_dry_run',
+    )
+    return { issues: allIssues, suppressed: 0, articlesChecked: candidates.length, secondOpinionFailures }
   }
 
   const claimed = await reconcileAlerts(findings.map((f) => f.key))
   const fired = findings.filter((f) => claimed.has(f.key)).map((f) => f.issue)
 
   log.info(
-    { articlesChecked: candidates.length, active: findings.length, fired: fired.length },
+    { articlesChecked: candidates.length, active: findings.length, fired: fired.length, secondOpinionFailures },
     'event=evidence_second_opinion_check',
   )
 
-  return { issues: fired, suppressed: findings.length - fired.length, articlesChecked: candidates.length }
+  return {
+    issues: fired,
+    suppressed: findings.length - fired.length,
+    articlesChecked: candidates.length,
+    secondOpinionFailures,
+  }
 }

@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       notifyEvidenceSecondOpinionDigest({
         issues: result.issues,
         articlesChecked: result.articlesChecked,
+        secondOpinionFailures: result.secondOpinionFailures,
       })
     }
 
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
       dryRun,
       articlesChecked: result.articlesChecked,
       suppressed: result.suppressed,
+      secondOpinionFailures: result.secondOpinionFailures,
       issues: result.issues,
     })
   } catch (err) {
