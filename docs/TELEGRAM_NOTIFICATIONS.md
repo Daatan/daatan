@@ -113,7 +113,7 @@ Sent by the **EC2 app process** via `GET /api/cron/heartbeat` (triggered by `hea
 | Event | Icon | Message |
 |---|---|---|
 | Daily summary | 📊 | `Daily summary — vX.Y.Z · N new users · N forecasts · N commitments · N resolved · search U/T providers usable` (last 24h, from Prisma counts + Oracul `/search/health`) |
-| Backup restore failed | 🚨 | `Backup Verification FAILED — reason — Manual investigation required` (sent from `scripts/verify-backup.sh` on EC2) |
+| Backup restore failed | 🚨 | `DB Backup restore verification FAILED` — sent by `backup.yml`'s failure step, which now waits for the SSM verify command (daatan#1808). `scripts/verify-backup.sh` also posts `Backup Verification FAILED — reason` itself, but only when it can read Telegram credentials from `~/app/.env`, which under SSM (root) it can't — so in the scheduled run the workflow message is the one you see. |
 
 ---
 
