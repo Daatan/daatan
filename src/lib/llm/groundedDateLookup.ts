@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/logger'
 import { vertexEnv, vertexEndpoint, vertexAccessToken } from './providers/vertex'
+import { stageModel } from '@/lib/llm/stageModels'
 
 const log = createLogger('grounded-date-lookup')
 
@@ -88,7 +89,7 @@ export async function lookupGroundedEventDate(
   const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS)
   try {
     const token = await vertexAccessToken(env)
-    const res = await fetch(vertexEndpoint(env, LOOKUP_MODEL, 'generateContent'), {
+    const res = await fetch(vertexEndpoint(env, stageModel('grounded_date', LOOKUP_MODEL), 'generateContent'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({

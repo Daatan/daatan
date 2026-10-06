@@ -1,5 +1,6 @@
 import { llmService } from './index'
 import { createLogger } from '@/lib/logger'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('search-query')
 
@@ -56,7 +57,7 @@ export async function buildSearchQuery(claim: string): Promise<string> {
 
   const extraction = (async (): Promise<string> => {
     const prompt = EXTRACTION_PROMPT.replace('{claim}', () => cleaned)
-    const res = await llmService.generateContent({ prompt, temperature: 0 })
+    const res = await llmService.generateContent({ ...forStage('search_query'), prompt, temperature: 0 })
     return res.text.trim().replace(/^["']+|["']+$/g, '').replace(/\s+/g, ' ').trim()
   })()
 

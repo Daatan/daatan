@@ -1,3 +1,4 @@
+import type { LlmStage } from './stageModels'
 import { Schema } from '@google/generative-ai'
 
 export interface LLMRequest {
@@ -13,6 +14,8 @@ export interface LLMRequest {
    *  the non-Google fallback legs keep their own pinned models, so the chain's
    *  degradation behavior is unchanged. */
   model?: string
+  /** Which call site this is (#1800) — logged, and what `LLM_STAGE_MODELS` keys on. */
+  stage?: LlmStage
 }
 
 export interface LLMResponse {

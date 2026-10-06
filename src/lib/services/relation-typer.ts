@@ -25,6 +25,7 @@ import { llmService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { createLogger } from '@/lib/logger'
 import { proposeRelation, supersedeStaleModelRows, type ProposeOutcome, type RelationProposal } from './question-relation'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('relation-typer')
 
@@ -173,7 +174,7 @@ export async function typePair(pair: CandidatePair): Promise<TyperVerdict | null
       bDirection: pair.bDirection ?? 'unknown',
     })
     const res = await withTimeout(
-      llmService.generateContent({ prompt, schema: relationTyperSchema, temperature: 0 }),
+      llmService.generateContent({ ...forStage('relation_typer'), prompt, schema: relationTyperSchema, temperature: 0 }),
       TYPE_TIMEOUT_MS,
     )
     return verdictSchema.parse(JSON.parse(res.text))

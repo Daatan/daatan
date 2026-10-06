@@ -5,6 +5,7 @@ import { searchArticlesMultilingual } from '@/lib/utils/multilingualSearch'
 import { llmService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { queryGenerationSchema, researchSchema } from '@/lib/llm/schemas'
+import { forStage } from '@/lib/llm/stageModels'
 
 // Resolution research runs after the fact: confirmation coverage (hands-ons,
 // day-after reports) often lands just past the deadline, so search a few days
@@ -179,6 +180,7 @@ export async function runResolutionResearch(
     })
 
     const qRes = await llmService.generateContent({
+      ...forStage('research_queries'),
       prompt,
       schema: queryGenerationSchema,
       temperature: 0,
@@ -264,7 +266,7 @@ export async function runResolutionResearch(
     prompt,
     schema: researchSchema,
     temperature: 0,
-    model: RESEARCH_VERDICT_MODEL,
+    ...forStage('research_verdict', RESEARCH_VERDICT_MODEL),
   })
 
   const llmMs = Date.now() - llmStart

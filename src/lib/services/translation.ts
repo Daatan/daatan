@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { locales, defaultLocale } from '@/i18n/config'
 import { notifyTranslationFailed } from '@/lib/services/telegram'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('translation-service')
 
@@ -77,6 +78,7 @@ export async function callGeminiTranslate(
   ].join('\n')
 
   const response = await llmService.generateContent({
+    ...forStage('translation'),
     prompt,
     temperature: 0,
   })
@@ -196,7 +198,7 @@ async function detectAndTranslateToEnglish(
     .filter(Boolean)
     .join('\n')
 
-  const res = await llmService.generateContent({ prompt, temperature: 0 })
+  const res = await llmService.generateContent({ ...forStage('translation_detect'), prompt, temperature: 0 })
   const match = res.text.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No JSON object in detect-translate response')
   const parsed = JSON.parse(match[0]) as Record<string, unknown>
