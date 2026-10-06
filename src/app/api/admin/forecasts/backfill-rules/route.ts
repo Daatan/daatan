@@ -3,12 +3,14 @@ import { llmService } from '@/lib/llm'
 import { fillPrompt, getPromptTemplate } from '@/lib/llm/bedrock-prompts'
 import { rulesSchema } from '@/lib/llm/schemas'
 import { findPredictionsWithoutRules, updateForecastResolutionRules } from '@/lib/services/forecast'
+import { forStage } from '@/lib/llm/stageModels'
 
 export const maxDuration = 300
 
 async function generateRules(claimText: string, detailsText: string | null, outcomeType: string): Promise<string> {
   const template = await getPromptTemplate('backfill-rules')
   const response = await llmService.generateContent({
+    ...forStage('backfill_rules'),
     prompt: fillPrompt(template, {
       claimText,
       detailsLine: detailsText ? `Details: "${detailsText}"` : '',

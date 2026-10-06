@@ -5,6 +5,7 @@ import { Prisma, ClaimDirection, ClaimArchetype } from '@prisma/client'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
 import { llmService } from '@/lib/llm'
 import { createLogger } from '@/lib/logger'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('temporal-classifier')
 
@@ -117,7 +118,7 @@ export async function classifyClaim(input: {
     })
 
     const response = await withTimeout(
-      llmService.generateContent({ prompt, schema: temporalClassifierSchema, temperature: 0 }),
+      llmService.generateContent({ ...forStage('temporal_classifier'), prompt, schema: temporalClassifierSchema, temperature: 0 }),
       CLASSIFY_TIMEOUT_MS,
     )
 

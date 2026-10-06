@@ -22,6 +22,7 @@ import {
   saveContextUpdate,
   listContextSnapshots,
 } from '@/lib/services/context'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('forecast-context')
 
@@ -503,7 +504,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
                 try {
                     // LLM runs concurrently with oracle (estimationRace already started above)
-                    const result = await llmService.generateContent({ prompt, temperature: 0 })
+                    const result = await llmService.generateContent({ ...forStage('context_summary'), prompt, temperature: 0 })
                     const newContextSummary = result.text.trim()
                     const llmMs = Date.now() - t1
                     const now = new Date()

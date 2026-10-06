@@ -3,6 +3,7 @@ import { getPromptTemplate, fillPrompt } from '../llm/bedrock-prompts'
 import { llmService } from '../llm'
 import { createLogger } from '@/lib/logger'
 import { z } from 'zod'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('moderation-service')
 
@@ -58,6 +59,7 @@ export async function checkContent(
     })
 
     const result = await llmService.generateContent({
+      ...forStage('moderation'),
       prompt,
       schema: moderationSchema,
       temperature: 0, // High consistency for moderation

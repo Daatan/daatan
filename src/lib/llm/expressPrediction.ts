@@ -16,6 +16,7 @@ import { localizeForecastForAuthor, type LocalizedForecast } from '../services/t
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 import { lookupGroundedEventDate } from './groundedDateLookup'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('express-prediction')
 
@@ -338,6 +339,7 @@ export async function generateExpressPrediction(
     const template = await getPromptTemplate('express-prediction')
     const draft = async (text: string): Promise<ParsedPrediction> => {
       const result = await llmService.generateContent({
+        ...forStage('express_draft'),
         prompt: fillPrompt(template, {
           userInput,
           articlesText: text,
@@ -516,6 +518,7 @@ export async function generateExpressPrediction(
         const template = await getPromptTemplate('topic-extraction')
         const prompt = fillPrompt(template, { articleContent: articleContent.substring(0, 3000) })
         const extractResult = await llmService.generateContent({
+          ...forStage('express_topic'),
           prompt,
           temperature: 0,
         })
@@ -634,6 +637,7 @@ URL: ${article.url}
   const template = await getPromptTemplate('express-prediction')
   const draft = async (text: string): Promise<ParsedPrediction> => {
     const result = await llmService.generateContent({
+      ...forStage('express_draft'),
       prompt: fillPrompt(template, {
         userInput,
         articlesText: text,
@@ -825,6 +829,7 @@ Snippet: ${article.snippet}
 
   try {
     const result = await llmService.generateContent({
+      ...forStage('guess_chances'),
       prompt,
       schema: guessChancesSchema,
       temperature: 0,

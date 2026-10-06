@@ -43,6 +43,30 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 A single provider failing is **logged but not paged** — a later leg may still succeed, and a fallback that rescues the call is silent. Telegram is paged (via `notifyLlmError`) **only when the whole chain fails**, with the attempted provider chain (e.g. `Gemini → Oracul → OpenRouter`) and the last error. See `docs/TELEGRAM_NOTIFICATIONS.md`.
 
+### Model per stage (#1800)
+
+Every `llmService.generateContent` call names its stage (`forStage('<stage>')`,
+`src/lib/llm/stageModels.ts`, the list is `LLM_STAGES`). One env var moves any stage
+independently of the rest:
+
+```
+LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flash"
+```
+
+- Unset/empty = every stage on its built-in model (the chain's `GEMINI_MODEL`;
+  `research_verdict` → `gemini-2.5-pro`; `grounded_date` → `gemini-2.5-flash`).
+- Values are **Google model ids** — they reach the Vertex/Gemini legs only. The non-Google
+  fallback legs (Oracul Nova Pro, OpenRouter, Ollama) keep their pinned models.
+- Prod: set it in Secrets Manager `daatan-env-prod`, then redeploy — `blue-green-deploy.sh`
+  passes it only when non-empty (same for `EVIDENCE_SECOND_OPINION_MODEL`, which before #1800
+  never reached the container at all).
+- When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
+  with the `stage` — the stage ran on another vendor's model. Not paged.
+
+Not covered, by design: embeddings (`embedding.ts`, `gemini-embedding-2` @ 768 dims — a change
+means re-embedding every row), the LLM panel roster (a model change starts a new Brier series)
+and bots (`Bot.modelPreference`, per bot in the DB).
+
 ## Code Structure
 
 *   **`src/lib/llm/types.ts`**: Interfaces for `LLMProvider`, `LLMRequest`, `LLMResponse`.

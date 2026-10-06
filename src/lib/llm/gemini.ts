@@ -3,6 +3,7 @@ import { getPromptTemplate, fillPrompt } from './bedrock-prompts'
 import { llmService } from './index'
 import { createLogger } from '@/lib/logger'
 import { STANDARD_TAGS } from '@/lib/constants'
+import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('llm-gemini')
 
@@ -61,6 +62,7 @@ export async function suggestTags(claim: string, details?: string) {
 
   try {
     const result = await llmService.generateContent({
+      ...forStage('tags'),
       prompt,
       schema: suggestTagsSchema,
       temperature: 0,
@@ -85,6 +87,7 @@ export async function extractPrediction(text: string) {
 
   try {
     const result = await llmService.generateContent({
+      ...forStage('prediction_extract'),
       prompt,
       schema: predictionSchema,
       temperature: 0,
