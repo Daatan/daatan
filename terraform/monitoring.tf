@@ -514,20 +514,26 @@ resource "aws_cloudwatch_metric_alarm" "ec2_disk_high" {
 }
 
 # --------------------------------------------------------------------
-# Swap high — prod + staging (CWAgent). Sustained swap on a 2 GB box is
-# an early memory-pressure / pre-OOM signal.
+# Swap high — prod + staging (CWAgent). Prod is a 4 GB t3.medium with a
+# 2 GB swapfile; staging a 2 GB t3.small.
+#
+# Threshold 50%, not 25% (#1808): swap_used_percent only ratchets up — pages
+# swapped out during a brief spike stay there until a restart even after RAM
+# frees up, so 25% fired on prod with RAM at ~35% and paged on noise (backup
+# verification restoring into the live DB, 10-03 and 10-06). Live memory
+# pressure is daatan-*-memory-high's job; this one catches swap filling up.
 # --------------------------------------------------------------------
 resource "aws_cloudwatch_metric_alarm" "ec2_swap_high" {
   for_each = local.cwagent_instances
 
   alarm_name          = "${each.key}-ec2-swap-high"
-  alarm_description   = "${each.key} swap usage >= 25% — memory pressure"
+  alarm_description   = "${each.key} swap usage >= 50% — swap filling up"
   metric_name         = "swap_used_percent"
   namespace           = "CWAgent"
   statistic           = "Average"
   period              = 300
   evaluation_periods  = 3
-  threshold           = 25
+  threshold           = 50
   comparison_operator = "GreaterThanOrEqualToThreshold"
   alarm_actions       = [aws_sns_topic.infra_alerts.arn]
   ok_actions          = [aws_sns_topic.infra_alerts.arn]
