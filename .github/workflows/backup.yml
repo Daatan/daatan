@@ -81,12 +81,13 @@ jobs:
           # Wait for the result: this used to be fire-and-forget, so the job stayed
           # green while every verification failed for weeks (#1808). A failure here
           # fails the job, which triggers the Telegram step below.
-          # Restore takes ~5 min on the current DB — SSM timeout set to 10 min.
+          # The restore runs in a memory-capped throwaway container and takes several
+          # minutes — SSM timeout 20 min, polled for up to 21.
           COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=instanceids,Values=$INSTANCE_ID" \
             --comment "Backup restore verification $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --timeout-seconds 600 \
+            --timeout-seconds 1200 \
             --parameters commands='[
               "set -e",
               "mkdir -p ~/app/scripts",
@@ -99,25 +100,26 @@ jobs:
             --query "Command.CommandId")
           echo "Command ID: $COMMAND_ID"
 
-          for i in $(seq 1 66); do
+          for i in $(seq 1 126); do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" --details \
               --query "CommandInvocations[0].Status" --output text)
             echo "Status: $STATUS"
             if [[ "$STATUS" == "Success" ]]; then
+              aws ssm list-command-invocations --command-id "$COMMAND_ID" --details \
+                --query "CommandInvocations[0].CommandPlugins[0].Output" --output text | tail -5
               echo "✅ Backup restore verified"
               exit 0
             elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" || "$STATUS" == "TimedOut" ]]; then
-              # Output starts with S3 download progress; the verdict is at the end.
               aws ssm list-command-invocations --command-id "$COMMAND_ID" --details \
                 --query "CommandInvocations[0].CommandPlugins[0].Output" --output text \
-                | tr '\r' '\n' | grep -v '^Completed ' | tail -20
+                | tail -20
               echo "❌ Backup restore verification failed"
               exit 1
             fi
             sleep 10
           done
-          echo "❌ Backup restore verification did not finish in 11 minutes"
+          echo "❌ Backup restore verification did not finish in 21 minutes"
           exit 1
 
       - name: Alert via Telegram on failure
