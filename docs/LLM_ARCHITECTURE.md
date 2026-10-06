@@ -58,8 +58,8 @@ LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flas
 - Values are **Google model ids** — they reach the Vertex/Gemini legs only. The non-Google
   fallback legs (Oracul Nova Pro, OpenRouter, Ollama) keep their pinned models.
 - Prod: set it in Secrets Manager `daatan-env-prod`, then redeploy — `blue-green-deploy.sh`
-  passes it only when non-empty (same for `EVIDENCE_SECOND_OPINION_MODEL`, which before #1800
-  never reached the container at all).
+  and both compose files pass it (and `EVIDENCE_SECOND_OPINION_MODEL`, which before #1800
+  never reached the container at all); empty = default.
 - When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
   with the `stage` — the stage ran on another vendor's model. Not paged.
 

@@ -285,10 +285,9 @@ ENV_ARGS+=(-e "GOOGLE_VERTEX_PROJECT_ID=${GOOGLE_VERTEX_PROJECT_ID}")
 ENV_ARGS+=(-e "GOOGLE_VERTEX_LOCATION=${GOOGLE_VERTEX_LOCATION}")
 ENV_ARGS+=(-e "GOOGLE_VERTEX_CLIENT_EMAIL=${GOOGLE_VERTEX_CLIENT_EMAIL}")
 ENV_ARGS+=(-e "GOOGLE_VERTEX_PRIVATE_KEY=${GOOGLE_VERTEX_PRIVATE_KEY}")
-# Optional model overrides, passed only when set: an empty EVIDENCE_SECOND_OPINION_MODEL
-# would fail env.ts's min(1) check. LLM_STAGE_MODELS = per-stage Google model (#1800).
-if [ -n "${LLM_STAGE_MODELS:-}" ]; then ENV_ARGS+=(-e "LLM_STAGE_MODELS=${LLM_STAGE_MODELS}"); fi
-if [ -n "${EVIDENCE_SECOND_OPINION_MODEL:-}" ]; then ENV_ARGS+=(-e "EVIDENCE_SECOND_OPINION_MODEL=${EVIDENCE_SECOND_OPINION_MODEL}"); fi
+# Optional model overrides (#1800); empty = default (env.ts emptyStringAsUndefined).
+ENV_ARGS+=(-e "LLM_STAGE_MODELS=${LLM_STAGE_MODELS:-}")
+ENV_ARGS+=(-e "EVIDENCE_SECOND_OPINION_MODEL=${EVIDENCE_SECOND_OPINION_MODEL:-}")
 
 if [ "$ENVIRONMENT" = "staging" ]; then
     ENV_ARGS+=(-e "DATABASE_URL=postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging")
