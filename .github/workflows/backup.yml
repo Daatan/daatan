@@ -78,9 +78,11 @@ jobs:
 
           RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
 
-          # Fire-and-forget: the script sends its own Telegram alert on failure.
-          # Restore can take a few minutes on large DBs — SSM timeout set to 10 min.
-          aws ssm send-command \
+          # Wait for the result: this used to be fire-and-forget, so the job stayed
+          # green while every verification failed for weeks (#1808). A failure here
+          # fails the job, which triggers the Telegram step below.
+          # Restore takes ~5 min on the current DB — SSM timeout set to 10 min.
+          COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=instanceids,Values=$INSTANCE_ID" \
             --comment "Backup restore verification $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -93,7 +95,30 @@ jobs:
               "chmod +x scripts/verify-backup.sh",
               "./scripts/verify-backup.sh"
             ]' \
-            --output text
+            --output text \
+            --query "Command.CommandId")
+          echo "Command ID: $COMMAND_ID"
+
+          for i in $(seq 1 66); do
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" --details \
+              --query "CommandInvocations[0].Status" --output text)
+            echo "Status: $STATUS"
+            if [[ "$STATUS" == "Success" ]]; then
+              echo "✅ Backup restore verified"
+              exit 0
+            elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" || "$STATUS" == "TimedOut" ]]; then
+              # Output starts with S3 download progress; the verdict is at the end.
+              aws ssm list-command-invocations --command-id "$COMMAND_ID" --details \
+                --query "CommandInvocations[0].CommandPlugins[0].Output" --output text \
+                | tr '\r' '\n' | grep -v '^Completed ' | tail -20
+              echo "❌ Backup restore verification failed"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "❌ Backup restore verification did not finish in 11 minutes"
+          exit 1
 
       - name: Alert via Telegram on failure
         if: failure()
@@ -101,7 +126,11 @@ jobs:
           # Backup failure is page-worthy and prod-only → clean channel (fallback to noisy if unset)
           CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
           CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
-          MSG="🚨 <b>DB Backup FAILED</b>%0ATime: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if [[ "${{ steps.backup.outputs.status }}" == "success" ]]; then
+            MSG="🚨 <b>DB Backup restore verification FAILED</b>%0AThe backup uploaded, but restoring it failed. See the workflow run.%0ATime: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            MSG="🚨 <b>DB Backup FAILED</b>%0ATime: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=$CHAT_ID" \
             -d "text=$MSG" \

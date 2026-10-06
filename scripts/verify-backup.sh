@@ -59,19 +59,25 @@ echo "Downloaded $(du -sh "$BACKUP_LOCAL" | cut -f1)"
 
 # Create temp database
 echo "Creating temp database $TEMP_DB..."
-docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d postgres \
-    -c "CREATE DATABASE \"$TEMP_DB\";"
+if ! docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d postgres \
+    -c "CREATE DATABASE \"$TEMP_DB\";"; then
+    send_alert "could not create temp database $TEMP_DB"
+    exit 1
+fi
 
-# Restore
+# Restore. ON_ERROR_STOP: without it psql exits 0 even when statements fail,
+# so a "successful" restore proved nothing (#1808).
 echo "Restoring to $TEMP_DB..."
-if ! gunzip -c "$BACKUP_LOCAL" | docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -d "$TEMP_DB" -q; then
+if ! gunzip -c "$BACKUP_LOCAL" | docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -d "$TEMP_DB" -q -v ON_ERROR_STOP=1; then
     send_alert "pg restore failed for $LATEST"
     exit 1
 fi
 
-# Sanity check: User table must have at least one row
+# Sanity check: users table must have at least one row. The Prisma model is
+# User but the table is mapped to "users". `|| true` so a query error reaches
+# send_alert instead of tripping set -e/pipefail first (#1808).
 ROW_COUNT=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$TEMP_DB" \
-    -t -c 'SELECT COUNT(*) FROM "User";' 2>&1 | tr -d ' \n')
+    -t -c 'SELECT COUNT(*) FROM users;' 2>&1 | tr -d ' \n' || true)
 
 if ! [[ "$ROW_COUNT" =~ ^[0-9]+$ ]] || [ "$ROW_COUNT" -eq 0 ]; then
     send_alert "Sanity check failed — User count was '${ROW_COUNT}' (expected > 0) in $LATEST"
