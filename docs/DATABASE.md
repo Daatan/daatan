@@ -66,7 +66,8 @@ The central table (`Prediction`). Field groups:
   after re-slugs), `originalLanguage` (non-English originals preserved in
   `prediction_translations`), `headline` (2-5 word card label generated from
   `claimText` by `src/lib/llm/headline.ts`, daatan#1814; null = cards show the claim,
-  cleared whenever the claim changes).
+  cleared to NULL whenever the claim changes; `''` = generated but rejected by the
+  polarity/length guard, not retried; NULL rows are filled by `/api/cron/backfill-headlines`).
 - **Outcome**: `outcomeType` (BINARY | MULTIPLE_CHOICE | NUMERIC_THRESHOLD),
   `outcomePayload` JSON, `prediction_options` rows for MC/numeric,
   `resolveByDatetime` (the platform deadline).

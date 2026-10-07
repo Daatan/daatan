@@ -11,8 +11,9 @@ const log = createLogger('headline')
  * clipped it mid-sentence (#1805). The headline is a 2-5 word label shown above the
  * claim on cards; the claim stays canonical everywhere voting or resolution happens.
  *
- * Nullable by design: no headline (legacy row, LLM failure, guard rejection) means the
- * card shows the claim exactly as before.
+ * Nullable by design: no headline means the card shows the claim exactly as before.
+ * NULL = not generated yet (new/edited claim, or the LLM failed) and the backfill cron
+ * retries it; '' = generated but rejected by the guards below, so it isn't retried.
  */
 export const HEADLINE_MAX_CHARS = 60
 const HEADLINE_TIMEOUT_MS = 10_000
@@ -58,7 +59,7 @@ function clean(raw: string): string {
     .trim()
 }
 
-/** Returns the headline, or null when the model fails, times out or the guard rejects it. */
+/** The headline; '' when a guard rejects the output; null when the model fails or times out. */
 export async function generateHeadline(claimText: string): Promise<string | null> {
   const emoji = claimText.match(LEADING_EMOJI)?.[1]
   const claim = claimText.replace(LEADING_EMOJI, '').trim()
@@ -73,18 +74,22 @@ export async function generateHeadline(claimText: string): Promise<string | null
   try {
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HEADLINE_TIMEOUT_MS))
     const headline = await Promise.race([generation, timeout])
-    if (!headline || headline.length < 2) {
-      log.warn({ claim }, 'headline: empty or timed out')
+    if (headline === null) {
+      log.warn({ claim }, 'headline: timed out')
       return null
+    }
+    if (headline.length < 2) {
+      log.warn({ claim }, 'headline: empty, discarded')
+      return ''
     }
     const words = headline.split(' ').length
     if (words > 8 || headline.length > HEADLINE_MAX_CHARS) {
       log.warn({ claim, headline }, 'headline: too long, discarded')
-      return null
+      return ''
     }
     if (!polarityMatches(claim, headline)) {
       log.warn({ claim, headline }, 'headline: polarity differs from claim, discarded')
-      return null
+      return ''
     }
     return emoji ? `${emoji} ${headline}` : headline
   } catch (err) {
@@ -98,8 +103,9 @@ export async function generateHeadline(claimText: string): Promise<string | null
  * like embedAndStoreForecast. The write is conditional on the claim being unchanged,
  * so a slow generation can't attach a headline to a claim edited in the meantime.
  */
-export async function generateAndStoreHeadline(id: string, claimText: string): Promise<void> {
+export async function generateAndStoreHeadline(id: string, claimText: string): Promise<'stored' | 'rejected' | 'failed'> {
   const headline = await generateHeadline(claimText)
-  if (!headline) return
+  if (headline === null) return 'failed'
   await prisma.prediction.updateMany({ where: { id, claimText }, data: { headline } })
+  return headline ? 'stored' : 'rejected'
 }

@@ -1,0 +1,73 @@
+name: Backfill Headlines
+
+# Nightly sweep for /api/cron/backfill-headlines (daatan#1814): generates the short card
+# headline for predictions with `headline IS NULL`, i.e. rows that predate the column and
+# any whose fire-and-forget generation failed. Guard-rejected rows hold '' and are skipped.
+# Manual runs pick one environment and a batch size, which is how the one-off backfill
+# of existing forecasts is drained (up to 100 per call).
+#
+# Like backfill-embeddings.yml: a GitHub runner makes the request, the app does the work.
+# A 404 means the route isn't deployed in that environment yet (prod before the v* tag
+# that ships it). That is reported, not failed.
+
+on:
+  schedule:
+    - cron: '37 2 * * *'   # nightly at 02:37 UTC, after backfill-embeddings
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'staging, production, or both'
+        default: staging
+        type: choice
+        options: [staging, production, both]
+      limit:
+        description: 'Rows per call (max 100)'
+        default: '25'
+      calls:
+        description: 'Consecutive calls (drains limit × calls rows)'
+        default: '1'
+
+jobs:
+  backfill:
+    name: Backfill ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [staging, production]
+    steps:
+      - name: Generate missing headlines
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          PICK: ${{ github.event.inputs.environment || 'both' }}
+          LIMIT: ${{ github.event.inputs.limit || '25' }}
+          CALLS: ${{ github.event.inputs.calls || '1' }}
+        run: |
+          ENV="${{ matrix.env }}"
+          if [ "$PICK" != "both" ] && [ "$PICK" != "$ENV" ]; then
+            echo "Skipping $ENV (dispatched for $PICK)"; exit 0
+          fi
+          if [ "$ENV" = "staging" ]; then BASE="$STAGING_URL"; else BASE="https://daatan.com"; fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $ENV"; exit 1; fi
+
+          FAILED_TOTAL=0
+          for i in $(seq 1 "$CALLS"); do
+            HTTP=$(curl -s -o body.txt -w "%{http_code}" --max-time 300 \
+              -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+              "$BASE/api/cron/backfill-headlines?limit=$LIMIT")
+            BODY=$(cat body.txt)
+            echo "call $i: HTTP $HTTP — $BODY"
+            if [ "$HTTP" = "404" ]; then
+              echo "⚠️ backfill-headlines not deployed on $ENV yet"; exit 0
+            fi
+            if [ "$HTTP" != "200" ]; then echo "❌ Backfill failed for $ENV (HTTP $HTTP)"; exit 1; fi
+            FAILED_TOTAL=$((FAILED_TOTAL + $(echo "$BODY" | jq -r '.failed // 0')))
+            [ "$(echo "$BODY" | jq -r '.remaining // 0')" = "0" ] && break
+          done
+
+          if [ "$FAILED_TOTAL" != "0" ]; then
+            echo "❌ $FAILED_TOTAL headline(s) failed on $ENV — check the app log for 'cron-backfill-headlines'"
+            exit 1
+          fi
+          echo "✅ Headline backfill OK for $ENV"

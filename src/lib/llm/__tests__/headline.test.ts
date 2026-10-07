@@ -42,14 +42,14 @@ describe('generateHeadline', () => {
     expect(generateContent.mock.calls[0][0].stage).toBe('headline')
   })
 
-  it('returns null when polarity flips', async () => {
+  it("returns '' (rejected, not retried) when polarity flips", async () => {
     generateContent.mockResolvedValue({ text: 'Ceasefire this year' })
-    expect(await generateHeadline('A ceasefire will not be implemented by Dec 31, 2026')).toBeNull()
+    expect(await generateHeadline('A ceasefire will not be implemented by Dec 31, 2026')).toBe('')
   })
 
-  it('returns null when too long', async () => {
+  it("returns '' when too long", async () => {
     generateContent.mockResolvedValue({ text: 'one two three four five six seven eight nine ten' })
-    expect(await generateHeadline('Something will happen by 2027')).toBeNull()
+    expect(await generateHeadline('Something will happen by 2027')).toBe('')
   })
 
   it('returns null on LLM failure', async () => {
@@ -59,16 +59,25 @@ describe('generateHeadline', () => {
 
   it('stores only while the claim is unchanged', async () => {
     generateContent.mockResolvedValue({ text: 'Netanyahu wins' })
-    await generateAndStoreHeadline('p1', 'Netanyahu will win the 2026 Israeli election')
+    expect(await generateAndStoreHeadline('p1', 'Netanyahu will win the 2026 Israeli election')).toBe('stored')
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: 'p1', claimText: 'Netanyahu will win the 2026 Israeli election' },
       data: { headline: 'Netanyahu wins' },
     })
   })
 
-  it('stores nothing when generation is rejected', async () => {
+  it("stores '' when the guard rejects, so the backfill doesn't retry it", async () => {
     generateContent.mockResolvedValue({ text: 'Ceasefire this year' })
-    await generateAndStoreHeadline('p1', 'A ceasefire will not be implemented by Dec 31, 2026')
+    expect(await generateAndStoreHeadline('p1', 'A ceasefire will not be implemented by Dec 31, 2026')).toBe('rejected')
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'p1', claimText: 'A ceasefire will not be implemented by Dec 31, 2026' },
+      data: { headline: '' },
+    })
+  })
+
+  it('stores nothing when the LLM fails, so the backfill retries it', async () => {
+    generateContent.mockRejectedValue(new Error('down'))
+    expect(await generateAndStoreHeadline('p1', 'Something will happen by 2027')).toBe('failed')
     expect(updateMany).not.toHaveBeenCalled()
   })
 })
