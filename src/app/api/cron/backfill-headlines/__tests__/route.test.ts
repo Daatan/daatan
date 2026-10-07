@@ -39,10 +39,10 @@ describe('GET /api/cron/backfill-headlines', () => {
     expect(body).toEqual({ ok: true, stored: 1, rejected: 1, failed: 1, remaining: 7 })
   })
 
-  it('caps ?limit at 100', async () => {
+  it('caps ?limit at 40', async () => {
     findMany.mockResolvedValue([])
     count.mockResolvedValue(0)
     await GET(req('test-secret', '?limit=500'))
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }))
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 40 }))
   })
 })

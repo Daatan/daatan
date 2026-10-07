@@ -4,7 +4,7 @@ name: Backfill Headlines
 # headline for predictions with `headline IS NULL`, i.e. rows that predate the column and
 # any whose fire-and-forget generation failed. Guard-rejected rows hold '' and are skipped.
 # Manual runs pick one environment and a batch size, which is how the one-off backfill
-# of existing forecasts is drained (up to 100 per call).
+# of existing forecasts is drained (up to 40 per call: 100 hit the proxy's 60s timeout).
 #
 # Like backfill-embeddings.yml: a GitHub runner makes the request, the app does the work.
 # A 404 means the route isn't deployed in that environment yet (prod before the v* tag
@@ -21,7 +21,7 @@ on:
         type: choice
         options: [staging, production, both]
       limit:
-        description: 'Rows per call (max 100)'
+        description: 'Rows per call (max 40)'
         default: '25'
       calls:
         description: 'Consecutive calls (drains limit × calls rows)'
