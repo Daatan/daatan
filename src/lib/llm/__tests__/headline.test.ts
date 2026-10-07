@@ -18,6 +18,10 @@ describe('polarityMatches', () => {
   it('rejects an added negation', () => {
     expect(polarityMatches('Bitcoin will reach $200k by 2027', "Bitcoin won't hit $200k")).toBe(false)
   })
+  it('treats "misses" and "zero" as negation', () => {
+    expect(polarityMatches('Am Yisrael will not pass the electoral threshold', 'Am Yisrael misses threshold')).toBe(true)
+    expect(polarityMatches('Zero rockets will be fired towards Israel by March 8, 2026', 'No rocket fire on Israel')).toBe(true)
+  })
   it('skips questions', () => {
     expect(polarityMatches('Who will win the 2028 US presidential election?', 'Next US president')).toBe(true)
   })

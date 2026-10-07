@@ -20,6 +20,8 @@ const HEADLINE_TIMEOUT_MS = 10_000
 const HEADLINE_PROMPT = `Write a very short headline for this forecast, for a news-feed card.
 - 2 to 5 words. No date, no year, no probability, no trailing period.
 - Name the key actor or subject, and the outcome being forecast.
+- State the outcome neutrally and no stronger than the claim. No words that hint at likelihood or drama ("looms", "set to", "likely", "poised", "finally"), and don't escalate the event ("reported destruction" is not "destroys").
+- Sentence case: capitalize only the first word and proper nouns ("Nvidia tops $5T", not "Nvidia Tops $5T").
 - Keep the claim's polarity: if the claim says something will NOT happen, the headline must say so too ("No ceasefire this year", "Bitcoin won't hit $200k"). Never turn a negative claim into a positive headline or the reverse.
 - For a question (multiple choice), name the contest instead ("Next US president").
 - Same language as the claim. Output the headline only: no quotes, no explanation.
@@ -30,7 +32,7 @@ const HEADLINE_PROMPT = `Write a very short headline for this forecast, for a ne
 Headline:`
 
 // English-canonical claims (createForecast canonicalizes), so English negation cues.
-const NEGATION = /\b(not|no|never|none|neither|nor|without|fails?|won't|isn't|aren't|doesn't|don't|didn't|cannot|can't)\b|n't\b/i
+const NEGATION = /\b(not|no|never|none|zero|neither|nor|without|fails?|miss(?:es)?|won't|isn't|aren't|doesn't|don't|didn't|cannot|can't)\b|n't\b/i
 
 /**
  * A headline that drops or adds a negation would show the opposite of what people
