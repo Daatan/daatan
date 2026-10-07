@@ -184,9 +184,25 @@ describe('/api/forecasts', () => {
                     OR: [
                         { claimText: { contains: 'turkey', mode: 'insensitive' } },
                         { tags: { some: { name: { contains: 'turkey', mode: 'insensitive' } } } },
+                        { translations: { some: { fieldName: 'claimText', translatedText: { contains: 'turkey', mode: 'insensitive' } } } },
                     ],
                 },
             ])
+        })
+
+        it('matches a non-English query against translated claims (#1804)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            const request = new NextRequest('http://localhost/api/forecasts?q=' + encodeURIComponent('ממשלה'))
+            await GET(request)
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(findManyCall.where.AND[0].OR).toContainEqual({
+                translations: { some: { fieldName: 'claimText', translatedText: { contains: 'ממשלה', mode: 'insensitive' } } },
+            })
         })
 
         it('adds trigram-matched predictions and tags to the search OR-clause', async () => {
@@ -211,6 +227,7 @@ describe('/api/forecasts', () => {
                     OR: [
                         { claimText: { contains: 'netanyau', mode: 'insensitive' } },
                         { tags: { some: { name: { contains: 'netanyau', mode: 'insensitive' } } } },
+                        { translations: { some: { fieldName: 'claimText', translatedText: { contains: 'netanyau', mode: 'insensitive' } } } },
                         { id: { in: ['p1', 'p2'] } },
                         { tags: { some: { name: { in: ['Politics'] } } } },
                     ],
