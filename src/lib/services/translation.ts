@@ -8,8 +8,11 @@ import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('translation-service')
 
+/** Author-written fields: canonicalized to English on save, original kept as a translation. */
 export const TRANSLATABLE_FIELDS = ['claimText', 'detailsText', 'resolutionRules'] as const
-type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number]
+/** Everything translated for display: the authored fields plus the generated card headline (#1814). */
+export const DISPLAY_TRANSLATED_FIELDS = [...TRANSLATABLE_FIELDS, 'headline'] as const
+type TranslatableField = (typeof DISPLAY_TRANSLATED_FIELDS)[number]
 
 /** SHA-256 of a source string — the content key for the translation cache. */
 export function sourceHash(text: string): string {
@@ -280,7 +283,7 @@ export async function translatePrediction(
 ): Promise<Partial<Record<TranslatableField, string>>> {
   const prediction = await prisma.prediction.findUnique({
     where: { id: predictionId },
-    select: { claimText: true, detailsText: true, resolutionRules: true },
+    select: { claimText: true, detailsText: true, resolutionRules: true, headline: true },
   })
 
   if (!prediction) {
@@ -288,7 +291,7 @@ export async function translatePrediction(
   }
 
   // Determine which fields need translation
-  const fieldsToTranslate: TranslatableField[] = TRANSLATABLE_FIELDS.filter(
+  const fieldsToTranslate: TranslatableField[] = DISPLAY_TRANSLATED_FIELDS.filter(
     (f) => !!prediction[f],
   )
 
@@ -361,7 +364,7 @@ export async function getCachedPredictionTranslation(
   return Object.fromEntries(
     cached
       .filter((c): c is typeof c & { fieldName: TranslatableField } =>
-        TRANSLATABLE_FIELDS.includes(c.fieldName as TranslatableField)
+        DISPLAY_TRANSLATED_FIELDS.includes(c.fieldName as TranslatableField)
       )
       .map((c) => [c.fieldName, c.translatedText]),
   ) as Partial<Record<TranslatableField, string>>

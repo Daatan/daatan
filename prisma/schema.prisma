@@ -317,6 +317,8 @@ model Prediction {
 
   // Prediction content
   claimText        String  @db.VarChar(500) // The testable statement (canonical = English)
+  // 2-5 word card label (daatan#1814), generated from claimText. Null = card shows claimText.
+  headline         String? @db.VarChar(80)
   slug             String? @unique // URL-friendly identifier (e.g., "bitcoin-100k-2026")
   detailsText      String? @db.Text // Additional conditions/context
   tags             Tag[]
@@ -1518,7 +1520,7 @@ model PredictionTranslation {
   id             String     @id @default(cuid())
   predictionId   String
   prediction     Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
-  fieldName      String     @db.VarChar(50) // "claimText" | "detailsText" | "resolutionRules"
+  fieldName      String     @db.VarChar(50) // "claimText" | "detailsText" | "resolutionRules" | "headline"
   language       String     @db.VarChar(10) // ISO 639-1 e.g. "he"
   translatedText String     @db.Text
   // SHA-256 of the source text this translation was produced from. The cache is a

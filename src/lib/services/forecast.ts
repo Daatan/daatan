@@ -6,6 +6,7 @@ import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { tagConnectOrCreate } from '@/lib/services/tag'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
+import { generateAndStoreHeadline } from '@/lib/llm/headline'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { scheduleBornTrueCheck } from '@/lib/services/bornTrueCheck'
 import { scheduleCreationEstimate } from '@/lib/services/creation-estimate'
@@ -379,6 +380,9 @@ export async function createForecast(input: CreateForecastInput) {
   embedAndStoreForecast(prediction.id, claimText).catch((err) =>
     log.error({ err, id: prediction.id }, 'embed failed')
   )
+  generateAndStoreHeadline(prediction.id, claimText).catch((err) =>
+    log.error({ err, id: prediction.id }, 'headline failed')
+  )
 
   // Fire-and-forget: classify temporal structure (deadline/direction/archetype)
   // for the requote cron. Bot-created forecasts bypass createForecast
@@ -614,6 +618,7 @@ export async function canonicalizeForecastToEnglish(predictionId: string): Promi
         claimText: norm.english.claimText,
         detailsText: norm.english.detailsText,
         resolutionRules: norm.english.resolutionRules,
+        headline: null,
         slug: newSlug,
         originalLanguage: lang,
       },
@@ -629,6 +634,9 @@ export async function canonicalizeForecastToEnglish(predictionId: string): Promi
 
   await embedAndStoreForecast(p.id, norm.english.claimText).catch((err) =>
     log.error({ err, id: p.id }, 'embed failed during canonicalization'),
+  )
+  await generateAndStoreHeadline(p.id, norm.english.claimText).catch((err) =>
+    log.error({ err, id: p.id }, 'headline failed during canonicalization'),
   )
   await translatePredictionToAllLocales(p.id).catch((err) =>
     log.error({ err, id: p.id }, 'locale fill failed during canonicalization'),
@@ -774,6 +782,8 @@ async function directUpdateForecast(id: string, data: UpdateForecastData) {
       where: { id },
       data: {
         claimText: data.claimText,
+        // The old headline describes the old claim; clear it until the new one lands.
+        headline: data.claimText ? null : undefined,
         detailsText: data.detailsText,
         resolutionRules: data.resolutionRules,
         resolveByDatetime: data.resolveByDatetime ? new Date(data.resolveByDatetime) : undefined,
@@ -788,6 +798,9 @@ async function directUpdateForecast(id: string, data: UpdateForecastData) {
   if (data.claimText) {
     await embedAndStoreForecast(id, data.claimText).catch((err) =>
       log.error({ err, id }, 'embed failed during English edit'),
+    )
+    generateAndStoreHeadline(id, data.claimText).catch((err) =>
+      log.error({ err, id }, 'headline failed during English edit'),
     )
   }
 
@@ -827,6 +840,7 @@ async function saveOriginalLanguageEdit(
       where: { id },
       data: {
         claimText: norm.english.claimText,
+        headline: null,
         detailsText: norm.english.detailsText,
         resolutionRules: norm.english.resolutionRules,
         resolveByDatetime: data.resolveByDatetime ? new Date(data.resolveByDatetime) : undefined,
@@ -839,6 +853,9 @@ async function saveOriginalLanguageEdit(
 
   await embedAndStoreForecast(id, norm.english.claimText).catch((err) =>
     log.error({ err, id }, 'embed failed during original-language edit'),
+  )
+  generateAndStoreHeadline(id, norm.english.claimText).catch((err) =>
+    log.error({ err, id }, 'headline failed during original-language edit'),
   )
   return result
 }

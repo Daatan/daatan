@@ -36,6 +36,8 @@ export type Prediction = {
   id: string
   slug?: string | null
   claimText: string
+  /** daatan#1814: 2-5 word card label. Null/absent = the claim is the card title, as before. */
+  headline?: string | null
   outcomeType: string
   status: string
   lockedAt?: string | Date | null
@@ -101,6 +103,7 @@ export default function ForecastCard({
 
   // Translation state
   const [translatedClaim, setTranslatedClaim] = useState<string | null>(null)
+  const [translatedHeadline, setTranslatedHeadline] = useState<string | null>(null)
   const [isTranslating, setIsTranslating] = useState(false)
   const [showTranslated, setShowTranslated] = useState(locale !== 'en')
 
@@ -121,6 +124,7 @@ export default function ForecastCard({
         })
         if (response.ok) {
           const data = await response.json()
+          if (data.headline) setTranslatedHeadline(data.headline)
           if (data.claimText) {
             setTranslatedClaim(data.claimText)
           }
@@ -514,12 +518,30 @@ export default function ForecastCard({
             )}
           </div>
 
-          {/* Claim Text */}
-          <div className="flex items-start gap-3 mb-4">
-            <h2 className="flex-1 text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug">
-              {showTranslated && translatedClaim ? translatedClaim : prediction.claimText}
-            </h2>
-          </div>
+          {/* Claim Text. With a headline (#1814) the headline is the title and the
+              full claim sits under it; without one, the claim is the title as before. */}
+          {(() => {
+            const claim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
+            const headline = prediction.headline
+              ? (showTranslated && translatedHeadline ? translatedHeadline : prediction.headline)
+              : null
+            return headline ? (
+              <div className="mb-4">
+                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug" data-testid="forecast-headline">
+                  {headline}
+                </h2>
+                <p className="mt-1 text-sm text-gray-400 line-clamp-3 leading-snug" title={claim}>
+                  {claim}
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 mb-4">
+                <h2 className="flex-1 text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug" title={claim}>
+                  {claim}
+                </h2>
+              </div>
+            )
+          })()}
 
           {/* Personal origin marker (no news anchor, manually created) — a subtle
               icon with a tooltip rather than a "no source" text badge. */}
