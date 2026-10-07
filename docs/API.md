@@ -266,7 +266,7 @@ Resolve a pasted Polymarket / Kalshi market URL into a forecast prefill for the 
 ---
 
 ### `POST /api/forecasts/[id]/translate`
-LLM-translate the forecast's claim/details/options. Public (no session required). **Body** `{ language }` — a supported locale, else `400`. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
+LLM-translate the forecast's claim/details/rules and card `headline` (daatan#1814). Public (no session required). **Body** `{ language }` — a supported locale, else `400`. Rate-limited to 20 requests/hour per IP (429 on exceed); cache hits don't count against the quota.
 
 ---
 

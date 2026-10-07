@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { embedAndStoreForecast } from '@/lib/services/embedding'
+import { generateAndStoreHeadline } from '@/lib/llm/headline'
 import { auditResolveByDatetime } from '@/lib/services/deadline-normalisation'
 import {
   createCommitment,
@@ -75,6 +76,9 @@ export async function createAndStake(
   // but log it rather than swallowing, so a Vertex outage isn't invisible here.
   embedAndStoreForecast(prediction.id, predictionCreateData.claimText).catch((err) =>
     log.error({ err, id: prediction.id }, 'embed failed for bot forecast (non-critical)'),
+  )
+  generateAndStoreHeadline(prediction.id, predictionCreateData.claimText).catch((err) =>
+    log.error({ err, id: prediction.id }, 'headline failed for bot forecast (non-critical)'),
   )
 
   return { prediction, stakeAmount }

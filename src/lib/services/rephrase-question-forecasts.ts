@@ -22,6 +22,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { embedAndStoreForecast } from '@/lib/services/embedding'
+import { generateAndStoreHeadline } from '@/lib/llm/headline'
 import { translatePredictionToAllLocales } from '@/lib/services/translation'
 import { createLogger } from '@/lib/logger'
 
@@ -100,7 +101,7 @@ export async function rephraseOne(r: Rephrasing, dryRun: boolean): Promise<Rephr
   }
   if (dryRun) return 'rephrased'
 
-  await prisma.prediction.update({ where: { id: r.id }, data: { claimText: r.to } })
+  await prisma.prediction.update({ where: { id: r.id }, data: { claimText: r.to, headline: null } })
 
   // Best-effort and deliberately outside the write: a failure here leaves a
   // correctly-rewritten claim with a stale embedding/translation, which the
@@ -108,6 +109,9 @@ export async function rephraseOne(r: Rephrasing, dryRun: boolean): Promise<Rephr
   // would be worse.
   await embedAndStoreForecast(r.id, r.to).catch((err) =>
     log.error({ err, predictionId: r.id }, 're-embed failed after rephrase'),
+  )
+  await generateAndStoreHeadline(r.id, r.to).catch((err) =>
+    log.error({ err, predictionId: r.id }, 'headline failed after rephrase'),
   )
   await translatePredictionToAllLocales(r.id).catch((err) =>
     log.error({ err, predictionId: r.id }, 'locale refill failed after rephrase'),

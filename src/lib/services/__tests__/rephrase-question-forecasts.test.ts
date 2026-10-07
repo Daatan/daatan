@@ -4,6 +4,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { prediction: { findUnique: vi.fn(), update: vi.fn() } },
 }))
 vi.mock('@/lib/services/embedding', () => ({ embedAndStoreForecast: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/llm/headline', () => ({ generateAndStoreHeadline: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/services/translation', () => ({
   translatePredictionToAllLocales: vi.fn().mockResolvedValue(undefined),
 }))
@@ -42,7 +43,7 @@ describe('rephraseOne', () => {
     mockFindUnique.mockResolvedValue({ claimText: ENTRY.from } as never)
 
     expect(await rephraseOne(ENTRY, false)).toBe('rephrased')
-    expect(mockUpdate).toHaveBeenCalledWith({ where: { id: ENTRY.id }, data: { claimText: ENTRY.to } })
+    expect(mockUpdate).toHaveBeenCalledWith({ where: { id: ENTRY.id }, data: { claimText: ENTRY.to, headline: null } })
     expect(embedAndStoreForecast).toHaveBeenCalledWith(ENTRY.id, ENTRY.to)
     expect(translatePredictionToAllLocales).toHaveBeenCalledWith(ENTRY.id)
   })
