@@ -837,6 +837,11 @@ Status is always 200 on the authorized paths: per-row embedding errors are caugh
 
 Scheduled by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/backfill-embeddings.yml), nightly at 02:23 UTC (#1369). Not an EC2 crontab — there is no crontab on the prod box; this entry claimed otherwise until #1369, which is why the route went uncalled from its introduction until then.
 
+### `GET /api/cron/backfill-headlines`
+Generates missing card headlines (daatan#1814) for predictions with `headline IS NULL`, newest first. `?limit=` defaults to 25, max 100; 5 concurrent LLM calls. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, stored, rejected, failed, remaining }`. `rejected` rows are stored as `''` and never retried; `failed` (LLM down/timeout) rows stay NULL for the next run. Always 200 when authorized — inspect `failed`.
+
+Scheduled by [`.github/workflows/backfill-headlines.yml`](../.github/workflows/backfill-headlines.yml), nightly at 02:37 UTC; `workflow_dispatch` picks an environment, batch size and number of calls for the one-off drain.
+
 ### `GET /api/cron/ai-panel`
 LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an
 ungrounded probability on every open BINARY forecast; date-hash-gated to one
