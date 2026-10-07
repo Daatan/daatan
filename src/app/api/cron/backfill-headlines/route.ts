@@ -20,7 +20,8 @@ const log = createLogger('cron-backfill-headlines')
  */
 
 const DEFAULT_LIMIT = 25
-const MAX_LIMIT = 100
+// 100 hit the proxy's ~60s timeout on staging (504); 40 finishes in time.
+const MAX_LIMIT = 40
 const CONCURRENCY = 5
 
 export async function GET(request: NextRequest) {
