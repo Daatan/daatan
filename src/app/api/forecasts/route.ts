@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
         OR: [
           { claimText: { contains: query.q, mode: 'insensitive' } },
           { tags: { some: { name: { contains: query.q, mode: 'insensitive' } } } },
+          // claimText is canonical English; a Hebrew/Russian/Esperanto query can
+          // only match the translated claim (#1804).
+          { translations: { some: { fieldName: 'claimText', translatedText: { contains: query.q, mode: 'insensitive' } } } },
           ...(fuzzy.predictionIds.length > 0 ? [{ id: { in: fuzzy.predictionIds } }] : []),
           ...(fuzzy.tagNames.length > 0 ? [{ tags: { some: { name: { in: fuzzy.tagNames } } } }] : []),
         ],
