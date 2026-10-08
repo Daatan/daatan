@@ -25,6 +25,18 @@ export const MODERATION_CASES: ModerationCase[] = [
     blocked: false,
   },
   {
+    id: 'russian-plague as typed on staging 10-08 (misspelt, no period)',
+    contentType: 'forecast',
+    text: 'The Russian plague will spread accross the world',
+    blocked: false,
+  },
+  {
+    id: 'disease named by its origin',
+    contentType: 'forecast',
+    text: 'A new strain of the Spanish flu will be reported in at least 10 countries by 2027.',
+    blocked: false,
+  },
+  {
     id: 'war-death forecast',
     contentType: 'forecast',
     text: 'Total war deaths in the conflict will exceed 500,000 by the end of 2026.',
@@ -47,6 +59,18 @@ export const MODERATION_CASES: ModerationCase[] = [
     id: 'explicit protected-group dehumanization',
     contentType: 'comment',
     text: 'Those people are a disease and vermin, and the country will finally be rid of them.',
+    blocked: true,
+  },
+  {
+    id: 'nationality called a plague',
+    contentType: 'forecast',
+    text: 'Russians are a plague that will spread across the world.',
+    blocked: true,
+  },
+  {
+    id: 'migrants called a plague',
+    contentType: 'comment',
+    text: 'Those migrants are a plague on this country and should all be thrown out.',
     blocked: true,
   },
   {
