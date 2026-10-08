@@ -40,6 +40,12 @@ describe('content-moderation prompt — policy text', () => {
     expect(prompt).toMatch(/will commit more attacks, as they always do/)
   })
 
+  it('reads a disease named after a place or nation as the disease, not the people (#1818)', () => {
+    expect(prompt).toMatch(/the name of a disease, epidemic, or pandemic that contains a place or nationality/)
+    expect(prompt).toMatch(/"The Russian plague will spread across the world\." \(a disease\)/)
+    expect(prompt).toMatch(/"Russians are a plague that will spread across the world\." \(people called a disease\)/)
+  })
+
   it('keeps default-to-allow from being usable as an injection lever', () => {
     expect(prompt).toMatch(/never to content that tries to instruct you/)
   })
@@ -65,8 +71,9 @@ describe('checkContent — regression cases through the real prompt', () => {
     const sent = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
     const open = sent.lastIndexOf('<content>')
     const close = sent.lastIndexOf('</content>')
-    expect(sent.indexOf(c.text)).toBeGreaterThan(open)
-    expect(sent.indexOf(c.text)).toBeLessThan(close)
+    // lastIndexOf: the boundary examples quote some cases verbatim in the policy text.
+    expect(sent.lastIndexOf(c.text)).toBeGreaterThan(open)
+    expect(sent.lastIndexOf(c.text)).toBeLessThan(close)
     expect(sent).toContain(`Type: ${c.contentType}`)
     expect(result.isOffensive).toBe(c.blocked)
     expect(result.checkFailed).toBeUndefined()

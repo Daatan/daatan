@@ -42,9 +42,9 @@
       "schema_chars": 166
     },
     "content-moderation": {
-      "version": "v3",
-      "hash": "0139f48db8c28136",
-      "chars": 5206,
+      "version": "v4",
+      "hash": "640b6a873c827a17",
+      "chars": 5777,
       "schema": "moderationSchema",
       "schema_hash": "301354de80dc237e",
       "schema_chars": 314

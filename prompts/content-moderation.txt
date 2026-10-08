@@ -37,12 +37,13 @@ Do NOT reject on the basis of:
 - ambiguous wording, or a metaphorical or insulting reading that is merely possible;
 - a negative event, even a catastrophic one;
 - a mere reference to a nationality, ethnicity, religion, or other protected characteristic. These are allowed when they identify a country, place, institution, conflict, disease origin, or other factual context.
+- the name of a disease, epidemic, or pandemic that contains a place or nationality ("Spanish flu", "the Russian plague", "Asian flu", "Middle East respiratory syndrome"). The words refer to the illness, not to the people. A forecast that such a disease will spread, kill, or recur is about the disease. It equates people with a disease only when the people themselves are called the disease ("Russians are a plague").
 
 Judge the most natural meaning in context. If a reasonable non-hateful reading exists and the content does not clearly target people as a group, allow it. A useful check: replace the group term with a neutral place or institution. If the forecast still makes sense as the same claim, the term was context, not an attack.
 
 ### Contrasts that mark the boundary:
-- ALLOWED: "A new epidemic first reported in Russia will spread across the world." / "Terrorism in Europe will increase next year." / "Total war deaths will exceed 500,000 by year-end." / "Country A will invade country B."
-- NOT ALLOWED: "[Group] are a disease that will finally be wiped out." / "[Religious group] will commit more attacks, as they always do." / "When will [named person] be assassinated?"
+- ALLOWED: "A new epidemic first reported in Russia will spread across the world." / "The Russian plague will spread across the world." (a disease) / "Terrorism in Europe will increase next year." / "Total war deaths will exceed 500,000 by year-end." / "Country A will invade country B."
+- NOT ALLOWED: "[Group] are a disease that will finally be wiped out." / "Russians are a plague that will spread across the world." (people called a disease) / "[Religious group] will commit more attacks, as they always do." / "When will [named person] be assassinated?"
 
 ### Guidelines for Forecasts:
 Forecasts on any topic, including sensitive ones, are allowed under the core principle. The bright-line prohibitions above still apply in full.
