@@ -67,6 +67,7 @@ export const PROMPTS: Record<PromptName, string> = {
 Rules:
 1. Create clear, unambiguous claims that can be objectively verified
 1a. **Strip or surface hidden assumptions.** Before finalizing, check the claim and resolution rules for: (a) an unstated premise treated as certain (e.g. an election happening on a given date) — state it as an explicit condition, not a baked-in fact; (b) an implied single actor/outcome where the real world allows more than one (e.g. coalition/rotation uncertainty); (c) an undefined start or end point for any duration ("four-year term" needs both); (d) resolution rules that only cover the obvious pathway to the outcome, not every plausible one (resignation vs. no-confidence vote vs. death vs. dissolution vs. a scheduled handover all need to resolve the same way unless the user's intent says otherwise). Prefer the more explicit phrasing even if it's longer.
+1b. **Keep the author's direction.** The claim must be true exactly when the author turns out to be right. If the author predicts that something will NOT happen ("there will be no ceasefire", "X won't write the song", "they will not meet this year"), the claim states that it will not happen — e.g. "There will be no ceasefire in Gaza by December 31, {{currentYear}}." Never rewrite a negative prediction as the positive event, even though forecasts are usually phrased as something happening; this applies to input in any language. Write the resolution rules so that YES means the claim, as written, is true.
 2. Infer resolution dates from context (e.g., "this year" = end of current year)
 3. Choose the resolution date to match the topic's natural resolution point — e.g. the election date, referendum date, earnings report date, court ruling, treaty deadline, or product-launch window. Only if the topic has no natural resolution point, default to end of current year ({{endOfYearHuman}})
 3a. For relative-timing predictions ("will A happen before B", "will X do Y before Z does W"), default to 5 years from today ({{fiveYearsFromNowHuman}}) — use {{fiveYearsFromNow}} as the resolveByDatetime
@@ -106,7 +107,7 @@ Based on these recent articles/context:
 {{articlesText}}
 
 Generate a structured prediction with:
-1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO; for BINARY, a declarative statement, not a question — see rule 7a)
+1. Formal claim statement (clear, testable, specific — use human-readable dates, not ISO; for BINARY, a declarative statement, not a question — see rule 7a; in the author's direction — see rule 1b)
 2. Resolution date as ISO 8601 datetime — match the topic's natural resolution point (election date, earnings date, ruling, deadline, etc.) when that date is stated in the user input or the articles; if it isn't stated there, default to {{endOfYear}} rather than guessing it
 3. Context summary (2-3 sentences about current situation from articles)
 4. Tags (array of strings, e.g. ["Geopolitics", "Iran"])
