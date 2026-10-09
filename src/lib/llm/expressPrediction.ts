@@ -16,6 +16,7 @@ import { localizeForecastForAuthor, type LocalizedForecast } from '../services/t
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 import { lookupGroundedEventDate } from './groundedDateLookup'
+import { ensureRulesDirection, type RulesDirectionOutcome } from './rulesDirection'
 import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('express-prediction')
@@ -170,6 +171,10 @@ export interface ExpressPredictionResult {
   // or null when the claim has no explicit date phrase or it agrees with
   // resolveByDatetime.
   claimDeadlineMismatch: string | null
+  // #1813: whether the resolution rules resolve YES when the claim is true. Inverted
+  // rules are rewritten before the author sees them; `direction: 'inverted'` means the
+  // rewrite failed and the review screen warns. Null for MULTIPLE_CHOICE.
+  rulesDirection: Omit<RulesDirectionOutcome, 'rules'> | null
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -305,6 +310,14 @@ export function getFiveYearsFromNow(now: Date) {
   }
 }
 
+/** #1813: runs before localization, so the author's translated preview carries the fixed rules. */
+async function applyRulesDirection(prediction: ParsedPrediction): Promise<ExpressPredictionResult['rulesDirection']> {
+  if (prediction.outcomeType !== 'BINARY') return null
+  const { rules, ...outcome } = await ensureRulesDirection(prediction.claimText, prediction.resolutionRules)
+  prediction.resolutionRules = rules
+  return outcome
+}
+
 export async function generateExpressPrediction(
   userInput: string,
   onProgress?: (stage: string, data?: Record<string, unknown>) => void,
@@ -398,6 +411,7 @@ export async function generateExpressPrediction(
 
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
+    const rulesDirection = await applyRulesDirection(prediction)
     const localized = await localizeForecastForAuthor(
       { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
       userInput,
@@ -424,6 +438,7 @@ export async function generateExpressPrediction(
       market: null,
       ungroundedYears,
       claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
+      rulesDirection,
       localized,
     }
   }
@@ -756,6 +771,7 @@ URL: ${article.url}
 
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
+  const rulesDirection = await applyRulesDirection(prediction)
   const localized = await localizeForecastForAuthor(
     { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
     userInput,
@@ -788,6 +804,7 @@ URL: ${article.url}
       now,
     ),
     claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
+    rulesDirection,
     localized,
   }
 }

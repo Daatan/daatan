@@ -131,3 +131,34 @@ export const rulesSchema: Schema = {
   },
   required: ['resolutionRules'],
 }
+
+// ============================================
+// RULES-DIRECTION CHECK SCHEMA
+// ============================================
+
+/**
+ * Paired with the `rules-direction` prompt (#1813): does YES under the resolution
+ * rules mean the claim is true? `yesCondition` comes first so the model states the
+ * rules' YES event before it judges it.
+ */
+export const rulesDirectionSchema: Schema = {
+  description: 'Whether the resolution rules resolve YES when the claim is true',
+  type: SchemaType.OBJECT,
+  properties: {
+    yesCondition: {
+      type: SchemaType.STRING,
+      description: 'The event that makes the rules resolve YES, in one short sentence.',
+    },
+    direction: {
+      type: SchemaType.STRING,
+      format: 'enum',
+      enum: ['consistent', 'inverted', 'unclear'],
+      description: 'consistent: rules YES means the claim is true. inverted: rules YES means the claim is false. unclear: the rules never say what resolves YES.',
+    },
+    fixedRules: {
+      type: SchemaType.STRING,
+      description: 'Only when inverted: the rules rewritten so YES means the claim is true, everything else kept. Otherwise an empty string.',
+    },
+  },
+  required: ['yesCondition', 'direction', 'fixedRules'],
+}

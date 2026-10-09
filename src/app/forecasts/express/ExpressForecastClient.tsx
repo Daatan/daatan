@@ -65,6 +65,9 @@ export interface GeneratedPrediction {
   // it surfaces on the review screen instead of only at publish time). Null when
   // the claim has no explicit date phrase or it agrees with resolveByDatetime.
   claimDeadlineMismatch?: string | null
+  // #1813: 'inverted' when the server could not make the rules resolve YES on the
+  // claim being true. Inverted rules it could fix arrive already fixed.
+  rulesDirection?: { direction: string } | null
   localized?: {
     language: string
     claimText: string
@@ -453,7 +456,12 @@ export default function ExpressForecastClient({
       const claimChanged = editForm.claimText !== generated?.claimText
       const probabilitySuggestion = claimChanged ? null : editForm.probabilitySuggestion
       const probabilityReasoning = claimChanged ? '' : editForm.probabilityReasoning
-      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate, probabilitySuggestion, probabilityReasoning })
+      // The direction verdict was for the generated claim and rules; once the author
+      // rewrites either, it no longer applies.
+      const rulesDirection = claimChanged || editForm.resolutionRules !== generated?.resolutionRules
+        ? null
+        : generated?.rulesDirection
+      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate, probabilitySuggestion, probabilityReasoning, rulesDirection })
       setIsEditing(false)
     }
   }
@@ -964,6 +972,11 @@ export default function ExpressForecastClient({
             {/* Resolution Rules */}
             <div>
               <h3 className="text-sm font-bold text-text-secondary mb-2">{t('resolutionRules')}</h3>
+              {!isEditing && generated.rulesDirection?.direction === 'inverted' && (
+                <WarningBanner icon={<AlertCircle className="w-4 h-4" />} title={t('rulesDirectionWarningTitle')}>
+                  <p className="text-xs text-gray-500">{t('rulesDirectionWarningHint')}</p>
+                </WarningBanner>
+              )}
               {isEditing ? (
                 <textarea
                   dir="auto"

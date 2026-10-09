@@ -7,6 +7,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { createBotLLMService } from '@/lib/llm'
 import { getPromptTemplate, fillPrompt } from '@/lib/llm/bedrock-prompts'
+import { ensureRulesDirection } from '@/lib/llm/rulesDirection'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { normalizeForecastTags } from '@/lib/forecast-tags'
 import { tagConnectOrCreate } from '@/lib/services/tag'
@@ -206,6 +207,16 @@ export async function processTopic(
     } catch (parseErr) {
       log.warn({ botId: bot.id, topic: topicTitle, err: parseErr, errorType: 'parse' }, 'Quality gate response unparseable, allowing forecast (fail-open)')
       // On parse failure, allow the forecast through (fail open) to avoid blocking all forecasts
+    }
+
+    // #1813: rules whose YES means the claim is false get rewritten; if that fails, skip.
+    if (forecast.resolutionRules) {
+      const rulesCheck = await ensureRulesDirection(forecast.claimText.replace(/^🤖\s*/, ''), forecast.resolutionRules)
+      if (rulesCheck.direction === 'inverted') {
+        await logBotAction(bot.id, 'SKIPPED', { title: topicTitle, urls: sourceUrls }, null, 'resolution rules resolve YES on the opposite of the claim', dryRun)
+        return 'skipped'
+      }
+      forecast.resolutionRules = rulesCheck.rules
     }
 
     const generatedText = JSON.stringify(forecast, null, 2)
