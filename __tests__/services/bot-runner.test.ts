@@ -42,6 +42,10 @@ vi.mock('@/lib/llm', () => ({
   createBotLLMService: vi.fn(() => ({ generateContent: mockGenerateContent })),
 }))
 
+vi.mock('@/lib/llm/rulesDirection', () => ({
+  ensureRulesDirection: vi.fn(async (_c: string, rules: string) => ({ direction: 'consistent', initial: 'consistent', rules, fixed: false })),
+}))
+
 vi.mock('@/lib/llm/bedrock-prompts', () => ({
   getPromptTemplate: vi.fn().mockImplementation((name) => {
     if (name === 'bot-forecast-generation') return 'Forecast template: {{personaPrompt}} {{forecastPrompt}} {{tagConstraint}}'
@@ -1136,6 +1140,60 @@ describe('runDueBots — quality gate', () => {
         }),
       }),
     )
+  })
+
+  describe('rules direction (#1813)', () => {
+    async function runOneTopic() {
+      const { prisma } = await import('@/lib/prisma')
+      const { fetchRssFeeds, detectHotTopics } = await import('@/lib/services/bots/rss')
+      const { runDueBots } = await import('@/lib/services/bots')
+      const { createCommitment } = await import('@/lib/services/commitment')
+
+      vi.mocked(prisma.botConfig.findMany).mockResolvedValue([makeBot({ maxVotesPerDay: 0 })] as any)
+      vi.mocked(prisma.botRunLog.count).mockResolvedValue(0)
+      vi.mocked(fetchRssFeeds).mockResolvedValue([])
+      vi.mocked(detectHotTopics).mockReturnValue([{ title: 'Topic A', items: [], sourceCount: 3 }] as any)
+      mockGenerateContent
+        .mockResolvedValueOnce({ text: 'no' })
+        .mockResolvedValueOnce({ text: VALID_FORECAST_JSON })
+        .mockResolvedValueOnce({ text: QUALITY_PASS_JSON })
+      vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+      vi.mocked(prisma.prediction.create).mockResolvedValue({ id: 'pred-new' } as any)
+      vi.mocked(prisma.prediction.update).mockResolvedValue({} as any)
+      vi.mocked(createCommitment).mockResolvedValue({ ok: true } as any)
+      vi.mocked(prisma.botRunLog.create).mockResolvedValue({} as any)
+      vi.mocked(prisma.botConfig.update).mockResolvedValue({} as any)
+      return { prisma, summaries: await runDueBots() }
+    }
+
+    it('saves the rewritten rules', async () => {
+      const { ensureRulesDirection } = await import('@/lib/llm/rulesDirection')
+      vi.mocked(ensureRulesDirection).mockResolvedValueOnce({ direction: 'consistent', initial: 'inverted', rules: 'Fixed rules.', fixed: true })
+
+      const { prisma, summaries } = await runOneTopic()
+
+      expect(summaries[0].forecastsCreated).toBe(1)
+      expect(vi.mocked(ensureRulesDirection).mock.calls[0][0]).not.toMatch(/^🤖/)
+      expect(prisma.prediction.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ resolutionRules: 'Fixed rules.' }) }),
+      )
+    })
+
+    it('skips the forecast when the rules stay inverted', async () => {
+      const { ensureRulesDirection } = await import('@/lib/llm/rulesDirection')
+      vi.mocked(ensureRulesDirection).mockResolvedValueOnce({ direction: 'inverted', initial: 'inverted', rules: 'r', fixed: false })
+
+      const { prisma, summaries } = await runOneTopic()
+
+      expect(summaries[0].forecastsCreated).toBe(0)
+      expect(summaries[0].skipped).toBe(1)
+      expect(prisma.prediction.create).not.toHaveBeenCalled()
+      expect(prisma.botRunLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'SKIPPED', error: 'resolution rules resolve YES on the opposite of the claim' }),
+        }),
+      )
+    })
   })
 
   it('skips forecast when resolveByDatetime is too far (>365 days)', async () => {

@@ -129,6 +129,14 @@
       "schema_hash": "3b50a9e8623d44e6",
       "schema_chars": 607
     },
+    "rules-direction": {
+      "version": "v1",
+      "hash": "94d8dc376619addb",
+      "chars": 1390,
+      "schema": "rulesDirectionSchema",
+      "schema_hash": "69f218a19e93fc3a",
+      "schema_chars": 695
+    },
     "suggest-tags": {
       "version": "v1",
       "hash": "14d83d6cb870e53f",

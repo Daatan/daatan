@@ -95,6 +95,7 @@ returns a phrase. Those still lock their prose.
 | `guess-chances` | `guessChancesSchema` | `/api/forecasts/express/guess`, `/api/forecasts/[id]/context` (LLM fallback) |
 | `panel-estimate` | — | `services/ai-panel.ts` (docs/LASSO.md) |
 | `panel-estimate-grounded` | — | `services/ai-panel.ts` (docs/LASSO.md) |
+| `rules-direction` | `rulesDirectionSchema` | `llm/rulesDirection.ts` — express draft (`/api/forecasts/express/generate`), `bots/forecastCreate.ts`, `bots/sourceless.ts` |
 | `relation-typer` | `relationTyperSchema` | `services/relation-typer.ts` — `/api/cron/relation-typer` |
 | `research-query-generation` | `queryGenerationSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
 | `resolution-research` | `researchSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
@@ -105,7 +106,7 @@ returns a phrase. Those still lock their prose.
 
 ### Prompts that ingest untrusted text
 
-Four prompts interpolate text the platform did not write. All four delimit it and tell the
+Five prompts interpolate text the platform did not write. All five delimit it and tell the
 model to ignore instructions inside it:
 
 | Prompt | Untrusted input | Delimiter |
@@ -114,6 +115,7 @@ model to ignore instructions inside it:
 | `content-moderation` | user-written forecast or comment | `<content>` |
 | `guess-chances` | user-drafted claim + third-party news snippets | `<forecast>`, `<articles>` |
 | `panel-estimate-grounded` | third-party news snippets | prose framing |
+| `rules-direction` | claim + rules drafted from author input | `<claim>`, `<rules>` |
 
 `content-moderation` is the one whose input is adversarial *by construction* — the author of
 the text is the person who wants the gate to say `isOffensive: false` — so it also states that
@@ -159,6 +161,7 @@ records what each was on.
 | `express-prediction` | v5 | 2026-10-08 — #1807: added rule 1b, keep the author's direction. A negative prediction ("there will be no ceasefire", "X won't write the song") stays a "will not" claim, and YES means the claim as written is true. On Gemini 2.5 Flash, 16 Hebrew/Russian inputs × 10 runs went from 5 polarity flips to 0. Prose only — schema half unchanged. Regression set: `expressPolarity.cases.ts`; live check: `scripts/check-express-polarity.ts`. |
 | `content-moderation` | v3 | 2026-10-07 — default-to-allow rewrite after a legitimate forecast ("The Russian plague will spread across the world.") was rejected as hate speech. Hate speech is now a judgment category that rejects only on clear dehumanization, contempt, exclusionary advocacy, collective harmful attribution, or celebration of violence; bright lines (named-person death/harm, harassment/doxxing, sexual content, self-harm/illegal-act encouragement, spam/scams) get no benefit of the doubt. Dropped the "phrased neutrally" requirement; added any-language and reason-must-not-accuse rules. Prose only — schema half unchanged. Regression set: `moderationRegression.cases.ts`; live check: `scripts/check-moderation-regression.ts`. |
 | `content-moderation` | v4 | 2026-10-08 — v3 still blocked "The Russian plague will spread across the world" on Gemini (the model checkContent uses); its live check had run on the Oracul/Bedrock fallback instead. Added: a disease named after a place or nation is the disease, not the people; only calling the people the disease is dehumanization (contrast pair in the boundary examples). `scripts/check-moderation-regression.ts` now calls Vertex with `stageModel('moderation')` and the real schema. |
+| `rules-direction` | v1 | 2026-10-09 — #1813: new. After the express draft and the bot drafts, it checks that a binary forecast's rules resolve YES when the claim is true. If they are inverted, it returns a rewrite with the same sources, deadline and thresholds, which is used only when a second check calls it consistent. Otherwise the express review screen warns and the bot skips. Fail-open. Stage `rules_direction`. Regression set: `rulesDirection.cases.ts` (the #1802 audit: 6 inverted, 16 consistent including 10 negated, 2 unclear). Live check: `scripts/check-rules-direction.ts`. |
 
 ## Bedrock
 

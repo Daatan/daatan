@@ -25,6 +25,7 @@ export const LLM_STAGES = [
   'research_verdict',
   'grounded_date',
   'headline',
+  'rules_direction',
 ] as const
 
 export type LlmStage = (typeof LLM_STAGES)[number]

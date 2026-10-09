@@ -6,6 +6,7 @@ import {
     forecastBatchSchema,
     queryGenerationSchema,
     researchSchema,
+    rulesDirectionSchema,
     rulesSchema,
     voteDecisionSchema,
 } from './schemas'
@@ -56,6 +57,7 @@ export const PROMPT_SCHEMAS: Record<PromptName, Schema | null> = {
     'backfill-rules': rulesSchema,
     'panel-estimate': null,
     'panel-estimate-grounded': null,
+    'rules-direction': rulesDirectionSchema,
 }
 
 /**
@@ -79,6 +81,7 @@ export const PROMPT_SCHEMA_NAMES: Partial<Record<PromptName, string>> = {
     'temporal-classifier': 'temporalClassifierSchema',
     'relation-typer': 'relationTyperSchema',
     'backfill-rules': 'rulesSchema',
+    'rules-direction': 'rulesDirectionSchema',
 }
 
 export interface PromptFingerprint {

@@ -774,7 +774,9 @@
     "groundedDateNoticeTitle": "Date looked up: {event} — {date}",
     "groundedDateNoticeHint": "The AI found this date with a web search because neither your input nor the sources stated one. Check that this is the event your forecast actually depends on before publishing.",
     "claimDeadlineMismatchWarningTitle": "Claim/date mismatch: {date}",
-    "claimDeadlineMismatchWarningHint": "The claim text names a different date than the resolution date below. Edit one of them so they agree — otherwise this forecast will be rejected when you try to publish it."
+    "claimDeadlineMismatchWarningHint": "The claim text names a different date than the resolution date below. Edit one of them so they agree — otherwise this forecast will be rejected when you try to publish it.",
+    "rulesDirectionWarningTitle": "Resolution rules may contradict the claim",
+    "rulesDirectionWarningHint": "These rules seem to resolve YES when the claim turns out false. Edit the rules so that YES means your claim came true."
   },
   "admin": {
     "panel": "Admin Panel",

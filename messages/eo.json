@@ -774,7 +774,9 @@
     "groundedDateNoticeTitle": "Dato trovita per serĉo: {event} — {date}",
     "groundedDateNoticeHint": "La AI trovis ĉi tiun daton per reta serĉo, ĉar nek via enigo nek la fontoj indikis daton. Antaŭ publikigo kontrolu, ke via prognozo vere dependas de ĉi tiu evento.",
     "claimDeadlineMismatchWarningTitle": "Data malkonsekvenco: {date}",
-    "claimDeadlineMismatchWarningHint": "La asertteksto mencias alian daton ol la solva dato sube. Redaktu unu el ili por ke ili konkordu — alie ĉi tiu prognozo estos rifuzita kiam vi provos publikigi ĝin."
+    "claimDeadlineMismatchWarningHint": "La asertteksto mencias alian daton ol la solva dato sube. Redaktu unu el ili por ke ili konkordu — alie ĉi tiu prognozo estos rifuzita kiam vi provos publikigi ĝin.",
+    "rulesDirectionWarningTitle": "La solvaj reguloj eble kontraŭdiras la aserton",
+    "rulesDirectionWarningHint": "Ŝajnas, ke ĉi tiuj reguloj solvas JES kiam la aserto montriĝas malvera. Redaktu la regulojn por ke JES signifu, ke via aserto realiĝis."
   },
   "admin": {
     "panel": "Administra Panelo",

@@ -12,6 +12,9 @@ vi.mock('../bedrock-prompts', () => ({
 }))
 vi.mock('../../services/translation', () => ({ localizeForecastForAuthor: vi.fn(async () => null) }))
 vi.mock('../groundedDateLookup', () => ({ lookupGroundedEventDate: vi.fn() }))
+vi.mock('../rulesDirection', () => ({
+  ensureRulesDirection: vi.fn(async (_c: string, rules: string) => ({ direction: 'consistent', initial: 'consistent', rules, fixed: false })),
+}))
 
 import { generateExpressPrediction } from '../expressPrediction'
 import { llmService } from '../index'
