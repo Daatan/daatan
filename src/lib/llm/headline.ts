@@ -8,8 +8,10 @@ const log = createLogger('headline')
 /**
  * Short card headline for a forecast (daatan#1814). The claim is the testable
  * statement — date, threshold, polarity — and runs up to 500 chars, so a feed card
- * clipped it mid-sentence (#1805). The headline is a 2-5 word label shown above the
+ * clipped it mid-sentence (#1805). The headline is a 2-6 word label shown above the
  * claim on cards; the claim stays canonical everywhere voting or resolution happens.
+ * Future tense (#1823): present-tense headlinese ("Russia unblocks Telegram") read as
+ * news, worst once translated ("רוסיה מתירה את טלגרם").
  *
  * Nullable by design: no headline means the card shows the claim exactly as before.
  * NULL = not generated yet (new/edited claim, or the LLM failed) and the backfill cron
@@ -18,11 +20,12 @@ const log = createLogger('headline')
 export const HEADLINE_MAX_CHARS = 60
 const HEADLINE_TIMEOUT_MS = 10_000
 
-const HEADLINE_PROMPT = `Write a very short headline for this forecast, for a news-feed card.
-- 2 to 5 words. No date, no year, no probability, no trailing period.
+export const HEADLINE_PROMPT = `Write a very short headline for this forecast, for a news-feed card.
+- 2 to 6 words. No date, no year, no probability, no trailing period.
 - Name the key actor or subject, and the outcome being forecast.
+- Future tense, with "will" ("Russia will unblock Telegram", "Nvidia will top $5T"). This is a forecast, not news: never use the present-tense news style ("Russia unblocks Telegram"), which reads as if it already happened, especially once translated.
 - State the outcome neutrally and no stronger than the claim. No words that hint at likelihood or drama ("looms", "set to", "likely", "poised", "finally"), and don't escalate the event ("reported destruction" is not "destroys").
-- Sentence case: capitalize only the first word and proper nouns ("Nvidia tops $5T", not "Nvidia Tops $5T").
+- Sentence case: capitalize only the first word and proper nouns ("Nvidia will top $5T", not "Nvidia Will Top $5T").
 - Keep the claim's polarity: if the claim says something will NOT happen, the headline must say so too ("No ceasefire this year", "Bitcoin won't hit $200k"). Never turn a negative claim into a positive headline or the reverse.
 - For a question (multiple choice), name the contest instead ("Next US president").
 - Same language as the claim. Output the headline only: no quotes, no explanation.
