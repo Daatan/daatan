@@ -5,7 +5,7 @@ vi.mock('../index', () => ({ llmService: { generateContent: (...a: unknown[]) =>
 const updateMany = vi.fn()
 vi.mock('@/lib/prisma', () => ({ prisma: { prediction: { updateMany: (...a: unknown[]) => updateMany(...a) } } }))
 
-import { generateHeadline, generateAndStoreHeadline, polarityMatches } from '../headline'
+import { generateHeadline, generateAndStoreHeadline, polarityMatches, HEADLINE_PROMPT } from '../headline'
 
 describe('polarityMatches', () => {
   it('accepts matching polarity', () => {
@@ -24,6 +24,13 @@ describe('polarityMatches', () => {
   })
   it('skips questions', () => {
     expect(polarityMatches('Who will win the 2028 US presidential election?', 'Next US president')).toBe(true)
+  })
+})
+
+describe('HEADLINE_PROMPT', () => {
+  it('asks for the future tense, not present-tense headlinese (#1823)', () => {
+    expect(HEADLINE_PROMPT).toMatch(/Future tense/)
+    expect(HEADLINE_PROMPT).toContain('Russia will unblock Telegram')
   })
 })
 
