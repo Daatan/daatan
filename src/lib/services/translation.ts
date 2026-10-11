@@ -369,16 +369,31 @@ export async function getCachedPredictionTranslation(
   predictionId: string,
   language: string,
 ): Promise<Partial<Record<TranslatableField, string>>> {
-  const cached = await prisma.predictionTranslation.findMany({
-    where: { predictionId, language },
-    select: { fieldName: true, translatedText: true },
-  })
+  // Only rows made from the *current* source text (#1827). Without the hash check a field
+  // that changed — an edited claim, a regenerated headline (#1823) — kept showing its old
+  // translation forever, and the translate route's all-cached fast path never refreshed it.
+  // A stale row now counts as missing, so the client's translate call re-translates it.
+  const [prediction, cached] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { id: predictionId },
+      select: { claimText: true, detailsText: true, resolutionRules: true, headline: true },
+    }),
+    prisma.predictionTranslation.findMany({
+      where: { predictionId, language },
+      select: { fieldName: true, translatedText: true, sourceHash: true },
+    }),
+  ])
+  if (!prediction) return {}
 
   return Object.fromEntries(
     cached
       .filter((c): c is typeof c & { fieldName: TranslatableField } =>
         DISPLAY_TRANSLATED_FIELDS.includes(c.fieldName as TranslatableField)
       )
+      .filter((c) => {
+        const source = prediction[c.fieldName]
+        return !!source && c.sourceHash === sourceHash(source)
+      })
       .map((c) => [c.fieldName, c.translatedText]),
   ) as Partial<Record<TranslatableField, string>>
 }

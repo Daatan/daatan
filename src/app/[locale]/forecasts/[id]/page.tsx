@@ -290,7 +290,11 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
 
   // Apply cached translations — never triggers Gemini, read-only
   const translations = await getCachedPredictionTranslation(prediction.id, locale)
-  const isLocalized = Object.keys(translations).length > 0
+  // Localized only when every shown field has a current translation (#1827); a partial set
+  // (one field stale after an edit) lets the client's /translate call fill the gap.
+  const isLocalized = (['claimText', 'detailsText', 'resolutionRules'] as const)
+    .filter((f) => !!prediction[f])
+    .every((f) => !!translations[f])
   const localizedPrediction = {
     ...prediction,
     claimText: translations.claimText || prediction.claimText,
