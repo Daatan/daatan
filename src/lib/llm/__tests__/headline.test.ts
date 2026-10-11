@@ -66,6 +66,20 @@ describe('generateHeadline', () => {
     expect(retryPrompt.trim().endsWith('Headline:')).toBe(true)
   })
 
+  it('waits past the first-attempt timeout for the retry (#1831)', async () => {
+    vi.useFakeTimers()
+    try {
+      generateContent
+        .mockResolvedValueOnce({ text: "Next Israeli PM won't serve full term" })
+        .mockImplementationOnce(() => new Promise((r) => setTimeout(() => r({ text: 'Next Israeli PM will serve less than full term' }), 19_000)))
+      const pending = generateHeadline('The next Prime Minister of Israel will serve for less than a full four-year term.')
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(await pending).toBe('Next Israeli PM will serve less than full term')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not retry when polarity matches', async () => {
     generateContent.mockResolvedValue({ text: 'Netanyahu will win' })
     await generateHeadline('Netanyahu will win the 2026 Israeli election')
