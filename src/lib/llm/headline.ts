@@ -63,30 +63,50 @@ function clean(raw: string): string {
 }
 
 /** The headline; '' when a guard rejects the output; null when the model fails or times out. */
+/**
+ * Appended on the one retry after a polarity mismatch (#1831): the regex guard rejects
+ * correct paraphrases that move the negation ("less than a full term" → "won't serve full
+ * term", "no longer display" → "drop"), so ask once more to keep the claim's own wording.
+ * The guard still checks the retry; nothing it rejects gets through.
+ */
+export function polarityRetryHint(rejected: string): string {
+  return `Your previous headline "${rejected}" was rejected: it adds or drops a negation compared with the claim. Keep the claim's own wording for negation and limits ("not", "no longer", "less than", "fails to") so the headline says exactly the same thing, as a natural, complete phrase of up to 6 words.\n\nHeadline:`
+}
+
+/** The headline; '' when a guard rejects the output; null when the model fails or times out. */
 export async function generateHeadline(claimText: string): Promise<string | null> {
   const emoji = claimText.match(LEADING_EMOJI)?.[1]
   const claim = claimText.replace(LEADING_EMOJI, '').trim()
   if (!claim) return null
 
-  const generation = (async (): Promise<string> => {
-    const prompt = HEADLINE_PROMPT.replace('{claim}', () => claim)
-    const res = await llmService.generateContent({ ...forStage('headline'), prompt, temperature: 0 })
-    return clean(res.text)
-  })()
+  const attempt = async (hint = ''): Promise<string | null> => {
+    const base = HEADLINE_PROMPT.replace('{claim}', () => claim)
+    const prompt = hint ? base.replace(/Headline:$/, () => hint) : base
+    const generation = llmService
+      .generateContent({ ...forStage('headline'), prompt, temperature: 0 })
+      .then((res) => clean(res.text))
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HEADLINE_TIMEOUT_MS))
+    return Promise.race([generation, timeout])
+  }
 
   try {
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HEADLINE_TIMEOUT_MS))
-    const headline = await Promise.race([generation, timeout])
+    let headline = await attempt()
     if (headline === null) {
       log.warn({ claim }, 'headline: timed out')
       return null
+    }
+    if (headline.length >= 2 && !polarityMatches(claim, headline)) {
+      log.info({ claim, headline }, 'headline: polarity differs from claim, retrying once')
+      const retry = await attempt(polarityRetryHint(headline))
+      if (retry !== null) headline = retry
     }
     if (headline.length < 2) {
       log.warn({ claim }, 'headline: empty, discarded')
       return ''
     }
     const words = headline.split(' ').length
-    if (words > 8 || headline.length > HEADLINE_MAX_CHARS) {
+    // 9, not 8: future tense (#1823) costs a "will"; the 60-char cap still bounds the card.
+    if (words > 9 || headline.length > HEADLINE_MAX_CHARS) {
       log.warn({ claim, headline }, 'headline: too long, discarded')
       return ''
     }

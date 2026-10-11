@@ -49,9 +49,27 @@ describe('generateHeadline', () => {
     expect(generateContent.mock.calls[0][0].stage).toBe('headline')
   })
 
-  it("returns '' (rejected, not retried) when polarity flips", async () => {
+  it("returns '' when polarity still flips after the one retry", async () => {
     generateContent.mockResolvedValue({ text: 'Ceasefire this year' })
     expect(await generateHeadline('A ceasefire will not be implemented by Dec 31, 2026')).toBe('')
+    expect(generateContent).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries once with a hint when the paraphrase moves the negation (#1831)', async () => {
+    generateContent
+      .mockResolvedValueOnce({ text: "Next Israeli PM won't serve full term" })
+      .mockResolvedValueOnce({ text: 'Next Israeli PM will serve less than full term' })
+    expect(await generateHeadline('The next Prime Minister of Israel will serve for less than a full four-year term.'))
+      .toBe('Next Israeli PM will serve less than full term')
+    const retryPrompt: string = generateContent.mock.calls[1][0].prompt
+    expect(retryPrompt).toContain(`Your previous headline "Next Israeli PM won't serve full term" was rejected`)
+    expect(retryPrompt.trim().endsWith('Headline:')).toBe(true)
+  })
+
+  it('does not retry when polarity matches', async () => {
+    generateContent.mockResolvedValue({ text: 'Netanyahu will win' })
+    await generateHeadline('Netanyahu will win the 2026 Israeli election')
+    expect(generateContent).toHaveBeenCalledTimes(1)
   })
 
   it("returns '' when too long", async () => {
