@@ -792,7 +792,7 @@ persisted `evidence_weight` column, which is unrelated to the temporal window �
 module docstring in `src/lib/services/evidence-second-opinion.ts`), and for an in-window
 article whose stance deviates ≥20pp from its forecast's published `confidence`, gets a
 second opinion on that same article from a stronger model (`EVIDENCE_SECOND_OPINION_MODEL`,
-default Sonnet 4.5). It escalates only when the cheap and expensive readings disagree with
+default Sonnet 5.5). It escalates only when the cheap and expensive readings disagree with
 **each other** by ≥15pp — agreement, even against the published number, is treated as real
 new evidence the normal ingestion path already self-heals from. Detector 2 is pure SQL, no
 model calls: flags a same-source stance drift ≥25pp between an older and a newer article on
