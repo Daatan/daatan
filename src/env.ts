@@ -147,7 +147,7 @@ export const env = createEnv({
     ORACLE_API_KEY: z.string().min(1).optional(),
 
     // litellm model id for the evidence-second-opinion cron's "expensive" re-read
-    // (daatan#1636) — see EXTRACTOR_MODEL_SURVEY.md in retro. Default: Sonnet 4.5.
+    // (daatan#1636) — see EXTRACTOR_MODEL_SURVEY.md in retro. Default: Sonnet 5.5.
     EVIDENCE_SECOND_OPINION_MODEL: z.string().min(1).optional(),
 
     // IndexNow — instant Bing/Yandex indexing on publish

@@ -12,7 +12,7 @@ name: Evidence Second Opinion
 # triages via /audit or manually.
 #
 # Runs against PRODUCTION by default: this is a diagnostic over the live pool,
-# and detector 1 spends real Bedrock tokens (top-10 cap per run, Sonnet 4.5 by
+# and detector 1 spends real Bedrock tokens (top-10 cap per run, Sonnet 5.5 by
 # default — see EXTRACTOR_MODEL_SURVEY.md). Manual dispatch supports staging and
 # a dry-run mode (report computed, nothing posted, dedup ledger untouched) for
 # verification before this is trusted unattended.

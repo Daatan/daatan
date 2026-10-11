@@ -55,7 +55,7 @@ export const MAX_REEXTRACTIONS_PER_RUN = 10
  *  is expected, not itself evidence of a bug. */
 export const SOURCE_DRIFT_TRIGGER_PP = 25
 
-const DEFAULT_EXPENSIVE_MODEL = 'bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0'
+const DEFAULT_EXPENSIVE_MODEL = 'bedrock/us.anthropic.claude-sonnet-5-5'
 
 function expensiveModel(): string {
   return env.EVIDENCE_SECOND_OPINION_MODEL || DEFAULT_EXPENSIVE_MODEL
