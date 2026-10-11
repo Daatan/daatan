@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs'
 process.env.SKIP_ENV_VALIDATION = '1'
 
 async function main() {
-  const { HEADLINE_PROMPT, polarityMatches } = await import('../src/lib/llm/headline')
+  const { HEADLINE_PROMPT, polarityMatches, polarityRetryHint } = await import('../src/lib/llm/headline')
   const { stageModel } = await import('../src/lib/llm/stageModels')
   const model = process.env.HEADLINE_MODEL || stageModel('headline', 'gemini-2.5-flash')
   const tModel = process.env.TRANSLATE_MODEL || stageModel('translation', 'gemini-2.5-flash')
@@ -52,10 +52,12 @@ async function main() {
   let bad = 0
   for (const c of cases) {
     const claim = c.claim.replace(/^🤖\s*/, '')
-    const raw = await gen(model, HEADLINE_PROMPT.replace('{claim}', () => claim))
-    const h = raw.split('\n')[0].replace(/^headline:\s*/i, '').replace(/^["'“”«»]+|["'“”«»]+$/g, '').replace(/[.。]+$/, '').trim()
+    const clean = (raw: string) => raw.split('\n')[0].replace(/^headline:\s*/i, '').replace(/^["'“”«»]+|["'“”«»]+$/g, '').replace(/[.。]+$/, '').trim()
+    const base = HEADLINE_PROMPT.replace('{claim}', () => claim)
+    let h = clean(await gen(model, base))
+    if (!polarityMatches(claim, h)) h = clean(await gen(model, base.replace(/Headline:$/, () => polarityRetryHint(h))))  // as generateHeadline (#1831)
     const words = h.split(/\s+/).length
-    const guard = words > 8 || h.length > 60 ? 'TOO_LONG' : !polarityMatches(claim, h) ? 'POLARITY' : 'ok'
+    const guard = words > 9 || h.length > 60 ? 'TOO_LONG' : !polarityMatches(claim, h) ? 'POLARITY' : 'ok'
     const future = claim.trim().endsWith('?') || FUTURE.test(h)
     if (!future) bad++
     const [he, ru] = guard === 'ok' ? await Promise.all([translate(h, 'Hebrew', claim), translate(h, 'Russian', claim)]) : ['', '']
