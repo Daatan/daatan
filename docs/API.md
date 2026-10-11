@@ -275,6 +275,8 @@ Generate an "express" forecast via AI from a URL or topic.
 
 When the first draft reports its resolution date as `assumed` (#1706), one extra call asks Gemini on Vertex, with the native `googleSearch` tool, for the date of the scheduled event the forecast hinges on (`src/lib/llm/groundedDateLookup.ts`). A found date is put in front of the model as a `[Reference]` block and the forecast is drafted again, so the claim text, rules and `resolveByDatetime` stay coherent and `dateBasis` comes back `from_sources`. Vertex only — the lookup bypasses the LLM fallback chain, which has no grounding; with no Vertex credentials, a failed call, or no scheduled date found, the first draft is returned unchanged with its "assumed date" warning. Adds ~5–10 s and one re-draft on the assumed path only. The result's `groundedDate` field records what happened.
 
+Every binary draft then goes through the #1813 rules-direction check (`src/lib/llm/rulesDirection.ts`): inverted rules are rewritten when a second check accepts the rewrite, otherwise the review screen warns. The result's `rulesDirection` field (`direction`, `initial`, `fixed`) records the outcome; the check is fail-open (`direction: 'error'`).
+
 ---
 
 ### `POST /api/forecasts/express/guess` — Auth
@@ -398,7 +400,7 @@ move slowly (only on resolution events), so this avoids the full multi-query agg
 With `tag`, `eloRating` is `null` for users with no resolved forecast in that tag (they sort last); without `tag` it is always a number. The leaderboard page only uses `elo`, `accuracy` and `brierScore`; the other sorts remain available here.
 
 ### `GET /api/leaderboard/sources`
-Author/outlet shadow-scoring leaderboard. Public. Rate-limited to 60 requests/hour per IP; cached 5 min per `(view, sortBy)`. `?view=authors|outlets` (default `authors`), `?sortBy=skillConservative|brierScore` (default `skillConservative`). Rows with fewer than 5 predictions are left out (daatan#1587).
+Author/outlet shadow-scoring leaderboard. Public. Rate-limited to 60 requests/hour per IP; cached 5 min per `(view, sortBy)`. `?view=authors|outlets` (default `authors`), `?sortBy=skillConservative|brierScore` (default `skillConservative`). Rows with fewer than 4 predictions are left out (daatan#1587; lowered from 5 on 2026-10-11).
 
 ### `GET /api/top-reputation`
 Top users by reputation for sidebar widget. Public. Rate-limited to 60 requests/hour per IP.

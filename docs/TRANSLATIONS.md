@@ -2,7 +2,8 @@
 
 Locales: `en` (default), `he`, `ru`, `eo` (`src/i18n/config.ts`). **English is the
 canonical source language** — every forecast's stored `claimText` / `detailsText` /
-`resolutionRules` are English, and the non-default locales are derived from them.
+`resolutionRules` and card `headline` are English, and the non-default locales are derived
+from them.
 
 UI locale resolution (`src/i18n/request.ts`): `NEXT_LOCALE` cookie (set only by the
 language picker) → browser `Accept-Language` (`src/i18n/negotiate.ts`, q-values
@@ -16,7 +17,8 @@ without a Hebrew browser).
 ## Translation cache
 
 `PredictionTranslation` (`prediction_translations`) caches one row per
-`(predictionId, fieldName, language)`. `sourceHash` is the SHA-256 of the English
+`(predictionId, fieldName, language)` for `claimText`, `detailsText`, `resolutionRules` and
+`headline` (`DISPLAY_TRANSLATED_FIELDS`). `sourceHash` is the SHA-256 of the English
 source the translation was produced from; a row is a cache hit only when it matches
 the *current* source, so an edited field re-translates instead of serving a stale
 translation (`src/lib/services/translation.ts`).
@@ -24,11 +26,17 @@ translation (`src/lib/services/translation.ts`).
 - **On create** (`POST /api/forecasts`): `translatePredictionToAllLocales` fans out
   to the non-default locales in the background (best-effort, retried).
 - **On read**: locale pages call `getCachedPredictionTranslation` — read-only, never
-  triggers Gemini. A cache miss falls back to the English source. This read does not
-  re-check `sourceHash`; staleness is prevented on the write side instead — an edit that
-  changes the English text deletes the forecast's translation rows (`directUpdateForecast`
-  and the original-language update in `src/lib/services/forecast.ts`; a context rewrite
-  drops the `detailsText` rows in `src/lib/services/context.ts`).
+  triggers Gemini. A cache miss falls back to the English source. Since #1827 this read also
+  checks `sourceHash` and drops rows that no longer match the current English text, so the
+  client's `/translate` call re-translates them. The write side still deletes rows on an edit
+  (`directUpdateForecast` and the original-language update in `src/lib/services/forecast.ts`;
+  a context rewrite drops the `detailsText` rows in `src/lib/services/context.ts`), but a
+  regenerated headline goes through no delete path, which is how stale present-tense Hebrew
+  headlines kept being served after #1823.
+- **Consistent names** (#1825): `detailsText`, `resolutionRules` and `headline` are translated
+  with the claim as context and, when the claim translation succeeded, with that translation,
+  so people, parties and places are named the same way in every field. A trailing period is
+  stripped from the translated headline.
 
 ## English canonicalization (non-English input)
 

@@ -151,7 +151,7 @@ Shipped on `main` for the SaaS edition; pointers to the owning code or doc:
 - **Prediction-market links** — Polymarket/Kalshi markets can be imported in the wizard or pasted into Express (#1545); the linked market's live price is shown on the forecast and fed to the AI as a prior. Linked prices refresh hourly (`external-market-sync.yml`).
 - **AI estimate** — each forecast gets a calibrated probability from the Oracul evidence pool, plus a multi-model AI panel with its own leaderboard (`/leaderboard/ai`).
 - **Ratings** — ELO headline rating, Accuracy and Brier (#1764); global and per-tag leaderboards.
-- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); sources with fewer than 5 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]`, pundit pages at `/authors/[author]`.
+- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); sources with fewer than 4 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]`, pundit pages at `/authors/[author]`.
 - **Retroanalysis case studies** — `/retroanalysis` (SaaS-only): Ukraine 2022 and Israel 2022 election (E02) reports rating what commentators said before the outcome (#1765–#1773).
 - **Forget History** — in Settings, a user can detach themselves from their own already-resolved commitments without deleting the rows (so other users' scoring is unchanged); refused while they hold a commitment on an unresolved forecast (#1701, #1724). `POST /api/account/forget-history`.
 - **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page.

@@ -214,9 +214,10 @@ Bot prompts live in git with every other prompt — `PROMPTS` in
 `prompts/prompt_versions.lock.json`. Inventory and edit procedure:
 **[docs/PROMPTS.md](PROMPTS.md)**.
 
-The bot lane uses seven of them: `bot-config-generation`, `bot-forecast-generation`,
+The bot lane uses eight of them: `bot-config-generation`, `bot-forecast-generation`,
 `bot-sourceless-forecast-generation`, `bot-vote-decision`, `dedupe-check`,
-`forecast-quality-validation` and `topic-extraction`.
+`forecast-quality-validation`, `rules-direction` (#1813: a draft whose rules stay inverted
+after the rewrite is skipped) and `topic-extraction`.
 
 Until #1658 these were fetched at runtime from AWS Bedrock Prompt Management via
 `/daatan/{env}/prompts/{name}` in SSM, with a 5-minute cache and an in-code fallback. That

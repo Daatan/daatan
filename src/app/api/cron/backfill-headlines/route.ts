@@ -20,7 +20,9 @@ const log = createLogger('cron-backfill-headlines')
  */
 
 const DEFAULT_LIMIT = 25
-// 100 hit the proxy's ~60s timeout on staging (504); 40 finishes in time.
+// 100 hit the proxy's ~60s timeout on staging (504); 40 usually finishes in time. A run with
+// several polarity retries (40s each since #1834) can still pass 60s: the response then
+// 504s but the rows already written stay written, and the next run picks up the rest.
 const MAX_LIMIT = 40
 const CONCURRENCY = 5
 
