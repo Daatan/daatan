@@ -915,6 +915,21 @@ describe('pushCredibilityFeedback', () => {
     })
   })
 
+  it('falls back to the source when the row has no outlet (daatan#1835)', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'art-1', author: 'Guy Bechor', source: 'ynet.co.il', outletName: null, authorLean: 0.4 }),
+    ] as never)
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1, author_signals_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.author_signals[0].outlet_name).toBe('ynet.co.il')
+  })
+
   it('still pushes when only the author lane has signal — the stance lane being all-opinion must not gate it', async () => {
     findMany.mockResolvedValue([
       poolArticle({ id: 'art-opinion', evidenceClass: 'opinion', author: 'Pundit', authorLean: -0.7 }),
