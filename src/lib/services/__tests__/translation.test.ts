@@ -11,6 +11,7 @@ vi.mock('@/lib/services/telegram', () => ({ notifyTranslationFailed: vi.fn() }))
 
 import {
   translatePrediction,
+  getCachedPredictionTranslation,
   sourceHash,
   callGeminiTranslate,
   languageName,
@@ -62,6 +63,28 @@ describe('callGeminiTranslate prompt', () => {
     expect(prompt).not.toContain(' he ')
     expect(prompt).toContain('the forecast claim')
     expect(prompt).toContain('Hello')
+  })
+})
+
+describe('getCachedPredictionTranslation — only current-source rows (#1827)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('drops a row made from an older source (regenerated headline, edited details)', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...PREDICTION, headline: 'Russia will unblock Telegram' } as never)
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'claimText', translatedText: 'he-claim', sourceHash: sourceHash(PREDICTION.claimText) },
+      { fieldName: 'detailsText', translatedText: 'he-old-details', sourceHash: sourceHash('older details') },
+      { fieldName: 'headline', translatedText: 'רוסיה מתירה את טלגרם', sourceHash: sourceHash('Russia unblocks Telegram') },
+      { fieldName: 'resolutionRules', translatedText: 'he-rules', sourceHash: null },
+    ] as never)
+
+    expect(await getCachedPredictionTranslation('p1', 'he')).toEqual({ claimText: 'he-claim' })
+  })
+
+  it('returns {} for a missing forecast', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue(null as never)
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([] as never)
+    expect(await getCachedPredictionTranslation('nope', 'he')).toEqual({})
   })
 })
 
