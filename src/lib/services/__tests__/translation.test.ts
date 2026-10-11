@@ -108,6 +108,30 @@ describe('translatePrediction — content-aware cache', () => {
     )
     const prompt = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
     expect(prompt).toContain(PREDICTION.claimText) // claim passed as context for detailsText
+    expect(prompt).toContain('already translated as: "he-claim"') // #1825: same names as the claim
+  })
+
+  it("strips a trailing period from a translated headline (#1825)", async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...PREDICTION, headline: 'Ben-Gvir will not reserve Silman' } as never)
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([] as never)
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'בן-גביר לא ישריין את סילמן.' } as never)
+
+    const result = await translatePrediction('p1', 'he')
+
+    expect(result.headline).toBe('בן-גביר לא ישריין את סילמן')
+    expect(result.claimText).toBe('בן-גביר לא ישריין את סילמן.') // other fields untouched
+  })
+
+  it('does not pass a failed claim translation as the translated claim', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([] as never)
+    vi.mocked(llmService.generateContent)
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValue({ text: 'TRANSLATED' } as never)
+
+    await translatePrediction('p1', 'he')
+
+    const detailsPrompt = vi.mocked(llmService.generateContent).mock.calls[1][0].prompt
+    expect(detailsPrompt).not.toContain('already translated as')
   })
 
   it('re-translates legacy rows with a null source hash', async () => {
