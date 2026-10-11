@@ -59,6 +59,7 @@ export async function callGeminiTranslate(
   text: string,
   language: string,
   context?: string,
+  translatedClaim?: string,
 ): Promise<string> {
   const target = languageName(language)
   const prompt = [
@@ -74,6 +75,9 @@ export async function callGeminiTranslate(
     '- Return ONLY the translated text: no quotes, no notes, no explanation.',
     context
       ? `\nContext — this text is part of the forecast: "${context}". Use it only to disambiguate terms and grammatical agreement; translate ONLY the text below.`
+      : '',
+    translatedClaim
+      ? `\nThe claim is already translated as: "${translatedClaim}". Use exactly the same ${target} names and terms for people, parties, organisations and places.`
       : '',
     '',
     'Text to translate:',
@@ -322,12 +326,21 @@ export async function translatePrediction(
       continue
     }
 
-    // Give non-claim fields the claim as disambiguating context.
+    // Give non-claim fields the claim as disambiguating context, plus the claim's own
+    // translation (claimText comes first) so names match across fields (#1825: details
+    // said "עם ישראל" where claim, rules and headline said "עמך ישראל").
     const context = field === 'claimText' ? undefined : prediction.claimText || undefined
+    const translatedClaim =
+      field !== 'claimText' && result.claimText && result.claimText !== prediction.claimText
+        ? result.claimText
+        : undefined
 
     try {
       log.info({ predictionId, field, language }, 'Translating field')
-      const translated = await callGeminiTranslate(sourceText, language, context ?? undefined)
+      let translated = await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim)
+      // Headlines carry no trailing period (headline.ts strips it from the source); the
+      // translation sometimes adds one back.
+      if (field === 'headline') translated = translated.replace(/[.。]+$/, '').trim()
 
       await prisma.predictionTranslation.upsert({
         where: {
