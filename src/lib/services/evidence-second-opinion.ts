@@ -371,6 +371,26 @@ async function reconcileAlerts(activeKeys: string[]): Promise<Set<string>> {
 /** Second opinions that returned no forecast, by Oracul failure class. */
 export type SecondOpinionFailures = Partial<Record<OracleFailureClass, number>>
 
+/**
+ * An abstain is normally a real answer ("the stronger model found no usable
+ * claim") and is kept out of the failure count (daatan#1798). But when nearly
+ * every checked article abstains it is a broken run in disguise: a model change
+ * that Bedrock rejects surfaces as extractor error -> `oracle_abstain`, and on
+ * 2026-10-11 that made 10/10 second opinions abstain while the run stayed green
+ * (baseline 1-3 of 10; retro#916). 100% is never "a real answer".
+ */
+export const ABSTAIN_STORM_MIN_CHECKED = 5
+export const ABSTAIN_STORM_SHARE = 0.8
+
+export function isAbstainStorm(
+  articlesChecked: number,
+  failures: SecondOpinionFailures | undefined,
+): boolean {
+  const abstains = failures?.oracle_abstain ?? 0
+  if (articlesChecked < ABSTAIN_STORM_MIN_CHECKED) return false
+  return abstains / articlesChecked >= ABSTAIN_STORM_SHARE
+}
+
 export interface EvidenceSecondOpinionResult {
   issues: EvidenceSecondOpinionIssue[]
   suppressed: number
