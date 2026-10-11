@@ -65,7 +65,6 @@ function clean(raw: string): string {
     .trim()
 }
 
-/** The headline; '' when a guard rejects the output; null when the model fails or times out. */
 /**
  * Appended on the one retry after a polarity mismatch (#1831): the regex guard rejects
  * correct paraphrases that move the negation ("less than a full term" → "won't serve full

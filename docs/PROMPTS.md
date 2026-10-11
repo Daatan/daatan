@@ -70,6 +70,7 @@ A few short prompts are still built inline in code rather than in `PROMPTS`, so 
 | Where | What |
 |---|---|
 | `src/lib/llm/searchQuery.ts` (`EXTRACTION_PROMPT`) | claim → 3–8-word search query |
+| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`) | claim → 2–6-word future-tense card headline (#1814, #1823); one retry with a hint when the negation guard rejects it (#1831) |
 | `src/lib/services/ai-estimate.ts` | bare 0–100 estimate backfilled onto a commitment's `aiProbabilityAtCommit` |
 | `src/lib/services/translation.ts` | forecast/comment translation and normalise-to-English |
 | `src/lib/llm/groundedDateLookup.ts` | the #1706 web-grounded event-date lookup (Vertex `googleSearch`, outside `llmService`) |
@@ -106,7 +107,7 @@ returns a phrase. Those still lock their prose.
 
 ### Prompts that ingest untrusted text
 
-Five prompts interpolate text the platform did not write. All five delimit it and tell the
+Six prompts interpolate text the platform did not write. All six delimit it and tell the
 model to ignore instructions inside it:
 
 | Prompt | Untrusted input | Delimiter |
@@ -116,6 +117,7 @@ model to ignore instructions inside it:
 | `guess-chances` | user-drafted claim + third-party news snippets | `<forecast>`, `<articles>` |
 | `panel-estimate-grounded` | third-party news snippets | prose framing |
 | `rules-direction` | claim + rules drafted from author input | `<claim>`, `<rules>` |
+| `HEADLINE_PROMPT` (outside the lock) | user-written claim | `<claim>` |
 
 `content-moderation` is the one whose input is adversarial *by construction* — the author of
 the text is the person who wants the gate to say `isOffensive: false` — so it also states that
@@ -146,7 +148,7 @@ platform's own voice in the position where the platform speaks.
 
 ## Versions
 
-All twenty start at `v1`. The Bedrock version numbers they carried until #1658 counted edits
+All twenty started at `v1` (#1658); `rules-direction`, added later, also started at `v1`. The Bedrock version numbers they carried until #1658 counted edits
 to the prose alone, so they describe something different and are not carried forward; #1658
 records what each was on.
 
