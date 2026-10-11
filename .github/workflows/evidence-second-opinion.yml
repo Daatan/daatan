@@ -92,3 +92,12 @@ jobs:
             echo "::error::every second opinion failed ($FAILED/$CHECKED) — detector 1 is not running"
             exit 1
           fi
+
+          # daatan#1832: abstains are excluded above ("a real answer"), but 10/10 abstains on
+          # 2026-10-11 was a rejected model parameter, not 10 real answers. The route computes
+          # the verdict (>=80% of >=5 checked) so the rule lives in one place.
+          if [ "$(echo "$BODY" | jq -r '.abstainStorm // false')" = "true" ]; then
+            ABSTAINED=$(echo "$BODY" | jq -r '.secondOpinionFailures.oracle_abstain // 0')
+            echo "::error::abstain storm: $ABSTAINED/$CHECKED second opinions abstained — detector 1 is likely broken"
+            exit 1
+          fi

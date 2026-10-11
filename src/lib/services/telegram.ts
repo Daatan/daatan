@@ -391,6 +391,8 @@ export function notifyEvidenceSecondOpinionDigest(report: {
   articlesChecked: number
   /** Second opinions that returned no forecast, by Oracul failure class (daatan#1798). */
   secondOpinionFailures?: Partial<Record<string, number>>
+  /** Abstains are an implausible share of the checked articles (daatan#1832). */
+  abstainStorm?: boolean
 }): void {
   if (isDevEnv()) return
   // An abstain is a real answer from the stronger model, not a broken run.
@@ -398,7 +400,8 @@ export function notifyEvidenceSecondOpinionDigest(report: {
     ([cls, n]) => cls !== 'oracle_abstain' && (n ?? 0) > 0,
   )
   const failedCount = failed.reduce((sum, [, n]) => sum + (n ?? 0), 0)
-  if (report.issues.length === 0 && failedCount === 0) return
+  const abstains = report.secondOpinionFailures?.oracle_abstain ?? 0
+  if (report.issues.length === 0 && failedCount === 0 && !report.abstainStorm) return
 
   const lines = report.issues.slice(0, EVIDENCE_SECOND_OPINION_MAX_LINES).map(evidenceSecondOpinionLine)
   const overflow = report.issues.length - lines.length
@@ -407,6 +410,9 @@ export function notifyEvidenceSecondOpinionDigest(report: {
     `🔍 <b>Evidence second opinion</b> — ${report.articlesChecked} article(s) re-checked`,
     failedCount > 0
       ? `⚠️ No second opinion for ${failedCount}/${report.articlesChecked}: ${failed.map(([cls, n]) => `${cls}×${n}`).join(', ')}`
+      : '',
+    report.abstainStorm
+      ? `⚠️ ${abstains}/${report.articlesChecked} second opinions abstained — implausibly high (normal 1–3 of 10); the stronger model is probably failing, not abstaining`
       : '',
     ...lines,
     overflow > 0 ? `…and ${overflow} more` : '',

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
 import { secretsMatch } from '@/lib/cron-auth'
-import { checkEvidenceSecondOpinion } from '@/lib/services/evidence-second-opinion'
+import { checkEvidenceSecondOpinion, isAbstainStorm } from '@/lib/services/evidence-second-opinion'
 import { notifyEvidenceSecondOpinionDigest } from '@/lib/services/telegram'
 
 const log = createLogger('cron-evidence-second-opinion')
@@ -35,12 +35,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await checkEvidenceSecondOpinion(new Date(), { dryRun })
+    // daatan#1832: abstains don't count as failures, but an implausible share of them does.
+    const abstainStorm = isAbstainStorm(result.articlesChecked, result.secondOpinionFailures)
 
     if (!dryRun) {
       notifyEvidenceSecondOpinionDigest({
         issues: result.issues,
         articlesChecked: result.articlesChecked,
         secondOpinionFailures: result.secondOpinionFailures,
+        abstainStorm,
       })
     }
 
@@ -50,6 +53,7 @@ export async function GET(request: NextRequest) {
       articlesChecked: result.articlesChecked,
       suppressed: result.suppressed,
       secondOpinionFailures: result.secondOpinionFailures,
+      abstainStorm,
       issues: result.issues,
     })
   } catch (err) {

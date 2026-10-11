@@ -33,4 +33,16 @@ describe('notifyEvidenceSecondOpinionDigest — failed second opinions (daatan#1
 
     expect(global.fetch).not.toHaveBeenCalled()
   })
+
+  it('warns on an abstain storm even when nothing else fired (daatan#1832)', async () => {
+    notifyEvidenceSecondOpinionDigest({
+      issues: [],
+      articlesChecked: 10,
+      secondOpinionFailures: { oracle_abstain: 10 },
+      abstainStorm: true,
+    })
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalled())
+
+    expect(sentTexts()[0]).toContain('10/10 second opinions abstained')
+  })
 })
