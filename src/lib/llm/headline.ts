@@ -19,6 +19,9 @@ const log = createLogger('headline')
  */
 export const HEADLINE_MAX_CHARS = 60
 const HEADLINE_TIMEOUT_MS = 10_000
+// The polarity retry runs 8-19s on prod (thinking on the longer prompt), so 10s threw away
+// correct retries (#1831). Every caller is background or batch work, so the wait is unseen.
+const HEADLINE_RETRY_TIMEOUT_MS = 40_000
 
 export const HEADLINE_PROMPT = `Write a very short headline for this forecast, for a news-feed card.
 - 2 to 6 words. No date, no year, no probability, no trailing period.
@@ -85,7 +88,8 @@ export async function generateHeadline(claimText: string): Promise<string | null
     const generation = llmService
       .generateContent({ ...forStage('headline'), prompt, temperature: 0 })
       .then((res) => clean(res.text))
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HEADLINE_TIMEOUT_MS))
+    const ms = hint ? HEADLINE_RETRY_TIMEOUT_MS : HEADLINE_TIMEOUT_MS
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
     return Promise.race([generation, timeout])
   }
 
