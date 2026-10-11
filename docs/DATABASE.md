@@ -643,7 +643,9 @@ news-indexer's `/articles/by-url` (Phase 2 of the matching redesign, news-indexe
 tables. All nullable; `author`/`personId`/`personName` were historically backfilled
 (2026-07-15: 88% author, 24% person coverage), `outletId`/`outletName` (#1131) are
 forward-populated only — and in practice have never been populated on pool rows
-(0% coverage as of 2026-08-17). Since news-indexer#302 the push payload carries the
+(0% coverage as of 2026-08-17; 527 of 31,195 rows on 2026-10-11, always equal to `source`).
+The credibility-feedback push therefore sends `outletName ?? source` as the author signal's
+`outlet_name` (daatan#1835), so the sources leaderboard keys on the source, not on null. Since news-indexer#302 the push payload carries the
 NAMES next to the ids, so a push that resolved identity no longer needs the by-url
 round-trip at all; the lookup runs only for URLs the push did not cover. Presence, not
 truthiness, decides: an item with no `author` key is an older news-indexer and is still

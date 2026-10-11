@@ -1360,7 +1360,10 @@ export async function pushCredibilityFeedback(
         })),
         author_signals: authorSignals.map((a) => ({
           author: a.author,
-          outlet_name: a.outletName,
+          // outletName is set only when news-indexer has an outlet row for the source
+          // (527 of 31k pool rows, daatan#1835), and when set it equals `source`. Without
+          // the fallback nearly every signal keyed on (author, null).
+          outlet_name: a.outletName ?? a.source,
           author_lean: a.authorLean,
           author_lean_certainty: a.authorLeanCertainty,
           evidence_class: a.evidenceClass,
