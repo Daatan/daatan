@@ -20,11 +20,13 @@ const log = createLogger('cron-backfill-headlines')
  */
 
 const DEFAULT_LIMIT = 25
-// 100 hit the proxy's ~60s timeout on staging (504); 40 usually finishes in time. A run with
-// several polarity retries (40s each since #1834) can still pass 60s: the response then
-// 504s but the rows already written stay written, and the next run picks up the rest.
+// 100 hit the proxy's ~60s timeout on staging (504). A batch is bounded by the first attempt
+// (10s) plus a polarity retry (40s since #1834), so one batch can take ~50s. A new batch is
+// therefore only started inside START_BUDGET_MS; the rest is left for the next call (see
+// `deferred` and `remaining`) instead of letting the whole response pass the proxy's 60s.
 const MAX_LIMIT = 40
 const CONCURRENCY = 5
+const START_BUDGET_MS = 8_000
 
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
@@ -45,7 +47,10 @@ export async function GET(request: NextRequest) {
   })
 
   const counts = { stored: 0, rejected: 0, failed: 0 }
+  const startedAt = Date.now()
+  let attempted = 0
   for (let i = 0; i < missing.length; i += CONCURRENCY) {
+    if (i > 0 && Date.now() - startedAt > START_BUDGET_MS) break
     const results = await Promise.all(
       missing.slice(i, i + CONCURRENCY).map(({ id, claimText }) =>
         generateAndStoreHeadline(id, claimText).catch((err) => {
@@ -54,10 +59,12 @@ export async function GET(request: NextRequest) {
         }),
       ),
     )
+    attempted += results.length
     for (const r of results) counts[r]++
   }
+  const deferred = missing.length - attempted
 
   const remaining = await prisma.prediction.count({ where: { headline: null } })
-  log.info({ ...counts, remaining }, 'Headline backfill cron complete')
-  return NextResponse.json({ ok: true, ...counts, remaining })
+  log.info({ ...counts, deferred, remaining }, 'Headline backfill cron complete')
+  return NextResponse.json({ ok: true, ...counts, deferred, remaining })
 }

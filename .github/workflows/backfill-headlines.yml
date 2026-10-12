@@ -4,7 +4,8 @@ name: Backfill Headlines
 # headline for predictions with `headline IS NULL`, i.e. rows that predate the column and
 # any whose fire-and-forget generation failed. Guard-rejected rows hold '' and are skipped.
 # Manual runs pick one environment and a batch size, which is how the one-off backfill
-# of existing forecasts is drained (up to 40 per call: 100 hit the proxy's 60s timeout).
+# of existing forecasts is drained (up to 40 per call: 100 hit the proxy's 60s timeout; a
+# call also stops starting batches after ~8s, so the rest is picked up by the next call).
 #
 # Like backfill-embeddings.yml: a GitHub runner makes the request, the app does the work.
 # A 404 means the route isn't deployed in that environment yet (prod before the v* tag
@@ -24,8 +25,8 @@ on:
         description: 'Rows per call (max 40)'
         default: '25'
       calls:
-        description: 'Consecutive calls (drains limit × calls rows)'
-        default: '1'
+        description: 'Consecutive calls (a call stops starting batches after ~8s, so drain with several)'
+        default: '3'
 
 jobs:
   backfill:
@@ -42,7 +43,7 @@ jobs:
           BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
           PICK: ${{ github.event.inputs.environment || 'both' }}
           LIMIT: ${{ github.event.inputs.limit || '25' }}
-          CALLS: ${{ github.event.inputs.calls || '1' }}
+          CALLS: ${{ github.event.inputs.calls || '3' }}
         run: |
           ENV="${{ matrix.env }}"
           if [ "$PICK" != "both" ] && [ "$PICK" != "$ENV" ]; then
