@@ -1232,5 +1232,95 @@
     "githubIssuesDesc": "Raportu cimojn aŭ petu novajn funkciojn",
     "twitter": "Twitter / X",
     "learnMore": "Lernu pli pri DAATAN →"
+  },
+  "HomeV5": {
+    "metaTitle": "Daatan - mezurebla rekordo de juĝo",
+    "metaDescription": "Daatan igas prognozojn kaj asertojn pri la estonteco mezurebla rekordo: kiu montris bonan juĝon, kaj en kiuj fakoj.",
+    "nav": {
+      "label": "Ĉefa navigado",
+      "forecasts": "Prognozoj",
+      "sources": "Fontoj",
+      "elections": "Elektoj 2026",
+      "retro": "Retro",
+      "howItWorks": "Kiel tio funkcias",
+      "about": "Pri ni",
+      "login": "Ensaluti",
+      "create": "Krei prognozon",
+      "search": "Serĉi",
+      "home": "Daatan, hejmo",
+      "menu": "Menuo",
+      "closeMenu": "Fermi la menuon"
+    },
+    "hero": {
+      "eyebrow": "Rekordo. Reputacio. Fido.",
+      "titleLine1": "Kiu vere scias,",
+      "titleLine2": "pri kio li parolas?",
+      "body": "Daatan igas prognozojn kaj asertojn pri la estonteco mezurebla rekordo. Kiam la estonteco fariĝas realo, eblas reiri al tio, kio estis dirita, kaj vidi kiu montris bonan juĝon kaj en kiuj fakoj.",
+      "ctaForecasts": "Daatan Prognozoj",
+      "ctaSources": "Daatan Fontoj",
+      "stepsLabel": "Prognozoj, rezultoj, rekordo, reputacio",
+      "stepForecasts": "Prognozoj",
+      "stepResults": "Rezultoj",
+      "stepRecord": "Rekordo",
+      "stepReputation": "Reputacio",
+      "radarOpenTitle": "Malfermitaj prognozoj",
+      "radarOpenSub": "El diversaj fakoj",
+      "radarResultsTitle": "Rezultoj",
+      "radarResultsSub": "Mezuritaj kontraŭ la realo",
+      "radarRecordTitle": "Rekordo",
+      "radarRecordSub": "Akumuliĝas kun la tempo"
+    },
+    "uses": {
+      "title": "Du ĉefaj uzoj, unu mezura tavolo",
+      "subtitle": "Sama mezurado, du vidpunktoj: via juĝo kaj la juĝo de tiuj, kiujn vi aŭskultas.",
+      "forecastsTitle": "Daatan Prognozoj",
+      "forecastsTagline": "Via mezurebla rekordo, prognozo post prognozo.",
+      "forecastsB1": "Mezuri vian juĝon laŭlonge de la tempo",
+      "forecastsB2": "Eltrovi en kiuj fakoj vi estas forta",
+      "forecastsB3": "Kompari vin kun spertuloj kaj la konsento",
+      "sourcesTitle": "Daatan Fontoj",
+      "sourcesTagline": "La mezurebla rekordo de spertuloj, komentistoj kaj fontoj.",
+      "sourcesB1": "Vidi kiu montris bonan juĝon laŭlonge de la tempo",
+      "sourcesB2": "Reiri al tio, kio estis dirita antaŭ ol la rezulto estis konata",
+      "sourcesB3": "Sekvi la elektojn 2026 kaj retro-analizojn"
+    },
+    "card": {
+      "statusOpen": "Malferma prognozo",
+      "statusResolved": "Decidita",
+      "confidence": "Fido",
+      "resolvesOn": "Dato de decido",
+      "saidOn": "Kio estis dirita, {date}",
+      "whatHappened": "Kio efektive okazis",
+      "verdict": "Verdikto",
+      "correct": "Ĝusta",
+      "wrong": "Malĝusta",
+      "recordIn": "Ĝia rekordo en {tag}",
+      "recordCount": "{correct} el {total} ĝustaj"
+    },
+    "capabilities": {
+      "title": "Kion fari kun mezurebla rekordo?",
+      "subtitle": "Kiam juĝo estas mezurebla laŭlonge de la tempo, eblas vidi ne nur kiu pravis, sed al kiu fidi, pri kio kaj kial.",
+      "expertiseTitle": "Rekoni veran spertecon",
+      "expertiseBody": "Vidi kiu montras bonan juĝon laŭlonge de la tempo, kaj en kiuj fakoj.",
+      "benchmarkTitle": "Kompari kaj konstrui komparnormojn",
+      "benchmarkBody": "Kompari spertulojn, fontojn kaj konsenton surbaze de mezureblaj rezultoj.",
+      "trendsTitle": "Rimarki atendojn kaj tendencojn",
+      "trendsBody": "Sekvi kion homoj kaj fontoj prognozas, kaj kiel la taksoj ŝanĝiĝas laŭlonge de la tempo.",
+      "decisionsTitle": "Decidi pli informite",
+      "decisionsBody": "Aldoni al ĉiu decido la rekordon de la fontoj, sur kiuj vi fidas.",
+      "leadsTo": "Kien tio kondukas",
+      "leadsToBody": "Daatan igas juĝon datumoj, kiujn eblas mezuri, kompari kaj el kiuj eblas lerni laŭlonge de la tempo. Sur tiu bazo eblas konstrui indicojn kaj komparnormojn de sperteco, reputacio kaj fido."
+    },
+    "cta": {
+      "title": "Nia juĝo lasas spurojn.",
+      "subtitle": "Konstruu vian rekordon. Malkovru la rekordon de tiuj, kiujn vi aŭskultas."
+    },
+    "footer": {
+      "label": "Suba navigado",
+      "contact": "Kontakto",
+      "privacy": "Privateco",
+      "terms": "Kondiĉoj de uzo",
+      "disclaimer": "Daatan ne provizas investan aŭ financan konsiladon nek rekomendojn agi. La enhavo de la retejo servas nur informajn celojn."
+    }
   }
 }

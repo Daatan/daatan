@@ -1232,5 +1232,95 @@
     "githubIssuesDesc": "Report bugs or request features",
     "twitter": "Twitter / X",
     "learnMore": "Learn more about DAATAN →"
+  },
+  "HomeV5": {
+    "metaTitle": "Daatan - a measurable record of judgment",
+    "metaDescription": "Daatan turns forecasts and claims about the future into a measurable record: who showed good judgment, and in which fields.",
+    "nav": {
+      "label": "Main navigation",
+      "forecasts": "Forecasts",
+      "sources": "Sources",
+      "elections": "Elections 2026",
+      "retro": "Retro",
+      "howItWorks": "How it works",
+      "about": "About",
+      "login": "Sign in",
+      "create": "Make a forecast",
+      "search": "Search",
+      "home": "Daatan, home",
+      "menu": "Menu",
+      "closeMenu": "Close menu"
+    },
+    "hero": {
+      "eyebrow": "Record. Reputation. Trust.",
+      "titleLine1": "Who really knows",
+      "titleLine2": "what they are talking about?",
+      "body": "Daatan turns forecasts and claims about the future into a measurable record. When the future becomes reality, you can go back to what was said and see who showed good judgment, and in which fields.",
+      "ctaForecasts": "Daatan Forecasts",
+      "ctaSources": "Daatan Sources",
+      "stepsLabel": "Forecasts, results, record, reputation",
+      "stepForecasts": "Forecasts",
+      "stepResults": "Results",
+      "stepRecord": "Record",
+      "stepReputation": "Reputation",
+      "radarOpenTitle": "Open forecasts",
+      "radarOpenSub": "Across many fields",
+      "radarResultsTitle": "Results",
+      "radarResultsSub": "Measured against reality",
+      "radarRecordTitle": "Record",
+      "radarRecordSub": "Builds up over time"
+    },
+    "uses": {
+      "title": "Two main uses, one measurement layer",
+      "subtitle": "The same measurement, two points of view: your judgment, and the judgment of those you listen to.",
+      "forecastsTitle": "Daatan Forecasts",
+      "forecastsTagline": "Your measurable record, forecast after forecast.",
+      "forecastsB1": "Measure your judgment over time",
+      "forecastsB2": "Find out which fields you are strong in",
+      "forecastsB3": "Compare yourself to experts and to the consensus",
+      "sourcesTitle": "Daatan Sources",
+      "sourcesTagline": "The measurable record of experts, commentators and sources.",
+      "sourcesB1": "See who has shown good judgment over time",
+      "sourcesB2": "Go back to what was said before the outcome was known",
+      "sourcesB3": "Follow Elections 2026 and retro analyses"
+    },
+    "card": {
+      "statusOpen": "Open forecast",
+      "statusResolved": "Resolved",
+      "confidence": "Confidence",
+      "resolvesOn": "Resolution date",
+      "saidOn": "What was said, {date}",
+      "whatHappened": "What actually happened",
+      "verdict": "Verdict",
+      "correct": "Correct",
+      "wrong": "Wrong",
+      "recordIn": "Their record in {tag}",
+      "recordCount": "{correct} of {total} correct"
+    },
+    "capabilities": {
+      "title": "So what can you do with a measurable record?",
+      "subtitle": "When judgment can be measured over time, you can see not only who was right, but whom to rely on, on what, and why.",
+      "expertiseTitle": "Identify real expertise",
+      "expertiseBody": "See who shows good judgment over time, and in which fields.",
+      "benchmarkTitle": "Compare and build benchmarks",
+      "benchmarkBody": "Compare experts, sources and the consensus on measurable performance.",
+      "trendsTitle": "Spot expectations and trends",
+      "trendsBody": "Follow what people and sources predict, and how estimates change over time.",
+      "decisionsTitle": "Make better-informed decisions",
+      "decisionsBody": "Add to every decision the record of the sources you rely on.",
+      "leadsTo": "Where this leads",
+      "leadsToBody": "Daatan turns judgment into data that can be measured, compared and learned from over time. On that base you can build indices and benchmarks for expertise, reputation and trust."
+    },
+    "cta": {
+      "title": "Our judgment leaves a trace.",
+      "subtitle": "Build your record. Discover the record of those you listen to."
+    },
+    "footer": {
+      "label": "Footer navigation",
+      "contact": "Contact",
+      "privacy": "Privacy",
+      "terms": "Terms of use",
+      "disclaimer": "Daatan does not provide investment advice, financial advice or recommendations to act. The content of this site is for information only."
+    }
   }
 }
