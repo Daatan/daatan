@@ -146,3 +146,23 @@ html:has(.retro-light)::-webkit-scrollbar-thumb:hover,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--color-cobalt);
 }
+
+/* Homepage V5 candidate (src/components/home-v5). Scoped so it never leaks into app chrome. */
+.hv5 {
+  --hv5-bg: #001020;
+  --hv5-panel: #10233f;
+  --hv5-accent: #3f7dc6;
+  --hv5-accent-2: #7aa8df;
+  --hv5-ok: #46b19b;
+  --hv5-bad: #c75b5b;
+  --hv5-ink: #e6edf5;
+  --hv5-body: #c3cdda;
+  --hv5-muted: #9098a8;
+  --hv5-line: #132a47;
+  --hv5-line-2: #24406a;
+  --hv5-light-bg: #f3f6fa;
+  --hv5-light-ink: #001020;
+  --hv5-light-body: #3a4a60;
+  --hv5-light-rule: #d9e1eb;
+  --hv5-light-icon-bg: #e1eaf6;
+}

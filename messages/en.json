@@ -1249,7 +1249,8 @@
       "search": "Search",
       "home": "Daatan, home",
       "menu": "Menu",
-      "closeMenu": "Close menu"
+      "closeMenu": "Close menu",
+      "searchPlaceholder": "Forecasts, sources and fields"
     },
     "hero": {
       "eyebrow": "Record. Reputation. Trust.",

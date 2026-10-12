@@ -1249,7 +1249,8 @@
       "search": "Serĉi",
       "home": "Daatan, hejmo",
       "menu": "Menuo",
-      "closeMenu": "Fermi la menuon"
+      "closeMenu": "Fermi la menuon",
+      "searchPlaceholder": "Prognozoj, fontoj kaj fakoj"
     },
     "hero": {
       "eyebrow": "Rekordo. Reputacio. Fido.",
