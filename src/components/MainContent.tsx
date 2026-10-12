@@ -1,10 +1,11 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { isBareChromePath } from '@/lib/bare-chrome'
 
 export function MainContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isBare = pathname.startsWith('/auth/') || pathname.startsWith('/oracle-v2')
+  const isBare = isBareChromePath(pathname)
   // overflow-x-clip (not -hidden) clips wide content without creating a scroll
   // container, so position:sticky descendants (e.g. the feed header) keep working.
   return (

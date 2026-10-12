@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { isBareChromePath } from '@/lib/bare-chrome'
 import { useState, useEffect, useRef } from 'react'
 import { useSession, signOut, signIn } from 'next-auth/react'
 import { VERSION } from '@/lib/version'
@@ -181,7 +182,7 @@ const Sidebar = () => {
     navLinks.push({ href: '#', labelKey: 'signIn', label: c('signIn'), icon: LogIn })
   }
 
-  if (pathname.startsWith('/auth/') || pathname.startsWith('/oracle-v2')) return null
+  if (isBareChromePath(pathname)) return null
 
   return (
     <>
