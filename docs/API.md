@@ -840,9 +840,9 @@ Status is always 200 on the authorized paths: per-row embedding errors are caugh
 Scheduled by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/backfill-embeddings.yml), nightly at 02:23 UTC (#1369). Not an EC2 crontab — there is no crontab on the prod box; this entry claimed otherwise until #1369, which is why the route went uncalled from its introduction until then.
 
 ### `GET /api/cron/backfill-headlines`
-Generates missing card headlines (daatan#1814) for predictions with `headline IS NULL`, newest first. `?limit=` defaults to 25, max 40 (100 overran the proxy's ~60s timeout); 5 concurrent LLM calls. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Returns `{ ok, stored, rejected, failed, remaining }`. `rejected` rows are stored as `''` and never retried; `failed` (LLM down/timeout) rows stay NULL for the next run. Always 200 when authorized — inspect `failed`.
+Generates missing card headlines (daatan#1814) for predictions with `headline IS NULL`, newest first. `?limit=` defaults to 25, max 40 (100 overran the proxy's ~60s timeout); 5 concurrent LLM calls. Auth: `x-cron-secret` header (`BOT_RUNNER_SECRET`), 401 otherwise. Stops starting new batches of 5 after ~8s (one batch can take ~50s with a polarity retry), so the response stays inside the proxy's 60s; unattempted rows are reported as `deferred` and stay NULL. Returns `{ ok, stored, rejected, failed, deferred, remaining }`. `rejected` rows are stored as `''` and never retried; `failed` (LLM down/timeout) rows stay NULL for the next run. Always 200 when authorized — inspect `failed`.
 
-Scheduled by [`.github/workflows/backfill-headlines.yml`](../.github/workflows/backfill-headlines.yml), nightly at 02:37 UTC; `workflow_dispatch` picks an environment, batch size and number of calls for the one-off drain.
+Scheduled by [`.github/workflows/backfill-headlines.yml`](../.github/workflows/backfill-headlines.yml), nightly at 02:37 UTC; `workflow_dispatch` picks an environment, batch size and number of calls (default 3, each call drains until its ~8s start budget) for the one-off drain.
 
 ### `GET /api/cron/ai-panel`
 LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an

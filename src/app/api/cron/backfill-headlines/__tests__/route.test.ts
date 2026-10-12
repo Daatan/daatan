@@ -36,7 +36,29 @@ describe('GET /api/cron/backfill-headlines', () => {
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { headline: null }, orderBy: { createdAt: 'desc' }, take: 25,
     }))
-    expect(body).toEqual({ ok: true, stored: 1, rejected: 1, failed: 1, remaining: 7 })
+    expect(body).toEqual({ ok: true, stored: 1, rejected: 1, failed: 1, deferred: 0, remaining: 7 })
+  })
+
+  it('stops starting batches once the time budget is spent and reports the rest as deferred', async () => {
+    vi.useFakeTimers()
+    try {
+      findMany.mockResolvedValue(
+        Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, claimText: `C${i}` })) as never,
+      )
+      // each batch of 5 "takes" 10s of the clock (a polarity retry), so only the first fits
+      store.mockImplementation(async () => {
+        vi.advanceTimersByTime(10_000 / 5)
+        return 'stored'
+      })
+      count.mockResolvedValue(7)
+
+      const body = await (await GET(req('test-secret', '?limit=12'))).json()
+
+      expect(store).toHaveBeenCalledTimes(5)
+      expect(body).toEqual({ ok: true, stored: 5, rejected: 0, failed: 0, deferred: 7, remaining: 7 })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('caps ?limit at 40', async () => {
