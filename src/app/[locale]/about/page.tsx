@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Info } from 'lucide-react'
+import Link from 'next/link'
 import { getAppUrl } from '@/lib/branding'
 
 const TITLES: Record<string, string> = {
@@ -40,6 +41,10 @@ function HeAboutPage() {
         <Info className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
         <h1 className="text-2xl sm:text-3xl font-bold text-white">על דעתן</h1>
       </div>
+
+      <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
+        <Link href="/he/home-v5" className="text-sm text-cobalt-light hover:underline">תצוגה מקדימה: עיצוב דף הבית החדש ←</Link>
+      </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
@@ -167,6 +172,10 @@ function RuAboutPage() {
         <Info className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
         <h1 className="text-2xl sm:text-3xl font-bold text-white">О Daatan</h1>
       </div>
+
+      <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
+        <Link href="/ru/home-v5" className="text-sm text-cobalt-light hover:underline">Предпросмотр: новый дизайн главной страницы →</Link>
+      </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
@@ -305,6 +314,10 @@ function EoAboutPage() {
         <Info className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
         <h1 className="text-2xl sm:text-3xl font-bold text-white">Pri Daatan</h1>
       </div>
+
+      <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
+        <Link href="/eo/home-v5" className="text-sm text-cobalt-light hover:underline">Antaŭrigardo: nova dezajno de la hejmpaĝo →</Link>
+      </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
