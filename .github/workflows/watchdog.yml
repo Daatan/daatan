@@ -63,8 +63,10 @@ jobs:
           RETRY_DELAY=10
 
           check() {
-            local label="$1" url="$2" expect_key="${3:-}" expect_val="${4:-}"
+            local label="$1" url="$2" expect_key="${3:-}" expect_val="${4:-}" cookie="${5:-}"
             local attempt REASON
+            local -a CURL_COOKIE=()
+            [ -n "$cookie" ] && CURL_COOKIE=(-H "Cookie: $cookie")
 
             # Retries once (after RETRY_DELAY) before recording a failure — a
             # single transient network blip between the runner and the target
@@ -90,6 +92,7 @@ jobs:
               rm -f /tmp/curl_body.txt /tmp/curl_err.txt
               CURL_EXIT=0
               HTTP_AND_REDIRECTS=$(curl -L --max-redirs 5 --max-time 15 \
+                "${CURL_COOKIE[@]}" \
                 -w "%{http_code}\n%{num_redirects}" \
                 -o /tmp/curl_body.txt \
                 "$url" 2>/tmp/curl_err.txt) || CURL_EXIT=$?
@@ -147,7 +150,11 @@ jobs:
           check "Health DB flag"  "$BASE/api/health" "db" "true"
 
           # Public pages
-          check "Homepage"      "$BASE"             ""
+          # A cookieless visitor is 307'd from "/" to /home-v5 on purpose (#1840), and this
+          # check treats every redirect as a possible loop (6/2026 incident). Send the
+          # "feed seen" cookie so the probe sees the real root; a redirect loop on it is
+          # still caught. Keep the name in sync with FEED_SEEN_COOKIE in src/lib/first-visit.ts.
+          check "Homepage"      "$BASE"             "" "" "daatan_feed_seen=1"
           check "Forecast feed" "$BASE/forecasts"   ""
           check "Leaderboard"   "$BASE/leaderboard" ""
           check "About/login"   "$BASE/auth/signin" ""
@@ -198,7 +205,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: /tmp/drift-notified
-          key: version-drift-notified-${{ hashFiles('/tmp/drift-key.txt') }}
+          key: version-drift-notified-${{ hashFiles('drift-key.txt') }}
           restore-keys: version-drift-notified-
 
       - name: Check version drift (prod vs staging)
@@ -231,7 +238,9 @@ jobs:
           # Cache key is keyed on prod version only — once alerted for a given prod
           # version, no further alerts fire until prod itself deploys a newer build.
           DRIFT_KEY="prod-${PROD_VER}"
-          echo "$DRIFT_KEY" > /tmp/drift-key.txt
+          # hashFiles() only reads inside the workspace; a /tmp path hashed to "" and every
+          # save collided on one immutable key, so the dedupe never advanced (#1852).
+          echo "$DRIFT_KEY" > "$GITHUB_WORKSPACE/drift-key.txt"
 
           if [ "$(ver "$STAGING_VER")" -gt "$(ver "$PROD_VER")" ]; then
             echo "Version drift detected: staging ($STAGING_VER) > production ($PROD_VER)"
@@ -261,7 +270,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: /tmp/drift-notified
-          key: version-drift-notified-${{ hashFiles('/tmp/drift-key.txt') }}
+          key: version-drift-notified-${{ hashFiles('drift-key.txt') }}
 
   disk-watchdog:
     name: Disk Check ${{ matrix.env.name }}
