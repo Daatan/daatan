@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import authConfig from "./auth.config"
 import { NextResponse } from "next/server"
+import { FEED_SEEN_COOKIE, homeV5RedirectPath } from "./lib/first-visit"
 
 const { auth } = NextAuth(authConfig)
 
@@ -16,6 +17,21 @@ export default auth((req) => {
     if (req.auth?.user?.role !== 'ADMIN') {
       return NextResponse.redirect(new URL('/', req.url))
     }
+  }
+
+  // First visit: anonymous visitors without the cookie land on the home-v5 page (#1840).
+  const homeTarget = homeV5RedirectPath({
+    pathname,
+    searchParams: req.nextUrl.searchParams,
+    hasFeedSeenCookie: req.cookies.has(FEED_SEEN_COOKIE),
+    isAuthenticated: isAuth,
+    // Read directly: this runs on the Edge, where the validated `@/env` module is not available.
+    selfHosted: process.env.DAATAN_EDITION === 'self_hosted',
+  })
+  if (homeTarget) {
+    const url = req.nextUrl.clone()
+    url.pathname = homeTarget
+    return NextResponse.redirect(url)
   }
 
   // Forward pathname to server components so the root layout can set

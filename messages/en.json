@@ -19,6 +19,7 @@
   },
   "nav": {
     "feed": "Forecasts",
+    "homePage": "Home",
     "create": "Create",
     "notifications": "Notifications",
     "commitments": "My Commitments",

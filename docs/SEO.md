@@ -291,6 +291,20 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 > The sitemap remains the authoritative discovery path — resubmit it in Search Console after large
 > backfills (e.g. the English-canonicalization re-slug pass).
 
+## Site root: first-visit redirect to `/home-v5`
+
+`src/middleware.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
+`daatan_feed_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets a **307** to the matching
+`/home-v5` page (query string kept). Crawlers have no cookie, so they get the same redirect as a
+first-time visitor — no user-agent sniffing, nothing cloaked. Not redirected: signed-in users,
+self-hosted installs, and filtered feed links (`status`, `tags`, `sortBy`, `q`, `page`).
+
+The cookie is set client-side by `FeedSeenMarker` when the forecasts page (`/forecasts`) is
+displayed (1 year, `SameSite=Lax`); link prefetches never run it. After that the root shows the
+forecast feed as before. The feed itself stays indexable at `/forecasts`; the root's own
+indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
+"Home" → `/home-v5` (hidden on self-host).
+
 ## Weekly measurement loop (platform#13)
 
 `.github/workflows/seo-report.yml` (Mondays 06:00 UTC) posts a GSC + Yandex.Webmaster

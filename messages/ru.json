@@ -19,6 +19,7 @@
   },
   "nav": {
     "feed": "Прогнозы",
+    "homePage": "Главная",
     "create": "Создать",
     "notifications": "Уведомления",
     "commitments": "Мои ставки",

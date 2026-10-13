@@ -32,6 +32,7 @@ import {
   Search,
   ArrowLeft,
   Vote,
+  Compass,
 } from 'lucide-react'
 
 import { useTranslations, useLocale } from 'next-intl'
@@ -43,6 +44,8 @@ type NavItem = {
   // External links (e.g. the separate elections.daatan.com app) render as a plain
   // <a target="_blank"> instead of a client-side next/link route.
   external?: boolean
+  // Extra paths (locale prefix stripped) on which this item is shown as current.
+  alsoActiveOn?: string[]
 }
 
 // Separate Next.js app, not part of white-label branding — SaaS-only, hidden
@@ -50,7 +53,10 @@ type NavItem = {
 const ELECTIONS_URL = 'https://elections.daatan.com'
 
 const navItems: NavItem[] = [
-  { href: '/', labelKey: 'feed', icon: Home },
+  // Opening /forecasts also marks the feed as seen, so the site root shows the feed from then on
+  // (src/lib/first-visit.ts). The root itself is the feed for returning visitors.
+  { href: '/forecasts', labelKey: 'feed', icon: Home, alsoActiveOn: ['/'] },
+  { href: '/home-v5', labelKey: 'homePage', icon: Compass },
   { href: '/create', labelKey: 'create', icon: PlusCircle },
   { href: '/notifications', labelKey: 'notifications', icon: Bell },
   { href: '/commitments', labelKey: 'commitments', icon: BarChart3 },
@@ -63,6 +69,11 @@ const navItems: NavItem[] = [
   { href: '/contact', labelKey: 'contact', icon: Mail },
   { href: '/retroanalysis', labelKey: 'retroanalysis', icon: History },
 ]
+
+// Routes that exist under src/app/[locale]; the rest are served at the root path only.
+const LOCALIZED_NAV_ROUTES = ['/about', '/forecasts', '/home-v5']
+
+const stripLocale = (pathname: string) => pathname.replace(/^\/(he|ru|eo)(?=\/|$)/, '') || '/'
 
 const Sidebar = () => {
   const pathname = usePathname()
@@ -144,7 +155,7 @@ const Sidebar = () => {
   // SaaS-only marketing/support pages are removed from the self-hosted edition.
   // `selfHosted` comes from the server-resolved CapabilitiesProvider value, so
   // it's stable across SSR + client (no hydration mismatch).
-  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', ELECTIONS_URL]
+  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', '/home-v5', ELECTIONS_URL]
   const editionNavItems = selfHosted
     ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
     : navItems
@@ -168,7 +179,7 @@ const Sidebar = () => {
 
   const navLinks = filteredNavItems.map(item => ({
     ...item,
-    href: currentLocale !== 'en' && item.href === '/about' ? `/${currentLocale}/about` : item.href,
+    href: currentLocale !== 'en' && LOCALIZED_NAV_ROUTES.includes(item.href) ? `/${currentLocale}${item.href}` : item.href,
     label: t(item.labelKey)
   }))
 
@@ -333,7 +344,11 @@ const Sidebar = () => {
             </li>
 
             {navLinks.map((item) => {
-              const isActive = pathname === item.href
+              const current = stripLocale(pathname)
+              const isActive =
+                pathname === item.href ||
+                current === stripLocale(item.href) ||
+                (item.alsoActiveOn?.includes(current) ?? false)
               const Icon = item.icon
               const linkClass = `
                 flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
