@@ -170,11 +170,12 @@ Handled by the same webhook as `/rollback` (`src/app/api/telegram/rollback/route
 
 ### Requote / temporal-clock alerts
 
-All sent from `src/lib/services/temporal-clock.ts`, driven by `GET /api/cron/requote` (`requote.yml`, daily 05:31 UTC). Dedup is per forecast via `Prediction` alert-timestamp columns (`deadlinePassedAlertAt`, `teffProvisionalAlertAt`, `divergenceAlertAt`, `settledDriftAlertAt`, `unlatchedPinAlertAt`), not the in-memory cooldown; the last two are cleared (re-armed) when the condition clears.
+All sent from `src/lib/services/temporal-clock.ts`, driven by `GET /api/cron/requote` (`requote.yml`, daily 05:31 UTC). Dedup is per forecast via `Prediction` alert-timestamp columns (`deadlinePassedAlertAt`, `deadlineHeadsUpAlertAt`, `teffProvisionalAlertAt`, `divergenceAlertAt`, `settledDriftAlertAt`, `unlatchedPinAlertAt`), not the in-memory cooldown; the last two are cleared (re-armed) when the condition clears.
 
 | Event | Icon | Channel | Function | When |
 |---|---|---|---|---|
 | Deadline passed quietly | ⏰ | clean | `notifyDeadlinePassedQuietly()` | the literal claim deadline passed with no settlement detected — suggests resolving YES/NO by claim direction; single-shot |
+| Deadline approaching | 🗓 | clean | `notifyDeadlineApproaching()` | ≥90% of `publishedAt → claimDeadline` elapsed on an ACTIVE, unresolved forecast that is not latched and not in Awaiting Resolution (daatan#1854); skips intervals under 3 days; single-shot, re-arms only if the deadline is moved later |
 | Stuck PENDING past deadline | 🚨 | clean | `notifyPendingPastDeadline()` | a `PENDING` forecast is past its deadline with no automated path to resolution (#1185); single-shot |
 | Settled forecast has drifted from its pin | ⚖️ | clean | `notifySettledDrift()` | a latched forecast's published number has walked away from its settlement pin (daatan#1490) |
 | Settlement asserted without a latch | ⚠️ | clean | `notifyUnlatchedPin()` | evidence asserts settlement but the latch is not set (daatan#1498); re-armed when the evidence stops asserting it |

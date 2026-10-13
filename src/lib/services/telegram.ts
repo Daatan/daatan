@@ -1156,6 +1156,32 @@ export function notifyDeadlinePassedQuietly(
 }
 
 /**
+ * Heads-up at ~90% of the way from publish to the claim deadline (daatan#1854):
+ * the date-based counterpart of the confidence alerts. Deliberately a heads-up, not
+ * a verdict — no "resolve" wording, since nothing has been settled. Single-shot
+ * (deduped via deadlineHeadsUpAlertAt in temporal-clock.ts).
+ */
+export function notifyDeadlineApproaching(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  probability: number | null,
+  deadline: Date,
+  now: Date,
+): void {
+  if (isDevEnv()) return
+
+  const days = Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / 86_400_000))
+  const estimate = probability !== null ? `AI estimate <b>${probability}%</b> · ` : ''
+  const msg = [
+    `🗓 <b>Deadline approaching</b>`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `${estimate}${days} day${days === 1 ? '' : 's'} to the claim deadline (${deadline.toISOString().slice(0, 10)}), not resolved yet.`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
+/**
  * A forecast is stuck PENDING past its claim deadline with no automated path
  * to resolution (#1185): the alert above only ever fires on ACTIVE
  * candidates, and the AI resolution panel only picks up the probability-band
