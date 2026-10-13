@@ -1,7 +1,7 @@
 import { Prisma, type ContextSnapshot } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
-import { notifyHighConfidence } from '@/lib/services/telegram'
+import { notifyHighConfidence, notifySettled } from '@/lib/services/telegram'
 import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 
 const log = createLogger('context-service')
@@ -126,17 +126,78 @@ async function readAwaitingDismissal(predictionId: string): Promise<AwaitingDism
   })
 }
 
+/** A latched pin is announced only at the extremes the Oracul's pin publishes
+ *  (settlement_stance ≈ 97/3) — a latch whose published number sits elsewhere is
+ *  not a resolution candidate worth a message (daatan#1845). */
+const SETTLED_ALERT_HIGH = 95
+const SETTLED_ALERT_LOW = 5
+
+/** Distinct outlets, not rows: syndicated echoes of one wire story are one witness. */
+const SETTLED_ALERT_MIN_OUTLETS = 2
+
+export interface SettledAlertFacts {
+  direction: 'YES' | 'NO'
+  settling: number
+  total: number
+  outlets: string[]
+  publishedFrom: Date | null
+  publishedTo: Date | null
+}
+
+/**
+ * What the settled alert reports, or null when it should not fire: the published
+ * number is not at a pin extreme, or the settling rows come from fewer than
+ * SETTLED_ALERT_MIN_OUTLETS distinct outlets. Pure over the persisted pool rows.
+ */
+export function settledAlertFacts(oracleSnapshot: unknown, probability: number): SettledAlertFacts | null {
+  const direction = probability >= SETTLED_ALERT_HIGH ? 'YES' : probability <= SETTLED_ALERT_LOW ? 'NO' : null
+  if (direction === null) return null
+  const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
+  if (!Array.isArray(sources)) return null
+
+  const outlets = new Map<string, string>()
+  let settling = 0
+  let from: Date | null = null
+  let to: Date | null = null
+  for (const row of sources) {
+    const s = row as { settled?: unknown; source?: unknown; publishedAt?: unknown } | null
+    if (s?.settled !== true) continue
+    settling++
+    if (typeof s.source === 'string' && s.source.trim() !== '') {
+      const key = s.source.trim().toLowerCase()
+      if (!outlets.has(key)) outlets.set(key, s.source.trim())
+    }
+    if (typeof s.publishedAt === 'string') {
+      const d = new Date(s.publishedAt)
+      if (!Number.isNaN(d.getTime())) {
+        if (from === null || d < from) from = d
+        if (to === null || d > to) to = d
+      }
+    }
+  }
+  if (outlets.size < SETTLED_ALERT_MIN_OUTLETS) return null
+  return {
+    direction,
+    settling,
+    total: sourceCount(oracleSnapshot),
+    outlets: [...outlets.values()],
+    publishedFrom: from,
+    publishedTo: to,
+  }
+}
+
 interface PreviousConfidence {
   confidence: number | null
   claimText: string
   slug: string | null
+  settled: boolean
 }
 
 /** Snapshot the prediction's confidence (plus notification fields) before a write. */
 async function readPreviousConfidence(predictionId: string): Promise<PreviousConfidence | null> {
   return prisma.prediction.findUnique({
     where: { id: predictionId },
-    select: { confidence: true, claimText: true, slug: true },
+    select: { confidence: true, claimText: true, slug: true, settled: true },
   })
 }
 
@@ -168,7 +229,7 @@ function notifyIfCrossedHighConfidence(
     { id: predictionId, claimText: prev.claimText, slug: prev.slug },
     newConfidence,
     prev.confidence,
-    settled,
+    false,
   )
 }
 
@@ -479,7 +540,22 @@ export async function recordEstimate(input: RecordEstimateInput) {
     )
   }
   if (willNotify) {
-    notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, backing.backed)
+    // Edge-triggered settled alert (daatan#1845): the latch flipping false → true is
+    // the event, so it fires whatever the previous number was — the 80-crossing alert
+    // below stays silent for a forecast already above 80 and for every NO pin.
+    const newlyLatched = latchWrite && prev !== null && prev.settled !== true
+    const facts = newlyLatched && input.probability !== null
+      ? settledAlertFacts(input.oracleSnapshot, input.probability)
+      : null
+    if (facts && prev) {
+      notifySettled(
+        { id: input.predictionId, claimText: prev.claimText, slug: prev.slug },
+        input.probability as number,
+        facts,
+      )
+    } else {
+      notifyIfCrossedHighConfidence(input.predictionId, prev, input.probability, pinned, backing.backed)
+    }
   }
   return snapshot as ContextSnapshot
 }

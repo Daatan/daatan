@@ -1091,6 +1091,46 @@ export function notifyHighConfidence(
 }
 
 /**
+ * A settlement pin was just latched on this forecast (daatan#1845): at least two
+ * distinct outlets report the outcome as an accomplished fact. Edge-triggered by
+ * the caller (`Prediction.settled` flipping false → true), independent of the 80%
+ * crossing alert — a pin can arrive on a forecast already above 80 (or at ≤5 for
+ * a NO), which the crossing alert never reports. Clean channel: it is a decision.
+ */
+export function notifySettled(
+  prediction: { id: string; claimText: string; slug?: string | null },
+  probability: number,
+  facts: {
+    direction: 'YES' | 'NO'
+    settling: number
+    total: number
+    outlets: string[]
+    publishedFrom: Date | null
+    publishedTo: Date | null
+  },
+): void {
+  if (isDevEnv()) return
+
+  const day = (d: Date) => d.toISOString().slice(0, 10)
+  const { publishedFrom: from, publishedTo: to } = facts
+  const reported = from && to
+    ? day(from) === day(to) ? ` · reported ${day(to)}` : ` · reported ${day(from)} → ${day(to)}`
+    : ''
+  const shown = facts.outlets.slice(0, 5).map(escapeHtml).join(', ')
+  const more = facts.outlets.length > 5 ? ` (+${facts.outlets.length - 5})` : ''
+
+  const msg = [
+    `✅ <b>Settled ${facts.direction}</b> — consider resolving`,
+    `"${truncate(prediction.claimText, 120)}"`,
+    `Pinned at <b>${probability}%</b> · ${facts.settling} of ${facts.total} sources report the outcome as fact${reported}`,
+    `Outlets: ${shown}${more}`,
+    `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
+  ].join('\n')
+
+  sendChannelNotification(msg, 'clean')
+}
+
+/**
  * The requote cron's daily glide moved the literal claim deadline into the
  * past with no settlement detected. Fired at the LITERAL claimDeadline, never
  * at the tau_lead-adjusted effective horizon — that horizon is a pricing
