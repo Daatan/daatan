@@ -117,6 +117,30 @@ The model must not invent dates for scheduled events (elections, rulings, statut
 
 **Grounded date lookup** (#1706 option 2, `draftWithGroundedDate` in `expressPrediction.ts`): when the first draft reports `dateBasis: "assumed"`, `lookupGroundedEventDate()` (`src/lib/llm/groundedDateLookup.ts`) makes one separate Vertex `gemini-2.5-flash` call with the `googleSearch` tool (15 s budget) to find the date of the officially scheduled event the forecast hinges on. If it finds one, the date is prepended to the articles text as a reference and the forecast is drafted again, so rule 3b can use it like any sourced date. The outcome is returned as `groundedDate` (`{ fired: false }`, `{ fired: true, status: 'no_date' | 'unavailable' }`, or `status: 'found'` with `event`/`date`/`sourceUrl`/`adopted`), recorded in the `ForecastCreationAttempt` details by `POST /api/forecasts/express/generate`, and shown on the review screen as a notice when the re-draft adopted the date. No Vertex, a failed call or no date found all keep the first draft and its "assumed" warning.
 
+### Card headline (#1814)
+
+The feed card shows a short **headline** above the claim; the claim stays canonical wherever
+voting or resolution happens. Source: `src/lib/llm/headline.ts`. The prompt (`HEADLINE_PROMPT`)
+is built inline in code, so it is **outside** the prompt lock — see
+[PROMPTS.md § Prompts outside the lock](PROMPTS.md#prompts-outside-the-lock).
+
+| | |
+|---|---|
+| Input | the claim text only (a leading emoji such as the bot "🤖" is stripped, then re-added). No details, no articles. |
+| Prompt rules | 2–6 words; no date/year/probability/trailing period; name the actor and the outcome; **future tense** with "will" (#1823); neutral, no hint of likelihood or drama; sentence case; keep the claim's polarity; for a question name the contest; same language as the claim. |
+| Model | stage `headline` (`forStage('headline')`, see Model per stage), `temperature: 0`, 10 s timeout. |
+| Guards | rejected (stored as `''`, never retried, card shows the claim) if empty, **> 9 words** or **> 60 chars** (`HEADLINE_MAX_CHARS`; DB column is `VarChar(80)`), or if its negation differs from the claim's (`polarityMatches`, regex on English cues). A polarity mismatch gets **one** retry with `polarityRetryHint` and a 40 s timeout (#1831); the guard still checks the retry. |
+| Failure | LLM error or timeout → `null`; the column stays `NULL` and the nightly backfill retries it. |
+| When it runs | fire-and-forget after create, after canonicalization, and after an English or original-language edit that changes the claim (`services/forecast.ts`); the write is conditional on the claim being unchanged (`updateMany where claimText`), and a claim edit clears the old headline first. |
+| Backfill | `GET /api/cron/backfill-headlines` ([API.md](API.md)), nightly 02:37 UTC; fills only `headline IS NULL`. |
+| Translation | translated per locale with `claimText`/`detailsText`/`resolutionRules`, cached against the source hash — see [TRANSLATIONS.md](TRANSLATIONS.md). |
+| Storage | `predictions.headline` — see [DATABASE.md](DATABASE.md). |
+
+**Changing the headline** (length, extra information, wording) touches four things at once:
+the prompt and the word/char guards in `headline.ts`, the card layout, a one-off regeneration
+of existing rows (the backfill only fills `NULL`, so edit-in-place does not refresh them), and
+the cached translations. Tracked in #1846.
+
 ## Usage
 
 ### Standard requests (Gemini → Oracul → OpenRouter → Ollama fallback)
