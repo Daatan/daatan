@@ -11,6 +11,7 @@ import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { isDeadlineDivergent, DEADLINE_AGREEMENT_TOLERANCE_MS } from '@/lib/utils/deadline-divergence'
 import {
+  notifyDeadlineApproaching,
   notifyDeadlinePassedQuietly,
   notifyPendingPastDeadline,
   notifyProvisionalImpossibility,
@@ -43,6 +44,11 @@ const SELF_HEAL_BATCH_SIZE = 5
 
 /** #1185 sweep: leave same-day human resolutions alone before alerting. */
 const PENDING_DEADLINE_GRACE_MS = 12 * 3600_000
+
+/** Fraction of publishedAt → claimDeadline after which the heads-up fires (daatan#1854). */
+const HEADS_UP_FRACTION = 0.9
+/** Shorter intervals are skipped: 90% of a 2-day forecast is reached almost at publish. */
+const HEADS_UP_MIN_INTERVAL_MS = 3 * 86_400_000
 
 /** How far a latched forecast's published probability may sit from the value its
  *  settlement pin published before the pair stops telling one story (daatan#1490).
@@ -191,6 +197,8 @@ export interface RequoteSummary {
   deadlineAlerts: number
   provisionalAlerts: number
   pendingDeadlineAlerts: number
+  /** "Approaching deadline" heads-ups sent this run (daatan#1854). */
+  headsUpAlerts: number
   /** Latched forecasts whose published number has drifted off their settlement
    *  pin far enough to be re-verified rather than believed (daatan#1490). */
   settledDriftAlerts: number
@@ -217,6 +225,7 @@ function emptySummary(): RequoteSummary {
     deadlineAlerts: 0,
     provisionalAlerts: 0,
     pendingDeadlineAlerts: 0,
+    headsUpAlerts: 0,
     settledDriftAlerts: 0,
     unlatchedPinAlerts: 0,
     errors: 0,
@@ -407,6 +416,65 @@ async function processCandidate(c: RequoteCandidate, now: Date, summary: Requote
   if (result.cause === 'pin') summary.pinned++
   else if (result.cause === 'pin-provisional') summary.provisionalPins++
   else summary.glided++
+}
+
+/**
+ * The moment the heads-up is due for a forecast, or null when it never is (interval
+ * shorter than HEADS_UP_MIN_INTERVAL_MS, or deadline not after publish).
+ */
+export function headsUpThreshold(publishedAt: Date, deadline: Date): Date | null {
+  const span = deadline.getTime() - publishedAt.getTime()
+  if (span < HEADS_UP_MIN_INTERVAL_MS) return null
+  return new Date(publishedAt.getTime() + span * HEADS_UP_FRACTION)
+}
+
+/**
+ * daatan#1854: a date-based heads-up so admins hear about a forecast BEFORE its
+ * deadline, not only at it (`notifyDeadlinePassedQuietly`). Population-wide and
+ * independent of the archetype allowlist, like the sweep above. Skips forecasts that
+ * are already latched or in Awaiting Resolution — the settled alert and the band own
+ * those. Single-shot: stamped on send; re-arms only when a later deadline pushes the
+ * 90% point past the stamp.
+ */
+async function alertApproachingDeadline(now: Date, summary: RequoteSummary): Promise<void> {
+  const candidates = await prisma.prediction.findMany({
+    where: {
+      status: 'ACTIVE',
+      resolvedAt: null,
+      settled: false,
+      awaitingAiResolution: false,
+      publishedAt: { not: null },
+      claimDeadline: { gt: now },
+    },
+    select: {
+      id: true,
+      slug: true,
+      claimText: true,
+      confidence: true,
+      publishedAt: true,
+      claimDeadline: true,
+      deadlineHeadsUpAlertAt: true,
+    },
+  })
+
+  for (const p of candidates ?? []) {
+    try {
+      const threshold = headsUpThreshold(p.publishedAt!, p.claimDeadline!)
+      if (threshold === null || now.getTime() < threshold.getTime()) continue
+      if (p.deadlineHeadsUpAlertAt && p.deadlineHeadsUpAlertAt.getTime() >= threshold.getTime()) continue
+      notifyDeadlineApproaching(
+        { id: p.id, claimText: p.claimText, slug: p.slug },
+        p.confidence,
+        p.claimDeadline!,
+        now,
+      )
+      await prisma.prediction.update({ where: { id: p.id }, data: { deadlineHeadsUpAlertAt: now } })
+      summary.headsUpAlerts++
+    } catch (err) {
+      summary.errors++
+      log.warn({ predictionId: p.id, err }, 'deadline heads-up alert failed')
+    }
+  }
 }
 
 /**
@@ -616,6 +684,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       await alertPendingPastDeadline(now, summary)
       await reverifyDriftedSettled(now, summary)
       await alertUnlatchedPins(now, summary)
+      await alertApproachingDeadline(now, summary)
     }
     return summary
   }
@@ -694,6 +763,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
     await alertPendingPastDeadline(now, summary)
     await reverifyDriftedSettled(now, summary)
     await alertUnlatchedPins(now, summary)
+    await alertApproachingDeadline(now, summary)
   }
 
   const moved = summary.glided + summary.pinned + summary.provisionalPins
@@ -707,6 +777,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       skippedUnlatchedPin: summary.skippedUnlatchedPin,
       selfHealed: summary.selfHealed,
       pendingDeadlineAlerts: summary.pendingDeadlineAlerts,
+      headsUpAlerts: summary.headsUpAlerts,
       settledDriftAlerts: summary.settledDriftAlerts,
       unlatchedPinAlerts: summary.unlatchedPinAlerts,
       errors: summary.errors,

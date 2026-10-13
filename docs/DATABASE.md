@@ -130,7 +130,7 @@ The central table (`Prediction`). Field groups:
   here; worth a follow-up if a fourth copy needing the *same* semantics ever
   appears (the existing three aren't quite identical to `isDeadlineDivergent`
   — no "both already past" carve-out).
-- **Alert dedup timestamps**: `deadlinePassedAlertAt`, `teffProvisionalAlertAt`,
+- **Alert dedup timestamps**: `deadlinePassedAlertAt`, `deadlineHeadsUpAlertAt` (daatan#1854), `teffProvisionalAlertAt`,
   `divergenceAlertAt` (requote cron), `marketDivergenceAlertAt` (market-sync
   cron) — single-shot alerts re-arm by timestamp comparison, not NULL checks.
   `settledDriftAlertAt` (daatan#1490: a latched forecast's published probability

@@ -22,6 +22,7 @@ vi.mock('@/lib/services/temporal-classifier', () => ({
 
 vi.mock('@/lib/services/telegram', () => ({
   notifyDeadlinePassedQuietly: vi.fn(),
+  notifyDeadlineApproaching: vi.fn(),
   notifyPendingPastDeadline: vi.fn(),
   notifyProvisionalImpossibility: vi.fn(),
   notifyDeadlineDivergence: vi.fn(),
@@ -41,6 +42,7 @@ import {
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import {
   notifyDeadlinePassedQuietly,
+  notifyDeadlineApproaching,
   notifyPendingPastDeadline,
   notifyProvisionalImpossibility,
   notifyDeadlineDivergence,
@@ -49,7 +51,7 @@ import {
   notifySettledDrift,
   notifyUnlatchedPin,
 } from '@/lib/services/telegram'
-import { runRequote } from '@/lib/services/temporal-clock'
+import { runRequote, headsUpThreshold } from '@/lib/services/temporal-clock'
 
 const findMany = vi.mocked(prisma.prediction.findMany)
 const update = vi.mocked(prisma.prediction.update)
@@ -58,6 +60,7 @@ const getAnchor = vi.mocked(getLatestEvidenceEstimate)
 const classify = vi.mocked(classifyAndStoreTemporal)
 const deadlineAlert = vi.mocked(notifyDeadlinePassedQuietly)
 const pendingAlert = vi.mocked(notifyPendingPastDeadline)
+const headsUpAlert = vi.mocked(notifyDeadlineApproaching)
 const provisionalAlert = vi.mocked(notifyProvisionalImpossibility)
 const divergenceAlert = vi.mocked(notifyDeadlineDivergence)
 const summaryAlert = vi.mocked(notifyRequoteSummary)
@@ -100,7 +103,7 @@ describe('runRequote', () => {
   it('no-ops the glide machinery on an empty archetype allowlist — only the sweeps run', async () => {
     const summary = await runRequote({ archetypes: [], now: NOW })
     expect(summary.examined).toBe(0)
-    expect(findMany).toHaveBeenCalledTimes(3) // #1185 stuck-PENDING + #1490 settled-drift + #1498 unlatched-pin, nothing else
+    expect(findMany).toHaveBeenCalledTimes(4) // #1185 stuck-PENDING + #1490 settled-drift + #1498 unlatched-pin + #1854 heads-up, nothing else
     expect(classify).not.toHaveBeenCalled()
     expect(getAnchor).not.toHaveBeenCalled()
     expect(saveClock).not.toHaveBeenCalled()
@@ -402,6 +405,90 @@ describe('runRequote', () => {
       expect(summary.pendingDeadlineAlerts).toBe(1)
     })
   })
+  describe('approaching-deadline heads-up (#1854)', () => {
+    const published = new Date('2026-05-01T00:00:00.000Z')
+    const deadline = new Date('2026-06-11T00:00:00.000Z') // 41 days; 90% point = 2026-06-06T21:36Z
+    const candidate = (overrides: Partial<Record<string, unknown>> = {}) => ({
+      id: 'pred-hu',
+      slug: 'hu-slug',
+      claimText: 'Z will happen by June 11',
+      confidence: 58,
+      publishedAt: published,
+      claimDeadline: deadline,
+      deadlineHeadsUpAlertAt: null,
+      ...overrides,
+    })
+    const serve = (rows: unknown[]) =>
+      findMany.mockImplementation((async (args: { where: Record<string, unknown> }) =>
+        'deadlineHeadsUpAlertAt' in ((args as { select?: Record<string, unknown> }).select ?? {}) ? rows : []) as never)
+
+    it('headsUpThreshold is 90% of the way, and null under 3 days', () => {
+      expect(headsUpThreshold(published, deadline)?.toISOString()).toBe('2026-06-06T21:36:00.000Z')
+      expect(headsUpThreshold(published, new Date('2026-05-03T00:00:00.000Z'))).toBeNull()
+    })
+
+    it('fires once past the 90% point and stamps deadlineHeadsUpAlertAt', async () => {
+      serve([candidate()])
+      const now = new Date('2026-06-08T00:00:00.000Z')
+      const summary = await runRequote({ archetypes: [], now })
+      expect(headsUpAlert).toHaveBeenCalledWith(
+        { id: 'pred-hu', claimText: 'Z will happen by June 11', slug: 'hu-slug' },
+        58,
+        deadline,
+        now,
+      )
+      expect(update).toHaveBeenCalledWith({ where: { id: 'pred-hu' }, data: { deadlineHeadsUpAlertAt: now } })
+      expect(summary.headsUpAlerts).toBe(1)
+    })
+
+    it('does not fire before the 90% point', async () => {
+      serve([candidate()])
+      await runRequote({ archetypes: [], now: new Date('2026-06-05T00:00:00.000Z') })
+      expect(headsUpAlert).not.toHaveBeenCalled()
+    })
+
+    it('does not re-fire once stamped after the 90% point', async () => {
+      serve([candidate({ deadlineHeadsUpAlertAt: new Date('2026-06-07T12:00:00.000Z') })])
+      await runRequote({ archetypes: [], now: new Date('2026-06-09T00:00:00.000Z') })
+      expect(headsUpAlert).not.toHaveBeenCalled()
+    })
+
+    it('re-arms when the deadline moved later so the stamp predates the new 90% point', async () => {
+      serve([candidate({
+        claimDeadline: new Date('2026-07-31T00:00:00.000Z'), // 91 days; 90% point = 2026-07-21T21:36Z
+        deadlineHeadsUpAlertAt: new Date('2026-06-07T12:00:00.000Z'),
+      })])
+      await runRequote({ archetypes: [], now: new Date('2026-07-25T00:00:00.000Z') })
+      expect(headsUpAlert).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips intervals shorter than 3 days', async () => {
+      serve([candidate({ claimDeadline: new Date('2026-05-03T00:00:00.000Z') })])
+      await runRequote({ archetypes: [], now: new Date('2026-05-02T20:00:00.000Z') })
+      expect(headsUpAlert).not.toHaveBeenCalled()
+    })
+
+    it('selects only ACTIVE, unresolved, unlatched, not-awaiting forecasts before their deadline', async () => {
+      const now = new Date('2026-06-08T00:00:00.000Z')
+      await runRequote({ archetypes: [], now })
+      const calls = findMany.mock.calls.map((c) => c[0] as { where: Record<string, unknown> })
+      const q = calls.find((c) => 'awaitingAiResolution' in c.where)
+      expect(q?.where).toMatchObject({
+        status: 'ACTIVE',
+        resolvedAt: null,
+        settled: false,
+        awaitingAiResolution: false,
+        claimDeadline: { gt: now },
+      })
+    })
+
+    it('is skipped entirely in dryRun', async () => {
+      serve([candidate()])
+      await runRequote({ archetypes: [], now: new Date('2026-06-08T00:00:00.000Z'), dryRun: true })
+      expect(headsUpAlert).not.toHaveBeenCalled()
+    })
+  })
+
   // daatan#1498: `CANDIDATE_WHERE { settled: false }` is supposed to keep the clock off a
   // settled forecast, but that only holds while a settlement-asserting write actually
   // latches Prediction.settled. In prod, 771 snapshots across 19 ACTIVE forecasts assert

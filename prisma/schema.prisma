@@ -423,6 +423,10 @@ model Prediction {
   // NULL check, so reclassifying a forecast to a later deadline doesn't
   // permanently silence its alert once that new deadline also passes.
   deadlinePassedAlertAt  DateTime? @map("deadline_passed_alert_at")
+  // Single-shot "approaching deadline" heads-up (daatan#1854): stamped when the clean-
+  // channel message fires at 90% of publishedAt → claimDeadline. Re-arms only if the
+  // deadline is later moved out so the stamp predates the new 90% point.
+  deadlineHeadsUpAlertAt DateTime? @map("deadline_heads_up_alert_at")
   teffProvisionalAlertAt DateTime? @map("teff_provisional_alert_at")
   divergenceAlertAt      DateTime? @map("divergence_alert_at")
 
