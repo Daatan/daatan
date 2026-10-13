@@ -74,6 +74,7 @@ A few short prompts are still built inline in code rather than in `PROMPTS`, so 
 | `src/lib/services/ai-estimate.ts` | bare 0–100 estimate backfilled onto a commitment's `aiProbabilityAtCommit` |
 | `src/lib/services/translation.ts` | forecast/comment translation and normalise-to-English |
 | `src/lib/llm/groundedDateLookup.ts` | the #1706 web-grounded event-date lookup (Vertex `googleSearch`, outside `llmService`) |
+| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`) | claim → 2–6-word future-tense card headline (#1814); the guards that decide whether it is kept live in the same file — see [LLM_ARCHITECTURE.md § Card headline](LLM_ARCHITECTURE.md#card-headline-1814) |
 
 ## The prompts
 
