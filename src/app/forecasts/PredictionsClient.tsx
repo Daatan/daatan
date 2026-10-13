@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import ForecastCard, { Prediction } from '@/components/forecasts/ForecastCard'
 import { ForecastCardSkeleton } from '@/components/forecasts/ForecastCardSkeleton'
 import EmptyState from '@/components/ui/EmptyState'
+import { FeedSeenMarker } from '@/components/FeedSeenMarker'
 
 type FilterStatus = 'ACTIVE' | 'PENDING' | 'RESOLVED' | 'CLOSING_SOON' | 'ALL'
 
@@ -98,6 +99,7 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
+      <FeedSeenMarker />
       {/* Header */}
       <div className="flex items-center justify-between mb-6 lg:mb-8">
         <div className="flex items-center gap-3">
