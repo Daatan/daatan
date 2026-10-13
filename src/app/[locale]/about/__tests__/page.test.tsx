@@ -35,4 +35,14 @@ describe('LocaleAboutPage', () => {
     })
     expect(meta.title).toBe('О Daatan')
   })
+
+  it.each([
+    ['he', '/he/home-v5'],
+    ['ru', '/ru/home-v5'],
+    ['eo', '/eo/home-v5'],
+  ])('links to the home-v5 preview for locale=%s', async (locale, href) => {
+    const page = await LocaleAboutPage({ params: Promise.resolve({ locale }) })
+    const { container } = render(page)
+    expect(container.querySelector(`a[href="${href}"]`)).not.toBeNull()
+  })
 })

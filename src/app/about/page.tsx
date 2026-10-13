@@ -87,6 +87,10 @@ function SaasAboutPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-white">About DAATAN</h1>
       </div>
 
+      <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
+        <Link href="/home-v5" className="text-sm text-cobalt-light hover:underline">Preview: the new homepage design →</Link>
+      </p>
+
       {/* Tagline */}
       <div className="bg-navy-800 border border-cobalt/30 rounded-xl p-6 mb-6">
         <p className="text-lg sm:text-xl font-semibold text-white mb-2">
