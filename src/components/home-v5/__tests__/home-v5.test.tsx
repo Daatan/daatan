@@ -52,3 +52,25 @@ describe('MobileMenu', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 })
+
+describe('home-v5 featured examples', () => {
+  it('has every locale filled in for the featured source', async () => {
+    const { FEATURED_SOURCE } = await import('../examples')
+    if (!FEATURED_SOURCE) return
+    for (const locale of ['en', 'he', 'ru', 'eo'] as const) {
+      for (const field of ['name', 'role', 'statement', 'whatHappened', 'tag'] as const) {
+        expect(FEATURED_SOURCE[field][locale].trim().length).toBeGreaterThan(0)
+      }
+    }
+    expect(FEATURED_SOURCE.record.length).toBeGreaterThan(0)
+  })
+
+  it('maps the source to card data with a localized date', async () => {
+    const { FEATURED_SOURCE } = await import('../examples')
+    const { toSourceCard } = await import('../featured')
+    if (!FEATURED_SOURCE) return
+    const card = toSourceCard(FEATURED_SOURCE, 'ru')
+    expect(card.name).toBe(FEATURED_SOURCE.name.ru)
+    expect(card.saidOn).toMatch(/2021/)
+  })
+})
