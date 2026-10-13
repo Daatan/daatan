@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/services/telegram', () => ({
   notifyHighConfidence: vi.fn(),
+  notifySettled: vi.fn(),
 }))
 
 import { prisma } from '@/lib/prisma'

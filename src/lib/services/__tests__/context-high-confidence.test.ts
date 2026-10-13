@@ -19,21 +19,24 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/services/telegram', () => ({
   notifyHighConfidence: vi.fn(),
+  notifySettled: vi.fn(),
 }))
 
 import { prisma } from '@/lib/prisma'
-import { notifyHighConfidence } from '@/lib/services/telegram'
+import { notifyHighConfidence, notifySettled } from '@/lib/services/telegram'
 import { saveContextUpdate, saveNewsIndexerMatch, saveOracleSnapshotOnly, saveClockSnapshot } from '@/lib/services/context'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
 const update = vi.mocked(prisma.prediction.update)
 const notify = vi.mocked(notifyHighConfidence)
+const notifySettledMock = vi.mocked(notifySettled)
 
-function mockPrevious(confidence: number | null) {
+function mockPrevious(confidence: number | null, settled = false) {
   findUnique.mockResolvedValue({
     confidence,
     claimText: 'The Knicks will win the finals',
     slug: 'knicks-finals',
+    settled,
   } as never)
 }
 
@@ -92,14 +95,76 @@ describe('high-confidence crossing alert', () => {
     expect(notify).toHaveBeenCalled()
   })
 
-  it('passes the settled flag through when the pin is evidence-backed', async () => {
+  it('a newly latched pin sends the settled alert instead of the crossing alert (daatan#1845)', async () => {
     mockPrevious(70)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: {
+        sources: [
+          { source: 'wire-a', settled: true, publishedAt: '2026-10-01T10:00:00Z' },
+          { source: 'wire-b', settled: true, publishedAt: '2026-10-02T10:00:00Z' },
+        ],
+      },
+    })
+    expect(notifySettledMock).toHaveBeenCalledTimes(1)
+    expect(notifySettledMock).toHaveBeenCalledWith(
+      { id: 'pred-1', claimText: 'The Knicks will win the finals', slug: 'knicks-finals' },
+      97,
+      expect.objectContaining({ direction: 'YES', settling: 2, total: 2, outlets: ['wire-a', 'wire-b'] }),
+    )
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('a pin on a forecast already above 80 still sends the settled alert', async () => {
+    mockPrevious(85)
     await saveNewsIndexerMatch({
       ...matchInput(97),
       settled: true,
       oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
     })
-    expect(notify).toHaveBeenCalledWith(expect.anything(), 97, 70, true)
+    expect(notifySettledMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('a settled NO pin (≤5) alerts with direction NO', async () => {
+    mockPrevious(40)
+    await saveNewsIndexerMatch({
+      ...matchInput(3),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+    })
+    expect(notifySettledMock).toHaveBeenCalledWith(expect.anything(), 3, expect.objectContaining({ direction: 'NO' }))
+  })
+
+  it('does not re-alert when the forecast was already latched', async () => {
+    mockPrevious(97, true)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+    })
+    expect(notifySettledMock).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('two settling rows from one outlet do not alert (echo, not a second witness)', async () => {
+    mockPrevious(60)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'Wire-A ', settled: true }] },
+    })
+    expect(notifySettledMock).not.toHaveBeenCalled()
+  })
+
+  it('a latched pin whose published number is not at a pin extreme does not alert', async () => {
+    mockPrevious(60)
+    await saveNewsIndexerMatch({
+      ...matchInput(70),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+    })
+    expect(notifySettledMock).not.toHaveBeenCalled()
   })
 
   it('a settlement pin with a single settling vote does not alert (daatan#1248)', async () => {
@@ -176,7 +241,11 @@ describe('high-confidence crossing alert', () => {
       aiCiHigh: 99,
       settled: true,
     })
-    expect(notify).toHaveBeenCalledWith(expect.anything(), 97, null, true)
+    expect(notifySettledMock).toHaveBeenCalledWith(
+      expect.anything(),
+      97,
+      expect.objectContaining({ direction: 'YES' }),
+    )
   })
 
   it('does not fire when confidence is null', async () => {
