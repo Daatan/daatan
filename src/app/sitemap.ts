@@ -127,7 +127,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1. Static routes (English)
   // Routes tagged with localized:true have /he and /ru counterparts in the sitemap.
   const staticRouteDefs = [
-    { route: '',          lastModified: new Date(),              frequency: 'daily'   as const, priority: 1.0, localized: true  },
+    // The root redirects first-time visitors and crawlers to /home-v5 (src/lib/first-visit.ts): list the target.
+    { route: '/home-v5', lastModified: new Date('2026-10-13'), frequency: 'weekly'  as const, priority: 1.0, localized: true  },
     { route: '/forecasts',lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: true  },
     { route: '/about',    lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.8, localized: true  },
     { route: '/methodology', lastModified: new Date('2026-07-05'), frequency: 'monthly' as const, priority: 0.6, localized: true  },
@@ -151,11 +152,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 2. Locale static routes (he + ru only — eo excluded)
   const localeStaticRoutes: MetadataRoute.Sitemap = SITEMAP_LOCALES.flatMap((locale) => [
     {
-      url: `${BASE_URL}/${locale}`,
-      lastModified: new Date(),
-      changeFrequency: 'daily' as const,
+      url: `${BASE_URL}/${locale}/home-v5`,
+      lastModified: new Date('2026-10-13'),
+      changeFrequency: 'weekly' as const,
       priority: 0.8,
-      alternates: { languages: localizedAlternates('') },
+      alternates: { languages: localizedAlternates('/home-v5') },
     },
     {
       url: `${BASE_URL}/${locale}/forecasts`,

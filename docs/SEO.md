@@ -303,6 +303,13 @@ The cookie is set client-side by `FeedSeenMarker` when the forecasts page (`/for
 displayed (1 year, `SameSite=Lax`); link prefetches never run it. After that the root shows the
 forecast feed as before. The feed itself stays indexable at `/forecasts`; the root's own
 indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
+
+Because the root now redirects, the SEO signals that used to live on it live on `/home-v5`:
+the sitemap lists `/home-v5`, `/he/home-v5` and `/ru/home-v5` instead of `/`, `/he`, `/ru`
+(sitemap URLs must not redirect); the page emits the site-level `Organization` + `WebSite`
+(with a `SearchAction` to `/forecasts?q=`) JSON-LD; and its metadata sets `og:image` /
+`twitter:image` explicitly (setting `openGraph` replaces the inherited one). When home-v5 becomes
+the real homepage, serve it at `/` directly and move the sitemap entry back.
 "Home" → `/home-v5` (hidden on self-host).
 
 ## Weekly measurement loop (platform#13)
