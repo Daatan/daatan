@@ -95,12 +95,12 @@ export async function SourceCard({ locale, data }: { locale: string; data: Sourc
         <span className="block text-sm leading-[1.4] text-[var(--hv5-muted)]">{t('saidOn', { date: data.saidOn })}</span>
         <p className="mt-2 text-xl font-bold leading-[1.4] text-white md:text-[22px]">{data.statement}</p>
       </div>
-      <div className="mt-[22px] grid grid-cols-2 border-t border-[var(--hv5-line-2)] pt-[18px]">
-        <div className="pe-5">
+      <div className="mt-[22px] grid grid-cols-1 gap-y-4 border-t border-[var(--hv5-line-2)] pt-[18px] md:grid-cols-2">
+        <div className="md:pe-5">
           <span className="block text-sm leading-[1.4] text-[var(--hv5-muted)]">{t('whatHappened')}</span>
           <p className="mt-1.5 text-[17px] leading-[1.45] text-[var(--hv5-body)]">{data.whatHappened}</p>
         </div>
-        <div className="border-s border-[var(--hv5-line-2)] ps-5">
+        <div className="border-[var(--hv5-line-2)] md:border-s md:ps-5">
           <span className="block text-sm leading-[1.4] text-[var(--hv5-muted)]">{t('verdict')}</span>
           <p className={`mt-1.5 flex items-center gap-2 text-xl font-bold leading-[1.3] ${ok ? 'text-[var(--hv5-ok)]' : 'text-[var(--hv5-bad)]'}`}>
             {ok ? <CircleCheck className="h-[22px] w-[22px]" strokeWidth={2} aria-hidden="true" /> : <CircleX className="h-[22px] w-[22px]" strokeWidth={2} aria-hidden="true" />}
@@ -119,7 +119,9 @@ export async function SourceCard({ locale, data }: { locale: string; data: Sourc
               <span
                 key={i}
                 className={`block h-3 w-3 shrink-0 rounded-full ${r ? 'bg-[var(--hv5-ok)]' : 'border-2 border-[var(--hv5-bad)]'} ${
-                  i === data.record.length - 1 ? 'ring-1 ring-offset-[3px] ring-[var(--hv5-bad)] ring-offset-[var(--hv5-panel)]' : ''
+                  i === data.record.length - 1
+                    ? `ring-1 ring-offset-[3px] ring-offset-[var(--hv5-panel)] ${r ? 'ring-[var(--hv5-ok)]' : 'ring-[var(--hv5-bad)]'}`
+                    : ''
                 }`}
               />
             ))}
