@@ -135,83 +135,104 @@ export async function runResolutionResearch(
 
   const searchStart = Date.now()
 
+  // The two legs below are independent — query generation needs only the claim
+  // text and the forecast dates, not the raw-claim results — so they run
+  // concurrently (daatan#1856). They used to run back to back: a slow first leg
+  // (24.7 s on brave, 2026-10-13) delayed query generation and the targeted
+  // searches behind it. Composition is unchanged.
+
   // 1. Try oracle first (shares provider fallback chain + quota with oracle forecasts).
   //    If oracle returns ≥ 3 results, skip the 3-way local parallel search.
   //    No dateFrom: the claim window has no lower bound unless the claim text
   //    states one — flooring searches at the creation date hid a resolving event
   //    that happened six days before the claim existed (daatan#1511, Brent $100).
-  const oracleResults = await oracleSearch(prediction.claimText, 12, {
-    dateTo: searchDateTo,
-  }, { source, userId: meta.userId, predictionId: prediction.id })
+  const rawClaimLeg = async (): Promise<SearchResult[]> => {
+    const oracleResults = await oracleSearch(prediction.claimText, 12, {
+      dateTo: searchDateTo,
+    }, { source, userId: meta.userId, predictionId: prediction.id })
 
-  let results: SearchResult[]
-  if (oracleResults && oracleResults.length >= 3) {
-    results = oracleResults
-  } else {
-    // Fallback: three parallel local searches
-    //    a) Deadline-capped with raw claim text
-    //    b) Broad (no date) with raw claim text — catches older or wider coverage
-    //    c) Deadline-capped with simplified key-term query — targets the actual topic
-    const researchMeta = { source, userId: meta.userId }
-    const [dated, broad, simplified] = await Promise.all([
-      searchArticlesMultilingual(prediction.claimText, 6, { dateTo: searchDateTo }, researchMeta)
-        .catch(() => [] as SearchResult[]),
-      searchArticlesMultilingual(prediction.claimText, 4, undefined, researchMeta)
-        .catch(() => [] as SearchResult[]),
-      searchArticlesMultilingual(simplifiedQuery, 6, { dateTo: searchDateTo }, researchMeta)
-        .catch(() => [] as SearchResult[]),
-    ])
-    results = dedup([...simplified, ...dated, ...broad])
+    let found: SearchResult[]
+    if (oracleResults && oracleResults.length >= 3) {
+      found = oracleResults
+    } else {
+      // Fallback: three parallel local searches
+      //    a) Deadline-capped with raw claim text
+      //    b) Broad (no date) with raw claim text — catches older or wider coverage
+      //    c) Deadline-capped with simplified key-term query — targets the actual topic
+      const researchMeta = { source, userId: meta.userId }
+      const [dated, broad, simplified] = await Promise.all([
+        searchArticlesMultilingual(prediction.claimText, 6, { dateTo: searchDateTo }, researchMeta)
+          .catch(() => [] as SearchResult[]),
+        searchArticlesMultilingual(prediction.claimText, 4, undefined, researchMeta)
+          .catch(() => [] as SearchResult[]),
+        searchArticlesMultilingual(simplifiedQuery, 6, { dateTo: searchDateTo }, researchMeta)
+          .catch(() => [] as SearchResult[]),
+      ])
+      found = dedup([...simplified, ...dated, ...broad])
+    }
+    return found.slice(0, PRIMARY_RESULTS_CAP)
   }
-
-  results = results.slice(0, PRIMARY_RESULTS_CAP)
 
   // 2. Always run LLM-generated targeted queries on top of the raw-claim
   //    searches. Raw-claim searches tend to surface generic roundups whose
   //    snippets omit the specific entity, and an LLM judging from those can
   //    mistake absence of mention for absence of the event (daatan#1467).
   //    Composition reserves slots per leg — see composeResearchResults.
-  try {
-    const template = await getPromptTemplate('research-query-generation')
-    const prompt = fillPrompt(template, {
-      claimText: prediction.claimText,
-      forecastStartStr,
-      forecastEndStr,
-    })
+  //    Resolves to null when query generation or the targeted search fails —
+  //    the caller then continues with the raw-claim results alone.
+  const targetedLeg = async (): Promise<{ preCreation: SearchResult[]; deadline: SearchResult[] } | null> => {
+    try {
+      const template = await getPromptTemplate('research-query-generation')
+      const prompt = fillPrompt(template, {
+        claimText: prediction.claimText,
+        forecastStartStr,
+        forecastEndStr,
+      })
 
-    const qRes = await llmService.generateContent({
-      ...forStage('research_queries'),
-      prompt,
-      schema: queryGenerationSchema,
-      temperature: 0,
-    })
-    const { queries } = JSON.parse(qRes.text) as { queries: string[] }
-    // Each targeted query runs twice: once over the whole window up to the
-    // deadline, and once strictly BEFORE the claim's creation date. The
-    // pre-creation leg is the born-true detector (daatan#1511): the first-in-
-    // chain news-indexer only holds recent articles, so a strictly historical
-    // window filters its hits to zero (retro#559) and the query falls through
-    // to the SERP providers that can actually search that far back.
-    const targetedMeta = { source, userId: meta.userId }
-    const perQuery = await Promise.all(
-      queries.slice(0, 3).map(q => Promise.all([
-        searchArticlesMultilingual(q, 5, { dateTo: searchDateTo }, targetedMeta)
-          .catch(() => [] as SearchResult[]),
-        searchArticlesMultilingual(q, 3, { dateTo: forecastStart }, targetedMeta)
-          .catch(() => [] as SearchResult[]),
-      ]))
-    )
-    // Compose with reserved slots per leg (daatan#1515) instead of a
-    // flat append-then-cap that starved the pre-creation leg.
-    results = composeResearchResults(
-      results,
-      perQuery.flatMap(([, pre]) => pre),
-      perQuery.flatMap(([deadline]) => deadline),
-      { preCreation: PRE_CREATION_RESULTS_CAP, total: TOTAL_RESULTS_CAP },
-    )
-  } catch {
-    // targeted search failed — continue with what we have
+      const qRes = await llmService.generateContent({
+        ...forStage('research_queries'),
+        prompt,
+        schema: queryGenerationSchema,
+        temperature: 0,
+      })
+      const { queries } = JSON.parse(qRes.text) as { queries: string[] }
+      // Each targeted query runs twice: once over the whole window up to the
+      // deadline, and once strictly BEFORE the claim's creation date. The
+      // pre-creation leg is the born-true detector (daatan#1511): the first-in-
+      // chain news-indexer only holds recent articles, so a strictly historical
+      // window filters its hits to zero (retro#559) and the query falls through
+      // to the SERP providers that can actually search that far back.
+      const targetedMeta = { source, userId: meta.userId }
+      const perQuery = await Promise.all(
+        queries.slice(0, 3).map(q => Promise.all([
+          searchArticlesMultilingual(q, 5, { dateTo: searchDateTo }, targetedMeta)
+            .catch(() => [] as SearchResult[]),
+          searchArticlesMultilingual(q, 3, { dateTo: forecastStart }, targetedMeta)
+            .catch(() => [] as SearchResult[]),
+        ]))
+      )
+      return {
+        preCreation: perQuery.flatMap(([, pre]) => pre),
+        deadline: perQuery.flatMap(([deadline]) => deadline),
+      }
+    } catch {
+      // targeted search failed — continue with what we have
+      return null
+    }
   }
+
+  const [primary, targeted] = await Promise.all([rawClaimLeg(), targetedLeg()])
+
+  // Compose with reserved slots per leg (daatan#1515) instead of a
+  // flat append-then-cap that starved the pre-creation leg.
+  const results: SearchResult[] = targeted
+    ? composeResearchResults(
+        primary,
+        targeted.preCreation,
+        targeted.deadline,
+        { preCreation: PRE_CREATION_RESULTS_CAP, total: TOTAL_RESULTS_CAP },
+      )
+    : primary
 
   const context = results.length > 0
     ? results.map(r =>
