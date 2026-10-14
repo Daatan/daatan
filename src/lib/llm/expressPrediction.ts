@@ -17,6 +17,7 @@ import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_L
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 import { lookupGroundedEventDate } from './groundedDateLookup'
 import { ensureRulesDirection, type RulesDirectionOutcome } from './rulesDirection'
+import { checkRulesStrength, type RulesStrengthOutcome } from './rulesStrength'
 import { forStage } from '@/lib/llm/stageModels'
 
 const log = createLogger('express-prediction')
@@ -175,6 +176,10 @@ export interface ExpressPredictionResult {
   // rules are rewritten before the author sees them; `direction: 'inverted'` means the
   // rewrite failed and the review screen warns. Null for MULTIPLE_CHOICE.
   rulesDirection: Omit<RulesDirectionOutcome, 'rules'> | null
+  // #1803 (shadow): whether the rules accept an event weaker than the claim's. Recorded
+  // on the attempt only — never changes the rules or the review screen. Null for
+  // MULTIPLE_CHOICE.
+  rulesStrength: RulesStrengthOutcome | null
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -318,6 +323,15 @@ async function applyRulesDirection(prediction: ParsedPrediction): Promise<Expres
   return outcome
 }
 
+/**
+ * #1803 shadow: starts after the direction check (it may have rewritten the rules) and
+ * runs beside localization so it adds no wall-clock in the common case.
+ */
+function startRulesStrength(prediction: ParsedPrediction): Promise<RulesStrengthOutcome | null> {
+  if (prediction.outcomeType !== 'BINARY') return Promise.resolve(null)
+  return checkRulesStrength(prediction.claimText, prediction.resolutionRules)
+}
+
 export async function generateExpressPrediction(
   userInput: string,
   onProgress?: (stage: string, data?: Record<string, unknown>) => void,
@@ -412,10 +426,12 @@ export async function generateExpressPrediction(
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
     const rulesDirection = await applyRulesDirection(prediction)
+    const rulesStrengthP = startRulesStrength(prediction)
     const localized = await localizeForecastForAuthor(
       { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
       userInput,
     )
+    const rulesStrength = await rulesStrengthP
     const ungroundedYears = findUngroundedYears(
       prediction.claimText,
       prediction.resolveByDatetime,
@@ -439,6 +455,7 @@ export async function generateExpressPrediction(
       ungroundedYears,
       claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
       rulesDirection,
+      rulesStrength,
       localized,
     }
   }
@@ -772,10 +789,12 @@ URL: ${article.url}
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
   const rulesDirection = await applyRulesDirection(prediction)
+  const rulesStrengthP = startRulesStrength(prediction)
   const localized = await localizeForecastForAuthor(
     { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
     userInput,
   )
+  const rulesStrength = await rulesStrengthP
 
   const claimDeadlineMismatch = findClaimTextDeadlineMismatch(prediction.claimText, new Date(prediction.resolveByDatetime))
 
@@ -805,6 +824,7 @@ URL: ${article.url}
     ),
     claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
     rulesDirection,
+    rulesStrength,
     localized,
   }
 }

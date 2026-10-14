@@ -137,6 +137,14 @@
       "schema_hash": "69f218a19e93fc3a",
       "schema_chars": 695
     },
+    "rules-strength": {
+      "version": "v1",
+      "hash": "70453796cd7a6c9c",
+      "chars": 2209,
+      "schema": "rulesStrengthSchema",
+      "schema_hash": "61c9938bf39f33b0",
+      "schema_chars": 793
+    },
     "suggest-tags": {
       "version": "v1",
       "hash": "14d83d6cb870e53f",

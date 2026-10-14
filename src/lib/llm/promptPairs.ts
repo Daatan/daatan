@@ -7,6 +7,7 @@ import {
     queryGenerationSchema,
     researchSchema,
     rulesDirectionSchema,
+    rulesStrengthSchema,
     rulesSchema,
     voteDecisionSchema,
 } from './schemas'
@@ -58,6 +59,7 @@ export const PROMPT_SCHEMAS: Record<PromptName, Schema | null> = {
     'panel-estimate': null,
     'panel-estimate-grounded': null,
     'rules-direction': rulesDirectionSchema,
+    'rules-strength': rulesStrengthSchema,
 }
 
 /**
@@ -82,6 +84,7 @@ export const PROMPT_SCHEMA_NAMES: Partial<Record<PromptName, string>> = {
     'relation-typer': 'relationTyperSchema',
     'backfill-rules': 'rulesSchema',
     'rules-direction': 'rulesDirectionSchema',
+    'rules-strength': 'rulesStrengthSchema',
 }
 
 export interface PromptFingerprint {

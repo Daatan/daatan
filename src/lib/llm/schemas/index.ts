@@ -137,6 +137,37 @@ export const rulesSchema: Schema = {
 // ============================================
 
 /**
+ * Paired with the `rules-strength` prompt (#1803): can the rules resolve YES on an
+ * event easier to meet than the claim's own? `yesTrigger` comes first so the model
+ * names the weakest YES event before it judges it.
+ */
+export const rulesStrengthSchema: Schema = {
+  description: 'Whether the resolution rules resolve YES on an easier event than the claim states',
+  type: SchemaType.OBJECT,
+  properties: {
+    yesTrigger: {
+      type: SchemaType.STRING,
+      description: 'The weakest event that makes the rules resolve YES, in one short sentence.',
+    },
+    weaker: {
+      type: SchemaType.BOOLEAN,
+      description: 'True when that trigger is easier to meet than the event the claim states.',
+    },
+    kind: {
+      type: SchemaType.STRING,
+      format: 'enum',
+      enum: ['none', 'announcement', 'intent', 'partial', 'scope', 'or_weak', 'other'],
+      description: 'Which kind of weakening, or none when weaker is false.',
+    },
+    fixedRules: {
+      type: SchemaType.STRING,
+      description: 'Only when weaker: the rules rewritten to resolve YES only on the claim\'s own event, everything else kept. Otherwise an empty string.',
+    },
+  },
+  required: ['yesTrigger', 'weaker', 'kind', 'fixedRules'],
+}
+
+/**
  * Paired with the `rules-direction` prompt (#1813): does YES under the resolution
  * rules mean the claim is true? `yesCondition` comes first so the model states the
  * rules' YES event before it judges it.

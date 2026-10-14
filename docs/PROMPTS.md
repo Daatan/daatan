@@ -98,6 +98,7 @@ returns a phrase. Those still lock their prose.
 | `panel-estimate` | — | `services/ai-panel.ts` (docs/LASSO.md) |
 | `panel-estimate-grounded` | — | `services/ai-panel.ts` (docs/LASSO.md) |
 | `rules-direction` | `rulesDirectionSchema` | `llm/rulesDirection.ts` — express draft (`/api/forecasts/express/generate`), `bots/forecastCreate.ts`, `bots/sourceless.ts` |
+| `rules-strength` | `rulesStrengthSchema` | `llm/rulesStrength.ts` — express draft only, shadow: recorded on the forecast-creation attempt, rules untouched (#1803) |
 | `relation-typer` | `relationTyperSchema` | `services/relation-typer.ts` — `/api/cron/relation-typer` |
 | `research-query-generation` | `queryGenerationSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
 | `resolution-research` | `researchSchema` | `services/resolutionResearch.ts` — `/api/forecasts/[id]/research`, `services/bornTrueCheck.ts` |
@@ -118,6 +119,7 @@ model to ignore instructions inside it:
 | `guess-chances` | user-drafted claim + third-party news snippets | `<forecast>`, `<articles>` |
 | `panel-estimate-grounded` | third-party news snippets | prose framing |
 | `rules-direction` | claim + rules drafted from author input | `<claim>`, `<rules>` |
+| `rules-strength` | claim + rules drafted from author input | `<claim>`, `<rules>` |
 | `HEADLINE_PROMPT` (outside the lock) | user-written claim | `<claim>` |
 
 `content-moderation` is the one whose input is adversarial *by construction* — the author of
@@ -166,6 +168,7 @@ records what each was on.
 | `content-moderation` | v3 | 2026-10-07 — default-to-allow rewrite after a legitimate forecast ("The Russian plague will spread across the world.") was rejected as hate speech. Hate speech is now a judgment category that rejects only on clear dehumanization, contempt, exclusionary advocacy, collective harmful attribution, or celebration of violence; bright lines (named-person death/harm, harassment/doxxing, sexual content, self-harm/illegal-act encouragement, spam/scams) get no benefit of the doubt. Dropped the "phrased neutrally" requirement; added any-language and reason-must-not-accuse rules. Prose only — schema half unchanged. Regression set: `moderationRegression.cases.ts`; live check: `scripts/check-moderation-regression.ts`. |
 | `content-moderation` | v4 | 2026-10-08 — v3 still blocked "The Russian plague will spread across the world" on Gemini (the model checkContent uses); its live check had run on the Oracul/Bedrock fallback instead. Added: a disease named after a place or nation is the disease, not the people; only calling the people the disease is dehumanization (contrast pair in the boundary examples). `scripts/check-moderation-regression.ts` now calls Vertex with `stageModel('moderation')` and the real schema. |
 | `rules-direction` | v1 | 2026-10-09 — #1813: new. After the express draft and the bot drafts, it checks that a binary forecast's rules resolve YES when the claim is true. If they are inverted, it returns a rewrite with the same sources, deadline and thresholds, which is used only when a second check calls it consistent. Otherwise the express review screen warns and the bot skips. Fail-open. Stage `rules_direction`. Regression set: `rulesDirection.cases.ts` (the #1802 audit: 6 inverted, 16 consistent including 10 negated, 2 unclear). Live check: `scripts/check-rules-direction.ts`. |
+| `rules-strength` | v1 | 2026-10-14 — #1803: new, **shadow**. After the express draft's direction check, a judge reads the claim/rules pair and says whether the rules can resolve YES on an easier event (announce vs implement, intent vs occurrence, partial vs full, scope widening, "or" with a weak trigger). Verdict, kind, weakest trigger and a proposed rewrite are stored in `forecast_creation_attempts.details.rulesStrength`; nothing is applied. Promote to enforce (rewrite, re-check) only after the shadow rate and false-positive rate are read. |
 
 ## Bedrock
 
