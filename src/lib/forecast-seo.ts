@@ -49,7 +49,12 @@ export function buildForecastDescription(
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s
-  return s.slice(0, max - 1).trimEnd() + '…'
+  const cut = s.slice(0, max - 1)
+  // Back up to the last word boundary so the snippet never ends mid-word ("oth…"); keep the
+  // hard cut only when the first word alone is longer than the limit (no space to back up to).
+  const lastSpace = cut.lastIndexOf(' ')
+  const base = lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut
+  return base.replace(/[\s,;:.\-–—]+$/, '') + '…'
 }
 
 // ---------------------------------------------------------------------------

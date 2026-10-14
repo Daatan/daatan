@@ -12,6 +12,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
 import { JsonLd } from '@/components/JsonLd'
+import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
 import { getAppUrl } from '@/lib/branding'
@@ -43,7 +44,7 @@ async function getInitialComments(predictionId: string): Promise<Comment[]> {
 async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
   const data = await getContextTimeline(predictionId)
   if (!data) return []
-  return data.contextSnapshots.map((s) => ({
+  return slimContextSnapshots(data.contextSnapshots.map((s) => ({
     id: s.id,
     summary: s.summary,
     sources: (s.sources as ContextSnapshot['sources']) ?? [],
@@ -51,7 +52,7 @@ async function getInitialContextSnapshots(predictionId: string): Promise<Context
     externalProbability: s.externalProbability,
     externalReasoning: s.externalReasoning,
     oracleSnapshot: (s.oracleSnapshot as ContextSnapshot['oracleSnapshot']) ?? null,
-  }))
+  })))
 }
 
 interface Props {

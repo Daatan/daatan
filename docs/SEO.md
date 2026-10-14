@@ -14,6 +14,16 @@ Forecast detail pages (`src/app/forecasts/[id]/page.tsx`) override with per-fore
 | `twitter:site` | `@daatan_dev` |
 | `twitter:creator` | Author's `twitterHandle` (if set on their profile) |
 
+`<title>`: forecast pages set `title: { absolute: '<claim> | <appName>' }` — the route does not inherit
+the root `%s | DAATAN` template, so without `absolute` the bare claim was the whole title
+(daatan#1870). `/about` is `absolute` too (brand-led, ≤ ~60 chars). Meta descriptions are cut at a
+word boundary (`truncate()` in `src/lib/forecast-seo.ts`).
+
+Payload: `initialContextSnapshots` is projected through `slimContextSnapshots`
+(`src/lib/slim-context-snapshots.ts`) before it reaches the client — the stored `oracleSnapshot`
+carries every source's `claimsDetail` shadow layer, which was ~1.4 MB of the 1.6 MB forecast page
+(daatan#1871). If a client component starts reading another `oracleSnapshot` field, add it there.
+
 ## Structured data (JSON-LD)
 
 A forecast page emits up to five JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the

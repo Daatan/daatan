@@ -17,12 +17,13 @@ import { forecastFaqJsonLd, latestProbabilityUpdateISO, type ForecastSeoCopy } f
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
 import { JsonLd } from '@/components/JsonLd'
-import { getAppUrl } from '@/lib/branding'
+import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
+import { getAppName, getAppUrl } from '@/lib/branding'
 
 async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
   const data = await getContextTimeline(predictionId)
   if (!data) return []
-  return data.contextSnapshots.map((s) => ({
+  return slimContextSnapshots(data.contextSnapshots.map((s) => ({
     id: s.id,
     summary: s.summary,
     sources: (s.sources as ContextSnapshot['sources']) ?? [],
@@ -31,7 +32,7 @@ async function getInitialContextSnapshots(predictionId: string): Promise<Context
     externalReasoning: s.externalReasoning,
     oracleSnapshot: (s.oracleSnapshot as ContextSnapshot['oracleSnapshot']) ?? null,
     insufficientData: s.insufficientData,
-  }))
+  })))
 }
 
 export const revalidate = 60
@@ -207,7 +208,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const metaAppUrl = getAppUrl()
 
   return {
-    title: prediction.claimText,
+    // `absolute`: this route does not inherit the root `%s | DAATAN` template, so the bare claim
+    // was the whole <title> (he/ru pages already carry the brand). OG/Twitter keep the claim alone.
+    title: { absolute: `${prediction.claimText} | ${getAppName()}` },
     description,
     keywords: buildForecastKeywords(prediction.claimText, prediction.tags, 'en'),
     alternates: {
