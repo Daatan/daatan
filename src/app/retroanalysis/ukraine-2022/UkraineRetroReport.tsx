@@ -511,12 +511,12 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
         ))}
       </ul>
       <div className="hidden md:block overflow-x-auto bg-white border border-gray-200 rounded-xl">
-        <table className="w-full min-w-[1100px] border-collapse text-sm">
+        <table className="w-full min-w-[1260px] border-collapse text-sm">
           <thead><tr>
             {th('n', '#', true)}{th('date', 'Date')}
             <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 text-left">Article</th>
             {th('voice_name', 'Main voice')}{th('p_full', 'P invasion')}{th('predicted_scope', 'Scope')}
-            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 text-left">Summary & quote</th>
+            <th className="sticky top-0 bg-white px-3 py-2.5 border-b border-gray-200 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600 text-left min-w-[320px]">Summary & quote</th>
           </tr></thead>
           <tbody>
             {shown.map(r => (
@@ -539,15 +539,18 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
                   <div className="mt-0.5 font-mono text-xs text-gray-500">confidence {(r.claim_strength ?? 0).toFixed(2)}</div>
                 </td>
                 <td className="px-3 py-2.5">{SCOPE[r.predicted_scope ?? ''] ?? r.predicted_scope}<div className="font-mono text-xs text-gray-500">{r.timeframe}</div></td>
-                <td className="px-3 py-2.5 min-w-[260px] max-w-[420px]">
-                  <details>
-                    <summary className="cursor-pointer text-[13px] text-gray-700 leading-snug">{r.summary}</summary>
-                    <blockquote className="mt-2 pl-2.5 border-l-2 border-gray-200 italic text-[13px] text-gray-800">
-                      {r.key_quote_en}
-                      {r.key_quote && r.key_quote !== r.key_quote_en && <span className="block mt-1 text-gray-500">{r.key_quote}</span>}
-                    </blockquote>
-                    {!r.quote_verified && <div className="mt-1 font-mono text-[11px] text-amber-700">quote not found verbatim</div>}
-                  </details>
+                <td className="px-3 py-2.5">
+                  {/* min-w on a <td> is ignored under auto table layout, so the width lives on an inner box (daatan#1781) */}
+                  <div className="min-w-[320px] max-w-[460px]">
+                    <details>
+                      <summary className="cursor-pointer text-[13px] text-gray-700 leading-snug">{r.summary}</summary>
+                      <blockquote className="mt-2 pl-2.5 border-l-2 border-gray-200 italic text-[13px] text-gray-800">
+                        {r.key_quote_en}
+                        {r.key_quote && r.key_quote !== r.key_quote_en && <span className="block mt-1 text-gray-500">{r.key_quote}</span>}
+                      </blockquote>
+                      {!r.quote_verified && <div className="mt-1 font-mono text-[11px] text-amber-700">quote not found verbatim</div>}
+                    </details>
+                  </div>
                 </td>
               </tr>
             ))}
