@@ -15,6 +15,9 @@ vi.mock('../groundedDateLookup', () => ({ lookupGroundedEventDate: vi.fn() }))
 vi.mock('../rulesDirection', () => ({
   ensureRulesDirection: vi.fn(async (_c: string, rules: string) => ({ direction: 'consistent', initial: 'consistent', rules, fixed: false })),
 }))
+vi.mock('../rulesStrength', () => ({
+  checkRulesStrength: vi.fn(async () => ({ verdict: 'ok', kind: 'none', yesTrigger: '', fixedRules: '' })),
+}))
 
 import { generateExpressPrediction } from '../expressPrediction'
 import { llmService } from '../index'
