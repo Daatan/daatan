@@ -1,3 +1,4 @@
+import { HomeSeenMarker } from '@/components/HomeSeenMarker'
 import { JsonLd } from '@/components/JsonLd'
 import { getAppUrl } from '@/lib/branding'
 import { isRtl } from '@/i18n/config'
@@ -22,6 +23,7 @@ export default async function HomeV5({ locale }: { locale: Locale }) {
   return (
     <div dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale} className="hv5 min-h-screen bg-[var(--hv5-bg)] font-sans text-[var(--hv5-ink)] antialiased">
       <JsonLd data={siteJsonLd} />
+      <HomeSeenMarker />
       <Header locale={locale} links={links} />
       <div>
         <Hero locale={locale} links={links} />

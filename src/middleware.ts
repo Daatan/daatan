@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import authConfig from "./auth.config"
 import { NextResponse } from "next/server"
-import { FEED_SEEN_COOKIE, homeV5RedirectPath } from "./lib/first-visit"
+import { HOME_SEEN_COOKIE, homeV5RedirectPath } from "./lib/first-visit"
 
 const { auth } = NextAuth(authConfig)
 
@@ -23,7 +23,7 @@ export default auth((req) => {
   const homeTarget = homeV5RedirectPath({
     pathname,
     searchParams: req.nextUrl.searchParams,
-    hasFeedSeenCookie: req.cookies.has(FEED_SEEN_COOKIE),
+    hasHomeSeenCookie: req.cookies.has(HOME_SEEN_COOKIE),
     isAuthenticated: isAuth,
     // Read directly: this runs on the Edge, where the validated `@/env` module is not available.
     selfHosted: process.env.DAATAN_EDITION === 'self_hosted',

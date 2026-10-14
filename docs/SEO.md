@@ -294,13 +294,15 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 ## Site root: first-visit redirect to `/home-v5`
 
 `src/middleware.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
-`daatan_feed_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets a **307** to the matching
+`daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets a **307** to the matching
 `/home-v5` page (query string kept). Crawlers have no cookie, so they get the same redirect as a
 first-time visitor — no user-agent sniffing, nothing cloaked. Not redirected: signed-in users,
 self-hosted installs, and filtered feed links (`status`, `tags`, `sortBy`, `q`, `page`).
 
-The cookie is set client-side by `FeedSeenMarker` when the forecasts page (`/forecasts`) is
-displayed (1 year, `SameSite=Lax`); link prefetches never run it. After that the root shows the
+The cookie is set client-side by `HomeSeenMarker` when the home-v5 page itself is displayed
+(1 year, `SameSite=Lax`); link prefetches never run it. It was renamed from `daatan_feed_seen`
+(set by opening `/forecasts`) so that returning users who had never seen home-v5 get it once too.
+After that the root shows the
 forecast feed as before. The feed itself stays indexable at `/forecasts`; the root's own
 indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
 
