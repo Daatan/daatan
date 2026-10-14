@@ -296,9 +296,9 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 `src/middleware.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
 `daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets the matching
 `/home-v5` page **served in place** (middleware rewrite, status 200, URL stays `/`; query string kept; the
-page's canonical is `/home-v5`). It was a 307 redirect until 1.65.415; a rewrite saves a request and gives
+page's canonical is `/home-v5`). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives
 crawlers a 200. Crawlers have no cookie, so they get the same page as a first-time visitor — no
-user-agent sniffing, nothing cloaked. Not redirected: signed-in users,
+user-agent sniffing, nothing cloaked. Not rewritten: signed-in users,
 self-hosted installs, and filtered feed links (`status`, `tags`, `sortBy`, `q`, `page`).
 
 The cookie is set client-side by `HomeSeenMarker` when the home-v5 page itself is displayed
@@ -307,14 +307,15 @@ The cookie is set client-side by `HomeSeenMarker` when the home-v5 page itself i
 After that the root shows the
 forecast feed as before. The feed itself stays indexable at `/forecasts`; the root's own
 indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
+"Home" → `/home-v5` (hidden on self-host).
 
 Because the root now serves home-v5 (canonical `/home-v5`), the SEO signals that used to live on it live on `/home-v5`:
 the sitemap lists `/home-v5`, `/he/home-v5` and `/ru/home-v5` instead of `/`, `/he`, `/ru`
 (sitemap URLs list the canonical); the page emits the site-level `Organization` + `WebSite`
 (with a `SearchAction` to `/forecasts?q=`) JSON-LD; and its metadata sets `og:image` /
-`twitter:image` explicitly (setting `openGraph` replaces the inherited one). When home-v5 becomes
-the real homepage, serve it at `/` directly and move the sitemap entry back.
-"Home" → `/home-v5` (hidden on self-host).
+`twitter:image` explicitly (setting `openGraph` replaces the inherited one). The root now serves the
+page itself; if `/` ever becomes the canonical (instead of `/home-v5`), switch `homeV5Metadata`'s
+canonical, move the sitemap entry back to `/` and make `/home-v5` canonical to it.
 
 ## Weekly measurement loop (platform#13)
 

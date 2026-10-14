@@ -1,6 +1,6 @@
 /**
  * Site-level structured data for the home-v5 page. It used to be emitted by the feed at "/", which
- * now redirects first-time visitors (and crawlers) here. SearchAction points at the forecasts
+ * now serves this page in place to first-time visitors (and crawlers). SearchAction points at the forecasts
  * search the page header uses.
  */
 export function buildSiteJsonLd(appUrl: string, locale: string) {
