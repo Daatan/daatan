@@ -28,15 +28,20 @@ export default auth((req) => {
     // Read directly: this runs on the Edge, where the validated `@/env` module is not available.
     selfHosted: process.env.DAATAN_EDITION === 'self_hosted',
   })
-  if (homeTarget) {
-    const url = req.nextUrl.clone()
-    url.pathname = homeTarget
-    return NextResponse.redirect(url)
-  }
 
   // Forward pathname to server components so the root layout can set
   // <html lang> from the URL prefix (/he, /ru, /eo) instead of cookies.
   const requestHeaders = new Headers(req.headers)
+
+  if (homeTarget) {
+    // Served in place (rewrite, not a redirect): one request fewer for a first visit, and crawlers
+    // get a 200 at "/" instead of a temporary redirect. The page's own canonical stays /home-v5.
+    requestHeaders.set('x-pathname', homeTarget)
+    const url = req.nextUrl.clone()
+    url.pathname = homeTarget
+    return NextResponse.rewrite(url, { request: { headers: requestHeaders } })
+  }
+
   requestHeaders.set('x-pathname', pathname)
   const response = NextResponse.next({ request: { headers: requestHeaders } })
 
