@@ -586,10 +586,15 @@ export default function ForecastDetailClient({
                       <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
                       <span className="text-amber-400/70">{t('legendAI')} · {t('aiInsufficientEvidence')}</span>
                     </div>
-                  ) : aiVal != null && (
+                  ) : aiVal != null ? (
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-1 bg-[#FBBF24] rounded-full" />
                       <span className="text-amber-400">{t('legendAI')} {aiVal}%</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2" data-testid="ai-no-sources-yet">
+                      <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
+                      <span className="text-amber-400/70">{t('legendAI')} · {t('aiNoSourcesYet')}</span>
                     </div>
                   )}
                 </div>
@@ -634,6 +639,23 @@ export default function ForecastDetailClient({
                     <FileQuestion className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                     <p>{t('aiUnevidencedNotice')}</p>
                   </div>
+                )}
+
+                {/* daatan#1806: say what the number (or its absence) rests on, and link
+                    the explainer. Three states; an abstention keeps its own label and
+                    an unknown source count (null) gets no line rather than a guess. */}
+                {!aiAbstained && (aiVal == null || usableEvidenceCount != null) && (
+                  <p className="mt-3 w-full text-left text-xs text-gray-400" data-testid="ai-how-estimated">
+                    {aiVal == null
+                      ? t('aiHowNoSources')
+                      : usableEvidenceCount === 0
+                        ? t('aiHowModelOnly')
+                        : t('aiHowEvidence', { count: usableEvidenceCount ?? 0 })}
+                    {' · '}
+                    <Link href="/help/rating-numbers" className="underline hover:text-gray-200">
+                      {t('aiHowLink')}
+                    </Link>
+                  </p>
                 )}
 
                 {/* Temporal-clock annotation: only for diffuse-deadline claims the
