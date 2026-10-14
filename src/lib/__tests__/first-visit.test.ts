@@ -3,7 +3,7 @@ import { homeV5RedirectPath } from '../first-visit'
 
 const base = {
   searchParams: new URLSearchParams(),
-  hasFeedSeenCookie: false,
+  hasHomeSeenCookie: false,
   isAuthenticated: false,
   selfHosted: false,
 }
@@ -18,8 +18,8 @@ describe('homeV5RedirectPath', () => {
     expect(homeV5RedirectPath({ ...base, pathname })).toBe(target)
   })
 
-  it('does nothing once the feed has been seen', () => {
-    expect(homeV5RedirectPath({ ...base, pathname: '/', hasFeedSeenCookie: true })).toBeNull()
+  it('does nothing once home-v5 has been seen', () => {
+    expect(homeV5RedirectPath({ ...base, pathname: '/', hasHomeSeenCookie: true })).toBeNull()
   })
 
   it('does nothing for signed-in users', () => {
