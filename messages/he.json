@@ -760,6 +760,8 @@
     "probabilityHint": "תנו ל-AI לנתח את המקורות ולהציע הסתברות התחלתית.",
     "noAiEstimateWarning": "עדיין אין הערכה לפי הכתבות — האוראקול יעריך את התחזית מהחדשות מיד לאחר הפרסום.",
     "guessError": "נכשל קבלת הצעת הסתברות",
+    "guessAbstainTitle": "עדיין אין מספיק מידע כדי להעריך את הטענה הזו",
+    "guessAbstainMissing": "מה חסר:",
     "marketLinked": "שוק מקושר",
     "newsAnchor": "עוגן חדשותי",
     "sourceLabel": "מקור",

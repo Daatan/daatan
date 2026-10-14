@@ -692,6 +692,24 @@ describe('ExpressForecastClient', () => {
       expect(body.confidence).toBeUndefined()
     })
 
+    it('model abstain: fixed heading, the model reasoning kept underneath as what is missing (#1806)', async () => {
+      await renderInReviewState({
+        ...generatedData,
+        probabilitySuggestion: null,
+        probabilityReasoning: 'not enough information',
+      })
+      const box = screen.getByTestId('guess-abstained')
+      expect(box).toHaveTextContent(messages.expressForecast.guessAbstainTitle)
+      expect(box).toHaveTextContent(`${messages.expressForecast.guessAbstainMissing} not enough information`)
+      expect(screen.getByText('Guess chances')).toBeInTheDocument()
+    })
+
+    it('never asked: shows the hint, not the abstain heading (#1806)', async () => {
+      await renderInReviewState({ ...generatedData, probabilitySuggestion: null, probabilityReasoning: '' })
+      expect(screen.queryByTestId('guess-abstained')).not.toBeInTheDocument()
+      expect(screen.getByText(messages.expressForecast.probabilityHint)).toBeInTheDocument()
+    })
+
     it('keeps the probability suggestion when an edit leaves the claim text unchanged', async () => {
       await renderInReviewState()
 
