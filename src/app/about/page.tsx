@@ -17,7 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   // SaaS — byte-identical to the previous static metadata.
   return {
-    title: 'How DAATAN Works — Forecast Tracking & Prediction Market',
+    // `absolute`: brand-led and under ~60 chars; the root template would append a second "| DAATAN".
+    title: { absolute: 'DAATAN — How Measurable Forecasting Works' },
     description: 'Learn how DAATAN works — a forecast tracking platform where you make predictions, stake your reputation, track your Brier score, and build your credibility over time.',
     alternates: { canonical: '/about' },
     openGraph: { url: '/about', type: 'website' },

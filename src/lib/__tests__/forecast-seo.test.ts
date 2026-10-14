@@ -35,6 +35,16 @@ describe('buildForecastDescription', () => {
     expect(result.endsWith('…')).toBe(true)
   })
 
+  it('cuts at a word boundary, never mid-word', () => {
+    const details = 'Benjamin Netanyahu\'s criminal trial continues, with recent reports indicating the prosecution maintains a bribery charge despite judicial warnings, while other sources suggest judges have been pressured'
+    const result = buildForecastDescription('Claim', details)
+    expect(result.endsWith('…')).toBe(true)
+    expect(result.length).toBeLessThanOrEqual(158)
+    const body = result.slice(0, -1)
+    expect(details.startsWith(body)).toBe(true)
+    expect(details[body.length]).toBe(' ')
+  })
+
   it('returns unique descriptions for different forecasts (no shared template)', () => {
     const a = buildForecastDescription('Forecast A about Iran', null)
     const b = buildForecastDescription('Forecast B about Russia', null)
