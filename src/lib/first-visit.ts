@@ -2,7 +2,8 @@
  * First-visit routing for the home-v5 page (#1840).
  *
  * Anonymous visitors without the "home seen" cookie who open the site root are sent to the
- * home-v5 page, which sets the cookie (HomeSeenMarker, client side, so link prefetches do not
+ * home-v5 page (served in place by a middleware rewrite, no redirect), which sets the cookie
+ * (HomeSeenMarker, client side, so link prefetches do not
  * count), after which the root shows the forecast feed again. The cookie is new on purpose: users
  * who had visited the feed before home-v5 existed still see the page once. Pure helpers so the Edge middleware stays thin and testable.
  */
@@ -22,7 +23,7 @@ export interface RootRedirectInput {
   selfHosted: boolean
 }
 
-/** Pathname to redirect to (without query), or null to serve the page as usual. */
+/** Pathname of the home-v5 page to serve at the root (without query), or null to serve the page as usual. */
 export function homeV5RedirectPath({
   pathname,
   searchParams,

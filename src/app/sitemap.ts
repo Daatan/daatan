@@ -127,7 +127,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1. Static routes (English)
   // Routes tagged with localized:true have /he and /ru counterparts in the sitemap.
   const staticRouteDefs = [
-    // The root redirects first-time visitors and crawlers to /home-v5 (src/lib/first-visit.ts): list the target.
+    // The root serves home-v5 in place for first-time visitors and crawlers (src/lib/first-visit.ts); its canonical is /home-v5, so list that.
     { route: '/home-v5', lastModified: new Date('2026-10-13'), frequency: 'weekly'  as const, priority: 1.0, localized: true  },
     { route: '/forecasts',lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: true  },
     { route: '/about',    lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.8, localized: true  },
