@@ -31,6 +31,10 @@ vi.mock('@/lib/llm/rulesDirection', () => ({
   ensureRulesDirection: vi.fn(async (_c: string, rules: string) => ({ direction: 'consistent', initial: 'consistent', rules, fixed: false })),
 }))
 
+vi.mock('@/lib/llm/rulesStrength', () => ({
+  checkRulesStrength: vi.fn(async () => ({ verdict: 'ok', kind: 'none', yesTrigger: '', fixedRules: '' })),
+}))
+
 vi.mock('@/lib/llm/bedrock-prompts', () => ({
   getPromptTemplate: vi.fn().mockImplementation((name) => {
     if (name === 'topic-extraction') return 'Extract the main topic: {{articleContent}}'
