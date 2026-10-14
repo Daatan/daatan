@@ -1030,11 +1030,21 @@ export default function ExpressForecastClient({
                   </div>
                 ) : !isGuessing && (
                   /* No number: either not asked yet (the hint), or the model
-                     abstained on a claim too vague to estimate (#1657) — then its
-                     reasoning says what is missing, which is what the drafter needs. */
-                  <p className="text-xs text-purple-600/70">
-                    {generated.probabilityReasoning || t('probabilityHint')}
-                  </p>
+                     abstained on a claim too vague to estimate (#1657). The model's
+                     reasoning is free text in whatever register it chose ("not enough
+                     information"), so the heading is ours and fixed (daatan#1806); the
+                     reasoning stays underneath as what is missing, which is what the
+                     drafter needs. */
+                  generated.probabilityReasoning ? (
+                    <div className="space-y-1" data-testid="guess-abstained">
+                      <p className="text-xs font-semibold text-purple-800">{t('guessAbstainTitle')}</p>
+                      <p className="text-xs text-purple-600/70" dir="auto">
+                        {t('guessAbstainMissing')} {generated.probabilityReasoning}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-purple-600/70">{t('probabilityHint')}</p>
+                  )
                 )}
               </div>
             )}

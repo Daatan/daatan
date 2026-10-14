@@ -760,6 +760,8 @@
     "probabilityHint": "Let AI analyze the gathered sources to suggest a starting probability.",
     "noAiEstimateWarning": "No evidence estimate yet — Oracul will estimate it from the news right after publishing.",
     "guessError": "Failed to get probability suggestion",
+    "guessAbstainTitle": "Not enough information to estimate this claim yet",
+    "guessAbstainMissing": "What is missing:",
     "marketLinked": "Linked Market",
     "newsAnchor": "News Anchor",
     "sourceLabel": "Source",

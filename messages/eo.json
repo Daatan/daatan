@@ -760,6 +760,8 @@
     "probabilityHint": "Lasu AI analizi la kolektitajn fontojn por proponi komencan probablon.",
     "noAiEstimateWarning": "Ankoraŭ neniu takso laŭ la novaĵoj — la Orakulo taksos ĝin laŭ la novaĵoj tuj post la publikigo.",
     "guessError": "Malsukcesis akiri probablecan sugeston",
+    "guessAbstainTitle": "Ankoraŭ ne sufiĉas informoj por taksi ĉi tiun aserton",
+    "guessAbstainMissing": "Kio mankas:",
     "marketLinked": "Ligita Merkato",
     "newsAnchor": "Novaĵa Ankro",
     "sourceLabel": "Fonto",
