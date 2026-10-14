@@ -442,6 +442,33 @@ It recreates the container in-place under live load and can spike CPU/memory —
 Over SSM (the `/ssm` skill in Claude Code, or `aws ssm send-command`):
 `docker logs daatan-app --tail 100`. For a quick health check, `curl -s https://daatan.com/api/health`.
 
+### Logs that survive a deploy (CloudWatch)
+
+`docker logs` belongs to the container, and blue-green removes the old container, so its
+logs go with it (daatan#1788). The app, nginx and postgres containers therefore also ship to
+CloudWatch Logs (`awslogs` driver, `mode=non-blocking`): log group `/daatan/prod/containers`
+or `/daatan/staging/containers` (30-day retention, Terraform-owned in `terraform/logging.tf`),
+one stream per container instance — `daatan-app/<UTC deploy timestamp>`, `daatan-nginx`,
+`daatan-postgres[-staging]`. `docker logs` keeps working (Docker's dual logging).
+
+Logs Insights, across deploys:
+
+```
+fields @timestamp, @logStream, @message
+| filter @logStream like /daatan-app/
+| sort @timestamp desc
+| limit 100
+```
+
+- The group must exist before a deploy reaches an environment: the flags omit
+  `awslogs-create-group` on purpose (a driver-created group has no retention), so a missing
+  group makes `docker run` fail at container start, before the old container is touched.
+- The rollback `docker run` uses bounded `json-file` instead of `awslogs`, so a log-driver
+  problem can never leave the site with no container.
+- Nginx and postgres only pick the new driver when their container is recreated
+  (`docker compose -f docker-compose.<env>.yml up -d nginx`); the deploy recreates postgres on
+  its own, nginx needs the manual step.
+
 ---
 
 ## Required Secrets

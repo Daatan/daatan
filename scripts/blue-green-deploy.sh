@@ -238,6 +238,32 @@ fi
 # for buffers/sharp while holding the worst case inside the box.
 RESOURCE_ARGS=(--memory 2g --memory-swap 2g --memory-reservation 1g)
 
+# Ship the app's stdout/stderr to CloudWatch Logs so it survives this script's
+# `docker rm -f` of the previous container (daatan#1788: the old container's logs
+# were deleted with it — #1725 forensics, the 2026-10-04 publish failures).
+#  - The log group is Terraform-owned (terraform/logging.tf), so there is no
+#    `awslogs-create-group`: a group created by the driver would have no retention.
+#    The group must exist before this runs in an environment, or `docker run`
+#    fails at container start (before the old container is touched).
+#  - `mode=non-blocking`: an unreachable CloudWatch drops lines instead of
+#    stalling the app's stdout writes.
+#  - One stream per container instance (`<name>/<UTC timestamp>`), computed at each
+#    call site so a replacement container never shares its predecessor's stream.
+#  - Docker's dual logging keeps a bounded local copy, so `docker logs` still works.
+case "$ENVIRONMENT" in
+    production) LOG_ENV="prod" ;;
+    *)          LOG_ENV="staging" ;;   # staging and next share the staging box
+esac
+awslogs_args() {
+    printf '%s\n' \
+        --log-driver awslogs \
+        --log-opt awslogs-region=eu-central-1 \
+        --log-opt "awslogs-group=/daatan/${LOG_ENV}/containers" \
+        --log-opt "awslogs-stream=$1/$(date -u +%Y%m%dT%H%M%SZ)" \
+        --log-opt mode=non-blocking \
+        --log-opt max-buffer-size=4m
+}
+
 # Get environment variables from the compose file for the new container
 # We run the new container directly (not via compose) to avoid name conflicts
 ENV_ARGS=()
@@ -323,10 +349,12 @@ echo "Using network: $NETWORK"
 
 # Start new container on the same network but with a temporary name
 # No network alias yet — old container still owns the service alias
+mapfile -t LOG_ARGS < <(awslogs_args "$CONTAINER")
 docker run -d \
     --name "$CONTAINER_NEW" \
     --network "$NETWORK" \
     --restart unless-stopped \
+    "${LOG_ARGS[@]}" \
     "${RESOURCE_ARGS[@]}" \
     "${ENV_ARGS[@]}" \
     "$IMAGE_NAME"
@@ -440,10 +468,13 @@ else
         docker stop $CONTAINER 2>/dev/null || true
         docker rm -f $CONTAINER 2>/dev/null || true
         # Start old image with canonical name and service alias
+        # Rollback deliberately does NOT use awslogs: the old container is already gone,
+        # so a log-driver failure here would leave nothing serving. Bounded json-file.
         docker run -d \
             --name "$CONTAINER" \
             --network "$NETWORK" \
             --restart unless-stopped \
+            --log-opt max-size=10m --log-opt max-file=3 \
             "${RESOURCE_ARGS[@]}" \
             "${ENV_ARGS[@]}" \
             "$OLD_IMAGE"

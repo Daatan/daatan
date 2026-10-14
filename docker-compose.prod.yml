@@ -18,10 +18,13 @@ services:
       timeout: 10s
       retries: 3
     logging:
-      driver: "json-file"
+      driver: awslogs
       options:
-        max-size: "10m"
-        max-file: "3"
+        awslogs-region: eu-central-1
+        awslogs-group: /daatan/prod/containers
+        awslogs-stream: daatan-nginx
+        mode: non-blocking
+        max-buffer-size: 4m
 
   app:
     build:
@@ -97,11 +100,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   postgres:
     # Pinned by digest on purpose: the mutable :pg16 tag silently swapped its
@@ -152,10 +150,13 @@ services:
       timeout: 5s
       retries: 5
     logging:
-      driver: "json-file"
+      driver: awslogs
       options:
-        max-size: "10m"
-        max-file: "3"
+        awslogs-region: eu-central-1
+        awslogs-group: /daatan/prod/containers
+        awslogs-stream: daatan-postgres
+        mode: non-blocking
+        max-buffer-size: 4m
 
   # Certbot for SSL renewal — uses DNS challenge via Route53 (requires daatan-ec2-role-prod IAM permissions)
   certbot:
@@ -170,6 +171,11 @@ services:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
