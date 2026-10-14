@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import authConfig from "./auth.config"
 import { NextResponse } from "next/server"
-import { HOME_SEEN_COOKIE, homeV5RedirectPath } from "./lib/first-visit"
+import { HOME_SEEN_COOKIE, homeV5RootTarget } from "./lib/first-visit"
 
 const { auth } = NextAuth(authConfig)
 
@@ -20,7 +20,7 @@ export default auth((req) => {
   }
 
   // First visit: anonymous visitors without the cookie land on the home-v5 page (#1840).
-  const homeTarget = homeV5RedirectPath({
+  const homeTarget = homeV5RootTarget({
     pathname,
     searchParams: req.nextUrl.searchParams,
     hasHomeSeenCookie: req.cookies.has(HOME_SEEN_COOKIE),

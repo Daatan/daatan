@@ -150,10 +150,11 @@ jobs:
           check "Health DB flag"  "$BASE/api/health" "db" "true"
 
           # Public pages
-          # A cookieless visitor is 307'd from "/" to /home-v5 on purpose (#1840), and this
-          # check treats every redirect as a possible loop (6/2026 incident). Send the
-          # "home seen" cookie so the probe sees the real root; a redirect loop on it is
-          # still caught. Keep the name in sync with HOME_SEEN_COOKIE in src/lib/first-visit.ts.
+          # A cookieless visitor gets the home-v5 page at "/" on purpose (#1840; rewritten in
+          # place, since #1867 no longer a 307). Send the "home seen" cookie so the probe
+          # checks the real root (the feed), and a redirect loop on it is still caught
+          # (every redirect counts as a failure since the 6/2026 incident).
+          # Keep the name in sync with HOME_SEEN_COOKIE in src/lib/first-visit.ts.
           check "Homepage"      "$BASE"             "" "" "daatan_home_v5_seen=1"
           check "Forecast feed" "$BASE/forecasts"   ""
           check "Leaderboard"   "$BASE/leaderboard" ""

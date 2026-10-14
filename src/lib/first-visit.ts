@@ -15,7 +15,7 @@ const ROOT = /^\/(he|ru|eo)?\/?$/
 // Filtered feed links (shared or bookmarked) must keep landing on the feed.
 const FEED_PARAMS = ['status', 'tags', 'sortBy', 'q', 'page']
 
-export interface RootRedirectInput {
+export interface RootTargetInput {
   pathname: string
   searchParams: URLSearchParams
   hasHomeSeenCookie: boolean
@@ -24,13 +24,13 @@ export interface RootRedirectInput {
 }
 
 /** Pathname of the home-v5 page to serve at the root (without query), or null to serve the page as usual. */
-export function homeV5RedirectPath({
+export function homeV5RootTarget({
   pathname,
   searchParams,
   hasHomeSeenCookie,
   isAuthenticated,
   selfHosted,
-}: RootRedirectInput): string | null {
+}: RootTargetInput): string | null {
   if (selfHosted || isAuthenticated || hasHomeSeenCookie) return null
   const m = ROOT.exec(pathname)
   if (!m) return null
