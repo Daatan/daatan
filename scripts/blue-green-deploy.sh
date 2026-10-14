@@ -132,6 +132,19 @@ echo ""
 echo "🔐 Phase 1b: Ensuring TLS cert renewal loop (certbot) is running..."
 docker compose -f $COMPOSE_FILE up -d certbot || echo "⚠️  Could not start certbot service (continuing deploy)"
 
+# ─── Phase 1c: Converge nginx with the compose file ─────────────────────────────
+# Nothing else ever runs compose for nginx — this script only reloads it — so a
+# changed `nginx:` service block (its log driver, #1788) never reached a running box
+# without a manual `up -d nginx` over SSM. `up -d` is a no-op unless that service's
+# config hash changed, so the usual deploy pays nothing; when it did change, nginx is
+# recreated here (a few seconds of 502s) and the deploy continues.
+# --no-deps: nginx `depends_on: app`, and the app is started by `docker run` below, so
+# without it compose would try to create its own `app` container next to ours.
+# Non-fatal: a failure leaves the existing nginx serving.
+echo ""
+echo "🌐 Phase 1c: Converging nginx with $COMPOSE_FILE..."
+docker compose -f $COMPOSE_FILE up -d --no-deps nginx || echo "⚠️  Could not converge nginx (continuing deploy)"
+
 # ─── Phase 2: Build new image (old container still serving traffic) ─────────────
 echo ""
 echo "🔨 Phase 2: Building new image (old container still serving traffic)..."
@@ -360,6 +373,7 @@ docker run -d \
     "$IMAGE_NAME"
 
 echo "✅ New container started as $CONTAINER_NEW"
+echo "   Log driver: $(docker inspect -f '{{.HostConfig.LogConfig.Type}}' "$CONTAINER_NEW" 2>/dev/null || echo unknown) (expected awslogs; see docs/DEPLOYMENT.md)"
 
 # ─── Phase 4: Health check new container ─────────────────────────────────────────
 echo ""

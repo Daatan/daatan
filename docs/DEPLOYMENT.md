@@ -465,9 +465,11 @@ fields @timestamp, @logStream, @message
   group makes `docker run` fail at container start, before the old container is touched.
 - The rollback `docker run` uses bounded `json-file` instead of `awslogs`, so a log-driver
   problem can never leave the site with no container.
-- Nginx and postgres only pick the new driver when their container is recreated
-  (`docker compose -f docker-compose.<env>.yml up -d nginx`); the deploy recreates postgres on
-  its own, nginx needs the manual step.
+- Postgres and nginx pick up a changed `logging:` block automatically: Phase 1 runs
+  `compose up -d <db>` and Phase 1c runs `compose up -d --no-deps nginx` on every deploy.
+  Both are no-ops unless that service's compose config changed; when it did, the container is
+  recreated (postgres: seconds of DB restart; nginx: seconds of 502s). `--no-deps` matters:
+  nginx `depends_on: app`, and the app is started by `docker run`, not by compose.
 
 ---
 
