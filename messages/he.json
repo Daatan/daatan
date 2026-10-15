@@ -1017,7 +1017,7 @@
     "stepPublishTitle": "פרסום",
     "stepPublishDesc": "אישור ופרסום",
     "errClaimMin": "טענת התחזית חייבת להכיל לפחות 10 תווים.",
-    "errRulesRequired": "כללי ההכרעה נדרשים (לפחות 10 תווים).",
+    "errRulesRequired": "כללי ההכרעה נדרשים (לפחות 30 תווים).",
     "errDateFuture": "מועד ההכרעה חייב להיות בעתיד.",
     "errCreateFailed": "יצירת התחזית נכשלה",
     "errPublishFailed": "פרסום התחזית נכשל",

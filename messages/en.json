@@ -1017,7 +1017,7 @@
     "stepPublishTitle": "Publish",
     "stepPublishDesc": "Commit & publish",
     "errClaimMin": "Prediction claim must be at least 10 characters.",
-    "errRulesRequired": "Resolution rules are required (minimum 10 characters).",
+    "errRulesRequired": "Resolution rules are required (minimum 30 characters).",
     "errDateFuture": "Resolution date must be in the future.",
     "errCreateFailed": "Failed to create prediction",
     "errPublishFailed": "Failed to publish prediction",
