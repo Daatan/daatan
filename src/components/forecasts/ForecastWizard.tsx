@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { analytics } from '@/lib/analytics'
 import { localEndOfDay } from '@/lib/utils/date'
+import { MIN_RESOLUTION_RULES_LENGTH } from '@/lib/resolution-rules'
 import {
   Newspaper,
   FileText,
@@ -231,7 +232,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
         setError(t('errClaimMin'))
         return
       }
-      if (!formData.resolutionRules || formData.resolutionRules.trim().length < 10) {
+      if (!formData.resolutionRules || formData.resolutionRules.trim().length < MIN_RESOLUTION_RULES_LENGTH) {
         setCurrentStep(3)
         setError(t('errRulesRequired'))
         return
@@ -355,7 +356,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
         return formData.claimText.length >= 10
       case 3: {
         const dateOk = !!(formData.resolveByDatetime && localEndOfDay(formData.resolveByDatetime) > new Date())
-        const rulesOk = !!(formData.resolutionRules && formData.resolutionRules.trim().length >= 10)
+        const rulesOk = !!(formData.resolutionRules && formData.resolutionRules.trim().length >= MIN_RESOLUTION_RULES_LENGTH)
         const optionsOk = formData.outcomeType !== 'MULTIPLE_CHOICE' ||
           (formData.outcomeOptions ?? []).filter(o => o.trim()).length >= 2
         return dateOk && rulesOk && optionsOk

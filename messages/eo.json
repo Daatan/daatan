@@ -1017,7 +1017,7 @@
     "stepPublishTitle": "Publikigi",
     "stepPublishDesc": "Konfirmi kaj publikigi",
     "errClaimMin": "La prognoza aserto devas havi almenaŭ 10 signojn.",
-    "errRulesRequired": "Solvaj reguloj estas postulataj (minimume 10 signoj).",
+    "errRulesRequired": "Solvaj reguloj estas postulataj (minimume 30 signoj).",
     "errDateFuture": "La solvodato devas esti estonta.",
     "errCreateFailed": "Malsukcesis krei prognozon",
     "errPublishFailed": "Malsukcesis publikigi prognozon",

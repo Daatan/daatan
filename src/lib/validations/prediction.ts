@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import { MAX_FORECAST_TAGS, MAX_TAG_LENGTH, normalizeForecastTags } from '@/lib/forecast-tags'
+import { MIN_RESOLUTION_RULES_LENGTH } from '@/lib/resolution-rules'
+
+export { MIN_RESOLUTION_RULES_LENGTH }
 
 // Normalised before the cap is checked, so an over-long list (e.g. an LLM-drafted
 // express forecast, #1787) is trimmed to the cap instead of failing the whole forecast.
@@ -57,7 +60,7 @@ export const createPredictionSchema = z.object({
   outcomePayload: z.record(z.string(), z.unknown()).optional(),
 
   // Resolution (resolutionRules optional for drafts — enforced at publish time)
-  resolutionRules: z.string().min(10, 'Resolution rules must be at least 10 characters').max(2000).optional(),
+  resolutionRules: z.string().trim().min(MIN_RESOLUTION_RULES_LENGTH, `Resolution rules must be at least ${MIN_RESOLUTION_RULES_LENGTH} characters`).max(2000).optional(),
   resolveByDatetime: z.string().datetime(),
 
   // Tags (0–MAX_FORECAST_TAGS, preferably from STANDARD_TAGS)
@@ -111,7 +114,8 @@ export const updatePredictionSchema = z.object({
   claimText: z.string().min(10).max(500).optional(),
   detailsText: z.string().max(5000).optional().nullable(),
   outcomePayload: z.record(z.string(), z.unknown()).optional(),
-  resolutionRules: z.string().max(2000).optional().nullable(),
+  // null clears the rules (draft); a non-empty value must still be a real criterion (#1873)
+  resolutionRules: z.string().trim().min(MIN_RESOLUTION_RULES_LENGTH, `Resolution rules must be at least ${MIN_RESOLUTION_RULES_LENGTH} characters`).max(2000).optional().nullable(),
   resolveByDatetime: z.string().datetime().optional(),
   tags: forecastTagsSchema.optional(),
   isPublic: z.boolean().optional(),

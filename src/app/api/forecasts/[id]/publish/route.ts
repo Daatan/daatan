@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { getForecastById, publishForecast } from '@/lib/services/forecast'
 import { notifyForecastPublished } from '@/lib/services/telegram'
+import { MIN_RESOLUTION_RULES_LENGTH } from '@/lib/resolution-rules'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,8 +28,8 @@ export const POST = withAuth(async (_request, user, { params }) => {
       return apiError('Claim text must be at least 10 characters', 400)
     }
 
-    if (!prediction.resolutionRules || prediction.resolutionRules.length < 10) {
-      return apiError('Resolution rules are required to publish (minimum 10 characters)', 400)
+    if (!prediction.resolutionRules || prediction.resolutionRules.trim().length < MIN_RESOLUTION_RULES_LENGTH) {
+      return apiError(`Resolution rules are required to publish (minimum ${MIN_RESOLUTION_RULES_LENGTH} characters)`, 400)
     }
 
     if (prediction.resolveByDatetime <= new Date()) {
