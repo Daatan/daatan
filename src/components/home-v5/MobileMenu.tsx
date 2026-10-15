@@ -8,14 +8,15 @@ import type { HomeLinks } from './links'
 
 interface Props {
   links: HomeLinks
+  signedIn: boolean
   items: { href: string; label: string }[]
   labels: Record<
-    'menu' | 'close' | 'search' | 'searchPlaceholder' | 'nav' | 'create' | 'login' | 'contact' | 'privacy' | 'terms' | 'home',
+    'menu' | 'close' | 'search' | 'searchPlaceholder' | 'nav' | 'create' | 'login' | 'profile' | 'contact' | 'privacy' | 'terms' | 'home',
     string
   >
 }
 
-export default function MobileMenu({ links, items, labels }: Props) {
+export default function MobileMenu({ links, items, signedIn, labels }: Props) {
   const [open, setOpen] = useState(false)
   const openerRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -114,10 +115,10 @@ export default function MobileMenu({ links, items, labels }: Props) {
               {labels.create}
             </Link>
             <Link
-              href={links.login}
+              href={signedIn ? links.profile : links.login}
               className="flex h-[54px] items-center justify-center rounded-lg border border-[var(--hv5-accent-2)] text-lg font-bold text-[#dce8f7] no-underline"
             >
-              {labels.login}
+              {signedIn ? labels.profile : labels.login}
             </Link>
             <div className="mt-2.5 flex justify-center gap-7 text-[15px] text-[var(--hv5-muted)]">
               <Link href={links.contact} className="py-1.5 text-[var(--hv5-muted)]">{labels.contact}</Link>

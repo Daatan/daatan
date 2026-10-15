@@ -1,3 +1,4 @@
+import { auth } from '@/auth'
 import { HomeSeenMarker } from '@/components/HomeSeenMarker'
 import { JsonLd } from '@/components/JsonLd'
 import { getAppUrl } from '@/lib/branding'
@@ -20,11 +21,12 @@ export default async function HomeV5({ locale }: { locale: Locale }) {
   // Which examples are shown is configured in ./examples.ts; a card with no data is not rendered.
   const forecast = await getFeaturedForecast(locale)
   const source = getFeaturedSource(locale)
+  const signedIn = Boolean((await auth())?.user)
   return (
     <div dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale} className="hv5 min-h-screen bg-[var(--hv5-bg)] font-sans text-[var(--hv5-ink)] antialiased">
       <JsonLd data={siteJsonLd} />
       <HomeSeenMarker />
-      <Header locale={locale} links={links} />
+      <Header locale={locale} links={links} signedIn={signedIn} />
       <div>
         <Hero locale={locale} links={links} />
         <TwoUses locale={locale} links={links} forecast={forecast} source={source} />

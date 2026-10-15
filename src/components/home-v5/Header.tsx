@@ -6,7 +6,7 @@ import MobileMenu from './MobileMenu'
 import { CONTAINER } from './ui'
 import type { HomeLinks } from './links'
 
-export default async function Header({ locale, links }: { locale: string; links: HomeLinks }) {
+export default async function Header({ locale, links, signedIn }: { locale: string; links: HomeLinks; signedIn: boolean }) {
   const t = await getTranslations({ locale, namespace: 'HomeV5.nav' })
   const tf = await getTranslations({ locale, namespace: 'HomeV5.footer' })
   const items = [
@@ -30,6 +30,7 @@ export default async function Header({ locale, links }: { locale: string; links:
         <MobileMenu
           links={links}
           items={items}
+          signedIn={signedIn}
           labels={{
             menu: t('menu'),
             close: t('closeMenu'),
@@ -38,6 +39,7 @@ export default async function Header({ locale, links }: { locale: string; links:
             nav: t('label'),
             create: t('create'),
             login: t('login'),
+            profile: t('profile'),
             contact: tf('contact'),
             privacy: tf('privacy'),
             terms: tf('terms'),
@@ -58,8 +60,11 @@ export default async function Header({ locale, links }: { locale: string; links:
           <Link href={links.forecasts} aria-label={t('search')} className="flex h-11 w-11 items-center justify-center text-[var(--hv5-body)] hover:text-white">
             <Search className="h-[22px] w-[22px]" strokeWidth={1.75} aria-hidden="true" />
           </Link>
-          <Link href={links.login} className="text-base font-medium text-[var(--hv5-body)] no-underline hover:text-white">
-            {t('login')}
+          <Link
+            href={signedIn ? links.profile : links.login}
+            className="text-base font-medium text-[var(--hv5-body)] no-underline hover:text-white"
+          >
+            {signedIn ? t('profile') : t('login')}
           </Link>
           <Link
             href={links.create}
