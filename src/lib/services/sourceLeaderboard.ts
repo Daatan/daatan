@@ -32,6 +32,25 @@ export interface SourceLeaderboardResult {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
+/**
+ * Domains that are the same outlet under two hostnames. The board is keyed by the raw
+ * `outlet_name` string, so without this ynet.co.il and ynetnews.com (daatan#1875) are ranked
+ * as two thin outlets instead of one. Keyed on the variant, valued with the canonical name
+ * (the one carrying more resolved predictions at the time of writing).
+ */
+const OUTLET_ALIASES: Record<string, string> = {
+  'ynetnews.com': 'ynet.co.il',
+  'aljazeera.com': 'aljazeera.net',
+  'yahoo.com': 'finance.yahoo.com',
+  'bbc.co.uk': 'bbc.com',
+}
+
+export function canonicalOutlet(name: string): string
+export function canonicalOutlet(name: string | null): string | null
+export function canonicalOutlet(name: string | null): string | null {
+  return name === null ? null : (OUTLET_ALIASES[name] ?? name)
+}
+
 function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
   return {
     id: e.id,
@@ -56,9 +75,10 @@ function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
 export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLeaderboardRow[] {
   const groups = new Map<string, OracleAuthorShadowEntry[]>()
   for (const e of entries) {
-    const list = groups.get(e.outlet_name) ?? []
+    const key = canonicalOutlet(e.outlet_name)
+    const list = groups.get(key) ?? []
     list.push(e)
-    groups.set(e.outlet_name, list)
+    groups.set(key, list)
   }
 
   const rows: OutletLeaderboardRow[] = []
@@ -131,6 +151,6 @@ export async function getSourceLeaderboard(
  */
 export async function getAuthorShadowRowsForOutlet(outletName: string): Promise<AuthorLeaderboardRow[]> {
   const data = await getAuthorShadowLeaderboard({ source: 'admin-outlet-detail' })
-  const entries = (data?.authors ?? []).filter(e => e.outlet_name === outletName)
+  const entries = (data?.authors ?? []).filter(e => canonicalOutlet(e.outlet_name) === canonicalOutlet(outletName))
   return sortRows(entries.map(toAuthorRow), 'skillConservative')
 }

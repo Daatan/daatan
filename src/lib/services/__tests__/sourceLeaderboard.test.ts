@@ -28,6 +28,28 @@ function entry(overrides: Partial<OracleAuthorShadowEntry>): OracleAuthorShadowE
   }
 }
 
+describe('outlet domain aliases', () => {
+  it('rolls ynetnews.com into ynet.co.il and keeps unrelated outlets apart', () => {
+    const rows = aggregateByOutlet([
+      entry({ author: 'A', outlet_name: 'ynet.co.il', predictions: 3 }),
+      entry({ author: 'B', outlet_name: 'ynetnews.com', predictions: 1 }),
+      entry({ author: 'C', outlet_name: 'jpost.com', predictions: 2 }),
+    ])
+    const ynet = rows.find(r => r.outletName === 'ynet.co.il')
+    expect(ynet).toMatchObject({ predictions: 4, authorCount: 2 })
+    expect(rows.some(r => r.outletName === 'ynetnews.com')).toBe(false)
+    expect(rows).toHaveLength(2)
+  })
+
+  it('outlet detail lookup by canonical name includes the alias rows', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [entry({ author: 'A', outlet_name: 'ynet.co.il' }), entry({ author: 'B', outlet_name: 'ynetnews.com' })],
+    })
+    expect(await getAuthorShadowRowsForOutlet('ynet.co.il')).toHaveLength(2)
+  })
+})
+
 describe('aggregateByOutlet', () => {
   it('weights brier_score and skill_conservative by each author\'s predictions', () => {
     const entries = [
