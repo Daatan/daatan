@@ -10,7 +10,7 @@ vi.mock('next/image', () => ({
 
 const labels = {
   menu: 'Menu', close: 'Close', search: 'Search', searchPlaceholder: 'Find', nav: 'Main',
-  create: 'Create', login: 'Sign in', contact: 'Contact', privacy: 'Privacy', terms: 'Terms', home: 'Home',
+  create: 'Create', login: 'Sign in', profile: 'My profile', contact: 'Contact', privacy: 'Privacy', terms: 'Terms', home: 'Home',
 }
 
 describe('home-v5 links', () => {
@@ -21,10 +21,16 @@ describe('home-v5 links', () => {
     expect(localePath('he', '/')).toBe('/he')
   })
 
+  it('points Sources at the source leaderboard and Elections at the elections app', () => {
+    const links = buildLinks('en')
+    expect(links.sources).toBe('/leaderboard/sources')
+    expect(links.elections).toBe('https://elections.daatan.com')
+  })
+
   it('has no placeholder hrefs', () => {
     for (const locale of ['en', 'he', 'ru', 'eo'] as const) {
       for (const href of Object.values(buildLinks(locale))) {
-        expect(href).toMatch(/^\//)
+        expect(href).toMatch(/^(\/|https:\/\/elections\.daatan\.com$)/)
         expect(href).not.toBe('#')
       }
     }
@@ -36,7 +42,7 @@ describe('MobileMenu', () => {
   const items = [{ href: links.forecasts, label: 'Forecasts' }]
 
   it('opens, exposes nav and closes on Escape', () => {
-    render(<MobileMenu links={links} items={items} labels={labels} />)
+    render(<MobileMenu links={links} items={items} signedIn={false} labels={labels} />)
     const opener = screen.getByRole('button', { name: 'Menu' })
     expect(opener).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(opener)
@@ -46,8 +52,15 @@ describe('MobileMenu', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('shows the profile link instead of sign-in when signed in', () => {
+    render(<MobileMenu links={links} items={items} signedIn labels={labels} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    expect(screen.getByRole('link', { name: 'My profile' })).toHaveAttribute('href', '/profile')
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument()
+  })
+
   it('has no axe violations when open', async () => {
-    const { container } = render(<MobileMenu links={links} items={items} labels={labels} />)
+    const { container } = render(<MobileMenu links={links} items={items} signedIn={false} labels={labels} />)
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
     expect(await axe(container)).toHaveNoViolations()
   })

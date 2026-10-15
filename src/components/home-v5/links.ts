@@ -16,9 +16,10 @@ export function buildLinks(locale: Locale) {
   return {
     home: p('/'),
     forecasts: p('/forecasts'),
-    // No /sources index page yet (tracked in #1840) — the source leaderboard is the closest.
-    sources: '/leaderboard',
-    elections: '/elections',
+    sources: '/leaderboard/sources',
+    // Separate app, same URL as the sidebar's Elections item; /elections here is only the internal matrix.
+    elections: 'https://elections.daatan.com',
+    profile: '/profile',
     retro: '/retroanalysis',
     howItWorks: p('/methodology'),
     about: p('/about'),
