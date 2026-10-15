@@ -100,9 +100,9 @@ export const analyses: AnalysisData[] = [
   },
   {
     id: 'energy-2022',
-    tag: 'CASE E03 · 280 RATED STATEMENTS',
+    tag: 'CASE E03 · 264 RATED ARTICLES',
     title: 'Who Saw $120 Oil and €200 Gas',
-    description: 'The six months before the February 2022 invasion. Every statement was rated separately on two questions: would Brent settle at or above $120 and would TTF gas settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022. Agencies mostly expected oil well below the line; the press expected a gas spike but rarely named a number. P is the probability a speaker expressed, from 0 to 1, and the two markets are never combined.',
+    description: 'The six months before the February 2022 invasion. Every article was rated separately on two questions: would Brent settle at or above $120 and would TTF gas settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022. Agencies mostly expected oil well below the line; the press expected a gas spike but rarely named a number. Most ratings are directional readings, not calibrated probabilities. P is the probability a speaker expressed, from 0 to 1, and the two markets are never combined.',
     reportHref: '/retroanalysis/energy-2022',
     leftColumn: {
       label: 'ABOVE THE LINE',
@@ -111,9 +111,9 @@ export const analyses: AnalysisData[] = [
       color: 'teal',
       items: [
         { source: 'BUSINESS INSIDER', headline: 'JPMorgan, bank', date: 'Jan 21, 2022', quote: 'International oil prices could soar to $150 a barrel during the first quarter of 2022 if an ongoing conflict between Russia and Ukraine leads to a supply shock.' },
-        { source: 'NPR', headline: 'Jeffrey Halley, Oanda', date: 'Feb 22, 2022', quote: 'The immediate impact would be an exacerbation of the rampant inflationary pressures globally as oil hits $130.00+ a barrel.' },
+        { source: 'NPR', headline: 'Jeffrey Halley, Oanda (if Russia invades in full)', date: 'Feb 22, 2022', quote: 'The immediate impact would be an exacerbation of the rampant inflationary pressures globally as oil hits $130.00+ a barrel.' },
         { source: 'ROSSIYSKAYA GAZETA', headline: 'Alexey Miller, head of Gazprom', date: 'Sep 17, 2021', quote: 'The price of gas in Europe may break the already achieved records in the near future.' },
-        { source: 'CNN ARABIC', headline: 'Dmitry Medvedev, Russian Security Council', date: 'Feb 22, 2022', quote: 'Welcome to the new brave world where Europeans will soon pay 2,000 euros for 1,000 cubic meters of natural gas.' },
+        { source: 'OILPRICE', headline: 'Samantha Dart, Goldman Sachs', date: 'Jan 25, 2022', quote: "We wouldn't rule out in this scenario the market briefly revisiting the 180 EUR/MWh high observed in mid-December - or even higher levels." },
       ]
     },
     rightColumn: {
@@ -123,9 +123,9 @@ export const analyses: AnalysisData[] = [
       color: 'rose',
       items: [
         { source: 'VEDOMOSTI', headline: 'Deutsche Bank, bank', date: 'Dec 01, 2021', quote: 'Oil price may fall below $60 per barrel next year due to a significant increase in supply.' },
-        { source: 'EIA', headline: 'U.S. Energy Information Administration', date: 'Jan 14, 2022', quote: 'We forecast that the price of Brent will average $75/b in 2022 and $68/b in 2023.' },
-        { source: 'FXSTREET', headline: 'ABN Amro, bank', date: 'Jan 27, 2022', quote: 'The TTF monthly contracts could trade above EUR 200/MWh for an extended period... Oil prices would be trading above $100/bbl.' },
-        { source: 'TASS', headline: 'Gazprom, press office', date: 'Sep 07, 2021', quote: 'Gas prices in Europe will definitely remain at the current level in the near future.' },
+        { source: 'EIA', headline: 'U.S. Energy Information Administration', date: 'Jan 12, 2022', quote: 'We forecast that the price of Brent will average $75/b in 2022 and $68/b in 2023.' },
+        { source: 'FXSTREET', headline: 'ABN Amro, bank', date: 'Jan 27, 2022', quote: 'The TTF monthly contracts could trade above EUR 200/MWh for an extended period... Oil prices would be trading above $100/bbl. [ABN Amro put the scenario of a halt in Russian gas exports at 5-10%.]' },
+        { source: 'TASS', headline: 'Alexander Ivannikov, Gazprom department head', date: 'Sep 07, 2021', quote: 'Gas prices in Europe will definitely remain at the current level in the near future.' },
       ]
     }
   }

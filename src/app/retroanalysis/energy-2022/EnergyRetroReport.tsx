@@ -23,7 +23,7 @@ const REGION_NAME: Record<Region, string> = {
 }
 const LEG_FIELD: Record<Leg, 'pb' | 'pt'> = { brent: 'pb', ttf: 'pt' }
 const LEG_TITLE: Record<Leg, string> = { brent: 'Brent ≥ $120', ttf: 'TTF > €200/MWh' }
-const LEG_UNIT: Record<Leg, string> = { brent: 'ICE, $/bbl', ttf: 'EUR/MWh' }
+const LEG_UNIT: Record<Leg, string> = { brent: 'front-month, $/bbl', ttf: 'EUR/MWh' }
 const THRESHOLD: Record<Leg, number> = { brent: 120, ttf: 200 }
 const THRESHOLD_LABEL: Record<Leg, string> = { brent: '$120', ttf: '€200' }
 const SIDE_LABEL: Record<Side, string> = { high: 'above threshold', uncertain: 'uncertain', low: 'does not expect' }
@@ -37,32 +37,33 @@ interface Voice { n: number; name: string; role: string; note: string }
 const CARDS: Record<Leg, { hit: Voice[]; miss: Voice[] }> = {
   brent: {
     hit: [
-      { n: 174, name: 'JPMorgan', role: 'bank, via Business Insider', note: 'A conditional scenario, but with a number: $150. Published five weeks before the invasion.' },
-      { n: 222, name: 'Jeffrey Halley', role: 'Oanda, via NPR', note: 'Two days before the invasion. Brent did close above $120 on 7 March.' },
+      { n: 160, name: 'JPMorgan', role: 'bank, via Business Insider', note: 'A conditional scenario, but with a number: $150. Published five weeks before the invasion.' },
+      { n: 206, name: 'Jeffrey Halley', role: 'Oanda, via NPR', note: 'Conditional on a full-scale invasion of Ukraine, said two days before it. Brent did close at or above $120 on 7 March.' },
     ],
     miss: [
-      { n: 132, name: 'Deutsche Bank', role: 'bank, via Vedomosti', note: 'The lowest target in the corpus. Three months later Brent cost about $120.' },
-      { n: 166, name: 'EIA', role: 'US Department of Energy', note: 'The official forecast six weeks before the invasion. Brent averaged about $100 in 2022.' },
+      { n: 120, name: 'Deutsche Bank', role: 'bank, via Vedomosti', note: 'Among the lowest targets in the corpus ($60, shared with Standard Chartered and Moody’s). About fourteen weeks later Brent closed above $120.' },
+      { n: 152, name: 'EIA', role: 'US Department of Energy', note: 'The official forecast six weeks before the invasion. Brent averaged about $100 in 2022.' },
     ],
   },
   ttf: {
     hit: [
-      { n: 11, name: 'Alexey Miller', role: 'head of Gazprom, via Rossiyskaya Gazeta', note: 'The seller of the gas is speaking, and gives no number. P is high on direction, not on level.' },
-      { n: 221, name: 'Dmitry Medvedev', role: 'Russian Security Council, via CNN Arabic', note: 'A threat and a forecast in one: EUR 2,000 per 1,000 m³ is roughly EUR 190/MWh, right at the threshold. Two weeks later it was crossed.' },
+      { n: 8, name: 'Alexey Miller', role: 'head of Gazprom, via Rossiyskaya Gazeta', note: 'The seller of the gas is speaking, and gives no number. P is high on direction, not on level.' },
+      { n: 164, name: 'Samantha Dart', role: 'Goldman Sachs, via OilPrice', note: 'A scenario view on possible flow disruption. €180 was the December high; the €200 line was crossed six weeks later.' },
     ],
     miss: [
-      { n: 181, name: 'ABN Amro', role: 'bank, via FXStreet', note: 'The right level, but the bank put the "Russia halts gas exports" scenario at 5-10%. The threshold was crossed without any halt.' },
-      { n: 7, name: 'Gazprom', role: 'press office, via TASS', note: 'Three and a half months later, on 21 December, TTF closed at EUR 180, three times higher.' },
+      { n: 167, name: 'ABN Amro', role: 'bank, via FXStreet', note: 'The right level, but the bank put the "Russia halts gas exports" scenario at 5-10%. The threshold was crossed without any halt.' },
+      { n: 5, name: 'Alexander Ivannikov', role: 'Gazprom department head, via TASS', note: 'Three and a half months later, on 21 December, TTF closed at EUR 180, three times higher.' },
     ],
   },
 }
 
 const GAPS = [
-  'Bloomberg, the Financial Times and the Wall Street Journal are barely represented: those sites did not appear in GDELT for the topic, and what exists in Wayback is mostly paywalled.',
-  'Texts of 179 table articles come from live pages and 48 from the Wayback archive before 25 February. Live pages may have been edited, so articles with traces of later edits were dropped.',
+  'Bloomberg, the Financial Times and the Wall Street Journal are barely represented: those sites barely appeared in GDELT for the topic, and what exists in Wayback is mostly paywalled.',
+  'Texts of 166 table articles come from live pages and 45 from the Wayback archive before 25 February. Live pages may have been edited, so articles with traces of later edits were dropped.',
   'Most articles name neither a price nor a probability. For them P is the model’s reading: “the winter will be very hard” gives clearly above 0.5, but does not prove the author had EUR 200 in mind. P should not be read as a calibrated probability.',
-  'Ratings were set by a model. It sometimes mixes up the market (US gas instead of European) or takes a conditional scenario for a forecast. We manually removed clear US-gas cases and checked the cards above.',
-  'Brent here is the ICE front-month future. Dated Brent spot on the same day, 8 March, was above $130, so a $130 threshold was not unambiguous; we used $120.',
+  'Ratings were set by a model. It sometimes mixes up the market (US gas instead of European) or takes a conditional scenario for a forecast. We removed by hand 12 articles whose TTF rating rested on US gas and 4 that held no forecast; other cases may remain. An independent check of 44 random rows against their texts found a defect in about half (95% CI 34-62%), a quarter of them changing what the dot says.',
+  'The price bands in the method are guidance for the model, not a mechanical formula: for a share of priced ratings P sits further from the band than the tone allowance permits (in the audit: 36% of priced Brent legs, before the clean-up). In the audit, recomputing P strictly by the rule lowered the Brent “expect above” share from about 28% to 17% and the TTF share from 62% to 54% (the TTF figure is from before the US-gas clean-up). Read the shares as direction, not as calibrated probabilities.',
+  'Brent here is the front-month future (Yahoo Finance BZ=F). Dated Brent spot on the same day, 8 March, was above $130, so a $130 threshold was not unambiguous; we used $120.',
 ]
 
 interface Agg { n: number; p: number; y: number; u: number; no: number }
@@ -129,8 +130,8 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
             Who saw <span className="text-rose-700">$120 oil</span> and <span className="text-rose-700">€200 gas</span>
           </h1>
           <p className="mt-5 max-w-2xl text-base md:text-lg text-gray-700 leading-relaxed">
-            Six months before the invasion: {pool.length} statements by banks, agencies, companies and the press on oil and European gas prices.
-            Each was read in full and rated separately on two questions: would Brent go above $120, and would TTF go above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022.
+            Six months before the invasion: {pool.length} rated articles that quote banks, agencies, companies and the press on oil and European gas prices.
+            Each was read in full and rated separately on two questions: would Brent settle at or above $120, and would TTF settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022.
           </p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-2 border-gray-900 border-b border-gray-200">
             {thesis.map(([who, big, unit, text, color], i) => (
@@ -149,7 +150,7 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">What happened next</h2>
-          <p className="mt-2 max-w-2xl text-gray-700">The black line is the front-month futures price: Brent (ICE) and TTF. The red dashed line is the question threshold. The grey band is the window in which we collected statements; whatever lies to the right, the authors did not yet know.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">The black line is the front-month futures price: Brent and TTF (Yahoo Finance series BZ=F and TTF=F). The red dashed line is the question threshold. The grey band is the window in which we collected statements; whatever lies to the right, the authors did not yet know.</p>
           <div className="mt-5 space-y-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
             {LEGS.map(l => (
               <div key={l}>
@@ -158,7 +159,7 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-gray-600">Front-month closing prices (Yahoo Finance, BZ=F and TTF=F). Brent: 11 closes above $120 in 2022, peak $127.98 (8 March). TTF: 30 closes above €200, peak €339 (26 August).</p>
+          <p className="mt-3 text-xs text-gray-600">Front-month closing prices (Yahoo Finance, BZ=F and TTF=F). Brent: 11 closes at or above $120 in 2022, peak $127.98 (8 March). TTF: 30 closes above €200, peak €339 (26 August).</p>
         </section>
 
         <section className="mt-16">
@@ -198,8 +199,8 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Who said yes, who said no</h2>
           <p className="mt-2 max-w-2xl text-gray-700">
-            Shares of positions by type of main voice and by publication language. On oil, {pct(agencyOil.no)} of agency statements ({agencyOil.n}) expected a price below the threshold; banks and the press split almost evenly.
-            On gas the corpus has almost no bank or agency statements ({bankGas} and {agencyGas}); the press did most of the talking, and {pct(pressGas.y)} of the time it expected a spike.
+            Shares of positions by type of main voice and by publication language. On oil, {pct(agencyOil.no)} of agency statements ({agencyOil.n}) expected a price below the threshold; banks and the press were more mixed, though “does not expect” outnumbered “expects above” in both.
+            On gas the corpus has {agencyGas} agency and {bankGas} bank statements; the press did most of the talking ({pressGas.n}), and {pct(pressGas.y)} of the time it expected a spike.
           </p>
           {LEGS.map(l => (
             <div key={l} className="mt-6">
@@ -220,22 +221,22 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{rows.length} articles</h2>
-          <p className="mt-2 max-w-2xl text-gray-700">A sample from the pool: at most 15 articles per outlet and 3 per speaker; sceptics raised to 45% so their arguments are visible. One article can speak about both markets. See <a href="#numbers" className="underline">how to read P</a>.</p>
+          <p className="mt-2 max-w-2xl text-gray-700">A sample from the pool: up to 23 articles per outlet and up to 5 per speaker (the 15 and 3 caps were relaxed to fill the table). Articles rated “does not expect” or “uncertain” on at least one question were filled first: 66% of the table against 66% of the pool. One article can speak about both markets. See <a href="#numbers" className="underline">how to read P</a>.</p>
           <ArticleTable rows={rows} />
         </section>
 
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">How this was computed</h2>
           <div className="mt-5 grid gap-x-10 gap-y-6" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
-            <Method title="Search">A list of 146 domains: business and energy press, agencies, banks, think tanks, and Russian-language and European outlets. GDELT GKG via BigQuery returned 12,537 URLs with energy headlines. Bloomberg, the Financial Times and the Wall Street Journal did not turn up in GDELT for these topics.</Method>
-            <Method title="Filter">Keywords and Claude Haiku on headlines: 2,551 candidates were narrowed to 817. Full texts were downloaded; 498 got a rating. We dropped irrelevant items, articles that only describe prices, and articles with traces of edits after 24 February. Dates were checked against the page itself for every year, not only 2021-2022.</Method>
-            <Method title="Rating" formula="P = 0.5 + 0.5 × position">The model reads the text as of the publication date and returns the main voice&apos;s position from −1 to +1 separately for each question. When a price is named, a fixed rule applies: for example a Brent forecast below $90 gives −0.6, $105-119 gives −0.1, $130 and above gives +0.6; the article&apos;s tone shifts it by at most 0.2. If the speaker stated a probability, that is used.</Method>
+            <Method title="Search">A list of 146 domains: business and energy press, agencies, banks, think tanks, and Russian-language and European outlets. GDELT GKG via BigQuery returned 12,432 distinct URLs with energy headlines. Bloomberg, the Financial Times and the Wall Street Journal were barely represented in GDELT for these topics (6 rows, 1 usable article).</Method>
+            <Method title="Filter">Keywords and Claude Haiku on headlines: 2,551 candidates were narrowed to 817. Full texts were downloaded; 496 got a rating. We dropped irrelevant items, articles that only describe prices, and articles with traces of edits after 24 February. Dates were checked against the page itself for every year, not only 2021-2022.</Method>
+            <Method title="Rating" formula="P = 0.5 + 0.5 × position">The model reads the text as of the publication date and returns the main voice&apos;s position from −1 to +1 separately for each question. When a price is named, a fixed rule applies: for example a Brent forecast below $90 gives −0.6, $105-119 gives −0.1, $130 and above gives +0.6; the article&apos;s tone shifts it by at most 0.2. If the speaker stated a probability, that is used. For a range, the highest price the speaker treats as likely is used.</Method>
             <Method title="Whose voice">P belongs to the article&apos;s main voice, not to the outlet or the author: a TASS item on Gazprom&apos;s words gets Gazprom&apos;s P. P of 0.6 or more is “expects above the threshold”, P of 0.4 or less is “does not expect”.</Method>
           </div>
           <h3 className="mt-10 text-lg font-extrabold text-gray-900">What is missing</h3>
           <ul className="mt-2 list-disc pl-5 space-y-1.5 text-gray-700 max-w-3xl">
             {GAPS.map(g => <li key={g}>{g}</li>)}
-            <li>{unverified} of {rows.length} quotes were not found verbatim in the text. These are the model&apos;s paraphrase and are marked in the table.</li>
+            <li>The opening (first 120 characters) of {unverified} of {rows.length} quotes was not found in the text; they are marked in the table. A further 57 quotes are excerpts from two places in an article stitched with “...”; 113 quotes in all are not fully verbatim.</li>
           </ul>
         </section>
 
@@ -249,7 +250,7 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
 const SCALE_MARKS: [number, string][] = [
   [0.2, 'EIA: $75'],
   [0.5, 'No view'],
-  [0.75, 'JPMorgan: $150'],
+  [0.9, 'JPMorgan: $150'],
 ]
 
 function NumbersGuide() {
@@ -266,7 +267,7 @@ function NumbersGuide() {
           <div className="relative mt-14 mb-12 mx-2">
             <div className="h-2 rounded-full bg-gradient-to-r from-rose-500 via-gray-300 to-teal-600" />
             {SCALE_MARKS.map(([p, who], i) => (
-              <div key={who} className={`absolute flex flex-col w-40 whitespace-nowrap -translate-x-1/2 items-center text-center ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
+              <div key={who} className={`absolute flex flex-col w-40 whitespace-nowrap ${p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
                 <span className="w-px h-2.5 bg-gray-500" />
                 <span className="font-mono text-[11px] text-gray-900 font-medium">{p.toFixed(2)} {who}</span>
               </div>
@@ -326,7 +327,7 @@ function VoiceColumn({ title, range, tone, voices, leg, byN }: { title: string; 
         return (
           <article key={v.n} className="grid grid-cols-[64px_1fr] gap-x-4 py-4 border-b border-gray-200">
             <div className={`row-span-3 text-2xl font-black tabular-nums ${tone === 'hit' ? 'text-teal-700' : 'text-rose-700'}`}>
-              {p == null ? '—' : p.toFixed(2)}
+              {p == null ? '—' : (Math.round(p * 100) / 100).toFixed(2)}
               <span className="block mt-1 font-mono text-[10px] font-normal text-gray-500">P</span>
             </div>
             <div className="font-mono text-xs text-gray-500">{r.date.split('-').reverse().join('.')} · <a href={r.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-700">{r.domain}</a></div>
@@ -483,7 +484,7 @@ function PBar({ p, price, unit }: { p: number | null; price: number | null; unit
         <span className="relative w-16 h-1.5 bg-gray-100 rounded"><span className="absolute inset-y-0 left-0 rounded bg-gray-700" style={{ width: `${p * 100}%` }} /><span className="absolute -inset-y-0.5 left-1/2 w-px bg-gray-400" /></span>
         <span className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-medium ${SIDE_PILL[s]}`}>{p.toFixed(2)}</span>
       </div>
-      {price != null && <div className="mt-0.5 font-mono text-xs text-gray-500">price estimate: {price} {unit}</div>}
+      {price != null && <div className="mt-0.5 font-mono text-xs text-gray-500">price estimate: {unit === '$' ? `$${price}` : `€${price}`}</div>}
     </div>
   )
 }
