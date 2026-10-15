@@ -20,6 +20,7 @@ export default function RetroanalysisPage() {
     switch (id) {
       case 'ukraine-2022': return 'Ukraine 2022'
       case 'israel-2022': return 'Israel 2022'
+      case 'energy-2022': return 'Energy 2022'
       default: return id
     }
   }
