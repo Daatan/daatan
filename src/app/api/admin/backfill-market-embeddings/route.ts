@@ -11,14 +11,15 @@ const BATCH_SIZE = 10
  * POST /api/admin/backfill-market-embeddings
  * Generates and stores embeddings for all external_markets rows that lack one —
  * chiefly the rows written before daatan#1640 fixed the write path, which have
- * been sitting NULL since the column was added. Mirrors
+ * been sitting NULL since the column was added. Kalshi rows are excluded (its
+ * Data ToU prohibits ML/AI use of market data, retro#937). Mirrors
  * /api/admin/backfill-embeddings. Idempotent — safe to run multiple times.
  */
 export const POST = withAuth(async () => {
   const started = Date.now()
 
   const missing = await prisma.$queryRaw<{ id: string; question: string }[]>`
-    SELECT id, question FROM external_markets WHERE embedding IS NULL
+    SELECT id, question FROM external_markets WHERE embedding IS NULL AND provider <> 'KALSHI'
   `
 
   log.info({ total: missing.length }, 'Backfill market embeddings started')

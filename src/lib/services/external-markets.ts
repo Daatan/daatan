@@ -748,10 +748,13 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
   }
 
   // Fire-and-forget, same pattern as embedAndStoreLatentNode's caller — a failed
-  // embed shouldn't fail the market link/sync itself (daatan#1640).
-  embedAndStoreExternalMarket(market.id, m.question).catch(err =>
-    log.error({ err, marketId: market.id }, 'Failed to embed external market')
-  )
+  // embed shouldn't fail the market link/sync itself (daatan#1640). Kalshi is
+  // skipped: its Data ToU prohibits any ML/AI use of market data (retro#937).
+  if (m.provider !== 'KALSHI') {
+    embedAndStoreExternalMarket(market.id, m.question).catch(err =>
+      log.error({ err, marketId: market.id }, 'Failed to embed external market')
+    )
+  }
 
   return market
 }
