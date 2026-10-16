@@ -35,7 +35,7 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 **Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above — its direct-Gemini legs still use the Developer API key (`GEMINI_API_KEY`), not Vertex, so where that key is unset (daatan.com since #1472) bots run on OpenRouter alone.
 
-**The AI panel (LASSO)** does not use this chain either: `src/lib/llm/panel/client.ts` calls each roster member (`src/lib/llm/panel/roster.ts`) on its own route — `openrouter`, `bedrock`, or `vertex` (the Gemini member moved from an OpenRouter `google-vertex` pin to direct Vertex in #1600). See [LASSO.md](LASSO.md).
+**The AI panel (LASSO)** does not use this chain either: `src/lib/llm/panel/client.ts` calls each roster member (`src/lib/llm/panel/roster.ts`) on its own route — `openrouter`, `bedrock`, or `vertex` (the Gemini member moved from an OpenRouter `google-vertex` pin to direct Vertex in #1600, and from `gemini-2.5-flash` to `gemini-3.5-flash-lite` in #1763 — a non-thinking model is required because Vertex counts thought tokens against the panel's 64-token cap, so the main chain's model choice does not apply to it). See [LASSO.md](LASSO.md).
 
 **The express grounded-date lookup** (`src/lib/llm/groundedDateLookup.ts`, #1706) is also deliberately outside the chain: it needs Gemini's `googleSearch` tool, which no fallback leg has, so it calls Vertex directly and is skipped when Vertex isn't configured. See [Express prediction date grounding](#express-prediction-date-grounding-1086) below.
 
