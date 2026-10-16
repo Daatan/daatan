@@ -324,6 +324,19 @@ describe('resolveMarketByUrl', () => {
     expect(embedAndStoreExternalMarket).toHaveBeenCalledWith('m1', 'Will X happen?')
   })
 
+  it('does not embed Kalshi markets (Kalshi Data ToU, retro#937)', async () => {
+    global.fetch = kalshiFetchMock({
+      market: kalshiRow(),
+      event: { event_ticker: 'KXFED-27APR', series_ticker: 'KXFED' },
+    })
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'k1' } as never)
+
+    await resolveMarketByUrl('https://kalshi.com/markets/KXFED-27APR-T4.25')
+
+    expect(prisma.externalMarket.upsert).toHaveBeenCalled()
+    expect(embedAndStoreExternalMarket).not.toHaveBeenCalled()
+  })
+
   it('does not let a failed embed fail the market resolution', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow()]))
     vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)

@@ -31,7 +31,7 @@ Request body includes `outputDimensionality: 768`. The 768-dim output matches th
 
 The text being embedded is the prediction's `claimText` alone (`embedAndStoreForecast(id, claimText)` — every call site passes only the claim).
 
-The same `embedText()` also fills the other two `vector(768)` columns, in the same vector space: `latent_nodes.embedding` from `text_en` (`embedAndStoreLatentNode`, on admin create) and `external_markets.embedding` from the market `question` (`embedAndStoreExternalMarket`; backfill via `POST /api/admin/backfill-market-embeddings`, ADMIN, batches of 10, `embedding IS NULL` only). Only `predictions.embedding` has an HNSW index. Besides similar-forecasts, `predictions.embedding` is read by the Oracle 2.0 relation typer's candidate-pair search (`src/lib/services/relation-typer.ts`).
+The same `embedText()` also fills the other two `vector(768)` columns, in the same vector space: `latent_nodes.embedding` from `text_en` (`embedAndStoreLatentNode`, on admin create) and `external_markets.embedding` from the market `question` (`embedAndStoreExternalMarket`, Polymarket only — Kalshi rows are never embedded, its Data ToU prohibits ML/AI use of market data (retro#937); backfill via `POST /api/admin/backfill-market-embeddings`, ADMIN, batches of 10, `embedding IS NULL` only). Only `predictions.embedding` has an HNSW index. Besides similar-forecasts, `predictions.embedding` is read by the Oracle 2.0 relation typer's candidate-pair search (`src/lib/services/relation-typer.ts`).
 
 Required env: all three of `GOOGLE_VERTEX_PROJECT_ID` / `GOOGLE_VERTEX_CLIENT_EMAIL` /
 `GOOGLE_VERTEX_PRIVATE_KEY` (optional `GOOGLE_VERTEX_LOCATION`, default `global`) — or, on **self-host**, `GEMINI_API_KEY` instead (a
