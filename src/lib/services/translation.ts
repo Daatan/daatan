@@ -5,6 +5,7 @@ import { createLogger } from '@/lib/logger'
 import { locales, defaultLocale } from '@/i18n/config'
 import { notifyTranslationFailed } from '@/lib/services/telegram'
 import { forStage } from '@/lib/llm/stageModels'
+import { HEADLINE_MAX_CHARS, HEADLINE_MAX_WORDS } from '@/lib/llm/headline'
 
 const log = createLogger('translation-service')
 
@@ -60,6 +61,8 @@ export async function callGeminiTranslate(
   language: string,
   context?: string,
   translatedClaim?: string,
+  isHeadline = false,
+  retryHint?: string,
 ): Promise<string> {
   const target = languageName(language)
   const prompt = [
@@ -72,6 +75,9 @@ export async function callGeminiTranslate(
     '- Keep all numbers, dates and units exactly as given.',
     '- For forecast resolution wording, render the binary outcomes (the equivalents of "YES" and "NO") naturally and unambiguously — avoid literal one-word calques.',
     '- Match the concise register of news/analysis writing.',
+    isHeadline
+      ? `- This is a news-feed card headline that must fit on two lines of a phone screen. Keep the future tense and every qualifier (timing, condition, negation) of the source, and keep it about as short as the source: one short sentence, no added words, no trailing period.`
+      : '',
     '- Return ONLY the translated text: no quotes, no notes, no explanation.',
     context
       ? `\nContext — this text is part of the forecast: "${context}". Use it only to disambiguate terms and grammatical agreement; translate ONLY the text below.`
@@ -82,6 +88,7 @@ export async function callGeminiTranslate(
     '',
     'Text to translate:',
     text,
+    retryHint ? `\n${retryHint}` : '',
   ].join('\n')
 
   const response = await llmService.generateContent({
@@ -90,6 +97,32 @@ export async function callGeminiTranslate(
     temperature: 0,
   })
   return response.text.trim()
+}
+
+// Explicit English negation only ("fails"/"misses" have no fixed marker in the target language).
+const SOURCE_NEGATION = /\b(not|no|never|none|without|won't|isn't|aren't|doesn't|don't|didn't|cannot|can't)\b|n't\b/i
+// Negation markers per target language, for the locales where we can check cheaply. Hebrew
+// takes one-letter prefixes (ולא, שלא), so the marker may follow ו/ש/ב/כ/ל/מ/ה.
+const TARGET_NEGATION: Record<string, RegExp> = {
+  he: /(?<![֐-׿])[ושבכלמה]?(לא|אין|אינו|אינה|אינם|ללא|בלי|טרם)(?![֐-׿])/,
+  ru: /(?<![а-яё])(не|нет|ни|без|никогда)(?![а-яё])/i,
+}
+
+/**
+ * Why a translated card headline can't be shown, or null when it is fine. It must fit the
+ * same two mobile lines as the English source (the card layout also shrinks to fit, but a
+ * longer translation would shrink it too far), and an explicit negation must survive.
+ */
+export function headlineTranslationProblem(source: string, translated: string, language: string): string | null {
+  if (!translated) return 'it is empty'
+  if (translated.length > HEADLINE_MAX_CHARS || translated.split(' ').length > HEADLINE_MAX_WORDS) {
+    return `it is too long (${translated.length} characters; the limit is ${HEADLINE_MAX_CHARS} characters and ${HEADLINE_MAX_WORDS} words)`
+  }
+  const marker = TARGET_NEGATION[language]
+  if (marker && SOURCE_NEGATION.test(source) && !marker.test(translated)) {
+    return 'it drops the negation of the source'
+  }
+  return null
 }
 
 /** Scripts that unambiguously signal non-English source text (Hebrew, Arabic,
@@ -337,10 +370,27 @@ export async function translatePrediction(
 
     try {
       log.info({ predictionId, field, language }, 'Translating field')
-      let translated = await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim)
+      let translated = await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim, field === 'headline')
       // Headlines carry no trailing period (headline.ts strips it from the source); the
       // translation sometimes adds one back.
-      if (field === 'headline') translated = translated.replace(/[.。]+$/, '').trim()
+      if (field === 'headline') {
+        const clean = (t: string) => t.replace(/[.。]+$/, '').trim()
+        translated = clean(translated)
+        let problem = headlineTranslationProblem(sourceText, translated, language)
+        if (problem) {
+          const hint = `Your previous translation "${translated}" was rejected: ${problem}. Translate again, shorter, within ${HEADLINE_MAX_CHARS} characters and ${HEADLINE_MAX_WORDS} words, keeping the future tense, the subject, the outcome and every negation, timing or condition of the source.`
+          const retry = clean(await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim, true, hint))
+          problem = headlineTranslationProblem(sourceText, retry, language)
+          if (problem) {
+            // Nothing is cached, so the card keeps the English headline instead of a
+            // translation that overflows or changes the meaning.
+            log.warn({ predictionId, language, translated: retry, problem }, 'Headline translation rejected, keeping source')
+            result[field] = sourceText
+            continue
+          }
+          translated = retry
+        }
+      }
 
       await prisma.predictionTranslation.upsert({
         where: {

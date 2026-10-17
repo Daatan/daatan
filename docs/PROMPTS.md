@@ -70,11 +70,11 @@ A few short prompts are still built inline in code rather than in `PROMPTS`, so 
 | Where | What |
 |---|---|
 | `src/lib/llm/searchQuery.ts` (`EXTRACTION_PROMPT`) | claim → 3–8-word search query |
-| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`) | claim → 2–6-word future-tense card headline (#1814, #1823); one retry with a hint when the negation guard rejects it (#1831) |
+| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`) | claim → self-contained future-tense card headline, ~5–10 words, max 12 words / 60 chars (#1814, #1823); one retry with a hint when the negation guard rejects it (#1831) or when it is over-long (`shortenRetryHint`) |
 | `src/lib/services/ai-estimate.ts` | bare 0–100 estimate backfilled onto a commitment's `aiProbabilityAtCommit` |
 | `src/lib/services/translation.ts` | forecast/comment translation and normalise-to-English |
 | `src/lib/llm/groundedDateLookup.ts` | the #1706 web-grounded event-date lookup (Vertex `googleSearch`, outside `llmService`) |
-| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`) | claim → 2–6-word future-tense card headline (#1814); the guards that decide whether it is kept live in the same file — see [LLM_ARCHITECTURE.md § Card headline](LLM_ARCHITECTURE.md#card-headline-1814) |
+| `src/lib/llm/headline.ts` (`HEADLINE_PROMPT`, `polarityRetryHint`, `shortenRetryHint`) | claim → self-contained future-tense card headline (#1814); the guards that decide whether it is kept live in the same file — see [LLM_ARCHITECTURE.md § Card headline](LLM_ARCHITECTURE.md#card-headline-1814) |
 
 ## The prompts
 

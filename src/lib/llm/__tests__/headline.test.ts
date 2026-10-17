@@ -5,7 +5,10 @@ vi.mock('../index', () => ({ llmService: { generateContent: (...a: unknown[]) =>
 const updateMany = vi.fn()
 vi.mock('@/lib/prisma', () => ({ prisma: { prediction: { updateMany: (...a: unknown[]) => updateMany(...a) } } }))
 
-import { generateHeadline, generateAndStoreHeadline, polarityMatches, HEADLINE_PROMPT } from '../headline'
+import {
+  generateHeadline, generateAndStoreHeadline, polarityMatches, HEADLINE_PROMPT,
+  HEADLINE_MAX_CHARS, HEADLINE_MAX_WORDS,
+} from '../headline'
 
 describe('polarityMatches', () => {
   it('accepts matching polarity', () => {
@@ -31,6 +34,12 @@ describe('HEADLINE_PROMPT', () => {
   it('asks for the future tense, not present-tense headlinese (#1823)', () => {
     expect(HEADLINE_PROMPT).toMatch(/Future tense/)
     expect(HEADLINE_PROMPT).toContain('Russia will unblock Telegram')
+  })
+  it('asks for a self-contained headline, as short as possible but as complete as necessary', () => {
+    expect(HEADLINE_PROMPT).toContain('as short as possible, but as complete as necessary')
+    expect(HEADLINE_PROMPT).toContain('Benny Gantz will withdraw from the race before the elections')
+    expect(HEADLINE_PROMPT).toContain('never more than 12 words or 60 characters')
+    expect(HEADLINE_PROMPT).not.toMatch(/2 to 6 words/)
   })
 })
 
@@ -86,9 +95,55 @@ describe('generateHeadline', () => {
     expect(generateContent).toHaveBeenCalledTimes(1)
   })
 
-  it("returns '' when too long", async () => {
-    generateContent.mockResolvedValue({ text: 'one two three four five six seven eight nine ten' })
+  it('keeps a self-contained headline of 10 words (the old 9-word cap would have rejected it)', async () => {
+    generateContent.mockResolvedValue({ text: 'Benny Gantz will withdraw from the race before the elections' })
+    expect(await generateHeadline('Benny Gantz will withdraw his candidacy before the 2026 elections'))
+      .toBe('Benny Gantz will withdraw from the race before the elections')
+    expect(generateContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a very short headline when it is clear', async () => {
+    generateContent.mockResolvedValue({ text: 'Nvidia will top $5T' })
+    expect(await generateHeadline('Nvidia market cap will exceed $5T by June 2027')).toBe('Nvidia will top $5T')
+  })
+
+  it("returns '' when still too long after the shorten retry", async () => {
+    generateContent.mockResolvedValue({ text: 'one two three four five six seven eight nine ten eleven twelve thirteen' })
     expect(await generateHeadline('Something will happen by 2027')).toBe('')
+    expect(generateContent).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries once with a shorten hint when over the word limit, and keeps the shorter result', async () => {
+    generateContent
+      .mockResolvedValueOnce({ text: 'one two three four five six seven eight nine ten eleven twelve thirteen' })
+      .mockResolvedValueOnce({ text: 'Something will happen by 2027' })
+    expect(await generateHeadline('Something will happen by 2027')).toBe('Something will happen by 2027')
+    const retryPrompt: string = generateContent.mock.calls[1][0].prompt
+    expect(retryPrompt).toContain('is too long (13 words')
+    expect(retryPrompt).toContain('keep the subject, the outcome, and any negation, timing or condition')
+    expect(retryPrompt.trim().endsWith('Headline:')).toBe(true)
+  })
+
+  it('retries when over 60 characters even within 12 words', async () => {
+    const long = 'Internationalization Administration Reconfiguration Notwithstanding Extraordinarily'
+    expect(long.length).toBeGreaterThan(60)
+    generateContent
+      .mockResolvedValueOnce({ text: long })
+      .mockResolvedValueOnce({ text: 'Something will happen by 2027' })
+    expect(await generateHeadline('Something will happen by 2027')).toBe('Something will happen by 2027')
+    expect(generateContent).toHaveBeenCalledTimes(2)
+  })
+
+  it('still rejects a shortened headline that drops the negation', async () => {
+    generateContent
+      .mockResolvedValueOnce({ text: 'There will be no ceasefire between the two sides in the region before the end of the year' })
+      .mockResolvedValueOnce({ text: 'Ceasefire this year' })
+    expect(await generateHeadline('A ceasefire will not be implemented by Dec 31, 2026')).toBe('')
+  })
+
+  it('stays within the VarChar(80) column and the two-line mobile budget', () => {
+    expect(HEADLINE_MAX_CHARS).toBeLessThanOrEqual(60)
+    expect(HEADLINE_MAX_WORDS).toBe(12)
   })
 
   it('returns null on LLM failure', async () => {
@@ -105,7 +160,7 @@ describe('generateHeadline', () => {
     })
   })
 
-  it("stores '' when the guard rejects, so the backfill doesn't retry it", async () => {
+  it("stores '' when the guard rejects, so it is recorded as rejected", async () => {
     generateContent.mockResolvedValue({ text: 'Ceasefire this year' })
     expect(await generateAndStoreHeadline('p1', 'A ceasefire will not be implemented by Dec 31, 2026')).toBe('rejected')
     expect(updateMany).toHaveBeenCalledWith({
@@ -114,7 +169,7 @@ describe('generateHeadline', () => {
     })
   })
 
-  it('stores nothing when the LLM fails, so the backfill retries it', async () => {
+  it('stores nothing when the LLM fails', async () => {
     generateContent.mockRejectedValue(new Error('down'))
     expect(await generateAndStoreHeadline('p1', 'Something will happen by 2027')).toBe('failed')
     expect(updateMany).not.toHaveBeenCalled()
