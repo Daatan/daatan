@@ -85,6 +85,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (query.q) {
+      // Search demand is otherwise unobservable (daatan#1878): the query text is the only
+      // thing recorded — no user id, no IP — and it is capped so a pasted blob can't flood logs.
+      log.info({ event: 'forecast_search', q: query.q.slice(0, 100), qLen: query.q.length }, 'forecast search')
       const fuzzy = await findFuzzyMatches(query.q)
       andConditions.push({
         OR: [

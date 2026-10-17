@@ -17,6 +17,11 @@ vi.mock('@/auth', () => ({
     auth: mockAuth,
 }))
 
+const { mockLogInfo } = vi.hoisted(() => ({ mockLogInfo: vi.fn() }))
+vi.mock('@/lib/logger', () => ({
+    createLogger: () => ({ info: mockLogInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+}))
+
 vi.mock('@/lib/services/moderation', () => ({
     checkContent: mockCheckContent,
 }))
@@ -203,6 +208,23 @@ describe('/api/forecasts', () => {
             expect(findManyCall.where.AND[0].OR).toContainEqual({
                 translations: { some: { fieldName: 'claimText', translatedText: { contains: 'ממשלה', mode: 'insensitive' } } },
             })
+        })
+
+        it('logs the search query once as event=forecast_search, capped at 100 chars (daatan#1878)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+            mockLogInfo.mockClear()
+
+            await GET(new NextRequest('http://localhost/api/forecasts?q=' + encodeURIComponent('ממשלה')))
+            await GET(new NextRequest('http://localhost/api/forecasts?q=' + 'x'.repeat(150)))
+            await GET(new NextRequest('http://localhost/api/forecasts'))
+
+            const searches = mockLogInfo.mock.calls.filter(([o]) => o?.event === 'forecast_search')
+            expect(searches).toHaveLength(2)
+            expect(searches[0][0]).toMatchObject({ q: 'ממשלה', qLen: 5 })
+            expect(searches[1][0].q).toHaveLength(100)
+            expect(searches[1][0].qLen).toBe(150)
         })
 
         it('adds trigram-matched predictions and tags to the search OR-clause', async () => {
