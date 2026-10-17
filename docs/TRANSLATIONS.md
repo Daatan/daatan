@@ -36,7 +36,7 @@ translation (`src/lib/services/translation.ts`).
 - **Consistent names** (#1825): `detailsText`, `resolutionRules` and `headline` are translated
   with the claim as context and, when the claim translation succeeded, with that translation,
   so people, parties and places are named the same way in every field. A trailing period is
-  stripped from the translated headline. Headlines also get an extra translate-prompt rule (`isHeadline`): keep the future tense and every qualifier (timing, condition, negation), and stay about as short as the source, so the Hebrew headline fits the same two mobile lines.
+  stripped from the translated headline. Headlines also get an extra translate-prompt rule (`isHeadline`): keep the future tense and every qualifier (timing, condition, negation), and stay about as short as the source, so the Hebrew headline fits the same two mobile lines. The result is also checked in code (`headlineTranslationProblem`): over 60 chars / 12 words, or a dropped explicit negation (he, ru), gets one retry with a hint; if the retry still fails nothing is cached and the card keeps the English headline. The card (`FitHeadline`) shrinks the font to keep any headline within two lines instead of clipping it.
 
 ## English canonicalization (non-English input)
 

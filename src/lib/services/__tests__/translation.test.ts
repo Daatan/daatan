@@ -14,6 +14,7 @@ import {
   getCachedPredictionTranslation,
   sourceHash,
   callGeminiTranslate,
+  headlineTranslationProblem,
   languageName,
   hasNonLatinScript,
   normalizeForecastToEnglish,
@@ -72,6 +73,30 @@ describe('callGeminiTranslate prompt', () => {
     const prompt = vi.mocked(llmService.generateContent).mock.calls.at(-1)![0].prompt
     expect(prompt).toContain('two lines of a phone screen')
     expect(prompt).toContain('every qualifier')
+  })
+})
+
+describe('headlineTranslationProblem', () => {
+  it('accepts a short translation that keeps the negation (he, ru)', () => {
+    expect(headlineTranslationProblem('Russia will not unblock Telegram', 'רוסיה לא תבטל את חסימת טלגרם', 'he')).toBeNull()
+    expect(headlineTranslationProblem('Russia will not unblock Telegram', 'Россия не разблокирует Telegram', 'ru')).toBeNull()
+  })
+  it('accepts a Hebrew prefixed negation (ולא, שלא)', () => {
+    expect(headlineTranslationProblem('Gantz will not run, and Eisenkot will', 'גנץ ולא אייזנקוט', 'he')).toBeNull()
+  })
+  it('rejects a translation over the character or word limit', () => {
+    expect(headlineTranslationProblem('x will win', 'א'.repeat(61), 'he')).toMatch(/too long/)
+    expect(headlineTranslationProblem('x will win', Array(13).fill('א').join(' '), 'he')).toMatch(/too long/)
+  })
+  it('rejects an empty translation', () => {
+    expect(headlineTranslationProblem('x will win', '', 'he')).toBe('it is empty')
+  })
+  it('rejects a dropped negation, but only when the source has an explicit one', () => {
+    expect(headlineTranslationProblem('Russia will not unblock Telegram', 'רוסיה תבטל את חסימת טלגרם', 'he')).toMatch(/negation/)
+    expect(headlineTranslationProblem('Russia will unblock Telegram', 'רוסיה תבטל את חסימת טלגרם', 'he')).toBeNull()
+  })
+  it('skips the negation check for languages without a marker table', () => {
+    expect(headlineTranslationProblem('Russia will not unblock Telegram', 'Rusio malŝlosos Telegram', 'eo')).toBeNull()
   })
 })
 
@@ -152,6 +177,65 @@ describe('translatePrediction — content-aware cache', () => {
 
     expect(result.headline).toBe('בן-גביר לא ישריין את סילמן')
     expect(result.claimText).toBe('בן-גביר לא ישריין את סילמן.') // other fields untouched
+  })
+
+  describe('headline translation guards', () => {
+    const HEADLINE = 'Benny Gantz will not withdraw from the race before the elections'
+    const LONG_HE = 'בני גנץ לא ייסוג מהמרוץ לבחירות לפני מועד הבחירות הקרובות לכנסת העשרים וחמש ולא יפרוש'
+    const OK_HE = 'בני גנץ לא יפרוש מהמרוץ לפני הבחירות'
+
+    // The headline prompt is the only one carrying the card-headline rule.
+    const headlineReplies = (...replies: string[]) => {
+      const queue = [...replies]
+      vi.mocked(llmService.generateContent).mockImplementation((async (req: { prompt: string }) =>
+        ({ text: req.prompt.includes('card headline') ? queue.shift() : 'TRANSLATED' })) as never)
+      return queue
+    }
+    const headlinePrompts = () =>
+      vi.mocked(llmService.generateContent).mock.calls.map((c) => c[0].prompt).filter((p) => p.includes('card headline'))
+    const setup = () => {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...PREDICTION, headline: HEADLINE } as never)
+      vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([] as never)
+    }
+
+    it('retries once with a hint when the translation is too long, and keeps the short result', async () => {
+      setup()
+      headlineReplies(LONG_HE, OK_HE)
+      const result = await translatePrediction('p1', 'he')
+      expect(result.headline).toBe(OK_HE)
+      const prompts = headlinePrompts()
+      expect(prompts).toHaveLength(2)
+      expect(prompts[1]).toContain(`was rejected: it is too long (${LONG_HE.length} characters`)
+      expect(prisma.predictionTranslation.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: expect.objectContaining({ fieldName: 'headline', translatedText: OK_HE }) }),
+      )
+    })
+
+    it('retries when the translation drops an explicit negation', async () => {
+      setup()
+      headlineReplies('בני גנץ יפרוש מהמרוץ לפני הבחירות', OK_HE)
+      const result = await translatePrediction('p1', 'he')
+      expect(result.headline).toBe(OK_HE)
+      expect(headlinePrompts()[1]).toContain('it drops the negation of the source')
+    })
+
+    it('keeps the English headline and caches nothing when the retry is still too long', async () => {
+      setup()
+      headlineReplies(LONG_HE, LONG_HE)
+      const result = await translatePrediction('p1', 'he')
+      expect(result.headline).toBe(HEADLINE)
+      expect(headlinePrompts()).toHaveLength(2)
+      const stored = vi.mocked(prisma.predictionTranslation.upsert).mock.calls.map((c) => c[0].create.fieldName)
+      expect(stored).not.toContain('headline')
+      expect(stored).toContain('claimText')
+    })
+
+    it('does not retry a translation that fits and keeps its negation', async () => {
+      setup()
+      headlineReplies(OK_HE)
+      expect((await translatePrediction('p1', 'he')).headline).toBe(OK_HE)
+      expect(headlinePrompts()).toHaveLength(1)
+    })
   })
 
   it('does not pass a failed claim translation as the translated claim', async () => {

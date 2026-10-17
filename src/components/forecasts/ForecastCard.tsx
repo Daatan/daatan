@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { createClientLogger } from '@/lib/client-logger'
+import { FitHeadline } from '@/components/forecasts/FitHeadline'
 import { toast } from 'react-hot-toast'
 import { useTranslations, useLocale } from 'next-intl'
 import {
@@ -527,9 +528,10 @@ export default function ForecastCard({
               : null
             return headline ? (
               <div className="mb-4">
-                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug" data-testid="forecast-headline">
-                  {headline}
-                </h2>
+                <FitHeadline
+                  text={headline}
+                  className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
+                />
                 <p className="mt-1 text-sm text-gray-400 line-clamp-3 leading-snug" title={claim}>
                   {claim}
                 </p>
