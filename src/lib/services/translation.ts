@@ -60,6 +60,7 @@ export async function callGeminiTranslate(
   language: string,
   context?: string,
   translatedClaim?: string,
+  isHeadline = false,
 ): Promise<string> {
   const target = languageName(language)
   const prompt = [
@@ -72,6 +73,9 @@ export async function callGeminiTranslate(
     '- Keep all numbers, dates and units exactly as given.',
     '- For forecast resolution wording, render the binary outcomes (the equivalents of "YES" and "NO") naturally and unambiguously — avoid literal one-word calques.',
     '- Match the concise register of news/analysis writing.',
+    isHeadline
+      ? `- This is a news-feed card headline that must fit on two lines of a phone screen. Keep the future tense and every qualifier (timing, condition, negation) of the source, and keep it about as short as the source: one short sentence, no added words, no trailing period.`
+      : '',
     '- Return ONLY the translated text: no quotes, no notes, no explanation.',
     context
       ? `\nContext — this text is part of the forecast: "${context}". Use it only to disambiguate terms and grammatical agreement; translate ONLY the text below.`
@@ -337,7 +341,7 @@ export async function translatePrediction(
 
     try {
       log.info({ predictionId, field, language }, 'Translating field')
-      let translated = await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim)
+      let translated = await callGeminiTranslate(sourceText, language, context ?? undefined, translatedClaim, field === 'headline')
       // Headlines carry no trailing period (headline.ts strips it from the source); the
       // translation sometimes adds one back.
       if (field === 'headline') translated = translated.replace(/[.。]+$/, '').trim()

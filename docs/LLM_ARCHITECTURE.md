@@ -127,19 +127,20 @@ is built inline in code, so it is **outside** the prompt lock — see
 | | |
 |---|---|
 | Input | the claim text only (a leading emoji such as the bot "🤖" is stripped, then re-added). No details, no articles. |
-| Prompt rules | 2–6 words; no date/year/probability/trailing period; name the actor and the outcome; **future tense** with "will" (#1823); neutral, no hint of likelihood or drama; sentence case; keep the claim's polarity; for a question name the contest; same language as the claim. |
+| Prompt rules | a **self-contained** forecast headline, "as short as possible, but as complete as necessary": subject + outcome, plus timing/condition/scope when dropping it would change the forecast ("Benny Gantz will withdraw from the race before the elections", not "Gantz will withdraw"); about 5–10 words, no minimum, never more than 12 words / 60 chars (two mobile lines); no probability/trailing period; **future tense** with "will" (#1823); neutral, no hint of likelihood or drama; sentence case; keep the claim's polarity; for a question name the contest; same language as the claim. |
 | Model | stage `headline` (`forStage('headline')`, see Model per stage), `temperature: 0`, 10 s timeout. |
-| Guards | rejected (stored as `''`, never retried, card shows the claim) if empty, **> 9 words** or **> 60 chars** (`HEADLINE_MAX_CHARS`; DB column is `VarChar(80)`), or if its negation differs from the claim's (`polarityMatches`, regex on English cues). A polarity mismatch gets **one** retry with `polarityRetryHint` and a 40 s timeout (#1831); the guard still checks the retry. |
-| Failure | LLM error or timeout → `null`; the column stays `NULL` and the nightly backfill retries it. |
+| Guards | rejected (stored as `''`, card shows the claim) if empty, **> 12 words** (`HEADLINE_MAX_WORDS`) or **> 60 chars** (`HEADLINE_MAX_CHARS`: two lines in the card at 360-375px, measured; the `VarChar(80)` column leaves headroom), or if its negation differs from the claim's (`polarityMatches`, regex on English cues). A polarity mismatch gets **one** retry with `polarityRetryHint` and a 40 s timeout (#1831); an over-long headline gets **one** retry with `shortenRetryHint` ("drop every word that does not change the forecast, keep subject, outcome and any negation/timing/condition"). Every retry result is checked again by all guards. |
+| Failure | LLM error or timeout → `null`; the column stays `NULL` and the card shows the claim. Nothing retries it. |
 | When it runs | fire-and-forget after create, after canonicalization, and after an English or original-language edit that changes the claim (`services/forecast.ts`); the write is conditional on the claim being unchanged (`updateMany where claimText`), and a claim edit clears the old headline first. |
-| Backfill | `GET /api/cron/backfill-headlines` ([API.md](API.md)), nightly 02:37 UTC; fills only `headline IS NULL`. |
+| Backfill | **Disabled.** `GET /api/cron/backfill-headlines` ([API.md](API.md)) returns `{ ok, disabled: true }` and touches nothing (its nightly workflow still calls it and gets a no-op 200). Already-published forecasts keep their existing headline, or fall back to the claim when it is `NULL`/`''`; they are never regenerated. |
 | Translation | translated per locale with `claimText`/`detailsText`/`resolutionRules`, cached against the source hash — see [TRANSLATIONS.md](TRANSLATIONS.md). |
 | Storage | `predictions.headline` — see [DATABASE.md](DATABASE.md). |
 
-**Changing the headline** (length, extra information, wording) touches four things at once:
-the prompt and the word/char guards in `headline.ts`, the card layout, a one-off regeneration
-of existing rows (the backfill only fills `NULL`, so edit-in-place does not refresh them), and
-the cached translations. Tracked in #1846.
+**Changing the headline** (length, extra information, wording) touches the prompt and the
+word/char guards in `headline.ts`, the card layout, and the translation rule for headlines
+(`callGeminiTranslate`'s `isHeadline`). The change applies to newly generated headlines only:
+stored headlines and their cached translations are not regenerated (#1846), because the
+backfill is off and translations are cached against the source hash of the unchanged headline.
 
 ## Usage
 

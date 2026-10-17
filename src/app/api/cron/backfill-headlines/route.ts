@@ -1,33 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateAndStoreHeadline } from '@/lib/llm/headline'
-import { prisma } from '@/lib/prisma'
-import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
 import { secretsMatch } from '@/lib/cron-auth'
 
-const log = createLogger('cron-backfill-headlines')
-
 /**
- * GET /api/cron/backfill-headlines?limit=N
+ * GET /api/cron/backfill-headlines
  *
- * Generates card headlines (daatan#1814) for predictions whose `headline IS NULL`:
- * rows that predate the column, plus any whose fire-and-forget generation failed.
- * Guard-rejected rows hold '' and are not retried. Newest first, so live cards fill
- * before old resolved ones.
- *
- * Scheduled by .github/workflows/backfill-headlines.yml. Like backfill-embeddings,
- * callers must inspect the body: per-row failures are counted, not surfaced as a status.
+ * Disabled. It used to generate card headlines (daatan#1814) for predictions with
+ * `headline IS NULL`. Headlines are now written only when a forecast is created or its
+ * claim is edited: filling NULL rows would attach new-style headlines to forecasts that
+ * are already published, which must not change, so those cards fall back to the claim.
+ * The route stays so the nightly workflow (still scheduled) keeps getting a 200 until it is removed.
  */
-
-const DEFAULT_LIMIT = 25
-// 100 hit the proxy's ~60s timeout on staging (504). A batch is bounded by the first attempt
-// (10s) plus a polarity retry (40s since #1834), so one batch can take ~50s. A new batch is
-// therefore only started inside START_BUDGET_MS; the rest is left for the next call (see
-// `deferred` and `remaining`) instead of letting the whole response pass the proxy's 60s.
-const MAX_LIMIT = 40
-const CONCURRENCY = 5
-const START_BUDGET_MS = 8_000
-
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
   const expected = env.BOT_RUNNER_SECRET
@@ -36,35 +19,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const limitParam = Number(request.nextUrl.searchParams.get('limit'))
-  const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, MAX_LIMIT) : DEFAULT_LIMIT
-
-  const missing = await prisma.prediction.findMany({
-    where: { headline: null },
-    select: { id: true, claimText: true },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  })
-
-  const counts = { stored: 0, rejected: 0, failed: 0 }
-  const startedAt = Date.now()
-  let attempted = 0
-  for (let i = 0; i < missing.length; i += CONCURRENCY) {
-    if (i > 0 && Date.now() - startedAt > START_BUDGET_MS) break
-    const results = await Promise.all(
-      missing.slice(i, i + CONCURRENCY).map(({ id, claimText }) =>
-        generateAndStoreHeadline(id, claimText).catch((err) => {
-          log.error({ err, id }, 'Backfill headline failed for prediction')
-          return 'failed' as const
-        }),
-      ),
-    )
-    attempted += results.length
-    for (const r of results) counts[r]++
-  }
-  const deferred = missing.length - attempted
-
-  const remaining = await prisma.prediction.count({ where: { headline: null } })
-  log.info({ ...counts, deferred, remaining }, 'Headline backfill cron complete')
-  return NextResponse.json({ ok: true, ...counts, deferred, remaining })
+  return NextResponse.json({ ok: true, disabled: true })
 }

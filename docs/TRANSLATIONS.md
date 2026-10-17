@@ -36,7 +36,7 @@ translation (`src/lib/services/translation.ts`).
 - **Consistent names** (#1825): `detailsText`, `resolutionRules` and `headline` are translated
   with the claim as context and, when the claim translation succeeded, with that translation,
   so people, parties and places are named the same way in every field. A trailing period is
-  stripped from the translated headline.
+  stripped from the translated headline. Headlines also get an extra translate-prompt rule (`isHeadline`): keep the future tense and every qualifier (timing, condition, negation), and stay about as short as the source, so the Hebrew headline fits the same two mobile lines.
 
 ## English canonicalization (non-English input)
 

@@ -63,6 +63,15 @@ describe('callGeminiTranslate prompt', () => {
     expect(prompt).not.toContain(' he ')
     expect(prompt).toContain('the forecast claim')
     expect(prompt).toContain('Hello')
+    expect(prompt).not.toContain('two lines of a phone screen')
+  })
+
+  it('adds the card-headline length and qualifier rule only for headlines', async () => {
+    vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'x' } as never)
+    await callGeminiTranslate('Benny Gantz will withdraw from the race before the elections', 'he', 'claim', undefined, true)
+    const prompt = vi.mocked(llmService.generateContent).mock.calls.at(-1)![0].prompt
+    expect(prompt).toContain('two lines of a phone screen')
+    expect(prompt).toContain('every qualifier')
   })
 })
 

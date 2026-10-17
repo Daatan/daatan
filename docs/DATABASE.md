@@ -64,10 +64,10 @@ The central table (`Prediction`). Field groups:
 - **Content**: `claimText` (canonical English, ≤500), `detailsText`,
   `resolutionRules`, `slug` (+ `prediction_slug_aliases` for 308 redirects
   after re-slugs), `originalLanguage` (non-English originals preserved in
-  `prediction_translations`), `headline` (2-6 word future-tense card label (#1823) generated from
+  `prediction_translations`), `headline` (self-contained future-tense card label, ~5-10 words, max 12 words / 60 chars (#1823) generated from
   `claimText` by `src/lib/llm/headline.ts`, daatan#1814; null = cards show the claim,
   cleared to NULL whenever the claim changes; `''` = generated but rejected by the
-  polarity/length guard, not retried; NULL rows are filled by `/api/cron/backfill-headlines`).
+  polarity/length guard; existing NULL/`''` rows are never backfilled, cards show the claim).
 - **Outcome**: `outcomeType` (BINARY | MULTIPLE_CHOICE | NUMERIC_THRESHOLD),
   `outcomePayload` JSON, `prediction_options` rows for MC/numeric,
   `resolveByDatetime` (the platform deadline).
