@@ -2184,5 +2184,13 @@
         }
       }
     }
+  },
+  "topicBreakdown": {
+    "title": "Laŭ temo",
+    "topic": "Temo",
+    "skill": "Takso",
+    "brier": "Brier",
+    "predictions": "Prognozoj",
+    "hint": "Ĉiu temo estas taksata nur laŭ siaj solvitaj prognozoj, do la specimenoj estas malgrandaj — legu la nombrojn singarde."
   }
 }

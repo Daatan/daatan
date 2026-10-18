@@ -12,6 +12,11 @@ vi.mock('@/lib/services/sourceLeaderboard', () => ({
   canonicalOutlet: (n: string) => n,
   authorsOfOutlet: () => [],
 }))
+vi.mock('@/lib/services/sourceTopicBoards', () => ({
+  getTopicBoards: async () => [],
+  outletTopicRecords: () => [],
+}))
+vi.mock('@/components/sources/TopicBreakdown', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
 vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }))
