@@ -82,19 +82,18 @@ const mockModerationPass = { isOffensive: false, reason: '' }
 // The text flow extracts a focused search query via an LLM call before searching.
 const MOCK_EXTRACTED_QUERY = 'bitcoin 100k 2026'
 
+// Moderation now runs beside the search-query extraction (#1890), so the LLM mocks answer by
+// kind of call rather than by call order.
+function mockLlmByKind(prediction: unknown = mockLlmPrediction) {
+  mockGenerateContent.mockImplementation(async (opts: { prompt?: string; schema?: unknown }) => {
+    if (opts.prompt?.includes('Moderation prompt')) return { text: JSON.stringify(mockModerationPass) }
+    if (opts.schema) return { text: JSON.stringify(prediction) }
+    return { text: MOCK_EXTRACTED_QUERY }
+  })
+}
+
 function setupLlmMock() {
-  // 1. Moderation check
-  mockGenerateContent.mockResolvedValueOnce({
-    text: JSON.stringify(mockModerationPass),
-  })
-  // 2. Search-query extraction (text flow only)
-  mockGenerateContent.mockResolvedValueOnce({
-    text: MOCK_EXTRACTED_QUERY,
-  })
-  // 3. The structured prediction call (with schema)
-  mockGenerateContent.mockResolvedValueOnce({
-    text: JSON.stringify(mockLlmPrediction),
-  })
+  mockLlmByKind()
 }
 
 describe('extractDomainFromUrl', () => {
@@ -147,10 +146,7 @@ describe('generateExpressPrediction', () => {
     })
 
     it('throws NO_ARTICLES_FOUND when search returns empty', async () => {
-      // 1. Moderation passes
-      mockGenerateContent.mockResolvedValueOnce({
-        text: JSON.stringify(mockModerationPass),
-      })
+      mockLlmByKind()
       mockOraculSearch.mockResolvedValue([])
 
       await expect(generateExpressPrediction('obscure topic xyz'))
@@ -172,11 +168,8 @@ describe('generateExpressPrediction', () => {
 
     it('anchors on the model-selected relevant article, not the first result', async () => {
       mockOraculSearch.mockResolvedValue(mockArticles) // [cnn, bloomberg, coindesk]
-      mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
-        .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
-        // relevantArticleIndices is 1-based → [2] selects the 2nd article (bloomberg)
-        .mockResolvedValueOnce({ text: JSON.stringify({ ...mockLlmPrediction, relevantArticleIndices: [2] }) })
+      // relevantArticleIndices is 1-based → [2] selects the 2nd article (bloomberg)
+      mockLlmByKind({ ...mockLlmPrediction, relevantArticleIndices: [2] })
 
       const result = await generateExpressPrediction('Bitcoin price')
 
@@ -186,16 +179,11 @@ describe('generateExpressPrediction', () => {
 
     it('creates the forecast source-free when no articles are relevant', async () => {
       mockOraculSearch.mockResolvedValue(mockArticles)
-      mockGenerateContent
-        .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
-        .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
-        .mockResolvedValueOnce({
-          text: JSON.stringify({
-            ...mockLlmPrediction,
-            detailsText: 'The provided articles do not contain specific information about this topic.',
-            relevantArticleIndices: [], // explicit: none relevant
-          }),
-        })
+      mockLlmByKind({
+        ...mockLlmPrediction,
+        detailsText: 'The provided articles do not contain specific information about this topic.',
+        relevantArticleIndices: [], // explicit: none relevant
+      })
 
       const result = await generateExpressPrediction('EU will admit two new members by 2028')
 
@@ -430,11 +418,7 @@ describe('generateExpressPrediction', () => {
           .mockResolvedValueOnce({ text: 'extracted topic' })
           .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
       } else {
-        // 1. Moderation, 2. Search-query extraction, 3. Prediction
-        mockGenerateContent
-          .mockResolvedValueOnce({ text: JSON.stringify(mockModerationPass) })
-          .mockResolvedValueOnce({ text: MOCK_EXTRACTED_QUERY })
-          .mockResolvedValueOnce({ text: JSON.stringify(mockLlmPrediction) })
+        mockLlmByKind()
       }
 
       await generateExpressPrediction(input)
