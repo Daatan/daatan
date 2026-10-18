@@ -982,7 +982,7 @@ describe('pushCredibilityFeedback', () => {
   // fire-and-forget call a 422 would only ever be a warning line.
   it('sends claim_archetype lowercased for retro’s Literal', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    predictionFindUnique.mockResolvedValue({ claimArchetype: 'DIFFUSE' } as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: 'DIFFUSE', tags: [] } as never)
     mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
@@ -998,7 +998,7 @@ describe('pushCredibilityFeedback', () => {
   // absent archetype toward no base rate at all, while 'none' is a real class.
   it('omits claim_archetype entirely when the claim is unclassified', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    predictionFindUnique.mockResolvedValue({ claimArchetype: null } as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: null, tags: [] } as never)
     mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
@@ -1012,7 +1012,7 @@ describe('pushCredibilityFeedback', () => {
 
   it('sends the NONE archetype as a real class, not as an omission', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
-    predictionFindUnique.mockResolvedValue({ claimArchetype: 'NONE' } as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: 'NONE', tags: [] } as never)
     mockOraculFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
@@ -1022,6 +1022,35 @@ describe('pushCredibilityFeedback', () => {
 
     const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
     expect(body.claim_archetype).toBe('none')
+  })
+
+  // retro#973: topic slugs feed retro's per-topic author board; untagged claims send nothing.
+  it('sends the forecast’s tag slugs for retro’s per-topic board', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: null, tags: [{ slug: 'economy' }, { slug: 'elections' }] } as never)
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
+    expect(body.tags).toEqual(['economy', 'elections'])
+  })
+
+  it('omits tags when the forecast has none', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    predictionFindUnique.mockResolvedValue({ claimArchetype: null, tags: [] } as never)
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
+    expect('tags' in body).toBe(false)
   })
 
   // daatan#1451: retro's settlement-pin ledger records nothing without this field,
