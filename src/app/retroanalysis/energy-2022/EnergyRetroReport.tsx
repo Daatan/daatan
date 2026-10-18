@@ -110,11 +110,11 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
   const byN = useMemo(() => new Map(rows.map(r => [r.n, r])), [rows])
   const unverified = rows.filter(r => !r.quote_verified).length
 
-  const thesis: [string, string, string, string, string][] = [
-    ['Brent', pct(total.brent.y), 'expect above', `Share of oil statements with P ≥ 0.6. Mean P across the whole pool ${total.brent.p.toFixed(2)}.`, '#2a78d6'],
-    ['TTF', pct(total.ttf.y), 'expect above', `Share of gas statements with P ≥ 0.6. Mean P across the whole pool ${total.ttf.p.toFixed(2)}.`, '#eb6834'],
-    ['Agencies', agencyOil.p.toFixed(2), 'mean P', `Mean P of agencies on oil, ${agencyOil.n} statements. ${pct(agencyOil.no)} expected a price below the threshold: the EIA gave about $70-75 a barrel.`, '#1baf7a'],
-    ['Press, gas', pct(pressGas.y), 'expect above', `Share of press and analyst statements on gas with P ≥ 0.6, ${pressGas.n} statements. They expected a spike but most often named no number.`, '#eda100'],
+  const thesis: [string, string, string, string, string, number, string][] = [
+    ['Brent', pct(total.brent.y), 'expect above', `Share of oil statements with P ≥ 0.6. Mean P across the whole pool ${total.brent.p.toFixed(2)}.`, '#2a78d6', total.brent.n, 'oil statements, share with P ≥ 0.6'],
+    ['TTF', pct(total.ttf.y), 'expect above', `Share of gas statements with P ≥ 0.6. Mean P across the whole pool ${total.ttf.p.toFixed(2)}.`, '#eb6834', total.ttf.n, 'gas statements, share with P ≥ 0.6'],
+    ['Agencies', agencyOil.p.toFixed(2), 'mean P', `Mean P of agencies on oil, ${agencyOil.n} statements. ${pct(agencyOil.no)} expected a price below the threshold: the EIA gave about $70-75 a barrel.`, '#1baf7a', agencyOil.n, 'agency oil statements, average P'],
+    ['Press, gas', pct(pressGas.y), 'expect above', `Share of press and analyst statements on gas with P ≥ 0.6, ${pressGas.n} statements. They expected a spike but most often named no number.`, '#eda100', pressGas.n, 'press gas statements, share with P ≥ 0.6'],
   ]
 
   return (
@@ -133,13 +133,17 @@ export default function EnergyRetroReport({ rows, pool, prices }: { rows: Report
             Six months before the invasion: {pool.length} rated articles that quote banks, agencies, companies and the press on oil and European gas prices.
             Each was read in full and rated separately on two questions: would Brent settle at or above $120, and would TTF settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022.
           </p>
+          <p className="mt-3 max-w-2xl text-sm text-gray-600 leading-relaxed">
+            These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × position, unless the speaker named a probability; most articles name no price, so P is a directional reading. P ≥ 0.6 counts as “expects above”, P ≤ 0.4 as “does not”.
+          </p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-2 border-gray-900 border-b border-gray-200">
-            {thesis.map(([who, big, unit, text, color], i) => (
+            {thesis.map(([who, big, unit, text, color, n, metric], i) => (
               <div key={who} className={`py-5 pr-5 ${i > 0 ? 'lg:pl-5 lg:border-l border-gray-200 border-t sm:border-t-0' : ''} ${i === 1 || i === 3 ? 'sm:pl-5 sm:border-l' : ''} ${i >= 2 ? 'sm:border-t lg:border-t-0' : ''}`}>
                 <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-gray-700">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />{who}
                 </div>
                 <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ml-1.5 text-sm font-normal text-gray-600">{unit}</span></div>
+                <div className="mt-1 font-mono text-[11px] text-gray-600">n = {n.toLocaleString('en-US')} · {metric}{n < 50 && <b className="text-amber-700 font-medium"> · small sample</b>}</div>
                 <p className="mt-2 text-sm text-gray-700 leading-snug">{text}</p>
               </div>
             ))}

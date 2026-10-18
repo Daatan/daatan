@@ -39,7 +39,7 @@ export const analyses: AnalysisData[] = [
     id: 'ukraine-2022',
     tag: 'CASE E01 · 910 RATED STATEMENTS',
     title: 'Who Saw the Invasion of Ukraine Coming',
-    description: "The three months before Russia's full-scale invasion on 24 February 2022. Every statement was rated on how likely its speaker thought a full-scale invasion was, on the day it was published. Western governments averaged 80%. Russian officials said no in 80% of their statements, and Ukrainian officials in 40%. P is the invasion probability a speaker expressed, from 0 to 1.",
+    description: "The three months before Russia's full-scale invasion on 24 February 2022. Every statement was rated on how likely its speaker thought a full-scale invasion was, on the day it was published. Western governments averaged P = 80% (307 statements). Russian officials said no (P ≤ 0.4) in 80% of their 92 statements, and Ukrainian officials in 40% of their 92. P is a 0–1 rating of the invasion probability each statement implies, assigned by an AI model (Claude Haiku 4.5); it is not a number the speakers stated.",
     reportHref: '/retroanalysis/ukraine-2022',
     leftColumn: {
       label: 'YES / INVASION',
@@ -49,7 +49,7 @@ export const analyses: AnalysisData[] = [
       items: [
         { source: 'INTERFAX', headline: 'Kyrylo Budanov, head of Ukrainian military intelligence', date: 'Nov 21, 2021', quote: 'Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.' },
         { source: 'THE WASHINGTON POST', headline: "Rob Lee, King's College London", date: 'Jan 21, 2022', quote: 'A Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.' },
-        { source: 'THE NEW YORK TIMES', headline: 'Joe Biden, US President', date: 'Feb 02, 2022', quote: 'My guess is he will move in. He has to do something.' },
+        { source: 'THE NEW YORK TIMES', headline: 'Joe Biden, US President, quoted in an NYT analysis', date: 'Feb 02, 2022', quote: 'My guess is he will move in. He has to do something.' },
         { source: 'PBS NEWSHOUR', headline: 'Jonathan Finer, US Deputy National Security Adviser', date: 'Feb 04, 2022', quote: "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we're actually seeing with our own eyes." },
       ]
     },
@@ -71,7 +71,7 @@ export const analyses: AnalysisData[] = [
     id: 'israel-2022',
     tag: 'CASE E02 · 1,100 RATED STATEMENTS',
     title: 'Who Saw 64 Seats Coming',
-    description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats throughout the campaign, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is the probability of a 61+ majority a speaker expressed, from 0 to 1.",
+    description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats throughout the campaign, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is a 0–1 rating of the 61+ majority probability each statement implies, assigned by an AI model (Claude Haiku 4.5); it is not a number the speakers stated.",
     reportHref: '/retroanalysis/israel-2022',
     leftColumn: {
       label: 'YES / 61+',
@@ -102,7 +102,7 @@ export const analyses: AnalysisData[] = [
     id: 'energy-2022',
     tag: 'CASE E03 · 264 RATED ARTICLES',
     title: 'Who Saw $120 Oil and €200 Gas',
-    description: 'The six months before the February 2022 invasion. Every article was rated separately on two questions: would Brent settle at or above $120 and would TTF gas settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022. Agencies mostly expected oil well below the line; the press expected a gas spike but rarely named a number. Most ratings are directional readings, not calibrated probabilities. P is the probability a speaker expressed, from 0 to 1, and the two markets are never combined.',
+    description: 'The six months before the February 2022 invasion. Every article was rated separately on two questions: would Brent settle at or above $120 and would TTF gas settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022. Agencies mostly expected oil well below the line; the press expected a gas spike but rarely named a number. Most ratings are directional readings, not calibrated probabilities. P is a 0–1 rating of the probability each statement implies, assigned by an AI model (Claude Haiku 4.5), and the two markets are never combined.',
     reportHref: '/retroanalysis/energy-2022',
     leftColumn: {
       label: 'ABOVE THE LINE',

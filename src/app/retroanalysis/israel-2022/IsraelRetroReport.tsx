@@ -83,11 +83,11 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
 
   const oct = polls.filter(r => r.d >= '2022-10-01')
   const octUnder = oct.filter(r => r.s < 61).length / Math.max(1, oct.length)
-  const thesis: [Group, string, string, string][] = [
-    ['polls', pct(octUnder), 'below 61', 'Share of October poll reports that left the bloc short of a majority. The most common figure was 60.'],
-    ['media', pct(byGroup.media.p), 'mean P', `Analysts and journalists split, but “no” came up more often: ${pct(byGroup.media.no)} against ${pct(byGroup.media.y)}.`],
-    ['bloc', pct(byGroup.bloc.y), 'say “yes”', 'Likud and its partners promised 61, though many in the camp conceded the polls were a seat or two short.'],
-    ['anti', pct(byGroup.anti.no), 'say “no”', `Lapid, Gantz and their allies ran on “Netanyahu has no 61”. Their mean P was ${pct(byGroup.anti.p)}.`],
+  const thesis: [Group, string, string, string, number, string][] = [
+    ['polls', pct(octUnder), 'below 61', 'Share of October poll reports that left the bloc short of a majority. The most common figure was 60.', oct.length, 'October poll reports with a seat total'],
+    ['media', pct(byGroup.media.p), 'mean P', `Analysts and journalists split, but “no” came up more often: ${pct(byGroup.media.no)} against ${pct(byGroup.media.y)}.`, byGroup.media.n, 'average P'],
+    ['bloc', pct(byGroup.bloc.y), 'say “yes”', 'Likud and its partners promised 61, though many in the camp conceded the polls were a seat or two short.', byGroup.bloc.n, 'share of statements with P ≥ 0.6'],
+    ['anti', pct(byGroup.anti.no), 'say “no”', `Lapid, Gantz and their allies ran on “Netanyahu has no 61”. Their mean P was ${pct(byGroup.anti.p)}.`, byGroup.anti.n, 'share of statements with P ≤ 0.4'],
   ]
 
   return (
@@ -106,13 +106,17 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
             The six months before Israel&apos;s 25th Knesset election: {pool.length.toLocaleString('en-US')} statements from the Israeli press in Hebrew, English, Russian and Arabic, world media and think tanks.
             Each article was read in full and rated on one question: how likely did its main voice think it was that Netanyahu&apos;s bloc (Likud, Religious Zionism, Shas, United Torah Judaism) would win 61 seats? The bloc won 64.
           </p>
+          <p className="mt-3 max-w-2xl text-sm text-gray-600 leading-relaxed">
+            These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × stance; the speaker did not necessarily name a probability. P ≥ 0.6 counts as “expects”, P ≤ 0.4 as “does not”.
+          </p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-2 border-gray-900 border-b border-gray-200">
-            {thesis.map(([g, big, unit, text], i) => (
+            {thesis.map(([g, big, unit, text, n, metric], i) => (
               <div key={g} className={`py-5 pr-5 ${i > 0 ? 'lg:pl-5 lg:border-l border-gray-200' : ''} ${i > 0 ? 'border-t sm:border-t-0' : ''} ${i === 1 || i === 3 ? 'sm:pl-5 sm:border-l' : ''} ${i >= 2 ? 'sm:border-t lg:border-t-0' : ''}`}>
                 <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-gray-700">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]}
                 </div>
                 <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ml-1.5 text-sm font-normal text-gray-600">{unit}</span></div>
+                <div className="mt-1 font-mono text-[11px] text-gray-600">n = {n.toLocaleString('en-US')} · {metric}</div>
                 <p className="mt-2 text-sm text-gray-700 leading-snug">{text}</p>
               </div>
             ))}
