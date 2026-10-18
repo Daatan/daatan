@@ -1,132 +1,66 @@
+// Display text for each case (tag, title, description, column labels, headlines, quotes)
+// lives in messages/*.json under `retroIndex.cases.<id>`; this file holds the language-neutral part.
 export interface NewsItem {
   source: string
-  headline: string
+  /** ISO date (UTC), formatted per locale on render. */
   date: string
-  quote?: string
-}
-
-export interface AnalysisSection {
-  title: string
-  content: string[]
 }
 
 export interface AnalysisData {
   id: string
-  tag: string
-  title: string
-  description: string
-  leftColumn: {
-    label: string
-    outcome: string
-    sublabel: string
-    color: string
-    items: NewsItem[]
-  }
-  rightColumn: {
-    label: string
-    outcome: string
-    sublabel: string
-    color: string
-    items: NewsItem[]
-  }
-  detailedAnalysis?: AnalysisSection[]
-  citations?: string[]
-  reportHref?: string
+  reportHref: string
+  leftItems: NewsItem[]
+  rightItems: NewsItem[]
 }
 
 export const analyses: AnalysisData[] = [
   {
     id: 'ukraine-2022',
-    tag: 'CASE E01 · 910 RATED STATEMENTS',
-    title: 'Who Saw the Invasion of Ukraine Coming',
-    description: "The three months before Russia's full-scale invasion on 24 February 2022. Every statement was rated on how likely its speaker thought a full-scale invasion was, on the day it was published. Western governments averaged P = 80% (307 statements). Russian officials said no (P ≤ 0.4) in 80% of their 92 statements, and Ukrainian officials in 40% of their 92. P is a 0–1 rating of the invasion probability each statement implies, assigned by an AI model (Claude Haiku 4.5); it is not a number the speakers stated.",
     reportHref: '/retroanalysis/ukraine-2022',
-    leftColumn: {
-      label: 'YES / INVASION',
-      outcome: 'CORRECT',
-      sublabel: 'EXPECTED A FULL-SCALE INVASION',
-      color: 'teal',
-      items: [
-        { source: 'INTERFAX', headline: 'Kyrylo Budanov, head of Ukrainian military intelligence', date: 'Nov 21, 2021', quote: 'Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.' },
-        { source: 'THE WASHINGTON POST', headline: "Rob Lee, King's College London", date: 'Jan 21, 2022', quote: 'A Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.' },
-        { source: 'THE NEW YORK TIMES', headline: 'Joe Biden, US President, quoted in an NYT analysis', date: 'Feb 02, 2022', quote: 'My guess is he will move in. He has to do something.' },
-        { source: 'PBS NEWSHOUR', headline: 'Jonathan Finer, US Deputy National Security Adviser', date: 'Feb 04, 2022', quote: "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we're actually seeing with our own eyes." },
-      ]
-    },
-    rightColumn: {
-      label: 'NO / BLUFF',
-      outcome: 'WRONG',
-      sublabel: 'DISMISSED A FULL-SCALE INVASION',
-      color: 'rose',
-      items: [
-        { source: 'IZVESTIA', headline: 'Dmitry Peskov, Kremlin spokesman', date: 'Nov 29, 2021', quote: 'Слова о якобы планируемом Россией нападении абсолютно беспочвенны.' },
-        { source: 'INSTITUTE FOR THE STUDY OF WAR', headline: "Putin's Likely Courses of Action in Ukraine, Part 2", date: 'Dec 12, 2021', quote: 'Putin does not, in fact, intend to invade unoccupied Ukraine this winter despite the continued build-up of Russian forces in preparation to do so.' },
-        { source: 'UNIAN', headline: "Oleksiy Danilov, Secretary of Ukraine's Security Council", date: 'Dec 30, 2021', quote: 'Сейчас угрозы открытой агрессии Российской Федерации против Украины не наблюдается… Поэтому отдыхайте спокойно, празднуйте.' },
-        { source: 'CARNEGIE MOSCOW CENTER', headline: 'Are We On the Brink of War? An Interview With Dmitri Trenin', date: 'Jan 20, 2022', quote: 'In the immediate future, say, the coming month, I think the answer is no.' },
-        { source: 'FOREIGN POLICY', headline: 'Jeff Hawn, London School of Economics', date: 'Jan 24, 2022', quote: 'While a full-scale invasion across Ukraine remains highly unlikely, there are a range of other options open to Russia.' },
-      ]
-    }
+    leftItems: [
+      { source: 'INTERFAX', date: '2021-11-21' },
+      { source: 'THE WASHINGTON POST', date: '2022-01-21' },
+      { source: 'THE NEW YORK TIMES', date: '2022-02-02' },
+      { source: 'PBS NEWSHOUR', date: '2022-02-04' },
+    ],
+    rightItems: [
+      { source: 'IZVESTIA', date: '2021-11-29' },
+      { source: 'INSTITUTE FOR THE STUDY OF WAR', date: '2021-12-12' },
+      { source: 'UNIAN', date: '2021-12-30' },
+      { source: 'CARNEGIE MOSCOW CENTER', date: '2022-01-20' },
+      { source: 'FOREIGN POLICY', date: '2022-01-24' },
+    ],
   },
   {
     id: 'israel-2022',
-    tag: 'CASE E02 · 1,100 RATED STATEMENTS',
-    title: 'Who Saw 64 Seats Coming',
-    description: "The six months before Israel's 25th Knesset election on 1 November 2022. Every statement was rated on how likely its speaker thought it was that Netanyahu's bloc would win a 61-seat majority. Polls gave the bloc 59–60 seats throughout the campaign, and the press leaned towards deadlock and a sixth election. The bloc won 64. P is a 0–1 rating of the 61+ majority probability each statement implies, assigned by an AI model (Claude Haiku 4.5); it is not a number the speakers stated.",
     reportHref: '/retroanalysis/israel-2022',
-    leftColumn: {
-      label: 'YES / 61+',
-      outcome: 'CORRECT',
-      sublabel: 'EXPECTED A NETANYAHU MAJORITY',
-      color: 'teal',
-      items: [
-        { source: 'ALL ISRAEL NEWS', headline: 'Joel Rosenberg, editor-in-chief', date: 'Jul 09, 2022', quote: "If I were a betting man at one of Trump's casinos, I would probably put my money 60-40 on Netanyahu to come back." },
-        { source: 'AL-QUDS AL-ARABI', headline: 'Nadav Eyal, Yedioth Ahronoth (translated)', date: 'Sep 18, 2022', quote: 'Since the start of the campaign, Netanyahu has not been closer to victory than he is now, thanks to Sami Abu Shehada and his colleagues, of course.' },
-        { source: 'KIKAR HASHABBAT', headline: 'Amit Segal, Yedioth Ahronoth', date: 'Oct 14, 2022', quote: 'נתניהו, באופן תיאורטי, עשוי להגיע ל-63 מנדטים גם אם המחנה שלו יזכה לפחות ממחצית הקולות' },
-        { source: 'AL-QUDS AL-ARABI', headline: 'Yuval Karni, Yedioth Ahronoth (translated)', date: 'Oct 28, 2022', quote: 'A 61-seat government headed by Netanyahu is the scenario with the highest likelihood of materializing.' },
-      ]
-    },
-    rightColumn: {
-      label: 'NO / DEADLOCK',
-      outcome: 'WRONG',
-      sublabel: 'EXPECTED NO MAJORITY',
-      color: 'rose',
-      items: [
-        { source: 'ATLANTIC COUNCIL', headline: 'Noga Tarnopolsky', date: 'Jun 17, 2022', quote: 'Netanyahu has no evident path back...' },
-        { source: 'CHANNEL 7 (RUSSIAN)', headline: 'Ze’ev Elkin, New Hope', date: 'Aug 29, 2022', quote: 'Нетаньяху почти ни в одном опросе не доходит до 61 мандата... Нетаньяху на этот раз не получит 61 место' },
-        { source: 'AL-QUDS AL-ARABI', headline: 'Bobby Ghosh, Bloomberg (translated)', date: 'Oct 31, 2022', quote: 'The closest bet is holding a sixth election.' },
-        { source: 'FOREIGN POLICY', headline: 'Shalom Lipner, Atlantic Council', date: 'Oct 31, 2022', quote: "Even more likely than this bleak scenario materializing is the correspondingly precarious outcome of Israelis being dragged to another sixth ballot in a few months' time." },
-      ]
-    }
+    leftItems: [
+      { source: 'ALL ISRAEL NEWS', date: '2022-07-09' },
+      { source: 'AL-QUDS AL-ARABI', date: '2022-09-18' },
+      { source: 'KIKAR HASHABBAT', date: '2022-10-14' },
+      { source: 'AL-QUDS AL-ARABI', date: '2022-10-28' },
+    ],
+    rightItems: [
+      { source: 'ATLANTIC COUNCIL', date: '2022-06-17' },
+      { source: 'CHANNEL 7 (RUSSIAN)', date: '2022-08-29' },
+      { source: 'AL-QUDS AL-ARABI', date: '2022-10-31' },
+      { source: 'FOREIGN POLICY', date: '2022-10-31' },
+    ],
   },
   {
     id: 'energy-2022',
-    tag: 'CASE E03 · 264 RATED ARTICLES',
-    title: 'Who Saw $120 Oil and €200 Gas',
-    description: 'The six months before the February 2022 invasion. Every article was rated separately on two questions: would Brent settle at or above $120 and would TTF gas settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022. Agencies mostly expected oil well below the line; the press expected a gas spike but rarely named a number. Most ratings are directional readings, not calibrated probabilities. P is a 0–1 rating of the probability each statement implies, assigned by an AI model (Claude Haiku 4.5), and the two markets are never combined.',
     reportHref: '/retroanalysis/energy-2022',
-    leftColumn: {
-      label: 'ABOVE THE LINE',
-      outcome: 'CORRECT',
-      sublabel: 'EXPECTED $120 OIL OR €200 GAS',
-      color: 'teal',
-      items: [
-        { source: 'BUSINESS INSIDER', headline: 'JPMorgan, bank', date: 'Jan 21, 2022', quote: 'International oil prices could soar to $150 a barrel during the first quarter of 2022 if an ongoing conflict between Russia and Ukraine leads to a supply shock.' },
-        { source: 'NPR', headline: 'Jeffrey Halley, Oanda (if Russia invades in full)', date: 'Feb 22, 2022', quote: 'The immediate impact would be an exacerbation of the rampant inflationary pressures globally as oil hits $130.00+ a barrel.' },
-        { source: 'ROSSIYSKAYA GAZETA', headline: 'Alexey Miller, head of Gazprom', date: 'Sep 17, 2021', quote: 'The price of gas in Europe may break the already achieved records in the near future.' },
-        { source: 'OILPRICE', headline: 'Samantha Dart, Goldman Sachs', date: 'Jan 25, 2022', quote: "We wouldn't rule out in this scenario the market briefly revisiting the 180 EUR/MWh high observed in mid-December - or even higher levels." },
-      ]
-    },
-    rightColumn: {
-      label: 'BELOW THE LINE',
-      outcome: 'WRONG',
-      sublabel: 'EXPECTED PRICES TO STAY LOWER',
-      color: 'rose',
-      items: [
-        { source: 'VEDOMOSTI', headline: 'Deutsche Bank, bank', date: 'Dec 01, 2021', quote: 'Oil price may fall below $60 per barrel next year due to a significant increase in supply.' },
-        { source: 'EIA', headline: 'U.S. Energy Information Administration', date: 'Jan 12, 2022', quote: 'We forecast that the price of Brent will average $75/b in 2022 and $68/b in 2023.' },
-        { source: 'FXSTREET', headline: 'ABN Amro, bank', date: 'Jan 27, 2022', quote: 'The TTF monthly contracts could trade above EUR 200/MWh for an extended period... Oil prices would be trading above $100/bbl. [ABN Amro put the scenario of a halt in Russian gas exports at 5-10%.]' },
-        { source: 'TASS', headline: 'Alexander Ivannikov, Gazprom department head', date: 'Sep 07, 2021', quote: 'Gas prices in Europe will definitely remain at the current level in the near future.' },
-      ]
-    }
-  }
+    leftItems: [
+      { source: 'BUSINESS INSIDER', date: '2022-01-21' },
+      { source: 'NPR', date: '2022-02-22' },
+      { source: 'ROSSIYSKAYA GAZETA', date: '2021-09-17' },
+      { source: 'OILPRICE', date: '2022-01-25' },
+    ],
+    rightItems: [
+      { source: 'VEDOMOSTI', date: '2021-12-01' },
+      { source: 'EIA', date: '2022-01-12' },
+      { source: 'FXSTREET', date: '2022-01-27' },
+      { source: 'TASS', date: '2021-09-07' },
+    ],
+  },
 ]
