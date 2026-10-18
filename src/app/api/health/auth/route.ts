@@ -48,8 +48,7 @@ export async function GET(request: Request) {
     },
     GOOGLE_CLIENT_SECRET: {
       set: true,
-      length: clientSecret.length,
-      preview: `${clientSecret.slice(0, 4)}...${clientSecret.slice(-4)}`
+      length: clientSecret.length
     },
     NEXTAUTH_SECRET: {
       set: true,
