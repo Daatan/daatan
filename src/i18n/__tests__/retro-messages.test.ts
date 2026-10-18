@@ -4,7 +4,7 @@ import he from '../../../messages/he.json'
 import ru from '../../../messages/ru.json'
 import eo from '../../../messages/eo.json'
 
-const NAMESPACES = ['retroIsrael', 'retroShared'] as const
+const NAMESPACES = ['retroIsrael', 'retroUkraine', 'retroShared'] as const
 
 type Tree = { [k: string]: string | Tree | Tree[] | string[] }
 
@@ -45,9 +45,10 @@ describe('retro report messages', () => {
     }
   })
 
+  // Quotes originally spoken in Russian have no Latin letters and stay verbatim in the ru copy.
   it.each([['he', he], ['ru', ru]] as const)('%s is actually translated (no copied English prose)', (_l, m) => {
     const loc = flat(m)
-    const same = Object.entries(base).filter(([k, v]) => v.length > 40 && loc[k] === v)
+    const same = Object.entries(base).filter(([k, v]) => v.length > 40 && /[A-Za-z]/.test(v) && loc[k] === v)
     expect(same.map(([k]) => k)).toEqual([])
   })
 })
