@@ -19,8 +19,8 @@ const MIN_PREDICTIONS = 4
 
 // Shadow-scoring rows move slowly — 5min TTL matches /api/leaderboard's.
 const getCachedSourceLeaderboard = unstable_cache(
-  async (view: SourceLeaderboardView, sortBy: SourceSortBy) =>
-    getSourceLeaderboard(view, sortBy, MIN_PREDICTIONS),
+  async (view: SourceLeaderboardView, sortBy: SourceSortBy, tag: string | null) =>
+    getSourceLeaderboard(view, sortBy, MIN_PREDICTIONS, tag ?? undefined),
   ['leaderboard-sources-api'],
   { revalidate: 300, tags: ['leaderboard-sources'] },
 )
@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const view: SourceLeaderboardView = searchParams.get('view') === 'outlets' ? 'outlets' : 'authors'
     const sortBy: SourceSortBy = searchParams.get('sortBy') === 'brierScore' ? 'brierScore' : 'skillConservative'
-    const leaderboard = await getCachedSourceLeaderboard(view, sortBy)
+    const tag = searchParams.get('tag')?.slice(0, 80) || null
+    const leaderboard = await getCachedSourceLeaderboard(view, sortBy, tag)
     return NextResponse.json(leaderboard)
   } catch (error) {
     return handleRouteError(error, 'Failed to fetch source leaderboard')

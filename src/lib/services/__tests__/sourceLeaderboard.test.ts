@@ -364,3 +364,13 @@ describe('joint bylines are split (#1904)', () => {
     expect(authorRows.map(r => [r.author, r.predictions])).toEqual([['A One', 5]])
   })
 })
+
+describe('per-topic board (#1917)', () => {
+  it('asks the Oracul for the tag’s board and leaves the default call untagged', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 0, authors: [] })
+    await getSourceLeaderboard('outlets', 'skillConservative', 0, 'economy')
+    expect(mockGetAuthorShadowLeaderboard).toHaveBeenLastCalledWith(undefined, 'economy')
+    await getSourceLeaderboard('outlets')
+    expect(mockGetAuthorShadowLeaderboard).toHaveBeenLastCalledWith(undefined, undefined)
+  })
+})

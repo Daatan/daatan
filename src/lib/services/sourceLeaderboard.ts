@@ -239,7 +239,8 @@ function sortRows<T extends { skillConservative: number; brierScore: number }>(
  * `minPredictions` defaults to 0 (no filtering) because this function also backs single-row
  * lookups — `/sources/[name]`, `/authors/[author]/[outlet]`, and the byline-linkability check
  * in forecast-sources.ts — that must keep seeing every scored row regardless of sample size.
- * Only the public `/leaderboard/sources` board (daatan#1587) passes a non-zero value. Outlets
+ * Only the public `/leaderboard/sources` board (daatan#1587) passes a non-zero value. `tag` (a
+ * Daatan tag slug, daatan#1917) scores only that topic's resolutions, via retro's `?tag=`. Outlets
  * are filtered on their aggregate `predictions` count (summed across authors), not by dropping
  * low-sample authors before aggregation.
  *
@@ -250,8 +251,9 @@ export async function getSourceLeaderboard(
   view: SourceLeaderboardView = 'authors',
   sortBy: SourceSortBy = 'skillConservative',
   minPredictions = 0,
+  tag?: string,
 ): Promise<SourceLeaderboardResult> {
-  const data = await getAuthorShadowLeaderboard()
+  const data = await getAuthorShadowLeaderboard(undefined, tag)
   const entries = data?.authors ?? []
 
   const authorRows = sortRows(mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow))), sortBy)
