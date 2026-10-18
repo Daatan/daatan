@@ -521,6 +521,9 @@ Populate the Oracul source roster for `ACTIVE`, public forecasts that have no co
 ### `POST /api/admin/forecasts/backfill-settlement-pins` — Admin or `x-cron-secret`
 One-off (daatan#1451): re-push resolved binaries that carry a settled Oracul snapshot so their settlement pins land in the Oracul's settlement-pin ledger. Safe to re-run (the ledger dedups). `?limit=N` (default and max 50). Reads the ledger before and after rather than trusting its own counter; returns `{ processed, predictionIds, ledgerBefore, ledgerAfter, recorded }`.
 
+### `POST /api/admin/forecasts/backfill-tags` — Admin or `x-cron-secret`
+One-off (daatan#1917): re-push resolved, tagged binaries to the Oracul with their tag slugs so its per-topic author board (`GET /leaderboard/author-shadow?tag=`) covers history. Safe to re-run (the ledger entry is untouched). `?limit=N` (default and max 50); page with `?after=<nextCursor>` until `nextCursor` is `null`. Returns `{ processed, nextCursor }`. The push swallows its own failures — verify on the Oracul's by-tag board.
+
 ### `POST /api/admin/forecasts/backfill-temporal` — Admin or `x-cron-secret`
 Two-phase backfill for the temporal-model classifier. **Body** `{ mode: 'dry-run' | 'apply', limit?, ids?, skipIds?, force? }` (`limit` default 100, max 200). `dry-run` classifies and returns a review report sorted by confidence ascending, writing nothing; `apply` persists through the same `classifyAndStoreTemporal` path the creation hook uses. Rows that already have a `classifierVersion` are skipped unless `force`.
 
