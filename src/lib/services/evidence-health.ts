@@ -258,8 +258,11 @@ async function batchLoopHeartbeat(now: Date): Promise<EvidenceHealthIssue[]> {
     `https://api.github.com/repos/${BATCH_HEARTBEAT_REPO}/commits` +
     `?path=${encodeURIComponent(BATCH_HEARTBEAT_PATH)}&per_page=1`
   try {
+    const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+    // Unset while retro is public; a read-only token keeps this working if it goes private (docs#213).
+    if (process.env.RETRO_READ_TOKEN) headers.Authorization = `Bearer ${process.env.RETRO_READ_TOKEN}`
     const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github+json' },
+      headers,
       signal: AbortSignal.timeout(BATCH_HEARTBEAT_TIMEOUT_MS),
     })
     if (!res.ok) {

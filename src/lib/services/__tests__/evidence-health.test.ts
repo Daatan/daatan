@@ -324,6 +324,21 @@ describe('checkEvidenceHealth', () => {
       )
     })
 
+    it('authenticates the GitHub call when RETRO_READ_TOKEN is set (docs#213)', async () => {
+      vi.stubEnv('RETRO_READ_TOKEN', 'tok')
+      try {
+        await checkEvidenceHealth()
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer tok' },
+          }),
+        )
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+
     it('fires when the newest atlas commit is older than the threshold', async () => {
       fetchMock.mockResolvedValue(heartbeatResponse(BATCH_HEARTBEAT_STALE_HOURS + 1))
 
