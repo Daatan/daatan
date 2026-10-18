@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { authorKey, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { authorTopicRecords, getTopicBoards } from '@/lib/services/sourceTopicBoards'
+import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import { getPublicArticlesByAuthorOutlet } from '@/lib/services/evidence-pool'
 import { getAppUrl } from '@/lib/branding'
 
@@ -52,7 +54,11 @@ export default async function AuthorPublicPage({ params }: Props) {
   const row = await findRow(decodedAuthor, decodedOutlet)
   if (!row) notFound()
 
-  const publications = await getPublicArticlesByAuthorOutlet(decodedAuthor, decodedOutlet)
+  const [publications, topicBoards] = await Promise.all([
+    getPublicArticlesByAuthorOutlet(decodedAuthor, decodedOutlet),
+    getTopicBoards(),
+  ])
+  const topics = authorTopicRecords(topicBoards, decodedAuthor, decodedOutlet)
   const t = await getTranslations('authorPage')
 
   return (
@@ -82,6 +88,8 @@ export default async function AuthorPublicPage({ params }: Props) {
           <Stat label={t('articles')} value={String(row.articles)} />
         </div>
       </div>
+
+      <TopicBreakdown records={topics} view="authors" />
 
       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
         {t('publications')} ({publications.length})

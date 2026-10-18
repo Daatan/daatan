@@ -2184,5 +2184,13 @@
         }
       }
     }
+  },
+  "topicBreakdown": {
+    "title": "By topic",
+    "topic": "Topic",
+    "skill": "Skill",
+    "brier": "Brier",
+    "predictions": "Predictions",
+    "hint": "Each topic is scored only on its own resolved forecasts, so samples are small — read the numbers with care."
   }
 }

@@ -5,6 +5,8 @@ import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
+import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
@@ -42,9 +44,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function OutletPublicPage({ params }: Props) {
   const { name } = await params
 
-  const [detail, { outletRows, authorRows }] = await Promise.all([
+  const [detail, { outletRows, authorRows }, topicBoards] = await Promise.all([
     getPublicOutletDetail(decodeURIComponent(name)),
     getSourceLeaderboard('outlets', 'skillConservative'),
+    getTopicBoards(),
   ])
   if (!detail) notFound()
 
@@ -55,6 +58,7 @@ export default async function OutletPublicPage({ params }: Props) {
   // The scored authors behind the track record. Same key as `track`, so the numbers above
   // and this list always describe the same rows.
   const scoredAuthors = track ? authorsOfOutlet(authorRows, track.outletName) : []
+  const topics = outletTopicRecords(topicBoards, keys)
   const noImpact =
     detail.impact.forecastsAffected === 0 && detail.impact.matches === 0 && detail.impact.last30dMatches === 0
   const t = await getTranslations('outletPage')
@@ -130,6 +134,8 @@ export default async function OutletPublicPage({ params }: Props) {
           <Stat label={t('last30dMatches')} hint={t('impactHint')} value={String(detail.impact.last30dMatches)} big highlight />
         </div>
       )}
+
+      <TopicBreakdown records={topics} view="outlets" />
 
       {scoredAuthors.length > 0 && (
         <>
