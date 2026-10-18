@@ -1339,7 +1339,7 @@ export async function pushCredibilityFeedback(
   // threaded through the caller because this is the only consumer.
   const prediction = await prisma.prediction.findUnique({
     where: { id: predictionId },
-    select: { claimArchetype: true },
+    select: { claimArchetype: true, tags: { select: { slug: true } } },
   })
 
   let res: Response
@@ -1380,6 +1380,9 @@ export async function pushCredibilityFeedback(
         ...(claimArchetypeParam(prediction?.claimArchetype)
           ? { claim_archetype: claimArchetypeParam(prediction?.claimArchetype) }
           : {}),
+        // Topic slugs for retro's per-topic author board (retro#973). Omitted when untagged so an
+        // old retro and an untagged claim look the same.
+        ...(prediction?.tags.length ? { tags: prediction.tags.map((t) => t.slug) } : {}),
       }),
       timeoutMs: 10_000,
     })
