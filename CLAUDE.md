@@ -17,7 +17,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - **Migrations run via the dedicated migrations container** in blue-green Phase 5. Don't rely on `docker exec` for `prisma migrate deploy` — the slim runner image lacks the Prisma CLI deps. See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md`.
 - **The pgvector extension must be present** in the postgres image. Production uses `pgvector/pgvector:pg16`. Don't switch to stock `postgres:16-alpine` without re-evaluating the embedding migration.
 - **When retro lands a new elicited field, decide explicitly whether it gets a Telegram panel row.** *Decide and record* — not "always add". The article-match panel is a human-readable summary and an unreadable one helps nobody; but the current failure mode is that the question is never asked, so `reader_confidence` (retro#681) and `quantity` (retro#683) both shipped in the Oracul and stayed invisible here for weeks. Retro's own checklist (`retro/CLAUDE.md`) ends by pointing at this rule. If the answer is yes, four places move together: `OracleClaimDetail` in `src/lib/services/oracle.ts` (the type — it was missing both fields too), the read in `src/app/api/news-indexer/context/route.ts` (`s.claims_detail?.[0]?.<field>` for per-claim, `s.<field>` for article-level), `shadowRows` in `notifyNewsArticleMatched` (`src/lib/services/telegram.ts`), and both reader-facing surfaces — `docs/TELEGRAM_NOTIFICATIONS.md` and `/help/rating-numbers`. If the answer is no, say so in the PR that would have added it, with the reason. Render **what is stored**: the Oracul legitimately returns the same figure as `452 / "thousand active US Army personnel"` and `452000 / "active US Army personnel"`, so a renderer that normalises prints a number the article never wrote.
-- **Claim an issue before starting work on it.** Several agent sessions work this org's repos concurrently. Before the first exploratory read/edit for a GitHub issue: `gh issue edit <n> --add-assignee @me` and post a short "starting work now" comment. Check existing assignee/comments first — an assignee already set is a live claim, not necessarily a stalled one.
+- **Claim an issue before starting work on it.** Several agent sessions work this org's repos concurrently. Before the first exploratory read/edit for a GitHub issue: `gh issue edit <n> --add-assignee @me` and post a short "starting work now" comment. Check existing assignee/comments first. Every session authenticates as the same GitHub account, so the assignee cannot say who claimed an issue or when — the claim comment (stamped with a session name) is the signal; judge it by freshness (see the workspace `CLAUDE.md`).
 
 ## Common patterns
 
@@ -32,7 +32,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - TypeScript strict; no `as any` / `as unknown as X` in app code, except 4 documented, unavoidable cases (re-audited June 2026): the two NextAuth callback-bridging casts in `src/auth.ts`, the polymorphic `as`-prop spread in `src/components/ui/Button.tsx`, and the non-standard `navigator.standalone` read in `src/components/PwaInstaller.tsx`. Don't add new ones.
 - Default to no comments; only add when WHY is non-obvious
 - Don't add error handling, fallbacks, or validation for impossible scenarios — trust internal callers
-- Tests use vitest. Run `npm test` (no extra flags needed) for the unit suite (happy-dom, `vitest.config.ts`, ~290 test files). The `*.integration.test.ts` files run separately in node against a real Postgres via `npm run test:integration` (`vitest.config.integration.ts`).
+- Tests use vitest. Run `npm test` (no extra flags needed) for the unit suite (happy-dom, `vitest.config.ts`, 300+ test files). The `*.integration.test.ts` files run separately in node against a real Postgres via `npm run test:integration` (`vitest.config.integration.ts`).
 - `npm run lint` and `npx tsc --noEmit` must both be clean before any commit. Note: `npm run lint` still uses `next lint`, which is deprecated and removed in Next.js 16 — migrate to the ESLint CLI before that bump.
 
 ## Where to look
@@ -55,7 +55,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 
 - Production EC2: `i-04ea44d4243d35624`, EIP `3.126.238.216` → `daatan.com`
 - Staging EC2:    `i-0406d237ca5d92cdf` → `staging.daatan.com`
-- SSH port 22 is closed — server access is via AWS SSM `send-command` (use the `/ssm` slash command in Claude Code)
+- SSH port 22 is closed — server access is via AWS SSM `send-command` (use the `ssm-exec` skill in Claude Code)
 - Use `docker compose` (v2 plugin, no hyphen) on prod, not `docker-compose`
 - Production uses containers `daatan-app`, `daatan-nginx`, `daatan-postgres`, `daatan-certbot`
 - Backups: GitHub Actions `backup.yml` runs at 04:00 and 16:00 UTC daily (RPO ≤ 12h); stored in S3 `daatan-db-backups-272007598366`
