@@ -50,3 +50,7 @@ coverage/
 
 *.tsbuildinfo
 __pycache__/
+
+# Runtime state (not source)
+test-results/
+memory/heartbeat-state.json
