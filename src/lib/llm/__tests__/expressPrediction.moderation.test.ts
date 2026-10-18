@@ -63,4 +63,48 @@ describe('generateExpressPrediction — moderation gating', () => {
 
     expect(checkContent).toHaveBeenCalledOnce()
   })
+
+  it('runs moderation beside the search and never drafts an offensive input (#1890)', async () => {
+    let moderationStarted = false
+    let searchStartedDuringModeration = false
+    vi.mocked(checkContent).mockImplementation(async () => {
+      moderationStarted = true
+      await new Promise(r => setTimeout(r, 20))
+      return { isOffensive: true, reason: 'nope' }
+    })
+    vi.mocked(oracleSearch).mockImplementation(async () => {
+      searchStartedDuringModeration = moderationStarted
+      return [{ title: 't', url: 'https://x.test/a', snippet: 's', source: 'X' }] as never
+    })
+
+    await expect(
+      generateExpressPrediction('some clearly offensive free-text claim'),
+    ).rejects.toThrow(/OFFENSIVE_INPUT/)
+
+    expect(searchStartedDuringModeration).toBe(true)
+    expect(llmService.generateContent).not.toHaveBeenCalled()
+  })
+
+  it('reports an offensive input as such even when the search finds nothing (#1890)', async () => {
+    vi.mocked(checkContent).mockResolvedValue({ isOffensive: true, reason: 'nope' })
+    vi.mocked(oracleSearch).mockResolvedValue([])
+
+    await expect(
+      generateExpressPrediction('some clearly offensive free-text claim'),
+    ).rejects.toThrow(/OFFENSIVE_INPUT/)
+  })
+
+  it('returns per-stage timings with a total (#1890)', async () => {
+    vi.mocked(checkContent).mockResolvedValue({ isOffensive: false, reason: '' })
+    vi.mocked(oracleSearch).mockResolvedValue([
+      { title: 't', url: 'https://x.test/a', snippet: 's', source: 'X' },
+    ] as never)
+
+    const result = await generateExpressPrediction('a perfectly fine free-text claim')
+
+    expect(Object.keys(result.stageTimings).sort()).toEqual([
+      'draftMs', 'localizationMs', 'moderationMs', 'rulesDirectionMs', 'searchMs', 'searchQueryMs', 'totalMs',
+    ])
+    expect(result.stageTimings.totalMs).toBeGreaterThanOrEqual(0)
+  })
 })

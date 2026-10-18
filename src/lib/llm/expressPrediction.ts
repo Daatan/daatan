@@ -184,6 +184,9 @@ export interface ExpressPredictionResult {
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
   localized?: LocalizedForecast | null
+  // #1890: wall-clock ms per creation stage (plus `totalMs`), persisted on the attempt so
+  // latency can be read from `forecast_creation_attempts` instead of log archaeology.
+  stageTimings: StageTimings
 }
 
 /** Shape of the JSON object returned by the LLM (matches expressPredictionSchema). */
@@ -315,6 +318,17 @@ export function getFiveYearsFromNow(now: Date) {
   }
 }
 
+export type StageTimings = Record<string, number>
+
+async function timed<T>(timings: StageTimings, stage: string, fn: () => Promise<T>): Promise<T> {
+  const start = Date.now()
+  try {
+    return await fn()
+  } finally {
+    timings[stage] = Date.now() - start
+  }
+}
+
 /** #1813: runs before localization, so the author's translated preview carries the fixed rules. */
 async function applyRulesDirection(prediction: ParsedPrediction): Promise<ExpressPredictionResult['rulesDirection']> {
   if (prediction.outcomeType !== 'BINARY') return null
@@ -345,13 +359,25 @@ export async function generateExpressPrediction(
   // forecast-create time (checkContent in POST /api/forecasts), so skipping the
   // raw-URL check here is safe.
   const isUrlInput = /^https?:\/\/[^\s]+$/i.test(userInput.trim())
-  if (!isUrlInput) {
+  const startedAt = Date.now()
+  const stageTimings: StageTimings = {}
+  const finish = (): StageTimings => ({ ...stageTimings, totalMs: Date.now() - startedAt })
+
+  // Moderation is independent of search, so on the search paths it runs beside them (#1890)
+  // and is awaited before anything is drafted — an offensive input still never reaches the
+  // drafter, it only stops costing its own 2-3 s of serial wall-clock. The no-op catch keeps
+  // a rejection from being "unhandled" while a search error propagates first.
+  const moderate = async (): Promise<void> => {
+    if (isUrlInput) return
     onProgress?.('checking', { message: 'Checking content…' })
-    const moderation = await checkContent(userInput, 'forecast')
+    const moderation = await timed(stageTimings, 'moderationMs', () => checkContent(userInput, 'forecast'))
     if (moderation.isOffensive) {
       throw new Error(`OFFENSIVE_INPUT: ${moderation.reason}`)
     }
   }
+  const moderationP = moderate()
+  moderationP.catch(() => {})
+  if (skipSources) await moderationP
 
   // Source-free path: skip web search entirely
   if (skipSources) {
@@ -391,9 +417,9 @@ export async function generateExpressPrediction(
     let articlesText: string
     let groundedDate: GroundedDateOutcome
     try {
-      ;({ prediction, articlesText, groundedDate } = await draftWithGroundedDate(
+      ;({ prediction, articlesText, groundedDate } = await timed(stageTimings, 'draftMs', () => draftWithGroundedDate(
         userInput, `[User Input]\n${userInput}`, now, draft, onProgress,
-      ))
+      )))
       onProgress?.('prediction_formed', {
         message: 'Forecast drafted — finalising…',
         preview: {
@@ -425,12 +451,12 @@ export async function generateExpressPrediction(
 
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-    const rulesDirection = await applyRulesDirection(prediction)
+    const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
     const rulesStrengthP = startRulesStrength(prediction)
-    const localized = await localizeForecastForAuthor(
+    const localized = await timed(stageTimings, 'localizationMs', () => localizeForecastForAuthor(
       { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
       userInput,
-    )
+    ))
     const rulesStrength = await rulesStrengthP
     const ungroundedYears = findUngroundedYears(
       prediction.claimText,
@@ -457,6 +483,7 @@ export async function generateExpressPrediction(
       rulesDirection,
       rulesStrength,
       localized,
+      stageTimings: finish(),
     }
   }
 
@@ -603,11 +630,12 @@ export async function generateExpressPrediction(
   } else {
     // Normal text flow: extract a focused query from the claim, then search.
     // Sentence-style claims retrieve poorly; key entities/topic do much better.
-    const searchQuery = await buildSearchQuery(userInput)
+    const searchQuery = await timed(stageTimings, 'searchQueryMs', () => buildSearchQuery(userInput))
     onProgress?.('searching', { message: 'Searching for relevant articles...' })
-    searchResults = (await oracleSearch(searchQuery, DEFAULT_MAX_ARTICLES, undefined, meta)) ?? []
+    searchResults = (await timed(stageTimings, 'searchMs', () => oracleSearch(searchQuery, DEFAULT_MAX_ARTICLES, undefined, meta))) ?? []
 
     if (searchResults.length === 0) {
+      await moderationP // an offensive input is reported as such, not as "no articles"
       throw new NoArticlesFoundError({
         searchedFor: searchQuery,
         isUrl: false,
@@ -615,6 +643,8 @@ export async function generateExpressPrediction(
       })
     }
   }
+
+  await moderationP
 
   // Build source summary like "CNN×2, Bloomberg, BBC"
   const sourceCounts = new Map<string, number>()
@@ -699,9 +729,9 @@ URL: ${article.url}
   try {
     // The reference block is prepended, so [Article N] numbering — and with it
     // relevantArticleIndices — is the same in both drafts.
-    ;({ prediction, articlesText, groundedDate } = await draftWithGroundedDate(
+    ;({ prediction, articlesText, groundedDate } = await timed(stageTimings, 'draftMs', () => draftWithGroundedDate(
       userInput, searchedArticlesText, now, draft, onProgress,
-    ))
+    )))
   } catch (error) {
     log.error({ err: error }, 'Failed to generate express prediction')
     throw error
@@ -788,12 +818,12 @@ URL: ${article.url}
 
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-  const rulesDirection = await applyRulesDirection(prediction)
+  const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
   const rulesStrengthP = startRulesStrength(prediction)
-  const localized = await localizeForecastForAuthor(
+  const localized = await timed(stageTimings, 'localizationMs', () => localizeForecastForAuthor(
     { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
     userInput,
-  )
+  ))
   const rulesStrength = await rulesStrengthP
 
   const claimDeadlineMismatch = findClaimTextDeadlineMismatch(prediction.claimText, new Date(prediction.resolveByDatetime))
@@ -826,6 +856,7 @@ URL: ${article.url}
     rulesDirection,
     rulesStrength,
     localized,
+    stageTimings: finish(),
   }
 }
 
