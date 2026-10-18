@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
-import { getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +12,9 @@ export const dynamic = 'force-dynamic'
 interface Props {
   params: Promise<{ name: string }>
 }
+
+/** Below this many resolved predictions a skill/Brier number is mostly noise. */
+const LOW_SAMPLE = 30
 
 function isUrl(s: string | null | undefined): s is string {
   return !!s && /^https?:\/\//.test(s)
@@ -39,13 +42,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function OutletPublicPage({ params }: Props) {
   const { name } = await params
 
-  const [detail, { outletRows }] = await Promise.all([
+  const [detail, { outletRows, authorRows }] = await Promise.all([
     getPublicOutletDetail(decodeURIComponent(name)),
     getSourceLeaderboard('outlets', 'skillConservative'),
   ])
   if (!detail) notFound()
 
   const track = outletRows.find(r => r.outletName === detail.name)
+  // The scored authors behind the track record. Same key as `track`, so the numbers above
+  // and this list always describe the same rows.
+  const scoredAuthors = track
+    ? authorRows
+        .filter(r => canonicalOutlet(r.outletName) === track.outletName)
+        .sort((a, b) => b.predictions - a.predictions || b.skillConservative - a.skillConservative)
+    : []
+  const noImpact =
+    detail.impact.forecastsAffected === 0 && detail.impact.matches === 0 && detail.impact.last30dMatches === 0
   const t = await getTranslations('outletPage')
 
   return (
@@ -91,26 +103,77 @@ export default async function OutletPublicPage({ params }: Props) {
       <div className="p-4 rounded-xl bg-navy-700 border border-navy-600 mb-8">
         <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">{t('trackRecord')}</h2>
         {track ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat label={t('skill')} value={track.skillConservative.toFixed(3)} />
-            <Stat label={t('brier')} value={track.brierScore.toFixed(3)} />
-            <Stat label={t('authors')} value={String(track.authorCount)} />
-            <Stat label={t('predictions')} value={String(track.predictions)} />
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Stat label={t('skill')} value={track.skillConservative.toFixed(3)} />
+              <Stat label={t('brier')} value={track.brierScore.toFixed(3)} />
+              <Stat label={t('authors')} value={String(track.authorCount)} />
+              <Stat label={t('predictions')} value={String(track.predictions)} />
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              {t('brierHint')}
+              {track.predictions < LOW_SAMPLE && (
+                <span className="text-amber-400"> · {t('lowSample', { count: track.predictions })}</span>
+              )}
+            </p>
+          </>
         ) : (
           <p className="text-sm text-gray-500">{t('noTrackRecord')}</p>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-8">
-        <Stat label={t('forecastsAffected')} value={String(detail.impact.forecastsAffected)} big />
-        <Stat label={t('matches')} value={String(detail.impact.matches)} big />
-        <Stat label={t('last30dMatches')} value={String(detail.impact.last30dMatches)} big highlight />
-      </div>
+      {noImpact ? (
+        <p className="text-sm text-gray-500 mb-8">{t('noImpact')}</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          <Stat label={t('forecastsAffected')} hint={t('impactHint')} value={String(detail.impact.forecastsAffected)} big />
+          <Stat label={t('matches')} hint={t('impactHint')} value={String(detail.impact.matches)} big />
+          <Stat label={t('last30dMatches')} hint={t('impactHint')} value={String(detail.impact.last30dMatches)} big highlight />
+        </div>
+      )}
 
-      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('linkedPeople')}</h3>
+      {scoredAuthors.length > 0 && (
+        <>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+            {t('scoredAuthors')} ({scoredAuthors.length})
+          </h3>
+          <div className="overflow-x-auto rounded-lg border border-navy-600 mb-8">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-navy-600">
+                  <th className="px-3 py-2 font-medium">{t('author')}</th>
+                  <th className="px-3 py-2 font-medium text-right">{t('skill')}</th>
+                  <th className="px-3 py-2 font-medium text-right">{t('brier')}</th>
+                  <th className="px-3 py-2 font-medium text-right">{t('predictions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoredAuthors.map(a => (
+                  <tr key={a.id} className="border-t border-navy-700 first:border-t-0">
+                    <td className="px-3 py-2">
+                      <Link
+                        href={`/authors/${encodeURIComponent(a.author)}/${encodeURIComponent(a.outletName)}`}
+                        className="text-white hover:underline hover:text-cyan-300"
+                      >
+                        {a.author}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-cyan-300">{a.skillConservative.toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-300">{a.brierScore.toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{a.predictions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {(detail.linkedPeople.length > 0 || scoredAuthors.length === 0) && (
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('linkedPeople')}</h3>
+      )}
       {detail.linkedPeople.length === 0 ? (
-        <p className="text-sm text-gray-500 mb-8">{t('noLinkedPeople')}</p>
+        scoredAuthors.length === 0 && <p className="text-sm text-gray-500 mb-8">{t('noLinkedPeople')}</p>
       ) : (
         <div className="flex flex-wrap gap-1.5 mb-8">
           {detail.linkedPeople.map(p => (
@@ -121,49 +184,49 @@ export default async function OutletPublicPage({ params }: Props) {
         </div>
       )}
 
-      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-        {t('publications')} ({detail.publications.length})
-      </h3>
-      {detail.publications.length === 0 ? (
-        <p className="text-sm text-gray-500">{t('noPublications')}</p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-navy-600">
-          <table className="w-full text-sm">
-            <tbody>
-              {detail.publications.map((p, i) => (
-                <tr key={i} className="border-t border-navy-700 first:border-t-0">
-                  <td className="px-3 py-2 max-w-[26rem]">
-                    {isUrl(p.url) ? (
-                      <a href={p.url} target="_blank" rel="noopener noreferrer"
-                         className="inline-flex items-center gap-1 text-blue-500 hover:underline truncate">
-                        <span className="truncate">{p.title || p.url}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                      </a>
-                    ) : (
-                      <span className="text-white">{p.title || '—'}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {p.forecastId ? (
-                      <Link href={`/forecasts/${p.forecastId}`} className="text-blue-500 hover:underline">
-                        {t('forecast')}
-                      </Link>
-                    ) : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-gray-400">{p.outcome || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {detail.publications.length > 0 && (
+        <>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+            {t('publications')} ({detail.publications.length})
+          </h3>
+          <div className="overflow-x-auto rounded-lg border border-navy-600">
+            <table className="w-full text-sm">
+              <tbody>
+                {detail.publications.map((p, i) => (
+                  <tr key={i} className="border-t border-navy-700 first:border-t-0">
+                    <td className="px-3 py-2 max-w-[26rem]">
+                      {isUrl(p.url) ? (
+                        <a href={p.url} target="_blank" rel="noopener noreferrer"
+                           className="inline-flex items-center gap-1 text-blue-500 hover:underline truncate">
+                          <span className="truncate">{p.title || p.url}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-white">{p.title || '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {p.forecastId ? (
+                        <Link href={`/forecasts/${p.forecastId}`} className="text-blue-500 hover:underline">
+                          {t('forecast')}
+                        </Link>
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-gray-400">{p.outcome || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function Stat({ label, value, big, highlight }: { label: string; value: string; big?: boolean; highlight?: boolean }) {
+function Stat({ label, value, big, highlight, hint }: { label: string; value: string; big?: boolean; highlight?: boolean; hint?: string }) {
   return (
-    <div className="p-3 rounded-lg bg-navy-800 border border-navy-600">
+    <div title={hint} className="p-3 rounded-lg bg-navy-800 border border-navy-600">
       <div className={`font-bold ${highlight ? 'text-emerald-400' : 'text-white'} ${big ? 'text-2xl' : 'text-lg'}`}>{value}</div>
       <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
     </div>

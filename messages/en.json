@@ -1201,7 +1201,13 @@
     "noLinkedPeople": "No people linked to this outlet yet.",
     "publications": "Recent publications",
     "noPublications": "No publications yet",
-    "forecast": "Forecast"
+    "forecast": "Forecast",
+    "author": "Author",
+    "scoredAuthors": "Scored authors",
+    "brierHint": "Lower Brier is better; 0.25 is a coin flip.",
+    "lowSample": "only {count} resolved predictions — treat as noise",
+    "noImpact": "No matches with Daatan forecasts yet.",
+    "impactHint": "Articles from this outlet that Daatan used as evidence in forecasts."
   },
   "authorPage": {
     "backToLeaderboard": "Back to source leaderboard",
