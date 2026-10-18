@@ -23,9 +23,20 @@ const sampleDetail = {
   telegramChannel: null,
   links: [],
   sourceConfig: null,
+  domains: [],
   impact: { matches: 0, forecastsAffected: 0, last30dMatches: 0, lastMatchedAt: null },
   publications: [],
   linkedPeople: [],
+}
+
+/** Every string/number in a React element tree (props, not component internals). */
+function collectText(node: unknown, out: string[] = []): string[] {
+  if (typeof node === 'string' || typeof node === 'number') out.push(String(node))
+  else if (Array.isArray(node)) node.forEach(n => collectText(n, out))
+  else if (node && typeof node === 'object' && 'props' in node) {
+    for (const v of Object.values((node as { props: Record<string, unknown> }).props)) collectText(v, out)
+  }
+  return out
 }
 
 describe('sources/[name] page', () => {
@@ -64,5 +75,18 @@ describe('sources/[name] page', () => {
     mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
     await OutletPublicPage({ params: Promise.resolve({ name: encodeURIComponent('some/outlet') }) })
     expect(mockGetPublicOutletDetail).toHaveBeenCalledWith('some/outlet')
+  })
+
+  it('finds the track record through a domain when the URL carries the display name (#1891)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynet', domains: ['ynet.co.il'] })
+    mockGetSourceLeaderboard.mockResolvedValue({
+      view: 'outlets',
+      sortBy: 'skillConservative',
+      authorRows: [],
+      outletRows: [{ id: 'ynet.co.il', outletName: 'ynet.co.il', skillConservative: 0.078, brierScore: 0.433, authorCount: 25, predictions: 29, articles: 40 }],
+    })
+    const texts = collectText(await OutletPublicPage({ params: Promise.resolve({ name: 'Ynet' }) }))
+    expect(texts).toContain('0.078')
+    expect(texts).not.toContain('noTrackRecord')
   })
 })

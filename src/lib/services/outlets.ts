@@ -41,6 +41,8 @@ export interface PublicOutletDetail {
   telegramChannel: string | null
   links: PublicOutletLink[]
   sourceConfig: PublicOutletSourceConfig | null
+  /** Article domains news-indexer keyed the numbers by (`ynet.co.il`); [] on an older news-indexer. */
+  domains: string[]
   impact: PublicOutletImpact
   publications: PublicOutletPublication[]
   linkedPeople: PublicOutletLinkedPerson[]
@@ -72,6 +74,7 @@ export async function getPublicOutletDetail(name: string): Promise<PublicOutletD
       telegramChannel: data.telegramChannel ?? null,
       links: data.links ?? [],
       sourceConfig: data.sourceConfig ?? null,
+      domains: data.domains ?? [],
       impact: data.impact,
       publications: data.publications ?? [],
       linkedPeople: data.linkedPeople ?? [],
