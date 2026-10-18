@@ -33,7 +33,7 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 **Embeddings** do not go through this chain at all — `src/lib/services/embedding.ts` calls `gemini-embedding-2` directly, preferring Vertex on the same credentials and falling back to the Developer API. See [EMBEDDINGS.md](EMBEDDINGS.md).
 
-**Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). It is unchanged by the above — its direct-Gemini legs still use the Developer API key (`GEMINI_API_KEY`), not Vertex, so where that key is unset (daatan.com since #1472) bots run on OpenRouter alone.
+**Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). A Gemini-preference bot tries Vertex first (#1879/#1888 — daatan.com carries no `GEMINI_API_KEY` since #1472, so without this leg such a bot had zero Google providers), then the direct Developer-API leg when `GEMINI_API_KEY` is set (self-host), then the free non-Google OpenRouter model.
 
 **The AI panel (LASSO)** does not use this chain either: `src/lib/llm/panel/client.ts` calls each roster member (`src/lib/llm/panel/roster.ts`) on its own route — `openrouter`, `bedrock`, or `vertex` (the Gemini member moved from an OpenRouter `google-vertex` pin to direct Vertex in #1600, and from `gemini-2.5-flash` to `gemini-3.5-flash-lite` in #1763 — a non-thinking model is required because Vertex counts thought tokens against the panel's 64-token cap, so the main chain's model choice does not apply to it). See [LASSO.md](LASSO.md).
 
