@@ -4,7 +4,7 @@ import he from '../../../messages/he.json'
 import ru from '../../../messages/ru.json'
 import eo from '../../../messages/eo.json'
 
-const NAMESPACES = ['retroIsrael', 'retroUkraine', 'retroEnergy', 'retroShared'] as const
+const NAMESPACES = ['retroIsrael', 'retroUkraine', 'retroEnergy', 'retroIndex', 'retroShared'] as const
 
 type Tree = { [k: string]: string | Tree | Tree[] | string[] }
 

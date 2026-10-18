@@ -3,27 +3,42 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { analyses } from './data'
 
+const COLUMN_STYLE = {
+  left: {
+    header: 'bg-teal-600', badge: 'bg-teal-700/30', soft: 'text-teal-100', dot: 'bg-teal-500',
+    border: 'border-teal-600', hover: 'hover:bg-teal-50', source: 'text-teal-700',
+    icon: 'M5 13l4 4L19 7',
+  },
+  right: {
+    header: 'bg-rose-600', badge: 'bg-rose-700/30', soft: 'text-rose-100', dot: 'bg-rose-500',
+    border: 'border-rose-600', hover: 'hover:bg-rose-50', source: 'text-rose-700',
+    icon: 'M6 18L18 6M6 6l12 12',
+  },
+}
+
 export default function RetroanalysisPage() {
   const { selfHosted } = useCapabilities()
+  const t = useTranslations('retroIndex')
+  const locale = useLocale()
   const [activeAnalysisId, setActiveAnalysisId] = useState(analyses[0].id)
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   // SaaS-only marketing archive — not part of the self-hosted edition.
   if (selfHosted) notFound()
 
   const activeAnalysis = analyses.find(a => a.id === activeAnalysisId) || analyses[0]
 
-  const getNavLabel = (id: string) => {
-    switch (id) {
-      case 'ukraine-2022': return 'Ukraine 2022'
-      case 'israel-2022': return 'Israel 2022'
-      case 'energy-2022': return 'Energy 2022'
-      default: return id
-    }
-  }
+  const formatDate = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' })
+
+  const k = `cases.${activeAnalysis.id}`
+  const columns = [
+    { key: 'left', side: 'left' as const, items: activeAnalysis.leftItems },
+    { key: 'right', side: 'right' as const, items: activeAnalysis.rightItems },
+  ]
 
   return (
     <div className="retro-light min-h-screen bg-[#f5f7fa] text-gray-800 font-sans">
@@ -40,7 +55,7 @@ export default function RetroanalysisPage() {
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {getNavLabel(analysis.id)}
+              {t(`nav.${analysis.id}`)}
             </button>
           ))}
         </div>
@@ -48,191 +63,77 @@ export default function RetroanalysisPage() {
         {/* Header */}
         <div className="text-center mb-8 animate-fadeIn">
           <span className="inline-block px-4 py-1 bg-gray-900 text-white text-[10px] tracking-widest font-bold rounded-full mb-4 uppercase">
-            {activeAnalysis.tag}
+            {t(`${k}.tag`)}
           </span>
           <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight leading-tight">
-            {activeAnalysis.title}
+            {t(`${k}.title`)}
           </h1>
           <p className="text-gray-600 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            {activeAnalysis.description}
+            {t(`${k}.description`)}
           </p>
           {activeAnalysis.reportHref && (
             <Link
               href={activeAnalysis.reportHref}
               className="inline-block mt-6 px-5 py-2.5 rounded-full bg-gray-900 text-white text-xs font-bold tracking-wide hover:bg-gray-700 transition-colors"
             >
-              Full report: chart, method and every rated article →
+              {t('fullReport')}
             </Link>
           )}
         </div>
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Left Column */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-            <div className={`bg-teal-600 p-5 flex justify-between items-center`}>
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center bg-teal-700/30">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </span>
-                <span className="text-white font-bold italic tracking-wide text-lg">{activeAnalysis.leftColumn.label}</span>
-              </div>
-              <div className="text-right">
-                <p className="text-teal-100 text-[10px] uppercase tracking-widest font-bold">Predicted Outcome</p>
-                <p className="text-white font-black text-xl">{activeAnalysis.leftColumn.outcome}</p>
-              </div>
-            </div>
-            
-            <div className="p-6 flex-grow">
-              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-                {activeAnalysis.leftColumn.sublabel}
-              </p>
-              <div className="space-y-4">
-                {activeAnalysis.leftColumn.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 bg-gray-50 rounded-lg border-l-4 border-teal-600 hover:bg-teal-50 hover:shadow-md transition-all duration-200 cursor-default"
-                    onMouseEnter={() => setHoveredItem(`left-${idx}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-[10px] text-teal-700 font-black uppercase tracking-tighter">{item.source}</p>
-                      <p className="text-[10px] text-gray-500 font-bold">{item.date}</p>
-                    </div>
-                    <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
-                    {item.quote && (
-                      <div className="mt-3 p-3 bg-teal-600 rounded-md text-white text-xs shadow-inner">
-                        <p className="text-teal-100 text-[9px] font-black uppercase tracking-widest mb-1">QUOTE</p>
-                        <p className="italic leading-relaxed">&quot;<bdi>{item.quote}</bdi>&quot;</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-            <div className={`bg-rose-600 p-5 flex justify-between items-center`}>
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center bg-rose-700/30">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </span>
-                <span className="text-white font-bold italic tracking-wide text-lg">{activeAnalysis.rightColumn.label}</span>
-              </div>
-              <div className="text-right">
-                <p className="text-rose-100 text-[10px] uppercase tracking-widest font-bold">Predicted Outcome</p>
-                <p className="text-white font-black text-xl">{activeAnalysis.rightColumn.outcome}</p>
-              </div>
-            </div>
-            
-            <div className="p-6 flex-grow">
-              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                {activeAnalysis.rightColumn.sublabel}
-              </p>
-              <div className="space-y-4">
-                {activeAnalysis.rightColumn.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 bg-gray-50 rounded-lg border-l-4 border-rose-600 hover:bg-rose-50 hover:shadow-md transition-all duration-200 cursor-default"
-                    onMouseEnter={() => setHoveredItem(`right-${idx}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-[10px] text-rose-700 font-black uppercase tracking-tighter">{item.source}</p>
-                      <p className="text-[10px] text-gray-500 font-bold">{item.date}</p>
-                    </div>
-                    <p className="text-sm font-bold text-gray-900 leading-snug">{item.headline}</p>
-                    {item.quote && (
-                      <div className="mt-3 p-3 bg-rose-600 rounded-md text-white text-xs shadow-inner">
-                        <p className="text-rose-100 text-[9px] font-black uppercase tracking-widest mb-1">QUOTE</p>
-                        <p className="italic leading-relaxed">&quot;<bdi>{item.quote}</bdi>&quot;</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Detailed Analysis Section */}
-        {activeAnalysis.detailedAnalysis && (
-          <div className="mb-12 space-y-12">
-            <div className="text-center">
-              <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">
-                Detailed Analysis of the Debate
-              </h2>
-              <div className="w-24 h-1 bg-gray-900 mx-auto mt-4"></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              {activeAnalysis.detailedAnalysis.map((section, idx) => (
-                <div key={idx} className={idx === 2 ? 'md:col-span-2 max-w-3xl mx-auto text-center' : ''}>
-                  <h3 className="text-xl font-extrabold text-gray-900 mb-6 flex items-center gap-3 justify-center md:justify-start">
-                    <span className="flex-shrink-0 w-8 h-8 rounded bg-gray-900 text-white flex items-center justify-center text-sm">
-                      {idx + 1}
+          {columns.map(({ key, side, items }) => {
+            const c = COLUMN_STYLE[side]
+            return (
+              <div key={key} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                <div className={`${c.header} p-5 flex justify-between items-center`}>
+                  <div className="flex items-center gap-3">
+                    <span className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center ${c.badge}`}>
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.icon} />
+                      </svg>
                     </span>
-                    {section.title}
-                  </h3>
+                    <span className="text-white font-bold italic tracking-wide text-lg">{t(`${k}.${side}.label`)}</span>
+                  </div>
+                  <div className="text-end">
+                    <p className={`${c.soft} text-[10px] uppercase tracking-widest font-bold`}>{t('predictedOutcome')}</p>
+                    <p className="text-white font-black text-xl">{t(`${k}.${side}.outcome`)}</p>
+                  </div>
+                </div>
+
+                <div className="p-6 flex-grow">
+                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
+                    {t(`${k}.${side}.sublabel`)}
+                  </p>
                   <div className="space-y-4">
-                    {section.content.map((p, pIdx) => (
-                      <p key={pIdx} className="text-gray-700 leading-relaxed text-sm md:text-base">
-                        {p}
-                      </p>
+                    {items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 bg-gray-50 rounded-lg border-s-4 ${c.border} ${c.hover} hover:shadow-md transition-all duration-200 cursor-default`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <p className={`text-[10px] ${c.source} font-black uppercase tracking-tighter`}>{item.source}</p>
+                          <p className="text-[10px] text-gray-500 font-bold">{formatDate(item.date)}</p>
+                        </div>
+                        <p className="text-sm font-bold text-gray-900 leading-snug" dir="auto">{t(`${k}.${side}.items.${idx}.headline`)}</p>
+                        <div className={`mt-3 p-3 ${c.header} rounded-md text-white text-xs shadow-inner`}>
+                          <p className={`${c.soft} text-[9px] font-black uppercase tracking-widest mb-1`}>{t('quote')}</p>
+                          <p className="italic leading-relaxed">&quot;<bdi>{t(`${k}.${side}.items.${idx}.quote`)}</bdi>&quot;</p>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Citations Section */}
-        {activeAnalysis.citations && (activeAnalysis.citations.length > 0) && (
-          <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
-            <h2 className="text-lg font-black text-gray-900 uppercase tracking-widest mb-6 border-b pb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              Works Cited
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-              {activeAnalysis.citations.map((citation, idx) => {
-                // Handle different citation formats (with or without URL)
-                const text = citation.includes('http') ? citation.split('http')[0].trim().replace(/,$/, '') : citation;
-                const url = citation.includes('http') ? `http${citation.split('http')[1]}` : null;
-                
-                return (
-                  <div key={idx} className="text-[11px] leading-relaxed text-gray-700 hover:text-gray-900 transition-colors">
-                    <span className="text-gray-500 font-mono mr-2">[{String(idx + 1).padStart(2, '0')}]</span>
-                    {text}
-                    {url && (
-                      <a 
-                        href={url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="ml-1 text-teal-600 hover:underline break-all inline-block"
-                      >
-                        [Link]
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+              </div>
+            )
+          })}
+        </div>
 
         {/* Footer info */}
         <div className="mt-12 text-center text-[10px] text-gray-500 uppercase tracking-[0.2em] font-bold">
-          DAATAN Retro-Analysis Archive &copy; 2026
+          {t('footer')}
         </div>
       </div>
 

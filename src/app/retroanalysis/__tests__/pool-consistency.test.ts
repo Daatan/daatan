@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyses } from '../data'
+import messages from '../../../../messages/en.json'
 import ukrainePool from '../ukraine-2022/pool.json'
 import ukraineRows from '../ukraine-2022/rows.json'
 import israelPool from '../israel-2022/pool.json'
@@ -49,13 +49,13 @@ describe.each(studies)('retroanalysis pool: $id', ({ id, pool, rows, groups, reg
   })
 
   it("index page's stated n matches the pool", () => {
-    const a = analyses.find(x => x.id === id)
+    const a = (messages.retroIndex.cases as Record<string, { tag: string; description: string }>)[id]
     expect(a).toBeDefined()
-    const tagN = Number(/([\d,]+) RATED/.exec(a!.tag)?.[1].replace(/,/g, ''))
+    const tagN = Number(/([\d,]+) RATED/.exec(a.tag)?.[1].replace(/,/g, ''))
     expect(tagN).toBe(pool.length)
     // Any "N statements" in the description is either the whole pool or one group's count.
     const byGroup = Object.values(count(pool.map(r => r.g)))
-    for (const m of a!.description.matchAll(/(\d[\d,]*) statements/g)) {
+    for (const m of a.description.matchAll(/(\d[\d,]*) statements/g)) {
       const n = Number(m[1].replace(/,/g, ''))
       expect([pool.length, ...byGroup]).toContain(n)
     }
