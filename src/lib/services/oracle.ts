@@ -879,13 +879,16 @@ export const getOraculLeaderboard = async (
  */
 export const getAuthorShadowLeaderboard = async (
   meta: OracleCallMeta = { source: 'source-leaderboard' },
+  tag?: string,
 ): Promise<OracleAuthorShadowResponse | null> => {
   const cfg = getOracleConfig()
   if (!cfg) return null
 
   const t0 = Date.now()
   try {
-    const res = await oracleFetch(cfg, '/leaderboard/author-shadow', { timeoutMs: HEALTH_TIMEOUT_MS })
+    const res = await oracleFetch(cfg, `/leaderboard/author-shadow${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`, {
+      timeoutMs: HEALTH_TIMEOUT_MS,
+    })
     if (!res.ok) {
       void logOracleCall({ callType: 'LEADERBOARD', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status })
       return null

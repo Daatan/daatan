@@ -33,12 +33,13 @@ function brierTone(brier: number): string {
   return 'text-red-400'
 }
 
-function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir): string {
-  return `/leaderboard/sources?view=${view}&sort=${sort}&dir=${dir}`
+function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir, tag: string | null): string {
+  return `/leaderboard/sources?view=${view}&sort=${sort}&dir=${dir}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`
 }
 
 export default function SourceLeaderboardPage() {
   const t = useTranslations('sourceLeaderboard')
+  const tl = useTranslations('leaderboard')
   const searchParams = useSearchParams()
   const view: SourceLeaderboardView = searchParams.get('view') === 'authors' ? 'authors' : 'outlets'
   // `sortBy=brierScore` is the pre-sortable-columns URL; keep old links working.
@@ -48,6 +49,9 @@ export default function SourceLeaderboardPage() {
   const dirParam = searchParams.get('dir')
   const dir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : DEFAULT_DIR[sort]
 
+  const tag = searchParams.get('tag')
+  const [tags, setTags] = useState<{ slug: string; name: string }[]>([])
+
   const [authorRows, setAuthorRows] = useState<AuthorLeaderboardRow[]>([])
   const [outletRows, setOutletRows] = useState<OutletLeaderboardRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -56,7 +60,7 @@ export default function SourceLeaderboardPage() {
     let cancelled = false
     setIsLoading(true)
 
-    fetch(`/api/leaderboard/sources?view=${view}`)
+    fetch(`/api/leaderboard/sources?view=${view}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`)
       .then(res => res.json())
       .then(data => {
         if (cancelled) return
@@ -71,7 +75,14 @@ export default function SourceLeaderboardPage() {
     return () => {
       cancelled = true
     }
-  }, [view])
+  }, [view, tag])
+
+  useEffect(() => {
+    fetch('/api/tags?limit=20')
+      .then(res => res.json())
+      .then(data => { if (data?.tags) setTags(data.tags) })
+      .catch(err => log.error({ err }, 'Failed to fetch tags'))
+  }, [])
 
   // Normalize both views to one display shape so the table only renders once.
   const rows = view === 'outlets'
@@ -138,7 +149,7 @@ export default function SourceLeaderboardPage() {
         {VIEWS.map(v => (
           <Link
             key={v}
-            href={boardHref(v, sort, dir)}
+            href={boardHref(v, sort, dir, tag)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               v === view ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
             }`}
@@ -147,6 +158,23 @@ export default function SourceLeaderboardPage() {
           </Link>
         ))}
       </div>
+
+      {tags.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{tl('filterByTopic')}:</span>
+          {[{ slug: null, name: tl('allTopics') }, ...tags].map(tg => (
+            <Link
+              key={tg.slug ?? 'all'}
+              href={boardHref(view, sort, dir, tg.slug)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                (tag ?? null) === tg.slug ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
+              }`}
+            >
+              {tg.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-gray-500">
@@ -175,7 +203,7 @@ export default function SourceLeaderboardPage() {
                       className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
                     >
                       <Link
-                        href={boardHref(view, c.key, nextDir)}
+                        href={boardHref(view, c.key, nextDir, tag)}
                         replace
                         className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
                       >
