@@ -8,7 +8,7 @@ vi.mock('../oracle', () => ({
 }))
 
 import { getAuthorShadowLeaderboard } from '../oracle'
-import { aggregateByOutlet, authorsOfOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
+import { aggregateByOutlet, authorKey, authorsOfOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
@@ -276,5 +276,38 @@ describe('byline placeholders and repeated authors (#1903)', () => {
     expect(out[0]).toMatchObject({ author: 'Lior Ben Ari', predictions: 4, outletName: 'ynet.co.il', articles: 2 })
     expect(out[0].brierScore).toBeCloseTo(0.3) // (0.2*3 + 0.6*1) / 4
     expect(out[0].skillConservative).toBeCloseTo(0.3) // (0.4*3 + 0*1) / 4
+  })
+})
+
+describe('one person, several spellings (#1904)', () => {
+  it('authorKey ignores case, periods, quotes and spacing', () => {
+    expect(authorKey('SETH J. FRANTZMAN')).toBe(authorKey('Seth J Frantzman'))
+    expect(authorKey("  Ze'ev   Smith ")).toBe(authorKey('Zeev Smith'))
+    expect(authorKey('Nadav Eyal')).not.toBe(authorKey('Nadav Eyal Jr'))
+  })
+
+  it('authorKey maps the listed Hebrew spellings onto the English one', () => {
+    expect(authorKey('איתמר אייכנר')).toBe(authorKey('Itamar Eichner'))
+    expect(authorKey('ליאור בן ארי')).toBe(authorKey('Lior Ben Ari'))
+  })
+
+  it('counts and merges them as one author', () => {
+    const [row] = aggregateByOutlet([
+      entry({ author: 'SETH J FRANTZMAN', outlet_name: 'jpost.com', predictions: 2 }),
+      entry({ author: 'SETH J. FRANTZMAN', outlet_name: 'jpost.com', predictions: 1 }),
+      entry({ author: 'Itamar Eichner', outlet_name: 'jpost.com', predictions: 1 }),
+      entry({ author: 'איתמר אייכנר', outlet_name: 'jpost.com', predictions: 1 }),
+    ])
+    expect(row.authorCount).toBe(2)
+    const merged = authorsOfOutlet(
+      [
+        { id: '1', author: 'SETH J FRANTZMAN', outletName: 'jpost.com', skillConservative: 0, brierScore: 0.4, predictions: 2, articles: 1 },
+        { id: '2', author: 'SETH J. FRANTZMAN', outletName: 'jpost.com', skillConservative: 0, brierScore: 0.7, predictions: 1, articles: 1 },
+      ],
+      'jpost.com',
+    )
+    expect(merged).toHaveLength(1)
+    expect(merged[0].predictions).toBe(3)
+    expect(merged[0].brierScore).toBeCloseTo(0.5)
   })
 })

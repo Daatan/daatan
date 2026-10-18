@@ -55,8 +55,28 @@ export function canonicalOutlet(name: string | null): string | null {
  *  outlet's own unattributed bucket — real predictions, but not a person. */
 export const NO_BYLINE = '(no byline)'
 
-const authorKey = (name: string) => name.trim().toLowerCase()
-const isPlaceholderAuthor = (name: string) => authorKey(name) === NO_BYLINE
+/**
+ * Cross-language spellings of one person (normalised form → canonical key). Display layer
+ * only: retro's board is keyed by the raw byline string, and re-keying it is a scoring change
+ * (#1904). Add a pair when an outlet page shows the same person twice; transliterating
+ * automatically is unreliable, so this stays an explicit list.
+ */
+const AUTHOR_ALIASES: Record<string, string> = {
+  'איתמר אייכנר': 'itamar eichner',
+  'ליאור בן ארי': 'lior ben ari',
+}
+
+/** Identity of a byline: case, periods, quotes/geresh and spacing don't make a second person. */
+export function authorKey(name: string): string {
+  const k = name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[.\u05f3\u05f4"'`\u2018\u2019\u201c\u201d]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return AUTHOR_ALIASES[k] ?? k
+}
+const isPlaceholderAuthor = (name: string) => name.trim().toLowerCase() === NO_BYLINE
 
 function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
   return {
