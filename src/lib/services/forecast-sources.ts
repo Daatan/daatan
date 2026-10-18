@@ -93,11 +93,12 @@ export async function getContributingSources(forecastId: string): Promise<Contri
  */
 async function markLinkableAuthors(rows: ContributingSource[]): Promise<ContributingSource[]> {
   if (!rows.some((r) => r.personName && r.outletName)) return rows
-  const { getSourceLeaderboard } = await import('@/lib/services/sourceLeaderboard')
+  const { getSourceLeaderboard, authorKey, canonicalOutlet } = await import('@/lib/services/sourceLeaderboard')
   const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative')
-  const scored = new Set(authorRows.map((r) => `${r.author}\u0000${r.outletName}`))
+  const scoredKey = (author: string, outlet: string) => `${authorKey(author)}\u0000${canonicalOutlet(outlet)}`
+  const scored = new Set(authorRows.map((r) => scoredKey(r.author, r.outletName)))
   return rows.map((r) =>
-    r.personName && r.outletName && scored.has(`${r.personName}\u0000${r.outletName}`)
+    r.personName && r.outletName && scored.has(scoredKey(r.personName, r.outletName))
       ? { ...r, authorLinkable: true }
       : r,
   )

@@ -127,9 +127,9 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
       outletName,
       skillConservative: round3(weighted(e => e.skill_conservative)),
       brierScore: round3(weighted(e => e.brier_score)),
-      // People, not ledger rows: the bylineless bucket isn't one, and one author can have a
-      // row per outlet alias (ynet.co.il + ynetnews.com).
-      authorCount: new Set(group.filter(e => !isPlaceholderAuthor(e.author)).map(e => authorKey(e.author))).size,
+      // People, not ledger rows: joint bylines name several, the bylineless bucket none, and one
+      // author can have a row per outlet alias or spelling.
+      authorCount: new Set(group.flatMap(e => bylinePeople(e.author)).map(authorKey)).size,
       predictions: totalPredictions,
       articles: totalArticles,
     })
@@ -138,21 +138,63 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
 }
 
 /**
- * The people behind one outlet's track record: rows of that canonical outlet (aliases
- * included), minus the bylineless bucket, with one row per author name. Same-name rows are
- * merged prediction-weighted, the way `aggregateByOutlet` rolls authors up. The merged row keeps
- * the outlet spelling it has the most predictions under, so the author-page link still resolves.
+ * Tokens that show up inside joint bylines but aren't authors: agencies, a publisher credit,
+ * datelines. Only applied to the pieces of a *split* byline — a solo byline that is an agency
+ * ("Reuters", "JPOST EDITORIAL") is left alone (#1904 item 3, not decided).
  */
-export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string): AuthorLeaderboardRow[] {
-  const target = canonicalOutlet(outletName)
+const NON_PERSON_TOKENS = new Set([
+  'news agencies', 'news agency', 'staff', 'the motley fool', 'motley fool',
+  'new york', 'ניו יורק', 'washington', 'london', 'tel aviv',
+])
+
+const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
+
+/**
+ * The people named by one byline string. Retro scores a joint byline ("A; B; News Agencies")
+ * as one author; here it becomes its individuals. Splits on `;`, `&`, ` and `, and on commas
+ * only when every piece is a full name (so "Smith, John" stays whole). Pieces that are
+ * agencies/datelines are dropped. The bylineless bucket names nobody.
+ */
+export function bylinePeople(author: string): string[] {
+  const raw = author.trim()
+  if (!raw || isPlaceholderAuthor(raw)) return []
+  let parts = raw.split(/\s*[;&]\s*|\s+and\s+/i)
+  if (parts.length === 1 && raw.includes(',')) {
+    const byComma = raw.split(/\s*,\s*/)
+    if (byComma.length > 1 && byComma.every(p => wordCount(p) >= 2)) parts = byComma
+  }
+  if (parts.length === 1) return [raw]
+  return parts.map(p => p.trim()).filter(p => p && !NON_PERSON_TOKENS.has(authorKey(p)))
+}
+
+/** Joint-byline rows → one row per named person. Each person gets the row's Brier and
+ *  prediction count in full (credit model chosen for #1904; Brier is a per-prediction mean). */
+function expandJointBylines(rows: AuthorLeaderboardRow[]): AuthorLeaderboardRow[] {
+  return rows.flatMap(r => {
+    const people = bylinePeople(r.author)
+    if (people.length === 1 && people[0] === r.author.trim()) return [r]
+    return people.map((author, i) => ({ ...r, id: `${r.id}#${i}`, author }))
+  })
+}
+
+/**
+ * One row per (person, canonical outlet): same-person rows (spelling variants, outlet aliases,
+ * a person's solo byline plus the joint ones) merged prediction-weighted, the way
+ * `aggregateByOutlet` rolls authors up. The merged row keeps the spelling and outlet it has the
+ * most predictions under, so the author-page link still resolves.
+ */
+function mergeAuthorRows(rows: AuthorLeaderboardRow[]): AuthorLeaderboardRow[] {
   const groups = new Map<string, AuthorLeaderboardRow[]>()
   for (const r of rows) {
-    if (canonicalOutlet(r.outletName) !== target || isPlaceholderAuthor(r.author)) continue
-    const key = authorKey(r.author)
+    const key = `${canonicalOutlet(r.outletName)}\u0000${authorKey(r.author)}`
     groups.set(key, [...(groups.get(key) ?? []), r])
   }
   const merged: AuthorLeaderboardRow[] = []
   for (const group of groups.values()) {
+    if (group.length === 1) {
+      merged.push(group[0])
+      continue
+    }
     const preds = group.reduce((sum, r) => sum + r.predictions, 0)
     const weighted = (pick: (r: AuthorLeaderboardRow) => number) =>
       preds > 0
@@ -167,7 +209,15 @@ export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string
       articles: group.reduce((sum, r) => sum + r.articles, 0),
     })
   }
-  return merged.sort((a, b) => b.predictions - a.predictions || b.skillConservative - a.skillConservative)
+  return merged
+}
+
+/** The people behind one outlet's track record (aliases included), most predictions first. */
+export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string): AuthorLeaderboardRow[] {
+  const target = canonicalOutlet(outletName)
+  return mergeAuthorRows(expandJointBylines(rows.filter(r => canonicalOutlet(r.outletName) === target))).sort(
+    (a, b) => b.predictions - a.predictions || b.skillConservative - a.skillConservative,
+  )
 }
 
 /** skillConservative is higher-is-better; brierScore is lower-is-better. */
@@ -204,8 +254,7 @@ export async function getSourceLeaderboard(
   const data = await getAuthorShadowLeaderboard()
   const entries = data?.authors ?? []
 
-  const authorRows = sortRows(entries.map(toAuthorRow), sortBy)
-    .filter(r => !isPlaceholderAuthor(r.author))
+  const authorRows = sortRows(mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow))), sortBy)
     .filter(r => r.predictions >= minPredictions)
   const outletRows = sortRows(aggregateByOutlet(entries), sortBy).filter(r => r.predictions >= minPredictions)
 

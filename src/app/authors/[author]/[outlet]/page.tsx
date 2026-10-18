@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
-import { getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { authorKey, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getPublicArticlesByAuthorOutlet } from '@/lib/services/evidence-pool'
 import { getAppUrl } from '@/lib/branding'
 
@@ -19,7 +19,8 @@ function isUrl(s: string | null | undefined): s is string {
 
 async function findRow(author: string, outlet: string) {
   const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative')
-  return authorRows.find(r => r.author === author && r.outletName === outlet) ?? null
+  // Rows are merged per (person, canonical outlet) — spelling and outlet-alias variants are one row.
+  return authorRows.find(r => authorKey(r.author) === authorKey(author) && canonicalOutlet(r.outletName) === canonicalOutlet(outlet)) ?? null
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

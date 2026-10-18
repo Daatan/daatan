@@ -6,7 +6,11 @@ const { mockGetSourceLeaderboard, mockGetPublicArticles, mockNotFound } = vi.hoi
   mockNotFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }),
 }))
 
-vi.mock('@/lib/services/sourceLeaderboard', () => ({ getSourceLeaderboard: mockGetSourceLeaderboard }))
+vi.mock('@/lib/services/sourceLeaderboard', () => ({
+  getSourceLeaderboard: mockGetSourceLeaderboard,
+  authorKey: (n: string) => n.trim().toLowerCase(),
+  canonicalOutlet: (n: string) => n,
+}))
 vi.mock('@/lib/services/evidence-pool', () => ({ getPublicArticlesByAuthorOutlet: mockGetPublicArticles }))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
