@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 // Clears the fixed mobile header (Sidebar.tsx, h-16) when jumping to a section.
 const HEADER_OFFSET = 80
@@ -8,6 +9,7 @@ const HEADER_OFFSET = 80
 /** Floating right-hand "next section" button for the long retro reports (daatan#1779);
  *  at the end of the page it becomes "back to top". */
 export default function ScrollNav() {
+  const t = useTranslations('retroShared')
   const [atEnd, setAtEnd] = useState(false)
 
   useEffect(() => {
@@ -38,9 +40,9 @@ export default function ScrollNav() {
     <button
       type="button"
       onClick={go}
-      aria-label={atEnd ? 'Back to top' : 'Next section'}
-      title={atEnd ? 'Back to top' : 'Next section'}
-      className="fixed right-4 bottom-6 md:right-8 md:bottom-8 z-40 grid place-items-center w-12 h-12 rounded-full bg-gray-900/90 text-white shadow-lg ring-1 ring-white/20 hover:bg-gray-700 transition-colors"
+      aria-label={atEnd ? t('backToTop') : t('nextSection')}
+      title={atEnd ? t('backToTop') : t('nextSection')}
+      className="fixed end-4 bottom-6 md:end-8 md:bottom-8 z-40 grid place-items-center w-12 h-12 rounded-full bg-gray-900/90 text-white shadow-lg ring-1 ring-white/20 hover:bg-gray-700 transition-colors"
     >
       <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden
         className={`transition-transform ${atEnd ? 'rotate-180' : ''}`}>
