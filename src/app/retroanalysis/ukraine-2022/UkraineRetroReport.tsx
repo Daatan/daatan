@@ -153,6 +153,9 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
             <Method title={t('method.filterT')}>{t('method.filter')}</Method>
             <Method title={t('method.ratingT')} formula={t('numbers.formulaShort')}>{t('method.rating')}</Method>
           </div>
+          <p className="mt-6 text-sm">
+            <a href="https://daatan.github.io/retro/studies/ukraine-2022/pool.csv" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900">{t('method.poolCsv')}</a>
+          </p>
           <h3 className="mt-10 text-lg font-extrabold text-gray-900">{t('method.missingH')}</h3>
           <ul className="mt-2 list-disc ps-5 space-y-1.5 text-gray-700 max-w-3xl">
             <li>{t('method.m1')}</li>
