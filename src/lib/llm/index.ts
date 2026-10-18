@@ -134,8 +134,11 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
     log.info({ from: modelName, to: resolvedModelName }, 'Resolved deprecated OpenRouter model alias')
   }
 
-  // If model looks like a Google model and we have a direct key, try direct provider first
-  if (resolvedModelName.toLowerCase().includes('gemini') && geminiApiKey) {
+  const isGemini = resolvedModelName.toLowerCase().includes('gemini')
+  const vertex = vertexEnv()
+
+  // If model looks like a Google model and we have Vertex or a direct key, try Google first
+  if (isGemini && (vertex || geminiApiKey)) {
     // Extract base model name from OpenRouter slug
     // e.g. "google/gemini-2.0-flash:free" -> "gemini-2.0-flash"
     let directModelName = resolvedModelName.split(':').shift()?.split('/').pop() || 'gemini-1.5-flash'
@@ -145,14 +148,22 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
       directModelName = 'gemini-2.5-flash'
     }
 
-    log.info({ modelName: resolvedModelName, directModelName }, 'Trying direct Gemini provider for bot')
-    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: directModelName }))
+    // Vertex first (#1879): prod containers carry no GEMINI_API_KEY (#1472), so
+    // without this leg a Gemini-preference bot gets zero providers.
+    if (vertex) {
+      log.info({ modelName: resolvedModelName, directModelName }, 'Trying Vertex provider for bot')
+      providers.push(new VertexProvider({ ...vertex, modelName: directModelName }))
+    }
+    if (geminiApiKey) {
+      log.info({ modelName: resolvedModelName, directModelName }, 'Trying direct Gemini provider for bot')
+      providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: directModelName }))
+    }
   }
 
   if (openrouterApiKey) {
     // No free Gemini exists on OpenRouter; substitute a free non-Google model so
     // this fallback leg works when Gemini/Google is the thing that's unavailable.
-    const openrouterModel = resolvedModelName.toLowerCase().includes('gemini')
+    const openrouterModel = isGemini
       ? OPENROUTER_FREE_FALLBACK_MODEL
       : resolvedModelName
     log.info({ modelName: openrouterModel }, 'Adding OpenRouter provider for bot')
@@ -166,7 +177,7 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
   }
 
   if (providers.length === 0) {
-    log.warn({ modelName: resolvedModelName, hasOpenRouter: !!openrouterApiKey, hasGemini: !!geminiApiKey }, 'No LLM providers available for bot')
+    log.warn({ modelName: resolvedModelName, hasOpenRouter: !!openrouterApiKey, hasGemini: !!geminiApiKey, hasVertex: !!vertex }, 'No LLM providers available for bot')
   }
 
   return new ResilientLLMService(providers)
