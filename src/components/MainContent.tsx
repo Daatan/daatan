@@ -15,7 +15,7 @@ export function MainContent({ children }: { children: React.ReactNode }) {
       // plain <main> only scrolls into view on click, it doesn't move keyboard
       // focus, so the next Tab press would otherwise restart from the top.
       tabIndex={-1}
-      className={`flex-1 min-w-0 overflow-x-clip focus:outline-none${isBare ? '' : ' lg:ml-64 mt-16 lg:mt-0'}`}
+      className={`flex-1 min-w-0 overflow-x-clip focus:outline-none${isBare ? '' : ' lg:ms-64 mt-16 lg:mt-0'}`}
     >
       {children}
     </main>
