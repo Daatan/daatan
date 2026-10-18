@@ -1,0 +1,53 @@
+name: Backfill Topic Tags
+
+# Re-pushes resolved, tagged forecasts to the Oracul so its per-topic author board
+# (GET /leaderboard/author-shadow?tag=) covers history (daatan#1917). Drives the admin route
+# POST /api/admin/forecasts/backfill-tags page by page until nextCursor is null. Idempotent.
+# Auth is the x-cron-secret (BOT_RUNNER_SECRET) header — the secret only lives in the runner.
+#
+# Manual, on-demand: Actions → Backfill Topic Tags → Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to backfill
+        type: choice
+        options: [staging, production]
+        default: production
+
+jobs:
+  backfill:
+    name: Backfill ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Page through tagged resolved forecasts
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          if [ "${{ inputs.target }}" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
+
+          after=""
+          total=0
+          for i in $(seq 1 200); do
+            BODY=$(curl -s --max-time 180 -X POST \
+              -H "x-cron-secret: $BOT_RUNNER_SECRET" \
+              "$BASE/api/admin/forecasts/backfill-tags?limit=50${after:+&after=$after}") || BODY=""
+            echo "page $i: ${BODY:-<no response>}"
+            N=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['processed'])" 2>/dev/null || echo ERR)
+            if [ "$N" = "ERR" ]; then echo "❌ bad response — aborting (re-run resumes safely)"; exit 1; fi
+            total=$((total + N))
+            after=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('nextCursor') or '')")
+            if [ -z "$after" ]; then
+              echo "✅ Done — $total forecasts re-pushed"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "⚠️ Hit the page cap after $total forecasts — re-run to repeat from the start (idempotent)"
