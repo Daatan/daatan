@@ -1557,6 +1557,227 @@
       }
     }
   },
+  "retroUkraine": {
+    "meta": {
+      "title": "Who Saw February 24 Coming — Retro Analysis",
+      "description": "910 statements from the three months before Russia’s full-scale invasion of Ukraine, each rated for how likely its speaker thought the invasion was."
+    },
+    "back": "← Retro Analysis",
+    "caseLabel": "Case E01",
+    "window": "Window 20 Nov 2021 → <hl>24 Feb 2022</hl>",
+    "h1": "Who saw <hl>24 February</hl> coming",
+    "lead": "The three months before Russia’s full-scale invasion of Ukraine: {count} statements from world, Russian and Ukrainian media, think tanks and officials. Each article was read in full and rated on one question: how likely did its main voice think a full-scale invasion was, on the day it was published?",
+    "ratingsNote": "These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × stance; the speaker did not necessarily name a probability. P ≥ 0.6 counts as “expects”, P ≤ 0.4 as “does not”.",
+    "group": {
+      "west": "Western governments & intelligence",
+      "analysts": "Analysts & press",
+      "ua": "Ukrainian officials",
+      "ru": "Russian officials"
+    },
+    "groupShort": {
+      "west": "West",
+      "analysts": "Analysts",
+      "ua": "Kyiv",
+      "ru": "Moscow"
+    },
+    "region": {
+      "west": "International outlets",
+      "ua": "Ukrainian outlets",
+      "ru": "Russian outlets"
+    },
+    "regionOption": {
+      "west": "international",
+      "ua": "Ukrainian",
+      "ru": "Russian"
+    },
+    "side": {
+      "invasion": "expects it",
+      "uncertain": "unsure",
+      "no_invasion": "doesn’t"
+    },
+    "scope": {
+      "full_scale": "full-scale",
+      "limited_donbas": "Donbas only",
+      "limited_strikes_or_partial": "limited",
+      "none": "none",
+      "unclear": "unclear"
+    },
+    "events": [
+      "Budanov: attack likely in late January or early February",
+      "Biden–Putin video call",
+      "Russia publishes draft treaties with the US and NATO",
+      "Geneva talks, then NATO–Russia Council and OSCE",
+      "Biden’s “minor incursion” remark",
+      "Zelensky: “we don’t need this panic”",
+      "Sullivan: invasion could begin any day",
+      "Russia recognises the DNR and LNR"
+    ],
+    "thesis": {
+      "west": {
+        "unit": "mean P",
+        "text": "Western governments and intelligence services were nearly unanimous. Only {no} of their statements said no.",
+        "metric": "average P"
+      },
+      "analysts": {
+        "unit": "mean P",
+        "text": "Experts and journalists mostly sided with Washington, but about one in {oneIn} did not believe in war.",
+        "metric": "average P"
+      },
+      "ua": {
+        "unit": "say “no”",
+        "text": "Kyiv was split. Military intelligence warned, while the Security Council and the President’s Office urged no panic.",
+        "metric": "share of statements with P ≤ 0.4"
+      },
+      "ru": {
+        "unit": "say “no”",
+        "text": "The Kremlin and the Foreign Ministry called invasion talk hysteria until the end. Their mean P was {p}.",
+        "metric": "share of statements with P ≤ 0.4"
+      }
+    },
+    "nStat": "n = {n}",
+    "trend": {
+      "h": "Three months of argument in one chart",
+      "intro": "Each dot is one article, placed at the invasion probability its main voice expressed. Each line is that group’s mean over the previous 14 days: what a reader could have seen at the time, without hindsight.",
+      "oneArticle": "one article",
+      "foot": "Full pool after filtering, {count} articles. The dashed line at 50% separates “more likely than not” from “less likely”. Hover the chart for the group means on a given day.",
+      "aria": "Mean invasion probability by group of voices, November 2021 to February 2022",
+      "election": "24.02",
+      "tip": "{date} · 14-day mean · {days} days to go",
+      "few": "few"
+    },
+    "voices": {
+      "h": "Who got it right, who didn’t",
+      "intro": "The clearest calls on both sides. The number is the invasion probability we assigned. Quotes are checked against the article text.",
+      "hit": "Expected the invasion",
+      "miss": "Did not expect it",
+      "pInvasion": "P invasion"
+    },
+    "split": {
+      "h": "Who said “yes”, who said “no”",
+      "intro": "Share of positions by type of voice and by the outlet’s country. Russian outlets are softer than their own government because they often relayed Western warnings, if only to rebut them. Ukrainian outlets barely differ from international ones.",
+      "byVoice": "By voice",
+      "byOutlet": "By outlet",
+      "articles": "{n} articles",
+      "meanP": "mean P",
+      "expects": "expects",
+      "unsure": "unsure",
+      "doesNot": "does not",
+      "legendYes": "expects invasion, P ≥ 0.6",
+      "legendUnsure": "unsure",
+      "legendNo": "does not, P ≤ 0.4",
+      "legendRight": "right: mean P",
+      "aria": "{label}: expects {y}, unsure {u}, does not {no}"
+    },
+    "table": {
+      "h": "{count} articles",
+      "intro": "A balanced sample of the pool: at most 8 articles per outlet and 2 per speaker, with sceptics raised to 35% so their arguments stay visible. See <a>how to read P</a>.",
+      "langNote": "Article titles, summaries and quotes in the table are shown in English, as extracted; original-language quotes are kept.",
+      "voice": "Voice",
+      "position": "Position",
+      "outlet": "Outlet",
+      "search": "Search",
+      "all": "all",
+      "placeholder": "name, outlet, word",
+      "positionInvasion": "expects invasion",
+      "positionDoesNot": "does not",
+      "shown": "{shown} of {total}",
+      "date": "Date",
+      "article": "Article",
+      "mainVoice": "Main voice",
+      "pInvasion": "P invasion",
+      "scope": "Scope",
+      "summary": "Summary & quote",
+      "archived": "archived",
+      "scopeLine": "scope: {scope}",
+      "confidence": "confidence {c}",
+      "notVerbatim": "quote not found verbatim"
+    },
+    "method": {
+      "h": "Method",
+      "searchT": "Search",
+      "search": "GDELT GKG via BigQuery over 122 domains: the sources news-indexer monitors, plus major world, Russian and Ukrainian outlets and think tanks. That gave 105,001 URLs. Gaps were filled from the Wayback archive, and key sceptics were found by hand.",
+      "filterT": "Filter",
+      "filter": "Title keywords kept 5,007 candidates, and Claude Haiku kept 2,432 of those on title alone. Full texts then dropped irrelevant pieces, repeats of one speaker on one day, and anything edited after 24 February. Dates were checked against the page itself.",
+      "ratingT": "Rating",
+      "rating": "The model reads the text as of its publication date and returns the main voice’s stance from −1 to +1, confidence, expected scope and a verbatim quote. Expecting a Donbas-only operation caps P at 0.35, and limited strikes cap it at 0.45.",
+      "missingH": "What is missing",
+      "m1": "FT, WSJ and Bloomberg are absent: GDELT lacks them for this window and they are paywalled. AP almost entirely collapsed in deduplication because it relays the same officials.",
+      "m2": "We could not fetch the Metaculus forecast, Zelensky’s 28 January press conference, Fiona Hill’s NYT column, or Macron’s 8 February statement.",
+      "m3": "154 texts come from live pages and 46 from Wayback snapshots taken before 24 February. No signs of later edits were found in the live texts.",
+      "m4": "{unverified} of {total} quotes were not found verbatim in the text. They are model paraphrases and are flagged in the table.",
+      "m5": "Telegram, social media and broadcasts are not covered. Ratings are by the model, with about 60 rows checked by hand."
+    },
+    "footer": "DAATAN Retro-Analysis Archive · E01 · built 23 Sep 2026",
+    "numbers": {
+      "h": "How to read P",
+      "intro": "Every article gets one number, <b>P</b>: what its main voice expected at the time, before anyone knew the outcome.",
+      "range": "0 to 1 · what the speaker expected",
+      "def": "The probability of a <b>full-scale</b> invasion that the article’s main voice expressed on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.",
+      "coin": "Coin flip",
+      "nytBiden": "NYT on Biden",
+      "formulaShort": "P = 0.5 + 0.5 × stance",
+      "b1": "The model rates the speaker’s stance from −1 to +1, and <m>P = 0.5 + 0.5 × stance</m>.",
+      "b2": "Expecting only a Donbas operation caps P at 0.35, and limited strikes cap it at 0.45. Those speakers did not predict what actually happened.",
+      "b3": "P ≥ 0.6 counts as “expects it” and P ≤ 0.4 as “doesn’t”. <b>Mean P</b> is the average over a group’s statements."
+    },
+    "hit": {
+      "1": {
+        "name": "Kyrylo Budanov",
+        "role": "Head of Ukrainian military intelligence (GUR)",
+        "quote": "Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.",
+        "note": "Described a multi-axis assault three months out. Off on timing by about three weeks, right on scale."
+      },
+      "125": {
+        "name": "Rob Lee",
+        "role": "King’s College London",
+        "quote": "…believes that a Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.",
+        "note": "The Washington Post paraphrasing his view. Lee tracked the buildup through open-source data."
+      },
+      "151": {
+        "name": "Joe Biden",
+        "role": "US President, quoted in The New York Times",
+        "quote": "My guess is he will move in. He has to do something.",
+        "note": "Said at the same 19 January press conference as the “minor incursion” remark. The P of 0.78 is the rating of the 2 February NYT analysis (Steven Erlanger) that quotes it, not of Biden himself."
+      },
+      "158": {
+        "name": "Jonathan Finer",
+        "role": "US Deputy National Security Adviser",
+        "quote": "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we’re actually seeing with our own eyes."
+      }
+    },
+    "miss": {
+      "17": {
+        "name": "Dmitry Peskov",
+        "role": "Kremlin spokesman",
+        "quote": "Слова о якобы планируемом Россией нападении абсолютно беспочвенны.",
+        "note": "“Talk of an allegedly planned Russian attack is absolutely groundless.” The line held until 21 February."
+      },
+      "48": {
+        "name": "Institute for the Study of War",
+        "role": "Washington think tank",
+        "quote": "Putin does not, in fact, intend to invade unoccupied Ukraine this winter despite the continued build-up of Russian forces in preparation to do so.",
+        "note": "One of the few Western think tanks to say no outright."
+      },
+      "86": {
+        "name": "Oleksiy Danilov",
+        "role": "Secretary of Ukraine’s National Security and Defence Council",
+        "quote": "Сейчас угрозы открытой агрессии Российской Федерации против Украины не наблюдается… Поэтому отдыхайте спокойно, празднуйте.",
+        "note": "“There is no threat of open aggression… So rest easy and celebrate.” A month earlier he had disputed Budanov’s warning."
+      },
+      "120": {
+        "name": "Dmitri Trenin",
+        "role": "Carnegie Moscow Center",
+        "quote": "In the immediate future, say, the coming month, I think the answer is no.",
+        "note": "Said on 20 January. The month ran out on 20 February, four days before the invasion."
+      },
+      "129": {
+        "name": "Jeff Hawn",
+        "role": "London School of Economics, in Foreign Policy",
+        "quote": "While a full-scale invasion across Ukraine remains highly unlikely, there are a range of other options open to Russia.",
+        "note": "The typical sceptic case: recognition of the republics or limited strikes would serve Moscow better."
+      }
+    }
+  },
   "retroShared": {
     "backToTop": "Back to top",
     "nextSection": "Next section"
