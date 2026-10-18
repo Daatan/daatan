@@ -8,7 +8,7 @@ vi.mock('../oracle', () => ({
 }))
 
 import { getAuthorShadowLeaderboard } from '../oracle'
-import { aggregateByOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
+import { aggregateByOutlet, authorsOfOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
@@ -233,5 +233,48 @@ describe('getAuthorShadowRowsForOutlet', () => {
       count: 1,
     })
     expect(await getAuthorShadowRowsForOutlet('Unrelated Outlet')).toEqual([])
+  })
+})
+
+describe('byline placeholders and repeated authors (#1903)', () => {
+  it('does not count the bylineless bucket or alias duplicates as authors, but keeps their predictions', () => {
+    const [row] = aggregateByOutlet([
+      entry({ author: 'Lior Ben Ari', outlet_name: 'ynet.co.il', predictions: 1 }),
+      entry({ author: 'Lior Ben Ari', outlet_name: 'ynetnews.com', predictions: 1 }),
+      entry({ author: 'lior ben ari ', outlet_name: 'ynet.co.il', predictions: 1 }),
+      entry({ author: 'Nadav Eyal', outlet_name: 'ynet.co.il', predictions: 2 }),
+      entry({ author: '(no byline)', outlet_name: 'ynet.co.il', predictions: 1 }),
+    ])
+    expect(row.authorCount).toBe(2)
+    expect(row.predictions).toBe(6)
+  })
+
+  it('drops the placeholder from the authors board', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [entry({ author: '(no byline)', outlet_name: 'X', predictions: 9 }), entry({ author: 'A', outlet_name: 'X', predictions: 9 })],
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative', 4)
+    expect(authorRows.map(r => r.author)).toEqual(['A'])
+  })
+
+  it('authorsOfOutlet merges same-name rows across aliases, prediction-weighted, and skips the placeholder', () => {
+    const row = (o: Partial<ReturnType<typeof rowBase>>) => ({ ...rowBase(), ...o })
+    function rowBase() {
+      return { id: 'x', author: 'A', outletName: 'ynet.co.il', skillConservative: 0, brierScore: 0.5, predictions: 1, articles: 1 }
+    }
+    const out = authorsOfOutlet(
+      [
+        row({ id: '1', author: 'Lior Ben Ari', outletName: 'ynet.co.il', brierScore: 0.2, skillConservative: 0.4, predictions: 3 }),
+        row({ id: '2', author: 'Lior Ben Ari', outletName: 'ynetnews.com', brierScore: 0.6, skillConservative: 0, predictions: 1 }),
+        row({ id: '3', author: '(no byline)', outletName: 'ynet.co.il', predictions: 5 }),
+        row({ id: '4', author: 'Other', outletName: 'jpost.com', predictions: 9 }),
+      ],
+      'ynet.co.il',
+    )
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ author: 'Lior Ben Ari', predictions: 4, outletName: 'ynet.co.il', articles: 2 })
+    expect(out[0].brierScore).toBeCloseTo(0.3) // (0.2*3 + 0.6*1) / 4
+    expect(out[0].skillConservative).toBeCloseTo(0.3) // (0.4*3 + 0*1) / 4
   })
 })

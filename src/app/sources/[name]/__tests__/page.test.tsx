@@ -10,6 +10,7 @@ vi.mock('@/lib/services/outlets', () => ({ getPublicOutletDetail: mockGetPublicO
 vi.mock('@/lib/services/sourceLeaderboard', () => ({
   getSourceLeaderboard: mockGetSourceLeaderboard,
   canonicalOutlet: (n: string) => n,
+  authorsOfOutlet: () => [],
 }))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))

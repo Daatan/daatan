@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
-import { canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getAppUrl } from '@/lib/branding'
 
 export const dynamic = 'force-dynamic'
@@ -54,11 +54,7 @@ export default async function OutletPublicPage({ params }: Props) {
   const track = outletRows.find(r => keys.has(r.outletName))
   // The scored authors behind the track record. Same key as `track`, so the numbers above
   // and this list always describe the same rows.
-  const scoredAuthors = track
-    ? authorRows
-        .filter(r => canonicalOutlet(r.outletName) === track.outletName)
-        .sort((a, b) => b.predictions - a.predictions || b.skillConservative - a.skillConservative)
-    : []
+  const scoredAuthors = track ? authorsOfOutlet(authorRows, track.outletName) : []
   const noImpact =
     detail.impact.forecastsAffected === 0 && detail.impact.matches === 0 && detail.impact.last30dMatches === 0
   const t = await getTranslations('outletPage')
