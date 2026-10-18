@@ -1477,6 +1477,7 @@
       "notVerbatim": "quote not found verbatim"
     },
     "method": {
+      "poolCsv": "Download the full rated pool (CSV)",
       "h": "Method",
       "searchT": "Search",
       "search": "A seed list of 326 domains: news-indexer sources, the Israeli press in Hebrew, English, Russian and Arabic, world outlets, think tanks and pollsters. GDELT GKG via BigQuery returned 20,245 URLs from 157 of them. Israel Hayom, Haaretz English, NewsRu.co.il, INSS, JPPI and others missing from GDELT were added from the Wayback archive.",
@@ -1693,6 +1694,7 @@
       "notVerbatim": "quote not found verbatim"
     },
     "method": {
+      "poolCsv": "Download the full rated pool (CSV)",
       "h": "Method",
       "searchT": "Search",
       "search": "GDELT GKG via BigQuery over 122 domains: the sources news-indexer monitors, plus major world, Russian and Ukrainian outlets and think tanks. That gave 105,001 URLs. Gaps were filled from the Wayback archive, and key sceptics were found by hand.",
@@ -1915,6 +1917,7 @@
       "priceEstimate": "price estimate: {price}"
     },
     "method": {
+      "poolCsv": "Download the full rated pool (CSV)",
       "h": "How this was computed",
       "searchT": "Search",
       "search": "A list of 146 domains: business and energy press, agencies, banks, think tanks, and Russian-language and European outlets. GDELT GKG via BigQuery returned 12,432 distinct URLs with energy headlines. Bloomberg, the Financial Times and the Wall Street Journal were barely represented in GDELT for these topics (6 rows, 1 usable article).",
