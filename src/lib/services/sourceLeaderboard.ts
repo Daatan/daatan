@@ -51,6 +51,13 @@ export function canonicalOutlet(name: string | null): string | null {
   return name === null ? null : (OUTLET_ALIASES[name] ?? name)
 }
 
+/** retro's scorer files bylineless predictions under this author string, per outlet. It is the
+ *  outlet's own unattributed bucket — real predictions, but not a person. */
+export const NO_BYLINE = '(no byline)'
+
+const authorKey = (name: string) => name.trim().toLowerCase()
+const isPlaceholderAuthor = (name: string) => authorKey(name) === NO_BYLINE
+
 function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
   return {
     id: e.id,
@@ -100,12 +107,47 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
       outletName,
       skillConservative: round3(weighted(e => e.skill_conservative)),
       brierScore: round3(weighted(e => e.brier_score)),
-      authorCount: group.length,
+      // People, not ledger rows: the bylineless bucket isn't one, and one author can have a
+      // row per outlet alias (ynet.co.il + ynetnews.com).
+      authorCount: new Set(group.filter(e => !isPlaceholderAuthor(e.author)).map(e => authorKey(e.author))).size,
       predictions: totalPredictions,
       articles: totalArticles,
     })
   }
   return rows
+}
+
+/**
+ * The people behind one outlet's track record: rows of that canonical outlet (aliases
+ * included), minus the bylineless bucket, with one row per author name. Same-name rows are
+ * merged prediction-weighted, the way `aggregateByOutlet` rolls authors up. The merged row keeps
+ * the outlet spelling it has the most predictions under, so the author-page link still resolves.
+ */
+export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string): AuthorLeaderboardRow[] {
+  const target = canonicalOutlet(outletName)
+  const groups = new Map<string, AuthorLeaderboardRow[]>()
+  for (const r of rows) {
+    if (canonicalOutlet(r.outletName) !== target || isPlaceholderAuthor(r.author)) continue
+    const key = authorKey(r.author)
+    groups.set(key, [...(groups.get(key) ?? []), r])
+  }
+  const merged: AuthorLeaderboardRow[] = []
+  for (const group of groups.values()) {
+    const preds = group.reduce((sum, r) => sum + r.predictions, 0)
+    const weighted = (pick: (r: AuthorLeaderboardRow) => number) =>
+      preds > 0
+        ? group.reduce((sum, r) => sum + pick(r) * r.predictions, 0) / preds
+        : group.reduce((sum, r) => sum + pick(r), 0) / group.length
+    const lead = group.reduce((a, b) => (b.predictions > a.predictions ? b : a))
+    merged.push({
+      ...lead,
+      skillConservative: round3(weighted(r => r.skillConservative)),
+      brierScore: round3(weighted(r => r.brierScore)),
+      predictions: preds,
+      articles: group.reduce((sum, r) => sum + r.articles, 0),
+    })
+  }
+  return merged.sort((a, b) => b.predictions - a.predictions || b.skillConservative - a.skillConservative)
 }
 
 /** skillConservative is higher-is-better; brierScore is lower-is-better. */
@@ -142,7 +184,9 @@ export async function getSourceLeaderboard(
   const data = await getAuthorShadowLeaderboard()
   const entries = data?.authors ?? []
 
-  const authorRows = sortRows(entries.map(toAuthorRow), sortBy).filter(r => r.predictions >= minPredictions)
+  const authorRows = sortRows(entries.map(toAuthorRow), sortBy)
+    .filter(r => !isPlaceholderAuthor(r.author))
+    .filter(r => r.predictions >= minPredictions)
   const outletRows = sortRows(aggregateByOutlet(entries), sortBy).filter(r => r.predictions >= minPredictions)
 
   return { view, sortBy, authorRows, outletRows }
