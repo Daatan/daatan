@@ -293,10 +293,10 @@ const Sidebar = () => {
       {/* Sidebar */}
       <aside
         className={`
-          fixed left-0 top-0 h-screen w-64 bg-navy-900 border-r border-navy-600 flex flex-col z-50
+          fixed start-0 top-0 h-screen w-64 bg-navy-900 border-e border-navy-600 flex flex-col z-50
           transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:rtl:translate-x-0
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}
         `}
       >
         {/* Logo */}
@@ -362,7 +362,7 @@ const Sidebar = () => {
                   <span className="relative">
                     <Icon className="w-5 h-5" />
                     {item.href === '/notifications' && hasMounted && unreadCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-600 rounded-full">
+                      <span className="absolute -top-1.5 -end-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-600 rounded-full">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
@@ -420,7 +420,7 @@ const Sidebar = () => {
                 onClick={handleCloseMenu}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-text-secondary hover:bg-navy-800 hover:text-white transition-colors w-full"
               >
-                <div className="flex-1 overflow-hidden text-left">
+                <div className="flex-1 overflow-hidden text-start">
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium truncate text-sm text-white">{session.user.username || session.user.name || 'User'}</p>
                     {session.user.role === 'ADMIN' && (
