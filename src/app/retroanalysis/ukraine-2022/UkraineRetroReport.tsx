@@ -43,7 +43,7 @@ interface Voice { n: number; name: string; role: string; quote: string; note?: s
 const HIT: Voice[] = [
   { n: 1, name: 'Kyrylo Budanov', role: 'Head of Ukrainian military intelligence (GUR)', quote: 'Россия сосредоточила у границ Украины более 92 тыс. военнослужащих и готовится к нападению в конце января или начале февраля 2022 года.', note: 'Described a multi-axis assault three months out. Off on timing by about three weeks, right on scale.' },
   { n: 125, name: 'Rob Lee', role: "King's College London", quote: '…believes that a Russian military operation against Ukraine is more likely than not, in part because of the unprecedented scale of the Russian military buildup underway around the country.', note: 'The Washington Post paraphrasing his view. Lee tracked the buildup through open-source data.' },
-  { n: 151, name: 'Joe Biden', role: 'US President, quoted in The New York Times', quote: 'My guess is he will move in. He has to do something.', note: 'From the same 19 January press conference as the “minor incursion” remark.' },
+  { n: 151, name: 'Joe Biden', role: 'US President, quoted in The New York Times', quote: 'My guess is he will move in. He has to do something.', note: 'Said at the same 19 January press conference as the “minor incursion” remark. The P of 0.78 is the rating of the 2 February NYT analysis (Steven Erlanger) that quotes it, not of Biden himself.' },
   { n: 158, name: 'Jonathan Finer', role: 'US Deputy National Security Adviser', quote: "Whatever Russian officials are saying in public about their intentions, we have to take that with a grain of salt because of what we're actually seeing with our own eyes." },
 ]
 const MISS: Voice[] = [
@@ -78,11 +78,11 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
   const byN = useMemo(() => new Map(rows.map(r => [r.n, r])), [rows])
   const unverified = rows.filter(r => !r.quote_verified).length
 
-  const thesis: [Group, string, string, string][] = [
-    ['west', pct(byGroup.west.p), 'mean P', `Western governments and intelligence services were nearly unanimous. Only ${pct(byGroup.west.no)} of their statements said no.`],
-    ['analysts', pct(byGroup.analysts.p), 'mean P', `Experts and journalists mostly sided with Washington, but about one in ${Math.round(1 / byGroup.analysts.no)} did not believe in war.`],
-    ['ua', pct(byGroup.ua.no), 'say “no”', 'Kyiv was split. Military intelligence warned, while the Security Council and the President’s Office urged no panic.'],
-    ['ru', pct(byGroup.ru.no), 'say “no”', `The Kremlin and the Foreign Ministry called invasion talk hysteria until the end. Their mean P was ${pct(byGroup.ru.p)}.`],
+  const thesis: [Group, string, string, string, number, string][] = [
+    ['west', pct(byGroup.west.p), 'mean P', `Western governments and intelligence services were nearly unanimous. Only ${pct(byGroup.west.no)} of their statements said no.`, byGroup.west.n, 'average P'],
+    ['analysts', pct(byGroup.analysts.p), 'mean P', `Experts and journalists mostly sided with Washington, but about one in ${Math.round(1 / byGroup.analysts.no)} did not believe in war.`, byGroup.analysts.n, 'average P'],
+    ['ua', pct(byGroup.ua.no), 'say “no”', 'Kyiv was split. Military intelligence warned, while the Security Council and the President’s Office urged no panic.', byGroup.ua.n, 'share of statements with P ≤ 0.4'],
+    ['ru', pct(byGroup.ru.no), 'say “no”', `The Kremlin and the Foreign Ministry called invasion talk hysteria until the end. Their mean P was ${pct(byGroup.ru.p)}.`, byGroup.ru.n, 'share of statements with P ≤ 0.4'],
   ]
 
   return (
@@ -101,13 +101,17 @@ export default function UkraineRetroReport({ rows, pool }: { rows: ReportRow[]; 
             The three months before Russia&apos;s full-scale invasion of Ukraine: {pool.length} statements from world, Russian and Ukrainian media, think tanks and officials.
             Each article was read in full and rated on one question: how likely did its main voice think a full-scale invasion was, on the day it was published?
           </p>
+          <p className="mt-3 max-w-2xl text-sm text-gray-600 leading-relaxed">
+            These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × stance; the speaker did not necessarily name a probability. P ≥ 0.6 counts as “expects”, P ≤ 0.4 as “does not”.
+          </p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-2 border-gray-900 border-b border-gray-200">
-            {thesis.map(([g, big, unit, text], i) => (
+            {thesis.map(([g, big, unit, text, n, metric], i) => (
               <div key={g} className={`py-5 pr-5 ${i > 0 ? 'lg:pl-5 lg:border-l border-gray-200' : ''} ${i > 0 ? 'border-t sm:border-t-0' : ''} ${i === 1 || i === 3 ? 'sm:pl-5 sm:border-l' : ''} ${i >= 2 ? 'sm:border-t lg:border-t-0' : ''}`}>
                 <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-gray-700">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GROUP_COLOR[g] }} />{GROUP_NAME[g]}
                 </div>
                 <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ml-1.5 text-sm font-normal text-gray-600">{unit}</span></div>
+                <div className="mt-1 font-mono text-[11px] text-gray-600">n = {n.toLocaleString('en-US')} · {metric}</div>
                 <p className="mt-2 text-sm text-gray-700 leading-snug">{text}</p>
               </div>
             ))}
@@ -199,7 +203,7 @@ const SCALE_MARKS: [number, string][] = [
   [0.075, 'Dmitry Peskov'],
   [0.35, 'Dmitri Trenin'],
   [0.5, 'Coin flip'],
-  [0.78, 'Joe Biden'],
+  [0.78, 'NYT on Biden'],
   [0.93, 'Kyrylo Budanov'],
 ]
 
