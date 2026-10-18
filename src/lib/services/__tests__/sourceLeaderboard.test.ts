@@ -8,7 +8,7 @@ vi.mock('../oracle', () => ({
 }))
 
 import { getAuthorShadowLeaderboard } from '../oracle'
-import { aggregateByOutlet, authorsOfOutlet, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
+import { aggregateByOutlet, authorKey, authorsOfOutlet, bylinePeople, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
@@ -276,5 +276,91 @@ describe('byline placeholders and repeated authors (#1903)', () => {
     expect(out[0]).toMatchObject({ author: 'Lior Ben Ari', predictions: 4, outletName: 'ynet.co.il', articles: 2 })
     expect(out[0].brierScore).toBeCloseTo(0.3) // (0.2*3 + 0.6*1) / 4
     expect(out[0].skillConservative).toBeCloseTo(0.3) // (0.4*3 + 0*1) / 4
+  })
+})
+
+describe('one person, several spellings (#1904)', () => {
+  it('authorKey ignores case, periods, quotes and spacing', () => {
+    expect(authorKey('SETH J. FRANTZMAN')).toBe(authorKey('Seth J Frantzman'))
+    expect(authorKey("  Ze'ev   Smith ")).toBe(authorKey('Zeev Smith'))
+    expect(authorKey('Nadav Eyal')).not.toBe(authorKey('Nadav Eyal Jr'))
+  })
+
+  it('authorKey maps the listed Hebrew spellings onto the English one', () => {
+    expect(authorKey('איתמר אייכנר')).toBe(authorKey('Itamar Eichner'))
+    expect(authorKey('ליאור בן ארי')).toBe(authorKey('Lior Ben Ari'))
+  })
+
+  it('counts and merges them as one author', () => {
+    const [row] = aggregateByOutlet([
+      entry({ author: 'SETH J FRANTZMAN', outlet_name: 'jpost.com', predictions: 2 }),
+      entry({ author: 'SETH J. FRANTZMAN', outlet_name: 'jpost.com', predictions: 1 }),
+      entry({ author: 'Itamar Eichner', outlet_name: 'jpost.com', predictions: 1 }),
+      entry({ author: 'איתמר אייכנר', outlet_name: 'jpost.com', predictions: 1 }),
+    ])
+    expect(row.authorCount).toBe(2)
+    const merged = authorsOfOutlet(
+      [
+        { id: '1', author: 'SETH J FRANTZMAN', outletName: 'jpost.com', skillConservative: 0, brierScore: 0.4, predictions: 2, articles: 1 },
+        { id: '2', author: 'SETH J. FRANTZMAN', outletName: 'jpost.com', skillConservative: 0, brierScore: 0.7, predictions: 1, articles: 1 },
+      ],
+      'jpost.com',
+    )
+    expect(merged).toHaveLength(1)
+    expect(merged[0].predictions).toBe(3)
+    expect(merged[0].brierScore).toBeCloseTo(0.5)
+  })
+})
+
+describe('joint bylines are split (#1904)', () => {
+  it('splits on ; & and, drops agencies/datelines, keeps solo and bylineless alone', () => {
+    expect(bylinePeople('Itamar Eichner; Lior Ben Ari; News Agencies')).toEqual(['Itamar Eichner', 'Lior Ben Ari'])
+    expect(bylinePeople('איתמר אייכנר; ליאור בן ארי; דניאל אדלסון; ניו יורק')).toEqual(['איתמר אייכנר', 'ליאור בן ארי', 'דניאל אדלסון'])
+    expect(bylinePeople('Sean Williams, The Motley Fool')).toEqual(['Sean Williams'])
+    expect(bylinePeople('Jane Doe and John Roe')).toEqual(['Jane Doe', 'John Roe'])
+    expect(bylinePeople('ליאור בן ארי, איתמר אייכנר')).toEqual(['ליאור בן ארי', 'איתמר אייכנר'])
+    expect(bylinePeople('Smith, John')).toEqual(['Smith, John'])
+    expect(bylinePeople('Reuters')).toEqual(['Reuters'])
+    expect(bylinePeople('(no byline)')).toEqual([])
+    expect(bylinePeople('News Agencies; The Motley Fool')).toEqual([])
+  })
+
+  it('credits each named person the joint row in full and merges it with their solo row', () => {
+    const base = { skillConservative: 0, articles: 1, outletName: 'ynet.co.il' }
+    const out = authorsOfOutlet(
+      [
+        { ...base, id: 's', author: 'Lior Ben Ari', brierScore: 0.2, predictions: 1 },
+        { ...base, id: 'j', author: 'ליאור בן ארי, איתמר אייכנר', brierScore: 0.6, predictions: 1 },
+        { ...base, id: 'k', author: 'Itamar Eichner; Lior Ben Ari; News Agencies', brierScore: 0.4, predictions: 2 },
+      ],
+      'ynet.co.il',
+    )
+    const by = Object.fromEntries(out.map(r => [authorKey(r.author), r]))
+    expect(Object.keys(by).sort()).toEqual(['itamar eichner', 'lior ben ari'])
+    expect(by['lior ben ari'].predictions).toBe(4) // 1 solo + 1 + 2
+    expect(by['lior ben ari'].brierScore).toBeCloseTo((0.2 + 0.6 + 0.4 * 2) / 4)
+    expect(by['itamar eichner'].predictions).toBe(3) // 1 + 2
+  })
+
+  it('counts people, not ledger rows, and leaves outlet totals untouched', () => {
+    const [row] = aggregateByOutlet([
+      entry({ author: 'Itamar Eichner; Lior Ben Ari', outlet_name: 'ynet.co.il', predictions: 2 }),
+      entry({ author: 'Lior Ben Ari', outlet_name: 'ynet.co.il', predictions: 1 }),
+      entry({ author: 'News Agencies; The Motley Fool', outlet_name: 'ynet.co.il', predictions: 1 }),
+    ])
+    expect(row.authorCount).toBe(2)
+    expect(row.predictions).toBe(4) // the outlet's own record is not multiplied
+  })
+
+  it('the authors board shows the individuals', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [
+        entry({ author: 'A One; B Two', outlet_name: 'X', predictions: 3 }),
+        entry({ author: 'A One', outlet_name: 'X', predictions: 2 }),
+      ],
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative', 4)
+    expect(authorRows.map(r => [r.author, r.predictions])).toEqual([['A One', 5]])
   })
 })

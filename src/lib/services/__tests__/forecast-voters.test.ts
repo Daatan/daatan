@@ -11,7 +11,11 @@ vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 vi.mock('@/lib/services/context', () => ({ getLatestOracleSnapshot: vi.fn() }))
-vi.mock('@/lib/services/sourceLeaderboard', () => ({ getSourceLeaderboard: vi.fn() }))
+vi.mock('@/lib/services/sourceLeaderboard', () => ({
+  getSourceLeaderboard: vi.fn(),
+  authorKey: (n: string) => n.trim().toLowerCase(),
+  canonicalOutlet: (n: string) => n,
+}))
 
 import { getForecastVoters } from '../forecast-sources'
 import { getLatestOracleSnapshot } from '@/lib/services/context'
