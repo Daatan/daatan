@@ -1338,5 +1338,227 @@
       "terms": "Kondiĉoj de uzo",
       "disclaimer": "Daatan ne provizas investan aŭ financan konsiladon nek rekomendojn agi. La enhavo de la retejo servas nur informajn celojn."
     }
+  },
+  "retroIsrael": {
+    "meta": {
+      "title": "Who Saw 64 Seats Coming — Retro Analysis",
+      "description": "1,100 statements from the six months before Israel’s November 2022 Knesset election, each rated for how likely its speaker thought a 61-seat majority for Netanyahu’s bloc was."
+    },
+    "back": "← Retro Analysis",
+    "caseLabel": "Case E02",
+    "window": "Window 1 May → <hl>1 Nov 2022</hl>",
+    "h1": "Who saw <hl>64 seats</hl> coming",
+    "lead": "The six months before Israel’s 25th Knesset election: {count} statements from the Israeli press in Hebrew, English, Russian and Arabic, world media and think tanks. Each article was read in full and rated on one question: how likely did its main voice think it was that Netanyahu’s bloc (Likud, Religious Zionism, Shas, United Torah Judaism) would win 61 seats? The bloc won 64.",
+    "ratingsNote": "These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × stance; the speaker did not necessarily name a probability. P ≥ 0.6 counts as “expects”, P ≤ 0.4 as “does not”.",
+    "group": {
+      "polls": "Seat polls",
+      "media": "Analysts & press",
+      "bloc": "Bloc politicians",
+      "anti": "Opposition politicians"
+    },
+    "groupShort": {
+      "polls": "Polls",
+      "media": "Press",
+      "bloc": "Bloc",
+      "anti": "Opposition"
+    },
+    "region": {
+      "he": "Israeli, Hebrew",
+      "il_en": "Israeli & Jewish, English",
+      "ru": "Russian-language",
+      "ar": "Arabic-language",
+      "intl": "International"
+    },
+    "side": {
+      "bloc61": "expects 61+",
+      "uncertain": "unsure",
+      "no61": "doesn’t"
+    },
+    "no61kind": {
+      "deadlock": "deadlock, new election",
+      "opposition_forms_govt": "opposition government",
+      "unity_govt": "unity government",
+      "unclear": "unclear"
+    },
+    "events": [
+      "Bennett and Lapid announce the Knesset will dissolve",
+      "Knesset dissolved, Lapid becomes prime minister",
+      "Gantz and Sa’ar merge their parties",
+      "Eisenkot joins Gantz: National Unity",
+      "List deadline: the Joint List splits",
+      "Maritime border deal with Lebanon"
+    ],
+    "thesis": {
+      "polls": {
+        "unit": "below 61",
+        "text": "Share of October poll reports that left the bloc short of a majority. The most common figure was 60.",
+        "metric": "October poll reports with a seat total"
+      },
+      "media": {
+        "unit": "mean P",
+        "text": "Analysts and journalists split, but “no” came up more often: {no} against {yes}.",
+        "metric": "average P"
+      },
+      "bloc": {
+        "unit": "say “yes”",
+        "text": "Likud and its partners promised 61, though many in the camp conceded the polls were a seat or two short.",
+        "metric": "share of statements with P ≥ 0.6"
+      },
+      "anti": {
+        "unit": "say “no”",
+        "text": "Lapid, Gantz and their allies ran on “Netanyahu has no 61”. Their mean P was {p}.",
+        "metric": "share of statements with P ≤ 0.4"
+      }
+    },
+    "nStat": "n = {n}",
+    "polls": {
+      "h": "Polls against the ballot box",
+      "intro": "Each bubble counts poll reports that gave the bloc that many seats. For six months the median sat at 59–60, one or two short of a majority. On election day the bloc won 64: Meretz and Balad fell below the threshold and their votes were wasted.",
+      "foot": "{count} articles that give a seat total for the bloc. Several outlets often reported the same poll, so this measures weight in the news, not the number of distinct polls.",
+      "aria": "Seats given to Netanyahu’s bloc in poll reports, by month",
+      "noMajority": "{lt} 61 no majority",
+      "result": "result 64",
+      "tip": "{month}: {c, plural, one {# report} other {# reports}} with {seats} seats · month median {med}"
+    },
+    "trend": {
+      "h": "Six months of argument in one chart",
+      "intro": "Each dot is one article, placed at the probability of 61+ seats its main voice expressed. Each line is that group’s mean over the previous 14 days: what a reader could have seen at the time, without hindsight.",
+      "oneArticle": "one article",
+      "foot": "Full pool after filtering, {count} articles. The dashed line at 50% separates “more likely than not” from “less likely”. Hover the chart for the group means on a given day.",
+      "aria": "Mean probability of a 61-seat majority for Netanyahu’s bloc by group of voices, May to October 2022",
+      "election": "1 Nov",
+      "tip": "{date} · 14-day mean · {days} days to go",
+      "few": "few"
+    },
+    "voices": {
+      "h": "Who got it right, who didn’t",
+      "intro": "The clearest calls on both sides. The number is the probability we assigned. Quotes are checked against the article text; Hebrew and Arabic ones are translated.",
+      "hit": "Expected 61+",
+      "miss": "Did not expect it",
+      "p61": "P 61+"
+    },
+    "split": {
+      "h": "Who said “yes”, who said “no”",
+      "intro": "Share of positions by type of voice and by the outlet’s language. Politicians in both camps predictably said what suited them. The press split almost evenly, and language made little difference: Hebrew, Russian and Arabic outlets all leaned slightly towards deadlock.",
+      "byVoice": "By voice",
+      "byLang": "By outlet language",
+      "articles": "{n} articles",
+      "meanP": "mean P",
+      "expects": "expects",
+      "unsure": "unsure",
+      "doesNot": "does not",
+      "legendYes": "expects 61+, P ≥ 0.6",
+      "legendUnsure": "unsure",
+      "legendNo": "does not, P ≤ 0.4",
+      "legendRight": "right: mean P",
+      "aria": "{label}: expects {y}, unsure {u}, does not {no}"
+    },
+    "table": {
+      "h": "{count} articles",
+      "intro": "A balanced sample of the pool: at most 15 articles per outlet and 3 per speaker, polls capped at 30% and one per pollster a week, sceptics raised to 35% so their arguments stay visible. See <a>how to read P</a>.",
+      "langNote": "Article titles, summaries and quotes in the table are shown in English, as extracted; original-language quotes are kept.",
+      "voice": "Voice",
+      "position": "Position",
+      "outlet": "Outlet",
+      "search": "Search",
+      "all": "all",
+      "placeholder": "name, outlet, word",
+      "shown": "{shown} of {total}",
+      "date": "Date",
+      "article": "Article",
+      "mainVoice": "Main voice",
+      "mainVoiceSub": "quoted speaker, not the author",
+      "p61": "P 61+",
+      "blocSeats": "Bloc seats",
+      "summary": "Summary & quote",
+      "archived": "archived",
+      "seatsLine": "bloc seats: {seats}",
+      "confidence": "confidence {c}",
+      "notVerbatim": "quote not found verbatim"
+    },
+    "method": {
+      "h": "Method",
+      "searchT": "Search",
+      "search": "A seed list of 326 domains: news-indexer sources, the Israeli press in Hebrew, English, Russian and Arabic, world outlets, think tanks and pollsters. GDELT GKG via BigQuery returned 20,245 URLs from 157 of them. Israel Hayom, Haaretz English, NewsRu.co.il, INSS, JPPI and others missing from GDELT were added from the Wayback archive.",
+      "filterT": "Filter",
+      "filter": "Keywords in four languages, then Claude Haiku on titles: 2,261 of 8,780 candidates kept. Full texts then dropped irrelevant pieces, repeats of one speaker on one day, repeats of one pollster in one week, and anything edited after 1 November. Articles whose page date falls in an earlier campaign (2019–2021) were dropped, 37 of them. A second pass dropped 33 spring-2022 articles where “61” was about the current Knesset (no-confidence votes, defections, an alternative government), not the election. Dates were checked against the page itself.",
+      "ratingT": "Rating",
+      "rating": "The model reads the text as of its publication date and returns the main voice’s stance from −1 to +1, confidence, the bloc’s seat total if given, and a verbatim quote. For seat polls the stance follows a fixed rule: ≤58 seats −0.6, 59 −0.4, 60 −0.2, 61–62 +0.3, ≥63 +0.6. The article’s framing can shift it by up to 0.2. The main voice is whoever the article quotes on the question, not the author.",
+      "missingH": "What is missing",
+      "m1": "N12, Kan and Channel 13 are barely represented: their sites are absent from GDELT and Wayback lists their articles without titles. Israeli TV, where much of the forecasting happened, is not covered.",
+      "m2": "About two thirds of Hebrew Israel Hayom articles for the window were fetched. Hebrew Haaretz, Walla and Ynet appear only through GDELT.",
+      "m3": "253 texts come from live pages and 47 from Wayback snapshots taken before 1 November.",
+      "m4": "{unverified} of {total} quotes were not found verbatim in the text. They are model paraphrases and are flagged in the table.",
+      "m5": "Ratings are by the model. It sometimes misplaces a speaker’s camp or reads a conditional “if Netanyahu gets 61” as a forecast, so some table rows are wrong. The cards above and about 40 rows were checked by hand."
+    },
+    "footer": "DAATAN Retro-Analysis Archive · E02 · built 24 Sep 2026",
+    "numbers": {
+      "h": "How to read P",
+      "intro": "Every article gets one number, <b>P</b>: what its main voice expected at the time, before anyone knew the outcome.",
+      "range": "0 to 1 · what the speaker expected",
+      "def": "The probability that Netanyahu’s bloc wins <b>61 or more</b> seats, as the article’s main voice expressed it on the day of publication. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.",
+      "coin": "Coin flip",
+      "poll": "Poll: {n}",
+      "b1": "The model rates the speaker’s stance from −1 to +1, and <m>P = 0.5 + 0.5 × stance</m>.",
+      "b2": "A poll that gives the bloc 60 seats lands at P = 0.4, and 61–62 seats at 0.65. The article’s framing can move it by up to 0.1 in P.",
+      "b3": "P ≥ 0.6 counts as “expects 61+” and P ≤ 0.4 as “doesn’t”. <b>Mean P</b> is the average over a group’s statements.",
+      "formulaShort": "P = 0.5 + 0.5 × stance"
+    },
+    "hit": {
+      "203": {
+        "name": "Nadav Eyal",
+        "role": "Yedioth Ahronoth, translated in Al-Quds Al-Arabi",
+        "quote": "Since the start of the campaign, Netanyahu has not been closer to victory than he is now, thanks to Sami Abu Shehada and his colleagues, of course.",
+        "note": "Written three days after Balad left the Joint List. Balad fell below the threshold, and the wasted votes helped the bloc to its majority."
+      },
+      "235": {
+        "name": "Amit Segal",
+        "role": "Yedioth Ahronoth, reported by Kikar HaShabbat",
+        "quote": "Netanyahu could theoretically reach 63 seats even if his camp wins less than half the votes.",
+        "note": "He described the mechanism exactly. In the same piece he reported internal polls giving Netanyahu 59 (Lapid’s pollster) and 60.5 (Netanyahu’s own)."
+      },
+      "275": {
+        "name": "Yuval Karni",
+        "role": "Yedioth Ahronoth, translated in Al-Quds Al-Arabi",
+        "quote": "A 61-seat government headed by Netanyahu is the scenario with the highest likelihood of materializing.",
+        "note": "Four days before the vote. His six scenarios also included deadlock and a sixth election."
+      },
+      "90": {
+        "name": "Joel Rosenberg",
+        "role": "Editor-in-chief, All Israel News",
+        "quote": "If I were a betting man at one of Trump’s casinos, I would probably put my money 60-40 on Netanyahu to come back.",
+        "note": "One of the few explicit odds in the corpus, given in July, right after the Knesset dissolved. That is why P is 0.60."
+      }
+    },
+    "miss": {
+      "37": {
+        "name": "Noga Tarnopolsky",
+        "role": "Journalist, Atlantic Council",
+        "quote": "Netanyahu has no evident path back... the most likely outcome should the Bennett-Lapid coalition fall [is] additional cycles of inconclusive elections.",
+        "note": "Published three days before the coalition did fall."
+      },
+      "171": {
+        "name": "Ze’ev Elkin",
+        "role": "New Hope, National Unity",
+        "quote": "Netanyahu almost never reaches 61 seats in any poll... Netanyahu will not get 61 seats this time.",
+        "note": "The core message of the Gantz–Sa’ar campaign. Said in Russian to Channel 7."
+      },
+      "285": {
+        "name": "Bobby Ghosh",
+        "role": "Bloomberg, translated in Al-Quds Al-Arabi",
+        "quote": "The closest bet is holding a sixth election.",
+        "note": "The day before the vote."
+      },
+      "287": {
+        "name": "Shalom Lipner",
+        "role": "Atlantic Council, in Foreign Policy",
+        "quote": "Even more likely than this bleak scenario materializing is the correspondingly precarious outcome of Israelis being dragged to another sixth ballot in a few months’ time.",
+        "note": "The “bleak scenario” is a Netanyahu government with Ben-Gvir. Published 31 October."
+      }
+    }
+  },
+  "retroShared": {
+    "backToTop": "Back to top",
+    "nextSection": "Next section"
   }
 }
