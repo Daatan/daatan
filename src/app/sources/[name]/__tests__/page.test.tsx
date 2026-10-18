@@ -7,7 +7,10 @@ const { mockGetPublicOutletDetail, mockGetSourceLeaderboard, mockNotFound } = vi
 }))
 
 vi.mock('@/lib/services/outlets', () => ({ getPublicOutletDetail: mockGetPublicOutletDetail }))
-vi.mock('@/lib/services/sourceLeaderboard', () => ({ getSourceLeaderboard: mockGetSourceLeaderboard }))
+vi.mock('@/lib/services/sourceLeaderboard', () => ({
+  getSourceLeaderboard: mockGetSourceLeaderboard,
+  canonicalOutlet: (n: string) => n,
+}))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
 vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }))

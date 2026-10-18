@@ -4,20 +4,26 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, Loader2, Newspaper } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Loader2, Newspaper } from 'lucide-react'
 import type {
   AuthorLeaderboardRow,
   OutletLeaderboardRow,
   SourceLeaderboardView,
-  SourceSortBy,
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
 
 const log = createClientLogger('SourceLeaderboard')
 
-const VIEWS: SourceLeaderboardView[] = ['authors', 'outlets']
-const SORTS: SourceSortBy[] = ['skillConservative', 'brierScore']
+const VIEWS: SourceLeaderboardView[] = ['outlets', 'authors']
+
+type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'predictions'
+type SortDir = 'asc' | 'desc'
+const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'predictions']
+/** First click on a column: text sorts A→Z, Brier lower-is-better, the rest biggest first. */
+const DEFAULT_DIR: Record<SortKey, SortDir> = {
+  name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', predictions: 'desc',
+}
 
 /** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
 function brierTone(brier: number): string {
@@ -27,15 +33,20 @@ function brierTone(brier: number): string {
   return 'text-red-400'
 }
 
-function toggleHref(view: SourceLeaderboardView, sortBy: SourceSortBy): string {
-  return `/leaderboard/sources?view=${view}&sortBy=${sortBy}`
+function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir): string {
+  return `/leaderboard/sources?view=${view}&sort=${sort}&dir=${dir}`
 }
 
 export default function SourceLeaderboardPage() {
   const t = useTranslations('sourceLeaderboard')
   const searchParams = useSearchParams()
-  const view: SourceLeaderboardView = searchParams.get('view') === 'outlets' ? 'outlets' : 'authors'
-  const sortBy: SourceSortBy = searchParams.get('sortBy') === 'brierScore' ? 'brierScore' : 'skillConservative'
+  const view: SourceLeaderboardView = searchParams.get('view') === 'authors' ? 'authors' : 'outlets'
+  // `sortBy=brierScore` is the pre-sortable-columns URL; keep old links working.
+  const legacyBrier = searchParams.get('sortBy') === 'brierScore'
+  const sortParam = searchParams.get('sort') as SortKey | null
+  const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam) ? sortParam : legacyBrier ? 'brier' : 'skill'
+  const dirParam = searchParams.get('dir')
+  const dir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : DEFAULT_DIR[sort]
 
   const [authorRows, setAuthorRows] = useState<AuthorLeaderboardRow[]>([])
   const [outletRows, setOutletRows] = useState<OutletLeaderboardRow[]>([])
@@ -45,7 +56,7 @@ export default function SourceLeaderboardPage() {
     let cancelled = false
     setIsLoading(true)
 
-    fetch(`/api/leaderboard/sources?view=${view}&sortBy=${sortBy}`)
+    fetch(`/api/leaderboard/sources?view=${view}`)
       .then(res => res.json())
       .then(data => {
         if (cancelled) return
@@ -60,7 +71,7 @@ export default function SourceLeaderboardPage() {
     return () => {
       cancelled = true
     }
-  }, [view, sortBy])
+  }, [view])
 
   // Normalize both views to one display shape so the table only renders once.
   const rows = view === 'outlets'
@@ -69,6 +80,7 @@ export default function SourceLeaderboardPage() {
         primary: r.outletName,
         href: `/sources/${encodeURIComponent(r.outletName)}`,
         secondary: t('authorsCount', { count: r.authorCount }),
+        secondarySort: r.authorCount,
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
         predictions: r.predictions,
@@ -78,10 +90,33 @@ export default function SourceLeaderboardPage() {
         primary: r.author,
         href: `/authors/${encodeURIComponent(r.author)}/${encodeURIComponent(r.outletName)}`,
         secondary: r.outletName,
+        secondarySort: r.outletName.toLowerCase(),
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
         predictions: r.predictions,
       }))
+
+  const sign = dir === 'asc' ? 1 : -1
+  const sortValue = (r: (typeof rows)[number]): string | number =>
+    sort === 'name' ? r.primary.toLowerCase()
+      : sort === 'secondary' ? r.secondarySort
+        : sort === 'skill' ? r.skillConservative
+          : sort === 'brier' ? r.brierScore
+            : r.predictions
+  const sortedRows = [...rows].sort((a, b) => {
+    const av = sortValue(a)
+    const bv = sortValue(b)
+    const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number)
+    return cmp * sign || a.primary.localeCompare(b.primary)
+  })
+
+  const columns: { key: SortKey; label: string; align: 'left' | 'right'; className: string }[] = [
+    { key: 'name', label: view === 'outlets' ? t('outlet') : t('author'), align: 'left', className: 'px-2' },
+    { key: 'secondary', label: view === 'outlets' ? t('authors') : t('outlet'), align: 'left', className: 'px-2' },
+    { key: 'skill', label: t('skillConservative'), align: 'right', className: 'px-2' },
+    { key: 'brier', label: t('brierScore'), align: 'right', className: 'px-2' },
+    { key: 'predictions', label: t('predictions'), align: 'right', className: 'px-4 sm:px-6' },
+  ]
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
@@ -103,24 +138,12 @@ export default function SourceLeaderboardPage() {
         {VIEWS.map(v => (
           <Link
             key={v}
-            href={toggleHref(v, sortBy)}
+            href={boardHref(v, sort, dir)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               v === view ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
             }`}
           >
             {t(`view.${v}`)}
-          </Link>
-        ))}
-        <span className="w-px h-5 bg-navy-600 mx-1" />
-        {SORTS.map(s => (
-          <Link
-            key={s}
-            href={toggleHref(view, s)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              s === sortBy ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
-            }`}
-          >
-            {t(`sortBy.${s}`)}
           </Link>
         ))}
       </div>
@@ -141,15 +164,31 @@ export default function SourceLeaderboardPage() {
             <thead>
               <tr className="text-left text-gray-500 border-b border-navy-600">
                 <th className="px-4 sm:px-6 py-3 font-medium w-10">#</th>
-                <th className="px-2 py-3 font-medium">{view === 'outlets' ? t('outlet') : t('author')}</th>
-                <th className="px-2 py-3 font-medium">{view === 'outlets' ? t('authors') : t('outlet')}</th>
-                <th className="px-2 py-3 font-medium text-right">{t('skillConservative')}</th>
-                <th className="px-2 py-3 font-medium text-right">{t('brierScore')}</th>
-                <th className="px-4 sm:px-6 py-3 font-medium text-right">{t('predictions')}</th>
+                {columns.map(c => {
+                  const active = c.key === sort
+                  const nextDir: SortDir = active ? (dir === 'asc' ? 'desc' : 'asc') : DEFAULT_DIR[c.key]
+                  const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
+                  return (
+                    <th
+                      key={c.key}
+                      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
+                    >
+                      <Link
+                        href={boardHref(view, c.key, nextDir)}
+                        replace
+                        className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
+                      >
+                        {c.label}
+                        {active && <Arrow className="w-3 h-3" aria-hidden="true" />}
+                      </Link>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {sortedRows.map((row, i) => (
                 <tr key={row.id} className="border-b border-navy-600/50 last:border-0">
                   <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
                   <td className="px-2 py-3 text-white font-medium">

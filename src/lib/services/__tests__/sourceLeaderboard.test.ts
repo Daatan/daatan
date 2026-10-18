@@ -50,6 +50,26 @@ describe('outlet domain aliases', () => {
   })
 })
 
+describe('aggregateByOutlet exclusions', () => {
+  it('drops rows with a null or blank outlet_name', () => {
+    const rows = aggregateByOutlet([
+      entry({ author: 'A', outlet_name: null as unknown as string }),
+      entry({ author: 'B', outlet_name: '  ' }),
+      entry({ author: 'C', outlet_name: 'jpost.com' }),
+    ])
+    expect(rows.map(r => r.outletName)).toEqual(['jpost.com'])
+  })
+
+  it('drops a personal source whose outlet_name is its own author', () => {
+    const rows = aggregateByOutlet([
+      entry({ author: 'Guy Bechor', outlet_name: 'Guy Bechor' }),
+      entry({ author: 'Someone', outlet_name: 'Guy Bechor' }),
+      entry({ author: 'C', outlet_name: 'jpost.com' }),
+    ])
+    expect(rows.map(r => r.outletName)).toEqual(['jpost.com'])
+  })
+})
+
 describe('aggregateByOutlet', () => {
   it('weights brier_score and skill_conservative by each author\'s predictions', () => {
     const entries = [

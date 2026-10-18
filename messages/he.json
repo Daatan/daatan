@@ -1201,7 +1201,13 @@
     "noLinkedPeople": "אין עדיין אנשים מקושרים למקור זה.",
     "publications": "פרסומים אחרונים",
     "noPublications": "אין עדיין פרסומים",
-    "forecast": "תחזית"
+    "forecast": "תחזית",
+    "author": "Author",
+    "scoredAuthors": "Scored authors",
+    "brierHint": "Lower Brier is better; 0.25 is a coin flip.",
+    "lowSample": "only {count} resolved predictions — treat as noise",
+    "noImpact": "No matches with Daatan forecasts yet.",
+    "impactHint": "Articles from this outlet that Daatan used as evidence in forecasts."
   },
   "authorPage": {
     "backToLeaderboard": "חזרה לטבלת דירוג המקורות",

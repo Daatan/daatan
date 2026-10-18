@@ -75,6 +75,8 @@ function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
 export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLeaderboardRow[] {
   const groups = new Map<string, OracleAuthorShadowEntry[]>()
   for (const e of entries) {
+    // Un-attributed ledger rows (null/blank outlet_name, see #1835) aren't an outlet.
+    if (!e.outlet_name?.trim()) continue
     const key = canonicalOutlet(e.outlet_name)
     const list = groups.get(key) ?? []
     list.push(e)
@@ -83,6 +85,9 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
 
   const rows: OutletLeaderboardRow[] = []
   for (const [outletName, group] of groups) {
+    // A blogger / Telegram channel the pipeline keyed by its own byline (outlet_name === author,
+    // e.g. "Guy Bechor") is a person, not a media outlet. They stay on the authors view.
+    if (group.some(e => e.author.trim().toLowerCase() === outletName.trim().toLowerCase())) continue
     const totalPredictions = group.reduce((sum, e) => sum + e.predictions, 0)
     const totalArticles = group.reduce((sum, e) => sum + e.articles, 0)
     const weighted = (pick: (e: OracleAuthorShadowEntry) => number) =>
