@@ -1202,12 +1202,12 @@
     "publications": "Lastaj publikaĵoj",
     "noPublications": "Ankoraŭ neniuj publikaĵoj",
     "forecast": "Prognozo",
-    "author": "Author",
-    "scoredAuthors": "Scored authors",
-    "brierHint": "Lower Brier is better; 0.25 is a coin flip.",
-    "lowSample": "only {count} resolved predictions — treat as noise",
-    "noImpact": "No matches with Daatan forecasts yet.",
-    "impactHint": "Articles from this outlet that Daatan used as evidence in forecasts."
+    "author": "Aŭtoro",
+    "scoredAuthors": "Poentitaj aŭtoroj",
+    "brierHint": "Pli malalta Brier estas pli bona; 0,25 estas moneroĵeto.",
+    "lowSample": "nur {count} solvitaj prognozoj — rigardu tion kiel bruon",
+    "noImpact": "Ankoraŭ neniuj kongruoj kun Daatan-prognozoj.",
+    "impactHint": "Artikoloj de ĉi tiu fonto, kiujn Daatan uzis kiel pruvojn en prognozoj."
   },
   "authorPage": {
     "backToLeaderboard": "Reen al la rangolisto de fontoj",

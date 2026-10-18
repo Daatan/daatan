@@ -1202,12 +1202,12 @@
     "publications": "פרסומים אחרונים",
     "noPublications": "אין עדיין פרסומים",
     "forecast": "תחזית",
-    "author": "Author",
-    "scoredAuthors": "Scored authors",
-    "brierHint": "Lower Brier is better; 0.25 is a coin flip.",
-    "lowSample": "only {count} resolved predictions — treat as noise",
-    "noImpact": "No matches with Daatan forecasts yet.",
-    "impactHint": "Articles from this outlet that Daatan used as evidence in forecasts."
+    "author": "מחבר",
+    "scoredAuthors": "מחברים מדורגים",
+    "brierHint": "ציון Brier נמוך יותר הוא טוב יותר; 0.25 הוא הטלת מטבע.",
+    "lowSample": "רק {count} תחזיות שנפתרו — התייחסו לזה כרעש",
+    "noImpact": "עדיין אין התאמות לתחזיות של Daatan.",
+    "impactHint": "כתבות מהמקור הזה ש-Daatan השתמשה בהן כראיות בתחזיות."
   },
   "authorPage": {
     "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
