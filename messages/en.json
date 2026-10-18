@@ -1778,6 +1778,232 @@
       }
     }
   },
+  "retroEnergy": {
+    "meta": {
+      "title": "Who Saw $120 Oil and €200 Gas — Retro Analysis",
+      "description": "264 rated articles from the six months before the February 2022 invasion, each rated for how likely its speaker thought Brent above $120 and TTF gas above €200/MWh were."
+    },
+    "back": "← Retro Analysis",
+    "caseLabel": "Case E03",
+    "window": "Window 1 Sep 2021 → <hl>24 Feb 2022</hl>",
+    "h1": "Who saw <hl>$120 oil</hl> and <hl>€200 gas</hl>",
+    "lead": "Six months before the invasion: {count} rated articles that quote banks, agencies, companies and the press on oil and European gas prices. Each was read in full and rated separately on two questions: would Brent settle at or above $120, and would TTF settle above €200/MWh in 2022. Both thresholds were crossed on 7 March 2022.",
+    "ratingsNote": "These are ratings, not stated odds. An AI model (Claude Haiku 4.5) reads each article and assigns P = 0.5 + 0.5 × position, unless the speaker named a probability; most articles name no price, so P is a directional reading. P ≥ 0.6 counts as “expects above”, P ≤ 0.4 as “does not”.",
+    "group": {
+      "banks": "Banks",
+      "agencies": "Agencies (IEA, EIA, OPEC, EC)",
+      "insiders": "Companies and governments",
+      "press": "Analysts and press"
+    },
+    "groupShort": {
+      "banks": "Banks",
+      "agencies": "Agencies",
+      "insiders": "Companies",
+      "press": "Press"
+    },
+    "region": {
+      "en": "English-language",
+      "ru": "Russian-language",
+      "eu": "European, non-English",
+      "ar": "Arabic-language"
+    },
+    "legTitle": {
+      "brent": "Brent ≥ $120",
+      "ttf": "TTF > €200/MWh"
+    },
+    "legUnit": {
+      "brent": "front-month, $/bbl",
+      "ttf": "EUR/MWh"
+    },
+    "legName": {
+      "brent": "Brent",
+      "ttf": "TTF"
+    },
+    "side": {
+      "high": "above threshold",
+      "uncertain": "uncertain",
+      "low": "does not expect"
+    },
+    "thesis": {
+      "brent": {
+        "who": "Brent",
+        "unit": "expect above",
+        "text": "Share of oil statements with P ≥ 0.6. Mean P across the whole pool {p}.",
+        "metric": "oil statements, share with P ≥ 0.6"
+      },
+      "ttf": {
+        "who": "TTF",
+        "unit": "expect above",
+        "text": "Share of gas statements with P ≥ 0.6. Mean P across the whole pool {p}.",
+        "metric": "gas statements, share with P ≥ 0.6"
+      },
+      "agencies": {
+        "who": "Agencies",
+        "unit": "mean P",
+        "text": "Mean P of agencies on oil, {n} statements. {no} expected a price below the threshold: the EIA gave about $70-75 a barrel.",
+        "metric": "agency oil statements, average P"
+      },
+      "press": {
+        "who": "Press, gas",
+        "unit": "expect above",
+        "text": "Share of press and analyst statements on gas with P ≥ 0.6, {n} statements. They expected a spike but most often named no number.",
+        "metric": "press gas statements, share with P ≥ 0.6"
+      }
+    },
+    "nStat": "n = {n}",
+    "smallSample": " · small sample",
+    "prices": {
+      "h": "What happened next",
+      "intro": "The black line is the front-month futures price: Brent and TTF (Yahoo Finance series BZ=F and TTF=F). The red dashed line is the question threshold. The grey band is the window in which we collected statements; whatever lies to the right, the authors did not yet know.",
+      "foot": "Front-month closing prices (Yahoo Finance, BZ=F and TTF=F). Brent: 11 closes at or above $120 in 2022, peak $127.98 (8 March). TTF: 30 closes above €200, peak €339 (26 August).",
+      "aria": "{leg} front-month price, September 2021 to December 2022",
+      "invasionDate": "24 Feb 2022",
+      "window": "collection window"
+    },
+    "who": {
+      "h": "Who said what",
+      "intro": "A dot is one article; its height is the probability the main voice expressed. The line is the group mean over the previous 30 days, shown when the group has at least four articles.",
+      "oneArticle": "one article",
+      "foot": "The dashed line at 50% separates “more likely than not” from “less likely”. The chart stops at the invasion: later statements are not part of the question.",
+      "aria": "Mean probability for {title} by group of voices, September 2021 to February 2022"
+    },
+    "voices": {
+      "h": "Who got it right, who did not",
+      "intro": "The clearest statements on each question. The number on the left is the probability we assigned to them. Quotes are checked against the article text.",
+      "hit": "Expected above the threshold",
+      "miss": "Did not expect it",
+      "p": "P"
+    },
+    "split": {
+      "h": "Who said yes, who said no",
+      "intro": "Shares of positions by type of main voice and by publication language. On oil, {agencyNo} of agency statements ({agencyN}) expected a price below the threshold; banks and the press were more mixed, though “does not expect” outnumbered “expects above” in both. On gas the corpus has {agencyGas} agency and {bankGas} bank statements; the press did most of the talking ({pressN}), and {pressY} of the time it expected a spike.",
+      "articles": "{n} articles",
+      "meanP": "mean P",
+      "expects": "expects above",
+      "uncertain": "uncertain",
+      "doesNot": "does not",
+      "aria": "{label}: expects above {y}, uncertain {u}, does not {no}",
+      "legendYes": "expects above threshold, P ≥ 0.6",
+      "legendUnsure": "uncertain",
+      "legendNo": "does not expect, P ≤ 0.4",
+      "legendRight": "right: mean P"
+    },
+    "table": {
+      "h": "{count} articles",
+      "intro": "A sample from the pool: up to 23 articles per outlet and up to 5 per speaker (the 15 and 3 caps were relaxed to fill the table). Articles rated “does not expect” or “uncertain” on at least one question were filled first: 66% of the table against 66% of the pool. One article can speak about both markets. See <a>how to read P</a>.",
+      "langNote": "Article titles, summaries and quotes in the table are shown in English, as extracted; original-language quotes are kept.",
+      "market": "Market",
+      "both": "both",
+      "oil": "oil",
+      "gas": "gas",
+      "voice": "Voice",
+      "position": "Position",
+      "outlet": "Outlet",
+      "all": "all",
+      "search": "Search",
+      "placeholder": "name, outlet, word",
+      "shown": "{shown} of {total}",
+      "date": "Date",
+      "article": "Article",
+      "mainVoice": "Main voice",
+      "mainVoiceSub": "who is quoted, not the author",
+      "pBrent": "P Brent",
+      "pTtf": "P TTF",
+      "summary": "Summary & quote",
+      "archive": "archive",
+      "notVerbatim": "quote not found verbatim",
+      "priceEstimate": "price estimate: {price}"
+    },
+    "method": {
+      "h": "How this was computed",
+      "searchT": "Search",
+      "search": "A list of 146 domains: business and energy press, agencies, banks, think tanks, and Russian-language and European outlets. GDELT GKG via BigQuery returned 12,432 distinct URLs with energy headlines. Bloomberg, the Financial Times and the Wall Street Journal were barely represented in GDELT for these topics (6 rows, 1 usable article).",
+      "filterT": "Filter",
+      "filter": "Keywords and Claude Haiku on headlines: 2,551 candidates were narrowed to 817. Full texts were downloaded; 496 got a rating. We dropped irrelevant items, articles that only describe prices, and articles with traces of edits after 24 February. Dates were checked against the page itself for every year, not only 2021-2022.",
+      "ratingT": "Rating",
+      "rating": "The model reads the text as of the publication date and returns the main voice’s position from −1 to +1 separately for each question. When a price is named, a fixed rule applies: for example a Brent forecast below $90 gives −0.6, $105-119 gives −0.1, $130 and above gives +0.6; the article’s tone shifts it by at most 0.2. If the speaker stated a probability, that is used. For a range, the highest price the speaker treats as likely is used.",
+      "voiceT": "Whose voice",
+      "voice": "P belongs to the article’s main voice, not to the outlet or the author: a TASS item on Gazprom’s words gets Gazprom’s P. P of 0.6 or more is “expects above the threshold”, P of 0.4 or less is “does not expect”.",
+      "missingH": "What is missing",
+      "gaps": [
+        "Bloomberg, the Financial Times and the Wall Street Journal are barely represented: those sites barely appeared in GDELT for the topic, and what exists in Wayback is mostly paywalled.",
+        "Texts of 166 table articles come from live pages and 45 from the Wayback archive before 25 February. Live pages may have been edited, so articles with traces of later edits were dropped.",
+        "Most articles name neither a price nor a probability. For them P is the model’s reading: “the winter will be very hard” gives clearly above 0.5, but does not prove the author had EUR 200 in mind. P should not be read as a calibrated probability.",
+        "Ratings were set by a model. It sometimes mixes up the market (US gas instead of European) or takes a conditional scenario for a forecast. We removed by hand 12 articles whose TTF rating rested on US gas and 4 that held no forecast; other cases may remain. An independent check of 44 random rows against their texts found a defect in about half (95% CI 34-62%), a quarter of them changing what the dot says.",
+        "The price bands in the method are guidance for the model, not a mechanical formula: for a share of priced ratings P sits further from the band than the tone allowance permits (in the audit: 36% of priced Brent legs, before the clean-up). In the audit, recomputing P strictly by the rule lowered the Brent “expect above” share from about 28% to 17% and the TTF share from 62% to 54% (the TTF figure is from before the US-gas clean-up). Read the shares as direction, not as calibrated probabilities.",
+        "Brent here is the front-month future (Yahoo Finance BZ=F). Dated Brent spot on the same day, 8 March, was above $130, so a $130 threshold was not unambiguous; we used $120."
+      ],
+      "quotes": "The opening (first 120 characters) of {unverified} of {total} quotes was not found in the text; they are marked in the table. A further 57 quotes are excerpts from two places in an article stitched with “...”; 113 quotes in all are not fully verbatim."
+    },
+    "footer": "DAATAN Retro-Analysis Archive · E03 · built 15 Oct 2026",
+    "numbers": {
+      "h": "How to read P",
+      "intro": "Every article gets up to two numbers, <b>P</b>: what its main voice expected about each market at the time, before anyone knew the outcome.",
+      "range": "0 to 1 · what the speaker expected",
+      "def": "One P for oil: the probability that Brent settles <b>at or above $120</b> in 2022. One P for gas: that TTF settles <b>above €200/MWh</b>. The two are independent and never combined. 0 means “certainly not”, 1 means “certainly yes”, 0.5 means no view either way.",
+      "eia": "EIA: $75",
+      "noView": "No view",
+      "jpm": "JPMorgan: $150",
+      "formulaShort": "P = 0.5 + 0.5 × position",
+      "b1": "The model rates the speaker’s position from −1 to +1, and <m>P = 0.5 + 0.5 × position</m>.",
+      "b2": "Most articles name no price, so P is mostly directional: “prices will keep climbing” reads clearly above 0.5 without saying how high. It is not a calibrated probability.",
+      "b3": "P ≥ 0.6 counts as “expects above the threshold” and P ≤ 0.4 as “does not”. <b>Mean P</b> is the average over a group’s statements."
+    },
+    "cards": {
+      "brent": {
+        "hit": {
+          "160": {
+            "name": "JPMorgan",
+            "role": "bank, via Business Insider",
+            "note": "A conditional scenario, but with a number: $150. Published five weeks before the invasion."
+          },
+          "206": {
+            "name": "Jeffrey Halley",
+            "role": "Oanda, via NPR",
+            "note": "Conditional on a full-scale invasion of Ukraine, said two days before it. Brent did close at or above $120 on 7 March."
+          }
+        },
+        "miss": {
+          "120": {
+            "name": "Deutsche Bank",
+            "role": "bank, via Vedomosti",
+            "note": "Among the lowest targets in the corpus ($60, shared with Standard Chartered and Moody’s). About fourteen weeks later Brent closed above $120."
+          },
+          "152": {
+            "name": "EIA",
+            "role": "US Department of Energy",
+            "note": "The official forecast six weeks before the invasion. Brent averaged about $100 in 2022."
+          }
+        }
+      },
+      "ttf": {
+        "hit": {
+          "8": {
+            "name": "Alexey Miller",
+            "role": "head of Gazprom, via Rossiyskaya Gazeta",
+            "note": "The seller of the gas is speaking, and gives no number. P is high on direction, not on level."
+          },
+          "164": {
+            "name": "Samantha Dart",
+            "role": "Goldman Sachs, via OilPrice",
+            "note": "A scenario view on possible flow disruption. €180 was the December high; the €200 line was crossed six weeks later."
+          }
+        },
+        "miss": {
+          "167": {
+            "name": "ABN Amro",
+            "role": "bank, via FXStreet",
+            "note": "The right level, but the bank put the “Russia halts gas exports” scenario at 5-10%. The threshold was crossed without any halt."
+          },
+          "5": {
+            "name": "Alexander Ivannikov",
+            "role": "Gazprom department head, via TASS",
+            "note": "Three and a half months later, on 21 December, TTF closed at EUR 180, three times higher."
+          }
+        }
+      }
+    }
+  },
   "retroShared": {
     "backToTop": "Back to top",
     "nextSection": "Next section"
