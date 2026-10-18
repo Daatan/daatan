@@ -48,7 +48,10 @@ export default async function OutletPublicPage({ params }: Props) {
   ])
   if (!detail) notFound()
 
-  const track = outletRows.find(r => r.outletName === detail.name)
+  // The leaderboard keys outlets by domain, forecast pages link by display name ("Ynet"), so
+  // match on every domain news-indexer knows for this outlet, not just the name in the URL (#1891).
+  const keys = new Set([detail.name, ...detail.domains].map(canonicalOutlet))
+  const track = outletRows.find(r => keys.has(r.outletName))
   // The scored authors behind the track record. Same key as `track`, so the numbers above
   // and this list always describe the same rows.
   const scoredAuthors = track
