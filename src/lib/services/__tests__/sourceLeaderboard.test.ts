@@ -374,3 +374,23 @@ describe('per-topic board (#1917)', () => {
     expect(mockGetAuthorShadowLeaderboard).toHaveBeenLastCalledWith(undefined, undefined)
   })
 })
+
+describe('an outlet filed under its own name in another script (#1904 item 3)', () => {
+  const entries = [
+    entry({ author: 'الجزيرة نت', outlet_name: 'aljazeera.net', predictions: 4 }),
+    entry({ author: 'Real Person', outlet_name: 'aljazeera.net', predictions: 2 }),
+  ]
+
+  it('is not an author, but still counts toward the outlet', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 2, authors: entries })
+    const { authorRows, outletRows } = await getSourceLeaderboard('authors')
+    expect(authorRows.map(r => r.author)).toEqual(['Real Person'])
+    expect(outletRows[0]).toMatchObject({ outletName: 'aljazeera.net', predictions: 6, authorCount: 1 })
+  })
+
+  it('leaves the outlet page with no listed authors when it has only that byline', () => {
+    const rows = [entry({ author: 'חדשות סרוגים', outlet_name: 'srugim.co.il', predictions: 8 })]
+    expect(bylinePeople('חדשות סרוגים')).toEqual([])
+    expect(aggregateByOutlet(rows)[0]).toMatchObject({ predictions: 8, authorCount: 0 })
+  })
+})
