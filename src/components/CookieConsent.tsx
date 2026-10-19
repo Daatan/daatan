@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 
 const STORAGE_KEY = 'daatan_analytics_consent'
+/** Dispatched on window by the footer "Cookie settings" link to re-open the banner. */
+export const COOKIE_SETTINGS_EVENT = 'daatan:open-cookie-settings'
 
 type ConsentValue = 'granted' | 'denied'
 
@@ -58,6 +61,17 @@ export default function CookieConsent() {
   }, [])
 
   useEffect(() => {
+    // Let the footer "Cookie settings" link re-open the banner so consent can be
+    // withdrawn as easily as it was given.
+    const reopen = () => {
+      previouslyFocused.current = document.activeElement as HTMLElement | null
+      setVisible(true)
+    }
+    window.addEventListener(COOKIE_SETTINGS_EVENT, reopen)
+    return () => window.removeEventListener(COOKIE_SETTINGS_EVENT, reopen)
+  }, [])
+
+  useEffect(() => {
     // Move focus into the banner so keyboard/screen-reader users notice it
     // immediately. Not a focus trap — the banner has no backdrop and doesn't
     // block the rest of the page, so trapping Tab here would hold keyboard
@@ -83,7 +97,8 @@ export default function CookieConsent() {
 
   const handleDecline = () => {
     try { localStorage.setItem(STORAGE_KEY, 'denied') } catch { /* ignore */ }
-    // consent stays 'denied' (default already set in GoogleAnalytics)
+    // Also revokes a previously granted choice when re-opened from the footer.
+    applyConsent('denied')
     dismiss()
   }
 
@@ -102,6 +117,7 @@ export default function CookieConsent() {
         <p id="cookie-consent-description" className="flex-1 text-sm text-gray-200">
           We use analytics cookies to understand how the app is used and improve it.
           No ads. No cross-site tracking.{' '}
+          <Link href="/privacy" className="underline hover:text-white">Privacy Policy</Link>.
         </p>
         <div className="flex gap-2 shrink-0">
           <Button

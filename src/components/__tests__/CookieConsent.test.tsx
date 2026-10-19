@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { describe, it, expect, beforeEach } from 'vitest'
 import CookieConsent from '../CookieConsent'
@@ -45,5 +45,24 @@ describe('CookieConsent', () => {
   it('has no automatically detectable a11y violations', async () => {
     const { container } = render(<CookieConsent />)
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+describe('CookieConsent re-open from footer', () => {
+  it('shows the banner again after a choice and revokes consent on Decline', async () => {
+    const { COOKIE_SETTINGS_EVENT } = await import('../CookieConsent')
+    localStorage.setItem('daatan_analytics_consent', 'granted')
+    render(<CookieConsent />)
+    expect(screen.queryByText('Decline')).not.toBeInTheDocument()
+
+    act(() => { window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT)) })
+    fireEvent.click(screen.getByText('Decline'))
+    expect(localStorage.getItem('daatan_analytics_consent')).toBe('denied')
+  })
+
+  it('links to the Privacy Policy', () => {
+    localStorage.clear()
+    render(<CookieConsent />)
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
   })
 })

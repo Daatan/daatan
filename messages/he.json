@@ -581,7 +581,8 @@
   "footer": {
     "privacy": "מדיניות פרטיות",
     "terms": "תנאי שימוש",
-    "disclaimer": "כתב ויתור"
+    "disclaimer": "כתב ויתור",
+    "cookieSettings": "הגדרות עוגיות"
   },
   "backToFeed": "חזרה לתחזיות",
   "auth": {
@@ -604,7 +605,8 @@
       "unexpectedError": "אירעה שגיאה בלתי צפויה",
       "error": "אירעה שגיאה במהלך ההתחברות.",
       "googleFailed": "Google OAuth נכשל. נסו שוב.",
-      "invalidCreds": "אישורים שגויים."
+      "invalidCreds": "אישורים שגויים.",
+      "consentNotice": "בהמשך אתם מסכימים ל<terms>תנאי השימוש</terms> ול<privacy>מדיניות הפרטיות</privacy>."
     },
     "signup": {
       "title": "יצירת חשבון",
@@ -621,7 +623,8 @@
       "orContinueWith": "או המשך עם",
       "google": "Google",
       "alreadyHaveAccount": "כבר יש לכם חשבון?",
-      "signIn": "התחבר"
+      "signIn": "התחבר",
+      "consent": "אני בן/בת 16 לפחות ומסכים/ה ל<terms>תנאי השימוש</terms> ול<privacy>מדיניות הפרטיות</privacy>."
     },
     "forgotPassword": {
       "title": "שכחתם סיסמה?",

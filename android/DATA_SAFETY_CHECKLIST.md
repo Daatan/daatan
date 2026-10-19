@@ -67,6 +67,6 @@ an oversight.
 - **Digital purchases: No.**
 
 ## Target audience / Families
-Not designed for children; primary audience is news/politics-engaged adults.
+Not designed for children; Terms/Privacy set a minimum age of 16 (`src/components/legal/version.ts`) and sign-up requires confirming it. Primary audience is news/politics-engaged adults.
 Recommend **not** opting into the Families program (avoids extra COPPA-style
 requirements the product doesn't need).

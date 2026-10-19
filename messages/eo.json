@@ -581,7 +581,8 @@
   "footer": {
     "privacy": "Privateca Politiko",
     "terms": "Uzkondiĉoj",
-    "disclaimer": "Malgarantio"
+    "disclaimer": "Malgarantio",
+    "cookieSettings": "Kuketaj agordoj"
   },
   "backToFeed": "Reen al prognozoj",
   "auth": {
@@ -604,7 +605,8 @@
       "unexpectedError": "Okazis neatendita eraro",
       "error": "Okazis eraro dum ensaluto.",
       "googleFailed": "Google OAuth malsukcesis. Provu denove.",
-      "invalidCreds": "Nevalidaj akreditaĵoj."
+      "invalidCreds": "Nevalidaj akreditaĵoj.",
+      "consentNotice": "Daŭrigante, vi konsentas pri la <terms>Kondiĉoj de uzo</terms> kaj la <privacy>Privateca politiko</privacy>."
     },
     "signup": {
       "title": "Kreu vian konton",
@@ -621,7 +623,8 @@
       "orContinueWith": "Aŭ daŭrigu per",
       "google": "Google",
       "alreadyHaveAccount": "Ĉu vi jam havas konton?",
-      "signIn": "Ensaluti"
+      "signIn": "Ensaluti",
+      "consent": "Mi havas almenaŭ 16 jarojn kaj konsentas pri la <terms>Kondiĉoj de uzo</terms> kaj la <privacy>Privateca politiko</privacy>."
     },
     "forgotPassword": {
       "title": "Ĉu vi forgesis la pasvorton?",

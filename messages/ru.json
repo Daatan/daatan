@@ -581,7 +581,8 @@
   "footer": {
     "privacy": "Политика конфиденциальности",
     "terms": "Условия использования",
-    "disclaimer": "Отказ от ответственности"
+    "disclaimer": "Отказ от ответственности",
+    "cookieSettings": "Настройки cookie"
   },
   "backToFeed": "Назад к прогнозам",
   "auth": {
@@ -604,7 +605,8 @@
       "unexpectedError": "Произошла непредвиденная ошибка",
       "error": "Произошла ошибка при входе.",
       "googleFailed": "Ошибка Google OAuth. Попробуйте снова.",
-      "invalidCreds": "Неверные учётные данные."
+      "invalidCreds": "Неверные учётные данные.",
+      "consentNotice": "Продолжая, вы принимаете <terms>Условия использования</terms> и <privacy>Политику конфиденциальности</privacy>."
     },
     "signup": {
       "title": "Создайте аккаунт",
@@ -621,7 +623,8 @@
       "orContinueWith": "Или продолжить с",
       "google": "Google",
       "alreadyHaveAccount": "Уже есть аккаунт?",
-      "signIn": "Войти"
+      "signIn": "Войти",
+      "consent": "Мне не меньше 16 лет, и я принимаю <terms>Условия использования</terms> и <privacy>Политику конфиденциальности</privacy>."
     },
     "forgotPassword": {
       "title": "Забыли пароль?",
