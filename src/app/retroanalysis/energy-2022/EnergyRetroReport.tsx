@@ -311,7 +311,7 @@ function VoiceColumn({ title, range, tone, voices, leg, byN }: { title: string; 
   )
 }
 
-function useWidth(): [React.RefObject<HTMLDivElement>, number] {
+function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(900)
   useEffect(() => {

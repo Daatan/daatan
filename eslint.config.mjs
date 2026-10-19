@@ -15,7 +15,7 @@ const config = [
     settings: {
       // eslint-plugin-react's "detect" calls an API removed in ESLint 10 and crashes lint.
       // Keep in step with the installed React major.
-      react: { version: '18.3.1' },
+      react: { version: '19.3.1' },
     },
     rules: {
       // React Compiler rules that eslint-plugin-react-hooks 7 (via eslint-config-next 16) turned
