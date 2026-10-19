@@ -24,6 +24,7 @@ export default function SignupClient() {
   })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -131,6 +132,23 @@ export default function SignupClient() {
             />
             <p className="mt-1.5 text-[11px] text-gray-500">{t('passwordHint')}</p>
           </div>
+
+          <label className="flex items-start gap-2 text-xs text-text-secondary">
+            <input
+              type="checkbox"
+              required
+              disabled={isLoading}
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              {t.rich('consent', {
+                terms: (c) => <Link href="/terms" className="underline hover:text-white">{c}</Link>,
+                privacy: (c) => <Link href="/privacy" className="underline hover:text-white">{c}</Link>,
+              })}
+            </span>
+          </label>
 
           <Button
             type="submit"

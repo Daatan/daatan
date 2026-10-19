@@ -197,6 +197,12 @@ export default function SignInClient() {
               {t('signUp')}
             </Link>
           </p>
+          <p className="mt-3 text-xs text-gray-500">
+            {t.rich('consentNotice', {
+              terms: (c) => <Link href="/terms" className="underline hover:text-white">{c}</Link>,
+              privacy: (c) => <Link href="/privacy" className="underline hover:text-white">{c}</Link>,
+            })}
+          </p>
         </div>
       </div>
       

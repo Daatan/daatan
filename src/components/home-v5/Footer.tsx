@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { CONTAINER } from './ui'
 import type { HomeLinks } from './links'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 
 export default async function Footer({ locale, links }: { locale: string; links: HomeLinks }) {
   const t = await getTranslations({ locale, namespace: 'HomeV5' })
@@ -28,6 +29,7 @@ export default async function Footer({ locale, links }: { locale: string; links:
                 {i.label}
               </Link>
             ))}
+            <CookieSettingsLink className="text-[15px] text-[var(--hv5-muted)] hover:text-white bg-transparent border-0 p-0 cursor-pointer" />
           </nav>
         </div>
         <p className="m-0 mt-8 max-w-[52em] text-sm leading-[1.6] text-[var(--hv5-muted)]">{t('footer.disclaimer')}</p>

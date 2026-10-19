@@ -581,7 +581,8 @@
   "footer": {
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
-    "disclaimer": "Disclaimer"
+    "disclaimer": "Disclaimer",
+    "cookieSettings": "Cookie settings"
   },
   "backToFeed": "Back to forecasts",
   "auth": {
@@ -604,7 +605,8 @@
       "unexpectedError": "An unexpected error occurred",
       "error": "An error occurred during sign in.",
       "googleFailed": "Google OAuth failed. Please try again.",
-      "invalidCreds": "Invalid credentials provided."
+      "invalidCreds": "Invalid credentials provided.",
+      "consentNotice": "By continuing you agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>."
     },
     "signup": {
       "title": "Create your account",
@@ -621,7 +623,8 @@
       "orContinueWith": "Or continue with",
       "google": "Google",
       "alreadyHaveAccount": "Already have an account?",
-      "signIn": "Sign in"
+      "signIn": "Sign in",
+      "consent": "I am at least 16 years old and agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>."
     },
     "forgotPassword": {
       "title": "Forgot your password?",
