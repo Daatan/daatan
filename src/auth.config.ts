@@ -2,7 +2,7 @@ import type { NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
 import { env } from "@/env"
 
-// NOTE: This file is imported by `src/middleware.ts`, which runs in the Edge
+// NOTE: This file is imported by `src/proxy.ts`, which was Edge middleware before Next 16 and is kept Edge-safe
 // runtime. It MUST NOT import Prisma, bcrypt, or any other Node-only module.
 // The Credentials provider (and the Playwright test provider) both need DB
 // access and therefore live in `src/auth.ts`, which runs on Node.

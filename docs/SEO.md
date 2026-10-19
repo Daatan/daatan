@@ -190,7 +190,7 @@ crawls them as page candidates (one per page that links them) and rejects them, 
 as **"Crawled - currently not indexed / Failed"** in Search Console (49% of that bucket as of
 2026-07).
 
-Fix: `src/middleware.ts` sets `X-Robots-Tag: noindex` on any response whose path ends in
+Fix: `src/proxy.ts` sets `X-Robots-Tag: noindex` on any response whose path ends in
 `/opengraph-image`. This moves them to the clean "Excluded by noindex tag" bucket instead.
 Deliberately **not** done via a `robots.txt` `Disallow`: blocking only Googlebot from a path
 requires a `User-agent: Googlebot`-specific block, and per RFC 9309 user-agent groups don't
@@ -303,7 +303,7 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 
 ## Site root: first-visit rewrite to `/home-v5`
 
-`src/middleware.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
+`src/proxy.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
 `daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets the matching
 `/home-v5` page **served in place** (middleware rewrite, status 200, URL stays `/`; query string kept; the
 page's canonical is `/home-v5`). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives

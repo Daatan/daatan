@@ -22,7 +22,7 @@ import path from 'path'
 
 const ROOT = path.resolve(__dirname, '../..')
 
-const MIDDLEWARE_PATH = path.join(ROOT, 'src/middleware.ts')
+const MIDDLEWARE_PATH = path.join(ROOT, 'src/proxy.ts')
 const ROUTING_PATH = path.join(ROOT, 'src/i18n/routing.ts')
 const LOCALE_APP_DIR = path.join(ROOT, 'src/app/[locale]')
 
@@ -32,7 +32,7 @@ const LOCALE_APP_DIR = path.join(ROOT, 'src/app/[locale]')
 
 function readMiddleware(): string {
   if (!fs.existsSync(MIDDLEWARE_PATH)) {
-    throw new Error(`src/middleware.ts not found at ${MIDDLEWARE_PATH}`)
+    throw new Error(`src/proxy.ts not found at ${MIDDLEWARE_PATH}`)
   }
   return fs.readFileSync(MIDDLEWARE_PATH, 'utf-8')
 }
@@ -104,7 +104,7 @@ describe('Locale folder <-> routing config consistency', () => {
       layoutExists,
       '[locale] folder exists without next-intl middleware but src/app/[locale]/layout.tsx ' +
       'is missing. Add a layout with a notFound() guard to prevent arbitrary segments from ' +
-      'matching, or add next-intl createMiddleware to src/middleware.ts.',
+      'matching, or add next-intl createMiddleware to src/proxy.ts.',
     ).toBe(true)
 
     if (layoutExists) {
@@ -219,7 +219,7 @@ describe('OG-image noindex header', () => {
 
     expect(
       /pathname\.endsWith\(['"]\/opengraph-image['"]\)/.test(src),
-      'middleware.ts no longer checks pathname.endsWith("/opengraph-image"). ' +
+      'proxy.ts no longer checks pathname.endsWith("/opengraph-image"). ' +
       'og:image routes need X-Robots-Tag: noindex to avoid piling up as ' +
       '"Crawled - currently not indexed" in Search Console — see src/app/robots.ts ' +
       'for why this is done in middleware rather than robots.txt.'
@@ -227,7 +227,7 @@ describe('OG-image noindex header', () => {
 
     expect(
       /X-Robots-Tag['"]\s*,\s*['"]noindex/.test(src),
-      'middleware.ts no longer sets the X-Robots-Tag: noindex header.'
+      'proxy.ts no longer sets the X-Robots-Tag: noindex header.'
     ).toBe(true)
   })
 

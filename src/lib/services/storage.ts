@@ -82,7 +82,7 @@ class S3StorageDriver implements StorageDriver {
 class LocalStorageDriver implements StorageDriver {
   async putObject(key: string, body: Buffer): Promise<string> {
     const base = env.STORAGE_LOCAL_PATH || DEFAULT_LOCAL_PATH
-    const dest = path.join(base, key)
+    const dest = path.join(/*turbopackIgnore: true*/ base, key)
     await fs.mkdir(path.dirname(dest), { recursive: true })
     await fs.writeFile(dest, body)
     log.debug({ key, dest }, 'Stored object on local filesystem')

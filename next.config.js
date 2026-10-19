@@ -41,11 +41,8 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   // The dedicated typecheck/lint CI jobs already gate every PR on the same
-  // commit, seconds before this build step runs — re-running both here is
-  // pure duplicate work (daatan#1584).
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // commit, seconds before this build step runs — re-running type-checking here
+  // is pure duplicate work (daatan#1584). Next 16 no longer lints during build.
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -64,22 +61,6 @@ const nextConfig = {
   transpilePackages: ['next-auth'],
   // Keep Node.js-only packages out of the Node.js server bundle (avoids re-bundling)
   serverExternalPackages: ['pg', 'pg-pool', 'pg-protocol', 'pg-types', '@prisma/adapter-pg'],
-  // Resolve Node.js-only packages to false in edge/browser webpack compilations.
-  // instrumentation.ts has a runtime guard so these are never actually executed
-  // in edge context — we just need webpack to accept the bundle without errors.
-  webpack: (config, { nextRuntime }) => {
-    if (nextRuntime === 'edge') {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        pg: false,
-        'pg-pool': false,
-        'pg-protocol': false,
-        'pg-types': false,
-        '@prisma/adapter-pg': false,
-      }
-    }
-    return config
-  },
   // Allow external images from Google OAuth
   images: {
     remotePatterns: [
