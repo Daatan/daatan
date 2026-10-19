@@ -80,13 +80,43 @@ blocks it, but double-check before any `git add -A` in this directory.
 
 ## Releasing
 
-Push a tag matching `android-v*` (e.g. `android-v1.0.0`) — deliberately
-decoupled from the web app's own `v*` tags, since a web deploy is
-instant/no-review but an Android release is a distinct, occasional event.
-`.github/workflows/android-release.yml` builds the signed AAB and attaches
-it to the workflow run as a downloadable artifact — **it does not upload to
-Play Console**. Download the artifact and upload it by hand to the
-appropriate track (internal testing first).
+`.github/workflows/android-release.yml` builds the signed AAB and, when the Play service account is configured, uploads
+it to Google Play. Triggers:
+
+| Trigger | What happens |
+|---|---|
+| Pull request touching `android/**` | Build + verify only (same-repo PRs; never uploads) |
+| Push to `main` touching `android/**` | Build + upload to the **internal** track |
+| Tag `android-v*` (e.g. `android-v1.1.0`) | Same, with `versionName` taken from the tag |
+| Monthly schedule (1st, 05:23 UTC) | Rebuild with the latest Bubblewrap + upload to internal, so the wrapper keeps meeting Google's target-API floor and toolchain breakage shows up early |
+| `workflow_dispatch` | Choose track (`internal`/`alpha`/`beta`/`production`) and status (`completed`/`draft`) |
+
+**Production promotion is a human step** (dispatch with `track=production`, or promote in Play Console). Nothing here
+publishes to production on its own.
+
+`versionCode` (minutes since the epoch) and `versionName` are derived in CI and stamped into `twa-manifest.json` at
+build time; the committed `appVersionCode`/`appVersion` are only a baseline. Play rejects a duplicate `versionCode`, so
+do not set it back to a fixed value in CI.
+
+**Target API floor.** Google Play requires updates to target a minimum API level (currently **36**, Android 16,
+enforced 2026-08-31 — Play Console → Policy status). The workflow runs the latest `@bubblewrap/cli`, whose template
+sets `targetSdkVersion`, and **fails before building** if the generated `app/build.gradle` targets less than
+`MIN_TARGET_SDK` (top of the workflow). When Google raises the floor, raise `MIN_TARGET_SDK` there; the monthly build
+picks up the newer Bubblewrap template.
+
+### One-time setup for automatic Play uploads
+
+Without it the job still builds and keeps the AAB as an artifact (you upload by hand). To enable uploads:
+
+1. Google Cloud: create a service account (any project), create a JSON key, and enable the **Google Play Android
+   Developer API** on that project.
+2. Play Console → Users and permissions → invite the service account's email with permission to **release to
+   testing tracks** (add production only if you want to dispatch production releases).
+3. `gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json -R Daatan/daatan`, store the same JSON in SSM (e.g.
+   `/daatan/shared/secrets/PLAY_SERVICE_ACCOUNT_JSON`) as the canonical copy, then delete the local file.
+
+Notes: the first upload through the API to a brand-new service account can take a few hours to be recognised. If the
+app is on managed publishing, an uploaded release still needs publishing in the console.
 
 Internal testers (as of the initial rollout — ask before assuming this list
 is final, more may be added later): `komapc@gmail.com`,

@@ -1,29 +1,74 @@
 name: Android release build
 
-# Builds and signs the Android App Bundle (AAB) for the Play Store TWA
-# wrapper (android/twa-manifest.json). Deliberately decoupled from the web
-# app's own `v*` tags -- a web deploy is instant/no-review, an Android
-# release is a distinct, occasional event.
+# Builds and signs the Android App Bundle (AAB) for the Play Store TWA wrapper
+# (android/twa-manifest.json) and, when a Play service account is configured,
+# uploads it to a Play track. Decoupled from the web app's own `v*` tags: a web
+# deploy is instant, an Android release goes through Play review.
 #
-# Downloadable GitHub Actions artifact ONLY -- no auto-upload to Play
-# Console (that needs a separate Google Cloud service account + Play
-# Developer API grant, explicitly out of scope for v1: release should be
-# simple and explicit). Upload the artifact to Play Console by hand.
+# Triggers
+#   pull_request (android/**)   build + verify only, never uploads (same-repo PRs only: needs the keystore)
+#   push to main (android/**)   build + upload to the internal track
+#   push tag android-v*         build + upload to the internal track, versionName taken from the tag
+#   schedule (monthly)          rebuild with the latest Bubblewrap so the wrapper keeps meeting Google's
+#                               target-API floor (Bubblewrap's template tracks it) and toolchain rot shows up early
+#   workflow_dispatch           pick the track (internal/alpha/beta/production) and status by hand
 #
-# Only android/twa-manifest.json is committed -- `bubblewrap build`
-# regenerates the full Gradle project fresh from it every run.
+# Promotion to production is deliberately a human step (dispatch with track=production, or the Play Console).
+# Uploading needs the repo secret PLAY_SERVICE_ACCOUNT_JSON; without it the job still builds and keeps the AAB as an
+# artifact, and says so in the summary. See android/README.md for the one-time setup.
+#
+# versionCode/versionName are derived here, not committed: Play rejects a duplicate versionCode and
+# `--skipVersionUpgrade` below keeps whatever the manifest says. Only android/twa-manifest.json is committed --
+# `bubblewrap update` regenerates the full Gradle project from it every run.
 
 on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-release.yml'
   push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-release.yml'
     tags:
       - 'android-v*'
+  schedule:
+    - cron: '23 5 1 * *'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play track to upload to'
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+      status:
+        description: 'Release status (draft = prepare it, finish in Play Console)'
+        type: choice
+        options: [completed, draft]
+        default: completed
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  # Google's current minimum target API for updates (Play policy: Android 16 = API 36, enforced 2026-08-31).
+  # Raise this when the policy does; the build fails before upload if the generated project targets less.
+  MIN_TARGET_SDK: '36'
+  PACKAGE_NAME: com.daatan.app
 
 jobs:
   build:
-    name: Build signed AAB
+    name: Build signed AAB (and upload to Play when configured)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A fork PR has no access to the keystore secret, so it cannot build a signed bundle.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
+    env:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
     steps:
       - name: Checkout repository
@@ -41,7 +86,7 @@ jobs:
       - name: Install required SDK components
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;34.0.0"
+          sdkmanager "platform-tools" "platforms;android-${MIN_TARGET_SDK}" "build-tools;34.0.0"
 
       - name: Point Bubblewrap at the JDK/Android SDK non-interactively
         run: |
@@ -58,6 +103,32 @@ jobs:
           # under cmdline-tools/latest/. This symlink satisfies the check
           # without altering the real SDK layout.
           ln -sf "${ANDROID_HOME}/cmdline-tools/latest/bin" "${ANDROID_HOME}/bin"
+
+      - name: Derive version
+        id: version
+        run: |
+          # Minutes since the epoch: strictly increasing, unique per build, no state to keep, well under
+          # Play's 2.1e9 ceiling (about 29.6M today).
+          CODE=$(( $(date +%s) / 60 ))
+          if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
+            NAME="${GITHUB_REF_NAME#android-v}"
+          else
+            NAME="1.0.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$CODE versionName=$NAME"
+
+      - name: Stamp version into the manifest
+        working-directory: android
+        env:
+          CODE: ${{ steps.version.outputs.code }}
+          NAME: ${{ steps.version.outputs.name }}
+        run: |
+          jq --argjson code "$CODE" --arg name "$NAME" \
+            '.appVersionCode = $code | .appVersionName = $name | .appVersion = $name' \
+            twa-manifest.json > twa-manifest.json.new
+          mv twa-manifest.json.new twa-manifest.json
 
       - name: Decode upload keystore
         working-directory: android
@@ -78,14 +149,27 @@ jobs:
           # whenever it doesn't already match the version code scheme)
           # generates the project + checksum file up front, so the
           # subsequent `build` finds a matching checksum and never prompts.
-          npx --yes @bubblewrap/cli update --skipVersionUpgrade
+          # Deliberately unpinned: the latest Bubblewrap template tracks Google's target-API floor.
+          npx --yes @bubblewrap/cli@latest update --skipVersionUpgrade
+
+      - name: Verify the generated project meets the target API floor
+        id: target
+        working-directory: android
+        run: |
+          TARGET=$(grep -E '^\s*targetSdkVersion\s+[0-9]+' app/build.gradle | head -1 | grep -oE '[0-9]+')
+          echo "targetSdkVersion=${TARGET:-unknown} (floor ${MIN_TARGET_SDK})"
+          echo "sdk=${TARGET:-unknown}" >> "$GITHUB_OUTPUT"
+          if [ -z "$TARGET" ] || [ "$TARGET" -lt "$MIN_TARGET_SDK" ]; then
+            echo "::error::Generated project targets API ${TARGET:-unknown}, Google Play requires >= ${MIN_TARGET_SDK}. Update Bubblewrap or raise targetSdkVersion."
+            exit 1
+          fi
 
       - name: Build signed AAB
         working-directory: android
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: npx --yes @bubblewrap/cli build
+        run: npx --yes @bubblewrap/cli@latest build
 
       - name: Clean up keystore
         if: always()
@@ -95,21 +179,41 @@ jobs:
       - name: Upload AAB + APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: daatan-android-${{ github.ref_name }}
+          name: daatan-android-${{ steps.version.outputs.name }}
           path: |
             android/app-release-bundle.aab
             android/app-release-signed.apk
           retention-days: 90
 
+      - name: Upload to Google Play
+        id: play
+        if: github.event_name != 'pull_request' && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        # r0adkll/upload-google-play v1.1.5, pinned to the commit
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
+        with:
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: android/app-release-bundle.aab
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'completed' }}
+
       - name: Summary
+        if: always()
+        env:
+          PLAY_CONFIGURED: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+          PLAY_OUTCOME: ${{ steps.play.outcome }}
+          TRACK: ${{ inputs.track || 'internal' }}
         run: |
           {
-            echo "### Android release build: ${{ github.ref_name }}"
+            echo "### Android build: versionName ${{ steps.version.outputs.name }} (versionCode ${{ steps.version.outputs.code }})"
             echo ""
-            echo "Signed AAB + APK built and attached to this run as \`daatan-android-${{ github.ref_name }}\`."
-            echo ""
-            echo "**This is a downloadable artifact only -- nothing was uploaded to Play"
-            echo "Console.** Upload the AAB to the appropriate track by hand (internal"
-            echo "testing first); the APK is for local sideload testing (\`adb install\`)."
-            echo "See \`android/README.md\` for the full process."
+            echo "- targetSdkVersion: \`${{ steps.target.outputs.sdk }}\` (floor ${MIN_TARGET_SDK})"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "- Pull request: build verified, nothing uploaded."
+            elif [ "$PLAY_CONFIGURED" = "true" ]; then
+              echo "- Play upload to \`$TRACK\`: ${PLAY_OUTCOME}"
+            else
+              echo "- **Not uploaded**: repo secret \`PLAY_SERVICE_ACCOUNT_JSON\` is not set. Download the artifact and upload the AAB by hand, or see android/README.md to enable automatic uploads."
+            fi
+            echo "- Production promotion is manual (dispatch with track=production, or Play Console)."
           } >> "$GITHUB_STEP_SUMMARY"
