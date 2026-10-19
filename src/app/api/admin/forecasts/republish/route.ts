@@ -1,25 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
-import { handleRouteError, apiError } from '@/lib/api-error'
+import { handleRouteError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
 import { republishForecasts } from '@/lib/services/forecast-republish'
+import { parseOptionalJsonBody } from '@/lib/api-body'
+import { republishBodySchema } from '@/lib/validations/api-inputs'
 
 const MAX_IDS_PER_CALL = 50
 
-type Body = { forecastIds?: unknown; mode?: unknown }
-
 async function run(request: NextRequest) {
-  const body = (await request.json().catch(() => ({}))) as Body
-  const ids = Array.isArray(body.forecastIds)
-    ? body.forecastIds.filter((v): v is string => typeof v === 'string' && v.length > 0)
-    : []
-  if (ids.length === 0) return apiError('forecastIds must be a non-empty array of prediction ids', 400)
-  if (ids.length > MAX_IDS_PER_CALL) return apiError(`at most ${MAX_IDS_PER_CALL} forecastIds per call`, 400)
-  if (body.mode !== undefined && body.mode !== 'dry-run' && body.mode !== 'apply') {
-    return apiError("mode must be 'dry-run' or 'apply'", 400)
-  }
-  return NextResponse.json(await republishForecasts(ids, body.mode === 'apply'))
+  const { forecastIds, mode } = await parseOptionalJsonBody(request, republishBodySchema(MAX_IDS_PER_CALL))
+  return NextResponse.json(await republishForecasts(forecastIds, mode === 'apply'))
 }
 
 const authed = withAuth(async (request: NextRequest) => {

@@ -1,16 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
-import { handleRouteError, apiError } from '@/lib/api-error'
+import { handleRouteError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
 import { retireLegacyNullRows } from '@/lib/services/evidence-pool'
+import { parseOptionalJsonBody } from '@/lib/api-body'
+import { retireLegacyNullBodySchema } from '@/lib/validations/api-inputs'
 
 async function run(request: NextRequest) {
-  const body = (await request.json().catch(() => ({}))) as { mode?: unknown }
-  if (body.mode !== undefined && body.mode !== 'dry-run' && body.mode !== 'apply') {
-    return apiError("mode must be 'dry-run' or 'apply'", 400)
-  }
   try {
+    const body = await parseOptionalJsonBody(request, retireLegacyNullBodySchema)
     return NextResponse.json(await retireLegacyNullRows(body.mode === 'apply'))
   } catch (error) {
     return handleRouteError(error, 'Legacy oracle_null retirement failed')
