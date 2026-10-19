@@ -54,3 +54,6 @@ __pycache__/
 # Runtime state (not source)
 test-results/
 memory/heartbeat-state.json
+
+# personal documents must not be committed to this public repo
+CV.md
