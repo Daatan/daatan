@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
 import { prisma } from '@/lib/prisma'
+import { parseJsonBody } from '@/lib/api-body'
+import { userPreferencesSchema } from '@/lib/validations/api-inputs'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,11 +24,7 @@ export const GET = withAuth(async (_request, user) => {
  *  flags are accepted; nothing here can change scoring, roles, or profile identity. */
 export const PATCH = withAuth(async (request, user) => {
   try {
-    const body = (await request.json()) as { showAiPanel?: unknown }
-
-    if (typeof body.showAiPanel !== 'boolean') {
-      return NextResponse.json({ error: 'showAiPanel must be a boolean' }, { status: 400 })
-    }
+    const body = await parseJsonBody(request, userPreferencesSchema)
 
     const updated = await prisma.user.update({
       where: { id: user.id },

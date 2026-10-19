@@ -3,6 +3,9 @@ import { env } from '@/env'
 import { secretsMatch } from '@/lib/cron-auth'
 import { runRequote } from '@/lib/services/temporal-clock'
 import { createLogger } from '@/lib/logger'
+import { parseOptionalJsonBody } from '@/lib/api-body'
+import { handleRouteError } from '@/lib/api-error'
+import { requoteBodySchema } from '@/lib/validations/api-inputs'
 
 const log = createLogger('cron-requote')
 
@@ -39,10 +42,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, disabled: true })
   }
 
-  const body = await request.json().catch(() => ({}))
-  const archetypes = Array.isArray(body.archetypes)
-    ? body.archetypes.filter((a: unknown): a is string => typeof a === 'string').map((a: string) => a.toLowerCase())
-    : ['diffuse']
+  let body
+  try {
+    body = await parseOptionalJsonBody(request, requoteBodySchema)
+  } catch (err) {
+    return handleRouteError(err, 'Invalid request body')
+  }
+  const archetypes = body.archetypes ? body.archetypes.map((a) => a.toLowerCase()) : ['diffuse']
   const dryRun = body.dryRun === true
 
   try {

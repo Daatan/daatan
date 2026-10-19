@@ -1,27 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
-import { handleRouteError, apiError } from '@/lib/api-error'
+import { handleRouteError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
 import { remediatePool, remediableWhere, usablePoolWhere, amnestyWhere } from '@/lib/services/pool-remediate'
+import { parseOptionalJsonBody } from '@/lib/api-body'
+import { remediateBodySchema } from '@/lib/validations/api-inputs'
 
 const MAX_IDS_PER_CALL = 10
 
-type Body = { ids?: unknown; mode?: unknown; scope?: unknown }
-
 async function run(request: NextRequest) {
-  const body = (await request.json().catch(() => ({}))) as Body
-  const ids = Array.isArray(body.ids) ? body.ids.filter((v): v is string => typeof v === 'string' && v.length > 0) : []
-  if (ids.length === 0) return apiError('ids must be a non-empty array of prediction ids', 400)
-  if (ids.length > MAX_IDS_PER_CALL) return apiError(`at most ${MAX_IDS_PER_CALL} ids per call`, 400)
-  if (body.mode !== undefined && body.mode !== 'dry-run' && body.mode !== 'apply') {
-    return apiError("mode must be 'dry-run' or 'apply'", 400)
-  }
-  if (body.scope !== undefined && body.scope !== 'a6' && body.scope !== 'usable' && body.scope !== 'amnesty') {
-    return apiError("scope must be 'a6', 'usable', or 'amnesty'", 400)
-  }
-  const target = body.scope === 'usable' ? usablePoolWhere() : body.scope === 'amnesty' ? amnestyWhere() : remediableWhere()
-  return NextResponse.json(await remediatePool(ids, body.mode === 'apply', target))
+  const { ids, mode, scope } = await parseOptionalJsonBody(request, remediateBodySchema(MAX_IDS_PER_CALL))
+  const target = scope === 'usable' ? usablePoolWhere() : scope === 'amnesty' ? amnestyWhere() : remediableWhere()
+  return NextResponse.json(await remediatePool(ids, mode === 'apply', target))
 }
 
 const authed = withAuth(async (request: NextRequest) => {

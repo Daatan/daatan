@@ -157,6 +157,6 @@ describe('POST /api/admin/forecasts/backfill-temporal', () => {
 
   it('rejects a missing/invalid mode', async () => {
     const res = await POST(req({}))
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(400)
   })
 })

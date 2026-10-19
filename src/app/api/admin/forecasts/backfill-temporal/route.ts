@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
+import { parseOptionalJsonBody } from '@/lib/api-body'
+import { backfillTemporalBodySchema } from '@/lib/validations/api-inputs'
+import type { z } from 'zod'
 import { secretsMatch } from '@/lib/cron-auth'
 import {
   classifyClaim,
@@ -19,13 +22,7 @@ const MAX_LIMIT = 200
 const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
-interface BackfillBody {
-  mode: 'dry-run' | 'apply'
-  limit?: number
-  ids?: string[]
-  skipIds?: string[]
-  force?: boolean
-}
+type BackfillBody = z.infer<typeof backfillTemporalBodySchema>
 
 interface Candidate {
   id: string
@@ -166,22 +163,8 @@ async function runBackfill(body: BackfillBody) {
   return result
 }
 
-function parseBody(json: unknown): BackfillBody {
-  const b = (json ?? {}) as Partial<BackfillBody>
-  if (b.mode !== 'dry-run' && b.mode !== 'apply') {
-    throw new Error('mode must be "dry-run" or "apply"')
-  }
-  return {
-    mode: b.mode,
-    limit: typeof b.limit === 'number' ? b.limit : undefined,
-    ids: Array.isArray(b.ids) ? b.ids : undefined,
-    skipIds: Array.isArray(b.skipIds) ? b.skipIds : undefined,
-    force: b.force === true,
-  }
-}
-
 async function handle(request: NextRequest) {
-  const body = parseBody(await request.json().catch(() => ({})))
+  const body = await parseOptionalJsonBody(request, backfillTemporalBodySchema)
   return NextResponse.json(await runBackfill(body))
 }
 
