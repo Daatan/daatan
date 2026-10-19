@@ -78,6 +78,15 @@ export function authorKey(name: string): string {
 }
 const isPlaceholderAuthor = (name: string) => name.trim().toLowerCase() === NO_BYLINE
 
+/**
+ * Bylines that are an outlet's own name in another script ("الجزيرة نت" = Al Jazeera Net, filed
+ * under aljazeera.net), so the exact `author === outlet_name` check misses them. Like
+ * `NO_BYLINE` they are the outlet's unattributed bucket, not a person: counted in the outlet's
+ * totals, never listed as an author (#1904 item 3). Explicit — an outlet's name can't be derived
+ * from its domain. Add a normalised byline when an authors board shows an outlet as a person.
+ */
+const INSTITUTIONAL_BYLINES = new Set(['الجزيرة نت', 'חדשות סרוגים'])
+
 function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
   return {
     id: e.id,
@@ -153,11 +162,11 @@ const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
  * The people named by one byline string. Retro scores a joint byline ("A; B; News Agencies")
  * as one author; here it becomes its individuals. Splits on `;`, `&`, ` and `, and on commas
  * only when every piece is a full name (so "Smith, John" stays whole). Pieces that are
- * agencies/datelines are dropped. The bylineless bucket names nobody.
+ * agencies/datelines are dropped. The bylineless bucket and an outlet's own name name nobody.
  */
 export function bylinePeople(author: string): string[] {
   const raw = author.trim()
-  if (!raw || isPlaceholderAuthor(raw)) return []
+  if (!raw || isPlaceholderAuthor(raw) || INSTITUTIONAL_BYLINES.has(authorKey(raw))) return []
   let parts = raw.split(/\s*[;&]\s*|\s+and\s+/i)
   if (parts.length === 1 && raw.includes(',')) {
     const byComma = raw.split(/\s*,\s*/)
