@@ -82,7 +82,7 @@ describe('Speedometer — probability calculation', () => {
     await renderPrediction([])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 50 }),
-      expect.anything()
+      undefined // React 19 calls function components with props only
     )
   })
 
@@ -99,7 +99,7 @@ describe('Speedometer — probability calculation', () => {
     await renderPrediction([{ binaryChoice: true, cuCommitted: 100 }])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 100 }),
-      expect.anything()
+      undefined // React 19 calls function components with props only
     )
   })
 
@@ -107,7 +107,7 @@ describe('Speedometer — probability calculation', () => {
     await renderPrediction([{ binaryChoice: false, cuCommitted: -32 }])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 34 }),
-      expect.anything()
+      undefined // React 19 calls function components with props only
     )
   })
 
@@ -118,7 +118,7 @@ describe('Speedometer — probability calculation', () => {
     ])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 50 }),
-      expect.anything()
+      undefined // React 19 calls function components with props only
     )
   })
 
@@ -131,7 +131,7 @@ describe('Speedometer — probability calculation', () => {
     ])
     expect(speedometerMock).toHaveBeenCalledWith(
       expect.objectContaining({ percentage: 70 }),
-      expect.anything()
+      undefined // React 19 calls function components with props only
     )
   })
 })
