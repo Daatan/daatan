@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.65.463",
+  "version": "1.65.464",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "analyze": "ANALYZE=true npm run build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:related": "vitest related --run",
@@ -23,7 +23,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "next lint --fix --file"
+      "eslint --fix"
     ]
   },
   "prisma": {
@@ -77,8 +77,8 @@
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10",
-    "eslint": "^8",
-    "eslint-config-next": "15.5.12",
+    "eslint": "^10.13.0",
+    "eslint-config-next": "^16.4.2",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "fast-check": "^4.5.3",
     "happy-dom": "^20.7.0",
@@ -95,6 +95,9 @@
   },
   "overrides": {
     "magicast": "^0.3.5",
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    },
     "next": {
       "postcss": "^8.5.26"
     }
