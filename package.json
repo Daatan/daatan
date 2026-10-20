@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.65.491",
+  "version": "1.65.492",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
@@ -84,7 +84,7 @@
     "happy-dom": "^20.7.0",
     "husky": "^9.1.7",
     "jest-axe": "^10.0.0",
-    "jsdom": "^28.0.0",
+    "jsdom": "^30.1.3",
     "lint-staged": "^16.2.7",
     "postcss": "^8.5.2",
     "prisma": "^7.10.1",
