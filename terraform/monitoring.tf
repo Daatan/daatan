@@ -81,8 +81,8 @@ data "aws_iam_policy_document" "billing_alerts" {
 
 # The former EstimatedCharges alarms ($50/$150/$200, net of credits) were removed
 # 2026-08-21: while credits cover the bill they sat in OK on 0.0 datapoints forever,
-# and once credits end (~Dec 2026 at ~$15/day) they would fire on roughly day 3,
-# 10 and 13 of EVERY month — noise, not signal. Both questions they tried to ask are
+# and once credits end they would fire on roughly day 3, 10 and 13 of EVERY month —
+# noise, not signal. Both questions they tried to ask are
 # answered by the budgets below: net_spend_monthly says "credits stopped covering",
 # gross_spend_monthly says "burn is above plan".
 resource "aws_sns_topic_policy" "billing_alerts" {
@@ -100,9 +100,9 @@ resource "aws_sns_topic_policy" "billing_alerts" {
 #
 # 1. gross_spend_monthly — "is burn where we expect it?" Measures GROSS spend
 #    (include_credit = false) so burn is visible while credits are still absorbing
-#    it. The limit is set at the post-Translate, post-cleanup target run-rate, i.e.
-#    deliberately a bit below today's actuals: it goes quiet only once the planned
-#    savings land, and the FORECASTED alert speaks early in the month if they don't.
+#    it. The limit must sit just above the real run-rate: a limit below it (this one
+#    was, until 2026-10-20) is in ALARM permanently and says nothing. Re-set it when
+#    the run-rate moves; the FORECASTED alert speaks early in the month on an overrun.
 # 2. net_spend_monthly — "has real cash started flowing, and is it on plan?"
 #    Measures NET spend (credits applied). While credits cover the bill it reads $0
 #    and stays silent; the 1% ACTUAL threshold fires on the first few dollars of
@@ -114,7 +114,7 @@ resource "aws_sns_topic_policy" "billing_alerts" {
 resource "aws_budgets_budget" "gross_spend_monthly" {
   name         = "daatan-gross-spend-monthly"
   budget_type  = "COST"
-  limit_amount = "650" # was 300; real gross run-rate is ~$620/mo (2026-10-20), so 300 sat in ALARM permanently
+  limit_amount = "650" # just above the run-rate; run-rate figures: private Daatan/docs finances audit
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
