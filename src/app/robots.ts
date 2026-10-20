@@ -51,7 +51,7 @@ export default function robots(): MetadataRoute.Robots {
         // require duplicating every other Disallow rule into a Googlebot-specific
         // user-agent block (RFC 9309: UA groups don't merge with the wildcard
         // group), and social-preview crawlers fetching the raw image bytes would
-        // still be fine either way. Instead, src/middleware.ts sets
+        // still be fine either way. Instead, src/proxy.ts sets
         // `X-Robots-Tag: noindex` on every /opengraph-image response — that
         // excludes them from the index cleanly ("Excluded by noindex tag") without
         // touching robots.txt at all, and works regardless of content-type.

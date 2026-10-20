@@ -25,7 +25,7 @@ export default auth((req) => {
     searchParams: req.nextUrl.searchParams,
     hasHomeSeenCookie: req.cookies.has(HOME_SEEN_COOKIE),
     isAuthenticated: isAuth,
-    // Read directly: this runs on the Edge, where the validated `@/env` module is not available.
+    // Read directly: the validated `@/env` module is not imported here (kept Edge-safe).
     selfHosted: process.env.DAATAN_EDITION === 'self_hosted',
   })
 

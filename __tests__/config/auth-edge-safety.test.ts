@@ -2,7 +2,7 @@
  * Auth middleware edge-safety tests.
  *
  * Background:
- *   src/middleware.ts runs in the Next.js Edge runtime. It imports auth.config.ts,
+ *   src/proxy.ts (formerly middleware.ts) is kept Edge-safe. It imports auth.config.ts,
  *   which transitively pulls every module listed there into the Edge bundle.
  *
  *   Prisma and bcryptjs both rely on Node-only APIs (crypto, fs, child_process,

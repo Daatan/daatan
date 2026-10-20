@@ -28,7 +28,7 @@ export async function GET(
     return new NextResponse('Not found', { status: 404 })
   }
 
-  const base = path.resolve(env.STORAGE_LOCAL_PATH || DEFAULT_LOCAL_PATH)
+  const base = path.resolve(/*turbopackIgnore: true*/ env.STORAGE_LOCAL_PATH || DEFAULT_LOCAL_PATH)
   const { path: segments } = await params
   const resolved = path.resolve(base, ...segments)
 
