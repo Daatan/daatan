@@ -10,6 +10,7 @@
 
 import { test } from "vitest";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 function parseEnvFile(text) {
   const values = {};
@@ -37,6 +38,29 @@ function formatAlarmMessage(alarm) {
   const emoji = STATE_EMOJI[alarm.NewStateValue] || "⚠️";
   return `${emoji} ${alarm.NewStateValue}: ${alarm.AlarmName} (${alarm.Region})\n${alarm.NewStateReason}`;
 }
+
+const STAGING_ALARM = /^(daatan-)?staging-/;
+
+function channelFor(alarmName) {
+  return alarmName && STAGING_ALARM.test(alarmName) ? "noisy" : "clean";
+}
+
+test("channelFor routes staging alarms to noisy, everything else to clean (daatan#1980)", () => {
+  assert.equal(channelFor("staging-ec2-disk-high"), "noisy");
+  assert.equal(channelFor("staging-ec2-status-check-failed"), "noisy");
+  assert.equal(channelFor("daatan-staging-memory-high"), "noisy");
+  assert.equal(channelFor("prod-ec2-disk-high"), "clean");
+  assert.equal(channelFor("daatan-infra-alerts-telegram-errors"), "clean");
+  assert.equal(channelFor("oracle-ec2-status-check-failed"), "clean");
+  // A non-alarm message on the topic has no name: keep the old clean routing.
+  assert.equal(channelFor(undefined), "clean");
+});
+
+test("index.mjs keeps channelFor in sync with this copy", () => {
+  const src = readFileSync("infra/telegram-alerts/index.mjs", "utf8") // vitest runs from the repo root;
+  assert.ok(src.includes("const STAGING_ALARM = /^(daatan-)?staging-/;"));
+  assert.ok(src.includes('return alarmName && STAGING_ALARM.test(alarmName) ? "noisy" : "clean";'));
+});
 
 test("parseEnvFile reads KEY=VALUE lines and skips comments/blank lines", () => {
   const text = [
