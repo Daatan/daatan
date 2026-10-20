@@ -498,6 +498,7 @@ model Prediction {
   evidencePool            EvidencePoolArticle[]
   translations            PredictionTranslation[]
   slugAliases             PredictionSlugAlias[]
+  headlineRevisions       PredictionHeadlineRevision[]
   oracleCallLogs          OracleCallLog[]
   aiEstimateRuns          AiEstimateRun[]
   aiMemberScores          AiMemberScore[]
@@ -1542,6 +1543,27 @@ model PredictionTranslation {
 // A forecast's previous slug(s), kept after a re-slug (e.g. a non-English slug
 // fixed during English canonicalization) so the old URL 308-redirects to the
 // current canonical slug instead of 404ing.
+/// Display-only card headline for an already-published forecast. `predictions.headline` is
+/// never touched; the card shows the newest non-revoked revision whose `claimHash` still
+/// matches the claim, so a claim edit (which regenerates the headline) retires it. `previousHeadline`
+/// is the published headline at apply time, kept as the audit trail. Revert = set `revokedAt`.
+model PredictionHeadlineRevision {
+  id               String     @id @default(cuid())
+  predictionId     String     @map("prediction_id")
+  prediction       Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  headline         String     @db.VarChar(80)
+  previousHeadline String?    @map("previous_headline") @db.VarChar(80)
+  claimHash        String     @map("claim_hash") @db.VarChar(64)
+  reason           String     @db.VarChar(20) // V vague | P meaning | G grammar | S scope | T timing
+  batch            String     @db.VarChar(40) // review batch, e.g. "2026-10-active"
+  createdAt        DateTime   @default(now()) @map("created_at")
+  revokedAt        DateTime?  @map("revoked_at")
+
+  @@unique([predictionId, batch])
+  @@index([predictionId])
+  @@map("prediction_headline_revisions")
+}
+
 model PredictionSlugAlias {
   id           String     @id @default(cuid())
   slug         String     @unique
