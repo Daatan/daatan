@@ -46,9 +46,6 @@ COPY . .
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build 2>&1 || (echo "Build failed!" && cat .next/build-error.log 2>/dev/null && exit 1)
 
-# Compile seed.ts → seed.js so it can run in the slim production image (tsx is a devDep)
-RUN npx esbuild prisma/seed.ts --bundle --platform=node --outfile=prisma/seed.js --packages=external
-
 # Migrations stage — has the full node_modules from builder so prisma CLI
 # and ALL its transitive deps (@prisma/dev, effect, pathe, etc.) are always
 # available without hand-copying individual packages.
@@ -83,9 +80,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/public ./public
 COPY --from=builder --chown=nodejs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nodejs:nodejs /app/.next/static ./.next/static
 
-# Copy compiled seed script (seed.ts compiled to seed.js during builder stage)
-COPY --from=builder --chown=nodejs:nodejs /app/prisma/seed.js ./prisma/seed.js
-# Copy generated Prisma client (needed by app + seed at runtime)
+# Copy generated Prisma client (needed by the app at runtime)
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 # Note: node_modules/prisma (CLI) and migration deps are NOT copied here.

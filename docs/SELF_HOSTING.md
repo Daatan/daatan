@@ -149,6 +149,24 @@ For people not in your IdP (contractors, guests) or orgs not using SSO:
 
 The SaaS-style Google provider is available if you set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; leave them unset to hide the Google button.
 
+### 4e. Promote an admin from the command line (seed)
+
+When `OIDC_ADMIN_EMAILS` doesn't fit (no SSO, or you need an admin before anyone can sign in), run the seed once against your database. It upserts each `ADMIN_EMAIL` address as `ADMIN` and prints the privileged users. It is **on demand only** — no deploy or container start runs it — and it's safe to re-run.
+
+```bash
+# pull path (use docker-compose.selfhost.yml if you build from source)
+docker compose -f docker-compose.selfhost.pull.yml run --rm \
+  -e DAATAN_EDITION=self_hosted \
+  -e ADMIN_EMAIL=admin@your-org.example \
+  migrate npx prisma db seed
+```
+
+It runs in the `migrate` image (the one with the Prisma CLI and `tsx`; the slim app image has neither), which already gets `DATABASE_URL` from the compose file. `ADMIN_EMAIL` is comma/space separated, case-insensitive; with `DAATAN_EDITION=self_hosted` the seed refuses to run without it.
+
+**Sign in once first, then run the seed** — it then just promotes your existing account. Pre-creating the account also works with OIDC (it links to an existing user by email), but **not** with Google: a pre-created row makes Google sign-in fail with `OAuthAccountNotLinked`.
+
+From a source checkout against a local database, the equivalent is `DATABASE_URL=... ADMIN_EMAIL=... npx prisma db seed` (Prisma 7 does not load `.env` for you). `SEED_DEMO_DATA=1` additionally inserts sample forecasts, bots and notifications — for a local dev database only, never a real install (it loads the bot registry, so it also needs the app env, e.g. `SKIP_ENV_VALIDATION=1`).
+
 ---
 
 ## 5. Storage (uploads / avatars)
@@ -261,6 +279,6 @@ See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated l
 
 - **Required:** `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION`, `APP_URL`
 - **Branding (optional seeds — editable in Admin → Settings):** `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
-- **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (seeds the first admin via `prisma/seed.ts`)
+- **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (admin(s) promoted by the on-demand seed — §4e)
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
 - **AI (a key enables it):** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`; `ORACLE_URL`/`ORACLE_API_KEY` add "Analyze"; `ENABLE_AI_FEATURES` (override), `ENABLE_EXTERNAL_MARKETS`

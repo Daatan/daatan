@@ -1,65 +1,34 @@
-import { PrismaClient } from '@prisma/client'
+// On-demand bootstrap — never part of a deploy. Promotes the configured admin
+// emails to ADMIN (see seed-admins.ts); with SEED_DEMO_DATA=1 it also adds
+// sample forecasts, the bot registry and notifications for a local dev DB.
+// Run: `npx prisma db seed` (see docs/SELF_HOSTING.md).
 import crypto from 'crypto'
+import { createSeedPrismaClient } from './seed-client'
+import { resolveAdminTargets, seedAdmins } from './seed-admins'
 
-const prisma = new PrismaClient()
+const prisma = createSeedPrismaClient()
 
 async function main() {
-  // ADMIN_EMAIL (comma/space separated) seeds the first admin(s) on a self-host
-  // without editing code. Falls back to the SaaS owners when unset, so existing
-  // dev/staging/prod seeding is unchanged.
-  const adminEmails = process.env.ADMIN_EMAIL
-    ? process.env.ADMIN_EMAIL.split(/[,\s]+/).map((e) => e.trim().toLowerCase()).filter(Boolean)
-    : ['komapc@gmail.com', 'andrey1bar@gmail.com']
+  console.log('Seeding admins...')
+  await seedAdmins(prisma, resolveAdminTargets({
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    DAATAN_EDITION: process.env.DAATAN_EDITION,
+  }))
 
-  console.log('Start seeding admins...')
-
-  for (const email of adminEmails) {
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) {
-      console.log(`Found user ${email} (id=${existing.id}, current role=${existing.role})`)
-    } else {
-      console.log(`User ${email} not found — will create`)
-    }
-
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: { role: 'ADMIN' },
-      create: {
-        email,
-        name: email.split('@')[0], // Replaced on first Google login
-        role: 'ADMIN',
-        username: email.split('@')[0], // Fallback username
-      },
-    })
-    console.log(`✅ User ${user.email} → role=${user.role} (id=${user.id}, name=${user.name})`)
-  }
-
-  // Also promote known user IDs that may have been created via OAuth
-  // with a different email mapping (duplicate account edge case)
-  const adminUserIds = [
-    'cml6p9bqz0000jnyvw6tx5uzq', // Mark Janwuf (prod)
-    'cml7r4krc0000fjmqkxz3rrwg', // Marik marik (prod)
-  ]
-
-  for (const id of adminUserIds) {
-    try {
-      const user = await prisma.user.update({
-        where: { id },
-        data: { role: 'ADMIN' },
-      })
-      console.log(`✅ User by ID ${id} → role=ADMIN (name=${user.name})`)
-    } catch {
-      // User ID doesn't exist on this environment (e.g., staging) — skip
-    }
-  }
-
-  // Verify: list all ADMIN/APPROVER users
   const privileged = await prisma.user.findMany({
     where: { role: { in: ['ADMIN', 'APPROVER', 'RESOLVER'] } },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, role: true },
   })
-  console.log(`Privileged users on this environment: ${JSON.stringify(privileged)}`)
+  console.log(`Privileged users on this database: ${JSON.stringify(privileged)}`)
 
+  if (process.env.SEED_DEMO_DATA !== '1') return
+
+  await seedDemoPredictions()
+  await seedBots()
+  await seedNotifications()
+}
+
+async function seedDemoPredictions() {
   console.log('Seeding predictions...')
   const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } })
 
@@ -198,8 +167,6 @@ async function seedNotifications() {
 }
 
 main()
-  .then(() => seedBots())
-  .then(() => seedNotifications())
   .catch((e) => {
     console.error(e)
     process.exit(1)

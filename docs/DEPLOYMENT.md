@@ -307,7 +307,7 @@ builder  ──► runner      (slim production app image, ~200MB)
          └──► migrations  (full node_modules for prisma CLI, ~700MB)
 ```
 
-- **`builder`**: Full build environment — `npm ci`, Prisma generate, Next.js build, seed compilation
+- **`builder`**: Full build environment — `npm ci`, Prisma generate, Next.js build
 - **`runner`**: Slim production image — only `.next/standalone`, static files, and runtime node_modules
 - **`migrations`**: `FROM builder`, removes `.next/public` — retains full `node_modules` for `prisma migrate deploy`
 
