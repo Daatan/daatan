@@ -11,15 +11,27 @@ export class ResilientLLMService {
     this.providers = providers
   }
 
+  /** Number of providers in the chain — callers size their overall deadline from it. */
+  get legCount(): number {
+    return this.providers.length
+  }
+
   async generateContent(request: LLMRequest): Promise<LLMResponse> {
     let lastError: Error | null = null
 
     const stage = request.stage
     for (const [i, provider] of this.providers.entries()) {
+      // The caller gave up (its overall deadline passed): starting another leg
+      // would only fail instantly, and is not a provider outage worth paging.
+      if (request.signal?.aborted) throw new Error('LLM call aborted by caller')
+
       const t0 = Date.now()
+      const legSignal = request.legTimeoutMs
+        ? AbortSignal.any([...(request.signal ? [request.signal] : []), AbortSignal.timeout(request.legTimeoutMs)])
+        : request.signal
       try {
         log.info({ provider: provider.name, stage }, 'llm: start')
-        const response = await provider.generateContent(request)
+        const response = await provider.generateContent(legSignal === request.signal ? request : { ...request, signal: legSignal })
         log.info(
           { provider: provider.name, stage, durationMs: Date.now() - t0, tokens: response.usage?.totalTokens },
           'llm: success',
@@ -38,7 +50,9 @@ export class ResilientLLMService {
         // still succeed, so this is logged but NOT paged. Only a full-chain
         // failure (below) pages Telegram; a fallback that rescues the call is silent.
         log.error({ err: error, provider: provider.name, stage, durationMs: Date.now() - t0 }, 'Provider failed')
-        lastError = error as Error
+        lastError = request.legTimeoutMs && legSignal?.aborted && !request.signal?.aborted
+          ? new Error(`LLM leg timeout after ${request.legTimeoutMs}ms (${provider.name})`)
+          : (error as Error)
         continue // Try next provider
       }
     }

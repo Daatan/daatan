@@ -9,6 +9,10 @@ export interface LLMRequest {
    *  provider call. Each provider also applies its own default timeout — this
    *  narrows that further when the caller has a tighter deadline. */
   signal?: AbortSignal
+  /** Per-provider budget. When set, ResilientLLMService gives every leg of the
+   *  chain its own timeout instead of letting a slow first leg spend the whole
+   *  shared `signal` and start the fallbacks already aborted (#1947). */
+  legTimeoutMs?: number
   /** Per-call Google model override (e.g. 'gemini-2.5-pro' for the
    *  resolution-research verdict). Honored by the Vertex and Gemini legs only;
    *  the non-Google fallback legs keep their own pinned models, so the chain's
