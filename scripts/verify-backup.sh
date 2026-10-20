@@ -35,23 +35,34 @@ VERIFY_CONTAINER="daatan-backup-verify"
 VERIFY_DB="daatan_verify"
 VERIFY_MEMORY="${VERIFY_MEMORY:-768m}"
 
+ENV_FILE=""
 if [ -f ~/app/.env ]; then
-    source ~/app/.env
+    ENV_FILE=~/app/.env
 elif [ -f .env ]; then
-    source .env
+    ENV_FILE=.env
 fi
 
+# The app .env is read only here, in a subshell with -e/-u off, for the
+# Telegram credentials: a value that doesn't parse cleanly in bash must not
+# abort the verification (and with it the only alert), and nothing else in it
+# may override this script's settings.
 send_alert() {
     local reason="$1"
     echo "❌ Verification failed: $reason"
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-        MSG="🚨 <b>Backup Verification FAILED</b>%0AThe latest backup was uploaded but could not be restored successfully.%0AReason: <code>${reason}</code>%0A<b>Manual investigation required — backup may be corrupt.</b>"
-        curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-            -d "chat_id=${TELEGRAM_CLEAN_CHAT_ID:-$TELEGRAM_CHAT_ID}" \
-            -d "text=$MSG" \
-            -d "parse_mode=HTML" > /dev/null
-        echo "⚠️ Alert sent to Telegram"
-    fi
+    [ -n "$ENV_FILE" ] || return 0
+    (
+        set +eu
+        # shellcheck disable=SC1090
+        source "$ENV_FILE" >/dev/null 2>&1
+        if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+            MSG="🚨 <b>Backup Verification FAILED</b>%0AThe latest backup was uploaded but could not be restored successfully.%0AReason: <code>${reason}</code>%0A<b>Manual investigation required — backup may be corrupt.</b>"
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+                -d "chat_id=${TELEGRAM_CLEAN_CHAT_ID:-$TELEGRAM_CHAT_ID}" \
+                -d "text=$MSG" \
+                -d "parse_mode=HTML" > /dev/null
+            echo "⚠️ Alert sent to Telegram"
+        fi
+    )
 }
 
 cleanup() {

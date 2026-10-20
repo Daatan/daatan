@@ -36,7 +36,7 @@ on_exit() {
     (
       set +eu
       # shellcheck disable=SC1091
-      source "$HOME/app/.env"
+      source "$HOME/app/.env" >/dev/null 2>&1
       if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
         curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
           -d "chat_id=${TELEGRAM_CLEAN_CHAT_ID:-$TELEGRAM_CHAT_ID}" \
