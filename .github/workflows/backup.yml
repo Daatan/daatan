@@ -1,5 +1,11 @@
 name: Database Backup
 
+# FALLBACK. The primary schedule is EventBridge Scheduler → SSM Run Command
+# (terraform/backup_schedule.tf, #1957), which runs the copies of
+# backup-db.sh / verify-backup.sh that deploy.yml ships to the prod box. This
+# GitHub cron stays on for a transition period; both triggers take the same
+# box-side lock, so a double fire is harmless. To retire it, delete the
+# `schedule:` block below and keep `workflow_dispatch` as the manual path.
 on:
   schedule:
     - cron: '0 4 * * *'   # 04:00 UTC daily
@@ -63,8 +69,19 @@ jobs:
               --query "CommandInvocations[0].Status" --output text)
             echo "Status: $STATUS"
             if [[ "$STATUS" == "Success" ]]; then
-              echo "✅ Backup completed"
-              echo "status=success" >> "$GITHUB_OUTPUT"
+              # The EventBridge schedule (terraform/backup_schedule.tf) is the
+              # primary trigger; this cron is the fallback. If that run held the
+              # box-side lock, backup-db.sh exited 0 with BACKUP_SKIPPED — a
+              # green no-op, and verification is that run's job, not this one's.
+              OUTPUT=$(aws ssm list-command-invocations --command-id "$COMMAND_ID" --details \
+                --query "CommandInvocations[0].CommandPlugins[0].Output" --output text)
+              if grep -q '^BACKUP_SKIPPED' <<< "$OUTPUT"; then
+                echo "ℹ️ Another backup run is in progress on the box (scheduled run) — skipping"
+                echo "status=skipped" >> "$GITHUB_OUTPUT"
+              else
+                echo "✅ Backup completed"
+                echo "status=success" >> "$GITHUB_OUTPUT"
+              fi
               break
             elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" || "$STATUS" == "TimedOut" ]]; then
               OUTPUT=$(aws ssm list-command-invocations --command-id "$COMMAND_ID" --details \
