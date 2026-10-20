@@ -136,6 +136,6 @@ export function getOpenRouterModel(): string {
   return (
     getCachedSetting(SETTING_KEYS.openrouterModel) ||
     env.OPENROUTER_MODEL ||
-    'openai/gpt-4o-mini'
+    'openai/gpt-5-mini'
   )
 }

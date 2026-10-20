@@ -19,7 +19,7 @@ vi.mock('@/env', () => ({ env: mockEnv }))
 let orKey = ''
 vi.mock('@/lib/services/settings', () => ({
   getOpenRouterKey: () => orKey,
-  getOpenRouterModel: () => 'openai/gpt-4o-mini',
+  getOpenRouterModel: () => 'openai/gpt-5-mini',
 }))
 
 let oracleConfigured = false
@@ -93,7 +93,7 @@ describe('buildProviders / rebuildLlmService', () => {
     orKey = 'sk-or-key'
     await load()
     expect(kinds()).toContain('openrouter')
-    expect(find('openrouter')?.model).toBe('openai/gpt-4o-mini')
+    expect(find('openrouter')?.model).toBe('openai/gpt-5-mini')
   })
 
   it('registers OpenRouter on SaaS too, using the free non-Google backstop model', async () => {

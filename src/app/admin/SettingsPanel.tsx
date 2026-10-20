@@ -158,8 +158,8 @@ export default function SettingsPanel() {
             </div>
           )}
         </Field>
-        <Field label="Model" hint="OpenRouter model slug. Leave blank for the default (openai/gpt-4o-mini).">
-          <input className={inputCls} value={model} onChange={(e) => setModel(e.target.value)} placeholder="openai/gpt-4o-mini" />
+        <Field label="Model" hint="OpenRouter model slug. Leave blank for the default (openai/gpt-5-mini).">
+          <input className={inputCls} value={model} onChange={(e) => setModel(e.target.value)} placeholder="openai/gpt-5-mini" />
         </Field>
       </section>
 

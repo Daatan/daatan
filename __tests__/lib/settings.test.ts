@@ -100,7 +100,7 @@ describe('settings — self_hosted', () => {
 
   it('getOpenRouterModel: DB setting > env > default', async () => {
     const s = await load()
-    expect(s.getOpenRouterModel()).toBe('openai/gpt-4o-mini')
+    expect(s.getOpenRouterModel()).toBe('openai/gpt-5-mini')
     mockEnv.OPENROUTER_MODEL = 'env/model'
     expect(s.getOpenRouterModel()).toBe('env/model')
     await s.setSetting(s.SETTING_KEYS.openrouterModel, 'db/model')
