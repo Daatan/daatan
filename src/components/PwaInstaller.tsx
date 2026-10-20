@@ -37,6 +37,7 @@ const PwaInstaller = () => {
     // Already running as installed PWA — never show the banner
     if (isRunningAsStandalone()) {
       isInstalledRef.current = true
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from display-mode / localStorage after mount; must stay out of SSR/hydration
       setIsInstalled(true)
       return
     }

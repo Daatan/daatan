@@ -61,24 +61,28 @@ const impactOf = (s: Source): Impact => s.impact ?? ZERO_IMPACT
 export default function SourcesTab() {
   const t = useTranslations('admin')
   const [data, setData] = useState<SourcesResponse | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sortImpact, setSortImpact] = useState(false)
 
+  const loadKey = 'init'
+  const [loadLoadedKey, setLoadLoadedKey] = useState<string | null>(null)
+  const loading = loadLoadedKey !== loadKey
+
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const res = await fetch('/api/admin/news-indexer/sources', { cache: 'no-store' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `Request failed (${res.status})`)
+      try {
+        const res = await fetch('/api/admin/news-indexer/sources', { cache: 'no-store' })
+        setError(null)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `Request failed (${res.status})`)
+        }
+        setData(await res.json())
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load sources')
       }
-      setData(await res.json())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load sources')
     } finally {
-      setLoading(false)
+      setLoadLoadedKey(loadKey)
     }
   }, [])
 

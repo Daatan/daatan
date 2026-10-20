@@ -40,25 +40,25 @@ export default function CommitmentsPage() {
   const tf = useTranslations('forecast')
   const { data: session } = useSession()
   const [commitments, setCommitments] = React.useState<Commitment[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const [loaded, setLoaded] = React.useState(false)
+  const loading = !!session && !loaded
 
   React.useEffect(() => {
-    if (!session) {
-      setLoading(false)
-      return
-    }
+    if (!session) return
 
     async function fetchCommitments() {
       try {
-        const response = await fetch('/api/commitments')
-        if (response.ok) {
-          const data = await response.json()
-          setCommitments(data.commitments ?? [])
+        try {
+          const response = await fetch('/api/commitments')
+          if (response.ok) {
+            const data = await response.json()
+            setCommitments(data.commitments ?? [])
+          }
+        } catch (error) {
+          log.error({ err: error }, 'Failed to fetch commitments')
         }
-      } catch (error) {
-        log.error({ err: error }, 'Failed to fetch commitments')
       } finally {
-        setLoading(false)
+        setLoaded(true)
       }
     }
 

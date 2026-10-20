@@ -11,17 +11,19 @@ type Invite = {
 
 export default function InvitesTable() {
   const [invites, setInvites] = useState<Invite[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [lastUrl, setLastUrl] = useState<string | null>(null)
 
+  const fetchInvitesKey = 'init'
+  const [fetchInvitesLoadedKey, setFetchInvitesLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchInvitesLoadedKey !== fetchInvitesKey
+
   const fetchInvites = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch('/api/admin/invites')
       if (res.ok) setInvites((await res.json()).invites)
     } finally {
-      setIsLoading(false)
+      setFetchInvitesLoadedKey(fetchInvitesKey)
     }
   }, [])
 

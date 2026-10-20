@@ -29,25 +29,27 @@ type PendingForecast = {
 export default function ApprovalsPage() {
     const [predictions, setPredictions] = useState<PendingForecast[]>([])
     const [total, setTotal] = useState(0)
-    const [isLoading, setIsLoading] = useState(true)
+    const [loadedAt, setLoadedAt] = useState(0)
+    const isLoading = loadedAt === 0
     const [actioningId, setActioningId] = useState<string | null>(null)
     const [isBulkActioning, setIsBulkActioning] = useState(false)
     const [resolvedIds, setResolvedIds] = useState<Record<string, 'approved' | 'rejected'>>({})
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
     const fetchPending = useCallback(async () => {
-        setIsLoading(true)
         try {
-            const res = await fetch('/api/admin/approvals')
-            if (res.ok) {
-                const data = await res.json()
-                setPredictions(data.predictions)
-                setTotal(data.total)
+            try {
+                const res = await fetch('/api/admin/approvals')
+                if (res.ok) {
+                    const data = await res.json()
+                    setPredictions(data.predictions)
+                    setTotal(data.total)
+                }
+            } catch {
+                // silent
             }
-        } catch {
-            // silent
         } finally {
-            setIsLoading(false)
+            setLoadedAt(Date.now())
         }
     }, [])
 

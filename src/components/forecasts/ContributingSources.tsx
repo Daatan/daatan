@@ -360,7 +360,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     )
   }
 
-  const Column = ({ side }: { side: Side }) => (
+  const renderColumn = (side: Side) => (
     <div>
       <p className={`text-[11px] font-bold uppercase tracking-wide mb-2 ${sideMeta[side].head}`}>
         {sideMeta[side].label} ({byCol[side].length})
@@ -396,13 +396,13 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {byCol.yes.length > 0 && <Column side="yes" />}
-        {byCol.no.length > 0 && <Column side="no" />}
+        {byCol.yes.length > 0 && renderColumn('yes')}
+        {byCol.no.length > 0 && renderColumn('no')}
       </div>
 
       {byCol.neutral.length > 0 && (
         <div className="mt-4 opacity-80">
-          <Column side="neutral" />
+          {renderColumn('neutral')}
         </div>
       )}
 

@@ -27,24 +27,27 @@ const TYPE_LABEL_KEYS: Record<NotificationType, string> = {
 export default function NotificationPreferences() {
   const t = useTranslations('settings')
   const [preferences, setPreferences] = useState<Preference[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
+  const loading = !loaded
   const [saving, setSaving] = useState<string | null>(null)
   const { isSupported, permission, isSubscribed, isLoading: pushLoading, subscribe, unsubscribe } = usePushSubscription()
   const [pushWorking, setPushWorking] = useState(false)
 
   const fetchPreferences = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications/preferences')
-      if (res.ok) {
-        const data = await res.json()
-        setPreferences(data.preferences)
-      } else {
+      try {
+        const res = await fetch('/api/notifications/preferences')
+        if (res.ok) {
+          const data = await res.json()
+          setPreferences(data.preferences)
+        } else {
+          toast.error(t('prefsLoadError'))
+        }
+      } catch {
         toast.error(t('prefsLoadError'))
       }
-    } catch {
-      toast.error(t('prefsLoadError'))
     } finally {
-      setLoading(false)
+      setLoaded(true)
     }
   }, [t])
 

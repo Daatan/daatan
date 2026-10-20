@@ -149,27 +149,31 @@ function ForecastsTab() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchPredictionsKey = `${page}|${search}|${statusFilter}`
+  const [fetchPredictionsLoadedKey, setFetchPredictionsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchPredictionsLoadedKey !== fetchPredictionsKey
 
   const fetchPredictions = useCallback(async () => {
-    setIsLoading(true)
     try {
-      const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (search) params.set('search', search)
-      if (statusFilter) params.set('status', statusFilter)
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: '20' })
+        if (search) params.set('search', search)
+        if (statusFilter) params.set('status', statusFilter)
 
-      const res = await fetch(`/api/admin/forecasts?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setPredictions(data.predictions)
-        setTotal(data.total)
+        const res = await fetch(`/api/admin/forecasts?${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          setPredictions(data.predictions)
+          setTotal(data.total)
+        }
+      } catch {
+        // silent
       }
-    } catch {
-      // silent
     } finally {
-      setIsLoading(false)
+      setFetchPredictionsLoadedKey(fetchPredictionsKey)
     }
-  }, [page, search, statusFilter])
+  }, [page, search, statusFilter, fetchPredictionsKey])
 
   useEffect(() => { fetchPredictions() }, [fetchPredictions])
 
@@ -302,28 +306,32 @@ function CommentsTab() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const fetchComments = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (search) params.set('search', search)
-      if (showDeleted) params.set('showDeleted', 'true')
+  const fetchCommentsKey = `${page}|${search}|${showDeleted}`
+  const [fetchCommentsLoadedKey, setFetchCommentsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchCommentsLoadedKey !== fetchCommentsKey
 
-      const res = await fetch(`/api/admin/comments?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setComments(data.comments)
-        setTotal(data.total)
+  const fetchComments = useCallback(async () => {
+    try {
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: '20' })
+        if (search) params.set('search', search)
+        if (showDeleted) params.set('showDeleted', 'true')
+
+        const res = await fetch(`/api/admin/comments?${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          setComments(data.comments)
+          setTotal(data.total)
+        }
+      } catch {
+        // silent
       }
-    } catch {
-      // silent
     } finally {
-      setIsLoading(false)
+      setFetchCommentsLoadedKey(fetchCommentsKey)
     }
-  }, [page, search, showDeleted])
+  }, [page, search, showDeleted, fetchCommentsKey])
 
   useEffect(() => { fetchComments() }, [fetchComments])
 
@@ -453,27 +461,31 @@ function UsersTab() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (search) params.set('search', search)
+  const fetchUsersKey = `${page}|${search}`
+  const [fetchUsersLoadedKey, setFetchUsersLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchUsersLoadedKey !== fetchUsersKey
 
-      const res = await fetch(`/api/admin/users?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setUsers(data.users)
-        setTotal(data.total)
+  const fetchUsers = useCallback(async () => {
+    try {
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: '20' })
+        if (search) params.set('search', search)
+
+        const res = await fetch(`/api/admin/users?${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          setUsers(data.users)
+          setTotal(data.total)
+        }
+      } catch {
+        // silent
       }
-    } catch {
-      // silent
     } finally {
-      setIsLoading(false)
+      setFetchUsersLoadedKey(fetchUsersKey)
     }
-  }, [page, search])
+  }, [page, search, fetchUsersKey])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 

@@ -1,16 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { VERSION } from '@/lib/version'
+import { useBrowserValue } from '@/lib/hooks/useIsClient'
 
 export const StagingBanner = () => {
-  const [isStaging, setIsStaging] = useState(false)
-
-  useEffect(() => {
-    // Detect staging by hostname
-    const hostname = window.location.hostname
-    setIsStaging(hostname.includes('staging'))
-  }, [])
+  // Detect staging by hostname
+  const isStaging = useBrowserValue(() => window.location.hostname.includes('staging'), false)
 
   if (!isStaging) return null
 

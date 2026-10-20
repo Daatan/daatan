@@ -111,6 +111,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       const saved = sessionStorage.getItem(DRAFT_KEY)
       if (!saved) return
       const { formData: savedData, currentStep: savedStep } = JSON.parse(saved)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the sessionStorage draft once on mount (browser-only state)
       setFormData(prev => ({ ...prev, ...savedData }))
       setCurrentStep(savedStep ?? 1)
     } catch {
@@ -153,6 +154,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
         ? data.options.filter((o: string) => o.trim())
         : undefined
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- imports the express-flow handoff from localStorage once (browser-only state)
       setFormData({
         claimText: data.claimText || '',
         detailsText: data.detailsText || '',

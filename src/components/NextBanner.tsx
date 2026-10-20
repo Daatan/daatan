@@ -1,16 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { VERSION } from '@/lib/version'
+import { useBrowserValue } from '@/lib/hooks/useIsClient'
 
 export const NextBanner = () => {
-  const [isNext, setIsNext] = useState(false)
-
-  useEffect(() => {
-    // Detect next testbed by hostname
-    const hostname = window.location.hostname
-    setIsNext(hostname.includes('next'))
-  }, [])
+  // Detect next testbed by hostname
+  const isNext = useBrowserValue(() => window.location.hostname.includes('next'), false)
 
   if (!isNext) return null
 

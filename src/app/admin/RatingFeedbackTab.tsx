@@ -161,15 +161,17 @@ function VotesTable({ votes }: { votes: Vote[] }) {
 
 export default function RatingFeedbackTab() {
   const [stats, setStats] = useState<RatingFeedbackStats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchStatsKey = 'init'
+  const [fetchStatsLoadedKey, setFetchStatsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchStatsLoadedKey !== fetchStatsKey
 
   const fetchStats = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch('/api/admin/rating-feedback')
       if (res.ok) setStats(await res.json())
     } finally {
-      setIsLoading(false)
+      setFetchStatsLoadedKey(fetchStatsKey)
     }
   }, [])
 

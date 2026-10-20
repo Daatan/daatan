@@ -57,6 +57,7 @@ export default function CookieConsent() {
       return
     }
     previouslyFocused.current = document.activeElement as HTMLElement | null
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage after mount; must stay out of SSR/hydration
     setVisible(true)
   }, [])
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useNowMs } from '@/lib/hooks/useNowMs'
 import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession, signIn } from 'next-auth/react'
@@ -130,6 +131,7 @@ export default function ForecastDetailClient({
   const locale = useLocale()
   const [prediction, setPrediction] = useState<Prediction | null>(initialData || null)
   const [isLoading, setIsLoading] = useState(!initialData)
+  const nowMs = useNowMs(60_000)
   const [error, setError] = useState<string | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [showRules, setShowRules] = useState(false)
@@ -154,20 +156,25 @@ export default function ForecastDetailClient({
   const canEdit = session?.user?.id === prediction?.author.id || session?.user?.role === 'ADMIN'
   const canApprove = (session?.user?.role === 'ADMIN' || session?.user?.role === 'APPROVER') && prediction?.status === 'PENDING_APPROVAL'
 
-  useEffect(() => {
-    if (prediction?.userCommitment) {
+  // Mirror the user's commitment into the form state whenever it changes. Adjusted during render
+  // ("derive from a changed value" pattern) rather than in an effect.
+  const userCommitment = prediction?.userCommitment
+  const [syncedCommitment, setSyncedCommitment] = useState<typeof userCommitment>(undefined)
+  if (userCommitment !== syncedCommitment) {
+    setSyncedCommitment(userCommitment)
+    if (userCommitment) {
       // cuCommitted stores -100..100 for BINARY in DB; convert to 0..100 for display
-      const val = prediction.userCommitment.cuCommitted ?? (prediction.userCommitment.binaryChoice ? 70 : -70)
-      if (prediction.userCommitment.optionId) {
+      const val = userCommitment.cuCommitted ?? (userCommitment.binaryChoice ? 70 : -70)
+      if (userCommitment.optionId) {
         setMcConfidence(Math.max(1, Math.abs(val)))
       } else {
         const displayVal = Math.round((val + 100) / 2)
         setUserConfidence(displayVal)
         setInitialUserConfidence(displayVal)
       }
-      setSelectedOptionId(prediction.userCommitment.optionId || null)
+      setSelectedOptionId(userCommitment.optionId || null)
     }
-  }, [prediction?.userCommitment])
+  }
 
   useEffect(() => {
     async function fetchPrediction() {
@@ -340,7 +347,6 @@ export default function ForecastDetailClient({
   // Note: an Oracul settlement pin (prediction.settled) is notification-only —
   // it does not lock commitments, only the deadline arms below do.
   const DEADLINE_AGREEMENT_TOLERANCE_MS = 72 * 3600_000
-  const nowMs = Date.now()
   const claimDeadlineMs = prediction.claimDeadline ? new Date(prediction.claimDeadline).getTime() : null
   const resolveByMs = new Date(prediction.resolveByDatetime).getTime()
   const impossibilityPinned =

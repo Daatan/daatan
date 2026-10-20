@@ -34,6 +34,21 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const userId = session.user.id
 
+  const { user, userTags, scores, tabData } = await loadOwnProfile({ userId, selectedTag, tab, page })
+
+  return (
+    <UserProfileView
+      user={user}
+      userTags={userTags}
+      selectedTag={selectedTag}
+      isOwnProfile={true}
+      scores={scores}
+      tabData={tabData}
+    />
+  )
+}
+
+async function loadOwnProfile({ userId, selectedTag, tab, page }: { userId: string; selectedTag: string | null; tab: ProfileTab; page: number }) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -86,16 +101,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       loadProfileTab({ userId: user.id, isPublic: false, selectedTag, tab, page }),
     ])
 
-    return (
-      <UserProfileView
-        user={user}
-        userTags={userTags}
-        selectedTag={selectedTag}
-        isOwnProfile={true}
-        scores={scores}
-        tabData={tabData}
-      />
-    )
+    return { user, userTags, scores, tabData }
   } catch (error) {
     createLogger('profile').error({ err: error, userId }, 'Profile page error')
     redirect('/login')

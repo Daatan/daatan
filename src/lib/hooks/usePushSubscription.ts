@@ -23,6 +23,7 @@ export function usePushSubscription() {
     if (typeof window === 'undefined') return
 
     const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- bootstraps from browser capability checks + service-worker readiness (external systems)
     setIsSupported(supported)
 
     if (!supported) {

@@ -18,13 +18,15 @@ type AdminUser = {
 
 export default function UsersTable() {
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalUsers, setTotalUsers] = useState<number | null>(null)
+  const fetchUsersKey = `${page}|${search}`
+  const [fetchUsersLoadedKey, setFetchUsersLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchUsersLoadedKey !== fetchUsersKey
+
   const fetchUsers = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch(`/api/admin/users?page=${page}&limit=20&search=${encodeURIComponent(search)}`)
       if (res.ok) {
@@ -34,9 +36,9 @@ export default function UsersTable() {
         setTotalUsers(data.total)
       }
     } finally {
-      setIsLoading(false)
+      setFetchUsersLoadedKey(fetchUsersKey)
     }
-  }, [page, search])
+  }, [page, search, fetchUsersKey])
 
   useEffect(() => {
     fetchUsers()

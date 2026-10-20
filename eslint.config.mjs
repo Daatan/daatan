@@ -18,15 +18,6 @@ const config = [
       react: { version: '19.3.1' },
     },
     rules: {
-      // React Compiler rules that eslint-plugin-react-hooks 7 (via eslint-config-next 16) turned
-      // on as errors. They flag existing patterns, not new bugs; kept visible as warnings until
-      // the React 19 step (#1938) decides which to fix and which to switch off.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/error-boundaries': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
       'no-restricted-syntax': [
         'error',
         {

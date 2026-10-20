@@ -15,21 +15,22 @@ const INNER_W = W - PAD.left - PAD.right
 const INNER_H = H - PAD.top - PAD.bottom
 
 export function GlickoChart({ userId, selectedTag }: GlickoChartProps) {
-  const [points, setPoints] = useState<GlickoDataPoint[] | null>(null)
-  const [error, setError] = useState(false)
+  const url = `/api/profile/${userId}/glicko-history${selectedTag ? `?tag=${selectedTag}` : ''}`
+  // The result is tagged with the URL it was fetched for, so a new user/tag reads as "loading" without a reset-in-effect.
+  const [result, setResult] = useState<{ url: string; points: GlickoDataPoint[] | null; error: boolean } | null>(null)
+  const current = result?.url === url ? result : null
+  const points = current?.points ?? null
+  const error = current?.error ?? false
 
   useEffect(() => {
-    setPoints(null)
-    setError(false)
-    const url = `/api/profile/${userId}/glicko-history${selectedTag ? `?tag=${selectedTag}` : ''}`
     fetch(url)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then(d => setPoints(d.points ?? []))
-      .catch(() => setError(true))
-  }, [userId, selectedTag])
+      .then(d => setResult({ url, points: d.points ?? [], error: false }))
+      .catch(() => setResult({ url, points: null, error: true }))
+  }, [url])
 
   if (error) return (
     <div className="h-[140px] flex items-center justify-center text-xs text-gray-500">

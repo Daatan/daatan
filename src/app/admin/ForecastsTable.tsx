@@ -5,13 +5,15 @@ import ForecastCard, { Prediction } from '@/components/forecasts/ForecastCard'
 
 export default function ForecastsTable() {
   const [predictions, setPredictions] = useState<Prediction[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
+  const fetchPredictionsKey = `${page}|${search}`
+  const [fetchPredictionsLoadedKey, setFetchPredictionsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchPredictionsLoadedKey !== fetchPredictionsKey
+
   const fetchPredictions = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch(`/api/admin/forecasts?page=${page}&limit=20&search=${encodeURIComponent(search)}`)
       if (res.ok) {
@@ -20,9 +22,9 @@ export default function ForecastsTable() {
         setTotalPages(data.pages)
       }
     } finally {
-      setIsLoading(false)
+      setFetchPredictionsLoadedKey(fetchPredictionsKey)
     }
-  }, [page, search])
+  }, [page, search, fetchPredictionsKey])
 
   useEffect(() => {
     fetchPredictions()

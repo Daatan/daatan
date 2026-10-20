@@ -18,7 +18,6 @@ const API = '/api/admin/news-indexer/authors'
 export default function AuthorsTab() {
   const t = useTranslations('admin')
   const [people, setPeople] = useState<Person[] | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [newName, setNewName] = useState('')
@@ -26,25 +25,30 @@ export default function AuthorsTab() {
   // Per-person draft state for the inline name/notes editors, the alias input, and the outlet-link input.
   const [drafts, setDrafts] = useState<Record<string, { name: string; notes: string; alias: string; outlet: string }>>({})
 
+  const loadKey = 'init'
+  const [loadLoadedKey, setLoadLoadedKey] = useState<string | null>(null)
+  const loading = loadLoadedKey !== loadKey
+
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const res = await fetch(API, { cache: 'no-store' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `Request failed (${res.status})`)
+      try {
+        const res = await fetch(API, { cache: 'no-store' })
+        setError(null)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `Request failed (${res.status})`)
+        }
+        const data = await res.json()
+        const list: Person[] = data.people ?? []
+        setPeople(list)
+        setDrafts(Object.fromEntries(
+          list.map((p) => [p.id, { name: p.canonical_name, notes: p.notes ?? '', alias: '', outlet: '' }]),
+        ))
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t('authorsLoadError'))
       }
-      const data = await res.json()
-      const list: Person[] = data.people ?? []
-      setPeople(list)
-      setDrafts(Object.fromEntries(
-        list.map((p) => [p.id, { name: p.canonical_name, notes: p.notes ?? '', alias: '', outlet: '' }]),
-      ))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('authorsLoadError'))
     } finally {
-      setLoading(false)
+      setLoadLoadedKey(loadKey)
     }
   }, [t])
 
