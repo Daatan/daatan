@@ -97,18 +97,24 @@ a non-`main` branch (see [VERSIONING.md](../VERSIONING.md)); CI's `Version bump`
 ### Jobs
 
 ```
-typecheck ─┐
-lint ──────┼──► build ──┬──► build-app-image ────────┬──► deploy-staging ──► deploy-production
-unit-test* ┘            └──► build-migrations-image ─┘    (push to main,       (tag push v* only)
-                                                           and tag push v*)
+typecheck ───┐
+lint ────────┤
+unit-test* ──┼──► build ──┬──► build-app-image ────────┬──► deploy-staging   (push to main)
+integration ─┘ (Build &   └──► build-migrations-image ─┘
+                Test)
+                  build ─────► resolve-release ──► deploy-production   (tag push v*)
 
 unit-test*  = `unit-test` on PRs (related tests only, scripts/run-related-tests.sh)
               or `unit-test-full` on push/tag (full suite, 4 shards)
 
-integration   (independent, on all pushes and PRs — runs
-               `npm run test:integration` against the dockerized
-               test postgres from docker-compose.test.yml)
+integration = `npm run test:integration` against the dockerized test postgres
+              from docker-compose.test.yml (required since daatan#1960)
 ```
+
+`build` ("Build & Test") is the required status check. It runs whenever the workflow wasn't
+cancelled and its first step fails it unless typecheck, lint, integration and the unit job
+for the event all succeeded — a skipped required check would count as passing on GitHub, so
+it must fail instead of skipping.
 
 The image builds and deploys are skipped on PRs. The `Version bump` check is a separate
 workflow (`.github/workflows/version.yml`).
