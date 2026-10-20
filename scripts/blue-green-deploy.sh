@@ -386,6 +386,19 @@ for i in {1..50}; do
     if echo "$HEALTH_RESPONSE" | grep -q '"status"'; then
         echo "✅ New container is healthy (attempt $i)"
         echo "   Response: $HEALTH_RESPONSE"
+        # EXPECTED_VERSION is exported by deploy.yml. Checking it here, before the
+        # swap, keeps a wrong image (e.g. a re-pointed tag, daatan#1954) from ever
+        # taking traffic; Phase 7's verify-health.sh reads the same variable.
+        if [ -n "$EXPECTED_VERSION" ]; then
+            NEW_VERSION=$(echo "$HEALTH_RESPONSE" | grep -oE '"version"\s*:\s*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+            if [ "$NEW_VERSION" != "$EXPECTED_VERSION" ]; then
+                echo "❌ New container reports version '$NEW_VERSION', expected '$EXPECTED_VERSION'"
+                docker rm -f $CONTAINER_NEW 2>/dev/null || true
+                echo "🔄 Old container still serving traffic — no downtime occurred"
+                exit 1
+            fi
+            echo "✅ Version matches ($NEW_VERSION)"
+        fi
         break
     fi
     if [ $i -eq 50 ]; then
@@ -427,19 +440,13 @@ docker run --rm \
 }
 echo "✅ Migrations applied successfully"
 
-# ─── Phase 5b: Run database seed (populate initial data) ──────────────────────────
-echo ""
-echo "🌱 Phase 5b: Seeding database..."
-# seed.ts is compiled to seed.js during Docker build (tsx is a devDep, not in prod image)
-docker exec $CONTAINER_NEW node prisma/seed.js 2>&1 || {
-    echo "⚠️  Seed script failed or had no-op (this is often OK)"
-}
-echo "✅ Database seed completed"
-
-# Save the old container's image reference NOW — before we stop or remove it in
-# Phase 6. If Phase 7 (external health check) fails after the swap, we need this
-# to start a replacement container from the previously-working image.
-OLD_IMAGE=$(docker inspect $CONTAINER --format '{{.Config.Image}}' 2>/dev/null || echo "")
+# Save the old container's image NOW — before we stop or remove it in Phase 6. If
+# Phase 7 (external health check) fails after the swap, we need this to start a
+# replacement container from the previously-working image. It must be the image ID
+# (.Image), not the name it was started from (.Config.Image): that name is
+# daatan-app:latest / :staging-latest, which the pull before this script has already
+# re-pointed at the NEW image (daatan#1955). Nothing prunes between here and Phase 7.
+OLD_IMAGE=$(docker inspect $CONTAINER --format '{{.Image}}' 2>/dev/null || echo "")
 echo "   Old image saved for rollback: ${OLD_IMAGE:-<none>}"
 
 # ─── Phase 6: Swap traffic via network aliases (zero downtime) ──────────────────
@@ -515,17 +522,9 @@ AUTH_CHECK=$(curl -s "$HEALTH_URL/api/auth/providers" | head -c 50)
 if echo "$AUTH_CHECK" | grep -q "google"; then
     echo "✅ Authentication working"
 else
-    echo "⚠️ Auth check failed, restarting with env vars..."
-    docker compose -f $COMPOSE_FILE --env-file .env restart $SERVICE
-    sleep 10
-    AUTH_CHECK=$(curl -s "$HEALTH_URL/api/auth/providers" | head -c 50)
-    if echo "$AUTH_CHECK" | grep -q "google"; then
-        echo "✅ Authentication working after restart"
-    else
-        echo "❌ Authentication still failing"
-        docker logs $CONTAINER --tail 30 | grep -i "auth\|secret\|error"
-        exit 1
-    fi
+    echo "❌ Authentication failing"
+    docker logs $CONTAINER --tail 30 | grep -i "auth\|secret\|error"
+    exit 1
 fi
 
 # ─── Cleanup ────────────────────────────────────────────────────────────────────

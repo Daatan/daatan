@@ -22,7 +22,7 @@ Run the production release checklist for the daatan project. Follow every step i
    git tag v<VERSION>
    git push origin v<VERSION>
    ```
-   This triggers deploy.yml on the tag: it rebuilds the images, runs `deploy-staging` first (staging is woken if asleep), then `deploy-production`, which waits up to 10 minutes for staging to report a version ≥ the tag before deploying.
+   This triggers deploy.yml on the tag. It does **not** rebuild: `resolve-release` waits (up to 30 min) for this commit's `main` run to finish `Deploy to Staging` successfully, then `deploy-production` checks that ECR's `X.Y.Z` image is the one built from this commit and ships that exact digest. The tag must be on a `main` commit whose staging deploy succeeded (normally the current HEAD) and must equal `package.json`'s version there.
 
 ## Monitor CI/CD
 

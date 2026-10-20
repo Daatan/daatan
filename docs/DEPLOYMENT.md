@@ -16,8 +16,8 @@ GitHub → CI/CD (GitHub Actions) → ECR → EC2 via SSM → Blue-green swap �
 
 | Environment | URL                        | Trigger              | Image tag         | EC2 Instance            |
 |-------------|----------------------------|----------------------|-------------------|-------------------------|
-| Staging     | https://staging.daatan.com | Push to `main`       | `staging-latest`  | `i-0406d237ca5d92cdf`   |
-| Production  | https://daatan.com         | Git tag `v*`         | `X.Y.Z` (from tag) | `i-04ea44d4243d35624`   |
+| Staging     | https://staging.daatan.com | Push to `main`       | this run's digest | `i-0406d237ca5d92cdf`   |
+| Production  | https://daatan.com         | Git tag `v*`         | digest of `X.Y.Z`, built on `main` (never rebuilt) | `i-04ea44d4243d35624`   |
 
 Each environment has its own EC2 instance, Postgres container, nginx, and SSL certificate.
 
@@ -37,10 +37,11 @@ git push -u origin feat/my-feature
 ### 2. Open and merge a PR
 
 Create a PR targeting `main`. When merged:
-- CI builds **two** Docker images and pushes them to ECR:
-  - `staging-latest` — the production-slim app image
-  - `staging-latest-migrations` — the full-node_modules migrations image
-- The staging environment is updated automatically
+- CI builds **two** Docker images and pushes them to ECR (tags `sha-<commit>`, `X.Y.Z`, `staging-latest`):
+  - the production-slim app image
+  - the full-node_modules migrations image (same tags with a `-migrations` suffix)
+- The staging environment is updated automatically, pulling the images **by digest**
+- This is the only build of that commit: a later `v*` tag ships these exact images
 - Monitor: https://staging.daatan.com/api/health
 
 ### 3. Release to production
@@ -55,12 +56,14 @@ git push origin vX.Y.Z
 
 (`./scripts/release.sh` does the same interactively and also creates the GitHub release.)
 
-The tag push re-runs the pipeline on the tagged commit — images are rebuilt and tagged
-`X.Y.Z` / `X.Y.Z-migrations`, `deploy-staging` runs first — and then the
-`deploy-production` job:
-1. Verifies staging reports a version ≥ the tag (polling up to 10 min while staging deploys)
-2. Pulls the versioned app + migrations images from ECR
-3. Runs the full blue-green deploy on production
+The tag push does **not** rebuild anything or redeploy staging. It runs the tests, then:
+1. `resolve-release` waits for this commit's `main` run to finish `Deploy to Staging`
+   successfully (up to 30 min)
+2. `deploy-production` checks that ECR's `X.Y.Z` / `X.Y.Z-migrations` are the images built
+   from this commit (`sha-<commit>` digests), pulls those digests and runs the full blue-green deploy on production
+
+So tag a `main` commit whose staging deploy succeeded — normally the current HEAD. A commit
+whose `main` build was cancelled by a newer merge was never on staging and cannot be released.
 
 > **Version**: `package.json`'s `version` field is the only place it's edited.
 > `src/lib/version.ts` reads it at runtime via `NEXT_PUBLIC_APP_VERSION` — no
@@ -118,15 +121,19 @@ workflow (`.github/workflows/version.yml`).
    (`scripts/check-env-parity.sh` — extracts `-e KEY` tokens from `blue-green-deploy.sh`'s
    `ENV_ARGS` bash array and compares against the compose file's `environment:` block per
    service; doesn't catch a var missing from *both*, only drift between them)
-4. Resolve `NEXT_PUBLIC_APP_VERSION` (tag name on `v*` pushes, else `package.json`)
+4. Resolve `NEXT_PUBLIC_APP_VERSION` (tag name on `v*` pushes, else `package.json`) — baked into the image, so a tag must match `package.json`'s version at the tagged commit
 
 ### `build-app-image` / `build-migrations-image` jobs
 
-Run in parallel after `build` (push/tag/dispatch only):
-- **app image** (`staging-latest`, `sha-<commit>`, and `X.Y.Z` — `package.json`'s version on
-  `main` pushes, the tag's version on `v*` pushes) — the only one that writes the BuildKit cache
-- **migrations image** (`staging-latest-migrations` + `<version>-migrations`, `migrations`
-  Dockerfile target) — reads the cache only
+Run in parallel after `build`, on `main` pushes and staging dispatches only — **never on `v*` tags**
+(daatan#1954: tag rebuilds overwrote `staging-latest` and raced the main deploy, putting an older
+commit on staging; they also meant production ran bytes staging never saw):
+- **app image** (`sha-<commit>`; on `main` also `staging-latest` and `X.Y.Z` = `package.json`'s
+  version) — the only one that writes the BuildKit cache
+- **migrations image** (the same tags with `-migrations`, `migrations` Dockerfile target) — reads
+  the cache only
+
+Both jobs output the pushed digest; deploys pull by digest, not by tag.
 
 ### `deploy-staging` job
 
@@ -134,25 +141,31 @@ Run in parallel after `build` (push/tag/dispatch only):
 2. Wake staging if asleep (see [Staging sleep schedule](#staging-sleep-schedule)) and wait for SSM `Online`
 3. SSM command to server:
    - Download deploy scripts from GitHub
-   - Pull `staging-latest` app image from ECR
-   - Pull `staging-latest-migrations` migrations image from ECR
-   - Run `blue-green-deploy.sh staging`
+   - Pull the app and migrations images **by the digests this run pushed**
+   - Run `blue-green-deploy.sh staging` with `EXPECTED_VERSION` set (checked before the swap and in Phase 7)
 4. Poll command status (via `.github/actions/ssm-deploy`)
 5. Verify `https://staging.daatan.com/api/health` reports correct version
 6. Send Telegram notification
 
-### `deploy-production` job
+### `resolve-release` job (tag / production dispatch)
 
-1. Configure AWS credentials
-2. Resolve version from tag name
-3. Verify staging version ≥ production target (safety gate; polls up to 10 min)
-4. Check EC2 SSM health (`Environment=prod` instance)
-5. SSM command:
-   - Pull versioned app image (`X.Y.Z`) from ECR
-   - Pull versioned migrations image (`X.Y.Z-migrations`) from ECR
-   - Run `blue-green-deploy.sh production`
-6. Poll + verify (via `.github/actions/ssm-deploy`)
-7. Send Telegram notification (to `TELEGRAM_CLEAN_CHAT_ID`, falling back to `TELEGRAM_CHAT_ID`)
+1. Resolve the version from the tag (or the required `version` input on a production dispatch)
+2. **Tag only:** wait (up to 30 min) for this commit's `main` run to finish `Deploy to Staging`
+   successfully. Fails if it failed, was cancelled or superseded by a newer merge — tag the
+   current `main` HEAD instead. Does not touch staging itself, so weekend releases work while
+   staging sleeps. Needs no AWS credentials.
+
+### `deploy-production` job (`environment: production`)
+
+1. Configure AWS credentials (the OIDC role trusts only `main` and this environment)
+2. Look up the ECR digests of `X.Y.Z` and `X.Y.Z-migrations`; on a tag, require they equal
+   `sha-<commit>` / `sha-<commit>-migrations` (i.e. the images built from this very commit)
+3. Check EC2 SSM health (`Environment=prod` instance)
+4. SSM command:
+   - Pull the app and migrations images by those digests
+   - Run `blue-green-deploy.sh production` with `EXPECTED_VERSION` set
+5. Poll + verify (via `.github/actions/ssm-deploy`)
+6. Send Telegram notification (to `TELEGRAM_CLEAN_CHAT_ID`, falling back to `TELEGRAM_CHAT_ID`)
 
 ### Composite action: `.github/actions/ssm-deploy`
 
@@ -178,14 +191,14 @@ Phase 1  DB up       postgres-staging (always running)
 Phase 1b Certbot     docker compose up -d certbot (re-asserts the TLS renewal loop; non-fatal)
 Phase 2  Skip build  (SKIP_BUILD=true, image pre-pulled)
 Phase 3  Start new   daatan-app-staging-new  (no alias, no traffic)
-Phase 4  Health ✓    curl 127.0.0.1:3000/api/health inside new container
+Phase 4  Health ✓    wget 127.0.0.1:3000/api/health inside new container
+                     (+ version == $EXPECTED_VERSION when set — a wrong image never gets traffic)
 Phase 5  Migrate     docker run --rm daatan-migrations:staging-latest  ← isolated
-Phase 5b Seed        docker exec daatan-app-staging-new node prisma/seed.js
 Phase 6  Swap        alias moves: nginx now resolves to new container
-Phase 7  Verify      curl https://staging.daatan.com/api/health
+Phase 7  Verify      verify-health.sh https://staging.daatan.com (+ $EXPECTED_VERSION)
 Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
-         Rollback?   if Phase 7 fails → restart old image, swap back
-                     (Phase 8 failure: one service restart + re-check, then exit 1 — no rollback)
+         Rollback?   if Phase 7 fails → restart the old image (by image ID), swap back
+                     (Phase 8 failure: exit 1 — no rollback)
 ```
 
 **Zero-downtime guarantee**: old container serves all traffic until Phase 6. Phases 3–5
@@ -279,11 +292,12 @@ See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` for full background.
 
 | Tag | Purpose | Built from |
 |---|---|---|
-| `staging-latest` | Latest staging app image | `runner` stage |
-| `staging-latest-migrations` | Latest staging migrations image | `migrations` stage |
-| `X.Y.Z` | Versioned app image (pushed on `main` merges and `v*` tags; production and rollbacks pull this) | `runner` stage |
+| `staging-latest` | Latest `main` app image (informational — deploys pull by digest) | `runner` stage |
+| `staging-latest-migrations` | Latest `main` migrations image (informational) | `migrations` stage |
+| `X.Y.Z` | Versioned app image, pushed by the `main` build of the commit carrying that `package.json` version; a `v*` tag promotes it, never rebuilds it. Production and rollbacks pull this | `runner` stage |
 | `X.Y.Z-migrations` | Versioned migrations image | `migrations` stage |
-| `sha-<commit>` | Per-commit reference | `runner` stage |
+| `sha-<commit>` | Per-commit reference (7-char SHA); a release checks `X.Y.Z` has the same digest | `runner` stage |
+| `sha-<commit>-migrations` | Per-commit migrations reference | `migrations` stage |
 | `buildcache` | BuildKit layer cache | — |
 
 ### Dockerfile Stages
