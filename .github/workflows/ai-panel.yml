@@ -45,7 +45,7 @@ jobs:
         env:
           - name: production
             url: https://daatan.com
-          - name: staging
+          # staging sleeps nights + weekends (terraform/staging_schedule.tf, #1526/#1952)
 
     steps:
       - name: Trigger AI panel sweep
