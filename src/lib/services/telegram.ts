@@ -233,8 +233,8 @@ export function notifySearchHealthDigest(report: {
  * The pool variants are each a DELTA against the same population's own baseline —
  * see `evidence-health.ts` for why an absolute failure rate can't be alerted on.
  * The `batch_heartbeat_*` pair is the exception: it watches an external liveness
- * signal (the TruthMachine batch loop's atlas commits, retro#556), where absolute
- * staleness IS the condition.
+ * signal (the TruthMachine batch loop's heartbeat on Oracul `/health`, retro#556/#996),
+ * where absolute staleness IS the condition.
  */
 export type EvidenceHealthIssue =
   | { kind: 'source_failure_rate'; source: string; recentPct: number; baselinePct: number; recentRows: number }
@@ -246,8 +246,16 @@ export type EvidenceHealthIssue =
   // credits and every panel member on that route is down (daatan#1504).
   | { kind: 'panel_payment_failure'; count: number; lastSeenAt: Date; lastModel: string }
   // Not a delta either: an external liveness signal — the TruthMachine batch
-  // loop's atlas commits (retro#556) — where absolute staleness IS the condition.
-  | { kind: 'batch_heartbeat_stale'; hoursSince: number; thresholdHours: number; lastCommitAt: string }
+  // loop's heartbeat (retro#556/#996) — where absolute staleness IS the condition.
+  // `since`/`hoursSince` are null only for `cycles_failing` with no OK cycle on record.
+  | {
+      kind: 'batch_heartbeat_stale'
+      reason: 'no_cycle' | 'cycles_failing' | 'unpushed'
+      hoursSince: number | null
+      thresholdHours: number
+      since: string | null
+      head: string | null
+    }
   | { kind: 'batch_heartbeat_unreachable'; detail: string }
 
 /** Keeps a first run (or a genuine pipeline-wide failure) inside Telegram's message limit. */
@@ -272,14 +280,24 @@ function evidenceHealthLine(i: EvidenceHealthIssue): string {
         `• <b>AI panel</b>: ${i.count} × HTTP 402 from OpenRouter — credits exhausted, ` +
         `all OpenRouter members down (last ${i.lastSeenAt.toISOString().slice(0, 16)}Z, ${escapeHtml(i.lastModel)})`
       )
-    case 'batch_heartbeat_stale':
+    case 'batch_heartbeat_stale': {
+      const age = i.hoursSince === null ? 'ever' : `for <b>${i.hoursSince}h</b>`
+      const what =
+        i.reason === 'no_cycle'
+          ? `no completed cycle ${age}`
+          : i.reason === 'cycles_failing'
+            ? `cycles running but none succeeded ${age}`
+            : `local commits unpushed ${age}`
+      const last = i.since ? `, since ${escapeHtml(i.since)}` : ''
+      const head = i.head ? `, head ${escapeHtml(i.head.slice(0, 9))}` : ''
       return (
-        `• <b>TruthMachine batch loop</b>: no atlas commit for <b>${i.hoursSince}h</b> ` +
-        `(threshold ${i.thresholdHours}h, last ${escapeHtml(i.lastCommitAt)}) — ` +
+        `• <b>TruthMachine batch loop</b>: ${what} ` +
+        `(threshold ${i.thresholdHours}h${last}${head}) — ` +
         `check the batch tree on the Oracul box (retro#556)`
       )
+    }
     case 'batch_heartbeat_unreachable':
-      return `• <b>TruthMachine batch loop</b>: heartbeat unreadable — ${escapeHtml(i.detail)} (GitHub API problem, not proof the loop is down)`
+      return `• <b>TruthMachine batch loop</b>: heartbeat unreadable — ${escapeHtml(i.detail)} (Oracul /health problem, not proof the loop is down)`
   }
 }
 
@@ -309,8 +327,8 @@ export function notifyEvidenceHealthDigest(report: {
   // total panel outage (every OpenRouter member fails together), so it sits on the
   // page-worthy side — still the digest, not a pager (daatan#1504). A dead batch
   // loop joins it too: it ran stale code for six weeks once with nobody noticing
-  // (retro#553/#556). An UNREACHABLE heartbeat stays noisy — a GitHub API blip is
-  // not a production incident.
+  // (retro#553/#556). An UNREACHABLE heartbeat stays noisy — an Oracul /health blip
+  // is not a production incident.
   const critical = report.issues.some(
     (i) =>
       i.kind === 'overall_failure_rate' ||
