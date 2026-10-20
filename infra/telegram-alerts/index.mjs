@@ -37,6 +37,16 @@ export function formatAlarmMessage(alarm) {
   return `${emoji} ${alarm.NewStateValue}: ${alarm.AlarmName} (${alarm.Region})\n${alarm.NewStateReason}`;
 }
 
+// prod and staging alarms share one SNS topic (terraform/monitoring.tf), but the
+// clean channel is production-only signal: staging alarms -- including the OKs
+// its nightly sleep/wake produces -- go to the noisy channel (daatan#1980).
+// Staging alarm names start with `staging-` (for_each keys) or `daatan-staging-`.
+const STAGING_ALARM = /^(daatan-)?staging-/;
+
+export function channelFor(alarmName) {
+  return alarmName && STAGING_ALARM.test(alarmName) ? "noisy" : "clean";
+}
+
 // Cached across warm invocations of the same container so a burst of alarms
 // (e.g. every EC2 metric tipping over during a thrash) doesn't hit Secrets
 // Manager once per message. The secret is manually managed and rarely
@@ -48,18 +58,19 @@ async function getTelegramCreds() {
   const res = await secretsManager.send(new GetSecretValueCommand({ SecretId: ENV_SECRET_ID }));
   const env = parseEnvFile(res.SecretString || "");
   const token = env.TELEGRAM_BOT_TOKEN;
-  const chatId = env.TELEGRAM_CLEAN_CHAT_ID || env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) {
+  const clean = env.TELEGRAM_CLEAN_CHAT_ID || env.TELEGRAM_CHAT_ID;
+  const noisy = env.TELEGRAM_CHAT_ID || clean;
+  if (!token || !clean) {
     throw new Error(
       `Missing TELEGRAM_BOT_TOKEN/TELEGRAM_CLEAN_CHAT_ID in secret ${ENV_SECRET_ID}`
     );
   }
-  cachedCreds = { token, chatId };
+  cachedCreds = { token, chatIds: { clean, noisy } };
   return cachedCreds;
 }
 
 export const handler = async (event) => {
-  const { token, chatId } = await getTelegramCreds();
+  const { token, chatIds } = await getTelegramCreds();
 
   for (const record of event.Records) {
     const raw = record.Sns.Message;
@@ -75,10 +86,11 @@ export const handler = async (event) => {
     const text =
       alarm && alarm.AlarmName ? formatAlarmMessage(alarm) : `⚠️ daatan-infra-alerts: ${raw.slice(0, 500)}`;
 
+    const channel = channelFor(alarm?.AlarmName);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: chatIds[channel], text }),
     });
 
     if (!res.ok) {
@@ -90,6 +102,6 @@ export const handler = async (event) => {
       throw new Error(`Telegram sendMessage failed: ${res.status} ${body}`);
     }
 
-    console.log(`Forwarded alarm "${alarm?.AlarmName ?? "unknown"}" (${alarm?.NewStateValue ?? "?"}) to Telegram.`);
+    console.log(`Forwarded alarm "${alarm?.AlarmName ?? "unknown"}" (${alarm?.NewStateValue ?? "?"}) to Telegram (${channel}).`);
   }
 };
