@@ -17,7 +17,7 @@ Roll back immediately if you observe any of the following:
 
 A rollback does **not** fix the underlying bug. It only restores a known-good version while you prepare a proper fix.
 
-A rollback also does **not** revert database migrations. Neither `rollback.yml` nor the manual commands below pull a migrations image, so Phase 5 of `blue-green-deploy.sh` runs whatever `daatan-migrations:latest` (prod) / `daatan-migrations:staging-latest` (staging) is already on the host — i.e. the newer schema stays. Rolling back across a migration the old code can't handle needs a hand-written down-migration.
+A rollback also does **not** revert database migrations. Neither `rollback.yml` nor the manual commands below pull a migrations image, so Phase 5 of `blue-green-deploy.sh` runs whatever `daatan-migrations:latest` (prod) / `daatan-migrations:staging-latest` (staging) is already on the host — i.e. the newer schema stays. Rolling back across a migration the old code can't handle needs a hand-written down-migration, or a restore of the pre-migrate dump the deploy took on the host (loses writes made since; see `docs/DEPLOYMENT.md` → "Pre-migrate DB dump"). Expand/contract discipline (same section) is what keeps this rare.
 
 ---
 

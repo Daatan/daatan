@@ -415,19 +415,83 @@ for i in {1..50}; do
     sleep 3
 done
 
+if [ "$ENVIRONMENT" = "staging" ] || [ "$ENVIRONMENT" = "next" ]; then
+    MIGRATIONS_IMAGE="daatan-migrations:staging-latest"
+    DB_NAME="daatan_staging"
+    MIGRATION_DB_URL="postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging"
+else
+    MIGRATIONS_IMAGE="daatan-migrations:latest"
+    DB_NAME="daatan"
+    MIGRATION_DB_URL="postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan"
+fi
+
+# ─── Phase 4b: Pre-migrate DB dump (#1958) ──────────────────────────────────────
+# Phase 5 changes the schema under the live old container, and neither the Phase 7
+# auto-rollback nor rollback.yml undoes a migration. So when a migration is pending,
+# dump the DB to the host first; if the dump fails or looks truncated, abort here,
+# before anything is migrated or swapped. `prisma migrate status` exits 0 only when
+# the DB is up to date; any other exit (pending, diverged, unreachable) dumps anyway.
+# Restore procedure: docs/DEPLOYMENT.md "Pre-migrate DB dump".
+abort_before_migrate() {
+    echo "❌ $1 — aborting before migrations."
+    docker rm -f $CONTAINER_NEW 2>/dev/null || true
+    echo "🔄 Old container still serving traffic — no downtime occurred, DB untouched"
+    exit 1
+}
+
+echo ""
+echo "💾 Phase 4b: Checking for pending migrations..."
+if docker run --rm \
+    --network "$NETWORK" \
+    -e DATABASE_URL="$MIGRATION_DB_URL" \
+    "$MIGRATIONS_IMAGE" node node_modules/prisma/build/index.js migrate status >/dev/null 2>&1; then
+    echo "✅ Database schema is up to date — skipping pre-migrate dump"
+else
+    DUMP_DIR="$PWD/backups/pre-migrate"
+    DUMP_KEEP="${PRE_MIGRATE_DUMP_KEEP:-2}"
+    DUMP_FILE="$DUMP_DIR/${ENVIRONMENT}-${EXPECTED_VERSION:-${GIT_COMMIT:0:8}}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+    mkdir -p "$DUMP_DIR"
+    [ -n "$DB_CONTAINER" ] || abort_before_migrate "Database container not found"
+
+    # Keep DUMP_KEEP dumps in total: prune to DUMP_KEEP-1 before writing the new one.
+    mapfile -t OLD_DUMPS < <(ls -1t "$DUMP_DIR"/*.sql.gz 2>/dev/null || true)
+    for old in "${OLD_DUMPS[@]:$((DUMP_KEEP > 0 ? DUMP_KEEP - 1 : 0))}"; do
+        rm -f "$old" && echo "   🗑️  Pruned $(basename "$old")"
+    done
+    rm -f "$DUMP_DIR"/*.part
+    PREV_DUMP=$(ls -1t "$DUMP_DIR"/*.sql.gz 2>/dev/null | head -1 || true)
+    PREV_BYTES=$( [ -n "$PREV_DUMP" ] && stat -c %s "$PREV_DUMP" || echo 0)
+
+    # Room for the new dump: twice the previous one, or 3 GiB with no baseline.
+    NEED_BYTES=$(( PREV_BYTES > 0 ? PREV_BYTES * 2 : 3 * 1024 * 1024 * 1024 ))
+    FREE_BYTES=$(( $(df -Pk "$DUMP_DIR" | awk 'NR==2 {print $4}') * 1024 ))
+    [ "$FREE_BYTES" -ge "$NEED_BYTES" ] || \
+        abort_before_migrate "Only $((FREE_BYTES / 1048576)) MiB free in $DUMP_DIR, need $((NEED_BYTES / 1048576)) MiB for the dump"
+
+    echo "💾 Dumping $DB_NAME to $DUMP_FILE ..."
+    DUMP_START=$(date +%s)
+    if ! ( set -o pipefail
+           docker exec "$DB_CONTAINER" pg_dump -U daatan "$DB_NAME" | nice -n 10 gzip > "$DUMP_FILE.part" ); then
+        rm -f "$DUMP_FILE.part"
+        abort_before_migrate "pg_dump failed"
+    fi
+    DUMP_BYTES=$(stat -c %s "$DUMP_FILE.part")
+    # An empty or errored dump gzips to well under 256 KiB; a real one is MBs. A dump
+    # under half the previous one means something is missing, not that data shrank.
+    if [ "$DUMP_BYTES" -lt 262144 ] || [ "$DUMP_BYTES" -lt $(( PREV_BYTES / 2 )) ]; then
+        rm -f "$DUMP_FILE.part"
+        abort_before_migrate "Dump is suspiciously small ($DUMP_BYTES bytes; previous $PREV_BYTES)"
+    fi
+    mv "$DUMP_FILE.part" "$DUMP_FILE"
+    echo "✅ Pre-migrate dump: $(basename "$DUMP_FILE") ($((DUMP_BYTES / 1048576)) MiB, $(( $(date +%s) - DUMP_START ))s)"
+fi
+
 # ─── Phase 5: Run migrations (BEFORE swap — old container still serves traffic) ─
 echo ""
 echo "🗄️ Phase 5: Running Prisma migrations via dedicated migrations container..."
 # The migrations container is built from the builder stage and has full node_modules,
 # so prisma CLI and all transitive deps (@prisma/dev, effect, pathe, etc.) are always
 # available — no missing-module errors regardless of Prisma version.
-if [ "$ENVIRONMENT" = "staging" ] || [ "$ENVIRONMENT" = "next" ]; then
-    MIGRATIONS_IMAGE="daatan-migrations:staging-latest"
-    MIGRATION_DB_URL="postgresql://daatan:${POSTGRES_PASSWORD}@postgres-staging:5432/daatan_staging"
-else
-    MIGRATIONS_IMAGE="daatan-migrations:latest"
-    MIGRATION_DB_URL="postgresql://daatan:${POSTGRES_PASSWORD}@postgres:5432/daatan"
-fi
 echo "   Image: $MIGRATIONS_IMAGE"
 docker run --rm \
     --network "$NETWORK" \

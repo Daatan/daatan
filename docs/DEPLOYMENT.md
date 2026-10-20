@@ -193,6 +193,8 @@ Phase 2  Skip build  (SKIP_BUILD=true, image pre-pulled)
 Phase 3  Start new   daatan-app-staging-new  (no alias, no traffic)
 Phase 4  Health ✓    wget 127.0.0.1:3000/api/health inside new container
                      (+ version == $EXPECTED_VERSION when set — a wrong image never gets traffic)
+Phase 4b Dump        if `prisma migrate status` ≠ up to date: pg_dump → ~/app/backups/pre-migrate/
+                     (dump fails or looks truncated → abort, old container untouched)
 Phase 5  Migrate     docker run --rm daatan-migrations:staging-latest  ← isolated
 Phase 6  Swap        alias moves: nginx now resolves to new container
 Phase 7  Verify      verify-health.sh https://staging.daatan.com (+ $EXPECTED_VERSION)
@@ -278,6 +280,88 @@ to Postgres via the Docker network, applies migrations, then exits. It has no DN
 and cannot receive application traffic.
 
 See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` for full background.
+
+### Migrations must be expand/contract
+
+Phase 5 migrates the live database **while the old container is still serving traffic**,
+and the old container keeps serving for a few more seconds until the Phase 6 swap — or
+for good, if Phase 7 auto-rolls back to it. Neither that auto-rollback nor `rollback.yml`
+undoes a migration (see `docs/ROLLBACK.md`). So every migration must be safe for the
+**previous** release's code to run against:
+
+- **Expand (any release):** add tables, add nullable columns or columns with a default,
+  add indexes, add enum values. Old code ignores what it doesn't know about.
+- **Contract (a later release):** drop or rename a column/table, add `NOT NULL` to an
+  existing column, drop an enum value, tighten a constraint — only after a release that
+  no longer reads or writes the old shape has been deployed to production.
+- **A rename is three steps:** add the new column and write both (release N), backfill and
+  switch reads (N+1), drop the old column (N+2).
+- **Long locks block the live app.** Prisma runs each migration file in a transaction, so
+  `CREATE INDEX CONCURRENTLY` cannot go in a normal migration; on a large table, put it in
+  its own migration file with nothing else in it (it must be the only statement) or build
+  the index by hand before the deploy and make the migration `IF NOT EXISTS`.
+
+Reviewers: a migration that drops, renames or narrows something in the same PR that
+stops using it is the pattern to reject.
+
+### Pre-migrate DB dump (#1958)
+
+Phase 4b runs `prisma migrate status` in the migrations image. Exit 0 (schema up to date —
+most deploys) skips the dump. Anything else (pending migrations, diverged history, DB
+unreachable) dumps first:
+
+- **Where:** `~/app/backups/pre-migrate/<env>-<version>-<UTC timestamp>.sql.gz` on the host
+  (`pg_dump -U daatan <db> | gzip` via `docker exec` into the postgres container). Staging
+  and `next` share the staging DB and the same directory.
+- **Retention:** the newest `PRE_MIGRATE_DUMP_KEEP` (default 2) files; older ones are
+  pruned before each new dump. Prod's dump is ~1.1–1.5 GB compressed (the size of the S3
+  backups), so 2 dumps hold ~3 GB of the 40 GB root volume. Prod already peaks around
+  65% during deploys and the disk alarm fires at 85% — raise the count only with disk
+  headroom to match. Older restore points live in the S3 backups.
+- **Abort, before migrating or swapping traffic, when:** the postgres container can't be
+  found; free disk is under twice the previous dump (3 GiB if there is none); `pg_dump`
+  exits non-zero; or the result is under 256 KiB or under half the previous dump. The
+  half-size guard can trip after a legitimately large data deletion — delete the older
+  dumps in the directory and redeploy.
+- **Cost:** the status check is one short container run (seconds). The dump itself only
+  happens on migration deploys; on prod expect roughly 1–3 min (not yet measured), on
+  top of a ~3 min deploy, inside the 10 min wait in `.github/actions/ssm-deploy`.
+
+These are separate from, and do not replace, the twice-daily S3 backups (`backup.yml`).
+
+**Restoring** (writes made between the dump and the restore are lost; prefer a forward
+fix or a hand-written down-migration when the data is intact). Over SSM on the host,
+production names shown (staging: `daatan-app-staging`, `daatan-postgres-staging`,
+DB `daatan_staging`):
+
+```bash
+cd ~/app && ls -lt backups/pre-migrate/            # pick the dump taken before the bad deploy
+DUMP=backups/pre-migrate/<file>.sql.gz
+docker stop daatan-app                              # stop writes (site is down from here)
+docker exec daatan-postgres psql -U daatan -d postgres -v ON_ERROR_STOP=1 \
+  -c "DROP DATABASE daatan WITH (FORCE)" -c "CREATE DATABASE daatan OWNER daatan"
+gunzip -c "$DUMP" | docker exec -i daatan-postgres psql -U daatan -d daatan -v ON_ERROR_STOP=1 -q
+docker exec daatan-postgres psql -U daatan -d daatan -c "SELECT count(*) FROM users"
+```
+
+Then bring back the version that matches the restored schema. **First re-point the local
+migrations tag at that version** — the Rollback workflow does not pull a migrations image,
+so its Phase 5 would run the newer `daatan-migrations:latest` and re-apply the very
+migrations you just rolled back (the dump's `_prisma_migrations` doesn't list them):
+
+```bash
+ECR=272007598366.dkr.ecr.eu-central-1.amazonaws.com
+aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin $ECR
+docker pull $ECR/daatan-app:release-X.Y.Z-migrations     # the version you are rolling back to
+docker tag  $ECR/daatan-app:release-X.Y.Z-migrations daatan-migrations:latest
+```
+
+(Staging: pull `X.Y.Z-migrations` — `release-` tags exist only for prod releases — and tag
+it `daatan-migrations:staging-latest`.)
+
+then run the **Rollback** workflow for `X.Y.Z` (`docs/ROLLBACK.md`); its Phase 4b/5 find
+the schema up to date. If a collation-sensitive index looks wrong afterwards, see
+`docs/DATABASE_COLLATION.md`.
 
 ---
 
