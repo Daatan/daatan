@@ -448,7 +448,7 @@ if docker run --rm \
     echo "✅ Database schema is up to date — skipping pre-migrate dump"
 else
     DUMP_DIR="$PWD/backups/pre-migrate"
-    DUMP_KEEP="${PRE_MIGRATE_DUMP_KEEP:-5}"
+    DUMP_KEEP="${PRE_MIGRATE_DUMP_KEEP:-2}"
     DUMP_FILE="$DUMP_DIR/${ENVIRONMENT}-${EXPECTED_VERSION:-${GIT_COMMIT:0:8}}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
     mkdir -p "$DUMP_DIR"
     [ -n "$DB_CONTAINER" ] || abort_before_migrate "Database container not found"

@@ -313,9 +313,11 @@ unreachable) dumps first:
 - **Where:** `~/app/backups/pre-migrate/<env>-<version>-<UTC timestamp>.sql.gz` on the host
   (`pg_dump -U daatan <db> | gzip` via `docker exec` into the postgres container). Staging
   and `next` share the staging DB and the same directory.
-- **Retention:** the newest `PRE_MIGRATE_DUMP_KEEP` (default 5) files; older ones are
-  pruned before each new dump. Prod's dump is ~1.1 GB compressed (the size of the S3
-  backups), so 5 dumps hold ~5.5 GB of the 40 GB root volume (disk alarm at 85%).
+- **Retention:** the newest `PRE_MIGRATE_DUMP_KEEP` (default 2) files; older ones are
+  pruned before each new dump. Prod's dump is ~1.1–1.5 GB compressed (the size of the S3
+  backups), so 2 dumps hold ~3 GB of the 40 GB root volume. Prod already peaks around
+  65% during deploys and the disk alarm fires at 85% — raise the count only with disk
+  headroom to match. Older restore points live in the S3 backups.
 - **Abort, before migrating or swapping traffic, when:** the postgres container can't be
   found; free disk is under twice the previous dump (3 GiB if there is none); `pg_dump`
   exits non-zero; or the result is under 256 KiB or under half the previous dump. The
