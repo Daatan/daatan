@@ -114,7 +114,7 @@ resource "aws_sns_topic_policy" "billing_alerts" {
 resource "aws_budgets_budget" "gross_spend_monthly" {
   name         = "daatan-gross-spend-monthly"
   budget_type  = "COST"
-  limit_amount = "300"
+  limit_amount = "650" # was 300; real gross run-rate is ~$620/mo (2026-10-20), so 300 sat in ALARM permanently
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
