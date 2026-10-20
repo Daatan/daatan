@@ -45,7 +45,25 @@ done
 
 echo "   Removed $removed tags."
 
-# Drop dangling layers left behind by the rmi pass.
+# Deploys pull by digest, so once the local staging-latest/latest tag moves on
+# the previous image is left with no tag at all — invisible to the pass above,
+# and not "dangling" to `docker system prune` either (it still has a repo
+# digest). Keep the newest 2*KEEP_COUNT of these (app and migrations images
+# can't be told apart by tag here) and remove the rest by ID. Plain
+# `docker rmi` (no -f) refuses images used by any container or still carrying
+# a tag, so nothing in use goes.
+digest_only=$(docker images --digests "$ECR_REPO" --format '{{.Tag}}|{{.CreatedAt}}|{{.ID}}' \
+    | awk -F'|' '$1 == "<none>"' | sort -t'|' -k2 -r | awk -F'|' '!seen[$3]++ {print $3}' \
+    | tail -n +$((KEEP_COUNT * 2 + 1)))
+removed_untagged=0
+for id in $digest_only; do
+    if docker rmi "$id" >/dev/null 2>&1; then
+        removed_untagged=$((removed_untagged + 1))
+    fi
+done
+echo "   Removed $removed_untagged untagged (pulled-by-digest) images."
+
+# Drop dangling layers left behind by the rmi passes.
 docker system prune -f >/dev/null 2>&1 || true
 
 echo "   Disk after:"
