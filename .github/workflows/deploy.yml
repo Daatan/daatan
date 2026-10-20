@@ -157,17 +157,13 @@ jobs:
   # Build and test (runs on all pushes and PRs)
   build:
     name: Build & Test
-    needs: [typecheck, lint, unit-test, unit-test-full]
-    # Default needs-gating (all must succeed) doesn't fit here: unit-test
-    # and unit-test-full are mutually exclusive by event (see their `if`
-    # above), so exactly one of them is always "skipped" — explicitly
-    # tolerate that instead of the whole job skipping too.
-    if: |
-      always() &&
-      needs.typecheck.result == 'success' &&
-      needs.lint.result == 'success' &&
-      (needs.unit-test.result == 'success' || needs.unit-test.result == 'skipped') &&
-      (needs.unit-test-full.result == 'success' || needs.unit-test-full.result == 'skipped')
+    needs: [typecheck, lint, unit-test, unit-test-full, integration]
+    # This is the required status check, so it must FAIL — never skip — when
+    # a prerequisite fails: GitHub counts a skipped required check as passing.
+    # Hence `!cancelled()` plus the gate step below rather than a needs-condition.
+    # unit-test and unit-test-full are mutually exclusive by event (see their
+    # `if` above), so exactly one of them is always "skipped" — tolerated.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -176,6 +172,19 @@ jobs:
       group: build-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      - name: Require typecheck, lint, unit and integration tests
+        env:
+          TYPECHECK: ${{ needs.typecheck.result }}
+          LINT: ${{ needs.lint.result }}
+          UNIT: ${{ needs.unit-test.result }}
+          UNIT_FULL: ${{ needs.unit-test-full.result }}
+          INTEGRATION: ${{ needs.integration.result }}
+        run: |
+          echo "typecheck=$TYPECHECK lint=$LINT unit=$UNIT unit-full=$UNIT_FULL integration=$INTEGRATION"
+          [ "$TYPECHECK" = success ] && [ "$LINT" = success ] && [ "$INTEGRATION" = success ] &&
+            [[ "$UNIT" =~ ^(success|skipped)$ ]] && [[ "$UNIT_FULL" =~ ^(success|skipped)$ ]] &&
+            [[ "$UNIT$UNIT_FULL" == *success* ]] || { echo "::error::A required job did not succeed."; exit 1; }
+
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -380,7 +389,8 @@ jobs:
     timeout-minutes: 30
     concurrency:
       group: integration-${{ github.ref }}
-      cancel-in-progress: true
+      # Never cancel on main: Build & Test (and so that commit's deploy) needs it.
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
