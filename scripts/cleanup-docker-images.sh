@@ -1,49 +1,62 @@
 #!/bin/bash
 #
 # Prune old daatan-app Docker images so the host does not run out of disk
-# during a deploy. Keeps the most recent N app tags and N migrations tags
-# (default: 3 of each). Never removes an image currently referenced by a
-# running container, because `docker rmi` fails loudly on those.
+# during a deploy. Keeps the 2*N newest images of the ECR daatan-app repo
+# (default N=3: roughly 3 app + 3 migrations builds). Never removes an image
+# that a container (running or stopped) uses, nor the one the local
+# daatan-app:* / daatan-migrations:* tags point at.
 #
 # Usage: cleanup-docker-images.sh [KEEP_COUNT]
 # Designed to run on the EC2 host via SSM, before a pull.
+#
+# Selection is by image ID, not tag (daatan#1987): since daatan#1954 the deploy
+# pulls `daatan-app@sha256:<digest>`, so those images have no tag at all and a
+# tag-based pass matched nothing while 35 images filled the staging disk. They
+# aren't dangling either (they keep a RepoDigest), so `docker image prune` skips
+# them too.
 #
 
 set -u
 
 KEEP_COUNT="${1:-3}"
-ECR_REPO="272007598366.dkr.ecr.eu-central-1.amazonaws.com/daatan-app"
+KEEP_IMAGES=$((KEEP_COUNT * 2))
+ECR_REPO="${ECR_REPO:-272007598366.dkr.ecr.eu-central-1.amazonaws.com/daatan-app}"
 
-echo "🧹 Cleaning up old Docker images (keeping last $KEEP_COUNT app + $KEEP_COUNT migrations tags)..."
+echo "🧹 Cleaning up old Docker images (keeping newest $KEEP_IMAGES daatan-app images)..."
 echo "   Disk before:"
 df -h / | awk 'NR==2 {print "   " $0}'
 
-# List all tags of the ECR daatan-app repo on this host, sorted by creation date
-# (newest first). `-migrations` tags live in the same repo so we split on the suffix.
-all_tags=$(docker images "$ECR_REPO" --format '{{.Tag}}|{{.CreatedAt}}' | sort -t'|' -k2 -r)
+# Every image of the repo, tagged or digest-only, newest first, one line per ID.
+mapfile -t image_ids < <(
+    docker images --no-trunc --format '{{.CreatedAt}}|{{.ID}}' "$ECR_REPO" \
+        | sort -r | awk -F'|' '!seen[$2]++ {print $2}'
+)
 
-# App tags: everything that does NOT end in -migrations
-app_tags=$(echo "$all_tags" | awk -F'|' '$1 !~ /-migrations$/ {print $1}')
-mig_tags=$(echo "$all_tags" | awk -F'|' '$1 ~  /-migrations$/ {print $1}')
-
-# Drop the KEEP_COUNT newest from each list; the rest are candidates for removal.
-app_remove=$(echo "$app_tags" | tail -n +$((KEEP_COUNT + 1)))
-mig_remove=$(echo "$mig_tags" | tail -n +$((KEEP_COUNT + 1)))
+# Images any container was created from, running or not.
+in_use=" $(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null | tr '\n' ' ') "
 
 removed=0
-for tag in $app_remove $mig_remove; do
-    # `docker rmi` fails for images backing a running container, which is
-    # exactly what we want — those stay. We swallow the error so one
-    # in-use tag doesn't abort the whole pass.
-    # -f forces untag even if the image has multiple tags, but Docker still
-    # refuses to remove an image backing a RUNNING container, so this stays safe.
-    if docker rmi -f "$ECR_REPO:$tag" >/dev/null 2>&1; then
-        echo "   removed: $tag"
+for id in "${image_ids[@]:$KEEP_IMAGES}"; do
+    [[ "$in_use" == *" $id "* ]] && continue
+    # Remove each reference the image holds; Docker deletes it with the last
+    # one. An image still carrying a local tag (daatan-app:latest,
+    # daatan-migrations:staging-latest, ...) is the current deploy's — skip it.
+    mapfile -t refs < <(docker inspect --format '{{range .RepoTags}}{{println .}}{{end}}{{range .RepoDigests}}{{println .}}{{end}}' "$id" 2>/dev/null | sed '/^$/d')
+    skip=false
+    for ref in "${refs[@]}"; do
+        [[ "$ref" == "$ECR_REPO"[:@]* ]] || skip=true
+    done
+    $skip && continue
+    for ref in "${refs[@]}"; do
+        docker rmi "$ref" >/dev/null 2>&1 || true
+    done
+    if ! docker image inspect "$id" >/dev/null 2>&1; then
+        echo "   removed: ${id#sha256:}" | cut -c1-28
         removed=$((removed + 1))
     fi
 done
 
-echo "   Removed $removed tags."
+echo "   Removed $removed images."
 
 # Drop dangling layers left behind by the rmi pass.
 docker system prune -f >/dev/null 2>&1 || true
