@@ -333,7 +333,8 @@ unreachable) dumps first:
   happens on migration deploys; on prod expect roughly 1–3 min (not yet measured), on
   top of a ~3 min deploy, inside the 10 min wait in `.github/actions/ssm-deploy`.
 
-These are separate from, and do not replace, the twice-daily S3 backups (`backup.yml`).
+These are separate from, and do not replace, the twice-daily S3 backups (see
+[DB backups (S3)](#db-backups-s3)).
 
 **Restoring** (writes made between the dump and the restore are lost; prefer a forward
 fix or a hand-written down-migration when the data is intact). Over SSM on the host,
@@ -462,6 +463,35 @@ What this means in practice:
   (or just trigger a staging deploy). To pause the schedule without a TF change:
   `aws scheduler update-schedule --name daatan-staging-stop --state DISABLED ...` — but
   prefer a TF change so the state does not drift.
+
+### DB backups (S3)
+
+The prod database is dumped twice a day, at **04:00 and 16:00 UTC** (RPO ≤ 12 h), to
+`s3://daatan-db-backups-272007598366/backups/<UTC timestamp>.sql.gz`; the newest 60 are
+kept, and every backup is restore-verified in a throwaway, memory-capped container.
+
+- **Primary trigger: EventBridge Scheduler → SSM Run Command** (`terraform/backup_schedule.tf`,
+  schedule `daatan-prod-db-backup`, #1957). It runs `scripts/backup-db.sh` and then
+  `scripts/verify-backup.sh` from `~/app/scripts` on the prod box. Those copies are shipped
+  by `deploy-production` (`DEPLOY_FILES` in `deploy.yml`), so a change to either script
+  reaches the scheduled run only with the next `v*` release. GitHub's cron fired 4–5 h late
+  on average, which is why the schedule moved off it.
+- **Fallback: GitHub cron `backup.yml`** at the same times, kept on for a transition period.
+  It ships the script inline from the checkout, so it does not depend on what is on the box.
+- **No double runs.** Both scripts take the same box-side `flock`
+  (`/var/lock/daatan-db-backup.lock`). Whichever trigger comes second exits 0 with
+  `BACKUP_SKIPPED` / `VERIFY_SKIPPED`; `backup.yml` reports that as a green no-op and skips its
+  own verify step.
+- **Alerts.** On the scheduled path the scripts alert Telegram themselves (credentials from
+  `~/app/.env`): `backup-db.sh` because the run sets `BACKUP_ALERT_ON_FAILURE=1`,
+  `verify-backup.sh` always. `backup.yml` keeps its own failure step. Independently,
+  `watchdog.yml` (`metric-alarm-watchdog` job) alerts the clean channel when the newest
+  `backups/` object is older than 14 h — this catches a schedule that never fires.
+- **Run one now:** `gh workflow run backup.yml` (manual dispatch stays available).
+- **Retiring the GitHub cron** (once the EventBridge runs have been seen landing for 1–2
+  weeks — check the 04:00/16:00 objects in S3 and the SSM command history for comment
+  "Scheduled DB backup (EventBridge, #1957)"): delete the `schedule:` block in `backup.yml`,
+  keep `workflow_dispatch`, and update this section and `CLAUDE.md`.
 
 ---
 

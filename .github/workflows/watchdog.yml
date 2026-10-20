@@ -459,3 +459,86 @@ jobs:
             -d "text=$MSG" \
             -d "parse_mode=HTML" \
             -d "disable_web_page_preview=true"
+
+      # Backup freshness (#1957). The primary DB backup schedule runs from
+      # EventBridge Scheduler (terraform/backup_schedule.tf), outside GitHub,
+      # and its failure alerts come from the box itself; this catches the case
+      # where no backup lands at all (schedule disabled, SSM agent down,
+      # scripts missing on the box). Backups run at 04:00/16:00 UTC, so a
+      # newest object older than 14 h means at least one slot was missed.
+      # One alert per stale newest backup (cache key below), not every run.
+      # Last in the job, so nothing here can block the alarm check above.
+      - name: Check DB backup freshness
+        id: backup_fresh
+        env:
+          BUCKET: daatan-db-backups-272007598366
+          MAX_AGE_HOURS: 14
+        run: |
+          NOW=$(date -u +%s)
+          if ! NEWEST=$(aws s3api list-objects-v2 --bucket "$BUCKET" --prefix backups/ \
+                --query 'sort_by(Contents, &LastModified)[-1].[Key, LastModified]' \
+                --output text 2>/tmp/s3_err.txt); then
+            ERR=$(head -c 200 /tmp/s3_err.txt | tr '\n' ' ')
+            echo "::warning::Could not list s3://$BUCKET/backups/: $ERR"
+            # Once a day: a permissions/API problem is a watchdog problem, not
+            # proof the backups are stale — noisy channel, not clean.
+            {
+              echo "state=error"
+              echo "alert_key=backup-freshness-error-$(date -u +%Y%m%d)"
+              echo "detail=$ERR"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          read -r KEY MODIFIED <<< "$NEWEST"
+          if [[ -z "$KEY" || "$KEY" == "None" ]]; then
+            AGE_H=999
+          else
+            AGE_H=$(( (NOW - $(date -u -d "$MODIFIED" +%s)) / 3600 ))
+          fi
+          echo "Newest backup: ${KEY:-none} ($MODIFIED), age ${AGE_H} h (limit $MAX_AGE_HOURS h)"
+          if [ "$AGE_H" -ge "$MAX_AGE_HOURS" ]; then
+            {
+              echo "state=stale"
+              echo "alert_key=backup-freshness-stale-${KEY//\//_}"
+              echo "detail=${KEY:-no backups/ objects} is ${AGE_H} h old"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "state=fresh" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore backup-freshness alert marker
+        if: steps.backup_fresh.outputs.state == 'stale' || steps.backup_fresh.outputs.state == 'error'
+        id: backup_fresh_cache
+        uses: actions/cache/restore@v5
+        with:
+          path: /tmp/backup-freshness-alerted
+          key: ${{ steps.backup_fresh.outputs.alert_key }}
+
+      - name: Alert via Telegram (backup freshness)
+        if: (steps.backup_fresh.outputs.state == 'stale' || steps.backup_fresh.outputs.state == 'error') && steps.backup_fresh_cache.outputs.cache-hit != 'true'
+        env:
+          STATE: ${{ steps.backup_fresh.outputs.state }}
+          DETAIL: ${{ steps.backup_fresh.outputs.detail }}
+        run: |
+          if [ "$STATE" = stale ]; then
+            # Missing backups are page-worthy → clean channel (fallback to noisy)
+            CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
+            CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
+            MSG=$(printf '🚨 <b>[production] DB backup is stale</b>\nNewest: %s\nExpected one every 12 h (04:00/16:00 UTC). Check the EventBridge schedule daatan-prod-db-backup and the SSM command history.' "$DETAIL")
+          else
+            CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
+            MSG=$(printf '⚠️ <b>Backup freshness check could not list the backup bucket</b>\n%s' "$DETAIL")
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=$CHAT_ID" \
+            --data-urlencode "text=$MSG" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true"
+          mkdir -p /tmp/backup-freshness-alerted && date -u > /tmp/backup-freshness-alerted/at
+
+      - name: Save backup-freshness alert marker
+        if: (steps.backup_fresh.outputs.state == 'stale' || steps.backup_fresh.outputs.state == 'error') && steps.backup_fresh_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: /tmp/backup-freshness-alerted
+          key: ${{ steps.backup_fresh.outputs.alert_key }}

@@ -18,6 +18,16 @@
 
 set -euo pipefail
 
+# Same lock as backup-db.sh: the EventBridge schedule and backup.yml can both
+# fire for one slot, and two verifies share the fixed-name container below (the
+# second one's cleanup would remove the first one's mid-restore).
+LOCK_FILE="${BACKUP_LOCK_FILE:-/var/lock/daatan-db-backup.lock}"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "VERIFY_SKIPPED: another DB backup or restore verification is already running (lock $LOCK_FILE) — nothing to do"
+    exit 0
+fi
+
 S3_BUCKET="${S3_BACKUP_BUCKET:-daatan-db-backups-272007598366}"
 DB_CONTAINER="${DB_CONTAINER:-daatan-postgres}"
 DB_USER="${DB_USER:-daatan}"

@@ -243,6 +243,30 @@ resource "aws_iam_role_policy" "github_actions_cloudwatch_alarms" {
   })
 }
 
+# S3 list (read-only) on the prod backup bucket — for the watchdog's backup
+# freshness check (.github/workflows/watchdog.yml, #1957). The primary backup
+# schedule now runs from EventBridge (backup_schedule.tf), outside GitHub, so
+# the watchdog alerts when the newest backups/ object gets too old. ListBucket
+# only (bucket ARN, no /*): the check reads keys and timestamps, never objects.
+resource "aws_iam_role_policy" "github_actions_backup_freshness" {
+  name = "daatan-github-backup-freshness"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.backups.arn
+        Condition = {
+          StringLike = { "s3:prefix" = ["backups/*"] }
+        }
+      }
+    ]
+  })
+}
+
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions OIDC"
   value       = aws_iam_role.github_actions.arn

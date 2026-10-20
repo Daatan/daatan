@@ -11,8 +11,8 @@ Related: [PRISMA_MIGRATE_DEPLOY_DEPS.md](./PRISMA_MIGRATE_DEPLOY_DEPS.md)
 `docker exec`), [DATABASE_COLLATION.md](./DATABASE_COLLATION.md) (glibc
 collation-version incident: text btree indexes silently corrupt on OS upgrades —
 `REINDEX` + `ALTER DATABASE ... REFRESH COLLATION VERSION`),
-[DEPLOYMENT.md](./DEPLOYMENT.md) (backups: `backup.yml` 04:00/16:00 UTC →
-S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h).
+[DEPLOYMENT.md](./DEPLOYMENT.md) (backups: EventBridge schedule, `backup.yml` as fallback,
+04:00/16:00 UTC → S3 `daatan-db-backups-272007598366`, RPO ≤ 12 h; see "DB backups (S3)").
 
 ## Conventions
 

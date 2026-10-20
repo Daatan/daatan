@@ -773,7 +773,9 @@ jobs:
           echo "Deploying $VERSION: $APP_IMAGE"
 
           RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
-          DEPLOY_FILES="scripts/blue-green-deploy.sh scripts/cleanup-docker-images.sh scripts/fetch-secrets.sh scripts/verify-health.sh scripts/verify-logs.sh scripts/verify-deploy.sh docker-compose.prod.yml infra/nginx/nginx-prod-ssl.conf"
+          # backup-db.sh / verify-backup.sh are run from ~/app/scripts by the
+          # EventBridge backup schedule (terraform/backup_schedule.tf, #1957).
+          DEPLOY_FILES="scripts/blue-green-deploy.sh scripts/cleanup-docker-images.sh scripts/fetch-secrets.sh scripts/verify-health.sh scripts/verify-logs.sh scripts/verify-deploy.sh scripts/backup-db.sh scripts/verify-backup.sh docker-compose.prod.yml infra/nginx/nginx-prod-ssl.conf"
 
           echo "🚀 Sending SSM Command..."
           COMMAND_ID=$(aws ssm send-command \

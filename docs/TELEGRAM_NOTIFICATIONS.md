@@ -19,7 +19,7 @@ Sent by `deploy.yml`, `backup.yml`, `rollback.yml`. **Production** events route 
 | Staging deploy failure | ❌ | noisy | `[staging] Deployment failed` — version, PR number+title, PR link + logs link |
 | Production deploy success | ✅ | clean | `[prod] Deployment successful` — version, PR number+title, PR link |
 | Production deploy failure | ❌ | clean | `[prod] Deployment failed` — version, PR number+title, PR link + logs link |
-| DB backup failure | 🚨 | clean | `DB Backup FAILED` — timestamp (backup verification is prod-only) |
+| DB backup failure | 🚨 | clean | `DB Backup FAILED` — timestamp (backup verification is prod-only). Sent by `backup.yml` (fallback cron). The primary EventBridge-scheduled run sends `DB Backup FAILED (scheduled run, exit N)` from the box itself (`scripts/backup-db.sh`, clean with noisy fallback) |
 | Rollback success | 🔄 | clean (prod) / noisy (staging) | `[env] Rollback to vX complete` — reason, triggered-by |
 | Rollback failure | ❌ | clean (prod) / noisy (staging) | `[env] Rollback to vX FAILED. Manual intervention required` — reason, logs link |
 
@@ -54,6 +54,8 @@ Any unexpected redirect also counts as a failure (guards against redirect loops)
 **Job status reflects the alert:** the `Check production`/`Check staging` job now fails (non-zero conclusion) whenever the Telegram alert fires — previously the job always showed `success` even mid-outage, since the check script only recorded failures into an output variable without exiting non-zero.
 
 **Version drift dedup:** at most one alert per production version. Once notified that prod=vX is behind, no further alerts fire until prod itself advances to a new version.
+
+**DB backup freshness (one alert per stale backup):** runs in `metric-alarm-watchdog`. Lists `s3://daatan-db-backups-272007598366/backups/` and, when the newest object is older than 14 h (backups run 04:00/16:00 UTC, mostly from EventBridge outside GitHub — #1957), posts `[production] DB backup is stale` to **clean** (noisy fallback). Deduped by an Actions cache key on the newest object's name, so it fires once per missed stretch, again only after a newer backup lands and goes stale. If the bucket can't be listed (e.g. missing `s3:ListBucket`), it posts a warning to **noisy**, at most once a day.
 
 **SSM connectivity check (no dedup):** runs in `disk-watchdog`, prod only, before the SSM script steps below — `send-command` dispatches without awaiting delivery, so an unreachable agent otherwise leaves those steps silently exiting 0. Unlike version drift, this alerts on every run while the agent stays offline (there's no other signal it recovered).
 
@@ -114,7 +116,7 @@ Sent by the **EC2 app process** via `GET /api/cron/heartbeat` (triggered by `hea
 | Event | Icon | Message |
 |---|---|---|
 | Daily summary | 📊 | `Daily summary — vX.Y.Z · N new users · N forecasts · N commitments · N resolved · search U/T providers usable` (last 24h, from Prisma counts + Oracul `/search/health`) |
-| Backup restore failed | 🚨 | `DB Backup restore verification FAILED` — sent by `backup.yml`'s failure step, which now waits for the SSM verify command (daatan#1808). `scripts/verify-backup.sh` also posts `Backup Verification FAILED — reason` itself, but only when it can read Telegram credentials from `~/app/.env`, which under SSM (root) it can't — so in the scheduled run the workflow message is the one you see. |
+| Backup restore failed | 🚨 | `DB Backup restore verification FAILED` — sent by `backup.yml`'s failure step, which now waits for the SSM verify command (daatan#1808). `scripts/verify-backup.sh` also posts `Backup Verification FAILED — reason` itself when it can read Telegram credentials from `~/app/.env`: the primary EventBridge-scheduled run (`terraform/backup_schedule.tf`, #1957) sets `HOME=/home/ubuntu`, so there it does; in `backup.yml`'s SSM command it can't, so there the workflow message is the one you see. |
 
 ---
 
