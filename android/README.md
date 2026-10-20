@@ -88,21 +88,28 @@ it to Google Play. Triggers:
 | Pull request touching `android/**` | Build + verify only (same-repo PRs; never uploads) |
 | Push to `main` touching `android/**` | Build + upload to the **internal** track |
 | Tag `android-v*` (e.g. `android-v1.1.0`) | Same, with `versionName` taken from the tag |
-| Monthly schedule (1st, 05:23 UTC) | Rebuild with the latest Bubblewrap + upload to internal, so the wrapper keeps meeting Google's target-API floor and toolchain breakage shows up early |
-| `workflow_dispatch` | Choose track (`internal`/`alpha`/`beta`/`production`) and status (`completed`/`draft`) |
+| Monthly schedule (1st, 05:23 UTC) | Rebuild + upload to internal, so toolchain breakage shows up early |
+| `workflow_dispatch` | Choose a testing track (`internal`/`alpha`/`beta`) and status (`completed`/`draft`) |
 
-**Production promotion is a human step** (dispatch with `track=production`, or promote in Play Console). Nothing here
-publishes to production on its own.
+**Production promotion is a human step in Play Console.** The workflow only uploads to testing tracks; nothing here
+publishes to production.
 
 `versionCode` (minutes since the epoch) and `versionName` are derived in CI and stamped into `twa-manifest.json` at
 build time; the committed `appVersionCode`/`appVersion` are only a baseline. Play rejects a duplicate `versionCode`, so
-do not set it back to a fixed value in CI.
+do not set it back to a fixed value in CI. A tag build uses the tag's version; any other build uses
+`X.Y.(Z + run number)` from the highest `android-vX.Y.Z` tag, so it never reads lower than the last tagged release.
+
+**Signature check.** After building, `scripts/verify-android-signature.sh` checks that the APK (`apksigner`) and the AAB
+(`keytool`; bundles are JAR-signed) are signed with exactly the upload key (`UPLOAD_KEY_SHA256` at the top of the
+workflow) and that this fingerprint is listed in `public/.well-known/assetlinks.json`. If the upload key is ever
+rotated, update both.
 
 **Target API floor.** Google Play requires updates to target a minimum API level (currently **36**, Android 16,
-enforced 2026-08-31 — Play Console → Policy status). The workflow runs the latest `@bubblewrap/cli`, whose template
-sets `targetSdkVersion`, and **fails before building** if the generated `app/build.gradle` targets less than
-`MIN_TARGET_SDK` (top of the workflow). When Google raises the floor, raise `MIN_TARGET_SDK` there; the monthly build
-picks up the newer Bubblewrap template.
+enforced 2026-08-31 — Play Console → Policy status). The workflow runs a pinned `@bubblewrap/cli`
+(`BUBBLEWRAP_VERSION`), whose template sets `targetSdkVersion`, and **fails before building** if the generated
+`app/build.gradle` targets less than `MIN_TARGET_SDK` (top of the workflow). When Google raises the floor, raise
+`MIN_TARGET_SDK` there and bump `BUBBLEWRAP_VERSION` (by PR, which runs the full build) to a release whose template
+meets it.
 
 ### One-time setup for automatic Play uploads
 
@@ -111,7 +118,7 @@ Without it the job still builds and keeps the AAB as an artifact (you upload by 
 1. Google Cloud: create a service account (any project), create a JSON key, and enable the **Google Play Android
    Developer API** on that project.
 2. Play Console → Users and permissions → invite the service account's email with permission to **release to
-   testing tracks** (add production only if you want to dispatch production releases).
+   testing tracks** only — production promotion stays a manual step in the console.
 3. `gh secret set PLAY_SERVICE_ACCOUNT_JSON < key.json -R Daatan/daatan`, store the same JSON in SSM (e.g.
    `/daatan/shared/secrets/PLAY_SERVICE_ACCOUNT_JSON`) as the canonical copy, then delete the local file.
 
