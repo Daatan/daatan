@@ -6,10 +6,22 @@ on:
     - cron: '0 16 * * *'  # 16:00 UTC daily (RPO ≤ 12h)
   workflow_dispatch:
 
+# One backup at a time (#1957): two overlapping runs share the box, the dump
+# path and the fixed-name restore-verification container, and both fail.
+# Queue, never cancel — cancelling a running backup can leave a partial
+# upload or a half-restored verify container behind. (GitHub keeps at most
+# one pending run per group; a newer queued run supersedes an older queued
+# one, which is fine — it is the same backup, just later.)
+concurrency:
+  group: db-backup-prod
+  cancel-in-progress: false
+
 jobs:
   backup:
     name: Run DB backup
     runs-on: ubuntu-latest
+    # Backup poll ≤10 min + restore verification poll ≤21 min + setup/alert.
+    timeout-minutes: 45
     permissions:
       id-token: write
       contents: read
