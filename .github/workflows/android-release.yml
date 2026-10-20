@@ -9,13 +9,14 @@ name: Android release build
 #   pull_request (android/**)   build + verify only, never uploads (same-repo PRs only: needs the keystore)
 #   push to main (android/**)   build + upload to the internal track
 #   push tag android-v*         build + upload to the internal track, versionName taken from the tag
-#   schedule (monthly)          rebuild with the latest Bubblewrap so the wrapper keeps meeting Google's
-#                               target-API floor (Bubblewrap's template tracks it) and toolchain rot shows up early
-#   workflow_dispatch           pick the track (internal/alpha/beta/production) and status by hand
+#   schedule (monthly)          rebuild + upload to internal so toolchain rot (SDK, runner image) shows up early
+#   workflow_dispatch           pick a testing track (internal/alpha/beta) and status by hand
 #
-# Promotion to production is deliberately a human step (dispatch with track=production, or the Play Console).
-# Uploading needs the repo secret PLAY_SERVICE_ACCOUNT_JSON; without it the job still builds and keeps the AAB as an
-# artifact, and says so in the summary. See android/README.md for the one-time setup.
+# Promotion to production is deliberately a human step in the Play Console; this workflow only uploads to
+# testing tracks. Uploading needs the repo secret PLAY_SERVICE_ACCOUNT_JSON; without it the job still builds and
+# keeps the AAB as an artifact, and says so in the summary. See android/README.md for the one-time setup.
+# Secrets are scoped to the steps that need them: the keystore to its decode step, the keystore passwords to the
+# build step, the Play service account to the upload step (plus a presence probe that never prints it).
 #
 # versionCode/versionName are derived here, not committed: Play rejects a duplicate versionCode and
 # `--skipVersionUpgrade` below keeps whatever the manifest says. Only android/twa-manifest.json is committed --
@@ -40,7 +41,7 @@ on:
       track:
         description: 'Play track to upload to'
         type: choice
-        options: [internal, alpha, beta, production]
+        options: [internal, alpha, beta]
         default: internal
       status:
         description: 'Release status (draft = prepare it, finish in Play Console)'
@@ -57,6 +58,12 @@ env:
   # Raise this when the policy does; the build fails before upload if the generated project targets less.
   MIN_TARGET_SDK: '36'
   PACKAGE_NAME: com.daatan.app
+  # Exact Bubblewrap CLI version; bump by PR (the target-API floor check below catches a template that lags).
+  BUBBLEWRAP_VERSION: '1.27.0'
+  # SHA-256 of the upload key the CI keystore signs with -- the first entry of public/.well-known/assetlinks.json
+  # (see android/README.md, "Digital Asset Links"). Play re-signs distributed APKs with its own app signing key,
+  # so that one is not expected here. The build fails if the artifacts are signed with anything else.
+  UPLOAD_KEY_SHA256: '1B:79:A3:BC:73:B1:E0:DF:DC:45:2C:F4:84:F5:77:6C:1E:65:B0:D5:54:D4:44:F8:21:2B:9B:D5:4E:33:CF:18'
 
 jobs:
   build:
@@ -67,12 +74,21 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-    env:
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Check for Play upload credentials
+        id: playcfg
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -116,7 +132,14 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
             NAME="${GITHUB_REF_NAME#android-v}"
           else
-            NAME="1.0.${GITHUB_RUN_NUMBER}"
+            # Untagged builds continue from the highest android-vX.Y.Z tag: X.Y.(Z + run number). That never reads
+            # lower than the last tagged release, and with android-v1.0.0 it is the same 1.0.N as before.
+            BASE=$(git ls-remote --tags --refs origin 'refs/tags/android-v*' \
+              | sed -nE 's#.*refs/tags/android-v([0-9]+\.[0-9]+\.[0-9]+)$#\1#p' | sort -V | tail -1)
+            BASE=${BASE:-1.0.0}
+            IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+            NAME="${MAJOR}.${MINOR}.$(( PATCH + GITHUB_RUN_NUMBER ))"
+            echo "Last android-v* tag: android-v${BASE}"
           fi
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
@@ -152,8 +175,7 @@ jobs:
           # whenever it doesn't already match the version code scheme)
           # generates the project + checksum file up front, so the
           # subsequent `build` finds a matching checksum and never prompts.
-          # Deliberately unpinned: the latest Bubblewrap template tracks Google's target-API floor.
-          npx --yes @bubblewrap/cli@latest update --skipVersionUpgrade
+          npx --yes "@bubblewrap/cli@${BUBBLEWRAP_VERSION}" update --skipVersionUpgrade
 
       - name: Verify the generated project meets the target API floor
         id: target
@@ -163,7 +185,7 @@ jobs:
           echo "targetSdkVersion=${TARGET:-unknown} (floor ${MIN_TARGET_SDK})"
           echo "sdk=${TARGET:-unknown}" >> "$GITHUB_OUTPUT"
           if [ -z "$TARGET" ] || [ "$TARGET" -lt "$MIN_TARGET_SDK" ]; then
-            echo "::error::Generated project targets API ${TARGET:-unknown}, Google Play requires >= ${MIN_TARGET_SDK}. Update Bubblewrap or raise targetSdkVersion."
+            echo "::error::Generated project targets API ${TARGET:-unknown}, Google Play requires >= ${MIN_TARGET_SDK}. Bump BUBBLEWRAP_VERSION or raise targetSdkVersion."
             exit 1
           fi
 
@@ -172,12 +194,18 @@ jobs:
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: npx --yes @bubblewrap/cli@latest build
+        run: npx --yes "@bubblewrap/cli@${BUBBLEWRAP_VERSION}" build
 
       - name: Clean up keystore
         if: always()
         working-directory: android
         run: rm -f android.keystore
+
+      - name: Verify artifact signatures
+        run: |
+          scripts/verify-android-signature.sh "$UPLOAD_KEY_SHA256" \
+            android/app-release-signed.apk android/app-release-bundle.aab \
+            public/.well-known/assetlinks.json
 
       - name: Upload AAB + APK artifact
         uses: actions/upload-artifact@v4
@@ -190,11 +218,11 @@ jobs:
 
       - name: Upload to Google Play
         id: play
-        if: github.event_name != 'pull_request' && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        if: github.event_name != 'pull_request' && steps.playcfg.outputs.configured == 'true'
         # r0adkll/upload-google-play v1.1.5, pinned to the commit
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
         with:
-          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ${{ env.PACKAGE_NAME }}
           releaseFiles: android/app-release-bundle.aab
           track: ${{ inputs.track || 'internal' }}
@@ -203,7 +231,7 @@ jobs:
       - name: Summary
         if: always()
         env:
-          PLAY_CONFIGURED: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+          PLAY_CONFIGURED: ${{ steps.playcfg.outputs.configured }}
           PLAY_OUTCOME: ${{ steps.play.outcome }}
           TRACK: ${{ inputs.track || 'internal' }}
         run: |
@@ -218,5 +246,5 @@ jobs:
             else
               echo "- **Not uploaded**: repo secret \`PLAY_SERVICE_ACCOUNT_JSON\` is not set. Download the artifact and upload the AAB by hand, or see android/README.md to enable automatic uploads."
             fi
-            echo "- Production promotion is manual (dispatch with track=production, or Play Console)."
+            echo "- Production promotion is manual, in the Play Console."
           } >> "$GITHUB_STEP_SUMMARY"
