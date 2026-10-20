@@ -5,7 +5,6 @@ const DEFAULT_TIMINGS = { searchMs: 10_000, llmMs: 12_000, oracleMs: 8_000 }
 const WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 const MIN_SAMPLES = 3
 
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const since = new Date(Date.now() - WINDOW_MS)

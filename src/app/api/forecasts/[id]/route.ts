@@ -13,7 +13,6 @@ import {
 } from '@/lib/services/forecast'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
 
-export const dynamic = 'force-dynamic'
 
 const patchPredictionSchema = z.object({
   claimText: z.string().min(5).max(500).optional(),

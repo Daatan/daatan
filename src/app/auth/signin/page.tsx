@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import SignInClient from './SignInClient'
 
 // Force dynamic rendering to ensure page is always server-rendered
-export const dynamic = 'force-dynamic'
 
 function SignInLoading() {
   return (

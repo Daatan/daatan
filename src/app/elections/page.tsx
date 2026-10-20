@@ -3,7 +3,6 @@ import { ElectionMatrix } from './ElectionMatrix'
 
 // Fully live off the app DB (forecasts tagged "Israeli Elections 2026" + their
 // latest Oracul snapshot), so never statically cached.
-export const dynamic = 'force-dynamic'
 
 export default async function ElectionsPage() {
   const matrix = await getElectionMatrix()

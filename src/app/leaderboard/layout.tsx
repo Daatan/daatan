@@ -6,7 +6,6 @@ import { getAppUrl } from '@/lib/branding'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build. Route stays dynamic; the DB call below is cached.
-export const dynamic = 'force-dynamic'
 
 // Top 10 by ELO moves slowly; 5min TTL is plenty fresh and avoids a DB
 // hit on every leaderboard request.

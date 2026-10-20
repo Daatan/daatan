@@ -5,7 +5,6 @@ import { getForecastById, publishForecast } from '@/lib/services/forecast'
 import { notifyForecastPublished } from '@/lib/services/telegram'
 import { MIN_RESOLUTION_RULES_LENGTH } from '@/lib/resolution-rules'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/forecasts/[id]/publish - Publish a forecast (DRAFT → ACTIVE)
 export const POST = withAuth(async (_request, user, { params }) => {

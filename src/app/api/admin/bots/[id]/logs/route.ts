@@ -4,7 +4,6 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { getBotById, listBotLogs } from '@/lib/services/bot'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/admin/bots/[id]/logs?page=1&limit=20 — paginated run log
 export const GET = withAuth(

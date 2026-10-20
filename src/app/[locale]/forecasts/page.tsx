@@ -3,7 +3,6 @@ import { PredictionsPage } from '@/app/forecasts/PredictionsClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
 const META: Record<string, { title: string; description: string }> = {
   he: {

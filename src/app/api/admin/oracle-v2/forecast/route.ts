@@ -18,7 +18,6 @@ const schema = z.object({
   claim_deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 })
 
-export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(
   async (request) => {

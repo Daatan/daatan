@@ -7,7 +7,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { parseJsonBody } from '@/lib/api-body'
 import { suggestTagsBodySchema } from '@/lib/validations/api-inputs'
 
-export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req, user) => {
     if (!aiFeaturesEnabled()) {

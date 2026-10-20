@@ -5,7 +5,6 @@ import { prisma } from '@/lib/prisma'
 import { parseJsonBody } from '@/lib/api-body'
 import { userPreferencesSchema } from '@/lib/validations/api-inputs'
 
-export const dynamic = 'force-dynamic'
 
 /** GET /api/user/preferences — the current user's chart/display preferences. */
 export const GET = withAuth(async (_request, user) => {

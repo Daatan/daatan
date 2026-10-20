@@ -4,7 +4,6 @@ import { handleRouteError } from '@/lib/api-error'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 
 /** Admin-only proxy: read an Oracle 2.0 playground job trace (retro#595). */
-export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(
   async (_request, _user, { params }) => {

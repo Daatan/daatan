@@ -4,7 +4,6 @@ import { handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { searchNewsAnchors, getOrCreateNewsAnchor } from '@/lib/services/news-anchor'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/news-anchors - Search/list news anchors (public)
 export async function GET(request: NextRequest) {

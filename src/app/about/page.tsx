@@ -3,6 +3,8 @@ import { Info, Target, Users, TrendingUp, Shield, Mail, GitCommit, Zap, Github, 
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { VERSION } from '@/lib/version'
 import Link from 'next/link'
+import { Suspense } from 'react'
+import CurrentYear from '@/components/CurrentYear'
 import { isSelfHosted } from '@/lib/edition'
 import { getAppName, getContactEmail } from '@/lib/branding'
 import { ensureSettingsWarmed, getCachedSetting, SETTING_KEYS } from '@/lib/services/settings'
@@ -383,7 +385,7 @@ function SaasAboutPage() {
               <Link href="/terms" className="hover:text-white hover:underline">Terms of Service</Link>
               <Link href="/disclaimer" className="hover:text-white hover:underline">Disclaimer</Link>
               <Link href="/accessibility" className="hover:text-white hover:underline">Accessibility</Link>
-              <span>&copy; {new Date().getFullYear()} DAATAN</span>
+              <span>&copy; <Suspense fallback={null}><CurrentYear /></Suspense> DAATAN</span>
             </div>
           </div>
         </div>

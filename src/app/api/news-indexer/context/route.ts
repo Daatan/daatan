@@ -20,7 +20,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('news-indexer-context')
 
-export const dynamic = 'force-dynamic'
 
 /**
  * Wire cap on a forwarded article body.

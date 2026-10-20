@@ -5,7 +5,6 @@ import { getCachedClaimTranslations } from '@/lib/services/translation'
 import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { locales } from '@/i18n/config'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/forecasts/similar?id=<id>&limit=3&language=ru
 // GET /api/forecasts/similar?q=<text>&tags=<csv>&limit=3

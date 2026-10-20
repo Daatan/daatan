@@ -2,7 +2,6 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import UsersTable from '../UsersTable'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AdminUsersPage() {
   const session = await auth()

@@ -5,7 +5,6 @@ import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { z } from 'zod'
 import { getBotById, updateBot, disableBot } from '@/lib/services/bot'
 
-export const dynamic = 'force-dynamic'
 
 const updateBotSchema = z
   .object({

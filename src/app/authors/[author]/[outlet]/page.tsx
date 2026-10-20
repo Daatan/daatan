@@ -9,7 +9,6 @@ import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import { getPublicArticlesByAuthorOutlet } from '@/lib/services/evidence-pool'
 import { getAppUrl } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ author: string; outlet: string }>

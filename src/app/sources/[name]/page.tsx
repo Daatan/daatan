@@ -9,7 +9,6 @@ import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBo
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import { getAppUrl } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ name: string }>

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { listPendingApprovals } from '@/lib/services/forecast'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/admin/approvals — list PENDING_APPROVAL forecasts
 export const GET = withAuth(async (req) => {

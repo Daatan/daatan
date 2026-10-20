@@ -6,7 +6,6 @@ import { getAppUrl } from '@/lib/branding'
 import { JsonLd } from '@/components/JsonLd'
 import TagFeed from './TagFeed'
 
-export const revalidate = 60
 
 const PAGE_LIMIT = 20
 

@@ -11,7 +11,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('approve-route')
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/forecasts/[id]/approve - Approve a PENDING_APPROVAL forecast and stake on it
 export const POST = withAuth(async (_request, user, { params }) => {

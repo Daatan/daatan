@@ -7,7 +7,6 @@ import { UserProfileView } from '@/components/profile/UserProfileView'
 import { loadProfileScores, loadProfileTab } from '@/lib/services/profile'
 import type { ProfileTab } from '@/lib/services/profile'
 
-export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'My Profile - DAATAN',

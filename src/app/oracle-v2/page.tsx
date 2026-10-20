@@ -2,7 +2,6 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import OracleV2Playground from '@/app/admin/OracleV2Playground'
 
-export const dynamic = 'force-dynamic'
 
 // Same playground as /admin/oracle-v2, without the app chrome (Sidebar hides
 // itself and MainContent drops its margin for this route — see Sidebar.tsx /

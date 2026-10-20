@@ -6,7 +6,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const log = createLogger('unread-count')
 
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {

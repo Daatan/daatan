@@ -7,7 +7,6 @@ import { withAuth } from '@/lib/api-middleware'
 import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 
 const extractSchema = z.object({
   url: z.string().url().optional(),

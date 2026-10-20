@@ -3,7 +3,6 @@ import HomeV5 from '@/components/home-v5/HomeV5'
 import { homeV5Metadata } from '@/components/home-v5/meta'
 import type { Locale } from '@/i18n/config'
 
-export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params

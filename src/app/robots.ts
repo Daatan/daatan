@@ -1,9 +1,12 @@
 import type { MetadataRoute } from 'next'
+import { connection } from 'next/server'
 import { getAppUrl, shouldIndex } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
-export default function robots(): MetadataRoute.Robots {
+// Per request: the answer depends on runtime env (prod vs staging), which Cache
+// Components would otherwise freeze at build time.
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  await connection()
   const baseUrl = getAppUrl()
 
   // Non-indexable (any non-prod SaaS env, or any self-hosted instance) → block all.

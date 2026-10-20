@@ -3,7 +3,6 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import ProfileEditForm from '@/components/profile/ProfileEditForm'
 
-export const dynamic = 'force-dynamic'
 
 export default async function EditProfilePage() {
   const session = await auth()

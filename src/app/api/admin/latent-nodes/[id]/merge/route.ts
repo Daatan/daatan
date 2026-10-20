@@ -4,7 +4,6 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { mergeLatentNode } from '@/lib/services/latent-node'
 
-export const dynamic = 'force-dynamic'
 
 const schema = z.object({ targetId: z.string().min(1) })
 

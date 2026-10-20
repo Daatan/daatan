@@ -4,7 +4,6 @@ import { parseJsonBody } from '@/lib/api-body'
 import { forwardedObjectBodySchema } from '@/lib/validations/api-inputs'
 import { proxyAuthorsAdmin } from '@/lib/services/news-indexer-authors'
 
-export const dynamic = 'force-dynamic'
 
 const log = createLogger('admin-news-indexer-authors')
 

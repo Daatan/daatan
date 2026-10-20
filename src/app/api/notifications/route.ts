@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-middleware'
 import { listNotifications, markAllNotificationsRead } from '@/lib/services/notification'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/notifications - List notifications for current user
 export const GET = withAuth(async (request, user) => {

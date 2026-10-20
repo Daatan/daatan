@@ -4,7 +4,6 @@ import { handleRouteError } from '@/lib/api-error'
 import { getLeaderboard, type SortBy } from '@/lib/services/leaderboard'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 
 // Rankings move slowly (only on resolution events) — 5min TTL matches the
 // leaderboard/layout.tsx JSON-LD cache. unstable_cache keys on the

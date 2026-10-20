@@ -8,7 +8,6 @@ import { findUserBasicInfo } from '@/lib/services/user'
 import { rejectForecastSchema } from '@/lib/validations/prediction'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/forecasts/[id]/reject - Reject a PENDING_APPROVAL forecast
 export const POST = withAuth(async (request, user, { params }) => {

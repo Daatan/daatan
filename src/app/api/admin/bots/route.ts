@@ -12,7 +12,6 @@ import { listBots, getBotCount, findBotUserByUsername, createBotInDb } from '@/l
 
 const log = createLogger('admin-bots')
 
-export const dynamic = 'force-dynamic'
 
 const DEFAULT_PERSONA = 'You are a curious analyst who follows world news and enjoys making predictions about future events.'
 const DEFAULT_FORECAST_PROMPT = 'Based on the news topic provided, create a specific and verifiable forecast. Be realistic about timeframes.'

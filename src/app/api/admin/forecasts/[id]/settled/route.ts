@@ -4,7 +4,6 @@ import { apiError } from '@/lib/api-error'
 import { prisma } from '@/lib/prisma'
 import { clearSettledLatch } from '@/lib/services/context'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * DELETE /api/admin/forecasts/[id]/settled

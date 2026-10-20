@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { getGlickoHistory } from '@/lib/services/expertise'
 import { apiError, handleRouteError } from '@/lib/api-error'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 
