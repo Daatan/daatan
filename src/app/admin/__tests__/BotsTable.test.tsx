@@ -151,4 +151,40 @@ describe('BotsTable', () => {
     await waitFor(() => expect(runButton).not.toBeDisabled())
     expect(screen.queryByText('Fetching feeds…')).not.toBeInTheDocument()
   })
+
+  it('polls after a 202 and shows the result once the run is done (#1947)', async () => {
+    const summary = {
+      botId: 'bot-1', botName: 'Bot One', forecastsCreated: 2, votes: 0,
+      skipped: 0, errors: 0, dryRun: false, gatedByActiveHours: false,
+    }
+    let polls = 0
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/admin/bots') {
+        return Promise.resolve({ ok: true, json: async () => ({ bots: [testBot()] }) })
+      }
+      if (url === '/api/tags') {
+        return Promise.resolve({ ok: true, json: async () => ({ tags: [] }) })
+      }
+      if (url.includes('/run') && init?.method === 'POST') {
+        return Promise.resolve({ ok: true, status: 202, json: async () => ({ status: 'running' }) })
+      }
+      if (url.includes('/run')) {
+        polls += 1
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => (polls < 2 ? { status: 'running' } : { status: 'done', summary }),
+        })
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`))
+    })
+
+    render(<BotsTable />)
+    await waitFor(() => expect(screen.getByText('Bot One')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTitle('Run now'))
+
+    await waitFor(() => expect(polls).toBe(2), { timeout: 10_000 })
+    await waitFor(() => expect(screen.queryByText('Fetching feeds…')).not.toBeInTheDocument(), { timeout: 5000 })
+  }, 20_000)
 })

@@ -742,7 +742,7 @@ describe('POST /api/admin/bots/[id]/run', () => {
     const res = await POST(req, { params: Promise.resolve({ id: 'bot-1' }) })
     const data = await res.json()
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(202)
     expect(data.ok).toBe(true)
     expect(runBotById).toHaveBeenCalledWith('bot-1', false)
   })
@@ -761,12 +761,12 @@ describe('POST /api/admin/bots/[id]/run', () => {
     const req = new NextRequest('http://localhost/api/admin/bots/bot-1/run?dry=true', { method: 'POST' })
     const res = await POST(req, { params: Promise.resolve({ id: 'bot-1' }) })
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(202)
     expect(runBotById).toHaveBeenCalledWith('bot-1', true)
   })
 
-  it('returns summary from runBotById in response', async () => {
-    const { POST } = await import('@/app/api/admin/bots/[id]/run/route')
+  it('exposes the summary from runBotById through GET once the run settles (#1947)', async () => {
+    const { POST, GET } = await import('@/app/api/admin/bots/[id]/run/route')
     const { prisma } = await import('@/lib/prisma')
     const { runBotById } = await import('@/lib/services/bots')
     mockAuth.mockResolvedValue(ADMIN_SESSION)
@@ -777,14 +777,14 @@ describe('POST /api/admin/bots/[id]/run', () => {
     vi.mocked(prisma.botConfig.findUnique).mockResolvedValue(makeBotRecord() as any)
     vi.mocked(runBotById).mockResolvedValue(mockSummary)
 
-    const req = new NextRequest('http://localhost/api/admin/bots/bot-1/run', { method: 'POST' })
-    const res = await POST(req, { params: Promise.resolve({ id: 'bot-1' }) })
-    const data = await res.json()
+    const ctx = { params: Promise.resolve({ id: 'bot-1' }) }
+    await POST(new NextRequest('http://localhost/api/admin/bots/bot-1/run', { method: 'POST' }), ctx)
 
-    expect(data.summary).toMatchObject({
-      forecastsCreated: 2,
-      votes: 3,
-      dryRun: false,
+    await vi.waitFor(async () => {
+      const res = await GET(new NextRequest('http://localhost/api/admin/bots/bot-1/run'), ctx)
+      const data = await res.json()
+      expect(data.status).toBe('done')
+      expect(data.summary).toMatchObject({ forecastsCreated: 2, votes: 3, dryRun: false })
     })
   })
 })
