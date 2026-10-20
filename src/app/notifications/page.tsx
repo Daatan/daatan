@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma'
 import NotificationList from '@/components/notifications/NotificationList'
 import { Bell } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
 
 export default async function NotificationsPage() {
   const session = await auth()

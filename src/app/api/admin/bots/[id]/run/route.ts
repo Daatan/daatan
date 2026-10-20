@@ -6,7 +6,6 @@ import { blockedOnSelfHost } from '@/lib/api-edition-guard'
 import { getBotById } from '@/lib/services/bot'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const BOT_RUN_LIMIT = 5

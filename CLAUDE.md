@@ -26,6 +26,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - Prisma singleton: `src/lib/prisma.ts`
 - Errors: `handleRouteError(err, msg)` and `apiError(msg, status)`
 - Logging: structured pino via `createLogger('module-name')`
+- Cache Components is on (`next.config.js`): route segment configs `dynamic` / `revalidate` / `runtime` are build errors, and the root layout sets `export const instant = false` (every route blocks and renders per request, as before). A GET handler or `sitemap`/`robots` that reads no request data would be prerendered at build and frozen — call `await connection()` first (`next/server`). `new Date()` in a server component needs the same, inside `<Suspense>` (see `CurrentYear`).
 
 ## Code style
 

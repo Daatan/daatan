@@ -1,7 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
 
-export const runtime = 'nodejs'
 
 export const alt = 'DAATAN User Profile'
 export const size = { width: 1200, height: 630 }

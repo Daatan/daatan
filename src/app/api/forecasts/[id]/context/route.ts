@@ -43,7 +43,6 @@ export const CONTEXT_SEARCH_WINDOW_DAYS = 2
 // Lower this to trade non-indexed sources for latency — every top-up is a SERP round trip.
 export const CONTEXT_SEARCH_MIN_RESULTS = DEFAULT_MAX_ARTICLES
 
-export const dynamic = 'force-dynamic'
 
 /** Raw Next.js 15 context where params is a Promise. Used for direct exports. */
 type RawRouteContext = {

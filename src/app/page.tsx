@@ -6,7 +6,6 @@ import { JsonLd } from '@/components/JsonLd'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({
   searchParams,

@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, connection } from 'next/server'
 import { notifySearchHealthDigest, type SearchHealthIssue } from '@/lib/services/telegram'
 import { SEARCH_LOW_CREDITS_THRESHOLD } from '@/lib/services/oracleSearch'
 
-export const dynamic = 'force-dynamic'
 
 interface ProviderStatus {
   configured: boolean
@@ -49,6 +48,7 @@ async function checkSerpApi(): Promise<ProviderStatus> {
 }
 
 export async function GET() {
+  await connection()
   const [serper, serpapi] = await Promise.all([checkSerper(), checkSerpApi()])
 
   const allConfiguredProvidersFailed =

@@ -6,7 +6,6 @@ import { translateBodySchema } from '@/lib/validations/api-inputs'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
 
 const TRANSLATE_LIMIT = 20
 const TRANSLATE_WINDOW = 60 * 60_000 // 1 hour

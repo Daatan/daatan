@@ -3,7 +3,6 @@ import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
 import { promoteLatentNode, UnresolvableLatentNodeError } from '@/lib/services/latent-node'
 
-export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(
   async (_request, user, { params }) => {

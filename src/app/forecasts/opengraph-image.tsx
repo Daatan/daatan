@@ -1,8 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { prisma } from '@/lib/prisma'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 export const alt = 'DAATAN — Browse Forecasts'
 export const size = { width: 1200, height: 630 }

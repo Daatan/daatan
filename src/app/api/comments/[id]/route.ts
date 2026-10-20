@@ -4,7 +4,6 @@ import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { findCommentById, updateComment, softDeleteComment } from '@/lib/services/comment'
 
-export const dynamic = 'force-dynamic'
 
 // PATCH /api/comments/[id] - Update comment
 export const PATCH = withAuth(async (request, user, { params }) => {

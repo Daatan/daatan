@@ -35,7 +35,6 @@ async function getInitialContextSnapshots(predictionId: string): Promise<Context
   })))
 }
 
-export const revalidate = 60
 
 const SSR_COMMENT_LIMIT = 50
 

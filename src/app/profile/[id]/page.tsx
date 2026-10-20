@@ -9,7 +9,6 @@ import type { ProfileTab } from '@/lib/services/profile'
 import { JsonLd } from '@/components/JsonLd'
 import { getAppUrl } from '@/lib/branding'
 
-export const dynamic = 'force-dynamic'
 
 const VALID_TABS: ProfileTab[] = ['created', 'participated', 'resolved']
 

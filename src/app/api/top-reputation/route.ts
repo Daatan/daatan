@@ -4,7 +4,6 @@ import { handleRouteError } from '@/lib/api-error'
 import { getTopReputation } from '@/lib/services/leaderboard'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),

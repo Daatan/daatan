@@ -7,7 +7,6 @@ import { env } from '@/env'
 
 const log = createLogger('api/bots/run')
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes — RSS + LLM calls can be slow
 
 function secretsMatch(provided: string, expected: string): boolean {

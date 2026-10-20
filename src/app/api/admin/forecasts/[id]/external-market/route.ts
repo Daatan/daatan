@@ -8,7 +8,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('admin-forecast-external-market')
 
-export const dynamic = 'force-dynamic'
 
 const linkSchema = z.object({ url: z.string().min(1) })
 const invertSchema = z.object({ inverted: z.boolean() })

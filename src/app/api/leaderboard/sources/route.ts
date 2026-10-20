@@ -8,7 +8,6 @@ import {
 } from '@/lib/services/sourceLeaderboard'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 
 // Rows below this sample size are too noisy to rank publicly (a single lucky/unlucky
 // call shouldn't top or bottom the board) — see daatan#1587. Single-row lookups

@@ -1,12 +1,12 @@
 import type { MetadataRoute } from 'next'
 import { unstable_cache } from 'next/cache'
+import { connection } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
 import { getAppUrl } from '@/lib/branding'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
-export const dynamic = 'force-dynamic'
 
 // Cache the DB queries for 1h so crawler hits don't hammer the DB.
 // The route itself stays dynamic (avoids the build-time prerender problem
@@ -114,6 +114,7 @@ function localizedAlternates(path: string) {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await connection()
   // APP_ENV, not NEXT_PUBLIC_ENV: staging and production run the same
   // promoted Docker image (build-time vars are frozen to whichever env built
   // it), so this must read the runtime-set instance var instead — see src/env.ts.

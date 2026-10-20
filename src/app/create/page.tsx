@@ -3,7 +3,6 @@ import { auth } from '@/auth'
 import type { Metadata } from 'next'
 import CreateForecastClient from './CreateForecastClient'
 
-export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Create Forecast - DAATAN',

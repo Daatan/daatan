@@ -7,7 +7,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('admin-forecast-evidence-pool')
 
-export const dynamic = 'force-dynamic'
 
 const excludeSchema = z.object({ excluded: z.boolean() })
 

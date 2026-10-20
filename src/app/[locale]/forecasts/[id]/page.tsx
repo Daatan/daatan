@@ -27,7 +27,6 @@ import {
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
 
-export const revalidate = 60
 
 const SSR_COMMENT_LIMIT = 50
 

@@ -1,6 +1,5 @@
 import { ImageResponse } from 'next/og'
 
-export const runtime = 'nodejs'
 
 export const alt = 'Contact DAATAN'
 export const size = { width: 1200, height: 630 }

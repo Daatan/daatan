@@ -4,7 +4,6 @@ import { apiError } from '@/lib/api-error'
 import { prisma } from '@/lib/prisma'
 import { getPoolArticles, isUsablePoolRow } from '@/lib/services/evidence-pool'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/admin/forecasts/[id]/evidence-pool

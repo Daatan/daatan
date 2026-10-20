@@ -5,7 +5,6 @@ import { Bot, ArrowLeft, Trophy } from 'lucide-react'
 import { getAiLeaderboard } from '@/lib/services/ai-panel-leaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 
-export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'AI Panel Leaderboard — LLM forecasters vs the crowd',

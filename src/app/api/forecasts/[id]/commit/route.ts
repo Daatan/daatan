@@ -4,7 +4,6 @@ import { createCommitmentSchema, updateCommitmentSchema } from '@/lib/validation
 import { handleRouteError } from '@/lib/api-error'
 import { createCommitment, removeCommitment, updateCommitment } from '@/lib/services/commitment'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/forecasts/[id]/commit - Commit CU to a prediction
 export const POST = withAuth(async (request, user, { params }) => {

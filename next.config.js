@@ -46,6 +46,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  cacheComponents: true,
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },

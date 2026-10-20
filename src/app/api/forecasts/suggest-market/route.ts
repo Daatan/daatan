@@ -8,7 +8,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const log = createLogger('forecasts-suggest-market')
 
-export const dynamic = 'force-dynamic'
 
 const suggestSchema = z.object({
   claimText: z.string().min(1),

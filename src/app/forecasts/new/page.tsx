@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { ForecastWizard } from '@/components/forecasts/ForecastWizard'
 
-export const dynamic = 'force-dynamic'
 
 export default async function NewForecastPage() {
   const session = await auth()

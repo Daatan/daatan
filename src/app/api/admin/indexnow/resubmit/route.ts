@@ -4,7 +4,6 @@ import { handleRouteError } from '@/lib/api-error'
 import { notifyIndexNowBulk } from '@/lib/services/indexnow'
 import sitemap from '@/app/sitemap'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/admin/indexnow/resubmit
 // Bulk-submits every indexable URL to IndexNow (Bing/Yandex/Seznam). The

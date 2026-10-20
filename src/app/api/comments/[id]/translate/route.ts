@@ -5,7 +5,6 @@ import { parseJsonBody } from '@/lib/api-body'
 import { translateBodySchema } from '@/lib/validations/api-inputs'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/comments/[id]/translate
 // Body: { language: string }

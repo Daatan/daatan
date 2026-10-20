@@ -16,7 +16,6 @@ import { formatDisplayDate } from '@/lib/utils/date'
 
 const log = createLogger('api-forecasts')
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/predictions - List predictions (public, with optional session for user context)
 export async function GET(request: NextRequest) {

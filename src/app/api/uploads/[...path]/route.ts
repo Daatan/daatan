@@ -3,7 +3,6 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import { env } from '@/env'
 
-export const dynamic = 'force-dynamic'
 
 const DEFAULT_LOCAL_PATH = '/data/uploads'
 

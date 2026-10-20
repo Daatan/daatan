@@ -14,7 +14,6 @@ import {
 } from '@/lib/services/comment'
 import { getPredictionBasicInfo } from '@/lib/services/forecast'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/comments - List comments (public)
 export async function GET(request: NextRequest) {

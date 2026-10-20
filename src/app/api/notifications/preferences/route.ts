@@ -5,7 +5,6 @@ import { getNotificationPreferences, upsertNotificationPreference } from '@/lib/
 import { parseJsonBody } from '@/lib/api-body'
 import { notificationPreferenceSchema } from '@/lib/validations/api-inputs'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/notifications/preferences — Return merged defaults + stored preferences
 export const GET = withAuth(async (_request, user) => {

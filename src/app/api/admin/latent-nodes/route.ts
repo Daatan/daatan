@@ -4,7 +4,6 @@ import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
 import { createLatentNode, listLatentNodes } from '@/lib/services/latent-node'
 
-export const dynamic = 'force-dynamic'
 
 const createSchema = z.object({
   textEn: z.string().min(5).max(500),

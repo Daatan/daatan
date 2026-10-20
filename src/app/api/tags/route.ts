@@ -4,7 +4,6 @@ import { withAuth } from '@/lib/api-middleware'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { listTags, createTag } from '@/lib/services/tag'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/tags - List all tags with usage counts
 export async function GET() {

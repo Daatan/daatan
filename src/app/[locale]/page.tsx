@@ -6,7 +6,6 @@ import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
 import { globalKeywords } from '@/lib/forecast-seo'
 
-export const dynamic = 'force-dynamic'
 
 const META: Record<string, { title: string; description: string }> = {
   he: {

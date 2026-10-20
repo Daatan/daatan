@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { handleRouteError } from '@/lib/api-error'
 import { getRecentActivity } from '@/lib/services/commitment'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/commitments/activity - Public real-time activity feed of recent commitments
 export async function GET(request: NextRequest) {

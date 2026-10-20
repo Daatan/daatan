@@ -3,7 +3,6 @@ import { listCommitmentsQuerySchema } from '@/lib/validations/prediction'
 import { withAuth } from '@/lib/api-middleware'
 import { listUserCommitments } from '@/lib/services/commitment'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/commitments - List commitments for authenticated user
 export const GET = withAuth(async (request, user) => {

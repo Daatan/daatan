@@ -8,7 +8,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('forecasts-import-market')
 
-export const dynamic = 'force-dynamic'
 
 const importSchema = z.object({ url: z.string().min(1) })
 

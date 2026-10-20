@@ -3,7 +3,6 @@ import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError } from '@/lib/api-error'
 
-export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-news-indexer-secret')

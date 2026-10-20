@@ -2,7 +2,6 @@ import { Suspense, use } from 'react'
 import { Loader2 } from 'lucide-react'
 import EditForecastClient from './EditForecastClient'
 
-export const dynamic = 'force-dynamic'
 
 function EditLoading() {
   return (

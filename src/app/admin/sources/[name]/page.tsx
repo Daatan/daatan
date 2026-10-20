@@ -2,7 +2,6 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import OutletDetailPanel from './OutletDetailPanel'
 
-export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ name: string }>

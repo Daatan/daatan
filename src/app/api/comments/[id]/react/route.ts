@@ -4,7 +4,6 @@ import { apiError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { findCommentById, upsertCommentReaction, deleteCommentReaction } from '@/lib/services/comment'
 
-export const dynamic = 'force-dynamic'
 
 // POST /api/comments/[id]/react - Add or update reaction
 export const POST = withAuth(async (request, user, { params }) => {

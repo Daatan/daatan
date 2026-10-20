@@ -3,7 +3,6 @@ import { apiError } from '@/lib/api-error'
 import { createLogger } from '@/lib/logger'
 import { isUuid, proxyAuthorsAdmin } from '@/lib/services/news-indexer-authors'
 
-export const dynamic = 'force-dynamic'
 
 const log = createLogger('admin-news-indexer-authors')
 

@@ -15,7 +15,6 @@ export const metadata: Metadata = {
 
 // Render on demand — at build time the DB is a placeholder. The data layer
 // below is cached so crawler hits don't re-query the DB on every request.
-export const dynamic = 'force-dynamic'
 
 // SSR initial feed is user-agnostic (no session forwarded), so it's safe to
 // cache globally. 60s TTL keeps the front page fresh for the bulk of traffic.

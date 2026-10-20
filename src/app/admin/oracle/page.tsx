@@ -2,7 +2,6 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import OracleTab from '../OracleTab'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AdminOraclePage() {
   const session = await auth()

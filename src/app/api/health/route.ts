@@ -4,8 +4,6 @@ import { VERSION } from '@/lib/version'
 import { checkDatabaseHealth } from '@/lib/services/health'
 import { memoryUsageMb, toMb } from '@/lib/memory'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 // #1725 proposal 5: recycle the container on sustained memory pressure before the 2 GiB
 // cgroup limit (docker-compose.prod.yml / blue-green-deploy.sh) SIGKILLs it mid-request.

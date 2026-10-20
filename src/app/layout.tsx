@@ -110,6 +110,8 @@ function localeFromPathname(pathname: string | null): Locale | null {
   return (match?.[1] as Locale | undefined) ?? null
 }
 
+export const instant = false
+
 export default async function RootLayout({
   children,
 }: {
