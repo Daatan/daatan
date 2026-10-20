@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { createSeedPrismaClient } from './seed-client'
 
-const prisma = new PrismaClient()
+const prisma = createSeedPrismaClient()
 
 /**
  * Standard tags used across the application for categorizing predictions.

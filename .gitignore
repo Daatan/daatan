@@ -4,9 +4,6 @@
 # past `git add -A` and gets committed.
 node_modules
 
-# Compiled seed (generated during Docker build)
-prisma/seed.js
-
 # Environment files (secrets)
 .env
 .env.*
