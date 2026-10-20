@@ -9,20 +9,17 @@ The **NEXT** environment ([https://next.daatan.com](https://next.daatan.com)) is
 - **Confidence Model**: The first environment to implement the interactive -100 to +100 confidence slider and removal of the "CU" currency terminology.
 
 ## Deployment
-Deployments to the NEXT environment are **manual** to allow for maximum flexibility in showcasing specific branches.
+There is currently **no deploy workflow** for NEXT. The manual "Deploy to Next (Testbed)" workflow
+(`deploy-next.yml`) was removed in October 2026: it had not run since April 2026 and depended on a
+repository secret that no longer exists. Nothing builds or pushes a `daatan-app:next-latest` image
+any more, so the testbed is dormant.
 
-### How to deploy a branch to NEXT:
-1. Go to **GitHub Actions** in the repository.
-2. Select the **"Deploy to Next (Testbed)"** workflow.
-3. Click **"Run workflow"**.
-4. Choose the branch you want to preview (e.g., `feat/new-charts`).
-5. Click the green **Run workflow** button.
-
-The deployment uses a dedicated Docker container `daatan-app-next` and is managed by the `scripts/blue-green-deploy.sh next` command.
-
-Caveats (from `.github/workflows/deploy-next.yml`):
-- **Branch migrations do not run.** The workflow builds only the app image (`next-latest`); Phase 5 uses the existing `daatan-migrations:staging-latest` image, i.e. whatever `main` last deployed to staging. A branch that needs a schema change won't get it on NEXT — and the database is shared with staging anyway.
-- **It does not wake staging.** The staging box sleeps 20:00–06:00 UTC and on weekends (see `docs/DEPLOYMENT.md`); `deploy-next.yml` has no wake step, so start the instance (or trigger a staging deploy) first during that window.
+The staging-side pieces are still in place (the `app-next` service, the nginx server block and
+certificate, and `scripts/blue-green-deploy.sh next`). To revive the testbed, build a
+`daatan-app:next-latest` image for the branch on the staging host and run
+`scripts/blue-green-deploy.sh next`, or add a new workflow modelled on the staging job in
+`deploy.yml` (OIDC credentials, wake-staging step, migrations image). Note that the database is
+shared with staging, so branch migrations do not belong here.
 
 ## Technical Configuration
 - **Hostname**: `next.daatan.com`

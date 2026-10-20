@@ -23,10 +23,18 @@ on:
     - cron: '0 12 * * *'   # 12:00 UTC daily
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   cost-report:
     name: Send daily cost report
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read

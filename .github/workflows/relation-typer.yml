@@ -29,10 +29,18 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   relation-typer:
     name: Type candidate forecast pairs
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:

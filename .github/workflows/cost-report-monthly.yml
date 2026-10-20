@@ -18,10 +18,18 @@ on:
     - cron: '0 12 1 * *'   # 1st of month, 12:00 UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   cost-report-monthly:
     name: Send monthly cost report
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read

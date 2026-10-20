@@ -37,10 +37,18 @@ env:
   QUEUE_DEPTH_ALERT: '500' # main-queue depth that looks backed up
   DIGEST_HOUR: '8'         # UTC hour to post the daily digest (must be EVEN — see cron)
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   watch:
     name: news-indexer health
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Restore previous state
         uses: actions/cache/restore@v5

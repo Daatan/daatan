@@ -23,6 +23,9 @@ on:
 env:
   ECR_REGISTRY: 272007598366.dkr.ecr.eu-central-1.amazonaws.com
 
+permissions:
+  contents: read
+
 jobs:
   rollback:
     name: Rollback ${{ inputs.environment }} to v${{ inputs.version }}

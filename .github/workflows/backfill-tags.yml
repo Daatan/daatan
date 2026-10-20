@@ -16,10 +16,14 @@ on:
         options: [staging, production]
         default: production
 
+permissions:
+  contents: read
+
 jobs:
   backfill:
     name: Backfill ${{ inputs.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
       - name: Page through tagged resolved forecasts
         env:

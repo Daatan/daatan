@@ -584,7 +584,6 @@ fields @timestamp, @logStream, @message
 | `TELEGRAM_CLEAN_CHAT_ID`       | Prod deploy notifications + high-signal workflow alerts (falls back to `TELEGRAM_CHAT_ID`) |
 | `BOT_RUNNER_SECRET`            | Bot + cron triggers (`bots.yml`, `heartbeat.yml` and the other `/api/cron/*` workflows — all validate against the app's `BOT_RUNNER_SECRET`) |
 | `STAGING_URL`                  | Bot cron + heartbeat target URL (staging) |
-| `DATABASE_URL_STAGING`         | Build arg for the NEXT testbed image (`deploy-next.yml`) |
 | `GSC_SA_KEY`, `YWM_OAUTH_TOKEN`, `CRUX_API_KEY` | SEO report (`seo-report.yml`) |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` | Android release signing (`android-release.yml`) |
 

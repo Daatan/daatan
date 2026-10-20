@@ -23,10 +23,14 @@ on:
         description: Safety cap on rounds
         default: '80'
 
+permissions:
+  contents: read
+
 jobs:
   backfill:
     name: Backfill ${{ inputs.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
       - name: Drive backfill until drained
         env:

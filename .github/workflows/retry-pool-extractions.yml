@@ -32,10 +32,18 @@ on:
         description: Safety cap on rounds
         default: '60'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   retry:
     name: Sweep ${{ inputs.target || 'production (scheduled)' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
       - name: Drive retry sweep until drained or stalled
         env:

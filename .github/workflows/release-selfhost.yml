@@ -14,10 +14,14 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Build & push self-hosted image to GHCR
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write

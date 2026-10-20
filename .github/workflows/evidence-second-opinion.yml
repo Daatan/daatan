@@ -37,10 +37,18 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   evidence-second-opinion:
     name: Check for interesting cases
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:

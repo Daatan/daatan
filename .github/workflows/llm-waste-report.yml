@@ -27,10 +27,18 @@ on:
     - cron: '30 12 * * 1'   # Mondays 12:30 UTC — after the daily cost report at 12:00
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   llm-waste-report:
     name: Send weekly LLM waste report
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read

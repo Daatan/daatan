@@ -21,10 +21,18 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   watchdog:
     name: Check ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -276,6 +284,7 @@ jobs:
   disk-watchdog:
     name: Disk Check ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
@@ -408,6 +417,7 @@ jobs:
   metric-alarm-watchdog:
     name: CloudWatch Alarm Check
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read

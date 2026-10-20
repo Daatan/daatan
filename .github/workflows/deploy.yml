@@ -27,10 +27,14 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     concurrency:
       group: typecheck-${{ github.ref }}
       cancel-in-progress: true
@@ -53,6 +57,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     concurrency:
       group: lint-${{ github.ref }}
       cancel-in-progress: true
@@ -80,6 +85,7 @@ jobs:
     name: Unit tests
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: unit-test-${{ github.ref }}
       cancel-in-progress: true
@@ -121,6 +127,7 @@ jobs:
     name: Unit tests (full suite)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         shard: [1, 2, 3, 4]
@@ -162,6 +169,7 @@ jobs:
       (needs.unit-test.result == 'success' || needs.unit-test.result == 'skipped') &&
       (needs.unit-test-full.result == 'success' || needs.unit-test-full.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       app_version: ${{ steps.app_version.outputs.version }}
     concurrency:
@@ -249,6 +257,7 @@ jobs:
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     permissions:
@@ -315,6 +324,7 @@ jobs:
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     permissions:
@@ -367,6 +377,7 @@ jobs:
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: integration-${{ github.ref }}
       cancel-in-progress: true
@@ -467,7 +478,6 @@ jobs:
 
       - name: Deploy to Staging (SSM)
         env:
-          GH_TOKEN: ${{ github.token }}
           # Pulled by digest, never by the mutable staging-latest tag (daatan#1954).
           APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.build-app-image.outputs.digest }}
           MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.build-migrations-image.outputs.digest }}
@@ -497,7 +507,7 @@ jobs:
               "echo \"📦 Downloading deploy files from GitHub...\"",
               "mkdir -p ~/app/scripts ~/app/infra/nginx",
               "cd ~/app",
-              "for f in '"$DEPLOY_FILES"'; do curl -sfL -H \"Authorization: token '"$GH_TOKEN"'\" \"'"$RAW_BASE"'/$f\" -o \"$f\" || { echo \"  ❌ Download failed: $f\"; exit 1; }; done; echo \"  ✅ All deploy files downloaded\"",
+              "for f in '"$DEPLOY_FILES"'; do curl -sfL --retry 3 \"'"$RAW_BASE"'/$f\" -o \"$f\" || { echo \"  ❌ Download failed: $f\"; exit 1; }; done; echo \"  ✅ All deploy files downloaded\"",
               "chmod +x scripts/*.sh",
               "",
               "echo \"🔄 Testing and reloading nginx config...\"",
@@ -741,7 +751,6 @@ jobs:
 
       - name: Deploy to Production (SSM)
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.resolve-release.outputs.version }}
           APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ steps.digests.outputs.app }}
           MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ steps.digests.outputs.migrations }}
@@ -770,7 +779,7 @@ jobs:
               "echo \"📦 Downloading deploy files from GitHub...\"",
               "mkdir -p ~/app/scripts ~/app/infra/nginx",
               "cd ~/app",
-              "for f in '"$DEPLOY_FILES"'; do curl -sfL -H \"Authorization: token '"$GH_TOKEN"'\" \"'"$RAW_BASE"'/$f\" -o \"$f\" || { echo \"  ❌ Download failed: $f\"; exit 1; }; done; echo \"  ✅ All deploy files downloaded\"",
+              "for f in '"$DEPLOY_FILES"'; do curl -sfL --retry 3 \"'"$RAW_BASE"'/$f\" -o \"$f\" || { echo \"  ❌ Download failed: $f\"; exit 1; }; done; echo \"  ✅ All deploy files downloaded\"",
               "chmod +x scripts/*.sh",
               "",
               "echo \"🔄 Testing and reloading nginx config...\"",

@@ -24,10 +24,18 @@ on:
     - cron: '7 13 * * 1'   # Monday 13:07 UTC — staggered after the 12:00 cost report
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   model-audit-weekly:
     name: Send weekly model audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read

@@ -17,10 +17,18 @@ on:
     - cron: '*/15 * * * *'   # every 15 minutes
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   transition-expired-predictions:
     name: Transition ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

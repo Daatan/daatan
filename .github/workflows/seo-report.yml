@@ -18,10 +18,18 @@ on:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   seo-report:
     name: Send weekly SEO report
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
 
