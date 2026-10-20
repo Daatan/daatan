@@ -33,6 +33,10 @@ permissions:
 jobs:
   typecheck:
     name: Type check
+    # Skipped on v* tags: the tagged commit already passed it on main, and
+    # resolve-release only proceeds after that commit's main staging deploy
+    # succeeded (daatan#1990).
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -46,7 +50,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps
@@ -56,6 +59,7 @@ jobs:
 
   lint:
     name: Lint
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}  # see typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -69,7 +73,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps
@@ -100,7 +103,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps
@@ -125,7 +127,7 @@ jobs:
   # see a matrix-suffixed check name like "Unit tests (1)".
   unit-test-full:
     name: Unit tests (full suite)
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')  # see typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -142,7 +144,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps
@@ -181,6 +182,12 @@ jobs:
           INTEGRATION: ${{ needs.integration.result }}
         run: |
           echo "typecheck=$TYPECHECK lint=$LINT unit=$UNIT unit-full=$UNIT_FULL integration=$INTEGRATION"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # The test jobs are skipped on tags (see typecheck); anything else is a failure.
+            [[ "$TYPECHECK$LINT$UNIT$UNIT_FULL$INTEGRATION" == skippedskippedskippedskippedskipped ]] ||
+              { echo "::error::A test job did not skip on a tag run."; exit 1; }
+            exit 0
+          fi
           [ "$TYPECHECK" = success ] && [ "$LINT" = success ] && [ "$INTEGRATION" = success ] &&
             [[ "$UNIT" =~ ^(success|skipped)$ ]] && [[ "$UNIT_FULL" =~ ^(success|skipped)$ ]] &&
             [[ "$UNIT$UNIT_FULL" == *success* ]] || { echo "::error::A required job did not succeed."; exit 1; }
@@ -192,7 +199,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps
@@ -203,16 +209,6 @@ jobs:
       # it again here first is pure duplicate work (~1.5min/push measured
       # 2026-08-08, daatan#1315). A broken build still fails the job either
       # way; on push it just surfaces during the Docker build step instead.
-      - name: Cache Next.js build
-        if: github.event_name == 'pull_request'
-        uses: actions/cache@v5
-        with:
-          path: .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.css') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
-            ${{ runner.os }}-nextjs-
-
       - name: Build application
         if: github.event_name == 'pull_request'
         env:
@@ -385,6 +381,7 @@ jobs:
   # Integration tests (runs on all pushes and PRs, in parallel with build)
   integration:
     name: Integration Tests
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}  # see typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -399,7 +396,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         uses: ./.github/actions/install-deps

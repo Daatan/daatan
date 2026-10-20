@@ -1,18 +1,36 @@
 name: 'Install dependencies (cached)'
 description: >
-  Restores node_modules from a cache keyed on package-lock.json + the Prisma
-  schema, running `npm ci` (and its postinstall `prisma generate`) only on a
-  cache miss.
+  Restores node_modules from a cache keyed on package-lock.json (minus the root
+  version) + the Prisma schema, running `npm ci` (and its postinstall
+  `prisma generate`) only on a cache miss.
 
 runs:
   using: composite
   steps:
+    # Every commit bumps the version (pre-commit hook), which rewrites the root
+    # `version` in package-lock.json. Hashing the raw file made every PR and
+    # every main push miss (daatan#1990), so hash it without that field.
+    - name: Compute dependency cache key
+      id: key
+      shell: bash
+      run: |
+        node -e '
+          const fs = require("fs"), crypto = require("crypto");
+          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          delete lock.version;
+          if (lock.packages && lock.packages[""]) delete lock.packages[""].version;
+          const h = crypto.createHash("sha256");
+          h.update(JSON.stringify(lock));
+          h.update(fs.readFileSync("prisma/schema.prisma"));
+          console.log("hash=" + h.digest("hex"));
+        ' >> "$GITHUB_OUTPUT"
+
     - name: Cache node_modules
       id: cache
       uses: actions/cache@v5
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json', 'prisma/schema.prisma') }}
+        key: node-modules-v2-${{ runner.os }}-${{ steps.key.outputs.hash }}
 
     - name: Install dependencies
       if: steps.cache.outputs.cache-hit != 'true'
