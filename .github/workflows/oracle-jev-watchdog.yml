@@ -35,10 +35,18 @@ on:
 env:
   ORACLE_INSTANCE_ID: i-00ac444b94c5ff9b2
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   check:
     name: Jev health
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read

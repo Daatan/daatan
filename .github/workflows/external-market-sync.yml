@@ -15,10 +15,18 @@ on:
     - cron: '17 * * * *'   # hourly at :17 (off the top of the hour)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   sync:
     name: Sync ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

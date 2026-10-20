@@ -97,7 +97,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
       └──────────────────────────────────────┘
 ```
 
-(1) `daatan-app-next` serves the manually deployed NEXT testbed (`next.daatan.com`, `deploy-next.yml`, shares the staging DB — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying.
+(1) `daatan-app-next` serves the NEXT testbed (`next.daatan.com`, shares the staging DB; no workflow deploys it any more — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying.
 
 ### Request Flow
 
@@ -504,7 +504,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `evidence-second-opinion.yml` | Mon/Thu 09:00 | `/api/cron/evidence-second-opinion` |
 | `cost-report-monthly.yml` | 1st of month 12:00 | Monthly cost report |
 
-Manual-only workflows: `rollback.yml`, `deploy-next.yml` (NEXT testbed), `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`. `android-release.yml` runs on `android-v*` tags; `version.yml` and `terraform-validate.yml` (when `terraform/**` changes) run on pull requests.
+Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`. `android-release.yml` runs on `android-v*` tags; `version.yml` and `terraform-validate.yml` (when `terraform/**` changes) run on pull requests.
 
 #### Deploy Workflow (`deploy.yml`)
 
@@ -555,7 +555,6 @@ GitHub Actions secrets referenced by the workflows. Runtime app secrets (`POSTGR
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token for workflow notifications |
 | `TELEGRAM_CHAT_ID` | Telegram channel ID for notifications |
 | `TELEGRAM_CLEAN_CHAT_ID` | High-signal (clean) Telegram channel for reports/alerts |
-| `DATABASE_URL_STAGING` | Used by `deploy-next.yml` |
 | `GSC_SA_KEY` / `YWM_OAUTH_TOKEN` / `CRUX_API_KEY` | `seo-report.yml` data sources |
 | `ANDROID_KEYSTORE_*` / `ANDROID_KEY_PASSWORD` | `android-release.yml` signing |
 

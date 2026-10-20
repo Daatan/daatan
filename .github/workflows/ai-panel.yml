@@ -35,10 +35,18 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   panel:
     name: Panel ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

@@ -26,10 +26,14 @@ on:
         default: 'false'
         type: boolean
 
+permissions:
+  contents: read
+
 jobs:
   trigger-bots:
     name: Trigger bot runner on staging
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Only run on the main branch (staging target)
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 

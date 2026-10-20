@@ -30,10 +30,18 @@ on:
     - cron: '23 2 * * *'   # nightly at 02:23 UTC (empty window; odd minute by convention)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   backfill:
     name: Backfill ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

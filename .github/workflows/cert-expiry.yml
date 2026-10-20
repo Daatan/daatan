@@ -17,10 +17,18 @@ on:
     - cron: '17 6 * * *'   # 06:17 UTC daily
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   cert-expiry:
     name: Cert expiry ${{ matrix.env.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
