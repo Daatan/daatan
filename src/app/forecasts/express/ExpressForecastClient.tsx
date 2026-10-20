@@ -159,6 +159,7 @@ export default function ExpressForecastClient({
     const isLongStep = ['checking', 'searching', 'analyzing', 'generating'].includes(step)
     if (!isLongStep) {
       startTimeRef.current = null
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- timer lifecycle — resets progress when the flow leaves a long-running step
       setElapsedSeconds(0)
       setAnalyzingMsgIdx(0)
       return

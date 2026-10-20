@@ -14,16 +14,13 @@ export function notifyUnreadCountChanged(count?: number) {
 export function useUnreadCount() {
   const [count, setCount] = useState(0)
 
-  const fetchCount = useCallback(async () => {
-    try {
-      const res = await fetch('/api/notifications/unread-count')
-      if (res.ok) {
-        const data = await res.json()
-        setCount(data.count)
-      }
-    } catch {
-      // Silently fail — badge is non-critical
-    }
+  const fetchCount = useCallback(() => {
+    fetch('/api/notifications/unread-count')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setCount(data.count) })
+      .catch(() => {
+        // Silently fail — badge is non-critical
+      })
   }, [])
 
   useEffect(() => {

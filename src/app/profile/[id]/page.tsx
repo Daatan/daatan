@@ -80,6 +80,25 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     redirect('/profile')
   }
 
+  const { user, userTags, scores, tabData, personJsonLd, breadcrumbJsonLd } = await loadPublicProfile({ id, selectedTag, tab, page })
+
+  return (
+    <>
+      <JsonLd data={personJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
+      <UserProfileView
+        user={user}
+        userTags={userTags}
+        selectedTag={selectedTag}
+        isOwnProfile={false}
+        scores={scores}
+        tabData={tabData}
+      />
+    </>
+  )
+}
+
+async function loadPublicProfile({ id, selectedTag, tab, page }: { id: string; selectedTag: string | null; tab: ProfileTab; page: number }) {
   try {
     const user = await prisma.user.findFirst({
       where: { OR: [{ id }, { username: id }] },
@@ -154,20 +173,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
       ],
     }
 
-    return (
-      <>
-        <JsonLd data={personJsonLd} />
-        <JsonLd data={breadcrumbJsonLd} />
-        <UserProfileView
-          user={user}
-          userTags={userTags}
-          selectedTag={selectedTag}
-          isOwnProfile={false}
-          scores={scores}
-          tabData={tabData}
-        />
-      </>
-    )
+    return { user, userTags, scores, tabData, personJsonLd, breadcrumbJsonLd }
   } catch (error) {
     createLogger('public-profile').error({ err: error, userId: id }, 'Public profile page error')
     notFound()

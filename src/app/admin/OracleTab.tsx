@@ -368,14 +368,16 @@ export default function OracleTab() {
   // 'bot-voting' is a SaaS-only Oracul caller — drop it from the filter on self-host.
   const sourceOptions = selfHosted ? SOURCE_OPTIONS.filter(s => s !== 'bot-voting') : SOURCE_OPTIONS
   const [stats, setStats] = useState<OracleStats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [windowDays, setWindowDays] = useState(30)
   const [source, setSource] = useState('')
   const [callType, setCallType] = useState('')
   const [status, setStatus] = useState('')
 
+  const fetchStatsKey = `${windowDays}|${source}|${callType}|${status}`
+  const [fetchStatsLoadedKey, setFetchStatsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchStatsLoadedKey !== fetchStatsKey
+
   const fetchStats = useCallback(async () => {
-    setIsLoading(true)
     try {
       const params = new URLSearchParams({ windowDays: String(windowDays) })
       if (source) params.set('source', source)
@@ -384,9 +386,9 @@ export default function OracleTab() {
       const res = await fetch(`/api/admin/oracle-stats?${params}`)
       if (res.ok) setStats(await res.json())
     } finally {
-      setIsLoading(false)
+      setFetchStatsLoadedKey(fetchStatsKey)
     }
-  }, [windowDays, source, callType, status])
+  }, [windowDays, source, callType, status, fetchStatsKey])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 

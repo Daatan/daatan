@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { isBareChromePath } from '@/lib/bare-chrome'
 import { useState, useEffect, useRef } from 'react'
+import { useIsClient } from '@/lib/hooks/useIsClient'
 import { useSession, signOut, signIn } from 'next-auth/react'
 import { VERSION } from '@/lib/version'
 import { BrandLogo } from '@/components/BrandLogo'
@@ -79,7 +80,7 @@ const Sidebar = () => {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [hasMounted, setHasMounted] = useState(false)
+  const hasMounted = useIsClient()
   const [searchOpen, setSearchOpen] = useState(false)
   // Mobile-only: the header search field, opened in place by the magnifier icon.
   // Kept separate from the nav drawer so tapping search no longer opens the whole panel.
@@ -111,11 +112,8 @@ const Sidebar = () => {
   const session = sessionData?.data || null
   const status = sessionData?.status || 'unauthenticated'
 
-  // Track mount state to avoid hydration mismatch
-  // Server always renders the "loading" state; client switches after mount
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
+  // hasMounted (useIsClient) avoids a hydration mismatch:
+  // server always renders the "loading" state; client switches after mount
 
   const handleToggleMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)

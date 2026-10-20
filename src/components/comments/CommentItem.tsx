@@ -34,6 +34,8 @@ export default function CommentItem({
   const [showReplyForm, setShowReplyForm] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(comment.text)
+  const [savedText, setSavedText] = useState(comment.text)
+  const [extraReplies, setExtraReplies] = useState(0)
   const [replies, setReplies] = useState<Comment[]>([])
   const [showReplies, setShowReplies] = useState(false)
   const [isLoadingReplies, setIsLoadingReplies] = useState(false)
@@ -133,7 +135,7 @@ export default function CommentItem({
       })
       if (response.ok) {
         setIsEditing(false)
-        comment.text = editText
+        setSavedText(editText)
       }
     } catch (error) {
         log.error({ err: error }, 'Error updating comment')
@@ -167,7 +169,7 @@ export default function CommentItem({
     setReplies([reply, ...replies])
     setShowReplyForm(false)
     setShowReplies(true)
-    comment._count.replies++
+    setExtraReplies((n) => n + 1)
   }
 
   return (
@@ -228,7 +230,7 @@ export default function CommentItem({
                 <button
                   onClick={() => {
                     setIsEditing(false)
-                    setEditText(comment.text)
+                    setEditText(savedText)
                   }}
                   className="px-3 py-1 text-text-secondary text-sm hover:bg-navy-700 rounded-lg"
                 >
@@ -238,7 +240,7 @@ export default function CommentItem({
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-mist whitespace-pre-wrap">{translatedText ?? comment.text}</p>
+              <p className="text-mist whitespace-pre-wrap">{translatedText ?? savedText}</p>
               {translatedText && (
                 <div className="flex items-center gap-1.5 text-[10px] text-blue-600/70 italic bg-cobalt/10/30 px-2 py-1 rounded w-fit">
                   <Info className="w-3 h-3" />
@@ -356,7 +358,7 @@ export default function CommentItem({
           )}
 
           {/* Show Replies Button */}
-          {!isReply && comment._count.replies > 0 && (
+          {!isReply && comment._count.replies + extraReplies > 0 && (
             <button
               onClick={loadReplies}
               disabled={isLoadingReplies}
@@ -367,7 +369,7 @@ export default function CommentItem({
                 ? tc('loading')
                 : showReplies
                 ? tc('hideReplies')
-                : tc('showReplies', { count: comment._count.replies })}
+                : tc('showReplies', { count: comment._count.replies + extraReplies })}
             </button>
           )}
 

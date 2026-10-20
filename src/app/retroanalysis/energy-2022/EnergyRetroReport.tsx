@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import ScrollNav from '../ScrollNav'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group, Leg, PoolRow, PriceSeries, Prices, Region, ReportRow, Side } from './types'
+import { lcgSequence } from '@/lib/lcg'
 
 const GROUPS: Group[] = ['banks', 'agencies', 'insiders', 'press']
 const GROUP_COLOR: Record<Group, string> = { banks: '#2a78d6', agencies: '#1baf7a', insiders: '#eb6834', press: '#eda100' }
@@ -379,9 +380,8 @@ function PChart({ leg, pool }: { leg: Leg; pool: PoolRow[] }) {
   const y = (p: number) => T + (1 - p) * (H - T - B)
   const pts = useMemo(() => pool.filter(r => r[f] != null).map(r => ({ g: r.g, t: Date.parse(r.d), p: r[f] as number })), [pool, f])
   const jitter = useMemo(() => {
-    let seed = 7
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
-    return pts.map(() => [(rnd() - 0.5) * 4, (rnd() - 0.5) * 8])
+    const rnd = lcgSequence(pts.length * 2)
+    return pts.map((_, i) => [(rnd[2 * i] - 0.5) * 4, (rnd[2 * i + 1] - 0.5) * 8])
   }, [pts])
   const lines = useMemo(() => {
     const days: number[] = []

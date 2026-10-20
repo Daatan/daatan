@@ -3,7 +3,6 @@ import { env } from '@/env'
 import { logPrismaErrorEvent } from '@/lib/prisma-log'
 
 declare global {
-  // eslint-disable-next-line no-var
   var prismaClient: PrismaClient | undefined
 }
 
@@ -12,8 +11,8 @@ declare global {
 // so webpack does not statically bundle them (they use Node.js built-ins that
 // are unavailable in the edge runtime compilation).
 const createPrismaClient = (): PrismaClient => {
-  const { Pool } = require('pg') as typeof import('pg') // eslint-disable-line
-  const { PrismaPg } = require('@prisma/adapter-pg') as typeof import('@prisma/adapter-pg') // eslint-disable-line
+  const { Pool } = require('pg') as typeof import('pg')
+  const { PrismaPg } = require('@prisma/adapter-pg') as typeof import('@prisma/adapter-pg')
   const pool = new Pool({ connectionString: env.DATABASE_URL })
   const adapter = new PrismaPg(pool)
   // 'error' is event-emitted (not stdout) so the expected P2002 claim

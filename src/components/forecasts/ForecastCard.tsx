@@ -2,6 +2,8 @@
 
 import type { UserRole } from '@prisma/client'
 import { useState, useRef, useEffect } from 'react'
+import { useNowMs } from '@/lib/hooks/useNowMs'
+import { useIsClient } from '@/lib/hooks/useIsClient'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
@@ -97,9 +99,10 @@ export default function ForecastCard({
   const t = useTranslations('forecast')
   const tt = useTranslations('translate')
   const locale = useLocale()
+  const nowMs = useNowMs()
   const [isApproving, setIsApproving] = useState(false)
   const [showAdminMenu, setShowAdminMenu] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  const isMounted = useIsClient()
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Translation state
@@ -107,10 +110,6 @@ export default function ForecastCard({
   const [translatedHeadline, setTranslatedHeadline] = useState<string | null>(null)
   const [isTranslating, setIsTranslating] = useState(false)
   const [showTranslated, setShowTranslated] = useState(locale !== 'en')
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   useEffect(() => {
     if (locale === 'en' || !prediction.id || translatedClaim) return
@@ -408,7 +407,7 @@ export default function ForecastCard({
 
             {/* Resolve By Date (Deadline) - Moved to top */}
             {(() => {
-              const daysUntil = Math.ceil((new Date(prediction.resolveByDatetime).getTime() - Date.now()) / 86400000)
+              const daysUntil = Math.ceil((new Date(prediction.resolveByDatetime).getTime() - nowMs) / 86400000)
               const dateClass = prediction.status === 'ACTIVE'
                 ? daysUntil <= 3 ? 'text-red-500' : daysUntil <= 7 ? 'text-amber-500' : 'text-gray-400'
                 : 'text-gray-400'

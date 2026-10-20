@@ -39,7 +39,6 @@ export default function LeaderboardPage() {
 
   const [users, setUsers] = useState<LeaderboardUser[]>([])
   const [tags, setTags] = useState<TagOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [sortBy, setSortBy] = useState<SortBy>('elo')
   const [selectedTag, setSelectedTag] = useState<string | null>(searchParams.get('tag'))
 
@@ -49,22 +48,27 @@ export default function LeaderboardPage() {
     { value: 'brierScore', label: t('sortBy.brierScore'), icon: TrendingDown },
   ]
 
+  const fetchLeaderboardKey = `${sortBy}|${selectedTag}`
+  const [fetchLeaderboardLoadedKey, setFetchLeaderboardLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchLeaderboardLoadedKey !== fetchLeaderboardKey
+
   const fetchLeaderboard = useCallback(async () => {
-    setIsLoading(true)
     try {
-      const params = new URLSearchParams({ limit: '50', sortBy })
-      if (selectedTag) params.set('tag', selectedTag)
-      const response = await fetch(`/api/leaderboard?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.leaderboard)
+      try {
+        const params = new URLSearchParams({ limit: '50', sortBy })
+        if (selectedTag) params.set('tag', selectedTag)
+        const response = await fetch(`/api/leaderboard?${params}`)
+        if (response.ok) {
+          const data = await response.json()
+          setUsers(data.leaderboard)
+        }
+      } catch (error) {
+        log.error({ err: error }, 'Error fetching leaderboard')
       }
-    } catch (error) {
-      log.error({ err: error }, 'Error fetching leaderboard')
     } finally {
-      setIsLoading(false)
+      setFetchLeaderboardLoadedKey(fetchLeaderboardKey)
     }
-  }, [sortBy, selectedTag])
+  }, [sortBy, selectedTag, fetchLeaderboardKey])
 
   useEffect(() => {
     fetchLeaderboard()

@@ -33,7 +33,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - Default to no comments; only add when WHY is non-obvious
 - Don't add error handling, fallbacks, or validation for impossible scenarios — trust internal callers
 - Tests use vitest. Run `npm test` (no extra flags needed) for the unit suite (happy-dom, `vitest.config.ts`, 300+ test files). The `*.integration.test.ts` files run separately in node against a real Postgres via `npm run test:integration` (`vitest.config.integration.ts`).
-- `npm run lint` and `npx tsc --noEmit` must both be clean before any commit. `npm run lint` is the plain ESLint 10 CLI with a flat config (`eslint.config.mjs`); the React Compiler rules from `eslint-plugin-react-hooks` 7 are warnings for now (#1938).
+- `npm run lint` and `npx tsc --noEmit` must both be clean before any commit. `npm run lint` is the plain ESLint 10 CLI with a flat config (`eslint.config.mjs`); the React Compiler rules from `eslint-plugin-react-hooks` 7 are errors. A `set-state-in-effect` disable needs a `--` reason (browser-only init, timers); prefer `useIsClient`/`useBrowserValue`, a value tagged with the key it was loaded for, or adjusting state during render.
 
 ## Where to look
 

@@ -1,13 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useIsClient } from '@/lib/hooks/useIsClient'
 
 export function ClientOnly({ children }: { children: React.ReactNode }) {
-  const [hasMounted, setHasMounted] = useState(false)
-
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
+  const hasMounted = useIsClient()
 
   if (!hasMounted) {
     return null

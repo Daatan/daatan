@@ -17,6 +17,7 @@ const PushPermissionPrompt = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage after mount; must stay out of SSR/hydration
       setIsDismissed(localStorage.getItem(DISMISS_KEY) === 'true')
     } catch {
       setIsDismissed(false)

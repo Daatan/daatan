@@ -54,11 +54,12 @@ export default function SourceLeaderboardPage() {
 
   const [authorRows, setAuthorRows] = useState<AuthorLeaderboardRow[]>([])
   const [outletRows, setOutletRows] = useState<OutletLeaderboardRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const loadKey = `${view}|${tag ?? ''}`
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const isLoading = loadedKey !== loadKey
 
   useEffect(() => {
     let cancelled = false
-    setIsLoading(true)
 
     fetch(`/api/leaderboard/sources?view=${view}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`)
       .then(res => res.json())
@@ -69,13 +70,13 @@ export default function SourceLeaderboardPage() {
       })
       .catch(err => log.error({ err }, 'Failed to fetch source leaderboard'))
       .finally(() => {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) setLoadedKey(loadKey)
       })
 
     return () => {
       cancelled = true
     }
-  }, [view, tag])
+  }, [view, tag, loadKey])
 
   useEffect(() => {
     fetch('/api/tags?limit=20')

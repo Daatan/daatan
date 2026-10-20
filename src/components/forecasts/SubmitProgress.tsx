@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Check, Loader2 } from 'lucide-react'
 
@@ -28,16 +28,17 @@ interface SubmitProgressProps {
  */
 export function SubmitProgress({ steps, activeEstimateMs }: SubmitProgressProps) {
   const t = useTranslations('wizard')
-  const [elapsed, setElapsed] = useState(0)
-  const startRef = useRef<number>(Date.now())
+  // Elapsed time is tagged with the step it was measured for, so a step change
+  // reads as 0 until the first tick of the new interval (no reset-in-effect).
+  const [tick, setTick] = useState<{ key: string | undefined; ms: number }>({ key: undefined, ms: 0 })
   const activeKey = steps.find((s) => s.state === 'active')?.key
+  const elapsed = tick.key === activeKey ? tick.ms : 0
 
   // Restart the elapsed timer whenever the active step changes.
   useEffect(() => {
-    startRef.current = Date.now()
-    setElapsed(0)
     if (!activeKey) return
-    const id = setInterval(() => setElapsed(Date.now() - startRef.current), 100)
+    const start = Date.now()
+    const id = setInterval(() => setTick({ key: activeKey, ms: Date.now() - start }), 100)
     return () => clearInterval(id)
   }, [activeKey])
 

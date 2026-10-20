@@ -20,10 +20,12 @@ const BOT_RUN_TIMING_KEY: Record<BotRunStepKey, TimingKey> = {
   stake: 'bot-stake',
 }
 
+// Wall-clock for run timing; read from an event handler, never during render.
+const elapsedClock = () => performance.now()
+
 export default function BotsTable() {
   const t = useTranslations('admin')
   const [bots, setBots] = useState<Bot[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [runningBots, setRunningBots] = useState<Set<string>>(new Set())
   const [runSteps, setRunSteps] = useState<Record<string, ProgressStep[]>>({})
   const runTimers = useRef<Record<string, ReturnType<typeof setTimeout>[]>>({})
@@ -56,8 +58,11 @@ export default function BotsTable() {
     return getEstimate(BOT_RUN_TIMING_KEY[active.key as BotRunStepKey])
   }
 
+  const fetchBotsKey = 'init'
+  const [fetchBotsLoadedKey, setFetchBotsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchBotsLoadedKey !== fetchBotsKey
+
   const fetchBots = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch('/api/admin/bots')
       if (res.ok) {
@@ -65,18 +70,15 @@ export default function BotsTable() {
         setBots(data.bots)
       }
     } finally {
-      setIsLoading(false)
+      setFetchBotsLoadedKey(fetchBotsKey)
     }
   }, [])
 
-  const fetchTags = useCallback(async () => {
-    try {
-      const res = await fetch('/api/tags')
-      if (res.ok) {
-        const data = await res.json()
-        setAllTags(data.tags)
-      }
-    } catch { }
+  const fetchTags = useCallback(() => {
+    fetch('/api/tags')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setAllTags(data.tags) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function BotsTable() {
     }
     runTimers.current[botId] = timers
 
-    const runStart = performance.now()
+    const runStart = elapsedClock()
     try {
       const res = await fetch(`/api/admin/bots/${botId}/run${dryRun ? '?dry=true' : ''}`, { method: 'POST' })
       const data = await res.json()
@@ -137,7 +139,7 @@ export default function BotsTable() {
       // route, so split the observed total across the phases proportional
       // to their current estimates — self-correcting as each phase's share
       // of the total drifts toward reality over repeated runs.
-      const totalMs = performance.now() - runStart
+      const totalMs = elapsedClock() - runStart
       const sumEstimates = estimates.reduce((a, b) => a + b, 0)
       BOT_RUN_STEP_KEYS.forEach((key, i) => {
         const weight = sumEstimates > 0 ? estimates[i] / sumEstimates : 1 / estimates.length

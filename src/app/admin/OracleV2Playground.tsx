@@ -6,7 +6,7 @@
  * server: calls go through /api/admin/oracle-v2/* (ADMIN-only proxies).
  * Graph is plain SVG — no graph dependency (node_modules is tracked in git).
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 type Flat = {
   p: number | null; std?: number; ci?: [number, number]; articles_used?: number; n_eff?: number
@@ -35,8 +35,15 @@ const pct = (p: number | null | undefined) => (p == null ? '–' : `${Math.round
 const maxNodeDepth = (job: Job) => job.nodes.reduce((max, n) => Math.max(max, n.depth), 0)
 const NODE_W = 190, NODE_H = 58, COL = 230, ROW = 150
 
+const subscribeNoop = () => () => {}
+const readStoredQuestion = () => {
+  try { return localStorage.getItem('oracle_v2_q') || '' } catch { return '' }
+}
+
 export default function OracleV2Playground() {
-  const [question, setQuestion] = useState('')
+  const storedQuestion = useSyncExternalStore(subscribeNoop, readStoredQuestion, () => '')
+  const [typedQuestion, setQuestion] = useState<string | null>(null)
+  const question = typedQuestion ?? storedQuestion
   const [depth, setDepth] = useState(2)
   const [maxPrecursors, setMaxPrecursors] = useState(5)
   const [maxCalls, setMaxCalls] = useState(15)
@@ -49,14 +56,6 @@ export default function OracleV2Playground() {
   const [busy, setBusy] = useState(false)
   const [pane, setPane] = useState<'node' | 'prompts' | 'log' | 'json'>('node')
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    try { setQuestion(localStorage.getItem('oracle_v2_q') || '') } catch { /* ignore */ }
-    const h = window.location.hash.slice(1)
-    if (h) watch(h)
-    return () => { if (timer.current) clearInterval(timer.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const watch = useCallback((id: string) => {
     setJobId(id)
@@ -80,6 +79,16 @@ export default function OracleV2Playground() {
     void tick()
     timer.current = setInterval(tick, 3000)
   }, [])
+
+  useEffect(() => {
+    // Resume a job from the URL hash; deferred so the first poll's setState is not synchronous in the effect.
+    const h = window.location.hash.slice(1)
+    const resume = h ? setTimeout(() => watch(h), 0) : null
+    return () => {
+      if (resume) clearTimeout(resume)
+      if (timer.current) clearInterval(timer.current)
+    }
+  }, [watch])
 
   const run = async () => {
     const q = question.trim()

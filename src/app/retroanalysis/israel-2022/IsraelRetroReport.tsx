@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import ScrollNav from '../ScrollNav'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group, PollSeats, PoolRow, Region, ReportRow, Side } from './types'
+import { lcgSequence } from '@/lib/lcg'
 
 const GROUPS: Group[] = ['polls', 'media', 'bloc', 'anti']
 const GROUP_COLOR: Record<Group, string> = { polls: '#2a78d6', media: '#1baf7a', bloc: '#eb6834', anti: '#eda100' }
@@ -313,9 +314,8 @@ function TrendChart({ pool }: { pool: PoolRow[] }) {
     return w.length >= 5 ? w.reduce((a, r) => a + r.p, 0) / w.length : null
   })])) as Record<Group, (number | null)[]>, [pts, days])
   const jitter = useMemo(() => {
-    let seed = 7
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
-    return pts.map(() => [(rnd() - 0.5) * 4, (rnd() - 0.5) * 6])
+    const rnd = lcgSequence(pts.length * 2)
+    return pts.map((_, i) => [(rnd[2 * i] - 0.5) * 4, (rnd[2 * i + 1] - 0.5) * 6])
   }, [pts])
 
   const narrow = width < 640

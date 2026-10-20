@@ -27,12 +27,15 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
   // Skip the first client-side fetch when SSR data covers the default view (ACTIVE, no query)
   const ssrConsumed = useRef(!!(initialPredictions?.length) && !initialQ)
 
-  // Sync activeQuery when URL changes (e.g. sidebar search navigates here)
-  useEffect(() => {
-    const q = searchParams.get('q') ?? ''
-    setActiveQuery(q)
-    setSearchInput(q)
-  }, [searchParams])
+  // Sync activeQuery when URL changes (e.g. sidebar search navigates here).
+  // State is adjusted during render (React's "derive from a changed prop" pattern) rather than in an effect.
+  const urlQuery = searchParams.get('q') ?? ''
+  const [syncedUrlQuery, setSyncedUrlQuery] = useState(initialQ)
+  if (urlQuery !== syncedUrlQuery) {
+    setSyncedUrlQuery(urlQuery)
+    setActiveQuery(urlQuery)
+    setSearchInput(urlQuery)
+  }
 
   useEffect(() => {
     if (ssrConsumed.current && filter === 'ACTIVE' && !activeQuery) {

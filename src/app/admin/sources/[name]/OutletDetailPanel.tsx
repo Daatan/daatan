@@ -69,7 +69,6 @@ export default function OutletDetailPanel({ name }: Props) {
   const t = useTranslations('admin')
   const tBoard = useTranslations('sourceLeaderboard')
   const [data, setData] = useState<OutletDetail | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [authorScoring, setAuthorScoring] = useState<AuthorScoringRow[] | null>(null)
@@ -84,27 +83,32 @@ export default function OutletDetailPanel({ name }: Props) {
 
   const endpoint = `/api/admin/news-indexer/sources/${encodeURIComponent(name)}`
 
+  const loadKey = `${endpoint}`
+  const [loadLoadedKey, setLoadLoadedKey] = useState<string | null>(null)
+  const loading = loadLoadedKey !== loadKey
+
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const res = await fetch(endpoint, { cache: 'no-store' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || body.detail || `Request failed (${res.status})`)
+      try {
+        const res = await fetch(endpoint, { cache: 'no-store' })
+        setError(null)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || body.detail || `Request failed (${res.status})`)
+        }
+        const detail: OutletDetail = await res.json()
+        setData(detail)
+        setWikipediaUrl(detail.wikipediaUrl ?? '')
+        setTelegramChannel(detail.telegramChannel ?? '')
+        setNotes(detail.notes ?? '')
+        setLinks(detail.links ?? [])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load outlet')
       }
-      const detail: OutletDetail = await res.json()
-      setData(detail)
-      setWikipediaUrl(detail.wikipediaUrl ?? '')
-      setTelegramChannel(detail.telegramChannel ?? '')
-      setNotes(detail.notes ?? '')
-      setLinks(detail.links ?? [])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load outlet')
     } finally {
-      setLoading(false)
+      setLoadLoadedKey(loadKey)
     }
-  }, [endpoint])
+  }, [endpoint, loadKey])
 
   useEffect(() => { load() }, [load])
 

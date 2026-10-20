@@ -12,6 +12,11 @@ interface LanguagePickerProps {
   currentLocale: string
 }
 
+// Set cookie for server-side locale detection
+const setLocaleCookie = (locale: Locale) => {
+  document.cookie = `NEXT_LOCALE=${locale};path=/;max-age=31536000;samesite=lax`
+}
+
 export const LanguagePicker = ({ currentLocale }: LanguagePickerProps) => {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -23,8 +28,7 @@ export const LanguagePicker = ({ currentLocale }: LanguagePickerProps) => {
     setSelected(locale)
 
     try {
-      // Set cookie for server-side locale detection
-      document.cookie = `NEXT_LOCALE=${locale};path=/;max-age=31536000;samesite=lax`
+      setLocaleCookie(locale)
 
       // Save preference to user profile (if authenticated)
       await fetch('/api/profile/language', {

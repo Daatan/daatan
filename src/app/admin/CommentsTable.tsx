@@ -21,13 +21,15 @@ type AdminComment = {
 export default function CommentsTable() {
   const t = useTranslations('admin')
   const [comments, setComments] = useState<AdminComment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
+  const fetchCommentsKey = `${page}|${search}`
+  const [fetchCommentsLoadedKey, setFetchCommentsLoadedKey] = useState<string | null>(null)
+  const isLoading = fetchCommentsLoadedKey !== fetchCommentsKey
+
   const fetchComments = useCallback(async () => {
-    setIsLoading(true)
     try {
       const res = await fetch(`/api/admin/comments?page=${page}&limit=20&search=${encodeURIComponent(search)}`)
       if (res.ok) {
@@ -36,9 +38,9 @@ export default function CommentsTable() {
         setTotalPages(data.pages)
       }
     } finally {
-      setIsLoading(false)
+      setFetchCommentsLoadedKey(fetchCommentsKey)
     }
-  }, [page, search])
+  }, [page, search, fetchCommentsKey])
 
   useEffect(() => {
     fetchComments()
