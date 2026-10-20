@@ -160,8 +160,12 @@ aws ssm get-command-invocation \
 Before the traffic swap (Phase 6), the script captures the old container's image:
 
 ```bash
-OLD_IMAGE=$(docker inspect $CONTAINER --format '{{.Config.Image}}' ...)
+OLD_IMAGE=$(docker inspect $CONTAINER --format '{{.Image}}' ...)
 ```
+
+It must be the image **ID**. Until daatan#1955 this read `.Config.Image` — the name the old
+container was started from (`daatan-app:latest` / `:staging-latest`), which the deploy's pull had
+already re-pointed at the new image, so the "rollback" restarted the broken image.
 
 If `verify-health.sh` fails after the swap, the script:
 1. Stops and removes the new (broken) container
@@ -169,7 +173,9 @@ If `verify-health.sh` fails after the swap, the script:
 3. Reloads nginx
 4. Exits with code 1 (so CI marks the deploy as failed)
 
-This means a bad deploy will be automatically corrected within seconds of Phase 7 running. The Telegram failure notification will still fire.
+Phase 7 checks `$EXPECTED_VERSION` (exported by `deploy.yml`) as well as health, so a deploy that
+came up on the wrong version also rolls back. This means a bad deploy will be automatically
+corrected within seconds of Phase 7 running. The Telegram failure notification will still fire.
 
 Note: auto-rollback only covers Phase 7 failure. Failures in Phase 4 (new container health) or Phase 5 (migrations) abort before any swap occurs — the old container is never touched.
 

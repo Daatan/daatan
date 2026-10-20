@@ -226,6 +226,10 @@ jobs:
   # (~10-11min sequential, daatan#1315). This is the only one of the pair
   # with cache-to: two concurrent writers to the same BuildKit cache scope
   # can race/corrupt it, so build-migrations-image stays cache-from-only.
+  # Images are built once per commit, on main (or a staging dispatch). A `v*` tag
+  # never rebuilds: resolve-release promotes the digest this build pushed, after
+  # its staging deploy succeeded (daatan#1954 — tag rebuilds overwrote
+  # staging-latest and raced the main deploy, 3/3 times on 2026-10-18).
   build-app-image:
     name: Build & Push App Image
     needs: build
@@ -239,8 +243,11 @@ jobs:
     if: |
       always() &&
       needs.build.result == 'success' &&
-      github.event_name != 'pull_request'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
     permissions:
       id-token: write
       contents: read
@@ -270,14 +277,12 @@ jobs:
         with:
           images: ${{ steps.login-ecr.outputs.registry }}/daatan-app
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-            type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,format=short
+            type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=${{ needs.build.outputs.app_version }},enable={{is_default_branch}}
 
       - name: Build and push to ECR
+        id: push
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -304,8 +309,11 @@ jobs:
     if: |
       always() &&
       needs.build.result == 'success' &&
-      github.event_name != 'pull_request'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
     permissions:
       id-token: write
       contents: read
@@ -329,15 +337,21 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Short commit SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push migrations image to ECR
+        id: push
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
           target: migrations
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/daatan-app:staging-latest-migrations
-            ${{ steps.login-ecr.outputs.registry }}/daatan-app:${{ needs.build.outputs.app_version }}-migrations
+            ${{ steps.login-ecr.outputs.registry }}/daatan-app:sha-${{ steps.sha.outputs.short }}-migrations
+            ${{ github.ref == 'refs/heads/main' && format('{0}/daatan-app:staging-latest-migrations', steps.login-ecr.outputs.registry) || '' }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}/daatan-app:{1}-migrations', steps.login-ecr.outputs.registry, needs.build.outputs.app_version) || '' }}
           cache-from: type=gha
           build-args: |
             NEXT_PUBLIC_APP_VERSION=${{ needs.build.outputs.app_version }}
@@ -394,7 +408,7 @@ jobs:
       needs.build.result == 'success' &&
       needs.build-app-image.result == 'success' &&
       needs.build-migrations-image.result == 'success' &&
-      ((github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
 
     steps:
@@ -451,6 +465,10 @@ jobs:
       - name: Deploy to Staging (SSM)
         env:
           GH_TOKEN: ${{ github.token }}
+          # Pulled by digest, never by the mutable staging-latest tag (daatan#1954).
+          APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.build-app-image.outputs.digest }}
+          MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.build-migrations-image.outputs.digest }}
+          EXPECTED_VERSION: ${{ needs.build.outputs.app_version }}
         run: |
           # Get Instance ID
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -488,18 +506,19 @@ jobs:
               "echo \"🧹 Pruning old Docker images before pull...\"",
               "./scripts/cleanup-docker-images.sh 3 || echo \"  ⚠️ Cleanup failed (non-fatal, continuing)\"",
               "",
-              "echo \"⬇️ Pulling staging image...\"",
-              "docker pull '"$ECR_REGISTRY"'/daatan-app:staging-latest",
+              "echo \"⬇️ Pulling staging image ('"$APP_IMAGE"')...\"",
+              "docker pull '"$APP_IMAGE"'",
               "",
               "echo \"🏷️ Tagging image...\"",
-              "docker tag '"$ECR_REGISTRY"'/daatan-app:staging-latest daatan-app:staging-latest",
+              "docker tag '"$APP_IMAGE"' daatan-app:staging-latest",
               "",
               "echo \"⬇️ Pulling migrations image...\"",
-              "docker pull '"$ECR_REGISTRY"'/daatan-app:staging-latest-migrations",
-              "docker tag '"$ECR_REGISTRY"'/daatan-app:staging-latest-migrations daatan-migrations:staging-latest",
+              "docker pull '"$MIGRATIONS_IMAGE"'",
+              "docker tag '"$MIGRATIONS_IMAGE"' daatan-migrations:staging-latest",
               "",
               "echo \"🚀 Executing blue-green deployment...\"",
               "export GIT_COMMIT='"${{ github.sha }}"'",
+              "export EXPECTED_VERSION='"$EXPECTED_VERSION"'",
               "export SKIP_BUILD=true",
               "./scripts/blue-green-deploy.sh staging"
             ]' \
@@ -566,10 +585,124 @@ jobs:
             -d parse_mode="HTML" \
             -d disable_web_page_preview="true"
 
+  # Resolve which image a production deploy ships. A `v*` tag never rebuilds
+  # (daatan#1954): it waits for this commit's main-branch staging deploy to
+  # succeed, then promotes the exact digest that deploy ran. A manual production
+  # dispatch must name an existing version.
+  resolve-release:
+    name: Resolve Release Image
+    needs: build
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      app_digest: ${{ steps.digests.outputs.app }}
+      migrations_digest: ${{ steps.digests.outputs.migrations }}
+    steps:
+      - name: Get version from tag or input
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${INPUT_VERSION#v}"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Need a release version X.Y.Z (tag v<version>, or the 'version' input on a production dispatch); got '${VERSION}'."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for this commit's staging deploy
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The tagged commit must have gone through the main-branch pipeline and
+          # been deployed to staging successfully. Polls while that run is still
+          # going (a tag is usually pushed right after the merge).
+          for i in $(seq 1 60); do
+            RUN_ID=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/runs?head_sha=${GITHUB_SHA}&event=push&branch=main" \
+              --jq '.workflow_runs | sort_by(.created_at) | last | .id // empty')
+            if [[ -n "$RUN_ID" ]]; then
+              JOB=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?filter=latest&per_page=100" \
+                --jq '.jobs[] | select(.name == "Deploy to Staging") | "\(.status) \(.conclusion)"')
+              RUN_STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq .status)
+              echo "main run $RUN_ID ($RUN_STATUS): Deploy to Staging = ${JOB:-not started} ($i/60)"
+              case "$JOB" in
+                "completed success")
+                  echo "✅ ${GITHUB_SHA::7} is deployed to staging."
+                  exit 0 ;;
+                completed*)
+                  echo "::error::The staging deploy for ${GITHUB_SHA::7} did not succeed ($JOB) — see run $RUN_ID. A newer merge may have superseded it; tag the current main HEAD instead."
+                  exit 1 ;;
+              esac
+              if [[ "$RUN_STATUS" == "completed" && -z "$JOB" ]]; then
+                echo "::error::Main run $RUN_ID finished without a staging deploy for ${GITHUB_SHA::7}. Tag the current main HEAD instead."
+                exit 1
+              fi
+            else
+              echo "No main-branch run for ${GITHUB_SHA::7} yet ($i/60)"
+            fi
+            sleep 30
+          done
+          echo "::error::Timed out after 30 min waiting for the staging deploy of ${GITHUB_SHA::7}. Only commits merged to main can be released."
+          exit 1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Resolve image digests
+        id: digests
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          digest() {
+            aws ecr batch-get-image --repository-name daatan-app --image-ids "imageTag=$1" \
+              --accepted-media-types application/vnd.oci.image.index.v1+json application/vnd.docker.distribution.manifest.list.v2+json \
+                application/vnd.oci.image.manifest.v1+json application/vnd.docker.distribution.manifest.v2+json \
+              --query 'images[0].imageId.imageDigest' --output text
+          }
+          APP=$(digest "$VERSION")
+          MIG=$(digest "${VERSION}-migrations")
+          echo "daatan-app:$VERSION → $APP"
+          echo "daatan-app:${VERSION}-migrations → $MIG"
+          if [[ "$APP" != sha256:* || "$MIG" != sha256:* ]]; then
+            echo "::error::No image for version $VERSION in ECR (main builds push it from package.json's version)."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # The version tag must be the image built from this very commit: a tag
+            # whose name differs from package.json, or a version tag later
+            # overwritten by another commit, would otherwise ship something else.
+            SHA_APP=$(digest "sha-${GITHUB_SHA::7}")
+            SHA_MIG=$(digest "sha-${GITHUB_SHA::7}-migrations")
+            if [[ "$APP" != "$SHA_APP" || "$MIG" != "$SHA_MIG" ]]; then
+              echo "::error::daatan-app:$VERSION is not the image built from ${GITHUB_SHA::7} (sha tag → app $SHA_APP, migrations $SHA_MIG). Does the tag match package.json's version at that commit?"
+              exit 1
+            fi
+          fi
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          echo "migrations=$MIG" >> "$GITHUB_OUTPUT"
+
   # Deploy to PRODUCTION (on tag push only)
   deploy-production:
     name: Deploy to Production
-    needs: [build, build-app-image, build-migrations-image, deploy-staging]
+    needs: [resolve-release]
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -581,12 +714,7 @@ jobs:
       cancel-in-progress: false
     if: |
       always() &&
-      (needs.build.result == 'success') &&
-      (needs.build-app-image.result == 'success') &&
-      (needs.build-migrations-image.result == 'success') &&
-      (needs.deploy-staging.result == 'success' || needs.deploy-staging.result == 'skipped') &&
-      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
+      needs.resolve-release.result == 'success'
 
     steps:
       - name: Checkout repository
@@ -597,58 +725,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
-
-      - name: Get version from tag or input
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
-            VERSION=${{ github.event.inputs.version }}
-            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
-          else
-            echo "version=manual" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Verify Staging Version matches or exceeds Production
-        run: |
-          PROD_VERSION="${{ steps.version.outputs.version }}"
-          if [[ "$PROD_VERSION" == "manual" ]]; then
-            echo "Manual deployment, skipping version check."
-            exit 0
-          fi
-
-          function ver { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
-
-          # Staging deploy races with the tag push — poll for up to 10 minutes
-          # before giving up, so we never fail just because staging is still deploying.
-          MAX_ATTEMPTS=20
-          SLEEP_SECONDS=30
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            STAGING_VERSION=$(curl -s --connect-timeout 5 https://staging.daatan.com/api/health | jq -r .version 2>/dev/null || echo "error")
-
-            if [[ "$STAGING_VERSION" == "error" || "$STAGING_VERSION" == "null" ]]; then
-              echo "⚠️ Could not reach staging (attempt $i/$MAX_ATTEMPTS), retrying in ${SLEEP_SECONDS}s..."
-              sleep $SLEEP_SECONDS
-              continue
-            fi
-
-            echo "Staging: $STAGING_VERSION  |  Target: $PROD_VERSION  (attempt $i/$MAX_ATTEMPTS)"
-
-            if [ $(ver $PROD_VERSION) -le $(ver $STAGING_VERSION) ]; then
-              echo "✅ Version check passed."
-              exit 0
-            fi
-
-            if [ $i -lt $MAX_ATTEMPTS ]; then
-              echo "⏳ Staging not yet at $PROD_VERSION, retrying in ${SLEEP_SECONDS}s..."
-              sleep $SLEEP_SECONDS
-            fi
-          done
-
-          echo "❌ Staging did not reach v$PROD_VERSION after $((MAX_ATTEMPTS * SLEEP_SECONDS / 60)) minutes. Aborting."
-          exit 1
 
       - name: Check Instance SSM Health
         run: |
@@ -671,20 +747,16 @@ jobs:
       - name: Deploy to Production (SSM)
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+          APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.resolve-release.outputs.app_digest }}
+          MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.resolve-release.outputs.migrations_digest }}
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=prod" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
           echo "Found Production Instance: $INSTANCE_ID"
-
-          # Determine Image Tag
-          if [[ "${{ steps.version.outputs.version }}" != "manual" ]]; then
-            IMAGE_TAG="${{ steps.version.outputs.version }}"
-          else
-            IMAGE_TAG="staging-latest"
-          fi
-          echo "Deploying Image Tag: $IMAGE_TAG"
+          echo "Deploying $VERSION: $APP_IMAGE"
 
           RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
           DEPLOY_FILES="scripts/blue-green-deploy.sh scripts/cleanup-docker-images.sh scripts/fetch-secrets.sh scripts/verify-health.sh scripts/verify-logs.sh scripts/verify-deploy.sh docker-compose.prod.yml infra/nginx/nginx-prod-ssl.conf"
@@ -693,7 +765,7 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=instanceids,Values=$INSTANCE_ID" \
-            --comment "Deploy Production ${{ steps.version.outputs.version }}" \
+            --comment "Deploy Production $VERSION" \
             --timeout-seconds 600 \
             --parameters commands='[
               "set -e",
@@ -716,18 +788,19 @@ jobs:
               "echo \"🧹 Pruning old Docker images before pull...\"",
               "./scripts/cleanup-docker-images.sh 3 || echo \"  ⚠️ Cleanup failed (non-fatal, continuing)\"",
               "",
-              "echo \"⬇️ Pulling production image (tag: '"$IMAGE_TAG"')...\"",
-              "docker pull '"$ECR_REGISTRY"'/daatan-app:'"$IMAGE_TAG"'",
+              "echo \"⬇️ Pulling production image ('"$APP_IMAGE"')...\"",
+              "docker pull '"$APP_IMAGE"'",
               "",
               "echo \"🏷️ Tagging image as latest...\"",
-              "docker tag '"$ECR_REGISTRY"'/daatan-app:'"$IMAGE_TAG"' daatan-app:latest",
+              "docker tag '"$APP_IMAGE"' daatan-app:latest",
               "",
               "echo \"⬇️ Pulling migrations image...\"",
-              "docker pull '"$ECR_REGISTRY"'/daatan-app:'"$IMAGE_TAG"'-migrations",
-              "docker tag '"$ECR_REGISTRY"'/daatan-app:'"$IMAGE_TAG"'-migrations daatan-migrations:latest",
+              "docker pull '"$MIGRATIONS_IMAGE"'",
+              "docker tag '"$MIGRATIONS_IMAGE"' daatan-migrations:latest",
               "",
               "echo \"🚀 Executing blue-green deployment...\"",
               "export GIT_COMMIT='"${{ github.sha }}"'",
+              "export EXPECTED_VERSION='"$VERSION"'",
               "export SKIP_BUILD=true",
               "./scripts/blue-green-deploy.sh production"
             ]' \
@@ -741,7 +814,7 @@ jobs:
         with:
           command-id: ${{ env.COMMAND_ID }}
           health-url: https://daatan.com
-          app-version: ${{ needs.build.outputs.app_version }}
+          app-version: ${{ needs.resolve-release.outputs.version }}
 
       - name: Get merged PR info
         id: pr_info
@@ -768,7 +841,7 @@ jobs:
           MSG: |-
             ✅ [prod] Deployment successful
 
-            v${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}
+            v${{ needs.resolve-release.outputs.version }} · ${{ steps.pr_info.outputs.label }}
 
             <a href="${{ steps.pr_info.outputs.url }}">View changes →</a>
         run: |
@@ -786,7 +859,7 @@ jobs:
           MSG: |-
             ❌ [prod] Deployment failed
 
-            v${{ steps.version.outputs.version }} · ${{ steps.pr_info.outputs.label }}
+            v${{ needs.resolve-release.outputs.version }} · ${{ steps.pr_info.outputs.label }}
 
             <a href="${{ steps.pr_info.outputs.url }}">View changes →</a> · <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View logs →</a>
         run: |
