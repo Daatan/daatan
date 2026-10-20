@@ -33,9 +33,12 @@ fi
 
 fail=0
 
-APK_CERTS=$("$APKSIGNER" verify --print-certs "$APK" | sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: *//p' | norm | sort -u)
+echo "Using $APKSIGNER"
+APK_OUT=$("$APKSIGNER" verify --print-certs "$APK" 2>&1)
+APK_CERTS=$(printf '%s\n' "$APK_OUT" | sed -nE 's/^Signer.* certificate SHA-256 digest: *//p' | norm | sort -u)
 echo "APK signer SHA-256: ${APK_CERTS:-<none>}"
 if [ "$APK_CERTS" != "$EXPECTED" ]; then
+  printf '%s\n' "$APK_OUT"
   echo "::error::$APK is not signed (only) with the expected upload key"
   fail=1
 fi

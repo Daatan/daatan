@@ -60,6 +60,7 @@ env:
   PACKAGE_NAME: com.daatan.app
   # Exact Bubblewrap CLI version; bump by PR (the target-API floor check below catches a template that lags).
   BUBBLEWRAP_VERSION: '1.27.0'
+  BUILD_TOOLS_VERSION: '34.0.0'
   # SHA-256 of the upload key the CI keystore signs with -- the first entry of public/.well-known/assetlinks.json
   # (see android/README.md, "Digital Asset Links"). Play re-signs distributed APKs with its own app signing key,
   # so that one is not expected here. The build fails if the artifacts are signed with anything else.
@@ -105,7 +106,7 @@ jobs:
       - name: Install required SDK components
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-${MIN_TARGET_SDK}" "build-tools;34.0.0"
+          sdkmanager "platform-tools" "platforms;android-${MIN_TARGET_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
 
       - name: Point Bubblewrap at the JDK/Android SDK non-interactively
         run: |
@@ -203,6 +204,7 @@ jobs:
 
       - name: Verify artifact signatures
         run: |
+          export APKSIGNER="${ANDROID_HOME}/build-tools/${BUILD_TOOLS_VERSION}/apksigner"
           scripts/verify-android-signature.sh "$UPLOAD_KEY_SHA256" \
             android/app-release-signed.apk android/app-release-bundle.aab \
             public/.well-known/assetlinks.json
