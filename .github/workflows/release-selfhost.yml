@@ -27,11 +27,17 @@ jobs:
 
       - name: Resolve image name and version
         id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          OWNER=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
           echo "image=ghcr.io/$OWNER/daatan-selfhost" >> "$GITHUB_OUTPUT"
-          VER="${{ inputs.version }}"
+          VER="$INPUT_VERSION"
           [ -z "$VER" ] && VER="$(node -p "require('./package.json').version")"
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be X.Y.Z (e.g. 1.18.25); got '$VER'"
+            exit 1
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "Publishing ghcr.io/$OWNER/daatan-selfhost:$VER"
 

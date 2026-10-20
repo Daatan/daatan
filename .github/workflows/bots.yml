@@ -35,8 +35,10 @@ jobs:
 
     steps:
       - name: Trigger bot runner
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: |
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          [[ "$DRY_RUN" =~ ^(true|false)$ ]] || { echo "::error::dry_run must be true or false"; exit 1; }
           URL="${{ secrets.STAGING_URL }}/api/bots/run"
 
           echo "Triggering bot runner at $URL (dry=$DRY_RUN)"

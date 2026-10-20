@@ -45,6 +45,9 @@ jobs:
           LIMIT: ${{ github.event.inputs.limit || '25' }}
           CALLS: ${{ github.event.inputs.calls || '3' }}
         run: |
+          [[ "$PICK" =~ ^(staging|production|both)$ ]] || { echo "::error::environment must be staging, production or both"; exit 1; }
+          [[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || { echo "::error::limit must be a positive integer"; exit 1; }
+          [[ "$CALLS" =~ ^[0-9]{1,4}$ ]] || { echo "::error::calls must be a positive integer"; exit 1; }
           ENV="${{ matrix.env }}"
           if [ "$PICK" != "both" ] && [ "$PICK" != "$ENV" ]; then
             echo "Skipping $ENV (dispatched for $PICK)"; exit 0

@@ -25,13 +25,15 @@ jobs:
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
           BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          TARGET: ${{ inputs.target }}
         run: |
-          if [ "${{ inputs.target }}" = "production" ]; then
+          [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::target must be staging or production"; exit 1; }
+          if [ "$TARGET" = "production" ]; then
             BASE="https://daatan.com"
           else
             BASE="$STAGING_URL"
           fi
-          if [ -z "$BASE" ]; then echo "❌ No URL configured for ${{ inputs.target }}"; exit 1; fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
 
           after=""
           total=0

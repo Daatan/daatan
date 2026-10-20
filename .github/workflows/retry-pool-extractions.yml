@@ -46,6 +46,9 @@ jobs:
           LIMIT: ${{ inputs.limit || '2' }}
           MAX_ROUNDS: ${{ inputs.max_rounds || '60' }}
         run: |
+          [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::target must be staging or production"; exit 1; }
+          [[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || { echo "::error::limit must be a positive integer"; exit 1; }
+          [[ "$MAX_ROUNDS" =~ ^[0-9]{1,5}$ ]] || { echo "::error::max_rounds must be a positive integer"; exit 1; }
           if [ "$TARGET" = "production" ]; then
             BASE="https://daatan.com"
           else
