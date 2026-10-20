@@ -587,8 +587,9 @@ jobs:
 
   # Resolve which image a production deploy ships. A `v*` tag never rebuilds
   # (daatan#1954): it waits for this commit's main-branch staging deploy to
-  # succeed, then promotes the exact digest that deploy ran. A manual production
-  # dispatch must name an existing version.
+  # succeed; deploy-production then ships the exact digest that deploy ran. A
+  # manual production dispatch must name an existing version. No AWS access here:
+  # the OIDC role only trusts main and the production environment (platform#34).
   resolve-release:
     name: Resolve Release Image
     needs: build
@@ -599,14 +600,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
       actions: read
     timeout-minutes: 40
     outputs:
       version: ${{ steps.version.outputs.version }}
-      app_digest: ${{ steps.digests.outputs.app }}
-      migrations_digest: ${{ steps.digests.outputs.migrations }}
     steps:
       - name: Get version from tag or input
         id: version
@@ -660,6 +658,27 @@ jobs:
           echo "::error::Timed out after 30 min waiting for the staging deploy of ${GITHUB_SHA::7}. Only commits merged to main can be released."
           exit 1
 
+  # Deploy to PRODUCTION (on tag push only)
+  deploy-production:
+    name: Deploy to Production
+    needs: [resolve-release]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    if: |
+      always() &&
+      needs.resolve-release.result == 'success'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -669,7 +688,7 @@ jobs:
       - name: Resolve image digests
         id: digests
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.resolve-release.outputs.version }}
         run: |
           digest() {
             aws ecr batch-get-image --repository-name daatan-app --image-ids "imageTag=$1" \
@@ -699,33 +718,6 @@ jobs:
           echo "app=$APP" >> "$GITHUB_OUTPUT"
           echo "migrations=$MIG" >> "$GITHUB_OUTPUT"
 
-  # Deploy to PRODUCTION (on tag push only)
-  deploy-production:
-    name: Deploy to Production
-    needs: [resolve-release]
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      id-token: write
-      contents: read
-    timeout-minutes: 30
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    if: |
-      always() &&
-      needs.resolve-release.result == 'success'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: eu-central-1
-
       - name: Check Instance SSM Health
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -748,8 +740,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.resolve-release.outputs.version }}
-          APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.resolve-release.outputs.app_digest }}
-          MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ needs.resolve-release.outputs.migrations_digest }}
+          APP_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ steps.digests.outputs.app }}
+          MIGRATIONS_IMAGE: ${{ env.ECR_REGISTRY }}/daatan-app@${{ steps.digests.outputs.migrations }}
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=prod" \

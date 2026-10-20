@@ -58,9 +58,9 @@ git push origin vX.Y.Z
 
 The tag push does **not** rebuild anything or redeploy staging. It runs the tests, then:
 1. `resolve-release` waits for this commit's `main` run to finish `Deploy to Staging`
-   successfully (up to 30 min) and checks that ECR's `X.Y.Z` / `X.Y.Z-migrations` are the
-   images built from this commit (`sha-<commit>` digests)
-2. `deploy-production` pulls those digests and runs the full blue-green deploy on production
+   successfully (up to 30 min)
+2. `deploy-production` checks that ECR's `X.Y.Z` / `X.Y.Z-migrations` are the images built
+   from this commit (`sha-<commit>` digests), pulls those digests and runs the full blue-green deploy on production
 
 So tag a `main` commit whose staging deploy succeeded — normally the current HEAD. A commit
 whose `main` build was cancelled by a newer merge was never on staging and cannot be released.
@@ -153,19 +153,19 @@ Both jobs output the pushed digest; deploys pull by digest, not by tag.
 2. **Tag only:** wait (up to 30 min) for this commit's `main` run to finish `Deploy to Staging`
    successfully. Fails if it failed, was cancelled or superseded by a newer merge — tag the
    current `main` HEAD instead. Does not touch staging itself, so weekend releases work while
-   staging sleeps.
-3. Look up the ECR digests of `X.Y.Z` and `X.Y.Z-migrations`; on a tag, require they equal
+   staging sleeps. Needs no AWS credentials.
+
+### `deploy-production` job (`environment: production`)
+
+1. Configure AWS credentials (the OIDC role trusts only `main` and this environment)
+2. Look up the ECR digests of `X.Y.Z` and `X.Y.Z-migrations`; on a tag, require they equal
    `sha-<commit>` / `sha-<commit>-migrations` (i.e. the images built from this very commit)
-
-### `deploy-production` job
-
-1. Configure AWS credentials
-2. Check EC2 SSM health (`Environment=prod` instance)
-3. SSM command:
-   - Pull the app and migrations images by the digests `resolve-release` found
+3. Check EC2 SSM health (`Environment=prod` instance)
+4. SSM command:
+   - Pull the app and migrations images by those digests
    - Run `blue-green-deploy.sh production` with `EXPECTED_VERSION` set
-4. Poll + verify (via `.github/actions/ssm-deploy`)
-5. Send Telegram notification (to `TELEGRAM_CLEAN_CHAT_ID`, falling back to `TELEGRAM_CHAT_ID`)
+5. Poll + verify (via `.github/actions/ssm-deploy`)
+6. Send Telegram notification (to `TELEGRAM_CLEAN_CHAT_ID`, falling back to `TELEGRAM_CHAT_ID`)
 
 ### Composite action: `.github/actions/ssm-deploy`
 
