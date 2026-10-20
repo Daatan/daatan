@@ -104,7 +104,10 @@ jobs:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           NEXTAUTH_SECRET: "dummy-secret-for-build-long-enough-32-chars-!!"
           SKIP_ENV_VALIDATION: 1
-        run: ./scripts/run-related-tests.sh ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::unexpected base sha '$BASE_SHA'"; exit 1; }
+          ./scripts/run-related-tests.sh "$BASE_SHA"
 
   # Push to main (or a tag): run the full suite as a safety net, sharded
   # across 4 parallel runners instead of one serial `npm test` (measured

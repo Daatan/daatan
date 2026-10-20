@@ -44,6 +44,8 @@ jobs:
           DRY_RUN: ${{ inputs.dryRun && '1' || '0' }}
           LIMIT: ${{ inputs.limit }}
         run: |
+          [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::target must be staging or production"; exit 1; }
+          [[ "$LIMIT" =~ ^[0-9]{0,4}$ ]] || { echo "::error::limit must be a positive integer"; exit 1; }
           if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
           if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
           QS="?x=1"

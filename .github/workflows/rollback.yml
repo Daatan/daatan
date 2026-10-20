@@ -31,8 +31,23 @@ jobs:
       id-token: write
       contents: read
     timeout-minutes: 30
+    env:
+      ROLLBACK_ENV: ${{ inputs.environment }}
+      ROLLBACK_VERSION: ${{ inputs.version }}
+      ROLLBACK_REASON: ${{ inputs.reason }}
 
     steps:
+      - name: Validate inputs
+        run: |
+          if [[ ! "$ROLLBACK_ENV" =~ ^(production|staging)$ ]]; then
+            echo "::error::environment must be production or staging"
+            exit 1
+          fi
+          if [[ ! "$ROLLBACK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be X.Y.Z (e.g. 1.7.174)"
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -67,28 +82,28 @@ jobs:
             print(f'  {v}')
           " || echo "  (could not parse tags)"
           echo ""
-          echo "  You entered version: ${{ inputs.version }}"
+          echo "  You entered version: $ROLLBACK_VERSION"
           echo "=========================================="
 
       - name: Verify ECR image tag exists
         run: |
-          echo "Checking ECR for image tag: ${{ inputs.version }}"
+          echo "Checking ECR for image tag: $ROLLBACK_VERSION"
           if ! aws ecr describe-images \
               --repository-name daatan-app \
-              --image-ids imageTag=${{ inputs.version }} \
+              --image-ids "imageTag=$ROLLBACK_VERSION" \
               --region eu-central-1 \
               --output text > /dev/null 2>&1; then
-            echo "ERROR: Image tag '${{ inputs.version }}' not found in ECR repository 'daatan-app'"
+            echo "ERROR: Image tag '$ROLLBACK_VERSION' not found in ECR repository 'daatan-app'"
             echo ""
             echo "Tip: Look at the 'List available versions' step above to see valid options."
             exit 1
           fi
-          echo "Image tag '${{ inputs.version }}' confirmed in ECR ✅"
+          echo "Image tag '$ROLLBACK_VERSION' confirmed in ECR ✅"
 
       - name: Find EC2 instance
         id: instance
         run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
+          if [ "$ROLLBACK_ENV" = "production" ]; then
             ENV_TAG="prod"
           else
             ENV_TAG="staging"
@@ -113,7 +128,7 @@ jobs:
         # if it is not Online that is an incident, not a schedule.
         run: |
           INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
-          if [ "${{ inputs.environment }}" != "production" ]; then
+          if [ "$ROLLBACK_ENV" != "production" ]; then
             STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
               --query "Reservations[0].Instances[0].State.Name" --output text)
             echo "Instance $INSTANCE_ID state: $STATE"
@@ -133,7 +148,7 @@ jobs:
               --output text)
             echo "Instance $INSTANCE_ID PingStatus: $PING_STATUS ($i/30)"
             [[ "$PING_STATUS" == "Online" ]] && exit 0
-            [ "${{ inputs.environment }}" = "production" ] && break
+            [ "$ROLLBACK_ENV" = "production" ] && break
             sleep 10
           done
           echo "ERROR: Instance is $PING_STATUS. SSM command will fail."
@@ -145,7 +160,7 @@ jobs:
         run: |
           RAW_BASE="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}"
 
-          if [ "${{ inputs.environment }}" = "production" ]; then
+          if [ "$ROLLBACK_ENV" = "production" ]; then
             DEPLOY_FILES="scripts/blue-green-deploy.sh scripts/verify-health.sh scripts/verify-logs.sh scripts/verify-deploy.sh docker-compose.prod.yml infra/nginx/nginx-prod-ssl.conf"
             LOCAL_TAG="daatan-app:latest"
             BG_ENV="production"
@@ -155,16 +170,20 @@ jobs:
             BG_ENV="staging"
           fi
 
-          IMAGE_TAG="${{ inputs.version }}"
+          IMAGE_TAG="$ROLLBACK_VERSION"
           FULL_IMAGE="$ECR_REGISTRY/daatan-app:$IMAGE_TAG"
 
-          echo "Sending rollback SSM command..."
-          COMMAND_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=instanceids,Values=${{ steps.instance.outputs.instance_id }}" \
-            --comment "Rollback ${{ inputs.environment }} to ${{ inputs.version }}" \
-            --timeout-seconds 600 \
-            --parameters commands='[
+          # Build the SSM parameters with jq so every value is JSON-encoded.
+          PARAMS=$(jq -nc \
+            --arg files "$DEPLOY_FILES" \
+            --arg token "$GH_TOKEN" \
+            --arg raw "$RAW_BASE" \
+            --arg registry "$ECR_REGISTRY" \
+            --arg image "$FULL_IMAGE" \
+            --arg local_tag "$LOCAL_TAG" \
+            --arg image_tag "$IMAGE_TAG" \
+            --arg bg_env "$BG_ENV" \
+            '{commands: [
               "set -e",
               "export HOME=/home/ubuntu",
               "export PATH=$PATH:/usr/local/bin:/usr/bin",
@@ -172,29 +191,37 @@ jobs:
               "echo \"📦 Downloading deploy scripts from GitHub...\"",
               "mkdir -p ~/app/scripts ~/app/infra/nginx",
               "cd ~/app",
-              "for f in '"$DEPLOY_FILES"'; do curl -sfL -H \"Authorization: token '"$GH_TOKEN"'\" \"'"$RAW_BASE"'/$f\" -o \"$f\" && echo \"  OK: $f\" || { echo \"  FAIL: $f\"; exit 1; }; done",
+              "for f in \($files); do curl -sfL -H \"Authorization: token \($token)\" \"\($raw)/$f\" -o \"$f\" && echo \"  OK: $f\" || { echo \"  FAIL: $f\"; exit 1; }; done",
               "chmod +x scripts/*.sh",
               "",
               "echo \"🔐 Logging in to ECR...\"",
-              "aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin '"$ECR_REGISTRY"'",
+              "aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin \($registry)",
               "",
-              "echo \"⬇️ Pulling rollback image: '"$FULL_IMAGE"'\"",
-              "docker pull '"$FULL_IMAGE"'",
+              "echo \"⬇️ Pulling rollback image: \($image)\"",
+              "docker pull \($image)",
               "",
-              "echo \"🏷️ Tagging image as '"$LOCAL_TAG"'\"",
-              "docker tag '"$FULL_IMAGE"' '"$LOCAL_TAG"'",
+              "echo \"🏷️ Tagging image as \($local_tag)\"",
+              "docker tag \($image) \($local_tag)",
               "",
               "echo \"🔄 Executing blue-green rollback deployment...\"",
-              "export GIT_COMMIT=rollback-'"$IMAGE_TAG"'",
+              "export GIT_COMMIT=rollback-\($image_tag)",
               "export SKIP_BUILD=true",
-              "export ECR_REGISTRY='"$ECR_REGISTRY"'",
-              "export IMAGE_TAG='"$IMAGE_TAG"'",
-              "./scripts/blue-green-deploy.sh '"$BG_ENV"'"
-            ]' \
+              "export ECR_REGISTRY=\($registry)",
+              "export IMAGE_TAG=\($image_tag)",
+              "./scripts/blue-green-deploy.sh \($bg_env)"
+            ]}')
+
+          echo "Sending rollback SSM command..."
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=instanceids,Values=${{ steps.instance.outputs.instance_id }}" \
+            --comment "Rollback $ROLLBACK_ENV to $ROLLBACK_VERSION" \
+            --timeout-seconds 600 \
+            --parameters "$PARAMS" \
             --output text \
             --query "Command.CommandId")
 
-          echo "COMMAND_ID=$COMMAND_ID" >> $GITHUB_ENV
+          echo "COMMAND_ID=$COMMAND_ID" >> "$GITHUB_ENV"
           echo "SSM Command ID: $COMMAND_ID"
 
       - name: Wait for SSM command to complete
@@ -255,7 +282,7 @@ jobs:
       - name: Verify rollback health
         if: success()
         run: |
-          if [ "${{ inputs.environment }}" = "production" ]; then
+          if [ "$ROLLBACK_ENV" = "production" ]; then
             HEALTH_URL="https://daatan.com/api/health"
           else
             HEALTH_URL="https://staging.daatan.com/api/health"
@@ -265,27 +292,27 @@ jobs:
           for i in 1 2 3 4 5; do
             RUNNING_VER=$(curl -sf --connect-timeout 5 "$HEALTH_URL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version','unknown'))" 2>/dev/null || echo "unreachable")
             echo "Attempt $i: running version = $RUNNING_VER"
-            if [ "$RUNNING_VER" = "${{ inputs.version }}" ]; then
-              echo "✅ Confirmed: ${{ inputs.environment }} is running v${{ inputs.version }}"
+            if [ "$RUNNING_VER" = "$ROLLBACK_VERSION" ]; then
+              echo "✅ Confirmed: $ROLLBACK_ENV is running v$ROLLBACK_VERSION"
               exit 0
             fi
             sleep 10
           done
-          echo "⚠️ Warning: health endpoint reports version '$RUNNING_VER', expected '${{ inputs.version }}'"
+          echo "⚠️ Warning: health endpoint reports version '$RUNNING_VER', expected '$ROLLBACK_VERSION'"
           echo "The deployment may still be stabilizing — check manually."
 
       - name: Notify Telegram - Rollback Success
         if: success()
         run: |
-          REASON="${{ inputs.reason }}"
+          REASON="$ROLLBACK_REASON"
           REASON_TEXT=""
           if [ -n "$REASON" ]; then
             REASON_TEXT="%0AReason: $REASON"
           fi
-          MSG="🔄 [${{ inputs.environment }}] Rollback to v${{ inputs.version }} complete.$REASON_TEXT%0A%0ATriggered by: ${{ github.actor }}%0A<a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View logs</a>"
+          MSG="🔄 [$ROLLBACK_ENV] Rollback to v$ROLLBACK_VERSION complete.$REASON_TEXT%0A%0ATriggered by: $GITHUB_ACTOR%0A<a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View logs</a>"
           # Prod rollback → clean channel; staging stays noisy
           CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          if [ "${{ inputs.environment }}" = "production" ]; then
+          if [ "$ROLLBACK_ENV" = "production" ]; then
             CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
             CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
           fi
@@ -298,15 +325,15 @@ jobs:
       - name: Notify Telegram - Rollback Failed
         if: failure()
         run: |
-          REASON="${{ inputs.reason }}"
+          REASON="$ROLLBACK_REASON"
           REASON_TEXT=""
           if [ -n "$REASON" ]; then
             REASON_TEXT="%0AReason: $REASON"
           fi
-          MSG="❌ [${{ inputs.environment }}] Rollback to v${{ inputs.version }} FAILED. Manual intervention required.$REASON_TEXT%0A%0A<a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View logs</a>"
+          MSG="❌ [$ROLLBACK_ENV] Rollback to v$ROLLBACK_VERSION FAILED. Manual intervention required.$REASON_TEXT%0A%0A<a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View logs</a>"
           # Prod rollback failure → clean channel; staging stays noisy
           CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          if [ "${{ inputs.environment }}" = "production" ]; then
+          if [ "$ROLLBACK_ENV" = "production" ]; then
             CHAT_ID="${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}"
             CHAT_ID="${CHAT_ID:-${{ secrets.TELEGRAM_CHAT_ID }}}"
           fi

@@ -54,8 +54,11 @@ jobs:
 
       - name: Run the check on the Oracle box
         id: check
+        env:
+          TEST_MESSAGE: ${{ inputs.test_message || 'none' }}
         run: |
           set -euo pipefail
+          [[ "$TEST_MESSAGE" =~ ^(none|alert|blip|recovered)$ ]] || { echo "::error::test_message must be none, alert, blip or recovered"; exit 1; }
           # Ship the script's content (no secrets in it) rather than a token-bearing curl —
           # same reasoning as watchdog.yml's disk check (daatan#1726).
           SCRIPT_B64=$(base64 -w 0 scripts/check-oracle-jev.sh)
@@ -94,8 +97,8 @@ jobs:
             echo "top_b64=$(printf '%s' "$TOP" | base64 -w 0)"
           } >> "$GITHUB_OUTPUT"
           # Manual check of the Telegram leg: keep the real counts, force the message.
-          if [ "${{ inputs.test_message || 'none' }}" != "none" ]; then
-            echo "action=${{ inputs.test_message }}" >> "$GITHUB_OUTPUT"
+          if [ "$TEST_MESSAGE" != "none" ]; then
+            echo "action=$TEST_MESSAGE" >> "$GITHUB_OUTPUT"
             echo "test=true" >> "$GITHUB_OUTPUT"
           fi
           if [ "$ACTION" = "error" ]; then
