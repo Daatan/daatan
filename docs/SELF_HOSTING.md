@@ -180,7 +180,7 @@ v1 is a **pure manual forecasting tool**: create questions, commit, resolve, and
 Notes:
 - **Easiest path:** an admin pastes the OpenRouter key under **Admin → Settings** (§3a) — no `.env` edit, no restart. The `OPENROUTER_API_KEY` env var is just a seed for the same setting.
 - On a self-host without a search backend, **Express runs LLM-only** (generates a structured forecast from your text, no web search) — which is the common case. "Analyze" stays hidden until you add the Oracul.
-- `OPENROUTER_MODEL` (or the Model field in Settings) overrides the default model (`openai/gpt-4o-mini`).
+- `OPENROUTER_MODEL` (or the Model field in Settings) overrides the default model (`openai/gpt-5-mini`).
 - `ENABLE_AI_FEATURES=true` is an explicit override; normally a key is enough.
 - Providers degrade gracefully relative to one another, in registration order: Gemini → the Oracul's `/llm` (only when `ORACLE_URL`/`ORACLE_API_KEY` are set) → OpenRouter → Ollama. Only configured legs register.
 
