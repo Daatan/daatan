@@ -48,14 +48,18 @@ export async function callLLMWithTimeout(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let timeoutId: NodeJS.Timeout | undefined
     try {
+      // timeoutMs is the budget of ONE provider leg. The overall deadline covers
+      // the whole chain (every leg gets its own timeoutMs), so a slow first leg
+      // no longer leaves the fallbacks with an already-aborted signal (#1947).
+      const overallMs = timeoutMs * Math.max(1, llm.legCount ?? 1)
       const controller = new AbortController()
-      timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+      timeoutId = setTimeout(() => controller.abort(), overallMs)
 
       const result = await Promise.race([
-        llm.generateContent({ prompt, temperature, schema, signal: controller.signal }),
+        llm.generateContent({ prompt, temperature, schema, signal: controller.signal, legTimeoutMs: timeoutMs }),
         new Promise<never>((_, reject) => {
           controller.signal.addEventListener('abort', () => {
-            reject(new Error(`LLM call timeout after ${timeoutMs}ms`))
+            reject(new Error(`LLM call timeout after ${overallMs}ms`))
           })
         }),
       ])
