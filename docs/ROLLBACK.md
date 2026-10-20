@@ -48,6 +48,8 @@ git log --oneline -20
 
 Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the version number from `package.json` at build time — pushed on every merge to `main`, not only on releases, so a staging-only version is also a valid rollback target. The workflow's "List available versions" step prints the newest ones.
 
+**Retention (`terraform/ecr.tf`):** each production deploy also tags its images `release-X.Y.Z` / `release-X.Y.Z-migrations`; the last 30 releases are kept. Version images that never reached prod expire after 7 days, untagged ones after 1 day. To see every rollback target: `aws ecr list-images --repository-name daatan-app --filter tagStatus=TAGGED --query 'imageIds[?starts_with(imageTag,\`release-\`)].imageTag'`.
+
 ---
 
 ## Option A: GitHub Actions rollback workflow (preferred)

@@ -24,10 +24,27 @@ resource "aws_ecr_repository" "daatan_app" {
 resource "aws_ecr_lifecycle_policy" "daatan_app_policy" {
   repository = aws_ecr_repository.daatan_app.name
 
+  # An image belongs to the first rule (by priority) whose tag selection it
+  # matches; lower-priority rules can't expire it. Every main merge pushes an
+  # X.Y.Z image, so "last N version images" is only a day or two of history
+  # (daatan#1959). deploy.yml adds release-X.Y.Z[-migrations] to what actually
+  # shipped to prod; those are the rollback window. One pattern per rule:
+  # entries within one tagPatternList are ANDed.
   policy = jsonencode({
     rules = [
       {
         rulePriority = 1
+        description  = "Keep the last 60 prod-released images (30 releases x app+migrations)"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["release-*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = 60
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
         description  = "Expire PR preview images after 14 days"
         selection = {
           tagStatus     = "tagged"
@@ -39,7 +56,19 @@ resource "aws_ecr_lifecycle_policy" "daatan_app_policy" {
         action = { type = "expire" }
       },
       {
-        rulePriority = 2
+        rulePriority = 3
+        description  = "Keep unreleased version images 7 days (tag-to-prod candidates)"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["*.*.*"]
+          countType      = "sinceImagePushed"
+          countUnit      = "days"
+          countNumber    = 7
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 4
         description  = "Remove untagged images after 1 day"
         selection = {
           tagStatus   = "untagged"
@@ -50,12 +79,13 @@ resource "aws_ecr_lifecycle_policy" "daatan_app_policy" {
         action = { type = "expire" }
       },
       {
-        rulePriority = 3
-        description  = "Keep last 60 images overall (~20 releases x app+migrations)"
+        rulePriority = 5
+        description  = "Anything else (sha-only staging dispatch builds) after 14 days"
         selection = {
           tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 60
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 14
         }
         action = { type = "expire" }
       }
