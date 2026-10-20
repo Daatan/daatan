@@ -9,6 +9,10 @@ import type { Bot, BotLog, BotRunSummary } from './_bots/types'
 import { SubmitProgress, type ProgressStep } from '@/components/forecasts/SubmitProgress'
 import { getEstimate, recordDuration, type TimingKey } from '@/lib/forecast-timing'
 
+// "Run now" is a 202 + poll (#1947): the run outlasts nginx's proxy timeout.
+const BOT_RUN_POLL_MS = 3000
+const BOT_RUN_POLL_MAX_MS = 10 * 60_000
+
 // "Run now" progress phases (daatan#1139), mirroring runner.ts's RunMetrics
 // stages: RSS/Oracul fetch, hot-topic detection, dedup+LLM generation, stake.
 const BOT_RUN_STEP_KEYS = ['fetch', 'detect', 'generate', 'stake'] as const
@@ -95,8 +99,8 @@ export default function BotsTable() {
     setRunningBots((s) => new Set(s).add(botId))
     setRunResult(null)
 
-    // Calibrated step-progress feedback (daatan#1139): the run route stays a
-    // plain blocking request, so step transitions are client-scheduled
+    // Calibrated step-progress feedback (daatan#1139): the run route returns 202
+    // and is polled, with no per-phase progress, so step transitions are client-scheduled
     // setTimeouts against per-device estimates — no server push involved.
     const estimates = BOT_RUN_STEP_KEYS.map((key) => getEstimate(BOT_RUN_TIMING_KEY[key]))
     setRunSteps((r) => ({ ...r, [botId]: botRunSteps(0) }))
@@ -113,8 +117,26 @@ export default function BotsTable() {
     const runStart = elapsedClock()
     try {
       const res = await fetch(`/api/admin/bots/${botId}/run${dryRun ? '?dry=true' : ''}`, { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
+      let data = await res.json()
+      // 202: the run continues server-side (#1947); poll until it settles.
+      if (res.status === 202) {
+        const pollDeadline = elapsedClock() + BOT_RUN_POLL_MAX_MS
+        do {
+          await new Promise((resolve) => setTimeout(resolve, BOT_RUN_POLL_MS))
+          const poll = await fetch(`/api/admin/bots/${botId}/run`)
+          data = await poll.json()
+          if (!poll.ok || data.status === 'failed') {
+            data = { error: data.error ?? t('requestFailed') }
+            break
+          }
+          if (data.status === 'none') {
+            data = { error: t('requestFailed') }
+            break
+          }
+        } while (data.status === 'running' && elapsedClock() < pollDeadline)
+        if (data.status === 'running') data = { error: t('requestFailed') }
+      }
+      if (data.summary) {
         setRunResult(data.summary)
         const s = data.summary
         flash(
@@ -135,8 +157,7 @@ export default function BotsTable() {
       setRunSteps((r) => { const n = { ...r }; delete n[botId]; return n })
       setRunningBots((s) => { const n = new Set(s); n.delete(botId); return n })
 
-      // No per-phase breakdown comes back from the (still blocking) run
-      // route, so split the observed total across the phases proportional
+      // No per-phase breakdown comes back from the run route, so split the observed total across the phases proportional
       // to their current estimates — self-correcting as each phase's share
       // of the total drifts toward reality over repeated runs.
       const totalMs = elapsedClock() - runStart

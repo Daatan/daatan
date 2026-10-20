@@ -184,7 +184,8 @@ All endpoints require an authenticated `ADMIN` session (NextAuth role check).
 | `PATCH` | `/api/admin/bots/:id` | Update bot configuration fields. |
 | `DELETE` | `/api/admin/bots/:id` | Soft-delete: sets `isActive=false`. |
 | `GET` | `/api/admin/bots/:id/logs` | Paginated run log (default 20/page, max 50). |
-| `POST` | `/api/admin/bots/:id/run` | Manually trigger a bot. Add `?dry=true` for dry-run mode. |
+| `POST` | `/api/admin/bots/:id/run` | Manually trigger a bot. Add `?dry=true` for dry-run mode. Returns `202` at once; the run continues in-process (a second POST while one is running joins it). |
+| `GET` | `/api/admin/bots/:id/run` | State of the latest manual run: `running` / `done` (+`summary`) / `failed` (+`error`) / `none`. Held in memory for 10 min after it finishes; lost on restart. |
 
 ### Manual trigger (dry-run vs live)
 
