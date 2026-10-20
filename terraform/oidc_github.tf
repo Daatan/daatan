@@ -220,6 +220,29 @@ resource "aws_iam_role_policy" "github_actions_model_audit" {
   })
 }
 
+# CloudWatch alarms (read-only) — for the watchdog's "firing alarms" check
+# (.github/workflows/watchdog.yml, step "Check CloudWatch alarms in ALARM
+# state"). Was attached by hand when that step landed (f21482a2) and lived
+# outside Terraform until imported: `terraform import
+# aws_iam_role_policy.github_actions_cloudwatch_alarms
+# daatan-github-actions-prod:daatan-github-cloudwatch-alarms`. Resource="*"
+# matches the live policy exactly so the import is a no-op.
+resource "aws_iam_role_policy" "github_actions_cloudwatch_alarms" {
+  name = "daatan-github-cloudwatch-alarms"
+  role = aws_iam_role.github_actions.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:DescribeAlarms"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 output "github_actions_role_arn" {
   description = "ARN of the IAM role for GitHub Actions OIDC"
   value       = aws_iam_role.github_actions.arn
