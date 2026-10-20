@@ -14,8 +14,6 @@ import {
   checkEvidenceHealth,
   alertKey,
   PANEL_402_LOOKBACK_HOURS,
-  BATCH_HEARTBEAT_REPO,
-  BATCH_HEARTBEAT_PATH,
   BATCH_HEARTBEAT_STALE_HOURS,
 } from '@/lib/services/evidence-health'
 import { USABLE_POOL_ROW_WHERE, isUsablePoolRow } from '@/lib/services/evidence-pool'
@@ -26,17 +24,36 @@ const findActive = vi.mocked(prisma.prediction.findMany)
 const alerts = vi.mocked(prisma.evidenceHealthAlert)
 const panel402 = vi.mocked(prisma.panelPaymentFailure.findMany)
 
-// The batch-heartbeat check (retro#556) reads the GitHub commits API; every test
-// gets a fresh heartbeat by default so the pool checks are exercised undisturbed.
+vi.mock('@/lib/services/oracleClient', () => ({ getOracleBaseUrl: vi.fn(() => 'https://oracle.test') }))
+import { getOracleBaseUrl } from '@/lib/services/oracleClient'
+
+// The batch-heartbeat check (retro#556/#996) reads `batch_loop` off Oracul /health;
+// every test gets a fresh heartbeat by default so the pool checks are exercised undisturbed.
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
-function heartbeatResponse(ageHours: number) {
-  const date = new Date(Date.now() - ageHours * 60 * 60 * 1000).toISOString()
+const hoursAgoIso = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString()
+
+function heartbeatResponse(
+  ageHours: number,
+  overrides: Partial<{ last_cycle_ok_at: string | null; oldest_unpushed_at: string | null }> = {},
+) {
+  const at = hoursAgoIso(ageHours)
   return {
     ok: true,
     status: 200,
-    json: async () => [{ commit: { committer: { date } } }],
+    json: async () => ({
+      status: 'ok',
+      batch_loop: {
+        last_cycle_at: at,
+        last_cycle_ok: true,
+        last_cycle_ok_at: at,
+        head: '3a1c1c2059',
+        oldest_unpushed_at: null,
+        cells: { done: 1354, no_predictions: 655, failed: 0, pending: 0 },
+        ...overrides,
+      },
+    }),
   }
 }
 
@@ -304,27 +321,14 @@ describe('checkEvidenceHealth', () => {
       stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, { 'ynet.co.il': { total: 400, failed: 100 } })
     })
 
-    // retro#838: the loop wedged on a stale `.git/rebase-merge` on 2026-08-23 and
-    // the atlas stopped for 27 days, while `data/progress.json` kept committing
-    // through `ec2_run.sh`'s forgiving push path — so the old watched path both
-    // missed the outage and flapped. Pin the path itself: a revert to
-    // `data/progress.json` restores a check that reports green through a dead loop.
-    it('watches the rendered atlas, not the progress file', () => {
-      expect(BATCH_HEARTBEAT_PATH).toBe('factum_atlas.html')
-    })
-
-    it('asks GitHub for the newest commit touching the watched batch-loop file', async () => {
+    it('reads the heartbeat off Oracul /health, not the GitHub commits API', async () => {
       await checkEvidenceHealth()
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        `https://api.github.com/repos/${BATCH_HEARTBEAT_REPO}/commits?path=${encodeURIComponent(
-          BATCH_HEARTBEAT_PATH,
-        )}&per_page=1`,
-        expect.objectContaining({ headers: { Accept: 'application/vnd.github+json' } }),
-      )
+      expect(fetchMock).toHaveBeenCalledWith('https://oracle.test/health', expect.anything())
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('api.github.com'))).toBe(false)
     })
 
-    it('fires when the newest atlas commit is older than the threshold', async () => {
+    it('fires no_cycle when no cycle has finished within the threshold', async () => {
       fetchMock.mockResolvedValue(heartbeatResponse(BATCH_HEARTBEAT_STALE_HOURS + 1))
 
       const { fired } = await checkEvidenceHealth()
@@ -332,15 +336,52 @@ describe('checkEvidenceHealth', () => {
       expect(fired).toEqual([
         {
           kind: 'batch_heartbeat_stale',
+          reason: 'no_cycle',
           hoursSince: BATCH_HEARTBEAT_STALE_HOURS + 1,
           thresholdHours: BATCH_HEARTBEAT_STALE_HOURS,
-          lastCommitAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          since: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+          head: '3a1c1c2059',
         },
       ])
     })
 
-    it('stays silent while the loop keeps committing', async () => {
-      fetchMock.mockResolvedValue(heartbeatResponse(2))
+    // The index.lock class: the loop keeps cycling, every cycle refuses to sync.
+    it('fires cycles_failing when cycles run but none succeeded within the threshold', async () => {
+      fetchMock.mockResolvedValue(
+        heartbeatResponse(0.1, { last_cycle_ok_at: hoursAgoIso(BATCH_HEARTBEAT_STALE_HOURS + 5) }),
+      )
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([
+        expect.objectContaining({ kind: 'batch_heartbeat_stale', reason: 'cycles_failing', hoursSince: 17 }),
+      ])
+    })
+
+    it('treats a null last_cycle_ok_at as stale, not as unknown', async () => {
+      fetchMock.mockResolvedValue(heartbeatResponse(0.1, { last_cycle_ok_at: null }))
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([
+        expect.objectContaining({ kind: 'batch_heartbeat_stale', reason: 'cycles_failing', hoursSince: null, since: null }),
+      ])
+    })
+
+    // retro#838: cycles succeed, a failing push leaves the atlas stuck on the box.
+    it('fires unpushed when local commits have not reached main within the threshold', async () => {
+      fetchMock.mockResolvedValue(
+        heartbeatResponse(0.1, { oldest_unpushed_at: hoursAgoIso(BATCH_HEARTBEAT_STALE_HOURS + 2) }),
+      )
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([expect.objectContaining({ kind: 'batch_heartbeat_stale', reason: 'unpushed' })])
+    })
+
+    // The 2026-10-20 false alarm: idle after retro#959, no atlas commit for 17h, loop healthy.
+    it('stays silent for an idle loop that keeps cycling, with recent unpushed commits tolerated', async () => {
+      fetchMock.mockResolvedValue(heartbeatResponse(0.1, { oldest_unpushed_at: hoursAgoIso(1) }))
 
       const { fired } = await checkEvidenceHealth()
 
@@ -348,12 +389,12 @@ describe('checkEvidenceHealth', () => {
     })
 
     it('reports unreachable — never a false "loop dead" — when the GitHub API errors', async () => {
-      fetchMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND api.github.com'))
+      fetchMock.mockRejectedValue(new Error('getaddrinfo ENOTFOUND oracle.test'))
 
       const { fired } = await checkEvidenceHealth()
 
       expect(fired).toEqual([
-        { kind: 'batch_heartbeat_unreachable', detail: 'getaddrinfo ENOTFOUND api.github.com' },
+        { kind: 'batch_heartbeat_unreachable', detail: 'getaddrinfo ENOTFOUND oracle.test' },
       ])
       // The failed fetch did not kill the run: the reconcile still executed.
       expect(alerts.createMany).toHaveBeenCalledWith({
@@ -370,17 +411,25 @@ describe('checkEvidenceHealth', () => {
       expect(fired).toEqual([{ kind: 'batch_heartbeat_unreachable', detail: 'HTTP 403' }])
     })
 
-    it('reports unreachable when the response holds no commits', async () => {
-      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    it('reports unreachable when /health carries no batch_loop (older Oracul, or file missing)', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: 'ok', batch_loop: null }) })
 
       const { fired } = await checkEvidenceHealth()
 
       expect(fired).toEqual([
-        { kind: 'batch_heartbeat_unreachable', detail: 'no commit date in response' },
+        { kind: 'batch_heartbeat_unreachable', detail: 'no batch_loop heartbeat on /health' },
       ])
     })
 
-    it('re-arms once commits resume: a latched stale key is released on a fresh heartbeat', async () => {
+    it('reports unreachable when ORACLE_URL is not configured', async () => {
+      vi.mocked(getOracleBaseUrl).mockReturnValueOnce(null)
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toEqual([{ kind: 'batch_heartbeat_unreachable', detail: 'ORACLE_URL not set' }])
+    })
+
+    it('re-arms once cycles resume: a latched stale key is released on a fresh heartbeat', async () => {
       fetchMock.mockResolvedValue(heartbeatResponse(1))
       alerts.findMany.mockResolvedValue([{ key: 'batch-heartbeat-stale' }] as never)
 
@@ -413,7 +462,14 @@ describe('alertKey', () => {
         'panel-payment',
       ],
       [
-        { kind: 'batch_heartbeat_stale', hoursSince: 26, thresholdHours: 12, lastCommitAt: '2026-08-19T10:00:00.000Z' },
+        {
+          kind: 'batch_heartbeat_stale',
+          reason: 'no_cycle',
+          hoursSince: 26,
+          thresholdHours: 12,
+          since: '2026-08-19T10:00:00.000Z',
+          head: null,
+        },
         'batch-heartbeat-stale',
       ],
       [{ kind: 'batch_heartbeat_unreachable', detail: 'HTTP 502' }, 'batch-heartbeat-unreachable'],

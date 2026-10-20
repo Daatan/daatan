@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
 import { USABLE_POOL_ROW_WHERE } from '@/lib/services/evidence-pool'
+import { getOracleBaseUrl } from '@/lib/services/oracleClient'
 
 const log = createLogger('evidence-health')
 
@@ -87,41 +88,32 @@ export const PANEL_402_LOOKBACK_HOURS = 26
 const MAX_KEY_SOURCE_LEN = 150
 
 /**
- * TruthMachine batch-loop liveness (retro#556).
+ * TruthMachine batch-loop liveness (retro#556, reworked in daatan#1979).
  *
- * The batch tree on the Oracul box ran stale code twice (six weeks once) with
- * zero detection; retro PR#555 makes a failed sync refuse the cycle, but that is
- * only visible in `pipeline_log.txt` on the box. The loop's one externally
- * visible heartbeat is the commits it pushes to `Daatan/retro` `main`. retro
- * itself has no alerting surface, which is why the check lives here.
+ * The batch tree on the Oracul box has died or wedged three times with nothing
+ * noticing for days to weeks: stale code behind a dead `.git/index.lock`
+ * (2026-07-02 → 08-16), and a stale `.git/rebase-merge` that blocked every push
+ * for 27 days while the loop kept cycling (retro#838). retro itself has no
+ * alerting surface, which is why the check lives here.
  *
- * The watched path is the **rendered atlas**, not `data/progress.json` — that
- * choice is the whole point of the check, so do not "simplify" it back
- * (retro#838). This check originally watched `data/progress.json` on the
- * assumption that both paths move together. They do not: `ec2_run.sh` pushes
- * progress through a forgiving path that survives a broken cycle, while the
- * atlas goes through `commit_and_push`, which returns early when the rebase
- * fails. When a stale `.git/rebase-merge` wedged the loop on 2026-08-23, the
- * atlas stopped dead for 27 days while progress kept committing — so
- * `progress.json` was not the outermost signal but the innermost, and it did
- * worse than stay silent: it flapped (gaps on 09-03→09-11, 09-12→09-14,
- * 09-14→09-16 each fired, then self-cleared when the next progress commit
- * landed), which the wholesale re-arm below turns into separate short blips
- * instead of one continuous 27-day outage. Watching the atlas would have fired
- * on 08-24 and stayed on. It is also the published product: if it is not
- * moving, nothing the loop does downstream reached a reader.
- */
-export const BATCH_HEARTBEAT_REPO = 'Daatan/retro'
-export const BATCH_HEARTBEAT_PATH = 'factum_atlas.html'
-/**
- * A healthy loop commits the atlas every few minutes (measured 2026-09-20 over
- * the 4,000 atlas commits from 08-16 to 09-19: exactly two gaps above 12h — a
- * 55.9h one on 08-17 and the 657.7h retro#838 outage itself), so any hours-scale
- * threshold is >100× the normal gap; the binding
- * constraint is instead this check's own daily sampling. 12h keeps ordinary
- * quiet stretches (API-quota pauses, empty ingest batches) far below the bar
- * while still flagging a dead loop on the next daily run — worst case ~36h
- * after death, against the 2 days and 6 weeks the last two incidents lasted.
+ * It used to read the newest atlas commit on `Daatan/retro` main. That stopped
+ * meaning anything after retro#959: an idle loop with a drained queue commits
+ * nothing, so "no atlas commit for 12h" fired on a healthy loop (2026-10-20).
+ * Now the loop writes its own heartbeat after every cycle and the Oracul serves
+ * it as `batch_loop` on the unauthenticated `/health` (retro#996). Three ways to
+ * be stale, each a distinct failure seen before:
+ *  - `last_cycle_at` old — no cycle finishes at all (process dead or hung);
+ *  - `last_cycle_ok_at` old or null — cycles run but every one fails (a sync
+ *    that keeps refusing, the index.lock class). Null with the field present
+ *    means no cycle has succeeded since the heartbeat began: stale, not unknown;
+ *  - `oldest_unpushed_at` old — cycles succeed but nothing reaches `main`
+ *    (retro#838: a failing push still counts as an OK cycle).
+ *
+ * A cycle is minutes when idle; with work queued it is a handful of ~20 min
+ * batches. The binding constraint is this check's own daily sampling: 12h still
+ * flags a dead loop on the next daily run — worst case ~36h after death, against
+ * the 2 days and 6 weeks the earlier incidents lasted. A very large backfill
+ * could stretch one healthy cycle past this (retro#996 "Known limit").
  */
 export const BATCH_HEARTBEAT_STALE_HOURS = 12
 const BATCH_HEARTBEAT_TIMEOUT_MS = 10_000
@@ -241,46 +233,67 @@ async function panelPaymentBurst(now: Date): Promise<EvidenceHealthIssue[]> {
   ]
 }
 
+interface BatchLoopHeartbeat {
+  last_cycle_at?: string | null
+  last_cycle_ok_at?: string | null
+  oldest_unpushed_at?: string | null
+  head?: string | null
+}
+
+const parseTime = (v: string | null | undefined): Date | null => {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 /**
- * Newest commit touching the batch loop's progress file, via the public GitHub
- * API (the repo is public; one unauthenticated call per daily run is nowhere
- * near the 60/hr/IP limit).
+ * The batch loop's heartbeat, read off the Oracul's `/health` (see the block
+ * comment above `BATCH_HEARTBEAT_STALE_HOURS`).
  *
  * Never throws, unlike the DB checks: `checkEvidenceHealth`'s throw-on-failure
  * contract exists so a run that can't read the pool doesn't report a clean
- * pipeline, but a GitHub blip must neither kill the DB checks nor masquerade as
- * "batch loop dead". An unreachable heartbeat is its own, explicitly weaker
- * condition — fired as `batch_heartbeat_unreachable` so a broken URL or a
- * repo-visibility change can't silence this check forever.
+ * pipeline, but an Oracul blip must neither kill the DB checks nor masquerade as
+ * "batch loop dead". An unreadable heartbeat is its own, explicitly weaker
+ * condition — `batch_heartbeat_unreachable` — so a broken URL or a dropped field
+ * can't silence this check forever.
  */
 async function batchLoopHeartbeat(now: Date): Promise<EvidenceHealthIssue[]> {
-  const url =
-    `https://api.github.com/repos/${BATCH_HEARTBEAT_REPO}/commits` +
-    `?path=${encodeURIComponent(BATCH_HEARTBEAT_PATH)}&per_page=1`
+  const baseUrl = getOracleBaseUrl()
+  if (!baseUrl) return [{ kind: 'batch_heartbeat_unreachable', detail: 'ORACLE_URL not set' }]
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github+json' },
+    const res = await fetch(`${baseUrl}/health`, {
       signal: AbortSignal.timeout(BATCH_HEARTBEAT_TIMEOUT_MS),
     })
     if (!res.ok) {
       return [{ kind: 'batch_heartbeat_unreachable', detail: `HTTP ${res.status}` }]
     }
-    const commits = (await res.json()) as Array<{ commit?: { committer?: { date?: string } } }>
-    const dateStr = commits[0]?.commit?.committer?.date
-    const lastCommitAt = dateStr ? new Date(dateStr) : null
-    if (!lastCommitAt || Number.isNaN(lastCommitAt.getTime())) {
-      return [{ kind: 'batch_heartbeat_unreachable', detail: 'no commit date in response' }]
+    const hb = ((await res.json()) as { batch_loop?: BatchLoopHeartbeat | null }).batch_loop
+    const lastCycleAt = parseTime(hb?.last_cycle_at)
+    if (!hb || !lastCycleAt) {
+      return [{ kind: 'batch_heartbeat_unreachable', detail: 'no batch_loop heartbeat on /health' }]
     }
-    const hoursSince = (now.getTime() - lastCommitAt.getTime()) / (60 * 60 * 1000)
-    if (hoursSince >= BATCH_HEARTBEAT_STALE_HOURS) {
-      return [
-        {
-          kind: 'batch_heartbeat_stale',
-          hoursSince: Math.round(hoursSince),
-          thresholdHours: BATCH_HEARTBEAT_STALE_HOURS,
-          lastCommitAt: lastCommitAt.toISOString(),
-        },
-      ]
+
+    const hoursAgo = (d: Date) => (now.getTime() - d.getTime()) / (60 * 60 * 1000)
+    const stale = (
+      reason: 'no_cycle' | 'cycles_failing' | 'unpushed',
+      since: Date | null,
+    ): EvidenceHealthIssue[] => [
+      {
+        kind: 'batch_heartbeat_stale',
+        reason,
+        hoursSince: since ? Math.round(hoursAgo(since)) : null,
+        thresholdHours: BATCH_HEARTBEAT_STALE_HOURS,
+        since: since ? since.toISOString() : null,
+        head: hb.head ?? null,
+      },
+    ]
+
+    if (hoursAgo(lastCycleAt) >= BATCH_HEARTBEAT_STALE_HOURS) return stale('no_cycle', lastCycleAt)
+    const lastOkAt = parseTime(hb.last_cycle_ok_at)
+    if (!lastOkAt || hoursAgo(lastOkAt) >= BATCH_HEARTBEAT_STALE_HOURS) return stale('cycles_failing', lastOkAt)
+    const oldestUnpushed = parseTime(hb.oldest_unpushed_at)
+    if (oldestUnpushed && hoursAgo(oldestUnpushed) >= BATCH_HEARTBEAT_STALE_HOURS) {
+      return stale('unpushed', oldestUnpushed)
     }
     return []
   } catch (err) {

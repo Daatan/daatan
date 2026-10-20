@@ -769,15 +769,15 @@ against the preceding 28 days and fires one grouped Telegram digest for whatever
 a source that went silent while the rest kept flowing, an ACTIVE forecast whose pool
 holds no `COMPLETE`-with-a-stance row, or a pipeline-wide move in failed share (≥15pp)
 or ingestion volume (<35% of the baseline rate). Also watches the TruthMachine batch
-loop's external heartbeat (retro#556): the newest `Daatan/retro` commit touching
-`factum_atlas.html` — the rendered atlas, i.e. the loop's published output — must be
-under 12h old (a healthy loop commits it every few minutes), else a
-`batch-heartbeat-stale` page fires on the clean channel; an unreachable GitHub API
-fires the weaker `batch-heartbeat-unreachable` (noisy) instead, never a false
-"loop dead". The watched path is deliberately the atlas and not `data/progress.json`:
-`ec2_run.sh` pushes progress through a forgiving path that survives a broken cycle,
-so during the 27-day retro#838 outage progress kept committing while the atlas was
-dead — the old path reported green, then flapped (retro#838). Auth: `x-cron-secret` header
+loop's heartbeat (retro#556, daatan#1979): `batch_loop` on the Oracul's unauthenticated
+`/health`, which the loop rewrites after every cycle (retro#996). It pages
+`batch-heartbeat-stale` on the clean channel when, for 12h, no cycle finished
+(`no_cycle`), cycles ran but none succeeded (`cycles_failing` — a null
+`last_cycle_ok_at` counts), or local commits stayed unpushed (`unpushed`, the
+retro#838 shape); a missing `batch_loop` or an unreachable Oracul fires the weaker
+`batch-heartbeat-unreachable` (noisy) instead, never a false "loop dead". It used to
+read the newest atlas commit on `Daatan/retro` main, which stopped meaning anything
+once retro#959 made an idle loop commit nothing (false alarm 2026-10-20). Auth: `x-cron-secret` header
 (`BOT_RUNNER_SECRET`), 401 otherwise; **500** if the check itself fails, so a run that
 couldn't read the data never reports a clean pipeline. Returns
 `{ ok, recentDays, baselineDays, recentRows, recentFailedPct, baselineFailedPct, suppressed, fired[] }`
