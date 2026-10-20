@@ -808,6 +808,36 @@ jobs:
           health-url: https://daatan.com
           app-version: ${{ needs.resolve-release.outputs.version }}
 
+      - name: Mark images as released (ECR retention)
+        # terraform/ecr.tf keeps the last 30 releases by this tag; plain X.Y.Z
+        # images expire after 7 days. Same manifest, new tag — --image-digest
+        # makes ECR refuse anything that isn't byte-identical. Non-fatal: the
+        # deploy already succeeded, but the error annotation must be fixed by
+        # re-tagging by hand or this release drops out of the rollback window.
+        continue-on-error: true
+        env:
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+          APP: ${{ steps.digests.outputs.app }}
+          MIG: ${{ steps.digests.outputs.migrations }}
+        run: |
+          retag() {
+            aws ecr batch-get-image --repository-name daatan-app --image-ids "imageDigest=$1" \
+              --accepted-media-types application/vnd.oci.image.index.v1+json application/vnd.docker.distribution.manifest.list.v2+json \
+                application/vnd.oci.image.manifest.v1+json application/vnd.docker.distribution.manifest.v2+json \
+              --output json > "$RUNNER_TEMP/img.json"
+            if ! aws ecr put-image --repository-name daatan-app --image-tag "$2" --image-digest "$1" \
+                --image-manifest "$(jq -r '.images[0].imageManifest' "$RUNNER_TEMP/img.json")" \
+                --image-manifest-media-type "$(jq -r '.images[0].imageManifestMediaType' "$RUNNER_TEMP/img.json")" \
+                > /dev/null 2> "$RUNNER_TEMP/err"; then
+              grep -q ImageAlreadyExistsException "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err"; return 1; }
+            fi
+            echo "daatan-app:$2 → $1"
+          }
+          retag "$APP" "release-$VERSION" && retag "$MIG" "release-$VERSION-migrations" || {
+            echo "::error::Could not tag daatan-app $VERSION as release-$VERSION; it will expire with unreleased images in 7 days."
+            exit 1
+          }
+
       - name: Get merged PR info
         id: pr_info
         if: always()
