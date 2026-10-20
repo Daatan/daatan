@@ -51,3 +51,9 @@ variable "github_repository_id" {
   type        = string
   default     = "1134569638"
 }
+
+variable "oracle_instance_id" {
+  description = "Oracul (retro) EC2 instance that oracle-jev-watchdog.yml reads over SSM; owned by the retro stack"
+  type        = string
+  default     = "i-00ac444b94c5ff9b2"
+}

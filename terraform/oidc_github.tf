@@ -23,16 +23,26 @@ resource "aws_iam_role" "github_actions" {
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         # Pin trust to the immutable repository_id (survives org transfer /
-        # rename). AWS still requires a sub condition, so we add an
-        # owner-agnostic sub pattern on the repo name — case-proof regardless of
-        # the org login's casing.
+        # rename), plus an owner-agnostic sub pattern on the repo name — case-proof
+        # regardless of the org login's casing.
+        #
+        # sub is limited to the two contexts that legitimately need AWS (platform#34):
+        #  - main: scheduled/dispatched workflows on the default branch, and the
+        #    main-branch image build + staging deploy in deploy.yml
+        #  - environment:production: deploy.yml's deploy-production job (v* tags
+        #    and production dispatches)
+        # Feature branches, PRs and other tags get no credentials, so pushing a
+        # branch with a modified workflow can no longer reach the servers.
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud"           = "sts.amazonaws.com"
             "token.actions.githubusercontent.com:repository_id" = var.github_repository_id
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:*/${split("/", var.github_repository)[1]}:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:*/${split("/", var.github_repository)[1]}:ref:refs/heads/main",
+              "repo:*/${split("/", var.github_repository)[1]}:environment:production",
+            ]
           }
         }
       }
@@ -65,6 +75,8 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
+          # rollback.yml lists/checks version tags with describe-images
+          "ecr:DescribeImages",
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
@@ -85,10 +97,26 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
     Version = "2012-10-17"
     Statement = [
       {
+        # SendCommand is authorized on both the document and the target instance,
+        # so listing them here limits CI to running shell commands on these hosts
+        # only (platform#34; it was Resource "*": any instance, any document).
+        Sid    = "SendCommandToKnownHosts"
+        Effect = "Allow"
+        Action = ["ssm:SendCommand"]
+        Resource = [
+          "arn:aws:ssm:eu-central-1::document/AWS-RunShellScript",
+          aws_instance.production.arn,
+          aws_instance.staging.arn,
+          # oracle-jev-watchdog.yml reads the Oracul box's logs
+          "arn:aws:ec2:eu-central-1:${data.aws_caller_identity.current.account_id}:instance/${var.oracle_instance_id}",
+        ]
+      },
+      {
+        # No resource-level permissions for these (read-only).
         Effect = "Allow"
         Action = [
-          "ssm:SendCommand",
           "ssm:ListCommandInvocations",
+          "ssm:GetCommandInvocation",
           "ssm:DescribeInstanceInformation"
         ]
         Resource = "*"
