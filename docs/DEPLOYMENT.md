@@ -493,7 +493,7 @@ fields @timestamp, @logStream, @message
 
 | Secret                         | Used by                              |
 |--------------------------------|--------------------------------------|
-| `AWS_ROLE_ARN`                 | OIDC auth for all AWS operations     |
+| `AWS_ROLE_ARN`                 | OIDC auth for all AWS operations — the role (`terraform/oidc_github.tf`) only trusts runs on `main` and jobs in the `production` environment, and may `SendCommand` only to the prod, staging and Oracul instances; a workflow run from any other branch gets no AWS credentials |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Baked into Docker image at build     |
 | `TELEGRAM_BOT_TOKEN`           | Deploy success/failure notifications |
 | `TELEGRAM_CHAT_ID`             | Deploy notifications target          |
