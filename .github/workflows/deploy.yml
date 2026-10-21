@@ -281,8 +281,12 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
+      # cleanup: false — the post-job "Removing builder" step cost 28 s here
+      # (11 s on migrations) and buys nothing on an ephemeral runner (daatan#2001).
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cleanup: false
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -350,6 +354,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cleanup: false  # see build-app-image
 
       - name: Login to Amazon ECR
         id: login-ecr
