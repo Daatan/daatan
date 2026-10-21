@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+SECONDS=0  # phase headers print elapsed time, to attribute deploy duration (daatan#1992)
 
 # DAATAN Blue-Green Deployment Script
 # True zero-downtime: builds new container, health-checks it, runs migrations,
@@ -113,7 +114,7 @@ echo "Git commit:   ${GIT_COMMIT:0:8}"
 
 # ─── Phase 1: Ensure database is running ───────────────────────────────────────
 echo ""
-echo "📦 Phase 1: Ensuring database is running..."
+echo "[+${SECONDS}s] 📦 Phase 1: Ensuring database is running..."
 docker compose -f $COMPOSE_FILE up -d $DB_SERVICE
 # Wait for DB to be ready — check pg_isready instead of sleeping unconditionally
 DB_CONTAINER=$(docker compose -f $COMPOSE_FILE ps -q $DB_SERVICE 2>/dev/null | head -1)
@@ -129,7 +130,7 @@ done
 # the outage on 2026-06-20). Re-assert it on every deploy so a missing renewal
 # loop can never outlive a single deploy cycle. Non-fatal: never block a deploy.
 echo ""
-echo "🔐 Phase 1b: Ensuring TLS cert renewal loop (certbot) is running..."
+echo "[+${SECONDS}s] 🔐 Phase 1b: Ensuring TLS cert renewal loop (certbot) is running..."
 docker compose -f $COMPOSE_FILE up -d certbot || echo "⚠️  Could not start certbot service (continuing deploy)"
 
 # ─── Phase 1c: Converge nginx with the compose file ─────────────────────────────
@@ -142,12 +143,12 @@ docker compose -f $COMPOSE_FILE up -d certbot || echo "⚠️  Could not start c
 # without it compose would try to create its own `app` container next to ours.
 # Non-fatal: a failure leaves the existing nginx serving.
 echo ""
-echo "🌐 Phase 1c: Converging nginx with $COMPOSE_FILE..."
+echo "[+${SECONDS}s] 🌐 Phase 1c: Converging nginx with $COMPOSE_FILE..."
 docker compose -f $COMPOSE_FILE up -d --no-deps nginx || echo "⚠️  Could not converge nginx (continuing deploy)"
 
 # ─── Phase 2: Build new image (old container still serving traffic) ─────────────
 echo ""
-echo "🔨 Phase 2: Building new image (old container still serving traffic)..."
+echo "[+${SECONDS}s] 🔨 Phase 2: Building new image (old container still serving traffic)..."
 
 echo ""
 echo "🧹 Pre-build cleanup: Docker disk usage before prune"
@@ -178,7 +179,7 @@ BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP"
 
 # Build the image without stopping the running container
 if [ "${SKIP_BUILD}" == "true" ]; then
-    echo "🔨 Phase 2: Skipping build (using pre-pulled image)..."
+    echo "[+${SECONDS}s] 🔨 Phase 2: Skipping build (using pre-pulled image)..."
 
     # Login and Pull if ECR info provided
     if [ -n "$ECR_REGISTRY" ] && [ -n "$IMAGE_TAG" ]; then
@@ -217,7 +218,7 @@ fi
 
 # ─── Phase 3: Start new container alongside old one ─────────────────────────────
 echo ""
-echo "🆕 Phase 3: Starting new container alongside old one..."
+echo "[+${SECONDS}s] 🆕 Phase 3: Starting new container alongside old one..."
 
 # Clean up any leftover new container from a previous failed deploy
 docker rm -f $CONTAINER_NEW 2>/dev/null || true
@@ -377,7 +378,7 @@ echo "   Log driver: $(docker inspect -f '{{.HostConfig.LogConfig.Type}}' "$CONT
 
 # ─── Phase 4: Health check new container ─────────────────────────────────────────
 echo ""
-echo "🏥 Phase 4: Health-checking new container..."
+echo "[+${SECONDS}s] 🏥 Phase 4: Health-checking new container..."
 echo "   URL: http://127.0.0.1:3000/api/health"
 sleep 2
 
@@ -440,11 +441,13 @@ abort_before_migrate() {
 }
 
 echo ""
-echo "💾 Phase 4b: Checking for pending migrations..."
+echo "[+${SECONDS}s] 💾 Phase 4b: Checking for pending migrations..."
+SCHEMA_UP_TO_DATE=0
 if docker run --rm \
     --network "$NETWORK" \
     -e DATABASE_URL="$MIGRATION_DB_URL" \
     "$MIGRATIONS_IMAGE" node node_modules/prisma/build/index.js migrate status >/dev/null 2>&1; then
+    SCHEMA_UP_TO_DATE=1
     echo "✅ Database schema is up to date — skipping pre-migrate dump"
 else
     DUMP_DIR="$PWD/backups/pre-migrate"
@@ -488,21 +491,27 @@ fi
 
 # ─── Phase 5: Run migrations (BEFORE swap — old container still serves traffic) ─
 echo ""
-echo "🗄️ Phase 5: Running Prisma migrations via dedicated migrations container..."
-# The migrations container is built from the builder stage and has full node_modules,
-# so prisma CLI and all transitive deps (@prisma/dev, effect, pathe, etc.) are always
-# available — no missing-module errors regardless of Prisma version.
-echo "   Image: $MIGRATIONS_IMAGE"
-docker run --rm \
-    --network "$NETWORK" \
-    -e DATABASE_URL="$MIGRATION_DB_URL" \
-    "$MIGRATIONS_IMAGE" 2>&1 || {
-    echo "❌ Migration failed! Aborting deployment."
-    docker rm -f $CONTAINER_NEW 2>/dev/null || true
-    echo "🔄 Old container still serving traffic — no downtime occurred"
-    exit 1
-}
-echo "✅ Migrations applied successfully"
+echo "[+${SECONDS}s] 🗄️ Phase 5: Running Prisma migrations via dedicated migrations container..."
+# Phase 4b's `migrate status` exited 0, i.e. nothing is pending: `migrate deploy`
+# would be a no-op, so skip its container start (daatan#1992).
+if [ "$SCHEMA_UP_TO_DATE" = 1 ]; then
+    echo "✅ No pending migrations (Phase 4b) — skipping migrate deploy"
+else
+    # The migrations container is built from the builder stage and has full node_modules,
+    # so prisma CLI and all transitive deps (@prisma/dev, effect, pathe, etc.) are always
+    # available — no missing-module errors regardless of Prisma version.
+    echo "   Image: $MIGRATIONS_IMAGE"
+    docker run --rm \
+        --network "$NETWORK" \
+        -e DATABASE_URL="$MIGRATION_DB_URL" \
+        "$MIGRATIONS_IMAGE" 2>&1 || {
+        echo "❌ Migration failed! Aborting deployment."
+        docker rm -f $CONTAINER_NEW 2>/dev/null || true
+        echo "🔄 Old container still serving traffic — no downtime occurred"
+        exit 1
+    }
+    echo "✅ Migrations applied successfully"
+fi
 
 # Save the old container's image NOW — before we stop or remove it in Phase 6. If
 # Phase 7 (external health check) fails after the swap, we need this to start a
@@ -515,7 +524,7 @@ echo "   Old image saved for rollback: ${OLD_IMAGE:-<none>}"
 
 # ─── Phase 6: Swap traffic via network aliases (zero downtime) ──────────────────
 echo ""
-echo "🔄 Phase 6: Swapping traffic to new container..."
+echo "[+${SECONDS}s] 🔄 Phase 6: Swapping traffic to new container..."
 
 # Disconnect old container from network (removes its DNS alias)
 docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
@@ -541,7 +550,7 @@ echo "✅ Old container removed, new container is now $CONTAINER"
 
 # ─── Phase 7: External verification ────────────────────────────────────────────
 echo ""
-echo "🔍 Phase 7: Verifying deployment externally..."
+echo "[+${SECONDS}s] 🔍 Phase 7: Verifying deployment externally..."
 if ./scripts/verify-health.sh "$HEALTH_URL"; then
     echo "✅ Health check passed"
 else
@@ -581,7 +590,7 @@ fi
 
 # ─── Phase 8: Verify auth ──────────────────────────────────────────────────────
 echo ""
-echo "🔐 Phase 8: Verifying authentication..."
+echo "[+${SECONDS}s] 🔐 Phase 8: Verifying authentication..."
 AUTH_CHECK=$(curl -s "$HEALTH_URL/api/auth/providers" | head -c 50)
 if echo "$AUTH_CHECK" | grep -q "google"; then
     echo "✅ Authentication working"
@@ -593,11 +602,11 @@ fi
 
 # ─── Cleanup ────────────────────────────────────────────────────────────────────
 echo ""
-echo "🧹 Cleaning up old images..."
+echo "[+${SECONDS}s] 🧹 Cleaning up old images..."
 docker image prune -f
 
 echo ""
-echo "✅ Blue-green deployment complete!"
+echo "✅ Blue-green deployment complete! (${SECONDS}s)"
 echo "   Environment: $ENVIRONMENT"
 echo "   Container:   $CONTAINER"
 echo "   Commit:      ${GIT_COMMIT:0:8}"

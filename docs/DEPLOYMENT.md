@@ -202,12 +202,16 @@ Phase 4  Health ✓    wget 127.0.0.1:3000/api/health inside new container
 Phase 4b Dump        if `prisma migrate status` ≠ up to date: pg_dump → ~/app/backups/pre-migrate/
                      (dump fails or looks truncated → abort, old container untouched)
 Phase 5  Migrate     docker run --rm daatan-migrations:staging-latest  ← isolated
+                     (skipped when Phase 4b's `migrate status` said up to date)
 Phase 6  Swap        alias moves: nginx now resolves to new container
 Phase 7  Verify      verify-health.sh https://staging.daatan.com (+ $EXPECTED_VERSION)
 Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
          Rollback?   if Phase 7 fails → restart the old image (by image ID), swap back
                      (Phase 8 failure: exit 1 — no rollback)
 ```
+
+Every phase header in the deploy log carries the elapsed time (`[+83s] 🏥 Phase 4: …`),
+so the SSM command output shows where a slow deploy spent its time (daatan#1992).
 
 **Zero-downtime guarantee**: old container serves all traffic until Phase 6. Phases 3–5
 run in parallel with live traffic. If anything in Phases 3–5 fails, the old container
@@ -282,7 +286,8 @@ container (`daatan-migrations:staging-latest`) is run with `docker run --rm`.
 container is built `FROM builder` and has complete `node_modules`.
 
 **Safety**: The migrations container runs before the traffic swap (Phase 5), connects
-to Postgres via the Docker network, applies migrations, then exits. It has no DNS alias
+to Postgres via the Docker network, applies migrations, then exits. When Phase 4b's
+`prisma migrate status` reports the schema up to date, Phase 5 doesn't start it at all. It has no DNS alias
 and cannot receive application traffic.
 
 See `docs/PRISMA_MIGRATE_DEPLOY_DEPS.md` for full background.
