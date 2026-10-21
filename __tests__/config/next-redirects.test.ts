@@ -35,7 +35,7 @@ describe('next.config redirects', () => {
     expect(await resolve('/he/elections')).toBe('https://elections.daatan.com/')
     expect(await resolve('/elections/resolved')).toBe('https://elections.daatan.com/resolved')
 
-    const elections = (await loadRedirects()).filter((r) => r.destination.startsWith('https://elections.daatan.com'))
+    const elections = (await loadRedirects()).filter((r) => /^https?:/.test(r.destination) && new URL(r.destination).host === 'elections.daatan.com')
     expect(elections.length).toBeGreaterThan(0)
     expect(elections.every((r) => r.permanent)).toBe(true)
   })
