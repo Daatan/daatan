@@ -3,7 +3,7 @@
 CloudWatch infra alarms (`daatan-infra-alerts` SNS topic, `terraform/monitoring.tf`) reached only
 a single email inbox until daatan#1726 — a 3+ hour prod outage on 2026-09-04 sat unactioned
 because nobody saw the alert in time. This Lambda mirrors `infra/mail-forwarder`'s
-SNS-topic-to-Lambda pattern to also post every alarm/OK transition to the Telegram clean channel.
+SNS-topic-to-Lambda pattern to also post every alarm/OK transition to Telegram (prod → clean channel, staging → noisy).
 
 ## Architecture
 
@@ -11,7 +11,7 @@ SNS-topic-to-Lambda pattern to also post every alarm/OK transition to the Telegr
 CloudWatch alarm → SNS (daatan-infra-alerts, eu-central-1) → email (unchanged)
                                                             → Lambda (daatan-infra-alerts-telegram-<env>)
                                                                     ↓
-                                                              Telegram clean channel
+                                                              Telegram clean (prod) / noisy (staging)
 ```
 
 **Terraform**: `terraform/telegram_alerts.tf`
@@ -30,6 +30,9 @@ here.
 2. Fetches `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CLEAN_CHAT_ID` (falling back to `TELEGRAM_CHAT_ID`)
    from the app's own `daatan-env-<environment>` Secrets Manager secret — no separate secret is
    provisioned for this Lambda, and credentials are cached for the life of the warm container.
+   Staging alarms (`staging-*` / `daatan-staging-*` names) go to the **noisy** channel
+   (`TELEGRAM_CHAT_ID`) instead, so staging's nightly sleep/wake transitions don't page the
+   clean channel (#1980).
 3. Posts `🔴 ALARM: <name> (<region>)\n<reason>` or `🟢 OK: ...` (`⚪ INSUFFICIENT_DATA: ...`
    for that state) to `https://api.telegram.org/bot<token>/sendMessage`.
 4. Rethrows on a non-2xx Telegram response, which counts against the Lambda's own `Errors` metric.

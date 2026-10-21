@@ -35,13 +35,8 @@
 - Check Docker build logs if pages are missing from production - local builds may differ from Docker builds.
 
 ## Next.js App Router Gotchas
-- `export const dynamic = 'force-dynamic'` only works in Server Components
-- If a page has `'use client'` at the top, the dynamic export is IGNORED
-- For client pages needing dynamic rendering, split into:
-  - `page.tsx` (Server Component with dynamic export + Suspense wrapper)
-  - `*Client.tsx` (Client Component with hooks and UI)
-- `useSearchParams()` requires Suspense boundary in Next.js 14+
-- Add `transpilePackages: ['next-auth']` in next.config.js for Docker builds
+- Cache Components is on (`cacheComponents: true` in `next.config.js`, Next 16): route segment configs (`export const dynamic` / `revalidate` / `runtime`) are build errors — don't add them. A route that reads no request data needs `await connection()` (`next/server`); see CLAUDE.md "Common patterns".
+- `useSearchParams()` in a client component requires a `<Suspense>` boundary
 
 ## File Operations
 - Create/modify files directly

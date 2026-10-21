@@ -25,9 +25,9 @@ Every feature must pass ALL checks:
 If any check fails → out of scope.
 
 ## 2. Technology Stack
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Language:** TypeScript 5
-- **Frontend:** React 18, Tailwind CSS
+- **Frontend:** React 19, Tailwind CSS
 - **Backend:** Next.js API Routes, Node.js 24
 - **Database:** PostgreSQL 16 (Prisma 7.x ORM)
 - **Authentication:** Auth.js v5 / NextAuth (Google OAuth + email/password; OIDC for self-host)

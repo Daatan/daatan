@@ -21,7 +21,7 @@ A fresh checkout boots with no Google, no AWS, no daatan.com — given only DB +
 - `.env.selfhost.example`, `docker-compose.selfhost.yml` (build-from-source), no nginx/certbot (TLS at operator ingress).
 
 ### 2. Enterprise auth (Phase 1 — PRs #947, #952, #954)
-- **OIDC** (`src/auth.config.ts`): a generic provider registered when `OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET` are all set. A plain config object (fetch-based) so it stays **Edge-safe** (auth.config.ts is bundled into the middleware — no Prisma/bcrypt/node imports). Callback URL: `${APP_URL}/api/auth/callback/oidc`.
+- **OIDC** (`src/auth.config.ts`): a generic provider registered when `OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET` are all set. A plain config object (fetch-based) so it stays **Edge-safe** (auth.config.ts is bundled into the proxy, `src/proxy.ts` — no Prisma/bcrypt/node imports). Callback URL: `${APP_URL}/api/auth/callback/oidc`.
 - **Admin bootstrap** (`src/lib/auth/oidc.ts`, jwt callback in `src/auth.ts`): emails in `OIDC_ADMIN_EMAILS` are promoted to `ADMIN` on sign-in.
 - **Domain gate** (`src/lib/auth/access.ts`, signIn callback in `src/auth.ts`): `ALLOWED_EMAIL_DOMAINS` restricts every provider (OIDC + credentials) to listed domains. Empty ⇒ no restriction.
 - **Closed signup + invites** (`src/lib/auth/access.ts`, `src/lib/services/invite.ts`): public credentials signup is closed by default on self-host (`isOpenSignupEnabled`); `SELF_HOST_OPEN_SIGNUP=true` re-opens. Single-use `Invite` model (token = SHA-256 hex; consumed atomically) issued from `/api/admin/invites` + Admin → Invites UI.

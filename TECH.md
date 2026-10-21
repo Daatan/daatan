@@ -24,7 +24,8 @@
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Framework | Next.js (App Router) | 15.5.x |
+| Framework | Next.js (App Router, Turbopack, Cache Components) | 16.4.x |
+| UI | React | 19.x |
 | Language | TypeScript | 5.x |
 | Runtime | Node.js | 24.x |
 | Styling | Tailwind CSS | 3.4.x |
@@ -32,6 +33,7 @@
 | ORM | Prisma | 7.x |
 | Authentication | NextAuth.js (Auth.js v5) | 5.0.0-beta.x |
 | Testing | Vitest | 4.x |
+| Linting | ESLint (flat config, React Compiler rules) | 10.x |
 | Containerization | Docker | Latest |
 | Reverse Proxy | Nginx | Alpine |
 | SSL | Let's Encrypt (Certbot) | Latest |
@@ -97,7 +99,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
       └──────────────────────────────────────┘
 ```
 
-(1) `daatan-app-next` serves the NEXT testbed (`next.daatan.com`, shares the staging DB; no workflow deploys it any more — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying.
+(1) `daatan-app-next` serves the NEXT testbed (`next.daatan.com`, shares the staging DB; no workflow deploys it any more — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying; scheduled workflows no longer target staging (#1952).
 
 ### Request Flow
 
@@ -141,6 +143,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
 ```
 daatan/
 ├── .github/                    # GitHub configuration
+│   ├── dependabot.yml          # Weekly npm / docker / github-actions version updates (#1967)
 │   └── workflows/              # CI/CD pipelines + scheduled jobs (see CI/CD Pipeline below)
 │       └── deploy.yml          # Main CI + deployment workflow
 ├── .husky/                     # Git hooks
@@ -212,6 +215,7 @@ src/
 │   ├── create/                 # Forecast creation
 │   ├── elections/              # Elections matrix
 │   ├── help/                   # Help pages (rating-numbers)
+│   ├── home-v5/                # Landing page; served at / in place (rewrite) to first-time visitors (#1840)
 │   ├── leaderboard/            # User rankings (+ ai/, sources/)
 │   ├── notifications/          # User notifications
 │   ├── forecasts/              # Forecast views
@@ -249,8 +253,11 @@ src/
 │   │                           # (NextAuth config lives at src/auth.ts, not src/lib/)
 │   ├── prisma.ts               # Prisma client singleton
 │   └── logger.ts               # Pino structured logging
-└── types/                      # TypeScript definitions
-    └── next-auth.d.ts          # NextAuth type extensions
+├── types/                      # TypeScript definitions
+│   └── next-auth.d.ts          # NextAuth type extensions
+├── auth.ts / auth.config.ts    # Auth.js v5 (Node config / Edge-safe base config)
+├── env.ts                      # Validated env schema
+└── proxy.ts                    # Next 16 proxy (formerly middleware.ts): locale, auth gate, home-v5 rewrite, noindex headers
 ```
 
 ### Scripts Directory
@@ -288,6 +295,8 @@ terraform/
 ├── monitoring.tf               # CloudWatch alarms, SNS topics, budgets
 ├── telegram_alerts.tf          # Lambda forwarding infra alerts to Telegram (#1726)
 ├── staging_schedule.tf         # EventBridge Scheduler off-hours staging stop/start (#1526)
+├── backup_schedule.tf          # EventBridge Scheduler → SSM: primary prod DB backup trigger, 04:00/16:00 UTC (#1957)
+├── logging.tf                  # CloudWatch log group for app/nginx/postgres container logs (#1788)
 ├── variables.tf                # Input variables
 ├── outputs.tf                  # Output values
 ├── backend-staging.hcl         # Staging backend config (partial configuration)
@@ -373,7 +382,7 @@ tests/
 | S3 Bucket | Staging DB backups | `daatan-db-backups-staging-272007598366` |
 | S3 Bucket | Avatar/upload storage | `daatan-uploads-prod-272007598366`, `daatan-uploads-staging-272007598366` |
 | ECR | Container registry | `daatan-app` repository (app + `-migrations` images) |
-| EventBridge Scheduler | Staging off-hours sleep | Stops staging 20:00 UTC, starts 06:00 UTC on weekdays (`terraform/staging_schedule.tf`) |
+| EventBridge Scheduler | Staging off-hours sleep | Stops staging 20:00 UTC Mon–Fri, starts 06:00 UTC Mon–Fri — so it is also off all weekend (`terraform/staging_schedule.tf`) |
 | Security Group | Firewall | HTTP, HTTPS (port 22 blocked — use SSM for server access) |
 | IAM Role | EC2 Profile (prod) | `daatan-ec2-role-prod` — SSM + S3 backup/upload access (prod buckets) + Secrets Manager (`daatan-env-prod`) |
 | IAM Role | EC2 Profile (staging) | `daatan-ec2-role-staging` — SSM + S3 backup/upload access (staging buckets) + Secrets Manager (`daatan-env-staging`) |
@@ -486,8 +495,10 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `search-health.yml` | hourly | `/api/cron/search-health` |
 | `external-market-sync.yml` | hourly :17 | `/api/cron/external-market-sync` — refresh linked Polymarket/Kalshi prices |
 | `news-indexer-watchdog.yml` | every 2 h :17 | news-indexer disk + pipeline health via its `/stats` |
+| `oracle-jev-watchdog.yml` | hourly :12 (GitHub runs it every 3–7 h) | Telegram alert when the Oracul's Jev calls start failing (#1792) |
 | `backfill-embeddings.yml` | 02:23 daily | `/api/cron/backfill-embeddings` |
-| `backup.yml` | 04:00 + 16:00 daily | Prod DB backup to S3 (see Automated Backups) |
+| `backfill-headlines.yml` | 02:37 daily | `/api/cron/backfill-headlines` — a no-op since the headline backfill was disabled (returns `disabled: true`; see `docs/LLM_ARCHITECTURE.md` "Card headline") |
+| `backup.yml` | 04:00 + 16:00 daily | **Fallback** prod DB backup trigger; the primary is EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`, #1957) — see `docs/DEPLOYMENT.md` "DB backups (S3)" |
 | `ai-panel.yml` | 04:43 + 16:43 daily | `/api/cron/ai-panel` — multi-model estimate panel |
 | `requote.yml` | 05:31 daily | `/api/cron/requote` — temporal-model daily requote |
 | `pundit-ratings-recalculate.yml` | 06:15 daily | `/api/admin/pundit-ratings/recalculate` |
@@ -504,7 +515,9 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `evidence-second-opinion.yml` | Mon/Thu 09:00 | `/api/cron/evidence-second-opinion` |
 | `cost-report-monthly.yml` | 1st of month 12:00 | Monthly cost report |
 
-Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`. `android-release.yml` runs on `android-v*` tags; `version.yml` and `terraform-validate.yml` (when `terraform/**` changes) run on pull requests.
+Since #1952 the scheduled workflows target production only (staging sleeps nights and weekends); `cert-expiry.yml` checks staging on weekdays only.
+
+Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` runs on `android-v*` tags; `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
 
 #### Deploy Workflow (`deploy.yml`)
 
@@ -524,23 +537,24 @@ Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english
 
 **Build Stage** (parallel jobs, Node.js 24):
 - `Type check` and `Lint`
-- `Unit tests` — on PRs, only tests related to changed files (`scripts/run-related-tests.sh`); on push/tag, the full suite sharded 4 ways (`Unit tests (full suite)`)
-- `Integration Tests` (`npm run test:integration`)
-- `Build & Test` (`npm run build`)
-- On push/tag: `Build & Push App Image` and `Build & Push Migrations Image` to ECR in parallel; AWS access is via the OIDC role in `AWS_ROLE_ARN`
+- `Unit tests` — on PRs, only tests related to changed files (`scripts/run-related-tests.sh`); on `main` pushes, the full suite sharded 4 ways (`Unit tests (full suite)`)
+- `Integration Tests` (`npm run test:integration`) — required (#1985)
+- `Build & Test` — the required status check: a gate that fails (never skips) if any test job failed, plus `next build` (PRs only), `npm audit --audit-level=critical` and the env-var parity check
+- On `main` pushes (not `v*` tags): `Build & Push App Image` and `Build & Push Migrations Image` to ECR, started in parallel with the tests (#1992); AWS access is via the OIDC role in `AWS_ROLE_ARN`
+- On `v*` tags the test jobs are skipped — the tagged commit already passed them on `main` (#1990)
 
 **Deploy Stage (Staging):**
 - Wake the staging instance if the off-hours schedule has stopped it, and wait for SSM to come online
 - Send command via AWS SSM (SSH port 22 is blocked)
 - Download deploy scripts from GitHub at the current commit SHA
-- Pull Docker image from ECR (`staging-latest`)
+- Retag the tested images `X.Y.Z` / `staging-latest` and pull them **by digest** (#1954)
 - Run blue-green deployment (`scripts/blue-green-deploy.sh staging`)
 - Verify health check externally
 
 **Deploy Stage (Production):**
-- Same as staging but triggered by version tag (`v*`)
-- Pulls image tagged with the specific version
-- More conservative cleanup
+- Triggered by a version tag (`v*`); nothing is rebuilt
+- `resolve-release` waits for this commit's `main` run to finish `Deploy to Staging`, then `deploy-production` checks ECR's `X.Y.Z` is the image built from the tagged commit and ships that exact digest (#1961)
+- Full detail: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
 
 ### Required Secrets
 
@@ -548,7 +562,7 @@ GitHub Actions secrets referenced by the workflows. Runtime app secrets (`POSTGR
 
 | Secret | Purpose |
 |--------|---------|
-| `AWS_ROLE_ARN` | OIDC role assumed for ECR, SSM and the report workflows (no static AWS keys) |
+| `AWS_ROLE_ARN` | OIDC role assumed for ECR, SSM and the report workflows (no static AWS keys); trusts only `main` and the `production` environment, `SendCommand` only to known hosts (#1962) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push public key, baked into the image at build time |
 | `BOT_RUNNER_SECRET` | Shared secret for `POST /api/bots/run` and other cron endpoints called by workflows |
 | `STAGING_URL` | Staging base URL used by scheduled workflows |
@@ -654,13 +668,14 @@ The staging and production databases are **fully independent**. They share no da
 
 ### Automated Backups
 
-- **Workflow:** `.github/workflows/backup.yml` — scheduled at **04:00 and 16:00 UTC** daily (RPO ≤ 12h), plus manual `workflow_dispatch`
-- **Mechanism:** GitHub Actions pushes `scripts/backup-db.sh` to the prod EC2 instance (tag `Environment=prod`) via AWS SSM `send-command` and runs it there — no cron on the box
+- **Schedule:** **04:00 and 16:00 UTC** daily (RPO ≤ 12h)
+- **Primary trigger:** EventBridge Scheduler → SSM Run Command (`terraform/backup_schedule.tf`, #1957) runs `scripts/backup-db.sh` then `scripts/verify-backup.sh` from `~/app/scripts` on the prod box (shipped there by `deploy-production`)
+- **Fallback trigger:** `.github/workflows/backup.yml` at the same times (plus manual `workflow_dispatch`), which ships the script inline over SSM. Both take the same box-side `flock`, so the second one is a no-op. Full detail and how to retire the cron: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) "DB backups (S3)"
 - **Backs up:** prod only (`daatan-postgres` → `daatan`) → `s3://daatan-db-backups-272007598366/backups/`
 - **S3 filename format:** `<UTC timestamp>.sql.gz` (e.g. `20260703T172550Z.sql.gz`)
 - **Retention:** the script itself trims the `backups/` prefix to the newest 60 objects (30 days at 2/day) after every upload; an S3 lifecycle rule on the same prefix (`terraform/s3.tf`) expires objects after 30 days as a backstop in case the script's trim ever fails
-- **Post-backup verification:** workflow triggers `scripts/verify-backup.sh` via SSM to confirm the dump restores cleanly (restore runs with `ON_ERROR_STOP`, then checks `users` has rows), waits for the result and fails the job on failure (daatan#1808). The restore streams the dump from S3 into a throwaway `daatan-backup-verify` container (same pgvector image, 768 MB cgroup cap, no swap, no network), never touching the live `daatan-postgres`; the cap also bounds the restore's page cache, so it no longer pushes the app into swap (it used to trip `prod-ec2-swap-high`). Takes ~5 min
-- **Failure alerting:** Telegram message to the clean/prod channel on any step failure
+- **Post-backup verification:** `scripts/verify-backup.sh` confirms the dump restores cleanly (restore runs with `ON_ERROR_STOP`, then checks `users` has rows), waits for the result and fails the job on failure (daatan#1808). The restore streams the dump from S3 into a throwaway `daatan-backup-verify` container (same pgvector image, 768 MB cgroup cap, no swap, no network), never touching the live `daatan-postgres`; the cap also bounds the restore's page cache, so it no longer pushes the app into swap (it used to trip `prod-ec2-swap-high`). Takes ~5 min
+- **Failure alerting:** Telegram message to the clean/prod channel on any step failure (the scheduled path's scripts post it themselves); `watchdog.yml` also alerts when the newest backup is older than 14 h
 - **Staging bucket:** `daatan-db-backups-staging-*` and its 14-day lifecycle rule exist in Terraform but nothing currently populates it — staging has no automated DB backup today
 
 ---
@@ -669,9 +684,9 @@ The staging and production databases are **fully independent**. They share no da
 
 ### NextAuth.js Configuration
 
-Auth.js v5. The config is split so middleware can run on the Edge runtime:
+Auth.js v5. The config is split so the proxy (`src/proxy.ts`, Next 16's renamed middleware) stays Edge-safe:
 
-- `src/auth.config.ts` — Edge-safe base config: Google provider (registered only when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set), optional generic OIDC provider (self-host, `OIDC_*`), `session: { strategy: 'jwt' }`, shared callbacks. Imported by `src/middleware.ts`.
+- `src/auth.config.ts` — Edge-safe base config: Google provider (registered only when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set), optional generic OIDC provider (self-host, `OIDC_*`), `session: { strategy: 'jwt' }`, shared callbacks. Imported by `src/proxy.ts`.
 - `src/auth.ts` — Node-only: `NextAuth({ ...authConfig, adapter: PrismaAdapter(prisma), providers: [...authConfig.providers, Credentials(...)] })` exporting `handlers, auth, signIn, signOut`. The bcrypt-backed email/password Credentials provider (and a Playwright test provider in test runs) live here because they need the DB.
 
 ```typescript
@@ -812,11 +827,13 @@ docker ps -a
 # Resource usage
 docker stats
 
-# Container logs
+# Container logs (current container only — blue-green removes the old one)
 docker logs daatan-app --tail 100 -f
 docker logs daatan-nginx --tail 100 -f
 docker logs daatan-postgres --tail 100 -f
 ```
+
+Logs from earlier deploys are in CloudWatch Logs, group `/daatan/<prod|staging>/containers` (30-day retention, `terraform/logging.tf`, #1788) — see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) "Logs that survive a deploy".
 
 ### Database Health
 

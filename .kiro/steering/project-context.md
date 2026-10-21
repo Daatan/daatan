@@ -1,7 +1,7 @@
 # DAATAN Project Context
 
 ## Project Overview
-DAATAN is a reputation-based prediction platform (Next.js 15, TypeScript, Prisma, PostgreSQL).
+DAATAN is a reputation-based prediction platform (Next.js 16, TypeScript, Prisma, PostgreSQL).
 - Production: https://daatan.com
 - Staging: https://staging.daatan.com
 - Version stored in: package.json (`src/lib/version.ts` reads the baked `NEXT_PUBLIC_APP_VERSION`)
@@ -13,7 +13,7 @@ All features must align with DAATAN_CORE.md. Key principles:
 - Authority is earned through results, not bought
 
 ## Tech Stack Quick Reference
-- Framework: Next.js 15 (App Router)
+- Framework: Next.js 16 (App Router)
 - Database: PostgreSQL 16 (pgvector) + Prisma 7
 - Auth: NextAuth.js with Google OAuth
 - Hosting: AWS EC2 (Docker + Nginx)

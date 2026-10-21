@@ -12,7 +12,7 @@
 - Use App Router patterns (not Pages Router)
 - Client components must have "use client" directive
 - For pages with useSearchParams, split into Server/Client components:
-  - Server Component: page.tsx with `export const dynamic = 'force-dynamic'`
+  - Server Component: page.tsx with a `<Suspense>` wrapper (no `export const dynamic` — with Cache Components on it is a build error)
   - Client Component: *Client.tsx with hooks and UI logic
 - Always wrap useSearchParams in Suspense boundary
 

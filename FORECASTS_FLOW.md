@@ -60,9 +60,31 @@ Other express-flow behaviour:
   draft is regenerated with it; any failure keeps the first draft.
 - **Hidden assumptions (#1744).** Prompt rule 1a makes the model state unstated
   premises as explicit conditions rather than baking them in.
+- **Author's direction kept (#1807).** Prompt rule 1b: a negative prediction stays a
+  "will not" claim, and YES means the claim as written is true.
+- **Rules checks (#1813, #1803).** After the draft, the `rules-direction` check verifies a
+  binary forecast's rules resolve YES when the claim is true; inverted rules get a rewrite
+  used only if a second check agrees, otherwise the review screen warns (bots skip). Prompt
+  rule 9a stops rules from resolving on a weaker event (announcement, intent, partial step)
+  than the claim; the `rules-strength` judge runs in **shadow** and only records its verdict
+  on the creation attempt. See [docs/PROMPTS.md](./docs/PROMPTS.md).
+- **Moderation beside search (#1890).** Moderation runs in parallel with query extraction
+  and search and is awaited before drafting; per-stage timings are stored in
+  `forecast_creation_attempts.details.stageTimings`.
+- **Probability suggestion (#1777, #1784, #1806).** The draft's `probabilitySuggestion` may
+  be `null` (the model abstains instead of hedging to 50); when the model declines, the form
+  shows a fixed "not enough information" heading with the model's reasoning underneath.
+  Editing the claim on the review screen clears the suggestion.
 - **Born-true check (#1748, every creation path via `createForecast` in `src/lib/services/forecast.ts`).** Right after creation, the resolution-research leg
   (`src/lib/services/bornTrueCheck.ts`) runs asynchronously and posts a Telegram
   review row if the claim is already decisively true/false.
+- **Creation-time estimate (#1777, #1783).** Once an ACTIVE, public, binary forecast is
+  temporally classified, a real Oracul estimate runs (`oracle_call_logs` source
+  `creation-estimate`); it is scheduled from create, publish and approve, and the run gates
+  on `classifiedAt`, so whichever trigger sees both does it once.
+- **Card headline (#1814).** A short self-contained headline is generated from the claim
+  (fire-and-forget) for the feed card; the claim stays canonical. See
+  [docs/LLM_ARCHITECTURE.md](./docs/LLM_ARCHITECTURE.md) "Card headline".
 
 ## Step 2: Write Forecast (Draft)
 
@@ -114,6 +136,7 @@ Prediction {
 | Type | Rules |
 | ---- | ----- |
 | All | `resolve_by_datetime` must be in the future |
+| All | `resolutionRules` at least 30 characters — on create, update, publish and in the wizard (#1874) |
 | Multiple Choice | Min 2 options, no duplicates |
 | Numeric | Valid number + defined metric/source |
 
