@@ -394,10 +394,11 @@ the schema up to date. If a collation-sensitive index looks wrong afterwards, se
 ### Dockerfile Stages
 
 ```
-builder  ──► runner      (slim production app image, ~200MB)
-         └──► migrations  (full node_modules for prisma CLI, ~700MB)
+manifests ──► builder  ──► runner      (slim production app image, ~200MB)
+                       └──► migrations  (full node_modules for prisma CLI, ~700MB)
 ```
 
+- **`manifests`**: copies `package.json` / `package-lock.json` with the root version pinned to `0.0.0`, so the per-commit version bump doesn't invalidate `builder`'s `npm ci` layer (daatan#1992)
 - **`builder`**: Full build environment — `npm ci`, Prisma generate, Next.js build
 - **`runner`**: Slim production image — only `.next/standalone`, static files, and runtime node_modules
 - **`migrations`**: `FROM builder`, removes `.next/public` — retains full `node_modules` for `prisma migrate deploy`
@@ -425,7 +426,7 @@ build — the standalone runner is the only place this bites.
 | Scenario | CI time | Server time |
 |---|---|---|
 | Standard code-only deploy | +30–60s (migrations image) | +5–30s (incremental pull) |
-| After `package.json` changes | +30–60s | +1–3 min (npm ci layer) |
+| After a dependency or Prisma schema change (not a version bump) | +30–60s | +1–3 min (npm ci layer) |
 | First deploy after PR #620 | +30–60s | +2–5 min (one-time: builder layers pulled) |
 
 ---
