@@ -11,13 +11,20 @@ SECONDS=0  # phase headers print elapsed time, to attribute deploy duration (daa
 # 2. Start new container with a temporary name (no network alias yet)
 # 3. Health-check the new container directly
 # 4. Run migrations on the new container (before swap — if they fail, old stays live)
-# 5. Swap traffic: disconnect old container's network alias, connect new container
-#    with the service alias so nginx resolves to the new container instantly
+# 5. Swap traffic: connect the new container to the edge network with the service
+#    alias, then disconnect the old one, so nginx resolves to the new container
 # 6. Stop old container
 #
 # Nginx uses variable-based upstream ($upstream_staging / $upstream_prod) with
 # Docker DNS resolver (127.0.0.11 valid=30s), so it re-resolves on each request.
 # By swapping network aliases, Docker DNS points to the new container immediately.
+#
+# The service alias lives on its own network ($EDGE_NETWORK: nginx + the live app),
+# not on the compose network the app shares with Postgres. Docker can only change a
+# container's aliases by disconnecting and reconnecting it; doing that on the DB
+# network killed the new container's already-open DB connections, and the first
+# request to pick one hung until nginx's 120 s timeout — every deploy (daatan#1998).
+EDGE_NETWORK="daatan-edge"
 #
 # Usage:
 #   ./scripts/blue-green-deploy.sh staging [--no-cache]
@@ -112,6 +119,10 @@ echo "Service:      $SERVICE"
 echo "Container:    $CONTAINER"
 echo "Git commit:   ${GIT_COMMIT:0:8}"
 
+# Both compose files declare the edge network external: it must exist before the
+# first `docker compose` call below.
+docker network inspect "$EDGE_NETWORK" >/dev/null 2>&1 || docker network create "$EDGE_NETWORK"
+
 # ─── Phase 1: Ensure database is running ───────────────────────────────────────
 echo ""
 echo "[+${SECONDS}s] 📦 Phase 1: Ensuring database is running..."
@@ -145,6 +156,11 @@ docker compose -f $COMPOSE_FILE up -d certbot || echo "⚠️  Could not start c
 echo ""
 echo "[+${SECONDS}s] 🌐 Phase 1c: Converging nginx with $COMPOSE_FILE..."
 docker compose -f $COMPOSE_FILE up -d --no-deps nginx || echo "⚠️  Could not converge nginx (continuing deploy)"
+# Phase 6 routes traffic over the edge network, so nginx must be on it even if the
+# converge above failed.
+if ! docker inspect daatan-nginx --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | grep -qx "$EDGE_NETWORK"; then
+    docker network connect "$EDGE_NETWORK" daatan-nginx
+fi
 
 # ─── Phase 2: Build new image (old container still serving traffic) ─────────────
 echo ""
@@ -347,7 +363,7 @@ fi
 
 # Get the Docker network name (compose project network)
 # Try to detect from current container, fallback to common compose network names
-NETWORK=$(docker inspect $CONTAINER --format '{{range $key, $val := .NetworkSettings.Networks}}{{$key}}{{end}}' 2>/dev/null || true)
+NETWORK=$(docker inspect $CONTAINER --format '{{range $key, $val := .NetworkSettings.Networks}}{{$key}}{{"\n"}}{{end}}' 2>/dev/null | grep -vx "$EDGE_NETWORK" | head -1 || true)
 if [ -z "$NETWORK" ]; then
     echo "⚠️  Could not detect network from $CONTAINER, trying common names..."
     for net in app_default daatan_default staging_default; do
@@ -526,13 +542,14 @@ echo "   Old image saved for rollback: ${OLD_IMAGE:-<none>}"
 echo ""
 echo "[+${SECONDS}s] 🔄 Phase 6: Swapping traffic to new container..."
 
-# Disconnect old container from network (removes its DNS alias)
-docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
+# Give the new container the service alias on the edge network — this only adds an
+# interface; its DB network connection (and open DB sockets) stay as they are.
+docker network connect --alias $SERVICE_ALIAS "$EDGE_NETWORK" $CONTAINER_NEW
 
-# Reconnect new container with the service alias so nginx resolves to it
-# First disconnect (it's already connected without alias), then reconnect with alias
-docker network disconnect $NETWORK $CONTAINER_NEW 2>/dev/null || true
-docker network connect --alias $SERVICE_ALIAS $NETWORK $CONTAINER_NEW
+# Then take the old container off both networks. Before daatan#1998 the alias lived
+# on $NETWORK, so the first deploy after it also drops the old alias there.
+docker network disconnect "$EDGE_NETWORK" $CONTAINER 2>/dev/null || true
+docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
 
 # Reload nginx to force immediate DNS re-resolution
 docker exec daatan-nginx nginx -s reload 2>/dev/null || true
@@ -558,6 +575,7 @@ else
     if [ -n "$OLD_IMAGE" ]; then
         echo "🔄 Rolling back to: $OLD_IMAGE"
         # New container is currently named $CONTAINER — stop and remove it
+        docker network disconnect "$EDGE_NETWORK" $CONTAINER 2>/dev/null || true
         docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
         docker stop $CONTAINER 2>/dev/null || true
         docker rm -f $CONTAINER 2>/dev/null || true
@@ -572,8 +590,7 @@ else
             "${RESOURCE_ARGS[@]}" \
             "${ENV_ARGS[@]}" \
             "$OLD_IMAGE"
-        docker network disconnect $NETWORK $CONTAINER 2>/dev/null || true
-        docker network connect --alias $SERVICE_ALIAS $NETWORK $CONTAINER
+        docker network connect --alias $SERVICE_ALIAS "$EDGE_NETWORK" $CONTAINER
         docker exec daatan-nginx nginx -s reload 2>/dev/null || true
         echo "✅ Rollback complete — old version is serving traffic again"
         echo "   Rolled back to image: $OLD_IMAGE"
