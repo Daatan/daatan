@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Restore previous state
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/niwd-prev.json
           key: niwd-state-${{ github.run_id }}
@@ -173,7 +173,7 @@ jobs:
 
       - name: Save state
         if: always()
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: /tmp/niwd-prev.json
           key: niwd-state-${{ github.run_id }}
