@@ -843,7 +843,7 @@ Status is always 200 on the authorized paths: per-row embedding errors are caugh
 Scheduled by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/backfill-embeddings.yml), nightly at 02:23 UTC (#1369). Not an EC2 crontab — there is no crontab on the prod box; this entry claimed otherwise until #1369, which is why the route went uncalled from its introduction until then.
 
 ### `GET /api/cron/backfill-headlines`
-**Disabled.** Used to generate missing card headlines (daatan#1814) for predictions with `headline IS NULL`. It now only checks auth (`x-cron-secret` header, `BOT_RUNNER_SECRET`, 401 otherwise) and returns `{ ok: true, disabled: true }` without reading or writing predictions, so already-published forecasts are never given a new-style headline; their cards fall back to the claim. The nightly run of [`.github/workflows/backfill-headlines.yml`](../.github/workflows/backfill-headlines.yml) still fires but only gets `disabled` back (200, no work); the workflow can be deleted in a follow-up.
+**Disabled.** Used to generate missing card headlines (daatan#1814) for predictions with `headline IS NULL`. It now only checks auth (`x-cron-secret` header, `BOT_RUNNER_SECRET`, 401 otherwise) and returns `{ ok: true, disabled: true }` without reading or writing predictions, so already-published forecasts are never given a new-style headline; their cards fall back to the claim. Nothing calls it any more: the nightly `backfill-headlines.yml` workflow was deleted (#2010).
 
 ### `GET /api/cron/ai-panel`
 LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an
