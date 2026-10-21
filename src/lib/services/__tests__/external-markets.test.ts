@@ -115,6 +115,16 @@ describe('polymarketProvider.parseId', () => {
   it('rejects non-polymarket URLs', () => {
     expect(polymarketProvider.parseId('https://example.com/event/foo')).toBeNull()
   })
+
+  it('rejects lookalike hosts that merely contain polymarket.com', () => {
+    expect(polymarketProvider.parseId('https://polymarket.com.evil.net/event/foo')).toBeNull()
+    expect(polymarketProvider.parseId('https://evilpolymarket.com/event/foo')).toBeNull()
+    expect(polymarketProvider.matchesUrl('https://polymarket.com.evil.net/event/foo')).toBe(false)
+  })
+
+  it('accepts polymarket subdomains', () => {
+    expect(polymarketProvider.parseId('https://www.polymarket.com/event/foo')).toBe('foo')
+  })
 })
 
 describe('getProviderForUrl', () => {
@@ -1116,6 +1126,11 @@ describe('kalshiProvider.matchesUrl / parseId', () => {
 
   it('rejects non-Kalshi URLs', () => {
     expect(kalshiProvider.parseId('https://example.com/markets/KXFED')).toBeNull()
+  })
+
+  it('rejects lookalike hosts that merely contain kalshi.com', () => {
+    expect(kalshiProvider.parseId('https://kalshi.com.evil.net/markets/KXFED')).toBeNull()
+    expect(kalshiProvider.matchesUrl('https://notkalshi.com/markets/KXFED')).toBe(false)
   })
 })
 

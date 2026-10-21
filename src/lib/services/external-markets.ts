@@ -390,12 +390,17 @@ async function backfillMarketHistory(
   }
 }
 
+/** `domain` itself or a subdomain of it — not merely a hostname containing it (`polymarket.com.evil.net`). */
+function isHostOf(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`)
+}
+
 export const polymarketProvider: MarketProvider = {
   id: 'POLYMARKET',
 
   matchesUrl(input: string): boolean {
     try {
-      return new URL(input.trim()).hostname.includes('polymarket.com')
+      return isHostOf(new URL(input.trim()).hostname, 'polymarket.com')
     } catch {
       return false
     }
@@ -408,7 +413,7 @@ export const polymarketProvider: MarketProvider = {
     if (!trimmed.includes('/') && !trimmed.includes(' ')) return trimmed
     try {
       const url = new URL(trimmed)
-      if (!url.hostname.includes('polymarket.com')) return null
+      if (!isHostOf(url.hostname, 'polymarket.com')) return null
       const segments = url.pathname.split('/').filter(Boolean)
       return segments.length > 0 ? segments[segments.length - 1] : null
     } catch {
@@ -613,7 +618,7 @@ export const kalshiProvider: MarketProvider = {
 
   matchesUrl(input: string): boolean {
     try {
-      return new URL(input.trim()).hostname.includes('kalshi.com')
+      return isHostOf(new URL(input.trim()).hostname, 'kalshi.com')
     } catch {
       return false
     }
@@ -627,7 +632,7 @@ export const kalshiProvider: MarketProvider = {
     if (!trimmed.includes('/') && !trimmed.includes(' ')) return trimmed.toUpperCase()
     try {
       const url = new URL(trimmed)
-      if (!url.hostname.includes('kalshi.com')) return null
+      if (!isHostOf(url.hostname, 'kalshi.com')) return null
       const segments = url.pathname.split('/').filter(Boolean)
       const last = segments[segments.length - 1]
       // Kalshi's web app links to an event page (e.g. .../markets/kxfed/fed-funds-rate/kxfed-26jul),
