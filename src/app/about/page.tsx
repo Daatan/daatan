@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Info, Target, Users, TrendingUp, Shield, Mail, GitCommit, Zap, Github, Twitter, Lightbulb } from 'lucide-react'
+import { Info, Target, Users, TrendingUp, Shield, Mail, GitCommit, Zap, Lightbulb } from 'lucide-react'
+import { Github, Twitter } from '@/components/icons/BrandIcons'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import { VERSION } from '@/lib/version'
 import Link from 'next/link'

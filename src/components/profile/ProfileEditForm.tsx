@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Globe, Twitter, Bell, Save, X, Upload } from 'lucide-react'
+import { User, Globe, Bell, Save, X, Upload } from 'lucide-react'
+import { Twitter } from '@/components/icons/BrandIcons'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Avatar } from '@/components/Avatar'

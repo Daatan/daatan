@@ -1,6 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server'
 import Image from 'next/image'
-import { TrendingUp, Award, Settings, Globe, Twitter, Sparkles, Swords } from 'lucide-react'
+import { TrendingUp, Award, Settings, Globe, Sparkles, Swords } from 'lucide-react'
+import { Twitter } from '@/components/icons/BrandIcons'
 import { ShareProfileButton } from '@/components/profile/ShareProfileButton'
 import ForecastCard, { type Prediction } from '@/components/forecasts/ForecastCard'
 import Link from 'next/link'
