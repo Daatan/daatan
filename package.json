@@ -1,6 +1,6 @@
 {
   "name": "daatan",
-  "version": "1.65.509",
+  "version": "1.65.510",
   "private": true,
   "engines": {
     "node": ">=24.0.0 <25"
@@ -40,7 +40,6 @@
     "@prisma/client": "^7.10.1",
     "@swc/helpers": "^0.5.18",
     "@t3-oss/env-nextjs": "^0.13.10",
-    "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
