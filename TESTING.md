@@ -186,11 +186,14 @@ Full test suite + integration tests run in CI. If any blocking check fails, the 
 
 GitHub Actions (`.github/workflows/deploy.yml`) runs on every PR:
 - `Type check`, `Lint`
-- `Unit tests` — related tests only, same script as pre-push (on pushes to `main`/tags the full suite runs instead, in 4 shards)
-- `Integration Tests` (`npm run test:integration`)
-- `Build & Test` — `next build`, `npm audit --audit-level=critical`, env-var parity check
+- `Unit tests` — related tests only, same script as pre-push (on pushes to `main` the full suite runs instead, in 4 shards)
+- `Integration Tests` (`npm run test:integration`) — required since #1985
+- `Build & Test` — the required status check: fails (never skips) when any job above failed, then `next build` (PRs), `npm audit --audit-level=critical`, env-var parity check
 
-plus the separate `Version bump` workflow (`.github/workflows/version.yml`). Playwright e2e
+On `v*` tag runs all test jobs are skipped: the tagged commit already passed them on `main`, and the release only proceeds once that commit's staging deploy succeeded (#1990).
+
+plus the separate `Version bump` workflow (`.github/workflows/version.yml`), and
+`Docker Build Check` when a PR touches `Dockerfile`/`.dockerignore` (not required). Playwright e2e
 tests are not part of CI.
 
 All checks must pass before merging.

@@ -42,7 +42,7 @@ DAaTAn is a reputation-based product that enables testing understanding and fore
 
 | Layer | Technology |
 | ----- | ---------- |
-| Framework | Next.js 15 (React 18) |
+| Framework | Next.js 16 (React 19) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS |
 | Database | PostgreSQL 16 + Prisma 7.x |
@@ -100,8 +100,8 @@ npm run test:e2e          # Playwright E2E
 
 ### Deployment
 ```bash
-# Deploy to staging (automatic on push to main)
-git push origin main
+# Deploy to staging: merge a PR into main (never push to main directly)
+gh pr merge <n> --squash
 
 # Deploy to production (create version tag)
 ./scripts/release.sh
@@ -115,7 +115,7 @@ git push origin v1.1.1
 1. **Local dev:** `npm run dev`.
 2. **Commit:** a husky pre-commit hook runs `scripts/check-version-bump.sh` and `lint-staged` (ESLint `--fix` on staged TS/TSX).
 3. **Push:** a husky pre-push hook runs `npm run typecheck` and `scripts/run-related-tests.sh origin/main` (`vitest related` on changed files; integration tests excluded).
-4. **Deploy staging:** push to `main`.
+4. **Deploy staging:** merge the PR into `main` (CI deploys staging; never push to `main` directly).
 5. **Deploy production:** run `./scripts/release.sh` to tag `vX.Y.Z` and create a GitHub release.
 
 ---

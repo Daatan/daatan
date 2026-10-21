@@ -56,7 +56,7 @@ git push origin vX.Y.Z
 
 (`./scripts/release.sh` does the same interactively and also creates the GitHub release.)
 
-The tag push does **not** rebuild anything or redeploy staging. It runs the tests, then:
+The tag push does **not** rebuild anything, re-run the tests (they passed on `main`, #1990) or redeploy staging. Instead:
 1. `resolve-release` waits for this commit's `main` run to finish `Deploy to Staging`
    successfully (up to 30 min)
 2. `deploy-production` checks that ECR's `X.Y.Z` / `X.Y.Z-migrations` are the images built

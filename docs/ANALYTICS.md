@@ -27,7 +27,8 @@ Google Analytics 4 with GDPR/CCPA consent mode. Data is only sent after explicit
    - Key absent (new visitor) → sets `analytics_storage: 'denied'` with `wait_for_update: 500`
 2. **GA library** loads `afterInteractive` and processes the already-established consent state.
 3. **New visitor** — `CookieConsent` banner appears. Accept → `gtag('consent', 'update', { analytics_storage: 'granted' })` + persists to localStorage. Decline → persists `'denied'`, banner disappears.
-4. **Returning visitor** — consent applied synchronously in step 1; banner never shown again.
+4. **Returning visitor** — consent applied synchronously in step 1; banner not shown again unless reopened.
+5. **Changing the choice** — the "Cookie settings" link in the home-v5 footer (`src/components/CookieSettingsLink.tsx`) dispatches `daatan:open-cookie-settings` (`COOKIE_SETTINGS_EVENT`), which reopens the banner; declining there also revokes an earlier grant (#1935).
 
 The `beforeInteractive` strategy guarantees consent is set before the GA library runs — no race condition is possible.
 

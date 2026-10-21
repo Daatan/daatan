@@ -143,20 +143,22 @@ for the full formulas.
 
 ---
 
-## Current Features (September 2026)
+## Current Features (October 2026)
 
 Shipped on `main` for the SaaS edition; pointers to the owning code or doc:
 
 - **Two creation flows** — Express (type an idea; the AI drafts claim, deadline, resolution rules and tags from a web/news search) and the step-by-step wizard (`src/components/forecasts/ForecastWizard.tsx`). See [FORECASTS_FLOW.md](./FORECASTS_FLOW.md).
 - **Prediction-market links** — Polymarket/Kalshi markets can be imported in the wizard or pasted into Express (#1545); the linked market's live price is shown on the forecast and fed to the AI as a prior. Linked prices refresh hourly (`external-market-sync.yml`).
-- **AI estimate** — each forecast gets a calibrated probability from the Oracul evidence pool, plus a multi-model AI panel with its own leaderboard (`/leaderboard/ai`).
+- **Landing page** — first-time anonymous visitors get the home-v5 intro served at `/` in place (rewrite, not redirect); the feed takes over once they open Forecasts (#1840). See [docs/SEO.md](./docs/SEO.md).
+- **Card headlines** — feed cards show a short AI-written headline above the claim; the claim stays canonical (#1814).
+- **Evidence estimate** (labelled "AI estimate" before #1790) — each forecast gets a calibrated probability from the Oracul evidence pool, starting at creation (#1777), with a line saying what it rests on (N sources / model estimate / no sources yet, #1806), plus a multi-model AI panel with its own leaderboard (`/leaderboard/ai`).
 - **Ratings** — ELO headline rating, Accuracy and Brier (#1764); global and per-tag leaderboards.
-- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); sources with fewer than 4 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]`, pundit pages at `/authors/[author]`.
-- **Retroanalysis case studies** — `/retroanalysis` (SaaS-only): Ukraine 2022 and Israel 2022 election (E02) reports rating what commentators said before the outcome (#1765–#1773).
+- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); defaults to outlets, sortable columns, topic (tag) chips (#1897, #1917); sources with fewer than 4 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]` list the scored authors and a per-topic track record (also on author pages, #1928), pundit pages at `/authors/[author]`.
+- **Retroanalysis case studies** — `/retroanalysis` (SaaS-only): Ukraine 2022, Israel 2022 election (E02) and Energy 2022 (E03, Brent + TTF, #1882) reports rating what commentators said before the outcome (#1765–#1773); each Method section links the study's `pool.csv` (#1916); index and reports translated to Hebrew and Russian (#1906, #1914).
 - **Forget History** — in Settings, a user can detach themselves from their own already-resolved commitments without deleting the rows (so other users' scoring is unchanged); refused while they hold a commitment on an unresolved forecast (#1701, #1724). `POST /api/account/forget-history`.
 - **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page.
 - **Social** — comments with reactions, share cards (OG images), notifications (in-app, email, browser push, Telegram).
-- **Languages** — English, Hebrew, Russian, Esperanto.
+- **Languages** — English, Hebrew (RTL, sidebar mirrored, #1893), Russian, Esperanto.
 - **Elections** — in-app `/elections` matrix of forecasts tagged "Israeli Elections 2026"; the sidebar also links to the separate `elections.daatan.com` app.
 - **Android app** — TWA wrapper in `android/` (Play Store listing: `android/STORE_LISTING.md`).
 

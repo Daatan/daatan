@@ -9,7 +9,7 @@ UI locale resolution (`src/i18n/request.ts`): `NEXT_LOCALE` cookie (set only by 
 language picker) → browser `Accept-Language` (`src/i18n/negotiate.ts`, q-values
 respected, `he-IL` matches `he`) → `en`. Detection is stateless — no cookie is
 written until the user explicitly picks. URL-prefixed pages (`/he`, `/ru`, `/eo`)
-override both: `src/middleware.ts` sets `<html lang>` from the prefix, and since #1738
+override both: `src/proxy.ts` (Next 16's renamed middleware) sets `<html lang>` from the prefix, and since #1738
 `request.ts` honours next-intl's `requestLocale` first, so the page's messages are loaded
 for the URL locale too (previously `/he/terms` etc. served English body text to anyone
 without a Hebrew browser).

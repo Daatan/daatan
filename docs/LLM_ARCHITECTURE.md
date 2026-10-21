@@ -31,6 +31,8 @@ The main `llmService` tries providers in this order; each leg is **registered on
 5.  **Fallback 3**: **Ollama** (hosting `qwen2.5:7b`)
     *   Self-hosted, private, no per-token cost. **Registered only when `OLLAMA_BASE_URL` is explicitly set** — the old implicit `localhost:11434` default was dropped so hosts that don't run Ollama (e.g. prod) don't carry a dead provider slot that fails on every fallback.
 
+**Timeouts are per leg when the caller asks for it** (#1948): `LLMRequest.legTimeoutMs` gives each provider in the chain its own `AbortSignal.timeout`, so a first leg that burns its budget no longer leaves the next leg starting already aborted; the overall deadline becomes `legTimeoutMs × legs`. A leg timeout is logged as `LLM leg timeout after Nms (<provider>)` and the chain moves on; an aborted *caller* signal stops the chain. Bots pass it (`src/lib/services/bots/shared.ts`); callers without it keep one shared signal.
+
 **Embeddings** do not go through this chain at all — `src/lib/services/embedding.ts` calls `gemini-embedding-2` directly, preferring Vertex on the same credentials and falling back to the Developer API. See [EMBEDDINGS.md](EMBEDDINGS.md).
 
 **Bots** use a separate service, `createBotLLMService(modelPreference)`, with its own Gemini + OpenRouter chain for per-bot model selection (requires `OPENROUTER_API_KEY`). A Gemini-preference bot tries Vertex first (#1879/#1888 — daatan.com carries no `GEMINI_API_KEY` since #1472, so without this leg such a bot had zero Google providers), then the direct Developer-API leg when `GEMINI_API_KEY` is set (self-host), then the free non-Google OpenRouter model.

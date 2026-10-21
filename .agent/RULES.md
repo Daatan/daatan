@@ -71,6 +71,4 @@ ALWAYS run these checks locally before pushing:
 - Git commands: Use `GIT_PAGER=cat` and `--no-pager` to prevent hangs.
 
 ## Next.js App Router Gotchas
-- `export const dynamic = 'force-dynamic'` only works in Server Components.
-- If a page has `'use client'`, the dynamic export is IGNORED.
-- Add `transpilePackages: ['next-auth']` in `next.config.js` if build issues occur.
+- Cache Components is on (`cacheComponents: true` in `next.config.js`, Next 16): route segment configs (`export const dynamic` / `revalidate` / `runtime`) are build errors — don't add them. A route that reads no request data needs `await connection()` (`next/server`); see CLAUDE.md "Common patterns".

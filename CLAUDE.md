@@ -4,7 +4,7 @@ This file is loaded automatically by Claude Code (and other CLAUDE.md-aware agen
 
 ## What this project is
 
-Daatan — reputation-based news prediction platform. Production at https://daatan.com, staging at https://staging.daatan.com. Stack: Next.js 15 (App Router) + TypeScript + Prisma 7 + PostgreSQL (with pgvector) + NextAuth (Google OAuth, JWT sessions) + Tailwind. Deployed on AWS EC2 via Docker + GitHub Actions blue-green.
+Daatan — reputation-based news prediction platform. Production at https://daatan.com, staging at https://staging.daatan.com. Stack: Next.js 16 (App Router) + TypeScript + Prisma 7 + PostgreSQL (with pgvector) + NextAuth (Google OAuth, JWT sessions) + Tailwind. Deployed on AWS EC2 via Docker + GitHub Actions blue-green.
 
 Detailed architecture and feature docs: see [`docs/`](./docs/).
 

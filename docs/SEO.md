@@ -305,7 +305,7 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 
 `src/proxy.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
 `daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets the matching
-`/home-v5` page **served in place** (middleware rewrite, status 200, URL stays `/`; query string kept; the
+`/home-v5` page **served in place** (`src/proxy.ts` rewrite, status 200, URL stays `/`; query string kept; the
 page's canonical is `/home-v5`). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives
 crawlers a 200. Crawlers have no cookie, so they get the same page as a first-time visitor — no
 user-agent sniffing, nothing cloaked. Not rewritten: signed-in users,

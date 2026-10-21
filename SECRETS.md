@@ -55,7 +55,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `EMAIL_FROM` | ✅ | — | Default From: address |
 | `VAPID_PRIVATE_KEY` | ✅ | — | Web Push signing key (runtime-only) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | — | ✅ | Web Push subscription key. **GitHub secret only** — `NEXT_PUBLIC_*` is substituted into the bundle at build, so a copy in the Secrets Manager bundle would be silently ignored at runtime (see the VAPID section below) |
-| `AWS_ROLE_ARN` | — | ✅ | OIDC role the `deploy.yml` workflow assumes to reach ECR + SSM |
+| `AWS_ROLE_ARN` | — | ✅ | OIDC role the workflows assume for ECR, SSM and the reports (`terraform/oidc_github.tf`); trusts only runs on `main` and jobs in the `production` environment (#1962) |
 
 "optional" = wired through `blue-green-deploy.sh` `ENV_ARGS` + compose and optional in `src/env.ts`; whether a given bundle carries it is not recorded here. Non-secret config passed the same way: `AI_PANEL_GROUNDED_TAG`, `TEMPORAL_CLOCK_DISABLED`, `MAX_BOTS` (default 50). `DATABASE_URL`, `NEXTAUTH_URL`, `APP_ENV`, `GA_MEASUREMENT_ID` and (non-prod) `AUTH_TRUST_HOST` are set per environment by `blue-green-deploy.sh` itself, overriding any bundle value.
 
