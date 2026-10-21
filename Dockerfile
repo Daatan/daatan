@@ -1,3 +1,18 @@
+# package.json / package-lock.json with the root version pinned to 0.0.0. Every
+# commit bumps the version (repo rule), so copying the real files would change the
+# npm ci layer's key on every build; these change only with a real dependency change.
+FROM node:24-bookworm-slim AS manifests
+WORKDIR /m
+COPY package.json package-lock.json ./
+RUN node -e ' \
+  const fs = require("fs"); \
+  for (const f of ["package.json", "package-lock.json"]) { \
+    const j = JSON.parse(fs.readFileSync(f, "utf8")); \
+    j.version = "0.0.0"; \
+    if (j.packages && j.packages[""]) j.packages[""].version = "0.0.0"; \
+    fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n"); \
+  }'
+
 # Build stage
 FROM node:24-bookworm-slim AS builder
 
@@ -21,10 +36,12 @@ ENV GOOGLE_CLIENT_SECRET=dummysecret12
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Copy package files and install dependencies.
-# These layers are cached by ECR BuildKit when package.json is unchanged.
+# The manifests come version-stripped from the stage above, so this layer is
+# cached until a dependency (or the Prisma schema) actually changes; `COPY . .`
+# below restores the real files before the build.
 # IMPORTANT: volatile per-build args (APP_VERSION, GIT_COMMIT) are declared
 # AFTER this block so they don't bust the npm ci cache on every deploy.
-COPY package*.json ./
+COPY --from=manifests /m/package.json /m/package-lock.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./prisma.config.ts
 
