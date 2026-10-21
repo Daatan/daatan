@@ -246,19 +246,14 @@ jobs:
   # never rebuilds: resolve-release promotes the digest this build pushed, after
   # its staging deploy succeeded (daatan#1954 — tag rebuilds overwrote
   # staging-latest and raced the main deploy, 3/3 times on 2026-10-18).
+  # Both image builds run in parallel with the tests rather than after `build`
+  # (~110 s off every main deploy, daatan#1992), so they push only the
+  # `sha-<short>` tags: an image whose tests failed must never carry a
+  # deployable name. deploy-staging adds X.Y.Z / staging-latest once `build`
+  # (the test gate) has passed.
   build-app-image:
     name: Build & Push App Image
-    needs: build
-    # always() + explicit needs.build.result check, not a bare event-name
-    # if: default success() gating walks the whole transitive needs chain,
-    # not just direct needs — since unit-test/unit-test-full are mutually
-    # exclusive by event (one is always "skipped"), that skip poisons the
-    # implicit success() here even though `build` itself succeeded. Same
-    # fix already applied to deploy-production; missing here broke every
-    # push-to-main deploy silently until caught 2026-08-23.
     if: |
-      always() &&
-      needs.build.result == 'success' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
@@ -274,6 +269,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      # Same value `build` outputs as app_version (image jobs never run on tags).
+      - name: App version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -295,8 +295,6 @@ jobs:
           images: ${{ steps.login-ecr.outputs.registry }}/daatan-app
           tags: |
             type=sha,format=short
-            type=raw,value=staging-latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=${{ needs.build.outputs.app_version }},enable={{is_default_branch}}
 
       - name: Build and push to ECR
         id: push
@@ -309,7 +307,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ needs.build.outputs.app_version }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.version.outputs.version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
@@ -321,11 +319,8 @@ jobs:
   # for why only one side of this pair may write it.
   build-migrations-image:
     name: Build & Push Migrations Image
-    needs: build
-    # See the comment on build-app-image's `if` above — same fix.
+    # In parallel with the tests too — see build-app-image.
     if: |
-      always() &&
-      needs.build.result == 'success' &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'))
     runs-on: ubuntu-latest
@@ -341,6 +336,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      # Same value `build` outputs as app_version (image jobs never run on tags).
+      - name: App version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -368,11 +368,9 @@ jobs:
           target: migrations
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/daatan-app:sha-${{ steps.sha.outputs.short }}-migrations
-            ${{ github.ref == 'refs/heads/main' && format('{0}/daatan-app:staging-latest-migrations', steps.login-ecr.outputs.registry) || '' }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}/daatan-app:{1}-migrations', steps.login-ecr.outputs.registry, needs.build.outputs.app_version) || '' }}
           cache-from: type=gha
           build-args: |
-            NEXT_PUBLIC_APP_VERSION=${{ needs.build.outputs.app_version }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.version.outputs.version }}
             GIT_COMMIT=${{ github.sha }}
             DATABASE_URL=postgresql://placeholder
             NEXTAUTH_URL=https://daatan.com
@@ -440,6 +438,36 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
+
+      - name: Tag the tested images (X.Y.Z, staging-latest)
+        # The image jobs push only sha-<short> (they don't wait for the tests);
+        # this job runs only after `build` passed, so the deployable names go on
+        # here. A manual production dispatch and rollback.yml resolve X.Y.Z.
+        # Same manifest, new tag — --image-digest makes ECR refuse anything that
+        # isn't byte-identical.
+        if: github.ref == 'refs/heads/main'
+        env:
+          VERSION: ${{ needs.build.outputs.app_version }}
+          APP: ${{ needs.build-app-image.outputs.digest }}
+          MIG: ${{ needs.build-migrations-image.outputs.digest }}
+        run: |
+          retag() {
+            aws ecr batch-get-image --repository-name daatan-app --image-ids "imageDigest=$1" \
+              --accepted-media-types application/vnd.oci.image.index.v1+json application/vnd.docker.distribution.manifest.list.v2+json \
+                application/vnd.oci.image.manifest.v1+json application/vnd.docker.distribution.manifest.v2+json \
+              --output json > "$RUNNER_TEMP/img.json"
+            if ! aws ecr put-image --repository-name daatan-app --image-tag "$2" --image-digest "$1" \
+                --image-manifest "$(jq -r '.images[0].imageManifest' "$RUNNER_TEMP/img.json")" \
+                --image-manifest-media-type "$(jq -r '.images[0].imageManifestMediaType' "$RUNNER_TEMP/img.json")" \
+                > /dev/null 2> "$RUNNER_TEMP/err"; then
+              grep -q ImageAlreadyExistsException "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err"; return 1; }
+            fi
+            echo "daatan-app:$2 → $1"
+          }
+          retag "$APP" "$VERSION"
+          retag "$APP" staging-latest
+          retag "$MIG" "$VERSION-migrations"
+          retag "$MIG" staging-latest-migrations
 
       - name: Get source branch
         id: source_branch

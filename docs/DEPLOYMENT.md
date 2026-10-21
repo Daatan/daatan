@@ -37,7 +37,7 @@ git push -u origin feat/my-feature
 ### 2. Open and merge a PR
 
 Create a PR targeting `main`. When merged:
-- CI builds **two** Docker images and pushes them to ECR (tags `sha-<commit>`, `X.Y.Z`, `staging-latest`):
+- CI builds **two** Docker images in parallel with the tests and pushes them to ECR as `sha-<commit>`; once the tests pass, `deploy-staging` adds `X.Y.Z` and `staging-latest`:
   - the production-slim app image
   - the full-node_modules migrations image (same tags with a `-migrations` suffix)
 - The staging environment is updated automatically, pulling the images **by digest**
@@ -131,15 +131,18 @@ workflow (`.github/workflows/version.yml`).
 
 ### `build-app-image` / `build-migrations-image` jobs
 
-Run in parallel after `build`, on `main` pushes and staging dispatches only — **never on `v*` tags**
-(daatan#1954: tag rebuilds overwrote `staging-latest` and raced the main deploy, putting an older
-commit on staging; they also meant production ran bytes staging never saw):
-- **app image** (`sha-<commit>`; on `main` also `staging-latest` and `X.Y.Z` = `package.json`'s
-  version) — the only one that writes the BuildKit cache
-- **migrations image** (the same tags with `-migrations`, `migrations` Dockerfile target) — reads
-  the cache only
+Run in parallel with each other **and with the tests** (they don't wait for `build`, daatan#1992),
+on `main` pushes and staging dispatches only — **never on `v*` tags** (daatan#1954: tag rebuilds
+overwrote `staging-latest` and raced the main deploy, putting an older commit on staging; they also
+meant production ran bytes staging never saw):
+- **app image** (`sha-<commit>`) — the only one that writes the BuildKit cache
+- **migrations image** (`sha-<commit>-migrations`, `migrations` Dockerfile target) — reads the
+  cache only
 
-Both jobs output the pushed digest; deploys pull by digest, not by tag.
+Both jobs output the pushed digest; deploys pull by digest, not by tag. Because they start before
+the tests finish, they push only the `sha-` tags: `deploy-staging` (which requires `build`, the
+test gate) adds `X.Y.Z` / `staging-latest` (+ `-migrations`) by digest on `main`, so a version tag
+always names an image whose tests passed.
 
 ### `deploy-staging` job
 
@@ -390,7 +393,7 @@ the schema up to date. If a collation-sensitive index looks wrong afterwards, se
 |---|---|---|
 | `staging-latest` | Latest `main` app image (informational — deploys pull by digest) | `runner` stage |
 | `staging-latest-migrations` | Latest `main` migrations image (informational) | `migrations` stage |
-| `X.Y.Z` | Versioned app image, pushed by the `main` build of the commit carrying that `package.json` version; a `v*` tag promotes it, never rebuilds it. Production and rollbacks pull this | `runner` stage |
+| `X.Y.Z` | Versioned app image, tagged by `deploy-staging` (after the tests passed) on the `main` build of the commit carrying that `package.json` version; a `v*` tag promotes it, never rebuilds it. Production and rollbacks pull this | `runner` stage |
 | `X.Y.Z-migrations` | Versioned migrations image | `migrations` stage |
 | `sha-<commit>` | Per-commit reference (7-char SHA); a release checks `X.Y.Z` has the same digest | `runner` stage |
 | `sha-<commit>-migrations` | Per-commit migrations reference | `migrations` stage |
