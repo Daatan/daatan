@@ -1,0 +1,60 @@
+name: Docker Build Check
+
+# PRs already run `npm run build` (deploy.yml, Build & Test), so the only thing
+# no PR check exercises is the Docker layer itself: the Dockerfile, .dockerignore
+# and the node base image — e.g. Dependabot's base-image bumps. Build both images
+# here, without pushing, when a PR touches those files (daatan#1960). Not a
+# required check: a broken image would otherwise only fail the staging deploy.
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker-build-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Docker build (no push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Placeholder build args: the real values only matter in deployed images, and
+      # Dependabot PRs get no secrets. Reads main's GHA layer cache; writes none.
+      - name: Build app image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          build-args: |
+            NEXT_PUBLIC_APP_VERSION=0.0.0-pr
+            GIT_COMMIT=${{ github.sha }}
+            DATABASE_URL=postgresql://placeholder
+            NEXTAUTH_URL=https://daatan.com
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=placeholder
+
+      - name: Build migrations image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          target: migrations
+          cache-from: type=gha
+          build-args: |
+            NEXT_PUBLIC_APP_VERSION=0.0.0-pr
+            GIT_COMMIT=${{ github.sha }}
+            DATABASE_URL=postgresql://placeholder
+            NEXTAUTH_URL=https://daatan.com
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=placeholder
