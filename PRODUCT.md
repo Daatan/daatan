@@ -159,7 +159,7 @@ Shipped on `main` for the SaaS edition; pointers to the owning code or doc:
 - **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page.
 - **Social** — comments with reactions, share cards (OG images), notifications (in-app, email, browser push, Telegram).
 - **Languages** — English, Hebrew (RTL, sidebar mirrored, #1893), Russian, Esperanto.
-- **Elections** — in-app `/elections` matrix of forecasts tagged "Israeli Elections 2026"; the sidebar also links to the separate `elections.daatan.com` app.
+- **Elections** — the separate `elections.daatan.com` app (Daatan/elections), linked from the sidebar and the landing page. The old in-app `/elections` matrix was removed; `/elections` (and `/<locale>/elections`) now 301-redirect there (#2011).
 - **Android app** — TWA wrapper in `android/` (Play Store listing: `android/STORE_LISTING.md`).
 
 ---

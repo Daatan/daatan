@@ -247,7 +247,7 @@ of the same URL collapse to one row. Started as a write-only foundation layer
 (2026-07-09, retro `docs/ORACLE_VARIABLES.md` §6 part 2); since v1.60.0 it is
 the source of truth the estimate is recomputed from (see below), and since
 2026-07-16 also what the elections consumers render (elections app #50/#51,
-daatan `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill`/`retry`/`remediate` (`PoolOrigin`) write
+and, until #2011 removed it, daatan's `/elections` matrix #1147). `analyze`/`news-indexer`/`backfill`/`retry`/`remediate` (`PoolOrigin`) write
 their per-source signal here (`addArticlesToPool` in
 `src/lib/services/evidence-pool.ts`) alongside their existing
 `ContextSnapshot`/`Prediction` writes. The row IS the extraction
@@ -653,8 +653,8 @@ looked up, while `author: null` is news-indexer stating it found no byline. Data
 2026-08-16 20:20Z carried `personId` with **NULL `personName`** (the daatan#1463
 enrichment regression, fixed in v1.65.178); their names were backfilled 2026-08-17
 (220/220, self-join on the table's own healthy id→name pairs), but their `author`
-stays NULL — that window's bylines were unrecoverable daatan-side. Both elections consumers now attribute by id first: the elections
-app (#50/#51) and daatan's `/elections` matrix (#1147) read usable pool rows and match
+stays NULL — that window's bylines were unrecoverable daatan-side. Both elections consumers attributed by id first: the elections
+app (#50/#51) and daatan's `/elections` matrix (#1147, removed in #2011) read usable pool rows and match
 `personId` before falling back to the `TRACKED_SOURCES`/`CURATED_ELECTION_AUTHORS` alias
 tables, which survive only for byline-only identities news-indexer can't resolve yet.
 **All three estimate paths are cut over to the pool** (ORACLE_VARIABLES.md §6).

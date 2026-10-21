@@ -208,6 +208,12 @@ creation — see [TRANSLATIONS.md](./TRANSLATIONS.md)). Reaching a forecast by r
 **retired slug** (kept in `prediction_slug_aliases` after a re-slug), 308-redirects to the
 current canonical `/forecasts/[slug]`, so old links and their SEO are preserved.
 
+Retired routes are permanent (308) redirects in `next.config.js` `redirects()`: `/predictions[/:id]`
+→ `/forecasts[/:id]`, and `/elections[/*]` (plus `/<locale>/elections[/*]`) →
+`https://elections.daatan.com/*` — the in-app elections matrix was removed in favour of the
+standalone app (#2011). `/tags/elections` is a normal tag page and is not redirected. Regression
+coverage: `__tests__/config/next-redirects.test.ts`.
+
 ## Search-engine notification
 
 `src/lib/services/indexnow.ts` exposes `notifySearchEngines(slug)` — a fire-and-forget

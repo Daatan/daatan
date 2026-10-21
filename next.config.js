@@ -24,6 +24,18 @@ const nextConfig = {
         destination: '/forecasts/:id',
         permanent: true,
       },
+      // The in-app elections matrix was superseded by the standalone
+      // elections.daatan.com app (Daatan/elections) and removed (daatan#2011).
+      {
+        source: '/elections/:path*',
+        destination: 'https://elections.daatan.com/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:locale(en|he|ru|eo)/elections/:path*',
+        destination: 'https://elections.daatan.com/:path*',
+        permanent: true,
+      },
     ]
   },
   async rewrites() {

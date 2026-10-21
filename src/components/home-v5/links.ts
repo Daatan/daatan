@@ -1,7 +1,7 @@
 import type { Locale } from '@/i18n/config'
 
 // Routes that exist under src/app/[locale]; everything else is served at the
-// root path only, so a /he/elections link would 404.
+// root path only, so a /he/methodology-style link to them would 404.
 const LOCALIZED = new Set(['/', '/about', '/forecasts', '/methodology', '/contact', '/privacy', '/terms'])
 
 export function localePath(locale: Locale, path: string): string {
@@ -17,7 +17,7 @@ export function buildLinks(locale: Locale) {
     home: p('/'),
     forecasts: p('/forecasts'),
     sources: '/leaderboard/sources',
-    // Separate app, same URL as the sidebar's Elections item; /elections here is only the internal matrix.
+    // Separate app, same URL as the sidebar's Elections item (daatan /elections 301s there, #2011).
     elections: 'https://elections.daatan.com',
     profile: '/profile',
     retro: '/retroanalysis',
