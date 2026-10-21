@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { Mail, Github, MessageSquare } from 'lucide-react'
+import { Mail, MessageSquare } from 'lucide-react'
+import { Github } from '@/components/icons/BrandIcons'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { isSelfHosted } from '@/lib/edition'
