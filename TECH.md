@@ -497,7 +497,6 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `news-indexer-watchdog.yml` | every 2 h :17 | news-indexer disk + pipeline health via its `/stats` |
 | `oracle-jev-watchdog.yml` | hourly :12 (GitHub runs it every 3–7 h) | Telegram alert when the Oracul's Jev calls start failing (#1792) |
 | `backfill-embeddings.yml` | 02:23 daily | `/api/cron/backfill-embeddings` |
-| `backfill-headlines.yml` | 02:37 daily | `/api/cron/backfill-headlines` — a no-op since the headline backfill was disabled (returns `disabled: true`; see `docs/LLM_ARCHITECTURE.md` "Card headline") |
 | `backup.yml` | 04:00 + 16:00 daily | **Fallback** prod DB backup trigger; the primary is EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`, #1957) — see `docs/DEPLOYMENT.md` "DB backups (S3)" |
 | `ai-panel.yml` | 04:43 + 16:43 daily | `/api/cron/ai-panel` — multi-model estimate panel |
 | `requote.yml` | 05:31 daily | `/api/cron/requote` — temporal-model daily requote |

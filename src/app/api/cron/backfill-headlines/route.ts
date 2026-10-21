@@ -9,7 +9,7 @@ import { secretsMatch } from '@/lib/cron-auth'
  * `headline IS NULL`. Headlines are now written only when a forecast is created or its
  * claim is edited: filling NULL rows would attach new-style headlines to forecasts that
  * are already published, which must not change, so those cards fall back to the claim.
- * The route stays so the nightly workflow (still scheduled) keeps getting a 200 until it is removed.
+ * Its nightly workflow was deleted (daatan#2010); nothing calls the route any more.
  */
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
