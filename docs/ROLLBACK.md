@@ -171,7 +171,7 @@ already re-pointed at the new image, so the "rollback" restarted the broken imag
 
 If `verify-health.sh` fails after the swap, the script:
 1. Stops and removes the new (broken) container
-2. Starts a fresh container from `$OLD_IMAGE` with the same name and network alias
+2. Starts a fresh container from `$OLD_IMAGE` with the same name, and gives it the service alias on the `daatan-edge` network
 3. Reloads nginx
 4. Exits with code 1 (so CI marks the deploy as failed)
 

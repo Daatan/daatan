@@ -3,6 +3,11 @@ services:
     image: nginx:alpine
     container_name: daatan-nginx
     restart: unless-stopped
+    # daatan-edge carries only nginx and the app's service alias; the blue-green swap
+    # moves the alias there without touching the app's DB network (daatan#1998).
+    networks:
+      - default
+      - edge
     ports:
       - "80:80"
       - "443:443"
@@ -232,6 +237,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+networks:
+  edge:
+    name: daatan-edge
+    external: true  # created by scripts/blue-green-deploy.sh
 
 volumes:
   postgres_staging_data:

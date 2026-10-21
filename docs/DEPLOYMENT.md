@@ -200,6 +200,7 @@ Inputs: `command-id`, `health-url`, `app-version`.
                            ▼
 Phase 1  DB up       postgres-staging (always running)
 Phase 1b Certbot     docker compose up -d certbot (re-asserts the TLS renewal loop; non-fatal)
+Phase 1c nginx       creates the `daatan-edge` network if missing, converges nginx, makes sure nginx is on it
 Phase 2  Skip build  (SKIP_BUILD=true, image pre-pulled)
 Phase 3  Start new   daatan-app-staging-new  (no alias, no traffic)
 Phase 4  Health ✓    wget 127.0.0.1:3000/api/health inside new container
@@ -208,7 +209,8 @@ Phase 4b Dump        if `prisma migrate status` ≠ up to date: pg_dump → ~/ap
                      (dump fails or looks truncated → abort, old container untouched)
 Phase 5  Migrate     docker run --rm daatan-migrations:staging-latest  ← isolated
                      (skipped when Phase 4b's `migrate status` said up to date)
-Phase 6  Swap        alias moves: nginx now resolves to new container
+Phase 6  Swap        new container joins `daatan-edge` with the alias, old one leaves both networks:
+                     nginx now resolves to the new container
 Phase 7  Verify      verify-health.sh https://staging.daatan.com (+ $EXPECTED_VERSION)
 Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
          Rollback?   if Phase 7 fails → restart the old image (by image ID), swap back
@@ -217,6 +219,17 @@ Phase 8  Auth ✓      curl https://staging.daatan.com/api/auth/providers
 
 Every phase header in the deploy log carries the elapsed time (`[+83s] 🏥 Phase 4: …`),
 so the SSM command output shows where a slow deploy spent its time (daatan#1992).
+
+**Why a separate `daatan-edge` network (daatan#1998).** nginx reaches the app by the service
+alias (`app` / `app-staging` / `app-next`), and Docker can only give a running container an
+alias by connecting it to a network. Until 2026-10-21 the swap disconnected the new container
+from the compose network it shares with Postgres and reconnected it with the alias — which
+tore down its interface and silently killed the DB connections it had opened in Phases 3–4.
+The first request to check one out of the pg Pool hung until nginx's `proxy_read_timeout`
+(120 s): every deploy's Phase 7 took ~125 s, and real users in the seconds after a swap could
+hit the same. Now the alias lives only on `daatan-edge` (nginx + the live app), so the swap
+only *adds* an interface to the new container and its DB network is never touched. The
+network is created by the deploy script and declared `external` in both compose files.
 
 **Zero-downtime guarantee**: old container serves all traffic until Phase 6. Phases 3–5
 run in parallel with live traffic. If anything in Phases 3–5 fails, the old container
