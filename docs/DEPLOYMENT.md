@@ -117,7 +117,9 @@ for the event all succeeded — a skipped required check would count as passing 
 it must fail instead of skipping.
 
 The image builds and deploys are skipped on PRs. The `Version bump` check is a separate
-workflow (`.github/workflows/version.yml`).
+workflow (`.github/workflows/version.yml`). A PR that touches `Dockerfile` or `.dockerignore`
+also gets `Docker build (no push)` (`.github/workflows/docker-build-check.yml`, daatan#1960):
+both images built with placeholder build args, nothing pushed, not a required check.
 
 ### `build` job
 
