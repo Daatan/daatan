@@ -213,7 +213,6 @@ src/
 │   ├── [locale]/               # Localized (he/ru/eo) routes
 │   ├── authors/                # Pundit/author pages
 │   ├── create/                 # Forecast creation
-│   ├── elections/              # Elections matrix
 │   ├── help/                   # Help pages (rating-numbers)
 │   ├── home-v5/                # Landing page; served at / in place (rewrite) to first-time visitors (#1840)
 │   ├── leaderboard/            # User rankings (+ ai/, sources/)
