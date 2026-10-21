@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/vitest'
 import { vi, expect } from 'vitest'
 import { toHaveNoViolations } from 'jest-axe'
 
