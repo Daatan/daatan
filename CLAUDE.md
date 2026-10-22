@@ -1,6 +1,6 @@
 # Claude / agent guidance
 
-This file is loaded automatically by Claude Code (and other CLAUDE.md-aware agents) when working in this repo. Keep it terse; it's read on every turn.
+This file is loaded automatically by Claude Code (and other CLAUDE.md-aware agents) when working in this repo. Keep it terse; it's read on every turn. Cross-repo rules (claim an issue first, PR-only, terraform `-target`, SSM-only server access) come from the Daatan workspace CLAUDE.md — this file holds only what's specific to daatan.
 
 ## What this project is
 
