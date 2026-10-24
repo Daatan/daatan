@@ -6,6 +6,7 @@ import { locales, defaultLocale } from '@/i18n/config'
 import { notifyTranslationFailed } from '@/lib/services/telegram'
 import { forStage } from '@/lib/llm/stageModels'
 import { HEADLINE_MAX_CHARS, HEADLINE_MAX_WORDS } from '@/lib/llm/headline'
+import { displayHeadlineFor } from '@/lib/services/headline-revisions'
 
 const log = createLogger('translation-service')
 
@@ -311,6 +312,25 @@ export async function normalizeTitleForDedup(text: string): Promise<string> {
 }
 
 /**
+ * The translatable source fields, with `headline` swapped for the display-only revision when
+ * one is active (headline-revisions.ts). That headline is cached under its own `displayHeadline`
+ * row, so the translation of the published headline stays untouched.
+ */
+async function loadTranslationSource(predictionId: string) {
+  const prediction = await prisma.prediction.findUnique({
+    where: { id: predictionId },
+    select: { claimText: true, detailsText: true, resolutionRules: true, headline: true },
+  })
+  if (!prediction) return null
+  const display = await displayHeadlineFor(predictionId, prediction.claimText).catch(() => null)
+  return {
+    prediction: display ? { ...prediction, headline: display } : prediction,
+    /** `prediction_translations.fieldName` that holds the headline translation. */
+    headlineRow: display ? 'displayHeadline' : 'headline',
+  }
+}
+
+/**
  * Returns translated fields for a prediction, fetching from cache or translating on demand.
  * Only translates fields that are non-empty in the source prediction.
  */
@@ -318,14 +338,13 @@ export async function translatePrediction(
   predictionId: string,
   language: string,
 ): Promise<Partial<Record<TranslatableField, string>>> {
-  const prediction = await prisma.prediction.findUnique({
-    where: { id: predictionId },
-    select: { claimText: true, detailsText: true, resolutionRules: true, headline: true },
-  })
+  const source = await loadTranslationSource(predictionId)
 
-  if (!prediction) {
+  if (!source) {
     throw new Error(`Prediction ${predictionId} not found`)
   }
+  const { prediction, headlineRow } = source
+  const rowOf = (f: TranslatableField): string => (f === 'headline' ? headlineRow : f)
 
   // Determine which fields need translation
   const fieldsToTranslate: TranslatableField[] = DISPLAY_TRANSLATED_FIELDS.filter(
@@ -337,7 +356,7 @@ export async function translatePrediction(
     where: {
       predictionId,
       language,
-      fieldName: { in: fieldsToTranslate },
+      fieldName: { in: fieldsToTranslate.map(rowOf) },
     },
     select: { fieldName: true, translatedText: true, sourceHash: true },
   })
@@ -353,7 +372,7 @@ export async function translatePrediction(
     // Cache hit only when the translation was produced from the *current* source.
     // A stale row (source edited, or legacy row with null hash) falls through and
     // re-translates, so an updated detailsText is never served as old Hebrew.
-    const hit = cachedMap.get(field)
+    const hit = cachedMap.get(rowOf(field))
     if (hit && hit.sourceHash === hash) {
       result[field] = hit.translatedText
       continue
@@ -394,9 +413,9 @@ export async function translatePrediction(
 
       await prisma.predictionTranslation.upsert({
         where: {
-          predictionId_fieldName_language: { predictionId, fieldName: field, language },
+          predictionId_fieldName_language: { predictionId, fieldName: rowOf(field), language },
         },
-        create: { predictionId, fieldName: field, language, translatedText: translated, sourceHash: hash },
+        create: { predictionId, fieldName: rowOf(field), language, translatedText: translated, sourceHash: hash },
         update: { translatedText: translated, sourceHash: hash },
       })
 
@@ -423,28 +442,29 @@ export async function getCachedPredictionTranslation(
   // that changed — an edited claim, a regenerated headline (#1823) — kept showing its old
   // translation forever, and the translate route's all-cached fast path never refreshed it.
   // A stale row now counts as missing, so the client's translate call re-translates it.
-  const [prediction, cached] = await Promise.all([
-    prisma.prediction.findUnique({
-      where: { id: predictionId },
-      select: { claimText: true, detailsText: true, resolutionRules: true, headline: true },
-    }),
+  const [source, cached] = await Promise.all([
+    loadTranslationSource(predictionId),
     prisma.predictionTranslation.findMany({
       where: { predictionId, language },
       select: { fieldName: true, translatedText: true, sourceHash: true },
     }),
   ])
-  if (!prediction) return {}
+  if (!source) return {}
+  const { prediction, headlineRow } = source
 
   return Object.fromEntries(
     cached
-      .filter((c): c is typeof c & { fieldName: TranslatableField } =>
-        DISPLAY_TRANSLATED_FIELDS.includes(c.fieldName as TranslatableField)
+      // Of the two headline rows only the one for the headline being shown counts.
+      .filter((c) => (c.fieldName !== 'headline' && c.fieldName !== 'displayHeadline') || c.fieldName === headlineRow)
+      .map((c) => ({ ...c, field: c.fieldName === 'displayHeadline' ? 'headline' : c.fieldName }))
+      .filter((c): c is typeof c & { field: TranslatableField } =>
+        DISPLAY_TRANSLATED_FIELDS.includes(c.field as TranslatableField)
       )
       .filter((c) => {
-        const source = prediction[c.fieldName]
-        return !!source && c.sourceHash === sourceHash(source)
+        const text = prediction[c.field]
+        return !!text && c.sourceHash === sourceHash(text)
       })
-      .map((c) => [c.fieldName, c.translatedText]),
+      .map((c) => [c.field, c.translatedText]),
   ) as Partial<Record<TranslatableField, string>>
 }
 

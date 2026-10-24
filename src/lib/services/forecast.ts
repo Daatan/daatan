@@ -7,6 +7,7 @@ import { tagConnectOrCreate } from '@/lib/services/tag'
 import { hashUrl } from '@/lib/utils/hash'
 import { embedText, embedAndStoreForecast } from '@/lib/services/embedding'
 import { generateAndStoreHeadline } from '@/lib/llm/headline'
+import { withDisplayHeadlines } from '@/lib/services/headline-revisions'
 import { classifyAndStoreTemporal } from '@/lib/services/temporal-classifier'
 import { scheduleBornTrueCheck } from '@/lib/services/bornTrueCheck'
 import { scheduleCreationEstimate } from '@/lib/services/creation-estimate'
@@ -177,10 +178,13 @@ export async function listForecasts(query: ListForecastsQuery) {
     prisma.prediction.count({ where: query.where }),
   ])
 
-  const commitmentStats = await getCommitmentStats(predictions.map(p => p.id), query.userId)
+  const [commitmentStats, shown] = await Promise.all([
+    getCommitmentStats(predictions.map(p => p.id), query.userId),
+    withDisplayHeadlines(predictions), // display-only revisions (headline-revisions.ts)
+  ])
 
   return {
-    predictions: predictions.map(p => ({
+    predictions: shown.map(p => ({
       ...p,
       commitmentStats: commitmentStats.get(p.id) ?? EMPTY_COMMITMENT_STATS,
     })),

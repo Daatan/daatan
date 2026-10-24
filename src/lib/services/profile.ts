@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { ensureTagRatingsSeeded } from '@/lib/services/tag-ratings'
+import { withDisplayHeadlines } from '@/lib/services/headline-revisions'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
 
 const DECAY = 0.95
@@ -334,13 +335,15 @@ export async function loadProfileTab({
   ])
 
   if (tab === 'created') {
-    const items = await prisma.prediction.findMany({
-      where: { authorId: userId, ...publicFilter, ...predTagFilter },
-      include: predictionInclude,
-      orderBy: { createdAt: 'desc' },
-      take: PAGE_SIZE,
-      skip,
-    })
+    const items = await withDisplayHeadlines(
+      await prisma.prediction.findMany({
+        where: { authorId: userId, ...publicFilter, ...predTagFilter },
+        include: predictionInclude,
+        orderBy: { createdAt: 'desc' },
+        take: PAGE_SIZE,
+        skip,
+      }),
+    )
     return {
       tab,
       page,
@@ -367,7 +370,10 @@ export async function loadProfileTab({
     skip,
   })
 
-  const commitItems = items
+  const shownPredictions = new Map(
+    (await withDisplayHeadlines(items.map((c) => c.prediction))).map((p) => [p.id, p]),
+  )
+  const commitItems = items.map((c) => ({ ...c, prediction: shownPredictions.get(c.prediction.id) ?? c.prediction }))
 
   return {
     tab,

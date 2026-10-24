@@ -845,6 +845,9 @@ Scheduled by [`.github/workflows/backfill-embeddings.yml`](../.github/workflows/
 ### `GET /api/cron/backfill-headlines`
 **Disabled.** Used to generate missing card headlines (daatan#1814) for predictions with `headline IS NULL`. It now only checks auth (`x-cron-secret` header, `BOT_RUNNER_SECRET`, 401 otherwise) and returns `{ ok: true, disabled: true }` without reading or writing predictions, so already-published forecasts are never given a new-style headline; their cards fall back to the claim. Nothing calls it any more: the nightly `backfill-headlines.yml` workflow was deleted (#2010).
 
+### `POST /api/admin/forecasts/headline-revisions`
+Applies the reviewed batch of display-only card headlines (`headline-revisions.data.ts`, batch `2026-10-active`) to ACTIVE forecasts. **Dry run by default**: returns `{ dryRun, batch, counts, rows }` with an outcome per forecast (`would_apply`, `already`, `missing`, `not_active`, `drifted` when the published headline is no longer the reviewed one, `invalid` when a proposal fails the length/negation guards) and writes nothing. `?apply=1` inserts the revisions. It never writes to `predictions`; idempotent (a second apply reports `already`). Auth: ADMIN session or `x-cron-secret`.
+
 ### `GET /api/cron/ai-panel`
 LASSO panel sweep ([LASSO.md](./LASSO.md) §9): asks every panel member for an
 ungrounded probability on every open BINARY forecast; date-hash-gated to one

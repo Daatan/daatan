@@ -68,6 +68,12 @@ The central table (`Prediction`). Field groups:
   `claimText` by `src/lib/llm/headline.ts`, daatan#1814; null = cards show the claim,
   cleared to NULL whenever the claim changes; `''` = generated but rejected by the
   polarity/length guard; existing NULL/`''` rows are never backfilled, cards show the claim).
+  A reviewed, display-only replacement for a published headline lives in
+  `prediction_headline_revisions` (`predictionId`, `headline`, `previousHeadline`,
+  `claimHash`, `reason`, `batch`, `revokedAt`; unique per prediction + batch). The card
+  shows the newest non-revoked revision whose `claimHash` matches the current claim;
+  `predictions.headline` is never rewritten. See
+  [LLM_ARCHITECTURE.md § Card headline](LLM_ARCHITECTURE.md#card-headline-1814).
 - **Outcome**: `outcomeType` (BINARY | MULTIPLE_CHOICE | NUMERIC_THRESHOLD),
   `outcomePayload` JSON, `prediction_options` rows for MC/numeric,
   `resolveByDatetime` (the platform deadline).

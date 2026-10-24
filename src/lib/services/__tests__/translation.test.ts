@@ -4,6 +4,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     prediction: { findUnique: vi.fn() },
     predictionTranslation: { findMany: vi.fn(), upsert: vi.fn() },
+    predictionHeadlineRevision: { findMany: vi.fn() },
   },
 }))
 vi.mock('@/lib/llm', () => ({ llmService: { generateContent: vi.fn() } }))
@@ -97,6 +98,56 @@ describe('headlineTranslationProblem', () => {
   })
   it('skips the negation check for languages without a marker table', () => {
     expect(headlineTranslationProblem('Russia will not unblock Telegram', 'Rusio malŝlosos Telegram', 'eo')).toBeNull()
+  })
+})
+
+describe('display-only headline revision (headline-revisions.ts)', () => {
+  const PUBLISHED = 'Gantz will withdraw'
+  const REVISED = 'Benny Gantz will withdraw from the race before the elections'
+  const HE = 'בני גנץ יפרוש מהמרוץ לפני הבחירות'
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...PREDICTION, headline: PUBLISHED } as never)
+    vi.mocked(prisma.predictionHeadlineRevision.findMany).mockResolvedValue([
+      { predictionId: 'p1', headline: REVISED, claimHash: sourceHash(PREDICTION.claimText) },
+    ] as never)
+    vi.mocked(prisma.predictionTranslation.upsert).mockResolvedValue({} as never)
+  })
+
+  it('translates the revised headline and caches it under displayHeadline, leaving the headline row alone', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([] as never)
+    vi.mocked(llmService.generateContent).mockImplementation((async (req: { prompt: string }) =>
+      ({ text: req.prompt.includes('card headline') ? HE : 'TRANSLATED' })) as never)
+
+    const result = await translatePrediction('p1', 'he')
+
+    expect(result.headline).toBe(HE)
+    const prompts = vi.mocked(llmService.generateContent).mock.calls.map((c) => c[0].prompt)
+    expect(prompts.some((p) => p.includes(REVISED))).toBe(true)
+    // the published headline is only ever the translation source if no revision is active
+    expect(prompts.filter((p) => p.includes('card headline')).every((p) => p.includes(REVISED))).toBe(true)
+    const rows = vi.mocked(prisma.predictionTranslation.upsert).mock.calls.map((c) => c[0].create.fieldName)
+    expect(rows).toContain('displayHeadline')
+    expect(rows).not.toContain('headline')
+  })
+
+  it('serves the cached displayHeadline row as the headline, and ignores the published headline row', async () => {
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'headline', translatedText: 'גנץ יפרוש', sourceHash: sourceHash(PUBLISHED) },
+      { fieldName: 'displayHeadline', translatedText: HE, sourceHash: sourceHash(REVISED) },
+    ] as never)
+    expect(await getCachedPredictionTranslation('p1', 'he')).toEqual({ headline: HE })
+  })
+
+  it('falls back to the published headline row once the claim was edited (revision retired)', async () => {
+    vi.mocked(prisma.predictionHeadlineRevision.findMany).mockResolvedValue([
+      { predictionId: 'p1', headline: REVISED, claimHash: sourceHash('an older claim') },
+    ] as never)
+    vi.mocked(prisma.predictionTranslation.findMany).mockResolvedValue([
+      { fieldName: 'headline', translatedText: 'גנץ יפרוש', sourceHash: sourceHash(PUBLISHED) },
+      { fieldName: 'displayHeadline', translatedText: HE, sourceHash: sourceHash(REVISED) },
+    ] as never)
+    expect(await getCachedPredictionTranslation('p1', 'he')).toEqual({ headline: 'גנץ יפרוש' })
   })
 })
 
