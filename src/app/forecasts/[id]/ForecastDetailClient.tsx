@@ -962,7 +962,7 @@ export default function ForecastDetailClient({
             </span>
           </UserLink>
           <span className="text-gray-600 shrink-0">·</span>
-          <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Math.round(prediction.author.eloRating)}</span>
+          <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
         </div>
       )}
 
