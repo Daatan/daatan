@@ -655,7 +655,7 @@ export async function getForecastById(idOrSlug: string) {
   return prisma.prediction.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
     include: {
-      author: { select: { id: true, name: true, username: true, image: true, rs: true, role: true, isBot: true } },
+      author: { select: { id: true, name: true, username: true, image: true, rs: true, eloRating: true, role: true, isBot: true } },
       newsAnchor: true,
       tags: { select: { id: true, name: true, slug: true } },
       options: { orderBy: { displayOrder: 'asc' } },

@@ -37,6 +37,19 @@ describe('getForecastById', () => {
     expect(em).toBeTruthy()
     expect(em?.select?.snapshots).toBeTruthy()
   })
+
+  // Regression: the detail page renders "ELO {Math.round(author.eloRating)}" and the same
+  // refetch overwrites the SSR author. Omitting eloRating here made every author show "ELO NaN".
+  it('selects author.eloRating', async () => {
+    mockFindFirst.mockResolvedValue(null as never)
+
+    await getForecastById('spacex-starship-orbit-next')
+
+    const arg = mockFindFirst.mock.calls[0][0] as {
+      include?: { author?: { select?: Record<string, unknown> } }
+    }
+    expect(arg.include?.author?.select?.eloRating).toBe(true)
+  })
 })
 
 describe('getCanonicalSlugForAlias', () => {
