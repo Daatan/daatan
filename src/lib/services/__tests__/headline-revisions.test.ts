@@ -12,6 +12,7 @@ import {
   applyHeadlineRevisions, withDisplayHeadlines, displayHeadlineFor, type HeadlineRevisionEntry,
 } from '../headline-revisions'
 import { HEADLINE_REVISIONS, HEADLINE_REVISION_BATCH } from '../headline-revisions.data'
+import { HEADLINE_REVISIONS_2, HEADLINE_REVISION_BATCH_2 } from '../headline-revisions-2.data'
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 const CLAIM = 'Benny Gantz will withdraw from the race for the general elections in Israel before October 27, 2026.'
@@ -128,5 +129,27 @@ describe('reviewed batch data', () => {
       expect(e.to).not.toMatch(/[.。]$/)
       expect(['V', 'P', 'G', 'S', 'T']).toContain(e.reason)
     }
+  })
+})
+
+describe('reviewed batch 2 data', () => {
+  it('states more, not less: every revision is longer than the published headline and fits the guards', () => {
+    expect(HEADLINE_REVISION_BATCH_2).toBe('2026-10-active-2')
+    const ids = HEADLINE_REVISIONS_2.map((e) => e.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.length).toBeGreaterThan(100)
+    for (const e of HEADLINE_REVISIONS_2) {
+      expect(e.to.length, e.to).toBeLessThanOrEqual(60)
+      expect(e.to.split(' ').length, e.to).toBeLessThanOrEqual(12)
+      expect(e.to.length, e.to).toBeGreaterThan(e.from.length)
+      expect(e.to).not.toMatch(/[.。]$/)
+      expect(['V', 'P', 'G', 'S', 'T']).toContain(e.reason)
+    }
+  })
+
+  it('averages 9+ words, in line with the 5-10 word target', () => {
+    const avg = HEADLINE_REVISIONS_2.reduce((n, e) => n + e.to.split(' ').length, 0) / HEADLINE_REVISIONS_2.length
+    expect(avg).toBeGreaterThanOrEqual(8.5)
+    expect(avg).toBeLessThanOrEqual(10.5)
   })
 })
