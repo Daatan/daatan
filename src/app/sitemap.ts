@@ -4,9 +4,14 @@ import { connection } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
 import { getAppUrl } from '@/lib/branding'
+import { VISIBLE_TAG_PREDICTION_WHERE } from '@/lib/services/tag'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
+
+// A tag page lists only active public forecasts and is noindexed when it has none, so a tag
+// whose forecasts are all resolved/pending must not be submitted (daatan#2028).
+export const SITEMAP_TAG_WHERE = { predictions: { some: VISIBLE_TAG_PREDICTION_WHERE } }
 
 // Cache the DB queries for 1h so crawler hits don't hammer the DB.
 // The route itself stays dynamic (avoids the build-time prerender problem
@@ -46,17 +51,15 @@ const fetchSitemapData = unstable_cache(
         select: { username: true, updatedAt: true },
       }),
       prisma.tag.findMany({
-        where: {
-          predictions: {
-            some: {
-              isPublic: true,
-              status: { in: ['ACTIVE', 'PENDING', 'RESOLVED_CORRECT', 'RESOLVED_WRONG'] },
-            },
-          },
-        },
+        where: SITEMAP_TAG_WHERE,
         select: {
           slug: true,
-          predictions: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+          predictions: {
+            where: VISIBLE_TAG_PREDICTION_WHERE,
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { updatedAt: true },
+          },
         },
       }),
     ])

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isSitemapEligible, sitemapLastModified } from '../sitemap'
+import { isSitemapEligible, sitemapLastModified, SITEMAP_TAG_WHERE } from '../sitemap'
+import { VISIBLE_TAG_PREDICTION_WHERE } from '@/lib/services/tag'
 
 function prediction(overrides: {
   status?: string
@@ -62,5 +63,14 @@ describe('sitemapLastModified', () => {
 
   it('falls back to updatedAt for a resolved forecast missing resolvedAt', () => {
     expect(sitemapLastModified({ status: 'RESOLVED_CORRECT', updatedAt, resolvedAt: null })).toBe(updatedAt)
+  })
+})
+
+describe('SITEMAP_TAG_WHERE', () => {
+  // The tag page noindexes itself when it has no active public forecast; listing such a tag
+  // in the sitemap puts it in GSC's "Excluded by 'noindex' tag" bucket (daatan#2028).
+  it('lists a tag only if it has a forecast the tag page would show', () => {
+    expect(SITEMAP_TAG_WHERE).toEqual({ predictions: { some: VISIBLE_TAG_PREDICTION_WHERE } })
+    expect(VISIBLE_TAG_PREDICTION_WHERE).toEqual({ status: 'ACTIVE', isPublic: true })
   })
 })

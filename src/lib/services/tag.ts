@@ -33,10 +33,16 @@ export const getTagBySlug = async (slug: string) => {
   return { id: tag.id, name: tag.name, slug: tag.slug, count: tag._count.predictions }
 }
 
-/** Count of a tag's predictions currently visible on the tag page (public + active). */
+/**
+ * Which of a tag's predictions the tag page shows (public + active). The sitemap lists a tag
+ * only if it has one of these, so it never submits an empty, noindexed tag page (daatan#2028).
+ */
+export const VISIBLE_TAG_PREDICTION_WHERE = { status: 'ACTIVE', isPublic: true } as const
+
+/** Count of a tag's predictions currently visible on the tag page. */
 export const getVisibleTagPredictionCount = async (tagId: string) => {
   return prisma.prediction.count({
-    where: { status: 'ACTIVE', isPublic: true, tags: { some: { id: tagId } } },
+    where: { ...VISIBLE_TAG_PREDICTION_WHERE, tags: { some: { id: tagId } } },
   })
 }
 
