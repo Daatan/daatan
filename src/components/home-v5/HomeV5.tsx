@@ -9,6 +9,7 @@ import ClosingCta from './ClosingCta'
 import Footer from './Footer'
 import Header from './Header'
 import Hero from './Hero'
+import LatestForecasts, { getLatestBlockData } from './LatestForecasts'
 import TwoUses from './TwoUses'
 import { getFeaturedForecast, getFeaturedSource } from './featured'
 import { buildLinks } from './links'
@@ -19,7 +20,7 @@ export default async function HomeV5({ locale }: { locale: Locale }) {
   const appUrl = getAppUrl()
   const siteJsonLd = buildSiteJsonLd(appUrl, locale)
   // Which examples are shown is configured in ./examples.ts; a card with no data is not rendered.
-  const forecast = await getFeaturedForecast(locale)
+  const [forecast, latest] = await Promise.all([getFeaturedForecast(locale), getLatestBlockData(locale)])
   const source = getFeaturedSource(locale)
   const signedIn = Boolean((await auth())?.user)
   return (
@@ -30,6 +31,7 @@ export default async function HomeV5({ locale }: { locale: Locale }) {
       <div>
         <Hero locale={locale} links={links} />
         <TwoUses locale={locale} links={links} forecast={forecast} source={source} />
+        <LatestForecasts locale={locale} links={links} forecasts={latest.forecasts} tags={latest.tags} />
         <Capabilities locale={locale} />
         <ClosingCta locale={locale} links={links} />
       </div>

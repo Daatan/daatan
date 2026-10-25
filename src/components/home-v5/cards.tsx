@@ -1,9 +1,12 @@
+import Link from 'next/link'
 import { CalendarDays, CircleX, CircleCheck } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 
 export interface ForecastCardData {
   tags: string[]
   statement: string
+  /** The forecast's page; the statement links there. */
+  href?: string
   resolutionNote?: string
   /** 0-100 */
   confidence: number
@@ -42,7 +45,15 @@ export async function ForecastCard({ locale, data }: { locale: string; data: For
           {data.open ? t('statusOpen') : t('statusResolved')}
         </span>
       </div>
-      <p className="mt-[22px] text-xl font-bold leading-[1.4] text-white md:text-2xl">{data.statement}</p>
+      <p className="mt-[22px] text-xl font-bold leading-[1.4] text-white md:text-2xl">
+        {data.href ? (
+          <Link href={data.href} className="text-white no-underline decoration-[var(--hv5-accent-2)] decoration-1 underline-offset-[5px] hover:underline">
+            {data.statement}
+          </Link>
+        ) : (
+          data.statement
+        )}
+      </p>
       {data.resolutionNote && <p className="mt-2.5 text-[15px] leading-[1.5] text-[var(--hv5-muted)]">{data.resolutionNote}</p>}
       <div className="mt-auto pt-7">
         <div className="flex flex-wrap gap-y-4 border-t border-[var(--hv5-line-2)] pt-[22px]">

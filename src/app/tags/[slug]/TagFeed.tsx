@@ -1,7 +1,7 @@
-import Link from 'next/link'
-import { Tag as TagIcon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Tag as TagIcon } from 'lucide-react'
 import ForecastCard, { type Prediction } from '@/components/forecasts/ForecastCard'
 import EmptyState from '@/components/ui/EmptyState'
+import PaginationLinks from '@/components/ui/PaginationLinks'
 
 interface TagFeedProps {
   tag: { name: string; slug: string }
@@ -43,31 +43,12 @@ export default function TagFeed({ tag, predictions, total, page, limit }: TagFee
             ))}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-8">
-              {page > 1 && (
-                <Link
-                  href={`/tags/${tag.slug}?page=${page - 1}`}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-navy-700 text-text-secondary hover:bg-navy-600 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </Link>
-              )}
-              <span className="text-sm text-gray-500">
-                Page {page} of {totalPages}
-              </span>
-              {page < totalPages && (
-                <Link
-                  href={`/tags/${tag.slug}?page=${page + 1}`}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-navy-700 text-text-secondary hover:bg-navy-600 transition-colors"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              )}
-            </div>
-          )}
+          <PaginationLinks
+            base={`/tags/${tag.slug}`}
+            page={page}
+            totalPages={totalPages}
+            labels={{ previous: 'Previous', next: 'Next', status: `Page ${page} of ${totalPages}` }}
+          />
         </>
       )}
     </div>

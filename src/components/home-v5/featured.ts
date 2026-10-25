@@ -46,6 +46,7 @@ export async function getFeaturedForecast(locale: Locale): Promise<ForecastCardD
       where: { OR: [{ id: FEATURED_FORECAST_ID }, { slug: FEATURED_FORECAST_ID }] },
       select: {
         id: true,
+        slug: true,
         claimText: true,
         status: true,
         isPublic: true,
@@ -64,9 +65,12 @@ export async function getFeaturedForecast(locale: Locale): Promise<ForecastCardD
       return undefined
     }
     const translated = locale === 'en' ? {} : await getCachedPredictionTranslation(p.id, locale)
+    const slug = p.slug || p.id
     return {
       tags: p.tags.map((t) => t.name),
       statement: translated.claimText || p.claimText,
+      // Untranslated locale forecast pages are noindex, so only a translated one gets the locale URL.
+      href: translated.claimText ? `/${locale}/forecasts/${slug}` : `/forecasts/${slug}`,
       confidence: p.confidence,
       resolvesOn: formatDate(p.resolveByDatetime, locale),
       open: p.status === 'ACTIVE',

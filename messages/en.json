@@ -215,6 +215,7 @@
       "void": "Void — cancelled without resolution",
       "unresolvable": "Unresolvable — the outcome could not be determined"
     },
+    "relatedTitle": "Related forecasts",
     "seoQuestionOpen": "What are the chances that",
     "seoQuestionResolved": "Did this come true:",
     "seoAnswerAiEstimate": "the evidence estimate is",
@@ -685,7 +686,17 @@
     "empty": "No forecasts yet",
     "emptyHint": "Be the first to make a forecast!",
     "clearSearch": "Clear search",
-    "createForecast": "Create Forecast"
+    "createForecast": "Create Forecast",
+    "pagePrevious": "Previous",
+    "pageNext": "Next",
+    "pageStatus": "Page {page} of {total}"
+  },
+  "tagsIndex": {
+    "title": "Topics",
+    "subtitle": "Every topic with open forecasts. Pick one to see its forecasts.",
+    "count": "{count, plural, one {# forecast} other {# forecasts}}",
+    "empty": "No topics have open forecasts right now.",
+    "browseForecasts": "Browse all forecasts"
   },
   "expressForecast": {
     "inputLabel": "Create a forecast",
@@ -1253,6 +1264,12 @@
     "learnMore": "Learn more about DAATAN →"
   },
   "HomeV5": {
+    "latest": {
+      "title": "Latest forecasts",
+      "topics": "Topics:",
+      "allForecasts": "All forecasts",
+      "allTopics": "All topics"
+    },
     "metaTitle": "Daatan - a measurable record of judgment",
     "metaDescription": "Daatan turns forecasts and claims about the future into a measurable record: who showed good judgment, and in which fields.",
     "nav": {
