@@ -135,13 +135,13 @@ is final, more may be added later): `komapc@gmail.com`,
 share an owner — this is what lets the TWA open **without a visible browser
 URL bar**. A mismatch here is the classic TWA bug.
 
-It lists **three** SHA-256 fingerprints:
+It lists exactly **two** SHA-256 fingerprints, and the route unit test pins that
+exact set, so adding a third fails CI:
 
 | Fingerprint | What it is | Needed for |
 |---|---|---|
 | `1B:79:A3:BC:…:CF:18` | **Upload key** (our keystore) | Locally-built / sideloaded installs via `adb install` |
 | `B0:60:24:A9:…:42:90` | **Play App Signing key** — what Google actually re-signs the distributed APK with | Every install from Google Play |
-| `FC:BE:B0:3B:…:81:52` | **Unaccounted for** — see warning below | Nothing known |
 
 **Do not read the Play App Signing fingerprint out of the Play Console UI.**
 That is how this broke (#1697): `FC:BE:B0:3B:…:81:52` was transcribed from
@@ -153,12 +153,12 @@ post-quantum) and it is easy to take the wrong one — and nothing downstream
 will tell you, because a wrong value still serves HTTP 200 and still passes
 the unit test.
 
-`FC:BE:…:81:52` is retained only because it may be the post-quantum app
-signing key, which Google could begin distributing later. It has never been
-observed on a real artifact. **If it can't be positively identified in Play
-Console, remove it** — an unidentified certificate in a
+`FC:BE:…:81:52` was kept for a while in case it was the post-quantum app
+signing key, but it was never observed on a real artifact or positively
+identified, so it was removed (platform#38) — an unidentified certificate in a
 `delegate_permission/common.handle_all_urls` allowlist grants URL-handling
-authority to a key we cannot account for.
+authority to a key we cannot account for. If Google ever starts signing with
+a new key, add it only after reading it off a Play-installed APK (below).
 
 ### Getting the Play App Signing fingerprint the reliable way
 

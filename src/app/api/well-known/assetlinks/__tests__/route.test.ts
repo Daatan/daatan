@@ -11,6 +11,10 @@ import { GET } from '../route'
 // no URL bar renders and that logcat shows TWAConnectionPool/DelegationService
 // binding. Sideloads use the *upload* key and prove nothing about the Play path.
 // See android/README.md.
+//
+// The set below must stay EXACTLY {upload key, Play App Signing key}: every entry
+// grants URL-handling authority to whoever holds that key, so an extra, unidentified
+// fingerprint is a security hole, not harmless slack (platform#38 removed one).
 describe('GET /api/well-known/assetlinks', () => {
   it('serves the real assetlinks.json content with a JSON content type', async () => {
     const res = await GET()
@@ -26,7 +30,6 @@ describe('GET /api/well-known/assetlinks', () => {
           sha256_cert_fingerprints: [
             '1B:79:A3:BC:73:B1:E0:DF:DC:45:2C:F4:84:F5:77:6C:1E:65:B0:D5:54:D4:44:F8:21:2B:9B:D5:4E:33:CF:18',
             'B0:60:24:A9:53:C7:3E:7F:50:49:99:15:4D:D9:4C:9A:A5:22:14:5B:7A:8C:0D:3C:A7:D4:66:3C:A4:B9:42:90',
-            'FC:BE:B0:3B:52:02:3C:46:75:27:E0:B5:4D:2E:C9:E9:E4:69:56:50:AD:63:0C:BB:08:D5:43:99:4E:DA:81:52',
           ],
         },
       },
