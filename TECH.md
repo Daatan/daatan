@@ -489,7 +489,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 
 | Workflow | Schedule | Purpose |
 |----------|----------|---------|
-| `watchdog.yml` | every 5 min | HTTP health + version drift, plus SSM disk/CPU/memory checks on the EC2 hosts |
+| `watchdog.yml` | every 5 min (GitHub actually runs it ~every 4 h) | HTTP health + version drift, plus SSM disk/CPU/memory checks on the EC2 hosts. **Secondary** uptime check — the primary is the Route53 health check + `prod-daatan-com-down` alarm (`terraform/monitoring.tf`, #1956) |
 | `transition-expired-predictions.yml` | every 15 min | `/api/cron/transition-expired-predictions` |
 | `search-health.yml` | hourly | `/api/cron/search-health` |
 | `external-market-sync.yml` | hourly :17 | `/api/cron/external-market-sync` — refresh linked Polymarket/Kalshi prices |

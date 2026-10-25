@@ -17,11 +17,13 @@ CloudWatch alarm → SNS (daatan-infra-alerts, eu-central-1) → email (unchange
 **Terraform**: `terraform/telegram_alerts.tf`
 **Lambda source**: `infra/telegram-alerts/index.mjs`
 
-Scoped to the eu-central-1 `daatan-infra-alerts` topic only — it covers prod/staging EC2 host
-alarms, the class this issue is about. `daatan-infra-alerts-us-east-1` (Bedrock/region-locked
-alarms) has no Telegram subscriber yet: an SNS→Lambda subscription must live in the topic's own
-region, so that needs a second function deployed via the `aws.us_east_1` provider, not a change
-here.
+Both infra topics feed the same function: `daatan-infra-alerts` (eu-central-1, EC2 host alarms)
+and `daatan-infra-alerts-us-east-1` (region-locked metrics — retro's `retro-extractor-*` Bedrock
+alarms and the `prod-daatan-com-down` Route53 uptime probe, daatan#1956). SNS delivers
+cross-region to Lambda between default-enabled regions
+([AWS docs](https://docs.aws.amazon.com/sns/latest/dg/sns-cross-region-delivery.html)), so the
+us-east-1 subscription (created with the `aws.us_east_1` provider) points at the eu-central-1
+function; no second function is needed.
 
 ## What the Lambda does
 
@@ -52,7 +54,7 @@ reads that env's `daatan-env-<env>` secret — see `terraform/README.md`):
 
 ```bash
 cd terraform
-terraform plan  -target=aws_lambda_function.telegram_alerts -target=aws_sns_topic_subscription.infra_alerts_telegram -target=aws_cloudwatch_metric_alarm.telegram_alerts_errors -target=aws_iam_role.lambda_telegram_alerts -target=aws_iam_role_policy.lambda_telegram_alerts -target=aws_lambda_permission.allow_sns_infra_alerts
+terraform plan  -target=aws_lambda_function.telegram_alerts -target=aws_sns_topic_subscription.infra_alerts_telegram -target=aws_cloudwatch_metric_alarm.telegram_alerts_errors -target=aws_iam_role.lambda_telegram_alerts -target=aws_iam_role_policy.lambda_telegram_alerts -target=aws_lambda_permission.allow_sns_infra_alerts -target=aws_lambda_permission.allow_sns_infra_alerts_us_east_1 -target=aws_sns_topic_subscription.infra_alerts_us_east_1_telegram
 terraform apply <same -target flags>
 ```
 

@@ -542,3 +542,81 @@ resource "aws_cloudwatch_metric_alarm" "ec2_swap_high" {
     InstanceId = each.value
   }
 }
+
+# --------------------------------------------------------------------
+# External uptime probe — daatan.com (daatan#1956)
+# --------------------------------------------------------------------
+# Every alarm above watches the box from the inside (EC2 status checks,
+# CWAgent metrics). None of them notices "the instance is fine but the site
+# is down" — nginx/app container dead, cert expired, DNS/EIP broken. The only
+# probe for that was watchdog.yml, scheduled */5 but actually run by GitHub
+# about every 4 h (median gap 223 min over 300 runs), so an outage was
+# noticed hours late. watchdog.yml stays as the secondary check.
+#
+# fqdn, not ip_address: resolving the name each time means a broken DNS
+# record or a detached EIP fails the check too, not just a dead app.
+#
+# /api/health (not /): it returns 200 directly (no redirect, so no 3xx
+# ambiguity — Route53 counts 2xx/3xx as healthy, which would hide a bad
+# redirect on /) and 503 when the DB ping fails or RSS is past the
+# memory-pressure line (src/app/api/health/route.ts). Cost per probe is one
+# DB ping. No search_string: the status code already carries the verdict,
+# and string matching is an extra-priced feature that buys nothing here.
+#
+# Known source of pages: a memory-pressure episode makes /api/health 503
+# until watchdog.yml's docker restart. If it lasts past ~2-3 min this alarm
+# fires. That's intentional — users are getting 503s too.
+#
+# regions: three checker regions (the minimum) instead of AWS's default
+# ~8. Route53 reports healthy while >18% of checkers succeed, so one
+# region's network blip still can't flip it, and the app sees ~6 req/min
+# instead of ~16.
+resource "aws_route53_health_check" "prod_uptime" {
+  fqdn              = var.domain_name
+  type              = "HTTPS"
+  port              = 443
+  resource_path     = "/api/health"
+  request_interval  = 30
+  failure_threshold = 3
+  measure_latency   = false
+  enable_sni        = true
+  regions           = ["us-east-1", "eu-west-1", "ap-southeast-1"]
+
+  # Health checks have no name field; the console shows this tag instead.
+  tags = {
+    Name = "prod-daatan-com-uptime"
+  }
+}
+
+# HealthCheckStatus is published ONLY in us-east-1, whatever region the
+# target is in, so this alarm needs the us_east_1 provider and the us-east-1
+# topic (see the region comment on infra_alerts_us_east_1 above). That topic
+# forwards to Telegram's clean channel (telegram_alerts.tf); the alarm name
+# must not start with `staging-` or the Lambda would route it to noisy.
+#
+# Minimum < 1 over 2 x 60s: one datapoint of 0 in each of two consecutive
+# minutes. With failure_threshold 3 at 30s, a hard outage pages in ~3-4 min.
+#
+# treat_missing_data = "breaching", same reasoning as prod_ec2_status_check:
+# Route53 publishes this metric every minute for as long as the check
+# exists, so silence means the check itself is gone, not that all is well.
+resource "aws_cloudwatch_metric_alarm" "prod_uptime" {
+  provider = aws.us_east_1
+
+  alarm_name          = "prod-daatan-com-down"
+  alarm_description   = "daatan.com/api/health is failing from Route53's external checkers — the site is down or degraded for users (daatan#1956)"
+  namespace           = "AWS/Route53"
+  metric_name         = "HealthCheckStatus"
+  statistic           = "Minimum"
+  period              = 60
+  evaluation_periods  = 2
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.infra_alerts_us_east_1.arn]
+  ok_actions          = [aws_sns_topic.infra_alerts_us_east_1.arn]
+
+  dimensions = {
+    HealthCheckId = aws_route53_health_check.prod_uptime.id
+  }
+}

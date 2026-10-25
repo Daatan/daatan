@@ -8,13 +8,16 @@
 # Lambda pattern from infra/mail-forwarder (see ses.tf) rather than
 # introducing a new one.
 #
-# Scoped to the eu-central-1 topic (aws_sns_topic.infra_alerts) only, which
-# covers prod/staging EC2 host alarms -- the class this issue is about.
-# daatan-infra-alerts-us-east-1 (Bedrock/region-locked alarms, monitoring.tf)
-# is a deliberate follow-up: an SNS-to-Lambda subscription must live in the
-# same region as its topic (see the region-mismatch comment above that
-# resource), so covering it means a second function deployed via the
-# aws.us_east_1 provider, not a config tweak to this one.
+# Subscribed to both infra topics: the eu-central-1 one (prod/staging EC2
+# host alarms) and daatan-infra-alerts-us-east-1 (region-locked metrics:
+# retro's Bedrock alarms, the Route53 uptime probe -- daatan#1956). The
+# us-east-1 topic reaches this same eu-central-1 function directly: SNS
+# delivers cross-region to Lambda between default-enabled regions
+# (https://docs.aws.amazon.com/sns/latest/dg/sns-cross-region-delivery.html),
+# so no second function is needed. The subscription is created in the
+# TOPIC's region (provider aws.us_east_1); the invoke permission lives with
+# the function. (An earlier version of this comment said a second function
+# would be required -- that was wrong.)
 #
 # Reads TELEGRAM_BOT_TOKEN / TELEGRAM_CLEAN_CHAT_ID from the app's own
 # daatan-env-<environment> secret (secrets.tf) instead of provisioning a new
@@ -97,6 +100,27 @@ resource "aws_sns_topic_subscription" "infra_alerts_telegram" {
   topic_arn = aws_sns_topic.infra_alerts.arn
   protocol  = "lambda"
   endpoint  = aws_lambda_function.telegram_alerts.arn
+}
+
+# us-east-1 topic -> this eu-central-1 function (cross-region, see header).
+# Routing is by alarm name as for the eu-central-1 topic: everything here
+# that isn't `staging-*` lands on the clean channel -- which now includes
+# retro's retro-extractor-* Bedrock alarms, previously email-only.
+resource "aws_lambda_permission" "allow_sns_infra_alerts_us_east_1" {
+  statement_id  = "AllowExecutionFromInfraAlertsUsEast1SNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.telegram_alerts.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.infra_alerts_us_east_1.arn
+}
+
+resource "aws_sns_topic_subscription" "infra_alerts_us_east_1_telegram" {
+  provider  = aws.us_east_1
+  topic_arn = aws_sns_topic.infra_alerts_us_east_1.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.telegram_alerts.arn
+
+  depends_on = [aws_lambda_permission.allow_sns_infra_alerts_us_east_1]
 }
 
 # An alarm about a broken Telegram forwarder must not depend on the Telegram
