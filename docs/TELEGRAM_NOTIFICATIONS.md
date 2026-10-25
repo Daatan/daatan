@@ -37,7 +37,8 @@ Sent directly by `watchdog.yml` from the **GitHub Actions runner**. Both `produc
 | Staging version newer than prod | ⚠️ | clean | `[prod] Version drift: prod is running vX but staging has vY — consider deploying` |
 | CloudWatch alarm(s) firing | 🚨 | clean | `CloudWatch alarm(s) firing` — alarm name + state reason per line |
 | Prod SSM agent unreachable | 🔌 | clean | `[production] SSM agent unreachable` — instance id, PingStatus; re-fires every run while down (daatan#1726) |
-| CloudWatch alarm state change (push, not the watchdog poll) | 🔴/🟢/⚪ | clean (prod, oracle) / **noisy** (`staging-*`, `daatan-staging-*`) | `STATE: alarm-name (region)` + state reason. `daatan-infra-alerts` SNS → `infra/telegram-alerts/index.mjs` Lambda (daatan#1726); prod and staging share the topic, the Lambda routes by alarm name (daatan#1980) |
+| CloudWatch alarm state change (push, not the watchdog poll) | 🔴/🟢/⚪ | clean (prod, oracle) / **noisy** (`staging-*`, `daatan-staging-*`) | `STATE: alarm-name (region)` + state reason. `daatan-infra-alerts` (eu-central-1) and `daatan-infra-alerts-us-east-1` SNS → `infra/telegram-alerts/index.mjs` Lambda (daatan#1726); prod and staging share the topic, the Lambda routes by alarm name (daatan#1980) |
+| Site down — `prod-daatan-com-down` (Route53 external probe of `https://daatan.com/api/health`, 30 s interval, 3 regions) | 🔴/🟢 | clean | Primary outage signal, ~3–4 min to page (daatan#1956). `terraform/monitoring.tf`; us-east-1 alarm → `daatan-infra-alerts-us-east-1` → same Lambda. The `watchdog.yml` "Any health check fails" row above is the secondary check |
 
 **Health checks performed:**
 - `Health (app+db)` — `/api/health` → `status: "ok"`
