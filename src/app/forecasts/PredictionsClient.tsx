@@ -11,7 +11,14 @@ import EmptyState from '@/components/ui/EmptyState'
 
 type FilterStatus = 'ACTIVE' | 'PENDING' | 'RESOLVED' | 'CLOSING_SOON' | 'ALL'
 
-export function PredictionsPage({ initialPredictions }: { initialPredictions?: Prediction[] }) {
+export function PredictionsPage({
+  initialPredictions,
+  pagination,
+}: {
+  initialPredictions?: Prediction[]
+  /** Server-rendered prev/next links for the SSR page (daatan#2027); they describe the default view only. */
+  pagination?: React.ReactNode
+}) {
   const t = useTranslations('forecastsFeed')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -26,6 +33,8 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
   const searchInputRef = useRef<HTMLInputElement>(null)
   // Skip the first client-side fetch when SSR data covers the default view (ACTIVE, no query)
   const ssrConsumed = useRef(!!(initialPredictions?.length) && !initialQ)
+  // The SSR page links stop describing the list once the client has fetched its own.
+  const [showingSsrPage, setShowingSsrPage] = useState(true)
 
   // Sync activeQuery when URL changes (e.g. sidebar search navigates here).
   // State is adjusted during render (React's "derive from a changed prop" pattern) rather than in an effect.
@@ -45,6 +54,7 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
 
     const fetchPredictions = async () => {
       setIsLoading(true)
+      setShowingSsrPage(false)
       setFetchError(null)
       try {
         let url = '/api/forecasts?limit=50'
@@ -201,6 +211,7 @@ export function PredictionsPage({ initialPredictions }: { initialPredictions?: P
               <ForecastCard key={prediction.id} prediction={prediction} />
             ))}
           </div>
+          {showingSsrPage && pagination}
         </div>
       )}
     </div>

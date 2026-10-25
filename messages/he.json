@@ -215,6 +215,7 @@
       "void": "בוטלה — נסגרה ללא הכרעה",
       "unresolvable": "לא ניתנת להכרעה — לא ניתן לקבוע את התוצאה"
     },
+    "relatedTitle": "תחזיות קשורות",
     "seoQuestionOpen": "מה הסיכויים ש",
     "seoQuestionResolved": "האם זה התממש:",
     "seoAnswerAiEstimate": "ההערכה לפי הכתבות היא",
@@ -685,7 +686,17 @@
     "empty": "אין תחזיות עדיין",
     "emptyHint": "היו הראשונים!",
     "clearSearch": "נקה חיפוש",
-    "createForecast": "יצירת תחזית"
+    "createForecast": "יצירת תחזית",
+    "pagePrevious": "הקודם",
+    "pageNext": "הבא",
+    "pageStatus": "עמוד {page} מתוך {total}"
+  },
+  "tagsIndex": {
+    "title": "נושאים",
+    "subtitle": "כל הנושאים שיש בהם תחזיות פתוחות. בחרו נושא כדי לראות את התחזיות שלו.",
+    "count": "{count, plural, one {תחזית אחת} other {# תחזיות}}",
+    "empty": "כרגע אין נושאים עם תחזיות פתוחות.",
+    "browseForecasts": "לכל התחזיות"
   },
   "expressForecast": {
     "inputLabel": "צור תחזית",
@@ -1253,6 +1264,12 @@
     "learnMore": "קראו עוד על דעתן ←"
   },
   "HomeV5": {
+    "latest": {
+      "title": "תחזיות אחרונות",
+      "topics": "נושאים:",
+      "allForecasts": "כל התחזיות",
+      "allTopics": "כל הנושאים"
+    },
     "metaTitle": "דעתן - רקורד מדיד של שיפוט",
     "metaDescription": "דעתן הופך תחזיות וטענות לגבי העתיד לרקורד מדיד: מי הפגין שיפוט טוב, ובאילו תחומים.",
     "nav": {

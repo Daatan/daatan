@@ -26,6 +26,7 @@ import {
 } from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
+import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 
 
 const SSR_COMMENT_LIMIT = 50
@@ -477,6 +478,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           showAiPanel={showAiPanel}
         />
       </Suspense>
+      {prediction.isPublic && <RelatedForecasts predictionId={prediction.id} linkLocale={locale} uiLocale={locale} />}
     </>
   )
 }

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { PredictionsPage } from '@/app/forecasts/PredictionsClient'
-import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
+import { getFeedPage, isPageOutOfRange } from '@/app/forecasts/feed-page'
+import PaginationLinks, { pageHref, parsePageParam } from '@/components/ui/PaginationLinks'
 import { getAppUrl } from '@/lib/branding'
 
 
@@ -19,53 +22,60 @@ const META: Record<string, { title: string; description: string }> = {
   },
 }
 
-export async function generateMetadata({
-  params,
-}: {
+interface Props {
   params: Promise<{ locale: string }>
-}): Promise<Metadata> {
+  searchParams: Promise<{ page?: string | string[] }>
+}
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale } = await params
+  const page = parsePageParam((await searchParams).page)
   // he is the fallback, not eo/ru: it's the original supported locale, and
   // an unexpected locale value here means ALLOWED_LOCALES (layout.tsx) and
   // this map have drifted — he is the least-wrong default until that's fixed.
   const meta = META[locale] ?? META.he
   const appUrl = getAppUrl()
+  // Self-canonical per page (daatan#2027); alternates point at the same page in each language.
+  const path = (prefix: string) => `${appUrl}${pageHref(`${prefix}/forecasts`, page)}`
 
   return {
-    title: meta.title,
+    title: page > 1 ? `${meta.title} — ${page}` : meta.title,
     description: meta.description,
     alternates: {
-      canonical: `${appUrl}/${locale}/forecasts`,
+      canonical: path(`/${locale}`),
       languages: {
-        'x-default': `${appUrl}/forecasts`,
-        en: `${appUrl}/forecasts`,
-        he: `${appUrl}/he/forecasts`,
-        ru: `${appUrl}/ru/forecasts`,
+        'x-default': path(''),
+        en: path(''),
+        he: path('/he'),
+        ru: path('/ru'),
       },
     },
     openGraph: {
       title: meta.title,
       description: meta.description,
-      url: `${appUrl}/${locale}/forecasts`,
+      url: path(`/${locale}`),
     },
   }
 }
 
-export default async function LocaleForecastsPage() {
-  const { predictions } = await listForecasts({
-    where: { status: 'ACTIVE', isPublic: true },
-    orderBy: { createdAt: 'desc' },
-    page: 1,
-    limit: 20,
-    isCuSort: false,
-    sortOrder: 'desc',
-  })
-  const initialPredictions = enrichPredictions(predictions, {
-    page: 1,
-    limit: 20,
-    sortOrder: 'desc',
-    isCuSort: false,
-  })
+export default async function LocaleForecastsPage({ params, searchParams }: Props) {
+  const { locale } = await params
+  const page = parsePageParam((await searchParams).page)
+  const { predictions, totalPages } = await getFeedPage(page)
+  if (isPageOutOfRange(page, totalPages)) notFound()
 
-  return <PredictionsPage initialPredictions={initialPredictions} />
+  const t = await getTranslations({ locale, namespace: 'forecastsFeed' })
+  return (
+    <PredictionsPage
+      initialPredictions={predictions}
+      pagination={
+        <PaginationLinks
+          base={`/${locale}/forecasts`}
+          page={page}
+          totalPages={totalPages}
+          labels={{ previous: t('pagePrevious'), next: t('pageNext'), status: t('pageStatus', { page, total: totalPages }) }}
+        />
+      }
+    />
+  )
 }

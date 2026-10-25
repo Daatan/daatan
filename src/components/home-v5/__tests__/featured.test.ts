@@ -10,6 +10,7 @@ import { getFeaturedForecast } from '../featured'
 
 const ROW = {
   id: 'pinned-id',
+  slug: 'no-party-25',
   claimText: 'No party wins more than 25 seats',
   status: 'ACTIVE',
   isPublic: true,
@@ -27,12 +28,16 @@ describe('getFeaturedForecast', () => {
     vi.mocked(getCachedPredictionTranslation).mockResolvedValue({ claimText: 'ни одна партия' })
     const card = await getFeaturedForecast('ru')
     expect(card).toMatchObject({ statement: 'ни одна партия', confidence: 62, open: true, tags: ['Politics'] })
+    expect(card?.href).toBe('/ru/forecasts/no-party-25')
   })
 
   it('falls back to the canonical text without a translation', async () => {
     vi.mocked(prisma.prediction.findFirst).mockResolvedValue(ROW as never)
     vi.mocked(getCachedPredictionTranslation).mockResolvedValue({})
-    expect((await getFeaturedForecast('he'))?.statement).toBe(ROW.claimText)
+    const card = await getFeaturedForecast('he')
+    expect(card?.statement).toBe(ROW.claimText)
+    // An untranslated /he/forecasts page is noindex — link the English one instead.
+    expect(card?.href).toBe('/forecasts/no-party-25')
   })
 
   it.each([

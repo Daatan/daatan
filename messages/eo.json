@@ -215,6 +215,7 @@
       "void": "Nuligita — fermita sen solvo",
       "unresolvable": "Nesolvebla — la rezulto ne povis esti determinita"
     },
+    "relatedTitle": "Rilataj prognozoj",
     "seoQuestionOpen": "Kiuj estas la ŝancoj, ke",
     "seoQuestionResolved": "Ĉu tio efektiviĝis:",
     "seoAnswerAiEstimate": "la takso laŭ la novaĵoj estas",
@@ -685,7 +686,17 @@
     "empty": "Ankoraŭ neniuj prognozoj",
     "emptyHint": "Estu la unua kiu faras prognozon!",
     "clearSearch": "Forigi serĉon",
-    "createForecast": "Krei prognozon"
+    "createForecast": "Krei prognozon",
+    "pagePrevious": "Antaŭa",
+    "pageNext": "Sekva",
+    "pageStatus": "Paĝo {page} el {total}"
+  },
+  "tagsIndex": {
+    "title": "Temoj",
+    "subtitle": "Ĉiuj temoj kun malfermitaj prognozoj. Elektu temon por vidi ĝiajn prognozojn.",
+    "count": "{count, plural, one {# prognozo} other {# prognozoj}}",
+    "empty": "Nun neniu temo havas malfermitajn prognozojn.",
+    "browseForecasts": "Ĉiuj prognozoj"
   },
   "expressForecast": {
     "inputLabel": "Krei prognozon",
@@ -1253,6 +1264,12 @@
     "learnMore": "Lernu pli pri DAATAN →"
   },
   "HomeV5": {
+    "latest": {
+      "title": "Lastaj prognozoj",
+      "topics": "Temoj:",
+      "allForecasts": "Ĉiuj prognozoj",
+      "allTopics": "Ĉiuj temoj"
+    },
     "metaTitle": "Daatan - mezurebla spurhistorio de juĝo",
     "metaDescription": "Daatan igas prognozojn kaj asertojn pri la estonteco mezurebla spurhistorio: kiu montris bonan juĝon, kaj en kiuj fakoj.",
     "nav": {

@@ -16,6 +16,7 @@ import { communityProbability } from '@/lib/forecast-math'
 import { forecastFaqJsonLd, latestProbabilityUpdateISO, type ForecastSeoCopy } from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import ForecastDetailClient from './ForecastDetailClient'
+import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 import { JsonLd } from '@/components/JsonLd'
 import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getAppName, getAppUrl } from '@/lib/branding'
@@ -477,6 +478,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         showAiPanel={showAiPanel}
         usableEvidenceCount={usableEvidenceCount}
       />
+      {prediction.isPublic && <RelatedForecasts predictionId={prediction.id} linkLocale="en" />}
     </>
   )
 }
