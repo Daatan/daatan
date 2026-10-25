@@ -87,98 +87,15 @@ resource "aws_instance" "production" {
       echo '/swapfile none swap sw 0 0' >> /etc/fstab
     fi
 
-    # --- Zero Touch Setup ---
-
-    # 1. Setup App Directory
+    # Bootstrap only (daatan#2022). Restoring prod onto a fresh box (clone, .env from
+    # Secrets Manager, ECR login, DB restore from S3 *before* the app starts, migrations via
+    # the -migrations image, TLS, EIP) is the runbook Daatan/docs runbooks/prod-restore.md,
+    # drilled 2026-10-25 (platform#42). The old "zero touch" block here could not work: no
+    # ECR login, a dead `prisma migrate` exec, and it migrated an empty DB before any restore.
     mkdir -p /home/ubuntu/app
     chown ubuntu:ubuntu /home/ubuntu/app
 
-    # 2. Retrieve Secrets
-    REGION="${var.aws_region}"
-    SECRET_ENV_Name="${aws_secretsmanager_secret.env_vars.name}"
-
-    # Get GitHub Token for HTTPS clone
-    GITHUB_TOKEN=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "${aws_secretsmanager_secret.github_token.name}" --query SecretString --output text) || { echo "Failed to retrieve GitHub token"; exit 1; }
-
-    # 3. Clone Repository
-    if [ ! -d "/home/ubuntu/app/.git" ]; then
-        sudo -u ubuntu git clone "https://x-access-token:$GITHUB_TOKEN@github.com/Daatan/daatan.git" /home/ubuntu/app || echo "Repo clone failed"
-    else
-        echo "Repo already exists"
-    fi
-
-    # 4. Retrieve .env (NOW, after clone)
-    if aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ENV_Name" --query SecretString --output text > /home/ubuntu/app/.env; then
-        chown ubuntu:ubuntu /home/ubuntu/app/.env
-        chmod 600 /home/ubuntu/app/.env
-    else
-        echo "Failed to retrieve .env — aborting setup"
-        exit 1
-    fi
-
-    # 5. Start Application
-    cd /home/ubuntu/app
-    # Only start if docker-compose.prod.yml exists (meaning clone was successful)
-    if [ -f "docker-compose.prod.yml" ]; then
-      docker compose -f docker-compose.prod.yml up -d
-      
-      # Wait for containers to be ready
-      sleep 20
-      
-      # Run migrations
-      if docker ps | grep -q daatan-app-staging; then
-        echo "Running staging migrations..."
-        docker exec daatan-app-staging node node_modules/prisma/build/index.js migrate deploy || echo "Staging migration failed"
-      fi
-      
-      if docker ps | grep -q daatan-app; then
-        echo "Running production migrations..."
-        docker exec daatan-app node node_modules/prisma/build/index.js migrate deploy || echo "Production migration failed"
-      fi
-      
-      echo "Application started and migrations applied!"
-    else
-      echo "docker-compose.prod.yml not found. Is the repo cloned? check /var/log/user-data.log"
-    fi
-
-    # 5. Setup Database Backups
-    # Write S3 bucket name to config file
-    echo "${aws_s3_bucket.backups.bucket}" > /home/ubuntu/.s3_bucket
-
-    # Create backup script
-    cat > /home/ubuntu/backup-db.sh << 'BACKUP'
-#!/bin/bash
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="/home/ubuntu/backups/daatan_$TIMESTAMP.sql.gz"
-S3_BUCKET=$(cat /home/ubuntu/.s3_bucket)
-
-# Dump database
-# Only run if container is running
-if docker ps | grep -q daatan-postgres; then
-  docker exec daatan-postgres pg_dump -U daatan daatan | gzip > "$BACKUP_FILE"
-  
-  # Upload to S3
-  aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/daily/"
-  
-  # Keep only last 3 local backups
-  ls -t /home/ubuntu/backups/*.sql.gz | tail -n +4 | xargs -r rm
-  
-  echo "Backup completed: $BACKUP_FILE"
-else
-  echo "Postgres container not running. Skipping backup."
-fi
-BACKUP
-
-    chmod +x /home/ubuntu/backup-db.sh
-    chown ubuntu:ubuntu /home/ubuntu/backup-db.sh
-    mkdir -p /home/ubuntu/backups
-    chown ubuntu:ubuntu /home/ubuntu/backups
-
-    # Setup daily backup cron (3 AM)
-    echo "0 3 * * * ubuntu /home/ubuntu/backup-db.sh >> /home/ubuntu/backups/backup.log 2>&1" > /etc/cron.d/daatan-backup
-    chmod 644 /etc/cron.d/daatan-backup
-
-    echo "Setup complete!" > /home/ubuntu/setup-complete.txt
+    echo "Bootstrap complete: follow runbooks/prod-restore.md" > /home/ubuntu/setup-complete.txt
   EOF
 
   user_data_replace_on_change = false
