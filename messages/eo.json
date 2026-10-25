@@ -173,6 +173,8 @@
     "personalBadge": "Persona prognozo — ne bazita sur novaĵartikolo",
     "legendCommunity": "Komunumo",
     "communityProbabilityTooltip": "Komunuma interkonsento — la averaĝa probablo tra ĉiuj voĉdonoj",
+    "showMore": "Montri pli",
+    "showLess": "Montri malpli",
     "topOptionShareTooltip": "Gvida opcio: {text} ({pct}% de voĉdonoj)",
     "filterByTagTooltip": "Foliumi prognozojn kun la etikedo \"{tag}\"",
     "legendYou": "Vi",

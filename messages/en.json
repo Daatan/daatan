@@ -173,6 +173,8 @@
     "personalBadge": "Personal forecast — not based on a news article",
     "legendCommunity": "Community",
     "communityProbabilityTooltip": "Community consensus — the average probability across all votes",
+    "showMore": "Show more",
+    "showLess": "Show less",
     "topOptionShareTooltip": "Leading option: {text} ({pct}% of votes)",
     "filterByTagTooltip": "Browse forecasts tagged \"{tag}\"",
     "legendYou": "You",

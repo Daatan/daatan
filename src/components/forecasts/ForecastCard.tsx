@@ -10,6 +10,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { createClientLogger } from '@/lib/client-logger'
 import { FitHeadline } from '@/components/forecasts/FitHeadline'
+import { ClampedClaim } from '@/components/forecasts/ClampedClaim'
 import { toast } from 'react-hot-toast'
 import { useTranslations, useLocale } from 'next-intl'
 import {
@@ -531,15 +532,15 @@ export default function ForecastCard({
                   text={headline}
                   className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
                 />
-                <p className="mt-1 text-sm text-gray-400 line-clamp-3 leading-snug" title={claim}>
-                  {claim}
-                </p>
+                <ClampedClaim text={claim} className="mt-1 text-sm text-gray-400 leading-snug" />
               </div>
             ) : (
-              <div className="flex items-start gap-3 mb-4">
-                <h2 className="flex-1 text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors line-clamp-3 leading-snug" title={claim}>
-                  {claim}
-                </h2>
+              <div className="mb-4">
+                <ClampedClaim
+                  as="h2"
+                  text={claim}
+                  className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
+                />
               </div>
             )
           })()}

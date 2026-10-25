@@ -173,6 +173,8 @@
     "personalBadge": "תחזית אישית — לא מבוססת על כתבה חדשותית",
     "legendCommunity": "קהילה",
     "communityProbabilityTooltip": "הסכמת הקהילה — ההסתברות הממוצעת על פני כל ההצבעות",
+    "showMore": "הצג עוד",
+    "showLess": "הצג פחות",
     "topOptionShareTooltip": "האפשרות המובילה: {text} ({pct}% מההצבעות)",
     "filterByTagTooltip": "עיון בתחזיות עם התגית \"{tag}\"",
     "legendYou": "אתה",
