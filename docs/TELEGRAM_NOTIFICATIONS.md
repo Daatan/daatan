@@ -19,7 +19,7 @@ Sent by `deploy.yml`, `backup.yml`, `rollback.yml`. **Production** events route 
 | Staging deploy failure | ❌ | noisy | `[staging] Deployment failed` — version, PR number+title, PR link + logs link |
 | Production deploy success | ✅ | clean | `[prod] Deployment successful` — version, PR number+title, PR link |
 | Production deploy failure | ❌ | clean | `[prod] Deployment failed` — version, PR number+title, PR link + logs link |
-| DB backup failure | 🚨 | clean | `DB Backup FAILED` — timestamp (backup verification is prod-only). Sent by `backup.yml` (fallback cron). The primary EventBridge-scheduled run sends `DB Backup FAILED (scheduled run, exit N)` from the box itself (`scripts/backup-db.sh`, clean with noisy fallback) |
+| DB backup failure | 🚨 | clean | `DB Backup FAILED` — timestamp (backup verification is prod-only). Sent by `backup.yml` (manual runs). The EventBridge-scheduled run sends `DB Backup FAILED (scheduled run, exit N)` from the box itself (`scripts/backup-db.sh`, clean with noisy fallback) |
 | Rollback success | 🔄 | clean (prod) / noisy (staging) | `[env] Rollback to vX complete` — reason, triggered-by |
 | Rollback failure | ❌ | clean (prod) / noisy (staging) | `[env] Rollback to vX FAILED. Manual intervention required` — reason, logs link |
 

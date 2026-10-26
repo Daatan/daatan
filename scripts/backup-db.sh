@@ -4,7 +4,7 @@
 # Runs ON the prod EC2 box (as root, via SSM Run Command) from two triggers:
 #  - EventBridge Scheduler (terraform/backup_schedule.tf) — the primary
 #    schedule, 04:00/16:00 UTC; runs the copy deploy.yml ships to ~/app/scripts.
-#  - GitHub Actions backup.yml — the fallback cron, which ships this file
+#  - GitHub Actions backup.yml — manual dispatch only, which ships this file
 #    inline to /tmp.
 # Both can fire for the same slot, so the lock below lets only one run at a
 # time; the other exits 0 with BACKUP_SKIPPED (backup.yml checks for it).
