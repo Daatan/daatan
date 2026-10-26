@@ -1,15 +1,14 @@
 name: Database Backup
 
-# FALLBACK. The primary schedule is EventBridge Scheduler → SSM Run Command
+# MANUAL ONLY. The schedule is EventBridge Scheduler → SSM Run Command
 # (terraform/backup_schedule.tf, #1957), which runs the copies of
-# backup-db.sh / verify-backup.sh that deploy.yml ships to the prod box. This
-# GitHub cron stays on for a transition period; both triggers take the same
-# box-side lock, so a double fire is harmless. To retire it, delete the
-# `schedule:` block below and keep `workflow_dispatch` as the manual path.
+# backup-db.sh / verify-backup.sh that deploy.yml ships to the prod box. The
+# GitHub cron fallback was retired on 2026-10-27 after 12/12 on-time
+# EventBridge runs: it fired 3–6 h late, found the lock free and took a second
+# full backup each time, which halved retention under keep-newest-60.
+# Both paths take the same box-side lock, so a manual run during a scheduled
+# one is a harmless no-op.
 on:
-  schedule:
-    - cron: '0 4 * * *'   # 04:00 UTC daily
-    - cron: '0 16 * * *'  # 16:00 UTC daily (RPO ≤ 12h)
   workflow_dispatch:
 
 # One backup at a time (#1957): two overlapping runs share the box, the dump

@@ -496,7 +496,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `news-indexer-watchdog.yml` | every 2 h :17 | news-indexer disk + pipeline health via its `/stats` |
 | `oracle-jev-watchdog.yml` | hourly :12 (GitHub runs it every 3–7 h) | Telegram alert when the Oracul's Jev calls start failing (#1792) |
 | `backfill-embeddings.yml` | 02:23 daily | `/api/cron/backfill-embeddings` |
-| `backup.yml` | 04:00 + 16:00 daily | **Fallback** prod DB backup trigger; the primary is EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`, #1957) — see `docs/DEPLOYMENT.md` "DB backups (S3)" |
+| `backup.yml` | manual (`workflow_dispatch`) | Manual prod DB backup; cron retired 2026-10-27. The schedule is EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`, #1957) — see `docs/DEPLOYMENT.md` "DB backups (S3)" |
 | `ai-panel.yml` | 04:43 + 16:43 daily | `/api/cron/ai-panel` — multi-model estimate panel |
 | `requote.yml` | 05:31 daily | `/api/cron/requote` — temporal-model daily requote |
 | `pundit-ratings-recalculate.yml` | 06:15 daily | `/api/admin/pundit-ratings/recalculate` |
@@ -668,7 +668,7 @@ The staging and production databases are **fully independent**. They share no da
 
 - **Schedule:** **04:00 and 16:00 UTC** daily (RPO ≤ 12h)
 - **Primary trigger:** EventBridge Scheduler → SSM Run Command (`terraform/backup_schedule.tf`, #1957) runs `scripts/backup-db.sh` then `scripts/verify-backup.sh` from `~/app/scripts` on the prod box (shipped there by `deploy-production`)
-- **Fallback trigger:** `.github/workflows/backup.yml` at the same times (plus manual `workflow_dispatch`), which ships the script inline over SSM. Both take the same box-side `flock`, so the second one is a no-op. Full detail and how to retire the cron: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) "DB backups (S3)"
+- **Manual trigger:** `.github/workflows/backup.yml` (`workflow_dispatch` only; its cron fallback was retired 2026-10-27), which ships the script inline over SSM. Both paths take the same box-side `flock`, so a run during a scheduled one is a no-op. Full detail: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) "DB backups (S3)"
 - **Backs up:** prod only (`daatan-postgres` → `daatan`) → `s3://daatan-db-backups-272007598366/backups/`
 - **S3 filename format:** `<UTC timestamp>.sql.gz` (e.g. `20260703T172550Z.sql.gz`)
 - **Retention:** the script itself trims the `backups/` prefix to the newest 60 objects (30 days at 2/day) after every upload; an S3 lifecycle rule on the same prefix (`terraform/s3.tf`) expires objects after 30 days as a backstop in case the script's trim ever fails

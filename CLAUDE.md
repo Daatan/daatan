@@ -59,7 +59,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 - SSH port 22 is closed — server access is via AWS SSM `send-command` (use the `ssm-exec` skill in Claude Code)
 - Use `docker compose` (v2 plugin, no hyphen) on prod, not `docker-compose`
 - Production uses containers `daatan-app`, `daatan-nginx`, `daatan-postgres`, `daatan-certbot`
-- Backups: 04:00 and 16:00 UTC daily (RPO ≤ 12h) to S3 `daatan-db-backups-272007598366`. Primary trigger: EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`) running the scripts `deploy.yml` ships to `~/app/scripts`; GitHub `backup.yml` cron is a temporary fallback (same box-side lock). Details + how to retire the cron: `docs/DEPLOYMENT.md` "DB backups (S3)"
+- Backups: 04:00 and 16:00 UTC daily (RPO ≤ 12h) to S3 `daatan-db-backups-272007598366`. Primary trigger: EventBridge Scheduler → SSM (`terraform/backup_schedule.tf`) running the scripts `deploy.yml` ships to `~/app/scripts`; GitHub `backup.yml` is manual-only (`workflow_dispatch`, same box-side lock; cron retired 2026-10-27). Details: `docs/DEPLOYMENT.md` "DB backups (S3)"
 
 ## Before opening a PR
 
