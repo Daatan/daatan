@@ -273,3 +273,23 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
+
+# Object Lock (production) — daatan#1957 B1. GOVERNANCE mode, 14-day default retention:
+# a compromised box or CI role (which can s3:PutObject/DeleteObject on backups/) cannot
+# destroy a backup version for 14 days; only a principal with
+# s3:BypassGovernanceRetention can. Unversioned `aws s3 rm` in backup-db.sh's keep-60
+# prune still works (it only adds a delete marker); lifecycle noncurrent expiry waits
+# out the retention. Uploads need a checksum header — AWS CLI v2 >= 2.23 sends one by
+# default (prod box: 2.34.9, verified 2026-10-27).
+resource "aws_s3_bucket_object_lock_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
+
+  rule {
+    default_retention {
+      mode = "GOVERNANCE"
+      days = 14
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.backups]
+}
