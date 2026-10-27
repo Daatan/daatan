@@ -184,7 +184,9 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
         // 3. AI probability + LLM summary — run concurrently (both need only searchResults)
         // llmMs and oracleMs are both measured from t1 (same start), not sequentially.
         const t1 = Date.now()
-        const ESTIMATION_TIMEOUT_MS = 15_000
+        // Must exceed INTERACTIVE_FORECAST_TIMEOUT_MS (19s) — the Oracul call runs inside
+        // this race. 15s -> 23s with it (daatan#2033).
+        const ESTIMATION_TIMEOUT_MS = 23_000
 
         type EstimationResult = {
             externalProbability: number | null
@@ -340,7 +342,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 resolutionRules: prediction.resolutionRules,
                 // Must stay under ESTIMATION_TIMEOUT_MS: this whole block is raced
                 // against it below, so a longer Oracul budget would just be abandoned
-                // 15s in — with the call still running, uncancelled. The default (30s)
+                // 23s in — with the call still running, uncancelled. The default (40s)
                 // is for the background push/sweep paths. See daatan#1254.
                 timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS,
             }, { source: 'context-update', userId: user.id, predictionId: prediction.id })

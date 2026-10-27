@@ -186,7 +186,7 @@ describe('POST /api/forecasts/[id]/context', () => {
     })
 
     it('asks the Oracul with the INTERACTIVE budget, not the background default (daatan#1254)', async () => {
-      // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (15s), so the
+      // This route races the whole estimation against ESTIMATION_TIMEOUT_MS (23s), so the
       // Oracul call must fit inside it. The service default is 30s — sized for the
       // background push/sweep paths — and inheriting it here would mean the race abandons
       // a call that is still running: the same timeout inversion, one hop further in.
@@ -203,7 +203,7 @@ describe('POST /api/forecasts/[id]/context', () => {
         expect.objectContaining({ timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS }),
         expect.anything(),
       )
-      expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(15_000)
+      expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(23_000)
     })
 
     it('forwards the claim\'s resolutionRules to the Oracul (daatan#1375)', async () => {

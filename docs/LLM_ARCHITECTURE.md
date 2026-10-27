@@ -208,8 +208,9 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
 1.  **Oracul** (`POST /forecast`) — calibrated multi-source estimate. The client budget is
     per path, not global (`src/lib/services/oracle.ts`): **40 s** (`FORECAST_TIMEOUT_MS`) by default for
     server-to-server/background callers (news-indexer push, the retry sweep), **20 s** for
-    bot voting, **12 s** (`INTERACTIVE_FORECAST_TIMEOUT_MS`) for the two interactive callers,
-    which race the Oracul against their own wall clock and fall back to the LLM.
+    bot voting, **19 s** (`INTERACTIVE_FORECAST_TIMEOUT_MS`; 12 s before daatan#2033, which the
+    Haiku 5.5 latency shift of retro#1004 outgrew) for the two interactive callers,
+    which race the Oracul against their own wall clock (the context route at 23 s) and fall back to the LLM.
     Every budget must stay strictly above the server budget it waits on: retro does not
     cancel on client disconnect, so aborting early discards a forecast already paid for and
     records it as a failure. The original 30 s was derived from retro's own server-side latency (p99 25.0 s,

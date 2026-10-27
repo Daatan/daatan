@@ -37,7 +37,7 @@ export const POST = withAuth(async (request, user) => {
 
     const t0 = Date.now()
     // Interactive: a user is waiting on this while drafting a claim, and the LLM
-    // fallback below is the better trade past ~12s. Opts out of the default (30s),
+    // fallback below is the better trade past ~19s. Opts out of the default (40s),
     // which is sized for the background push/sweep paths — see oracle.ts.
     const oracleProb = await getOraculProbability(
       claimText,
