@@ -78,10 +78,15 @@ export const FORECAST_TIMEOUT_MS = 40_000
  *
  * Both current interactive callers race the Oracul against their own wall-clock budget,
  * so a longer Oracul wait would only be abandoned one level up: `forecasts/[id]/context`
- * races the whole estimation at `ESTIMATION_TIMEOUT_MS` (15s), and `express/guess`
+ * races the whole estimation at `ESTIMATION_TIMEOUT_MS` (23s), and `express/guess`
  * answers a user typing a claim.
+ *
+ * 12s -> 19s (daatan#2033): after the Haiku 5.5 switch (retro#921) Oracul `/forecast`
+ * p50 went 7.3 -> 12.9s (retro#1004), so 12s cut off the median call — on 2026-10-26 both
+ * interactive calls for a new forecast timed out at ~12.0s while the background
+ * `creation-estimate` call succeeded at 37.9s. 19s keeps interactive < bot (20s).
  */
-export const INTERACTIVE_FORECAST_TIMEOUT_MS = 12_000
+export const INTERACTIVE_FORECAST_TIMEOUT_MS = 19_000
 
 // Bot voting runs in a background cron (bots.yml, ~270s budget) where latency is
 // not user-facing, so it tolerates a longer Oracul wait than the interactive

@@ -633,11 +633,11 @@ describe('forecast request timeout', () => {
     expect(BOT_FORECAST_TIMEOUT_MS).toBeLessThan(FORECAST_TIMEOUT_MS)
   })
 
-  it('interactive callers fit inside the 15s estimation race they run under', async () => {
-    // forecasts/[id]/context races the whole estimation at ESTIMATION_TIMEOUT_MS=15s.
+  it('interactive callers fit inside the 23s estimation race they run under', async () => {
+    // forecasts/[id]/context races the whole estimation at ESTIMATION_TIMEOUT_MS=23s.
     // An Oracul budget above that is abandoned one level up while still running — the
     // same inversion, one hop further in. Keep them consistent.
-    const ESTIMATION_TIMEOUT_MS = 15_000
+    const ESTIMATION_TIMEOUT_MS = 23_000
     expect(INTERACTIVE_FORECAST_TIMEOUT_MS).toBeLessThan(ESTIMATION_TIMEOUT_MS)
     await getOraculForecast('Q?', { timeoutMs: INTERACTIVE_FORECAST_TIMEOUT_MS })
     expect(timeoutSpy).toHaveBeenCalledWith(INTERACTIVE_FORECAST_TIMEOUT_MS)
