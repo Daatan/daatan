@@ -513,6 +513,14 @@ kept, and every backup is restore-verified in a throwaway, memory-capped contain
   `verify-backup.sh` always. `backup.yml` keeps its own failure step. Independently,
   `watchdog.yml` (`metric-alarm-watchdog` job) alerts the clean channel when the newest
   `backups/` object is older than 14 h — this catches a schedule that never fires.
+- **Object Lock (GOVERNANCE, 14 d default retention)** since 2026-10-27 (#1957 B1,
+  `aws_s3_bucket_object_lock_configuration.backups` in `terraform/s3.tf`). Every backup
+  version is undeletable for 14 days except by a principal holding
+  `s3:BypassGovernanceRetention` — so a compromised box or CI role cannot wipe the history.
+  The keep-60 prune (`aws s3 rm`, no version id) still works: it only adds a delete marker.
+  Uploads must carry a checksum header, which AWS CLI v2 ≥ 2.23 sends by default. Enabling
+  Object Lock on a bucket is permanent; the retention rule itself can be changed or removed.
+  Staging's bucket is not locked. No cross-region copy (B2/B3 not chosen).
 - **Run one now:** `gh workflow run backup.yml` (manual dispatch stays available).
 - **Checking the schedule:** the 04:00/16:00 objects in S3 and the SSM command history for
   comment "Scheduled DB backup (EventBridge, #1957)". A missed run also trips the watchdog's
