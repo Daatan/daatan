@@ -160,4 +160,4 @@ git push origin v1.1.1
 
 ## License
 
-Private — All rights reserved.
+Proprietary — all rights reserved. See [LICENSE](./LICENSE).

@@ -93,7 +93,14 @@ export default function TermsContent() {
       </section>
 
       <section>
-        <h2 className={H2}>12. Contact</h2>
+        <h2 className={H2}>12. Governing Law and Jurisdiction</h2>
+        <p>
+          These Terms and your use of DAATAN are governed by the laws of the State of Israel, without regard to its conflict-of-laws rules. The competent courts in Tel Aviv-Jaffa have exclusive jurisdiction over any dispute arising from them, except where the mandatory law of your place of residence gives you the right to bring a claim elsewhere.
+        </p>
+      </section>
+
+      <section>
+        <h2 className={H2}>13. Contact</h2>
         <p>
           For any legal inquiries, please contact {getContactEmail()}.
         </p>
