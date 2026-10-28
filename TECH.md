@@ -338,12 +338,11 @@ terraform/
 | `DAATAN_CORE.md` | Source of Truth — vision and principles |
 | `GLOSSARY.md` | Terminology definitions |
 | `FORECASTS_FLOW.md` | Forecast system implementation flow |
-| `TODO.md` | Pointer to the GitHub Issues backlog |
 | `TECH.md` | Technical architecture (this file) |
 | `INFRASTRUCTURE_SPLIT.md` | Prod / staging EC2 split details |
 | `docs/DEPLOYMENT.md` | Canonical deployment pipeline |
 | `docs/ROLLBACK.md` | Rollback procedures |
-| `SECRETS.md` | Secrets management guide |
+| `docs/SECRETS.md` | Secrets management guide |
 | `SECURITY.md` | Security policy & vulnerability reporting |
 | `VERSIONING.md` | Semantic versioning rules |
 | `PRODUCT.md` | Product documentation |
@@ -556,7 +555,7 @@ Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english
 
 ### Required Secrets
 
-GitHub Actions secrets referenced by the workflows. Runtime app secrets (`POSTGRES_PASSWORD`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `VAPID_PRIVATE_KEY`, …) are **not** GitHub secrets — they live in the Secrets Manager bundles (see [Secrets Management](#secrets-management) and [SECRETS.md](./SECRETS.md)).
+GitHub Actions secrets referenced by the workflows. Runtime app secrets (`POSTGRES_PASSWORD`, `NEXTAUTH_SECRET`, `GOOGLE_*`, `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `VAPID_PRIVATE_KEY`, …) are **not** GitHub secrets — they live in the Secrets Manager bundles (see [Secrets Management](#secrets-management) and [docs/SECRETS.md](./docs/SECRETS.md)).
 
 | Secret | Purpose |
 |--------|---------|
@@ -628,7 +627,7 @@ Full table map (including `AiEstimate*`, `CalibrationRecord`, `OracleCallLog`, `
 
 ### Database Operations
 
-> **All server commands go via AWS SSM** — SSH port 22 is blocked. See `/ssm` skill or DEPLOYMENT.md.
+> **All server commands go via AWS SSM** — SSH port 22 is blocked. See `/ssm` skill or [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
 ```bash
 # Connect to production DB (via SSM)
@@ -798,7 +797,7 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 - Runtime secrets live in AWS Secrets Manager bundles (`daatan-env-prod`, `daatan-env-staging`) and are pulled into `~/app/.env` on each deploy by `scripts/fetch-secrets.sh`
 - GitHub Secrets are used only for build-time / workflow values (`AWS_ROLE_ARN`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, Telegram notifications)
 - `.env` is gitignored; no secrets are baked into Docker images
-- See [SECRETS.md](./SECRETS.md) for the full list, rotation runbook, and update flow
+- See [docs/SECRETS.md](./docs/SECRETS.md) for the full list, rotation runbook, and update flow
 
 ---
 
@@ -867,7 +866,7 @@ npm run dev
 
 ### Environment Variables
 
-Typical local `.env` — only `DATABASE_URL`, `NEXTAUTH_URL` and `NEXTAUTH_SECRET` (≥32 chars, not placeholder text) are required by `src/env.ts`; everything else is optional. See `.env.example` for the full template and [SECRETS.md](./SECRETS.md) for what production sets:
+Typical local `.env` — only `DATABASE_URL`, `NEXTAUTH_URL` and `NEXTAUTH_SECRET` (≥32 chars, not placeholder text) are required by `src/env.ts`; everything else is optional. See `.env.example` for the full template and [docs/SECRETS.md](./docs/SECRETS.md) for what production sets:
 
 ```bash
 DATABASE_URL=postgresql://user:password@host:5432/database
@@ -952,7 +951,7 @@ free -m                                     # Memory
 
 ## Related Documentation
 
-- [DEPLOYMENT.md](./DEPLOYMENT.md) — Deployment procedures and operations
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) — Deployment procedures and operations
 - [PRODUCT.md](./PRODUCT.md) — Product documentation
 - [GitHub Issues](https://github.com/Daatan/daatan/issues) — Technical debt and roadmap (`P1`/`P2`/`P3`/`icebox` labels)
-- [SECRETS.md](./SECRETS.md) — Secrets management guide
+- [docs/SECRETS.md](./docs/SECRETS.md) — Secrets management guide

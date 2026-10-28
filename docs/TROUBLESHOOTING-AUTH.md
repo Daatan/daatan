@@ -1,7 +1,7 @@
 # Troubleshooting: Sign-in (Google OAuth)
 
 Use this when **Sign in** works on staging but fails on production (or vice versa).  
-See also: [SECRETS.md](../SECRETS.md) for where credentials live and how to rotate them.
+See also: [SECRETS.md](./SECRETS.md) for where credentials live and how to rotate them.
 
 ---
 
@@ -91,7 +91,7 @@ If you use **separate** OAuth clients for staging and prod, the production serve
 `~/app/.env` is **regenerated on every deploy** by `scripts/fetch-secrets.sh` from the
 Secrets Manager bundle (`daatan-env-prod` / `daatan-env-staging`), so a hand edit on the
 server is overwritten by the next deploy. Fix the value in the secret (see
-[SECRETS.md](../SECRETS.md)), then redeploy: **Actions → CI/CD Pipeline → Run workflow**
+[SECRETS.md](./SECRETS.md)), then redeploy: **Actions → CI/CD Pipeline → Run workflow**
 with the target environment. The blue-green deploy recreates the app container, which is
 what picks up the new env — a plain `docker restart` does not re-read `.env`.
 
