@@ -7,7 +7,9 @@ vi.mock('../sourceLeaderboard', () => ({
   authorKey: (n: string) => n.toLowerCase(),
 }))
 
-import { authorTopicRecords, outletTopicRecords, type TopicBoard } from '../sourceTopicBoards'
+import { STANDARD_TAGS } from '@/lib/constants'
+import { getSourceLeaderboard } from '../sourceLeaderboard'
+import { authorTopicRecords, getTopicBoards, outletTopicRecords, type TopicBoard } from '../sourceTopicBoards'
 
 const outlet = (outletName: string, predictions: number) => ({
   id: outletName, outletName, skillConservative: 1, brierScore: 0.2, authorCount: 1, predictions, articles: 1,
@@ -35,5 +37,30 @@ describe('topic records (#1917)', () => {
 
   it('is empty when nothing matches', () => {
     expect(outletTopicRecords(boards, new Set(['walla.co.il']))).toEqual([])
+  })
+})
+
+describe('getTopicBoards (#2050)', () => {
+  it('makes one Oracul call per topic, at most 5 in flight', async () => {
+    let inFlight = 0
+    let peak = 0
+    vi.mocked(getSourceLeaderboard).mockImplementation(async (_view, _sort, _min, tag) => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise(r => setTimeout(r, 1))
+      inFlight--
+      return {
+        view: 'outlets', sortBy: 'skillConservative',
+        outletRows: [outlet(`${tag}.com`, 1)], authorRows: [author('Ann', `${tag}.com`, 1)],
+      }
+    })
+
+    const result = await getTopicBoards()
+
+    expect(getSourceLeaderboard).toHaveBeenCalledTimes(STANDARD_TAGS.length)
+    expect(peak).toBeLessThanOrEqual(5)
+    expect(result).toHaveLength(STANDARD_TAGS.length)
+    expect(result[0].outletRows[0].outletName).toBe(`${result[0].slug}.com`)
+    expect(result[0].authorRows[0].outletName).toBe(`${result[0].slug}.com`)
   })
 })
