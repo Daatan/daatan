@@ -12,7 +12,7 @@ import { hashUrl } from '../utils/hash'
 import { createLogger } from '@/lib/logger'
 import { STANDARD_TAGS } from '@/lib/constants'
 import { checkContent } from '../services/moderation'
-import { localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
+import { callGeminiTranslate, localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 import { lookupGroundedEventDate } from './groundedDateLookup'
@@ -346,6 +346,33 @@ function startRulesStrength(prediction: ParsedPrediction): Promise<RulesStrength
   return checkRulesStrength(prediction.claimText, prediction.resolutionRules)
 }
 
+/**
+ * #1890 C: the direction check and the author's localized preview run side by side. The
+ * preview is translated from the rules as drafted; in the rare case the check rewrites them,
+ * only the rules are translated again, so the preview never shows the inverted text.
+ */
+async function checkRulesAndLocalize(prediction: ParsedPrediction, userInput: string, stageTimings: StageTimings) {
+  const localizedP = timed(stageTimings, 'localizationMs', () => localizeForecastForAuthor(
+    { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
+    userInput,
+  ))
+  const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
+  const rulesStrengthP = startRulesStrength(prediction)
+  let localized = await localizedP
+  if (localized && rulesDirection?.fixed) {
+    const { language } = localized
+    try {
+      const resolutionRules = await timed(stageTimings, 'rulesRetranslateMs', () =>
+        callGeminiTranslate(prediction.resolutionRules, language))
+      localized = { ...localized, resolutionRules: resolutionRules.trim() }
+    } catch (err) {
+      log.warn({ err }, 'rewritten rules not re-translated; preview stays English')
+      localized = null
+    }
+  }
+  return { rulesDirection, localized, rulesStrength: await rulesStrengthP }
+}
+
 export async function generateExpressPrediction(
   userInput: string,
   onProgress?: (stage: string, data?: Record<string, unknown>) => void,
@@ -451,13 +478,7 @@ export async function generateExpressPrediction(
 
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-    const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
-    const rulesStrengthP = startRulesStrength(prediction)
-    const localized = await timed(stageTimings, 'localizationMs', () => localizeForecastForAuthor(
-      { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
-      userInput,
-    ))
-    const rulesStrength = await rulesStrengthP
+    const { rulesDirection, localized, rulesStrength } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
     const ungroundedYears = findUngroundedYears(
       prediction.claimText,
       prediction.resolveByDatetime,
@@ -818,13 +839,7 @@ URL: ${article.url}
 
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-  const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
-  const rulesStrengthP = startRulesStrength(prediction)
-  const localized = await timed(stageTimings, 'localizationMs', () => localizeForecastForAuthor(
-    { claimText: prediction.claimText, detailsText: prediction.detailsText, resolutionRules: prediction.resolutionRules, options: prediction.options },
-    userInput,
-  ))
-  const rulesStrength = await rulesStrengthP
+  const { rulesDirection, localized, rulesStrength } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
 
   const claimDeadlineMismatch = findClaimTextDeadlineMismatch(prediction.claimText, new Date(prediction.resolveByDatetime))
 
