@@ -126,8 +126,8 @@ git push origin v1.1.1
 | -------- | ------- |
 | [DAATAN_CORE.md](./DAATAN_CORE.md) | Source of Truth — vision and principles |
 | [TECH.md](./TECH.md) | Technical architecture, infrastructure, and project structure |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment procedures and operations |
-| [SECRETS.md](./SECRETS.md) | Secrets management and security |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Deployment procedures and operations |
+| [docs/SECRETS.md](./docs/SECRETS.md) | Secrets management and security |
 | [PRODUCT.md](./PRODUCT.md) | Product vision and feature documentation |
 | [FORECASTS_FLOW.md](./FORECASTS_FLOW.md) | End-to-end forecast creation and resolution flow |
 | [public/docs/forecast-pipeline.html](./public/docs/forecast-pipeline.html) | Visual diagram of the Create + Analyze pipelines — served live (noindex) at [daatan.com/docs/forecast-pipeline.html](https://daatan.com/docs/forecast-pipeline.html) ([staging](https://staging.daatan.com/docs/forecast-pipeline.html)) |
@@ -135,7 +135,6 @@ git push origin v1.1.1
 | [VERSIONING.md](./VERSIONING.md) | Semantic versioning rules |
 | [TESTING.md](./TESTING.md) | Testing strategy and guidelines |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |
-| [TODO.md](./TODO.md) | Pointer to the task backlog ([GitHub Issues](https://github.com/Daatan/daatan/issues), `P1`/`P2`/`P3`/`icebox` labels) |
 | [POST_MORTEM.md](./POST_MORTEM.md) | Incident history and retrospectives |
 | [docs/bots.md](./docs/bots.md) | Autonomous bot system design and usage |
 | [docs/BOT_APPROVAL_WORKFLOW.md](./docs/BOT_APPROVAL_WORKFLOW.md) | Bot approval workflow (v1.7.31+) |

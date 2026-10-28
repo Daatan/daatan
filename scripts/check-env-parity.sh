@@ -102,7 +102,7 @@ for key in "${BUILD_TIME_ONLY[@]}"; do
     echo "FAIL: $key is a build-time value but is set at runtime:"
     grep -Hn "$key" "$BLUE_GREEN" "$COMPOSE_PROD" "$COMPOSE_STAGING" | sed 's/^/  - /'
     echo "  It is baked in by \`next build\` from the GitHub secret. A runtime copy is"
-    echo "  ignored, and drifts from the real one. Remove it. See SECRETS.md."
+    echo "  ignored, and drifts from the real one. Remove it. See docs/SECRETS.md."
     FAIL=1
   fi
 done

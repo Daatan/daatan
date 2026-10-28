@@ -113,7 +113,7 @@ export async function register() {
       curve.setPrivateKey(Buffer.from(process.env.VAPID_PRIVATE_KEY, 'base64url'))
       const derivedPublicKey = curve.getPublicKey().toString('base64url')
       if (derivedPublicKey !== vapidPublicKey) {
-        log.error('[startup] VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY are not a matching keypair — every browser push notification will fail VAPID auth. Regenerate and update both together (see SECRETS.md).')
+        log.error('[startup] VAPID_PRIVATE_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY are not a matching keypair — every browser push notification will fail VAPID auth. Regenerate and update both together (see docs/SECRETS.md).')
       }
     } catch (err) {
       log.warn({ err }, '[startup] Could not verify VAPID keypair match')

@@ -34,14 +34,14 @@ Deployed via Docker. Uses Tailwind CSS, React Hook Form, and Lucide icons.
 - `docker-compose.prod.yml` reads that `.env`; `blue-green-deploy.sh` sources it
 - **Adding a new env var:** add to `docker-compose.prod.yml` → SSH to server → edit `~/app/.env` → restart containers → sync to Secrets Manager
 - **NEVER use `NEXT_PUBLIC_` for per-environment runtime config** — both staging and production share the same Docker image, so `NEXT_PUBLIC_` vars are baked at build time and identical. Use server-side env vars and pass from Server Components instead.
-- Secrets docs: `SECRETS.md`
+- Secrets docs: `docs/SECRETS.md`
 
 ## Key Files
 - **Schema**: `prisma/schema.prisma`
 - **Auth config**: `src/lib/auth.ts`
 - **Validations**: `src/lib/validations/`
 - **Tests**: `__tests__/` (Vitest), Playwright for e2e
-- **Secrets**: `SECRETS.md`, `docker-compose.prod.yml`, `terraform/secrets.tf`
+- **Secrets**: `docs/SECRETS.md`, `docker-compose.prod.yml`, `terraform/secrets.tf`
 
 ## Edge Runtime & Middleware Safety
 - **Middleware runs in Edge Runtime:** It cannot import Node.js-only modules like `PrismaClient` or `fs`.
