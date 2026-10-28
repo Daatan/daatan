@@ -1198,7 +1198,9 @@
     "articles": "Artikoloj",
     "emptyTitle": "Ankoraŭ neniuj poentitaj fontoj",
     "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
-    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj."
+    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj.",
+    "deskBadge": "Redakcio",
+    "deskBadgeHint": "Subskribo de redakcio aŭ agentejo, ne de nomita persono"
   },
   "outletPage": {
     "backToLeaderboard": "Reen al la rangolisto de fontoj",

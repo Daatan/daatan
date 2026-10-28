@@ -12,6 +12,7 @@ import type {
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
+import DeskBadge from '@/components/sources/DeskBadge'
 
 const log = createClientLogger('SourceLeaderboard')
 
@@ -92,6 +93,7 @@ export default function SourceLeaderboardPage() {
         primary: r.outletName,
         href: `/sources/${encodeURIComponent(r.outletName)}`,
         secondary: t('authorsCount', { count: r.authorCount }),
+        desk: false,
         secondarySort: r.authorCount,
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
@@ -102,6 +104,7 @@ export default function SourceLeaderboardPage() {
         primary: r.author,
         href: `/authors/${encodeURIComponent(r.author)}/${encodeURIComponent(r.outletName)}`,
         secondary: r.outletName,
+        desk: r.isDesk === true,
         secondarySort: r.outletName.toLowerCase(),
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
@@ -224,6 +227,7 @@ export default function SourceLeaderboardPage() {
                     <Link href={row.href} className="hover:underline hover:text-cyan-300">
                       {row.primary}
                     </Link>
+                    {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
                   </td>
                   <td className="px-2 py-3 text-gray-400">{row.secondary}</td>
                   <td className="px-2 py-3 text-right font-mono text-cyan-300">

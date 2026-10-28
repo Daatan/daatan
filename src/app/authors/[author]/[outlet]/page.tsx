@@ -6,6 +6,7 @@ import { ExternalLink, Newspaper } from 'lucide-react'
 import { authorKey, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { authorTopicRecords, getTopicBoards } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
+import DeskBadge from '@/components/sources/DeskBadge'
 import { getPublicArticlesByAuthorOutlet } from '@/lib/services/evidence-pool'
 import { getAppUrl } from '@/lib/branding'
 
@@ -59,6 +60,7 @@ export default async function AuthorPublicPage({ params }: Props) {
   ])
   const topics = authorTopicRecords(topicBoards, decodedAuthor, decodedOutlet)
   const t = await getTranslations('authorPage')
+  const tBoard = await getTranslations('sourceLeaderboard')
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -70,7 +72,10 @@ export default async function AuthorPublicPage({ params }: Props) {
         {t('backToLeaderboard')}
       </Link>
 
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">{row.author}</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
+        {row.author}
+        {row.isDesk && <DeskBadge label={tBoard('deskBadge')} hint={tBoard('deskBadgeHint')} />}
+      </h1>
       <p className="text-sm text-gray-400 mb-6">
         {t('writesFor')}{' '}
         <Link href={`/sources/${encodeURIComponent(row.outletName)}`} className="text-blue-400 hover:underline">

@@ -1198,7 +1198,9 @@
     "articles": "Articles",
     "emptyTitle": "No scored sources yet",
     "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
-    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean."
+    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean.",
+    "deskBadge": "Desk",
+    "deskBadgeHint": "Newsroom or agency byline, not a named person"
   },
   "outletPage": {
     "backToLeaderboard": "Back to source leaderboard",
