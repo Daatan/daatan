@@ -10,7 +10,7 @@ name: Android release build
 #   push to main (android/**)   build + upload to the internal track
 #   push tag android-v*         build + upload to the internal track, versionName taken from the tag
 #   schedule (monthly)          rebuild + upload to internal so toolchain rot (SDK, runner image) shows up early
-#   workflow_dispatch           pick a testing track (internal/alpha/beta) and status by hand
+#   workflow_dispatch           pick a testing track (internal/alpha/beta), status and release notes by hand
 #
 # Promotion to production is deliberately a human step in the Play Console; this workflow only uploads to
 # testing tracks. Uploading needs the repo secret PLAY_SERVICE_ACCOUNT_JSON; without it the job still builds and
@@ -48,6 +48,10 @@ on:
         type: choice
         options: [completed, draft]
         default: completed
+      release_notes:
+        description: 'Release notes (en-US, max 500 chars; empty = default text)'
+        type: string
+        default: ''
 
 concurrency:
   group: android-release
@@ -60,7 +64,8 @@ env:
   PACKAGE_NAME: com.daatan.app
   # Exact Bubblewrap CLI version; bump by PR (the target-API floor check below catches a template that lags).
   BUBBLEWRAP_VERSION: '1.27.0'
-  BUILD_TOOLS_VERSION: '34.0.0'
+  # Matches MIN_TARGET_SDK; apksigner for the signature check comes from here.
+  BUILD_TOOLS_VERSION: '36.0.0'
   # SHA-256 of the upload key the CI keystore signs with -- the first entry of public/.well-known/assetlinks.json
   # (see android/README.md, "Digital Asset Links"). Play re-signs distributed APKs with its own app signing key,
   # so that one is not expected here. The build fails if the artifacts are signed with anything else.
@@ -218,6 +223,16 @@ jobs:
             android/app-release-signed.apk
           retention-days: 90
 
+      - name: Write release notes
+        env:
+          NOTES: ${{ inputs.release_notes }}
+          NAME: ${{ steps.version.outputs.name }}
+        run: |
+          # Play shows these per language; it carries them over when a release is promoted in the Console.
+          mkdir -p android/whatsnew
+          printf '%s' "${NOTES:-DAATAN ${NAME}: bug fixes and improvements.}" | head -c 500 > android/whatsnew/whatsnew-en-US
+          cat android/whatsnew/whatsnew-en-US; echo
+
       - name: Upload to Google Play
         id: play
         if: github.event_name != 'pull_request' && steps.playcfg.outputs.configured == 'true'
@@ -227,6 +242,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ${{ env.PACKAGE_NAME }}
           releaseFiles: android/app-release-bundle.aab
+          whatsNewDirectory: android/whatsnew
           track: ${{ inputs.track || 'internal' }}
           status: ${{ inputs.status || 'completed' }}
 

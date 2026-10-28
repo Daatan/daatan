@@ -89,10 +89,14 @@ it to Google Play. Triggers:
 | Push to `main` touching `android/**` | Build + upload to the **internal** track |
 | Tag `android-v*` (e.g. `android-v1.1.0`) | Same, with `versionName` taken from the tag |
 | Monthly schedule (1st, 05:23 UTC) | Rebuild + upload to internal, so toolchain breakage shows up early |
-| `workflow_dispatch` | Choose a testing track (`internal`/`alpha`/`beta`) and status (`completed`/`draft`) |
+| `workflow_dispatch` | Choose a testing track (`internal`/`alpha`/`beta`), status (`completed`/`draft`) and en-US release notes |
 
 **Production promotion is a human step in Play Console.** The workflow only uploads to testing tracks; nothing here
 publishes to production.
+
+**Release notes.** Every upload carries en-US release notes (`whatsNewDirectory`): the `release_notes` dispatch input,
+or `DAATAN <versionName>: bug fixes and improvements.` by default. Play keeps them when the release is promoted;
+edit them in the Console before promoting if the release deserves a real changelog.
 
 `versionCode` (minutes since the epoch) and `versionName` are derived in CI and stamped into `twa-manifest.json` at
 build time; the committed `appVersionCode`/`appVersion` are only a baseline. Play rejects a duplicate `versionCode`, so
