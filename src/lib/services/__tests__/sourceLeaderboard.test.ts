@@ -8,7 +8,7 @@ vi.mock('../oracle', () => ({
 }))
 
 import { getAuthorShadowLeaderboard } from '../oracle'
-import { aggregateByOutlet, authorKey, authorsOfOutlet, bylinePeople, getSourceLeaderboard, getAuthorShadowRowsForOutlet } from '../sourceLeaderboard'
+import { aggregateByOutlet, authorKey, authorsOfOutlet, bylinePeople, getSourceLeaderboard, getAuthorShadowRowsForOutlet, isDeskByline } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
@@ -320,7 +320,7 @@ describe('joint bylines are split (#1904)', () => {
     expect(bylinePeople('Jane Doe and John Roe')).toEqual(['Jane Doe', 'John Roe'])
     expect(bylinePeople('ליאור בן ארי, איתמר אייכנר')).toEqual(['ליאור בן ארי', 'איתמר אייכנר'])
     expect(bylinePeople('Smith, John')).toEqual(['Smith, John'])
-    expect(bylinePeople('Reuters')).toEqual(['Reuters'])
+    expect(bylinePeople('Reuters')).toEqual([]) // a desk byline names no person
     expect(bylinePeople('(no byline)')).toEqual([])
     expect(bylinePeople('News Agencies; The Motley Fool')).toEqual([])
   })
@@ -375,22 +375,36 @@ describe('per-topic board (#1917)', () => {
   })
 })
 
-describe('an outlet filed under its own name in another script (#1904 item 3)', () => {
+describe('desk bylines: newsroom, agency or the outlet itself (#1904 item 3)', () => {
+  it('recognises agencies, newsroom credits and an outlet named in another script', () => {
+    for (const b of ['Reuters', 'News Agencies', 'JPOST EDITORIAL', 'Times of Israel Staff', 'מערכת וואלה', 'الجزيرة نت', 'חדשות סרוגים']) {
+      expect(isDeskByline(b), b).toBe(true)
+    }
+    for (const b of ['Itamar Eichner', 'ליאור בן ארי', 'Guy Bechor', 'Smith, John', 'Itamar Eichner; News Agencies']) {
+      expect(isDeskByline(b), b).toBe(false)
+    }
+  })
+
   const entries = [
     entry({ author: 'الجزيرة نت', outlet_name: 'aljazeera.net', predictions: 4 }),
     entry({ author: 'Real Person', outlet_name: 'aljazeera.net', predictions: 2 }),
   ]
 
-  it('is not an author, but still counts toward the outlet', async () => {
+  it('stays on the authors board marked as a desk, counts toward the outlet, not its people', async () => {
     mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 2, authors: entries })
     const { authorRows, outletRows } = await getSourceLeaderboard('authors')
-    expect(authorRows.map(r => r.author)).toEqual(['Real Person'])
+    expect(authorRows.map(r => [r.author, r.isDesk])).toEqual([['الجزيرة نت', true], ['Real Person', false]])
     expect(outletRows[0]).toMatchObject({ outletName: 'aljazeera.net', predictions: 6, authorCount: 1 })
   })
 
-  it('leaves the outlet page with no listed authors when it has only that byline', () => {
-    const rows = [entry({ author: 'חדשות סרוגים', outlet_name: 'srugim.co.il', predictions: 8 })]
-    expect(bylinePeople('חדשות סרוגים')).toEqual([])
+  it('is listed on its outlet page even when it is the only byline', () => {
+    const rows = [entry({ author: 'JPOST EDITORIAL', outlet_name: 'jpost.com', predictions: 8 })]
+    expect(bylinePeople('JPOST EDITORIAL')).toEqual([])
     expect(aggregateByOutlet(rows)[0]).toMatchObject({ predictions: 8, authorCount: 0 })
+    const listed = authorsOfOutlet(
+      [{ id: 'd', author: 'JPOST EDITORIAL', outletName: 'jpost.com', skillConservative: 0, brierScore: 0.3, predictions: 8, articles: 8, isDesk: true }],
+      'jpost.com',
+    )
+    expect(listed.map(r => r.author)).toEqual(['JPOST EDITORIAL'])
   })
 })

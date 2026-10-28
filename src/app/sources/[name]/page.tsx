@@ -8,6 +8,7 @@ import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/se
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import { getAppUrl } from '@/lib/branding'
+import DeskBadge from '@/components/sources/DeskBadge'
 
 
 interface Props {
@@ -61,6 +62,7 @@ export default async function OutletPublicPage({ params }: Props) {
   const noImpact =
     detail.impact.forecastsAffected === 0 && detail.impact.matches === 0 && detail.impact.last30dMatches === 0
   const t = await getTranslations('outletPage')
+  const tBoard = await getTranslations('sourceLeaderboard')
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -161,6 +163,7 @@ export default async function OutletPublicPage({ params }: Props) {
                       >
                         {a.author}
                       </Link>
+                      {a.isDesk && <DeskBadge label={tBoard('deskBadge')} hint={tBoard('deskBadgeHint')} />}
                     </td>
                     <td className="px-3 py-2 text-right font-mono text-cyan-300">{a.skillConservative.toFixed(3)}</td>
                     <td className="px-3 py-2 text-right font-mono text-gray-300">{a.brierScore.toFixed(3)}</td>

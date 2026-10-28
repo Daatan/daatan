@@ -11,6 +11,9 @@ export interface AuthorLeaderboardRow {
   brierScore: number
   predictions: number
   articles: number
+  /** A newsroom/agency byline ("JPOST EDITORIAL", "Reuters", the outlet's own name), not a
+   *  person: listed with a desk badge and left out of the outlet's people count (#1904 item 3). */
+  isDesk?: boolean
 }
 
 export interface OutletLeaderboardRow {
@@ -80,12 +83,41 @@ const isPlaceholderAuthor = (name: string) => name.trim().toLowerCase() === NO_B
 
 /**
  * Bylines that are an outlet's own name in another script ("الجزيرة نت" = Al Jazeera Net, filed
- * under aljazeera.net), so the exact `author === outlet_name` check misses them. Like
- * `NO_BYLINE` they are the outlet's unattributed bucket, not a person: counted in the outlet's
- * totals, never listed as an author (#1904 item 3). Explicit — an outlet's name can't be derived
- * from its domain. Add a normalised byline when an authors board shows an outlet as a person.
+ * under aljazeera.net), so the exact `author === outlet_name` check misses them. Explicit — an
+ * outlet's name can't be derived from its domain. Add a normalised byline when an authors board
+ * shows an outlet as a person.
  */
 const INSTITUTIONAL_BYLINES = new Set(['الجزيرة نت', 'חדשות סרוגים'])
+
+/** Wire services and newsroom credits that byline a piece on their own. */
+const DESK_BYLINES = new Set([
+  'news agencies', 'news agency', 'staff', 'reuters', 'ap', 'associated press', 'afp', 'jta', 'tps',
+  'bloomberg', 'al jazeera', 'סוכנויות הידיעות', 'מערכת',
+])
+const DESK_PATTERN = /\b(editorial|editors|desk|staff|newsroom|agencies|wire)\b|מערכת|סוכנויות/i
+
+/**
+ * A byline that names a newsroom or agency rather than a person (#1904 item 3, Mark 2026-10-27:
+ * keep it on the authors board with a desk badge). Not a person, so `bylinePeople` returns none.
+ */
+export function isDeskByline(author: string): boolean {
+  const pieces = splitByline(author.trim())
+  return pieces.length > 0 && pieces.every(isDeskPiece)
+}
+
+function isDeskPiece(piece: string): boolean {
+  const k = authorKey(piece)
+  return INSTITUTIONAL_BYLINES.has(k) || DESK_BYLINES.has(k) || DESK_PATTERN.test(piece)
+}
+
+function splitByline(raw: string): string[] {
+  let parts = raw.split(/\s*[;&]\s*|\s+and\s+/i)
+  if (parts.length === 1 && raw.includes(',')) {
+    const byComma = raw.split(/\s*,\s*/)
+    if (byComma.length > 1 && byComma.every(p => wordCount(p) >= 2)) parts = byComma
+  }
+  return parts.map(p => p.trim()).filter(Boolean)
+}
 
 function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
   return {
@@ -96,6 +128,7 @@ function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
     brierScore: round3(e.brier_score),
     predictions: e.predictions,
     articles: e.articles,
+    isDesk: isDeskByline(e.author),
   }
 }
 
@@ -148,8 +181,8 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
 
 /**
  * Tokens that show up inside joint bylines but aren't authors: agencies, a publisher credit,
- * datelines. Only applied to the pieces of a *split* byline — a solo byline that is an agency
- * ("Reuters", "JPOST EDITORIAL") is left alone (#1904 item 3, not decided).
+ * datelines. Only applied to the pieces of a *split* byline; a solo agency/newsroom byline is a
+ * desk row instead (`isDeskByline`).
  */
 const NON_PERSON_TOKENS = new Set([
   'news agencies', 'news agency', 'staff', 'the motley fool', 'motley fool',
@@ -162,24 +195,21 @@ const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
  * The people named by one byline string. Retro scores a joint byline ("A; B; News Agencies")
  * as one author; here it becomes its individuals. Splits on `;`, `&`, ` and `, and on commas
  * only when every piece is a full name (so "Smith, John" stays whole). Pieces that are
- * agencies/datelines are dropped. The bylineless bucket and an outlet's own name name nobody.
+ * agencies/datelines are dropped. The bylineless bucket and a desk byline name nobody.
  */
 export function bylinePeople(author: string): string[] {
   const raw = author.trim()
-  if (!raw || isPlaceholderAuthor(raw) || INSTITUTIONAL_BYLINES.has(authorKey(raw))) return []
-  let parts = raw.split(/\s*[;&]\s*|\s+and\s+/i)
-  if (parts.length === 1 && raw.includes(',')) {
-    const byComma = raw.split(/\s*,\s*/)
-    if (byComma.length > 1 && byComma.every(p => wordCount(p) >= 2)) parts = byComma
-  }
+  if (!raw || isPlaceholderAuthor(raw) || isDeskByline(raw)) return []
+  const parts = splitByline(raw)
   if (parts.length === 1) return [raw]
-  return parts.map(p => p.trim()).filter(p => p && !NON_PERSON_TOKENS.has(authorKey(p)))
+  return parts.filter(p => !NON_PERSON_TOKENS.has(authorKey(p)) && !isDeskPiece(p))
 }
 
 /** Joint-byline rows → one row per named person. Each person gets the row's Brier and
  *  prediction count in full (credit model chosen for #1904; Brier is a per-prediction mean). */
 function expandJointBylines(rows: AuthorLeaderboardRow[]): AuthorLeaderboardRow[] {
   return rows.flatMap(r => {
+    if (r.isDesk) return [r]
     const people = bylinePeople(r.author)
     if (people.length === 1 && people[0] === r.author.trim()) return [r]
     return people.map((author, i) => ({ ...r, id: `${r.id}#${i}`, author }))
