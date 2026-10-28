@@ -408,8 +408,9 @@ export async function recordEstimate(input: RecordEstimateInput) {
   // so neither field matters for them; both keep the safe (anchor-eligible) default.
   let materialChange = true
   let evidenceAt: Date | null = null
+  let anchor: EvidenceAnchor | null = null
   if (policy.kind === 'evidence' && !input.insufficientData && input.probability !== null) {
-    const anchor = await getLatestEvidenceEstimate(input.predictionId)
+    anchor = await getLatestEvidenceEstimate(input.predictionId)
     materialChange = anchor === null || Math.abs(input.probability - anchor.externalProbability) >= MATERIAL_CHANGE_PTS
     evidenceAt = evidencePublishedAt(input.sources, input.oracleSnapshot)
   }
@@ -418,6 +419,35 @@ export async function recordEstimate(input: RecordEstimateInput) {
   // policy.canSettle the sticky latch obeys) — a clock or creation write
   // claiming `settled` must not buy its way into the band or the alert.
   const pinned = policy.canSettle && input.settled === true
+
+  // daatan#2047: a non-material write leaves the anchor where it was, so a clock
+  // requote written since that anchor is still the right published number — the glide
+  // off an unchanged anchor. Overwriting it with the raw pool mean erased the glide
+  // within hours on every forecast with steady push traffic (one went 23 → 53 fifty
+  // minutes after its last pre-deadline requote). A material write becomes the new
+  // anchor, so every earlier clock row falls out of this window and new information
+  // still wins; a settlement pin is never held back.
+  let glideHeld = false
+  if (!materialChange && anchor !== null && !pinned) {
+    const clockSinceAnchor = await prisma.contextSnapshot.findFirst({
+      where: { predictionId: input.predictionId, kind: 'clock', createdAt: { gt: anchor.createdAt } },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    })
+    if (clockSinceAnchor !== null) {
+      glideHeld = true
+      log.info(
+        {
+          predictionId: input.predictionId,
+          origin: input.origin,
+          probability: input.probability,
+          anchorProbability: anchor.externalProbability,
+          clockAt: clockSinceAnchor.createdAt,
+        },
+        'non-material evidence write: published estimate held at the clock glide (daatan#2047)',
+      )
+    }
+  }
   const backing = pinned
     ? settlementBacking(input.oracleSnapshot)
     : { settling: 0, total: 0, backed: false }
@@ -442,7 +472,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
     ? abstentionClearsEstimate(input.insufficientReason)
       ? { confidence: null, aiCiLow: null, aiCiHigh: null, awaitingAiResolution: false }
       : {}
-    : input.probability !== null
+    : input.probability !== null && !glideHeld
       ? await (async () => {
           const computed = isAwaitingAiResolution(input.probability as number, pinned, backing.backed)
           // Only a write that would put the forecast INTO the queue can be overridden
@@ -539,7 +569,8 @@ export async function recordEstimate(input: RecordEstimateInput) {
       'settlement latch did not stick: asked for settled=true and the row came back false (daatan#1498)',
     )
   }
-  if (willNotify) {
+  // A held write published nothing, so it has no crossing to announce.
+  if (willNotify && !glideHeld) {
     // Edge-triggered settled alert (daatan#1845): the latch flipping false → true is
     // the event, so it fires whatever the previous number was — the 80-crossing alert
     // below stays silent for a forecast already above 80 and for every NO pin.

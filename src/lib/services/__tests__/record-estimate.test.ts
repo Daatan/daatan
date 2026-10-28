@@ -450,6 +450,47 @@ describe('material-change anchor tagging (F17, daatan#1236)', () => {
   })
 })
 
+/**
+ * daatan#2047: a non-material write must not erase the clock's glide. The anchor did
+ * not move, so a clock requote written since it is still the right published number.
+ */
+describe('non-material writes hold the clock glide (daatan#2047)', () => {
+  const ANCHOR = { externalProbability: 53, createdAt: new Date('2026-10-26T08:00:00Z'), evidenceAt: null }
+  const CLOCK = { createdAt: new Date('2026-10-27T10:50:00Z') }
+
+  function mockSnapshots(clockRow: typeof CLOCK | null) {
+    findFirst.mockImplementation(((args: { where: { kind?: string } }) =>
+      Promise.resolve(args.where.kind === 'clock' ? clockRow : ANCHOR)) as never)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    transaction.mockResolvedValue([{ id: 'snap-1' }] as never)
+    findUnique.mockResolvedValue({ confidence: 23, claimText: 'Claim', slug: 'claim' } as never)
+  })
+
+  it('leaves confidence, band and awaiting flag alone when a clock row follows the anchor', async () => {
+    mockSnapshots(CLOCK)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 53, ciLow: 51, ciHigh: 55, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: false, externalProbability: 53 })
+    expect(update).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('still publishes a non-material write when no clock row follows the anchor', async () => {
+    mockSnapshots(null)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 53, ciLow: 51, ciHigh: 55, oracleSnapshot: { sources: [] } })
+    expect(updateData()).toMatchObject({ confidence: 53, aiCiLow: 51, aiCiHigh: 55 })
+  })
+
+  it('a material write replaces the glide — new information wins', async () => {
+    mockSnapshots(CLOCK)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 70, ciLow: 60, ciHigh: 80, oracleSnapshot: { sources: [] } })
+    expect(updateData()).toMatchObject({ confidence: 70, aiCiLow: 60, aiCiHigh: 80 })
+    expect(findFirst).not.toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ kind: 'clock' }) }))
+  })
+})
+
 describe('latestEvidenceAssertsSettlement — is the pin the thing we are publishing right now?', () => {
   const ASSERTED_AT = new Date('2026-08-15T22:24:00.000Z')
 
