@@ -242,7 +242,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
             return (
               <li key={head.id} className="rounded bg-navy-800">
                 <div className="flex items-start justify-between gap-3 text-xs px-2 py-1.5">
-                  <label className="flex items-start gap-2 min-w-0 cursor-pointer">
+                  <label className="flex flex-1 items-start gap-2 min-w-0 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={head.excluded}
@@ -251,14 +251,14 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
                       className="mt-0.5 accent-cyan-500 shrink-0"
                       aria-label={`Exclude ${head.title ?? head.url}`}
                     />
-                    <span className="min-w-0">
+                    <span className="flex-1 min-w-0">
                       <a
                         href={head.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-1 hover:text-cyan-300 ${head.excluded ? 'line-through text-gray-500' : 'text-gray-200'}`}
+                        className={`flex min-w-0 max-w-full items-center gap-1 hover:text-cyan-300 ${head.excluded ? 'line-through text-gray-500' : 'text-gray-200'}`}
                       >
-                        <span className="truncate">{head.title || head.url}</span>
+                        <span className="min-w-0 truncate">{head.title || head.url}</span>
                         <ExternalLink className="w-3 h-3 shrink-0" />
                         {head.status !== 'COMPLETE' && (
                           <span
