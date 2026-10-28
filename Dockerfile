@@ -1,7 +1,7 @@
 # package.json / package-lock.json with the root version pinned to 0.0.0. Every
 # commit bumps the version (repo rule), so copying the real files would change the
 # npm ci layer's key on every build; these change only with a real dependency change.
-FROM node:24-bookworm-slim AS manifests
+FROM node:24-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS manifests
 WORKDIR /m
 COPY package.json package-lock.json ./
 RUN node -e ' \
@@ -14,7 +14,7 @@ RUN node -e ' \
   }'
 
 # Build stage
-FROM node:24-bookworm-slim AS builder
+FROM node:24-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS builder
 
 # Install OpenSSL for Prisma during build
 RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl-dev && rm -rf /var/lib/apt/lists/*
@@ -73,7 +73,7 @@ RUN rm -rf .next public
 CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 
 # Production stage
-FROM node:24-bookworm-slim AS runner
+FROM node:24-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS runner
 
 # Install OpenSSL for Prisma and wget for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
