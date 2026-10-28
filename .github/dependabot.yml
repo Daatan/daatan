@@ -22,9 +22,9 @@ updates:
           - "minor"
           - "patch"
 
-  # Base images use floating tags (node:24-bookworm-slim), so this mostly earns
-  # its keep once images are digest-pinned. Major runtime bumps are a deliberate
-  # upgrade, not a weekly PR.
+  # Base images are digest-pinned (node:24-bookworm-slim@sha256:…, platform#40);
+  # this keeps the digest fresh. Major runtime bumps are a deliberate upgrade,
+  # not a weekly PR.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
