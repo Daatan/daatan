@@ -24,22 +24,30 @@ export interface TopicRecord {
   predictions: number
 }
 
+// Topics fetched at once. The Oracul nginx allows a burst of 30 per IP (retro infra/nginx/oracle.conf),
+// shared with every other daatan→Oracul call, so a refresh must stay well under it (daatan#2050).
+const TOPIC_FETCH_CONCURRENCY = 5
+
 /**
  * Every standard topic's board (daatan#1917). One Oracul call per topic, so cached: the shadow
- * boards move slowly and a profile page must not fan out ~20 requests per view.
+ * boards move slowly and a profile page must not fan out ~20 requests per view. A single call
+ * yields both views (getSourceLeaderboard returns outlet and author rows whatever `view` is).
  */
 export const getTopicBoards = unstable_cache(
-  async (): Promise<TopicBoard[]> =>
-    Promise.all(
-      STANDARD_TAGS.map(async name => {
-        const slug = tagSlug(name)
-        const [outlets, authors] = await Promise.all([
-          getSourceLeaderboard('outlets', 'skillConservative', 0, slug),
-          getSourceLeaderboard('authors', 'skillConservative', 0, slug),
-        ])
-        return { slug, name, outletRows: outlets.outletRows, authorRows: authors.authorRows }
-      }),
-    ),
+  async (): Promise<TopicBoard[]> => {
+    const boards: TopicBoard[] = []
+    for (let i = 0; i < STANDARD_TAGS.length; i += TOPIC_FETCH_CONCURRENCY) {
+      const batch = await Promise.all(
+        STANDARD_TAGS.slice(i, i + TOPIC_FETCH_CONCURRENCY).map(async name => {
+          const slug = tagSlug(name)
+          const { outletRows, authorRows } = await getSourceLeaderboard('outlets', 'skillConservative', 0, slug)
+          return { slug, name, outletRows, authorRows }
+        }),
+      )
+      boards.push(...batch)
+    }
+    return boards
+  },
   ['source-topic-boards'],
   { revalidate: 300, tags: ['leaderboard-sources'] },
 )
