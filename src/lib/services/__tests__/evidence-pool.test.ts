@@ -16,6 +16,10 @@ vi.mock('@/lib/prisma', () => {
     prediction: {
       findUnique: vi.fn(),
     },
+    evidenceDispute: {
+      upsert: vi.fn(),
+      findMany: vi.fn(),
+    },
   }
   // Array form (upsertCurrentVersion) resolves each already-started promise; callback
   // form (claimArticleForExtraction's versioning branch) runs against this same mocked
@@ -63,6 +67,8 @@ import {
   TERMINAL_POOL_REASONS,
   hashArticleContent,
   retireLegacyNullRows,
+  setUrlDispute,
+  unscoredDisputeUrlHashes,
 } from '../evidence-pool'
 import type { EnrichedOracleSource } from '../oracle-snapshot'
 import type { PoolRecompute } from '../evidence-pool'
@@ -462,6 +468,67 @@ describe('setArticleExcluded', () => {
 
     expect(update).not.toHaveBeenCalled()
     expect(result).toBeNull()
+  })
+})
+
+describe('setUrlDispute (elections#225)', () => {
+  const upsert = vi.mocked(prisma.evidenceDispute.upsert)
+  beforeEach(() => {
+    vi.clearAllMocks()
+    upsert.mockImplementation((async (args: { create: Record<string, unknown> }) => ({ id: 'd-1', ...args.create })) as never)
+  })
+
+  it('opens a dispute keyed by the article URL hash, without excluding anything', async () => {
+    findFirst.mockResolvedValue({ url: 'https://x.com/a', urlHash: 'h-1' } as never)
+
+    const result = await setUrlDispute('pred-1', 'art-1', 'disputed', 'complaint by email')
+
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: 'art-1', predictionId: 'pred-1' }, select: { url: true, urlHash: true } })
+    const args = upsert.mock.calls[0][0]
+    expect(args.where).toEqual({ urlHash: 'h-1' })
+    expect(args.create).toMatchObject({ urlHash: 'h-1', url: 'https://x.com/a', status: 'disputed', note: 'complaint by email', resolvedAt: null })
+    expect(args.update).toMatchObject({ status: 'disputed', resolvedAt: null, note: 'complaint by email' })
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(result?.excludedRows).toBe(0)
+  })
+
+  it('hidden excludes every current row for the URL, across forecasts', async () => {
+    findFirst.mockResolvedValue({ url: 'https://x.com/a', urlHash: 'h-1' } as never)
+    updateMany.mockResolvedValue({ count: 3 } as never)
+
+    const result = await setUrlDispute('pred-1', 'art-1', 'hidden')
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { urlHash: 'h-1', supersededAt: null, excluded: false },
+      data: { excluded: true },
+    })
+    expect(upsert.mock.calls[0][0].update.resolvedAt).toBeInstanceOf(Date)
+    // note omitted → existing note left alone on update
+    expect(upsert.mock.calls[0][0].update).not.toHaveProperty('note')
+    expect(result?.excludedRows).toBe(3)
+  })
+
+  it('upheld resolves without touching exclusion', async () => {
+    findFirst.mockResolvedValue({ url: 'https://x.com/a', urlHash: 'h-1' } as never)
+
+    await setUrlDispute('pred-1', 'art-1', 'upheld')
+
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(upsert.mock.calls[0][0].update).toMatchObject({ status: 'upheld' })
+  })
+
+  it('returns null for an article outside the forecast', async () => {
+    findFirst.mockResolvedValue(null)
+    expect(await setUrlDispute('pred-1', 'nope', 'disputed')).toBeNull()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it('unscoredDisputeUrlHashes asks for disputed + hidden only', async () => {
+    vi.mocked(prisma.evidenceDispute.findMany).mockResolvedValue([{ urlHash: 'h-1' }, { urlHash: 'h-2' }] as never)
+    expect(await unscoredDisputeUrlHashes()).toEqual(['h-1', 'h-2'])
+    expect(vi.mocked(prisma.evidenceDispute.findMany).mock.calls[0][0]).toMatchObject({
+      where: { status: { in: ['disputed', 'hidden'] } },
+    })
   })
 })
 

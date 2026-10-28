@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
 import { percentToStance, toClaimsDetail, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
-import type { EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
+import type { EvidenceDispute, EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { claimArchetypeParam, claimDirectionParam, TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
@@ -897,6 +897,76 @@ export async function setArticleExcluded(
     where: { id: articleId },
     data: { excluded },
   })
+}
+
+export const DISPUTE_STATUSES = ['disputed', 'upheld', 'hidden'] as const
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number]
+
+/** Statuses that keep a URL out of scoring (pundit ratings, the resolved record). A
+ *  `disputed` URL still counts in the live consensus — only `hidden` is also excluded
+ *  there (via the pool rows' `excluded` flag). See EvidenceDispute in schema.prisma. */
+export const UNSCORED_DISPUTE_STATUSES: readonly DisputeStatus[] = ['disputed', 'hidden']
+
+/**
+ * Admin action (elections#225): set the public dispute state of the URL behind one pooled
+ * article. Scoped like setArticleExcluded — the article must belong to `predictionId` — but
+ * the state itself is per URL (url_hash), so it applies to that article in every forecast's
+ * pool and to rows written for it later. `hidden` also sets `excluded` on every current pool
+ * row for the URL, in the same transaction, so every existing `NOT excluded` reader drops it
+ * without change. `upheld` deliberately does NOT un-exclude anything: an admin exclusion made
+ * for another reason must not be silently undone by a dispute outcome.
+ * Returns null on no match (caller maps to 404).
+ */
+export async function setUrlDispute(
+  predictionId: string,
+  articleId: string,
+  status: DisputeStatus,
+  note?: string | null,
+): Promise<{ dispute: EvidenceDispute; excludedRows: number } | null> {
+  const article = await prisma.evidencePoolArticle.findFirst({
+    where: { id: articleId, predictionId },
+    select: { url: true, urlHash: true },
+  })
+  if (!article) return null
+  const resolvedAt = status === 'disputed' ? null : new Date()
+  return prisma.$transaction(async (tx) => {
+    const dispute = await tx.evidenceDispute.upsert({
+      where: { urlHash: article.urlHash },
+      create: { urlHash: article.urlHash, url: article.url, status, note: note ?? null, resolvedAt },
+      // Re-opening a resolved dispute restarts its clock; `note` is only replaced when given.
+      update: {
+        status,
+        resolvedAt,
+        ...(status === 'disputed' ? { openedAt: new Date() } : {}),
+        ...(note !== undefined ? { note } : {}),
+      },
+    })
+    let excludedRows = 0
+    if (status === 'hidden') {
+      const res = await tx.evidencePoolArticle.updateMany({
+        where: { urlHash: article.urlHash, ...CURRENT_VERSION_ONLY, excluded: false },
+        data: { excluded: true },
+      })
+      excludedRows = res.count
+    }
+    return { dispute, excludedRows }
+  })
+}
+
+/** url_hash values whose dispute status keeps them out of scoring (see UNSCORED_DISPUTE_STATUSES). */
+export async function unscoredDisputeUrlHashes(): Promise<string[]> {
+  const rows = await prisma.evidenceDispute.findMany({
+    where: { status: { in: [...UNSCORED_DISPUTE_STATUSES] } },
+    select: { urlHash: true },
+  })
+  return rows.map((r) => r.urlHash)
+}
+
+/** Dispute state for the given url_hash values, for the admin pool listing. */
+export async function disputesByUrlHash(urlHashes: string[]): Promise<Map<string, EvidenceDispute>> {
+  if (urlHashes.length === 0) return new Map()
+  const rows = await prisma.evidenceDispute.findMany({ where: { urlHash: { in: urlHashes } } })
+  return new Map(rows.map((r) => [r.urlHash, r]))
 }
 
 /**

@@ -13,11 +13,12 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/services/evidence-pool', () => ({
   getPoolArticles: vi.fn(),
   isUsablePoolRow: vi.fn(),
+  disputesByUrlHash: vi.fn().mockResolvedValue(new Map()),
 }))
 
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
-import { getPoolArticles, isUsablePoolRow } from '@/lib/services/evidence-pool'
+import { disputesByUrlHash, getPoolArticles, isUsablePoolRow } from '@/lib/services/evidence-pool'
 import { GET } from '../route'
 
 const mockAuth = vi.mocked(auth as unknown as () => Promise<unknown>)
@@ -28,8 +29,8 @@ const mockIsUsable = vi.mocked(isUsablePoolRow)
 const req = () => new NextRequest('http://localhost/api/admin/forecasts/p1/evidence-pool')
 const ctx = { params: Promise.resolve({ id: 'p1' }) }
 
-function article(overrides: Partial<{ id: string; supersededAt: string | null; status: string }> = {}) {
-  return { id: 'a1', supersededAt: null, status: 'COMPLETE', ...overrides }
+function article(overrides: Partial<{ id: string; urlHash: string; supersededAt: string | null; status: string }> = {}) {
+  return { id: 'a1', urlHash: 'h-a', supersededAt: null, status: 'COMPLETE', ...overrides }
 }
 
 beforeEach(() => {
@@ -60,5 +61,16 @@ describe('GET /api/admin/forecasts/[id]/evidence-pool', () => {
     expect(body.usableSize).toBe(2)
     expect(body.articles).toHaveLength(4)
     expect(mockIsUsable).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'a1-old' }))
+  })
+
+  it('attaches the per-URL dispute status to every row of that URL (elections#225)', async () => {
+    mockGetPoolArticles.mockResolvedValue([article({ id: 'a1', urlHash: 'h-1' }), article({ id: 'a2', urlHash: 'h-2' })] as never)
+    mockIsUsable.mockReturnValue(true)
+    vi.mocked(disputesByUrlHash).mockResolvedValueOnce(new Map([['h-1', { status: 'disputed' }]]) as never)
+
+    const body = await (await GET(req(), ctx)).json()
+
+    expect(vi.mocked(disputesByUrlHash)).toHaveBeenCalledWith(['h-1', 'h-2'])
+    expect(body.articles.map((a: { disputeStatus: string | null }) => a.disputeStatus)).toEqual(['disputed', null])
   })
 })

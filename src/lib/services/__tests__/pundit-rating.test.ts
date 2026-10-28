@@ -5,6 +5,9 @@ vi.mock('@/lib/prisma', () => ({
     evidencePoolArticle: {
       findMany: vi.fn(),
     },
+    evidenceDispute: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }))
 
@@ -147,5 +150,17 @@ describe('replayPunditGlickoHistory', () => {
     expect(whereClause.supersededAt).toBeNull()
     expect(whereClause.prediction.outcomeType).toBe('BINARY')
     expect(whereClause.prediction.tags).toEqual({ some: { slug: 'israeli-elections-2026' } })
+  })
+
+  it('leaves out URLs that are disputed or hidden (elections#225)', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.evidenceDispute.findMany).mockResolvedValueOnce([{ urlHash: 'h-1' }] as never)
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([])
+
+    const { replayPunditGlickoHistory } = await import('../pundit-rating')
+    await replayPunditGlickoHistory('israeli-elections-2026')
+
+    const whereClause = vi.mocked(prisma.evidencePoolArticle.findMany).mock.calls[0][0]!.where as any
+    expect(whereClause.urlHash).toEqual({ notIn: ['h-1'] })
   })
 })

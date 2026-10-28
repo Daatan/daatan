@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
+import { CURRENT_VERSION_ONLY, unscoredDisputeUrlHashes } from '@/lib/services/evidence-pool'
 import { calculateEloUpdates } from '@/lib/services/elo'
 import { glicko2Update } from '@/lib/services/expertise'
 
@@ -39,8 +39,12 @@ interface PunditResolution {
 // simplest defensible aggregation, consistent with how evidence generally
 // contributes as a weighted signal elsewhere in this pipeline.
 async function loadResolvedPunditStances(tagSlug: string): Promise<Map<string, PunditResolution[]>> {
+  // A URL under public dispute, or hidden after one, doesn't score (elections#225) — keyed
+  // by URL so a row written after the dispute was opened is left out too.
+  const unscoredUrlHashes = await unscoredDisputeUrlHashes()
   const rows = await prisma.evidencePoolArticle.findMany({
     where: {
+      ...(unscoredUrlHashes.length > 0 ? { urlHash: { notIn: unscoredUrlHashes } } : {}),
       personId: { not: null },
       stance: { not: null },
       certainty: { gte: MIN_JUDGED_CERTAINTY },

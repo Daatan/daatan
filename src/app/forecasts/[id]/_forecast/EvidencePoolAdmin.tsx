@@ -14,10 +14,20 @@ type PoolArticle = {
   certainty: number | null
   origin: string
   excluded: boolean
+  /** Public dispute state of this URL (elections#225) — per URL, across every forecast. */
+  disputeStatus: DisputeStatus | null
   version: number
   supersedesId: string | null
   supersededAt: string | null
   status: 'PENDING' | 'COMPLETE' | 'FAILED'
+}
+
+type DisputeStatus = 'disputed' | 'upheld' | 'hidden'
+
+const DISPUTE_LABEL: Record<DisputeStatus, string> = {
+  disputed: 'Disputed (public badge, not scored)',
+  upheld: 'Upheld (reviewed, stands)',
+  hidden: 'Hidden (reviewed, withdrawn)',
 }
 
 const STATUS_BADGE: Record<Exclude<PoolArticle['status'], 'COMPLETE'>, string> = {
@@ -140,6 +150,32 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
     }
   }
 
+  async function setDispute(article: PoolArticle, status: DisputeStatus) {
+    if (status === 'hidden' && !window.confirm('Hide this URL in every forecast? Its current pool rows will be excluded.')) return
+    setBusyId(article.id)
+    try {
+      const res = await fetch(`${endpoint}/${article.id}/dispute`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error('Update failed')
+      // Per URL: every row of the same URL in this listing takes the new state.
+      setArticles(prev =>
+        (prev ?? []).map(a =>
+          a.url === article.url
+            ? { ...a, disputeStatus: status, excluded: status === 'hidden' && a.supersededAt === null ? true : a.excluded }
+            : a,
+        ),
+      )
+      toast.success(DISPUTE_LABEL[status])
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   function toggleChain(headId: string) {
     setExpandedChains(prev => {
       const next = new Set(prev)
@@ -244,6 +280,19 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
                   </label>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {busyId === head.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <select
+                      value={head.disputeStatus ?? ''}
+                      disabled={busyId === head.id}
+                      onChange={e => e.target.value && setDispute(head, e.target.value as DisputeStatus)}
+                      aria-label={`Dispute status for ${head.title ?? head.url}`}
+                      title="Public dispute status of this URL, in every forecast (elections#225)"
+                      className={`bg-navy-900 border border-navy-600 rounded px-1 py-px text-[10px] ${head.disputeStatus === 'disputed' ? 'text-amber-400' : head.disputeStatus === 'hidden' ? 'text-red-400' : 'text-gray-500'}`}
+                    >
+                      <option value="" disabled>no dispute</option>
+                      {(Object.keys(DISPUTE_LABEL) as DisputeStatus[]).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                     {priors.length > 0 && (
                       <button
                         onClick={() => toggleChain(head.id)}
