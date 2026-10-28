@@ -993,6 +993,33 @@ model EvidencePoolArticle {
   @@map("evidence_pool_articles")
 }
 
+// Public dispute state of one article URL (elections#225, counsel 2026-10-22). Keyed by
+// url_hash — the same hashUrl() normalization as evidence_pool_articles — and NOT by pool
+// row: a complaint is about an article's attribution, the same URL sits in several
+// forecasts' pools, and a later re-extraction writes a new pool row that must inherit the
+// state. One row per URL; status moves disputed → upheld | hidden and the timestamps are
+// the audit trail (the pool row itself is never deleted or rewritten).
+//   disputed — shown with a "disputed — under review" badge; STILL counted in the live
+//              consensus (Mark 2026-10-28: a complaint alone must not move the published
+//              number), but left out of scoring (pundit ratings, the resolved record).
+//   upheld   — reviewed, Daatan stands behind it: no badge, counted everywhere again.
+//   hidden   — reviewed and withdrawn: every current pool row for the URL is set
+//              `excluded` at that moment, and readers treat later rows for it as excluded.
+// `note` is internal (who complained, why) and must never be rendered publicly.
+model EvidenceDispute {
+  id         String    @id @default(cuid())
+  urlHash    String    @unique @map("url_hash") @db.VarChar(64)
+  url        String    @db.VarChar(2000)
+  status     String    @db.VarChar(16)
+  note       String?   @db.VarChar(1000)
+  openedAt   DateTime  @default(now()) @map("opened_at")
+  resolvedAt DateTime? @map("resolved_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("evidence_disputes")
+}
+
 // One value per number a rater can flag as wrong on a notifyNewsArticleMatched
 // Telegram notification. AUTHOR_LEAN/FACT_SIGNAL/EVIDENCE_CLASS/CREDIBILITY cover
 // the Signal Lanes judgment-lane line (daatan#1222) ahead of it seeing real rating

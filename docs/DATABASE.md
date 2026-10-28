@@ -476,6 +476,18 @@ self-heal on the next organic re-push.
 pool" panel (`EvidencePoolAdmin.tsx`, `PATCH
 /api/admin/forecasts/[id]/evidence-pool/[articleId]`) — shadow-writes never
 touch it, so an admin's exclusion decision survives re-discovery.
+
+**Public disputes (`evidence_disputes`, elections#225).** One row per article URL
+(`url_hash`, same `hashUrl()` normalization), not per pool row — a complaint is about the
+article's attribution, so the state applies to that URL in every forecast's pool and to rows
+written for it later. Set from the same admin panel (`PATCH
+/api/admin/forecasts/[id]/evidence-pool/[articleId]/dispute`, `setUrlDispute`). `disputed`
+gets a public badge on elections and **stays in the live consensus** (Mark 2026-10-28: a
+complaint alone must not move the published number) but is left out of scoring
+(`pundit-rating.ts` filters `UNSCORED_DISPUTE_STATUSES` by `url_hash`); `upheld` clears it;
+`hidden` also sets `excluded` on every current row for the URL. `upheld` never un-excludes
+— an exclusion made for another reason stays. `note` is internal only. `opened_at` /
+`resolved_at` are the audit trail; pool rows are never deleted.
 `evidenceWeight` is retro's resolved evidence_class weight (S2 cutover, retro
 `/forecast`'s `SourceSignal.evidence_weight`, PR #251) — the
 `class_weight[evidence_class]`/certainty-fallback value already computed
