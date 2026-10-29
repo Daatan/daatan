@@ -12,6 +12,12 @@ import { getAppUrl } from '@/lib/branding'
 
 const VALID_TABS: ProfileTab[] = ['created', 'participated', 'resolved']
 
+// Users without a username are still reachable by id (the lookup matches either), so the
+// id is their canonical path — `/profile/${username}` alone yielded `/profile/null` (#2052).
+function profileUrl(user: { id: string; username: string | null }): string {
+  return `${getAppUrl()}/profile/${user.username ?? user.id}`
+}
+
 interface ProfilePageProps {
   params: Promise<{ id: string }>
   searchParams: Promise<{ tag?: string; tab?: string; page?: string }>
@@ -22,6 +28,7 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   const user = await prisma.user.findFirst({
     where: { OR: [{ id }, { username: id }] },
     select: {
+      id: true,
       name: true,
       username: true,
       isPublic: true,
@@ -35,7 +42,7 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   })
 
   if (!user) {
-    return { title: 'User Not Found - DAATAN', robots: { index: false } }
+    return { title: 'User Not Found', robots: { index: false } }
   }
 
   if (!user.isPublic) {
@@ -46,18 +53,21 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   }
 
   const hasContent = user._count.predictions > 0 || user._count.commitments > 0
-  const title = `${user.name} (@${user.username}) - DAATAN Profile`
+  const title = user.username
+    ? `${user.name} (@${user.username}) - DAATAN Profile`
+    : `${user.name} - DAATAN Profile`
   const description = `Check out ${user.name}'s prediction track record on DAATAN.`
+  const url = profileUrl(user)
 
   return {
     title,
     description,
-    alternates: { canonical: `${getAppUrl()}/profile/${user.username}` },
+    alternates: { canonical: url },
     openGraph: {
       title,
       description,
       type: 'profile',
-      url: `${getAppUrl()}/profile/${user.username}`,
+      url,
     },
     twitter: { card: 'summary_large_image', title, description },
     ...(!hasContent ? { robots: { index: false, follow: true } } : {}),
@@ -148,12 +158,13 @@ async function loadPublicProfile({ id, selectedTag, tab, page }: { id: string; s
     ])
 
     const appUrl = getAppUrl()
+    const url = profileUrl(user)
     const personJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'Person',
       name: user.name,
-      identifier: `@${user.username}`,
-      url: `${appUrl}/profile/${user.username}`,
+      ...(user.username && { identifier: `@${user.username}` }),
+      url,
       ...(user.image && { image: user.image }),
       ...(user.website && { sameAs: [user.website] }),
     }
@@ -167,7 +178,7 @@ async function loadPublicProfile({ id, selectedTag, tab, page }: { id: string; s
           '@type': 'ListItem',
           position: 2,
           name: user.name ?? user.username,
-          item: `${appUrl}/profile/${user.username}`,
+          item: url,
         },
       ],
     }

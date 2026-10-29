@@ -411,7 +411,7 @@ describe('getPublicArticlesByAuthorOutlet', () => {
         url: true,
         publishedDate: true,
         predictionId: true,
-        prediction: { select: { claimText: true, status: true } },
+        prediction: { select: { slug: true, claimText: true, status: true } },
       },
     })
   })
@@ -424,7 +424,7 @@ describe('getPublicArticlesByAuthorOutlet', () => {
         url: 'https://maariv.co.il/a1',
         publishedDate: '2026-07-01',
         predictionId: 'pred-1',
-        prediction: { claimText: 'Will X happen?', status: 'RESOLVED_CORRECT' },
+        prediction: { slug: 'will-x-happen', claimText: 'Will X happen?', status: 'RESOLVED_CORRECT' },
       },
     ] as never)
 
@@ -435,6 +435,7 @@ describe('getPublicArticlesByAuthorOutlet', () => {
       url: 'https://maariv.co.il/a1',
       publishedDate: '2026-07-01',
       predictionId: 'pred-1',
+      predictionSlug: 'will-x-happen',
       predictionClaimText: 'Will X happen?',
       predictionStatus: 'RESOLVED_CORRECT',
     }])

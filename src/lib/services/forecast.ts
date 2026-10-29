@@ -557,6 +557,20 @@ export async function getCanonicalSlugForAlias(slug: string): Promise<string | n
   return alias?.prediction.slug ?? null
 }
 
+/**
+ * id → slug for forecasts referenced by id from outside this DB (news-indexer publication
+ * rows), so public pages link the canonical slug URL instead of an id twin. Ids without a
+ * slug (or unknown ids) are simply absent from the map.
+ */
+export async function getForecastSlugs(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map()
+  const rows = await prisma.prediction.findMany({
+    where: { id: { in: ids }, slug: { not: null } },
+    select: { id: true, slug: true },
+  })
+  return new Map(rows.flatMap((r) => (r.slug ? [[r.id, r.slug] as const] : [])))
+}
+
 /** Outcome of canonicalizing one existing forecast (see canonicalizeForecastToEnglish). */
 export type CanonicalizeResult = 'canonicalized' | 'english' | 'failed' | 'skipped'
 
