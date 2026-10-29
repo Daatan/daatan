@@ -1,4 +1,5 @@
 const { version } = require('./package.json')
+const { HTML_LIMITED_BOT_UA_RE } = require('next/dist/shared/lib/router/utils/html-bots')
 const createNextIntlPlugin = require('next-intl/plugin')
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
@@ -59,6 +60,14 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   cacheComponents: true,
+  // Routes with a loading.tsx stream metadata (title, canonical, robots, hreflang) into
+  // <body> for any UA not matched here. Next's default list leaves out Googlebot and every
+  // AI crawler, and GSC showed Google ignoring those body-placed canonicals (daatan#2055).
+  // This replaces the default, so extend its regex rather than restating it.
+  htmlLimitedBots: new RegExp(
+    `${HTML_LIMITED_BOT_UA_RE.source}|Googlebot|GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-User|PerplexityBot|CCBot|Amazonbot`,
+    'i',
+  ),
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },

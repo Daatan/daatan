@@ -19,6 +19,17 @@ the root `%s | DAATAN` template, so without `absolute` the bare claim was the wh
 (daatan#1870). `/about` is `absolute` too (brand-led, ≤ ~60 chars). Meta descriptions are cut at a
 word boundary (`truncate()` in `src/lib/forecast-seo.ts`).
 
+**Metadata placement (`htmlLimitedBots`, daatan#2055).** Routes with a `loading.tsx`
+(`/forecasts/[id]`, `/tags/[slug]`, `/profile/[id]`, `/sources/[name]`, …) stream: Next.js emits
+`<title>`, description, canonical, hreflang and `robots` inside `<body>` for any UA not matched by
+`htmlLimitedBots`. Next's default list omits plain `Googlebot` and all AI crawlers. GSC URL Inspection
+showed no `userCanonical` on those routes, and an id-URL twin indexed as its own canonical.
+`next.config.js` sets `htmlLimitedBots` to Next's default regex plus Googlebot and the AI crawlers
+(GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, CCBot, Amazonbot).
+Those get blocking metadata in `<head>`, browsers keep streaming. The value replaces the default,
+so add bots to the regex there rather than restating the list. Check with
+`curl -A Googlebot <url>`: canonical must come before `</head>`.
+
 Payload: `initialContextSnapshots` is projected through `slimContextSnapshots`
 (`src/lib/slim-context-snapshots.ts`) before it reaches the client — the stored `oracleSnapshot`
 carries every source's `claimsDetail` shadow layer, which was ~1.4 MB of the 1.6 MB forecast page
