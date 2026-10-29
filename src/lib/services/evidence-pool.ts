@@ -828,6 +828,7 @@ export interface PublicSourceArticle {
   url: string
   publishedDate: string | null
   predictionId: string
+  predictionSlug: string | null
   predictionClaimText: string
   predictionStatus: PredictionStatus
 }
@@ -862,7 +863,7 @@ export async function getPublicArticlesByAuthorOutlet(
       url: true,
       publishedDate: true,
       predictionId: true,
-      prediction: { select: { claimText: true, status: true } },
+      prediction: { select: { slug: true, claimText: true, status: true } },
     },
   })
 
@@ -872,6 +873,7 @@ export async function getPublicArticlesByAuthorOutlet(
     url: r.url,
     publishedDate: r.publishedDate,
     predictionId: r.predictionId,
+    predictionSlug: r.prediction.slug,
     predictionClaimText: r.prediction.claimText,
     predictionStatus: r.prediction.status,
   }))

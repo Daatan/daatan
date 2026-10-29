@@ -118,7 +118,7 @@ export default async function AuthorPublicPage({ params }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <Link href={`/forecasts/${p.predictionId}`} className="text-blue-500 hover:underline">
+                    <Link href={`/forecasts/${p.predictionSlug || p.predictionId}`} className="text-blue-500 hover:underline">
                       {t('forecast')}
                     </Link>
                   </td>

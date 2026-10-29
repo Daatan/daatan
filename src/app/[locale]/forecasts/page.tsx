@@ -7,17 +7,18 @@ import PaginationLinks, { pageHref, parsePageParam } from '@/components/ui/Pagin
 import { getAppUrl } from '@/lib/branding'
 
 
+// Bare titles: the root layout's `%s | DAATAN` template adds the brand (it was doubled).
 const META: Record<string, { title: string; description: string }> = {
   he: {
-    title: 'תחזיות | DAATAN',
-    description: 'עיין בתחזיות ועשה הימורים על אירועי עולם.',
+    title: 'תחזיות',
+    description: 'תחזיות פתוחות ומוכרעות ב-DAATAN: גאופוליטיקה, כלכלה, טכנולוגיה ועוד. הימרו במוניטין שלכם ועקבו אחרי הדיוק עם ציון ברייר ודירוג ELO.',
   },
   ru: {
-    title: 'Прогнозы | DAATAN',
-    description: 'Просматривайте прогнозы и делайте ставки на мировые события.',
+    title: 'Прогнозы',
+    description: 'Открытые и разрешённые прогнозы на DAATAN: геополитика, экономика, технологии и не только. Ставьте на кон свою репутацию и следите за точностью по оценке Брайера и рейтингу ELO.',
   },
   eo: {
-    title: 'Prognozoj | DAATAN',
+    title: 'Prognozoj',
     description: 'Foliumu prognozojn kaj vetu pri mondaj eventoj.',
   },
 }

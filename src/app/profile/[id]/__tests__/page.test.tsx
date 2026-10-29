@@ -82,6 +82,40 @@ describe('profile/[id] page generateMetadata', () => {
     expect(metadata.robots).toEqual({ index: false, follow: false })
   })
 
+  it('canonicalizes a username profile to /profile/<username>', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'cuid1',
+      name: 'Alice',
+      username: 'alice',
+      isPublic: true,
+      _count: { predictions: 1, commitments: 0 },
+    })
+
+    const metadata = await generateMetadata({ params, searchParams: Promise.resolve({}) })
+
+    expect(metadata.alternates?.canonical).toMatch(/\/profile\/alice$/)
+    expect(metadata.title).toBe('Alice (@alice) - DAATAN Profile')
+  })
+
+  it('canonicalizes a usernameless profile to its id, not /profile/null (#2052)', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'cmt9ytmot030x01l3qomow7nh',
+      name: 'Yoel',
+      username: null,
+      isPublic: true,
+      _count: { predictions: 1, commitments: 0 },
+    })
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ id: 'cmt9ytmot030x01l3qomow7nh' }),
+      searchParams: Promise.resolve({}),
+    })
+
+    expect(metadata.alternates?.canonical).toMatch(/\/profile\/cmt9ytmot030x01l3qomow7nh$/)
+    expect((metadata.openGraph as { url?: string }).url).toBe(metadata.alternates?.canonical)
+    expect(metadata.title).toBe('Yoel - DAATAN Profile')
+  })
+
   it('noindexes an unknown user', async () => {
     mockFindFirst.mockResolvedValue(null)
 

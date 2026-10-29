@@ -4,7 +4,7 @@ import LegalPage from '@/components/LegalPage'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Scoring Methodology — How DAATAN Measures Forecasting Skill',
+  title: { absolute: 'Scoring Methodology — How DAATAN Measures Forecasting Skill' },
   description:
     'How DAATAN scores forecasts: Brier score, ELO rating, and Glicko-2, plus every other ranking system on the leaderboard — definitions, formulas, and worked examples.',
   alternates: {

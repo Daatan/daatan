@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
+import { getForecastSlugs } from '@/lib/services/forecast'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
@@ -50,6 +51,9 @@ export default async function OutletPublicPage({ params }: Props) {
     getTopicBoards(),
   ])
   if (!detail) notFound()
+  const forecastSlugs = await getForecastSlugs(
+    detail.publications.flatMap((p) => (p.forecastId ? [p.forecastId] : [])),
+  )
 
   // The leaderboard keys outlets by domain, forecast pages link by display name ("Ynet"), so
   // match on every domain news-indexer knows for this outlet, not just the name in the URL (#1891).
@@ -214,7 +218,7 @@ export default async function OutletPublicPage({ params }: Props) {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {p.forecastId ? (
-                        <Link href={`/forecasts/${p.forecastId}`} className="text-blue-500 hover:underline">
+                        <Link href={`/forecasts/${forecastSlugs.get(p.forecastId) ?? p.forecastId}`} className="text-blue-500 hover:underline">
                           {t('forecast')}
                         </Link>
                       ) : '—'}
