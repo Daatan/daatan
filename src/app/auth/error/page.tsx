@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import AuthErrorClient from './AuthErrorClient'
 
-// Force dynamic rendering to ensure page is always server-rendered
+// The <Suspense> boundary is required by useSearchParams() in the client component.
 
 function AuthErrorLoading() {
   return (

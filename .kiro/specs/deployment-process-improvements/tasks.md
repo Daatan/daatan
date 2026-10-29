@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> **Archived spec (historical).** Implemented; root `DEPLOYMENT.md` was removed in #2039 — the current docs are `docs/DEPLOYMENT.md` and `docs/SECRETS.md`.
+
 - [x] 1. Enhance local verification system
   - Create enhanced pre-commit hook with build, test, and lint checks
   - Create pre-push hook with authentication change detection

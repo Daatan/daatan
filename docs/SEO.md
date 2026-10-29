@@ -88,7 +88,7 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 `src/app/sitemap.ts` — dynamically generates the sitemap from live DB data (queries cached 1h).
 It returns an empty sitemap unless `APP_ENV=production`, so staging is never submitted. Included pages:
 
-- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity` — daily;
+- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity`, `/tags` — daily;
   `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`, `/accessibility`, `/contact` — monthly
 - `/he` and `/ru` versions of the localized static routes (`localeStaticRoutes`; `eo` is
   deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`). Not the legal
@@ -99,7 +99,9 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
   (`lastModified` = `resolvedAt` for resolved forecasts). `/he/…` and `/ru/…` variants are
   listed only when a translation of the forecast exists in that language.
 - Public profiles with public activity (`/profile/[username]`) — weekly
-- Tags with at least one public forecast (`/tags/[slug]`) — daily
+- Tags with at least one public **ACTIVE** forecast (`/tags/[slug]`) — daily. Same filter as
+  the tag page itself (`VISIBLE_TAG_PREDICTION_WHERE` in `src/lib/services/tag.ts`, daatan#2028),
+  so no sitemap entry lands on an empty tag page.
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 
@@ -147,6 +149,20 @@ the `index: true` default — the moment the user has a public prediction or a c
 `/create` requires a session and redirects anonymous visitors, so it has nothing for Google to
 rank and no reason to appear in search results. `src/app/create/page.tsx` sets
 `robots: { index: false, follow: false }` in its `metadata` export.
+
+## Crawlable internal links (daatan#2027)
+
+Forecast and tag pages are reachable through real server-rendered `<a href>` links, not only
+through the sitemap. `src/lib/services/crawl-links.ts` (every reader wrapped in
+`unstable_cache`) feeds:
+
+- `RelatedForecasts` — on a forecast page, other public forecasts sharing a tag
+- `LatestForecasts` — recent forecasts and top topics on home-v5
+- `/tags` — the tag index page (also in the sitemap)
+- `PaginationLinks` — prev/next links on paginated lists (renders nothing for one page)
+
+Links use the same visibility filter as `/forecasts` and `/tags/<slug>`, so each lands on a
+page that shows the target.
 
 ## Server-rendered content (Soft 404 prevention)
 

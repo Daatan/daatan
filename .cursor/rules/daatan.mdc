@@ -7,7 +7,7 @@ alwaysApply: true
 # DAATAN Project Rules
 
 ## Project Context
-DAATAN is a Next.js 14 App Router web app with Prisma ORM, NextAuth, Zod validation, and Vitest testing.
+DAATAN is a Next.js 16 App Router web app with Prisma ORM, NextAuth, Zod validation, and Vitest testing.
 Deployed via Docker. Uses Tailwind CSS, React Hook Form, and Lucide icons.
 
 ## Git Safety
@@ -32,7 +32,7 @@ Deployed via Docker. Uses Tailwind CSS, React Hook Form, and Lucide icons.
 - **AWS Secrets Manager** backs up secrets: `daatan-env-staging`, `daatan-env-prod`
 - On EC2 boot, Terraform user-data pulls from Secrets Manager → `~/app/.env`
 - `docker-compose.prod.yml` reads that `.env`; `blue-green-deploy.sh` sources it
-- **Adding a new env var:** add to `docker-compose.prod.yml` → SSH to server → edit `~/app/.env` → restart containers → sync to Secrets Manager
+- **Adding a new env var:** follow the "Adding a new secret" checklist in `docs/SECRETS.md` (update the bundle, then redeploy). Editing `~/app/.env` on the box is overwritten by the next deploy, and a restart alone does not apply a new value
 - **NEVER use `NEXT_PUBLIC_` for per-environment runtime config** — both staging and production share the same Docker image, so `NEXT_PUBLIC_` vars are baked at build time and identical. Use server-side env vars and pass from Server Components instead.
 - Secrets docs: `docs/SECRETS.md`
 
@@ -48,12 +48,12 @@ Deployed via Docker. Uses Tailwind CSS, React Hook Form, and Lucide icons.
 - **NextAuth Pattern:**
   - `src/auth.config.ts`: **Edge-Compatible.** Only providers + basic logic. No Prisma.
   - `src/auth.ts`: **Node.js-Specific.** Imports `auth.config.ts` and adds `PrismaAdapter`.
-  - `src/middleware.ts`: **MUST ONLY** import from `auth.config.ts`.
-- **Validation:** Never import `@prisma/client` or `src/lib/prisma.ts` into files used by middleware.
+  - `src/proxy.ts` (formerly `middleware.ts`): **MUST ONLY** import from `auth.config.ts`.
+- **Validation:** Never import `@prisma/client` or `src/lib/prisma.ts` into files used by the proxy.
 
 ## Gotchas
-- `export const dynamic = 'force-dynamic'` is **ignored** in Client Components — only works in Server Components
-- `useSearchParams()` requires a `<Suspense>` boundary (Next.js 14+)
+- Route segment configs (`export const dynamic`, `runtime`, `revalidate`) are build errors under Cache Components — don't add them anywhere
+- `useSearchParams()` requires a `<Suspense>` boundary
 - Add `transpilePackages: ['next-auth']` in `next.config.js` for Docker builds
-- Never run interactive commands; use SSH alias `daatan` for server access
+- Never run interactive commands; server access is AWS SSM only (port 22 is closed) — use `aws ssm send-command` / the `ssm-exec` skill
 - Deployment task isn't done until code is pushed — don't stop at "tests pass"

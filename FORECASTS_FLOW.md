@@ -63,7 +63,9 @@ Other express-flow behaviour:
 - **Author's direction kept (#1807).** Prompt rule 1b: a negative prediction stays a
   "will not" claim, and YES means the claim as written is true.
 - **Rules checks (#1813, #1803).** After the draft, the `rules-direction` check verifies a
-  binary forecast's rules resolve YES when the claim is true; inverted rules get a rewrite
+  binary forecast's rules (it runs in parallel with the author's localized preview since
+  #1890 C; if it rewrites the rules, only the rules are re-translated, falling back to
+  English on failure) resolve YES when the claim is true; inverted rules get a rewrite
   used only if a second check agrees, otherwise the review screen warns (bots skip). Prompt
   rule 9a stops rules from resolving on a weaker event (announcement, intent, partial step)
   than the claim; the `rules-strength` judge runs in **shadow** and only records its verdict

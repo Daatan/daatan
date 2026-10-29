@@ -33,7 +33,7 @@
 - Git commands need `GIT_PAGER=cat` to avoid hanging
 
 ## Lessons Learned
-- **Docker build gotchas** (`transpilePackages: ['next-auth']` is no longer needed and is not in `next.config.js`): ensure required environment variables like `NEXTAUTH_URL` and dummy secrets are provided during the build phase even if skipped locally. 
+- **Docker build gotchas**: ensure required environment variables like `NEXTAUTH_URL` and dummy secrets are provided during the build phase even if skipped locally. 
 - **Next.js App Router pitfalls**: route segment configs (`export const dynamic` etc.) are build errors under Cache Components. Client components combining `useSearchParams` need a `<Suspense>` boundary to prevent de-optimizing the entire route.
-- **Blue-green deployment**: Zero-downtime deployment is achieved by bringing up the new container alongside the old, updating the Nginx upstream path, and executing `nginx -s reload` without stopping Nginx, before taking down the old container.
+- **Blue-green deployment**: Zero-downtime deployment is achieved by bringing up the new container alongside the old, health-checking it and running migrations on it, then swapping the service's Docker network alias on the edge network so nginx (variable upstream + Docker DNS) resolves to the new container, before stopping the old one. See `scripts/blue-green-deploy.sh` header and `docs/DEPLOYMENT.md`.
 - **Prisma migration lessons**: Rollbacks require using `npx prisma migrate resolve --rolled-back <migration-name>` to correct the shadow database state before re-deploying a fixed migration.

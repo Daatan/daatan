@@ -468,7 +468,7 @@ export interface OracleProvenanceModels {
  *   computing still finished. Until daatan#1254 this budget was 12s against a server
  *   whose p99 is 25s, and 15.3% of news-indexer forecasts were recorded as failures at
  *   exactly 12,002ms — a real share of what looked like "the extractor produced
- *   nothing" was pure latency. Now 30s; expect this class to shrink sharply.
+ *   nothing" was pure latency. Now 40s (`FORECAST_TIMEOUT_MS`); expect this class to shrink sharply.
  * - `oracle_http` — retro answered non-OK. Worth retrying; a 4xx repeatedly is a bug.
  * - `oracle_unconfigured` — no Oracul URL/key here. Says nothing about the article.
  * - `oracle_placeholder` — retro returned its stub response.

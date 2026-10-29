@@ -1,5 +1,7 @@
 # Design Document: Deployment Process Improvements
 
+> **Archived spec (historical).** Implemented; root `DEPLOYMENT.md` was removed in #2039 — the current docs are `docs/DEPLOYMENT.md` and `docs/SECRETS.md`.
+
 ## Overview
 
 This design document outlines the technical approach for improving the DAATAN deployment process. The solution focuses on four key areas: enhanced local verification, reliable staging authentication, automated version management, and comprehensive deployment monitoring. The design leverages existing infrastructure (GitHub Actions, Docker, NextAuth) while adding new automation and verification layers.
