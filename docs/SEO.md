@@ -91,7 +91,9 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
 - Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity` — daily;
   `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`, `/accessibility`, `/contact` — monthly
 - `/he` and `/ru` versions of the localized static routes (`localeStaticRoutes`; `eo` is
-  deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`)
+  deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`). Not the legal
+  pages: `/he|ru/{privacy,terms,disclaimer}` render English and canonical to the EN page until
+  they're translated (#1934), so they get no locale entry or hreflang (daatan#2057).
 - Public forecasts (`/forecasts/[slug]`) with status `ACTIVE`, `PENDING`, `RESOLVED_CORRECT` or
   `RESOLVED_WRONG` that pass the quality bar below — hourly while open, monthly once resolved
   (`lastModified` = `resolvedAt` for resolved forecasts). `/he/…` and `/ru/…` variants are
@@ -323,7 +325,7 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 `src/proxy.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
 `daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets the matching
 `/home-v5` page **served in place** (`src/proxy.ts` rewrite, status 200, URL stays `/`; query string kept; the
-page's canonical is `/home-v5`). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives
+page's canonical is the root — see below). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives
 crawlers a 200. Crawlers have no cookie, so they get the same page as a first-time visitor — no
 user-agent sniffing, nothing cloaked. Not rewritten: signed-in users,
 self-hosted installs, and filtered feed links (`status`, `tags`, `sortBy`, `q`, `page`).
@@ -336,13 +338,12 @@ forecast feed as before. The feed itself stays indexable at `/forecasts`; the ro
 indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
 "Home" → `/home-v5` (hidden on self-host).
 
-Because the root now serves home-v5 (canonical `/home-v5`), the SEO signals that used to live on it live on `/home-v5`:
-the sitemap lists `/home-v5`, `/he/home-v5` and `/ru/home-v5` instead of `/`, `/he`, `/ru`
-(sitemap URLs list the canonical); the page emits the site-level `Organization` + `WebSite`
-(with a `SearchAction` to `/forecasts?q=`) JSON-LD; and its metadata sets `og:image` /
-`twitter:image` explicitly (setting `openGraph` replaces the inherited one). The root now serves the
-page itself; if `/` ever becomes the canonical (instead of `/home-v5`), switch `homeV5Metadata`'s
-canonical, move the sitemap entry back to `/` and make `/home-v5` canonical to it.
+**Canonical = the root (daatan#2057, 2026-10-29).** `homeV5Metadata` declares `/`, `/he`, `/ru` as
+canonical and hreflang, so the `/home-v5` paths fold onto the root, and the sitemap lists `/`, `/he`,
+`/ru`. Until then the canonical was `/home-v5`, and GSC split the homepage across two URLs
+(`/` 91 vs `/home-v5` 66 impressions per 28 days). The page emits the site-level `Organization` +
+`WebSite` JSON-LD (with a `SearchAction` to `/forecasts?q=`). Its metadata sets `og:image` /
+`twitter:image` explicitly, because setting `openGraph` replaces the inherited one.
 
 ## Weekly measurement loop (platform#13)
 
