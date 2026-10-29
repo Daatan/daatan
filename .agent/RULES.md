@@ -54,7 +54,6 @@ ALWAYS run these checks locally before pushing:
 - Prefer Server Components where possible.
 - Use App Router patterns.
 - Always wrap `useSearchParams()` in a `<Suspense>` boundary.
-- All database-connected pages must use `export const runtime = 'nodejs'`.
 
 ### Database & API
 - Always use Prisma for database operations.

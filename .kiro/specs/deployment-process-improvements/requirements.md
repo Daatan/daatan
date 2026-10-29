@@ -1,5 +1,7 @@
 # Requirements Document
 
+> **Archived spec (historical).** Implemented; root `DEPLOYMENT.md` was removed in #2039 — the current docs are `docs/DEPLOYMENT.md` and `docs/SECRETS.md`.
+
 ## Introduction
 
 This document outlines the requirements for improving the DAATAN deployment process to ensure higher quality releases, better testing practices, and more reliable deployments. The improvements focus on local verification before staging deployment, ensuring authentication functionality works in staging, implementing automatic version incrementation, and establishing deployment monitoring practices.

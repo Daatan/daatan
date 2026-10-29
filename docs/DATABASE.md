@@ -352,7 +352,7 @@ only in `OracleCallLog.failureReason`, which the retry sweep never reads.
 | reason | meaning |
 |---|---|
 | `oracle_abstain` | the Oracul RAN and declined (`insufficient_data`) — usually its gatekeeper rejecting every article |
-| `oracle_timeout` | no answer within daatan's client budget (30 s on the background paths since daatan#1254; 12 s before, against a server whose measured p99 is 25 s — that inversion recorded 15.3% of news-indexer forecasts as failures at exactly 12,002 ms). retro does **not** cancel, so a timeout here does not mean the forecast was never produced |
+| `oracle_timeout` | no answer within daatan's client budget (40 s on the background paths — 30 s from daatan#1254, then raised to 40 s; 12 s before that, against a server whose measured p99 is 25 s — that inversion recorded 15.3% of news-indexer forecasts as failures at exactly 12,002 ms). retro does **not** cancel, so a timeout here does not mean the forecast was never produced |
 | `oracle_network` | transport failure other than a timeout |
 | `oracle_http` | retro answered non-OK |
 | `oracle_unconfigured` | no Oracul URL/key on this deployment — says nothing about the article |

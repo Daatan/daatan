@@ -697,22 +697,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 ### Auth Page Architecture
 
-Auth pages use a Server/Client component split pattern for proper Next.js App Router compatibility:
+Auth pages use a Server/Client component split:
 
 ```
 src/app/auth/
 ├── signin/
-│   ├── page.tsx           # Server Component (export const dynamic)
+│   ├── page.tsx           # Server Component: wraps the client in <Suspense>
 │   └── SignInClient.tsx   # Client Component (useSearchParams, hooks)
 └── error/
-    ├── page.tsx           # Server Component (export const dynamic)
+    ├── page.tsx           # Server Component: wraps the client in <Suspense>
     └── AuthErrorClient.tsx # Client Component (useSearchParams)
 ```
 
 **Why this pattern?**
-- `export const dynamic = 'force-dynamic'` only works in Server Components
-- `useSearchParams()` requires `'use client'` directive
-- Combining both in one file causes the dynamic export to be ignored
+- `useSearchParams()` requires `'use client'` and a `<Suspense>` boundary; without one it
+  de-optimizes the whole route
+- The `page.tsx` carries no segment config (`export const dynamic` etc.) — under Cache
+  Components that is a build error
 
 Auth pages are rendered without the sidebar: `Sidebar` returns `null` on `/auth/*` routes, and `MainContent` removes the `lg:ml-64 mt-16` offset so auth pages fill the full viewport.
 

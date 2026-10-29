@@ -1,8 +1,8 @@
 {
     "projectName": "DAaTAn",
-    "projectDescription": "Reputation-based news prediction platform built with Next.js 14, TypeScript, PostgreSQL, and deployed on AWS",
+    "projectDescription": "Reputation-based news prediction platform built with Next.js 16, TypeScript, PostgreSQL, and deployed on AWS",
     "primaryLanguage": "TypeScript",
-    "framework": "Next.js 14 (App Router)",
+    "framework": "Next.js 16 (App Router)",
     "testFramework": "Vitest",
     "lintCommand": "npm run lint",
     "testCommand": "npm test",

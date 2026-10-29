@@ -400,7 +400,7 @@ move slowly (only on resolution events), so this avoids the full multi-query agg
 With `tag`, `eloRating` is `null` for users with no resolved forecast in that tag (they sort last); without `tag` it is always a number. The leaderboard page only uses `elo`, `accuracy` and `brierScore`; the other sorts remain available here.
 
 ### `GET /api/leaderboard/sources`
-Author/outlet shadow-scoring leaderboard. Public. Rate-limited to 60 requests/hour per IP; cached 5 min per `(view, sortBy)`. `?view=authors|outlets` (default `authors`), `?sortBy=skillConservative|brierScore` (default `skillConservative`). Rows with fewer than 4 predictions are left out (daatan#1587; lowered from 5 on 2026-10-11).
+Author/outlet shadow-scoring leaderboard. Public. Rate-limited to 60 requests/hour per IP; cached 5 min per `(view, sortBy, tag)`. `?view=authors|outlets` (default `authors`), `?sortBy=skillConservative|brierScore` (default `skillConservative`), `?tag=<slug>` (optional, truncated to 80 chars) scores only that topic's resolutions (daatan#1917). Author rows carry `isDesk: true` when the byline names a newsroom or agency rather than a person — kept on the board with a desk badge (daatan#1904 item 3). Rows with fewer than 4 predictions are left out (daatan#1587; lowered from 5 on 2026-10-11).
 
 ### `GET /api/top-reputation`
 Top users by reputation for sidebar widget. Public. Rate-limited to 60 requests/hour per IP.
@@ -489,6 +489,9 @@ List the forecast's evidence pool (`evidence_pool_articles`) — every article `
 
 ### `PATCH /api/admin/forecasts/[id]/evidence-pool/[articleId]`
 Toggle one pooled article's `excluded` flag. **Body** `{ excluded: boolean }`. `404` if the article doesn't belong to this forecast. Excluded rows are dropped from the pool aggregate on every path, so the toggle genuinely moves the estimate.
+
+### `PATCH /api/admin/forecasts/[id]/evidence-pool/[articleId]/dispute`
+Set the public dispute state of the URL behind one pooled article (elections#225). **Body** `{ status: "disputed" | "upheld" | "hidden", note?: string | null }` (`note` ≤1000 chars, internal, never rendered). Applies per URL across every forecast's pool (`setUrlDispute`), not per row. `disputed` shows a public badge and is excluded from scoring but stays in the live consensus; `hidden` also excludes every current row for the URL. `404` if the article isn't in this forecast's pool. See `docs/DATABASE.md` "Public disputes".
 
 ### `POST /api/admin/evidence-pool/retry` — Admin or `x-cron-secret`
 Drain stuck evidence-pool rows (FAILED except the terminal reasons `oracle_omitted`/`oracle_null_final`, abandoned PENDING claims ≥24h old) by re-driving them through extraction, biggest ACTIVE-forecast backlogs first. A row that comes back null twice in a row is finalized (`oracle_null_final`) — the sweep stops asking, though an organic re-push with changed content can still revive it. Both strikes must be **attributable**: only `oracle_abstain`/`oracle_no_articles` count, i.e. the Oracul actually ran and declined. A timeout, network or HTTP failure retires nothing — one call carries up to 15 rows, so a single client-side failure used to stamp the whole batch terminal on no information at all (daatan#1253). See [DATABASE.md](./DATABASE.md). `?limit=N` predictions per call (default 3, max 10 — each is one full Oracul analysis). Returns per-status tallies (incl. `finalized`) plus `remaining`; re-call until it stops shrinking. Driven headlessly by the `Retry Pool Extractions` workflow — scheduled weekly (Mondays 06:30 UTC, against production) plus manual dispatch.
