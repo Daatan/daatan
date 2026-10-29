@@ -47,15 +47,16 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
 
   if (!user.isPublic) {
     return {
-      title: `${user.name} - DAATAN Profile`,
+      title: `${user.name} — Profile`,
       robots: { index: false, follow: false },
     }
   }
 
   const hasContent = user._count.predictions > 0 || user._count.commitments > 0
+  // Bare: the root layout's `%s | DAATAN` template adds the brand (#2059).
   const title = user.username
-    ? `${user.name} (@${user.username}) - DAATAN Profile`
-    : `${user.name} - DAATAN Profile`
+    ? `${user.name} (@${user.username}) — Forecast Track Record`
+    : `${user.name} — Forecast Track Record`
   const description = `Check out ${user.name}'s prediction track record on DAATAN.`
   const url = profileUrl(user)
 
@@ -64,12 +65,12 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
     description,
     alternates: { canonical: url },
     openGraph: {
-      title,
+      title: `${title} | DAATAN`,
       description,
       type: 'profile',
       url,
     },
-    twitter: { card: 'summary_large_image', title, description },
+    twitter: { card: 'summary_large_image', title: `${title} | DAATAN`, description },
     ...(!hasContent ? { robots: { index: false, follow: true } } : {}),
   }
 }

@@ -24,7 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const total = await getVisibleTagPredictionCount(tag.id)
-  const title = `${tag.name} forecasts | Daatan`
+  // Bare: the root layout's `%s | DAATAN` template adds the brand (it was doubled, #2059).
+  const title = `${tag.name} forecasts`
   const description = total > 0
     ? `Browse ${total} community forecast${total === 1 ? '' : 's'} tagged "${tag.name}" on Daatan.`
     : `Forecasts tagged "${tag.name}" on Daatan.`
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // state, not a dead tag, so keep the URL alive but don't index it yet.
     ...(total === 0 ? { robots: { index: false, follow: false } } : {}),
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website' },
+    openGraph: { title: `${title} | DAATAN`, description, url, type: 'website' },
   }
 }
 

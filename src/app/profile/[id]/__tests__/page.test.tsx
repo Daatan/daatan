@@ -94,7 +94,7 @@ describe('profile/[id] page generateMetadata', () => {
     const metadata = await generateMetadata({ params, searchParams: Promise.resolve({}) })
 
     expect(metadata.alternates?.canonical).toMatch(/\/profile\/alice$/)
-    expect(metadata.title).toBe('Alice (@alice) - DAATAN Profile')
+    expect(metadata.title).toBe('Alice (@alice) — Forecast Track Record')
   })
 
   it('canonicalizes a usernameless profile to its id, not /profile/null (#2052)', async () => {
@@ -113,7 +113,7 @@ describe('profile/[id] page generateMetadata', () => {
 
     expect(metadata.alternates?.canonical).toMatch(/\/profile\/cmt9ytmot030x01l3qomow7nh$/)
     expect((metadata.openGraph as { url?: string }).url).toBe(metadata.alternates?.canonical)
-    expect(metadata.title).toBe('Yoel - DAATAN Profile')
+    expect(metadata.title).toBe('Yoel — Forecast Track Record')
   })
 
   it('noindexes an unknown user', async () => {
