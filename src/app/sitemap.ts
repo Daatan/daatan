@@ -131,17 +131,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1. Static routes (English)
   // Routes tagged with localized:true have /he and /ru counterparts in the sitemap.
   const staticRouteDefs = [
-    // The root serves home-v5 in place for first-time visitors and crawlers (src/lib/first-visit.ts); its canonical is /home-v5, so list that.
-    { route: '/home-v5', lastModified: new Date('2026-10-13'), frequency: 'weekly'  as const, priority: 1.0, localized: true  },
+    // The root serves home-v5 in place for first-time visitors and crawlers (src/lib/first-visit.ts);
+    // home-v5 canonicalizes to the root (daatan#2057), so the root ('' = no trailing slash) is listed.
+    { route: '', lastModified: new Date('2026-10-13'), frequency: 'weekly'  as const, priority: 1.0, localized: true  },
     { route: '/forecasts',lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: true  },
     { route: '/about',    lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.8, localized: true  },
     { route: '/methodology', lastModified: new Date('2026-07-05'), frequency: 'monthly' as const, priority: 0.6, localized: true  },
     { route: '/leaderboard', lastModified: new Date(),           frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/activity', lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/tags',     lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.6, localized: false },
-    { route: '/privacy',     lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
-    { route: '/terms',       lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
-    { route: '/disclaimer',  lastModified: new Date('2026-06-12'), frequency: 'monthly' as const, priority: 0.3, localized: true  },
+    // Legal pages render English under /he and /ru and canonical to the EN page until they are
+    // translated (legal review, #1934), so no locale entries or hreflang (daatan#2057).
+    { route: '/privacy',     lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: false },
+    { route: '/terms',       lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: false },
+    { route: '/disclaimer',  lastModified: new Date('2026-06-12'), frequency: 'monthly' as const, priority: 0.3, localized: false },
     { route: '/accessibility', lastModified: new Date('2026-07-06'), frequency: 'monthly' as const, priority: 0.3, localized: false },
     { route: '/contact',     lastModified: new Date('2026-08-08'), frequency: 'monthly' as const, priority: 0.3, localized: false },
   ]
@@ -157,11 +160,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 2. Locale static routes (he + ru only — eo excluded)
   const localeStaticRoutes: MetadataRoute.Sitemap = SITEMAP_LOCALES.flatMap((locale) => [
     {
-      url: `${BASE_URL}/${locale}/home-v5`,
+      url: `${BASE_URL}/${locale}`,
       lastModified: new Date('2026-10-13'),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
-      alternates: { languages: localizedAlternates('/home-v5') },
+      alternates: { languages: localizedAlternates('') },
     },
     {
       url: `${BASE_URL}/${locale}/forecasts`,
@@ -183,27 +186,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly' as const,
       priority: 0.6,
       alternates: { languages: localizedAlternates('/methodology') },
-    },
-    {
-      url: `${BASE_URL}/${locale}/privacy`,
-      lastModified: new Date('2026-03-26'),
-      changeFrequency: 'monthly' as const,
-      priority: 0.3,
-      alternates: { languages: localizedAlternates('/privacy') },
-    },
-    {
-      url: `${BASE_URL}/${locale}/terms`,
-      lastModified: new Date('2026-03-26'),
-      changeFrequency: 'monthly' as const,
-      priority: 0.3,
-      alternates: { languages: localizedAlternates('/terms') },
-    },
-    {
-      url: `${BASE_URL}/${locale}/disclaimer`,
-      lastModified: new Date('2026-06-12'),
-      changeFrequency: 'monthly' as const,
-      priority: 0.3,
-      alternates: { languages: localizedAlternates('/disclaimer') },
     },
   ])
 

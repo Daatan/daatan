@@ -10,16 +10,16 @@ import { buildSiteJsonLd } from '../seo'
 
 describe('home-v5 metadata', () => {
   it.each([
-    ['en', 'https://daatan.com/home-v5'],
-    ['he', 'https://daatan.com/he/home-v5'],
-    ['ru', 'https://daatan.com/ru/home-v5'],
-  ])('has a self canonical and share image for %s', async (locale, canonical) => {
+    ['en', 'https://daatan.com'],
+    ['he', 'https://daatan.com/he'],
+    ['ru', 'https://daatan.com/ru'],
+  ])('canonicalizes to the site root and has a share image for %s', async (locale, canonical) => {
     const m = await homeV5Metadata(locale)
     expect(m.alternates?.canonical).toBe(canonical)
     expect(m.alternates?.languages).toMatchObject({
-      'x-default': 'https://daatan.com/home-v5',
-      he: 'https://daatan.com/he/home-v5',
-      ru: 'https://daatan.com/ru/home-v5',
+      'x-default': 'https://daatan.com',
+      he: 'https://daatan.com/he',
+      ru: 'https://daatan.com/ru',
     })
     expect(m.openGraph?.images).toEqual([expect.objectContaining({ url: 'https://daatan.com/opengraph-image' })])
     expect(m.twitter?.images).toEqual(['https://daatan.com/opengraph-image'])
