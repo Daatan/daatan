@@ -48,7 +48,7 @@ Deployed via Docker. Uses Tailwind CSS, React Hook Form, and Lucide icons.
 - **NextAuth Pattern:**
   - `src/auth.config.ts`: **Edge-Compatible.** Only providers + basic logic. No Prisma.
   - `src/auth.ts`: **Node.js-Specific.** Imports `auth.config.ts` and adds `PrismaAdapter`.
-  - `src/proxy.ts` (formerly `middleware.ts`): **MUST ONLY** import from `auth.config.ts`.
+  - `src/proxy.ts` (formerly `middleware.ts`): takes its auth config **only** from `auth.config.ts` — never `auth.ts`. Any other import (e.g. `src/lib/first-visit.ts`) must be Edge-safe: no Prisma, no Node-only modules.
 - **Validation:** Never import `@prisma/client` or `src/lib/prisma.ts` into files used by the proxy.
 
 ## Gotchas
