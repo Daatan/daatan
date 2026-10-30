@@ -30,6 +30,7 @@ on:
   workflow_dispatch:
 
 env:
+  HEALTH_URL: https://scrapper.daatan.com/health   # cheap liveness probe
   STATS_URL: https://scrapper.daatan.com/stats
   DLQ_URL: https://scrapper.daatan.com/dlq   # what is stuck and why; /stats only counts
   DISK_ALERT_PCT: '80'     # absolute disk-usage alert threshold
@@ -62,21 +63,35 @@ jobs:
         run: |
           set -uo pipefail
 
-          # --- fetch /stats; an unreachable indexer is itself an alert ---
+          # --- liveness: an unreachable indexer is itself an alert ---
           # news-indexer's systemd restart (Restart=always, no zero-downtime swap) briefly
           # refuses connections on every deploy — several a day during active dev. --max-time
           # is a per-attempt cap (curl resets it on each retry), so a short per-attempt timeout
           # plus a couple retries rides out that restart window instead of declaring the whole
           # indexer down over one unlucky poll. --retry-all-errors covers connection-refused,
-          # not just the default 5xx/timeout set.
-          if ! curl -sf --max-time 12 --retry 2 --retry-delay 3 --retry-all-errors "$STATS_URL" -o /tmp/stats.json; then
+          # not just the default 5xx/timeout set. Liveness is probed on /health, not /stats:
+          # /stats does real work (a cold rebuild took ~38s on 2026-10-30), and probing it
+          # with a 12s cap posted false "indexer may be down" alerts (daatan#2062).
+          unreachable() {
             echo "alert=true" >> "$GITHUB_OUTPUT"
-            printf 'news-indexer /stats is unreachable — the indexer may be down.' | base64 -w0 > /tmp/p.b64
+            printf '%s' "$1" | base64 -w0 > /tmp/p.b64
             echo "problems_b64=$(cat /tmp/p.b64)" >> "$GITHUB_OUTPUT"
             # still emit a digest line so the daily run isn't blank
-            printf '📊 <b>news-indexer health</b>%%0A🚨 /stats unreachable' | base64 -w0 > /tmp/d.b64
+            printf '📊 <b>news-indexer health</b>%%0A🚨 %s' "$2" | base64 -w0 > /tmp/d.b64
             echo "digest_b64=$(cat /tmp/d.b64)" >> "$GITHUB_OUTPUT"
+          }
+          if ! curl -sf --max-time 12 --retry 2 --retry-delay 3 --retry-all-errors "$HEALTH_URL" -o /dev/null; then
+            unreachable 'news-indexer /health is unreachable — the indexer may be down.' '/health unreachable'
             # preserve prior state (don't overwrite with garbage)
+            exit 0
+          fi
+
+          # --- fetch /stats for the content checks ---
+          # The indexer is up (above); /stats serves a cached payload but rebuilds when it is
+          # more than ~10 min old, which is always the case 2h after the last run — so give
+          # that rebuild room. One retry covers a deploy restart landing between the probes.
+          if ! curl -sf --max-time 90 --retry 1 --retry-delay 5 --retry-all-errors "$STATS_URL" -o /tmp/stats.json; then
+            unreachable 'news-indexer is up (/health OK) but /stats failed or took over 90s — health checks could not run.' '/stats failed (indexer up)'
             exit 0
           fi
 
