@@ -39,7 +39,7 @@ jobs:
           aws-region: eu-central-1
 
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Trigger backup via SSM
         id: backup
