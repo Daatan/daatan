@@ -53,7 +53,7 @@
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.71.1",
     "react-hot-toast": "^2.6.0",
-    "react-markdown": "^9.1.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "resend": "^6.9.3",
     "rss-parser": "^3.13.0",
