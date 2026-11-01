@@ -131,12 +131,12 @@
   <!-- ============ CREATE ============ -->
   <section class="lane create">
     <h2><span class="num">1</span> Create — make a forecast</h2>
-    <div class="tag">Express/link → 5-step draft → <b>review</b> (edit · regenerate · re-estimate) → publish &nbsp;·&nbsp; Manual → wizard → publish</div>
+    <div class="tag">Express/link → 5-step draft → <b>review</b> (edit · regenerate · re-estimate) → publish &nbsp;·&nbsp; AI off → wizard → publish</div>
     <div class="flow">
 
       <div class="node api" title="ExpressForecastClient → POST /api/forecasts/express/generate (SSE)">
-        <div class="row"><span class="kind">entry</span><span class="ttl">💬 Express · 🔗 Link · 📝 Manual</span></div>
-        <div class="desc">Express &amp; link drafts run through <code>/express/generate</code> (SSE). Manual entry skips drafting → straight to the wizard.</div>
+        <div class="row"><span class="kind">entry</span><span class="ttl">💬 Express · 🔗 Link</span></div>
+        <div class="desc">Express &amp; link drafts run through <code>/express/generate</code> (SSE). With AI off (self-host), drafting is skipped → straight to the wizard.</div>
       </div>
 
       <div class="conn arrow"><span class="lab">express draft · 5 user-visible steps</span></div>
@@ -190,7 +190,7 @@
 
       <div class="node api" title="ExpressForecastClient review step — edit / regenerate / publish, all inline (no wizard)">
         <div class="row"><span class="kind">review</span><span class="ttl">🔍 Review &amp; edit <span style="font-weight:600;color:var(--mut)">· express</span></span></div>
-        <div class="desc">The draft is shown for review. You can tweak it three ways before publishing — it does <em>not</em> go through the manual wizard.</div>
+        <div class="desc">The draft is shown for review. You can tweak it three ways before publishing — it does <em>not</em> go through the wizard.</div>
       </div>
 
       <div class="forklabel">— review actions (loop until happy) —</div>
@@ -213,25 +213,25 @@
 
       <div class="conn arrow"><span class="lab">Publish (express) / Submit (wizard) →</span></div>
 
-      <div class="node api" title="POST /api/forecasts · src/app/api/forecasts/route.ts — shared by both express publish and the manual wizard">
+      <div class="node api" title="POST /api/forecasts · src/app/api/forecasts/route.ts — shared by express publish and the wizard">
         <div class="row"><span class="kind">persist</span><span class="ttl">POST /api/forecasts</span></div>
-        <div class="desc">The only DB-writing step — the convergence point for <b>both</b> express-publish and the manual wizard.</div>
+        <div class="desc">The only DB-writing step — the convergence point for <b>both</b> express-publish and the wizard.</div>
       </div>
 
       <div class="branch">
         <div class="spur"></div>
-        <div class="node bgn" style="flex:1" title="ForecastWizard.tsx — the Manual create mode">
-          <div class="row"><span class="kind">manual path</span><span class="ttl">🧙 Wizard (4 steps)</span></div>
-          <div class="desc">The <b>Manual</b> mode skips express drafting entirely — News anchor → Prediction → Outcome → Publish — and submits to this same endpoint.</div>
+        <div class="node bgn" style="flex:1" title="ForecastWizard.tsx — the AI-off create path">
+          <div class="row"><span class="kind">AI-off path</span><span class="ttl">🧙 Wizard (4 steps)</span></div>
+          <div class="desc">When AI features are off (self-host default) the wizard is the only create path — News anchor → Prediction → Outcome → Publish — and submits to this same endpoint. The separate Manual mode was removed (daatan#2067).</div>
           <div class="ref mono">ForecastWizard.tsx</div>
         </div>
       </div>
 
       <div class="conn arrow"></div>
 
-      <div class="node mod" title="checkContent() — runs again on save (and is the only moderation for the manual path)">
+      <div class="node mod" title="checkContent() — runs again on save (and is the only moderation for the AI-off wizard path)">
         <div class="row"><span class="kind">censor</span><span class="ttl">Moderation — again</span></div>
-        <div class="desc">Re-checks on persist (also the <em>only</em> moderation for the manual wizard path).</div>
+        <div class="desc">Re-checks on persist (also the <em>only</em> moderation for the AI-off wizard path).</div>
       </div>
 
       <div class="conn arrow"></div>
@@ -325,7 +325,7 @@
 </div>
 
 <div class="insights">
-  <div class="card"><h3>🟥 Moderation runs twice</h3><p>Once when the express draft is generated, and <span class="em">again</span> on persist. The manual path skips the draft, so its only moderation is on <code>POST /api/forecasts</code>.</p></div>
+  <div class="card"><h3>🟥 Moderation runs twice</h3><p>Once when the express draft is generated, and <span class="em">again</span> on persist. The AI-off wizard path skips the draft, so its only moderation is on <code>POST /api/forecasts</code>.</p></div>
   <div class="card"><h3>🟪 The "math" is in Analyze</h3><p>The draft's first probability is just an <span class="em">LLM suggestion</span>. "Guess chances" in review re-estimates via the Oracle, but the full calibrated, credibility-weighted estimate (mean/std/CI + per-source) comes from the Oracle's <code>/forecast</code> — the Analyze flow.</p></div>
   <div class="card"><h3>↺ Two kinds of "redo" in review</h3><p><span class="em">Regenerate</span> re-runs the whole 5-step draft (new search + new LLM draft) from your edited claim. <span class="em">Guess chances</span> only re-scores the probability on the articles already found — much cheaper, no new search.</p></div>
   <div class="card"><h3>▦ Translate &amp; embed are background</h3><p>They're <span class="em">fire-and-forget</span> jobs fired after the row is saved — the response returns before they finish. They are not an inline stage between censorship and search.</p></div>
