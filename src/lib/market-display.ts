@@ -32,6 +32,15 @@ export function marketLineName(
   return outcomeLabel ? `"${outcomeLabel}" (${qualifier})` : qualifier
 }
 
+/**
+ * daatan#2069: a linked market is almost never the exact same question as the
+ * forecast — said on hover over the market's legend entry and under the chart.
+ */
+export function marketNotIdenticalHint(question: string | undefined): string {
+  const asks = question ? `The market asks: “${question}”. ` : ''
+  return `${asks}It is a related market, not the same question as this forecast — its wording, deadline or resolution rules may differ, so its price is shown for comparison only.`
+}
+
 /** One-line explanation of an inverted link, used as a hover hint. */
 export const INVERTED_HINT =
   'This market asks the opposite question, so its price is shown as 100 − market price to match this forecast’s claim.'

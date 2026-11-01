@@ -15,9 +15,6 @@ import {
   ChevronLeft,
   Check,
   Loader2,
-  TrendingUp,
-  ExternalLink,
-  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
@@ -26,6 +23,7 @@ import { StepPrediction } from './steps/StepPrediction'
 import { StepOutcome } from './steps/StepOutcome'
 import { StepPublish } from './steps/StepPublish'
 import { SubmitProgress } from './SubmitProgress'
+import { MarketSuggestionCard, type MarketMatch } from './MarketSuggestionCard'
 import { getEstimate, recordDuration } from '@/lib/forecast-timing'
 
 export type PredictionFormData = {
@@ -56,17 +54,6 @@ export type PredictionFormData = {
 
   // Set when the forecast was imported from a Polymarket/Kalshi URL (links the market on create)
   externalMarketId?: string
-}
-
-/** A "same question" market surfaced after the claim step (see /api/forecasts/suggest-market). */
-type MarketMatch = {
-  externalMarketId: string
-  provider: 'POLYMARKET' | 'KALSHI'
-  providerLabel: string
-  question: string
-  yesProbability: number
-  url: string
-  score: number
 }
 
 const STEPS = [
@@ -423,50 +410,11 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
 
       {/* "Same question" market match — offered after the claim step */}
       {marketMatch && !matchDismissed && !formData.externalMarketId && (
-        <div className="mb-6 p-4 rounded-xl border border-pink-500/40 bg-pink-500/5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400 mb-1">
-                <TrendingUp className="w-4 h-4" />
-                {t('marketMatch', { provider: marketMatch.providerLabel, score: marketMatch.score })}
-              </div>
-              <a
-                href={marketMatch.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-text-secondary hover:text-pink-300 inline-flex items-center gap-1"
-              >
-                <span className="truncate">{marketMatch.question}</span>
-                <ExternalLink className="w-3 h-3 shrink-0" />
-              </a>
-              <p className="mt-0.5 text-xs text-gray-500">{t('marketYes', { pct: marketMatch.yesProbability })}</p>
-            </div>
-            <button
-              onClick={() => setMatchDismissed(true)}
-              className="text-gray-400 hover:text-gray-200 shrink-0"
-              aria-label={t('dismiss')}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => {
-                updateFormData({ externalMarketId: marketMatch.externalMarketId })
-                setMarketMatch(null)
-              }}
-              className="px-3 py-1.5 text-sm font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded-lg"
-            >
-              {t('linkMarket')}
-            </button>
-            <button
-              onClick={() => setMatchDismissed(true)}
-              className="px-3 py-1.5 text-sm text-gray-300 hover:text-white"
-            >
-              {t('keepSeparate')}
-            </button>
-          </div>
-        </div>
+        <MarketSuggestionCard
+          match={marketMatch}
+          onLink={() => updateFormData({ externalMarketId: marketMatch.externalMarketId })}
+          onDismiss={() => setMatchDismissed(true)}
+        />
       )}
 
       {/* Linked-market confirmation */}
