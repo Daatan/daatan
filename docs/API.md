@@ -86,9 +86,13 @@ Resolve a prediction. Processes all commitments, distributes rewards, updates ba
   "outcome": "correct" | "wrong" | "void" | "unresolvable",
   "evidenceLinks": ["https://..."],
   "resolutionNote": "string",
-  "correctOptionId": "cuid"  // required for MULTIPLE_CHOICE
+  "correctOptionId": "cuid",  // required for MULTIPLE_CHOICE
+  "resolutionOverrodePin": true,         // required when the outcome contradicts the Oracul pin / extreme confidence (daatan#1234)
+  "earlyResolutionAcknowledged": true    // required for "wrong"/"unresolvable" before the deadline (daatan#2076)
 }
 ```
+
+**400** when a required acknowledgment is missing. The pre-deadline gate uses `claimDeadline`, falling back to `resolveByDatetime` (`detectEarlyResolution`, `src/lib/utils/early-resolution.ts`). `correct` and `void` are never gated.
 
 **Response** — the updated `Prediction` row, plus `timings` (daatan#1139): how long the transaction's two phases took — `scoringMs` (per-commitment Brier/RS/Glicko-2) and `updatingMs` (ELO + per-tag rating write-back). `ResolutionForm.tsx`'s "Scoring commitments…" / "Updating ratings…" step labels use these to self-calibrate their client-side timer (`@/lib/forecast-timing`, same EWMA pattern as forecast creation), the same way `POST /api/forecasts/[id]/research`'s `timings` already calibrates its own step labels.
 
@@ -218,6 +222,7 @@ AI-assisted resolution research for resolvers. Searches for recent articles abou
   "reasoning": "string",         // LLM explanation for the suggested outcome
   "evidenceLinks": ["https://..."],  // URLs found that support the resolution
   "correctOptionId": "opt_cuid", // only set for MULTIPLE_CHOICE predictions
+  "premature": true,             // daatan#2076: deadline not passed, claim neither confirmed nor impossible yet; outcome is then forced to "unresolvable" and the form shows a "too early" banner instead of prefilling
   "timings": { "searchMs": 8200, "llmMs": 9400, "totalMs": 17600 }
 }
 ```

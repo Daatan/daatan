@@ -486,3 +486,51 @@ describe('resolvePrediction — pin-acknowledgment gate', () => {
   })
 })
 
+
+/**
+ * daatan#2076 — "The Winds of Winter by Dec 31 2026" was resolved WRONG on
+ * 2026-11-01. Early 'wrong'/'unresolvable' now needs explicit acknowledgment;
+ * early 'correct'/'void' don't.
+ */
+describe('resolvePrediction — pre-deadline gate', () => {
+  const future = new Date(Date.now() + 60 * 86_400_000)
+  const past = new Date(Date.now() - 86_400_000)
+
+  it.each(['wrong', 'unresolvable'] as const)('rejects an unacknowledged early %s', async (outcome) => {
+    findUnique.mockResolvedValue(prediction({ claimDeadline: future, resolveByDatetime: future }) as never)
+
+    await expect(
+      resolvePrediction('p1', { outcome, resolvedById: 'admin' }),
+    ).rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('has not passed') })
+    expect(transaction).not.toHaveBeenCalled()
+  })
+
+  it('proceeds with an early wrong when acknowledged', async () => {
+    findUnique.mockResolvedValue(prediction({ claimDeadline: future, resolveByDatetime: future }) as never)
+
+    await resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin', earlyResolutionAcknowledged: true })
+    expect(transaction).toHaveBeenCalled()
+  })
+
+  it.each(['correct', 'void'] as const)('lets an early %s through without acknowledgment', async (outcome) => {
+    findUnique.mockResolvedValue(prediction({ claimDeadline: future, resolveByDatetime: future }) as never)
+
+    await resolvePrediction('p1', { outcome, resolvedById: 'admin' })
+    expect(transaction).toHaveBeenCalled()
+  })
+
+  it('uses claimDeadline over resolveByDatetime: a passed claim deadline is not early', async () => {
+    findUnique.mockResolvedValue(prediction({ claimDeadline: past, resolveByDatetime: future }) as never)
+
+    await resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin' })
+    expect(transaction).toHaveBeenCalled()
+  })
+
+  it('falls back to resolveByDatetime when claimDeadline is null', async () => {
+    findUnique.mockResolvedValue(prediction({ claimDeadline: null, resolveByDatetime: future }) as never)
+
+    await expect(
+      resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin' }),
+    ).rejects.toMatchObject({ statusCode: 400 })
+  })
+})

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2, ShieldAlert } from 'lucide-react'
+import { CheckCircle, XCircle, Ban, HelpCircle, Sparkles, Loader2, ShieldAlert, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { getEstimate, recordDuration } from '@/lib/forecast-timing'
 import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
+import { detectEarlyResolution, effectiveDeadline } from '@/lib/utils/early-resolution'
 
 const RESEARCH_TIMING_KEY = 'daatan:research-timings'
 const RESEARCH_TIMING_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -35,16 +36,20 @@ interface ResolutionFormProps {
   options: Array<{ id: string; text: string }>
   settled?: boolean
   confidence?: number | null
+  claimDeadline?: string | Date | null
+  resolveByDatetime?: string | Date | null
   onResolved?: () => void
 }
 
-export function ResolutionForm({ predictionId, outcomeType, options, settled, confidence, onResolved }: ResolutionFormProps) {
+export function ResolutionForm({ predictionId, outcomeType, options, settled, confidence, claimDeadline, resolveByDatetime, onResolved }: ResolutionFormProps) {
   const { aiResearch } = useCapabilities()
   const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable' | null>(null)
   const [correctOptionId, setCorrectOptionId] = useState<string>('')
   const [evidenceLinks, setEvidenceLinks] = useState<string>('')
   const [resolutionNote, setResolutionNote] = useState('')
   const [pinAcknowledged, setPinAcknowledged] = useState(false)
+  const [earlyAcknowledged, setEarlyAcknowledged] = useState(false)
+  const [prematureNote, setPrematureNote] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
   const [researchStep, setResearchStep] = useState<'searching' | 'analyzing' | null>(null)
@@ -58,6 +63,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
   const selectOutcome = (next: typeof outcome) => {
     setOutcome(next)
     setPinAcknowledged(false)
+    setEarlyAcknowledged(false)
     // daatan#1479: an AI note must not survive a human flip to a different
     // outcome — clear it unless the human already edited it.
     const ai = aiPrefill.current
@@ -70,11 +76,17 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
     ? detectPinContradiction(settled, confidence, outcomeType, outcome)
     : { contradicts: false, impliedOutcome: null, isSettled: false }
 
+  const early = outcome
+    ? detectEarlyResolution(outcome, claimDeadline, resolveByDatetime)
+    : { isEarly: false }
+  const deadlineLabel = effectiveDeadline(claimDeadline, resolveByDatetime)?.toISOString().split('T')[0]
+
   const handleAiResearch = async () => {
     const timings = loadResearchTimings()
     setIsResearching(true)
     setResearchStep('searching')
     setError(null)
+    setPrematureNote(null)
 
     researchTimers.current = [
       setTimeout(() => setResearchStep('analyzing'), timings.searchMs),
@@ -93,8 +105,15 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       if (data.timings) {
         saveResearchTimings({ searchMs: data.timings.searchMs, llmMs: data.timings.llmMs })
       }
-      setOutcome(data.outcome)
       setEvidenceLinks((data.evidenceLinks ?? []).join('\n'))
+      // daatan#2076: a premature verdict is advice, not an outcome — don't
+      // preselect anything the resolver could confirm by reflex.
+      if (data.premature) {
+        setPrematureNote(data.reasoning)
+        return
+      }
+      setOutcome(data.outcome)
+      setEarlyAcknowledged(false)
       setResolutionNote(data.reasoning)
       aiPrefill.current = { outcome: data.outcome, note: data.reasoning }
       if (data.correctOptionId) {
@@ -121,6 +140,11 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
 
     if (pinContradiction.contradicts && !pinAcknowledged) {
       setError('Please acknowledge the Oracul disagreement before confirming')
+      return
+    }
+
+    if (early.isEarly && !earlyAcknowledged) {
+      setError('Please acknowledge that the deadline has not passed before confirming')
       return
     }
 
@@ -154,6 +178,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
           resolutionNote: resolutionNote.trim() || undefined,
           correctOptionId: isMultipleChoice ? correctOptionId : undefined,
           resolutionOverrodePin: pinContradiction.contradicts ? pinAcknowledged : undefined,
+          earlyResolutionAcknowledged: early.isEarly ? earlyAcknowledged : undefined,
         }),
       })
 
@@ -215,6 +240,16 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
         </Button>
         )}
       </div>
+
+      {prematureNote && (
+        <div className="p-4 border border-cobalt/30 rounded-xl bg-navy-800 space-y-2" data-testid="premature-banner">
+          <div className="flex items-center gap-2 text-sm font-medium text-cobalt-light">
+            <Clock className="w-4 h-4 shrink-0" />
+            Too early to resolve{deadlineLabel ? ` — deadline is ${deadlineLabel}` : ''}
+          </div>
+          <p className="text-sm text-text-secondary">{prematureNote}</p>
+        </div>
+      )}
 
       {/* Outcome Selection */}
       <div className="space-y-3">
@@ -362,6 +397,29 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
         </div>
       )}
 
+      {/* Pre-deadline gate (daatan#2076): 'wrong'/'unresolvable' before the
+          claim's deadline — "hasn't happened yet" is not "didn't happen". */}
+      {early.isEarly && (
+        <div className="p-4 border border-amber-500/30 rounded-xl bg-navy-700 space-y-3">
+          <div className="flex items-start gap-2 text-sm text-amber-300">
+            <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              This forecast&apos;s deadline ({deadlineLabel}) has not passed yet. Resolve it as {outcome} now only if
+              the event can no longer happen (cancelled, officially ruled out) — not just because it hasn&apos;t happened so far.
+            </span>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-amber-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={earlyAcknowledged}
+              onChange={(e) => setEarlyAcknowledged(e.target.checked)}
+              className="rounded border-amber-500/50"
+            />
+            I confirm this resolution before the deadline
+          </label>
+        </div>
+      )}
+
       {error && (
         <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg text-red-400 text-sm">
           {error}
@@ -371,7 +429,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       <Button
         type="submit"
         loading={isSubmitting}
-        disabled={!outcome || (pinContradiction.contradicts && !pinAcknowledged)}
+        disabled={!outcome || (pinContradiction.contradicts && !pinAcknowledged) || (early.isEarly && !earlyAcknowledged)}
         fullWidth
         size="lg"
       >

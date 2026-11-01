@@ -362,4 +362,51 @@ describe('ResolutionForm', () => {
       expect(screen.queryByText(/reviewed the disagreement/i)).not.toBeInTheDocument()
     })
   })
+
+  // daatan#2076 — Winds of Winter fixture: deadline 2026-12-31, resolved 2026-11-01.
+  describe('pre-deadline gate', () => {
+    const future = new Date(Date.now() + 60 * 86_400_000).toISOString()
+
+    it('requires acknowledgment for an early Wrong, then sends the flag', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} resolveByDatetime={future} />)
+
+      fireEvent.click(screen.getByText('Wrong'))
+      const submit = screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]
+      expect(screen.getByText(/has not passed yet/)).toBeInTheDocument()
+      expect(submit).toBeDisabled()
+
+      fireEvent.click(screen.getByLabelText(/I confirm this resolution before the deadline/))
+      expect(submit).not.toBeDisabled()
+      fireEvent.click(submit)
+
+      await waitFor(() => {
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body).toMatchObject({ outcome: 'wrong', earlyResolutionAcknowledged: true })
+      })
+    })
+
+    it('does not gate an early Correct', () => {
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} resolveByDatetime={future} />)
+      fireEvent.click(screen.getByText('Correct'))
+      expect(screen.queryByText(/has not passed yet/)).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).not.toBeDisabled()
+    })
+
+    it('shows a too-early banner for a premature AI verdict and preselects nothing', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ outcome: 'unresolvable', premature: true, reasoning: 'Too early: not published yet.', evidenceLinks: [] }),
+      })
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} resolveByDatetime="2026-12-31T23:59:59Z" />)
+
+      fireEvent.click(screen.getByText('AI Assist'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('premature-banner')).toHaveTextContent('Too early to resolve — deadline is 2026-12-31')
+      })
+      expect(screen.getByText('Too early: not published yet.')).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).toBeDisabled()
+    })
+  })
 })

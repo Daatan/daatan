@@ -87,6 +87,11 @@ export const researchSchema: Schema = {
       items: { type: SchemaType.STRING },
       description: 'List of URLs found that support the resolution',
     },
+    premature: {
+      type: SchemaType.BOOLEAN,
+      description:
+        "True when the deadline has not passed yet and the claim is neither already confirmed nor already impossible — it is too early to resolve. outcome must then be 'unresolvable'.",
+    },
   },
   required: ['outcome', 'reasoning', 'evidenceLinks'],
 }

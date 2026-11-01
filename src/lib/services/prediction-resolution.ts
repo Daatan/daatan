@@ -7,6 +7,7 @@ import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordCalibration } from '@/lib/services/calibration'
 import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
+import { detectEarlyResolution } from '@/lib/utils/early-resolution'
 
 const log = createLogger('prediction-resolution')
 
@@ -37,6 +38,7 @@ interface ResolutionOptions {
   resolutionNote?: string
   correctOptionId?: string
   resolutionOverrodePin?: boolean
+  earlyResolutionAcknowledged?: boolean
 }
 
 /**
@@ -54,7 +56,7 @@ interface ResolutionOptions {
  * correctOptionId is missing/invalid for MULTIPLE_CHOICE predictions.
  */
 export async function resolvePrediction(predictionId: string, options: ResolutionOptions) {
-  const { outcome, resolvedById, evidenceLinks, resolutionNote, correctOptionId, resolutionOverrodePin } = options
+  const { outcome, resolvedById, evidenceLinks, resolutionNote, correctOptionId, resolutionOverrodePin, earlyResolutionAcknowledged } = options
 
   const prediction = await prisma.prediction.findUnique({
     where: { id: predictionId },
@@ -116,6 +118,16 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
   if (pinContradiction.contradicts && !resolutionOverrodePin) {
     throw Object.assign(
       new Error('This outcome contradicts the Oracul\'s current estimate — acknowledge the disagreement to proceed'),
+      { statusCode: 400 },
+    )
+  }
+
+  // daatan#2076: 'wrong'/'unresolvable' before the claim's deadline needs explicit
+  // acknowledgment — "hasn't happened yet" is not "didn't happen".
+  const early = detectEarlyResolution(outcome, prediction.claimDeadline, prediction.resolveByDatetime)
+  if (early.isEarly && !earlyResolutionAcknowledged) {
+    throw Object.assign(
+      new Error(`The forecast's deadline (${early.deadline!.toISOString().split('T')[0]}) has not passed — acknowledge the early '${outcome}' resolution to proceed`),
       { statusCode: 400 },
     )
   }
