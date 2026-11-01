@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Search, FileText, Loader2, AlertCircle, Edit2, RotateCcw, ArrowLeft, X, Plus, List, Trash2, Eye, EyeOff, ShieldCheck, Newspaper, type LucideIcon } from 'lucide-react'
+import { Sparkles, Search, FileText, Loader2, AlertCircle, Edit2, RotateCcw, ArrowLeft, X, Plus, List, Trash2, Eye, EyeOff, ShieldCheck, Newspaper, ExternalLink, Info, type LucideIcon } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { DateTimeField } from '@/components/ui/DateTimeField'
 import { SimilarForecastsWarning } from '@/components/forecasts/SimilarForecastsWarning'
 import { WarningBanner } from '@/components/ui/WarningBanner'
+import { MarketSuggestionCard, type MarketMatch } from '@/components/forecasts/MarketSuggestionCard'
+import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { createClientLogger } from '@/lib/client-logger'
 import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
@@ -133,6 +135,11 @@ export default function ExpressForecastClient({
   const [phase, setPhase] = useState(0)
   const [error, setError] = useState('')
   const [generated, setGenerated] = useState<GeneratedPrediction | null>(null)
+  // daatan#2069: a high-similarity market offered on the review screen when the
+  // input didn't already link one (a pasted market URL links it directly).
+  const { externalMarkets } = useCapabilities()
+  const [marketSuggestion, setMarketSuggestion] = useState<MarketMatch | null>(null)
+  const suggestionRequest = useRef(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [articlesFound, setArticlesFound] = useState(0)
   const [sourcesSummary, setSourcesSummary] = useState('')
@@ -268,6 +275,10 @@ export default function ExpressForecastClient({
               setGenerated(display)
               setEditForm(display) // Initialize edit form
               setStep('review')
+              if (externalMarkets && !data.data.externalMarketId) {
+                // English claim, not the localized one — markets are matched in English.
+                void fetchMarketSuggestion(data.data.claimText, data.data.resolveByDatetime)
+              }
             } else if (data.stage === 'error') {
               if (data.error === 'NO_ARTICLES_FOUND') {
                 setError(data.message || t('noArticlesFound'))
@@ -293,7 +304,45 @@ export default function ExpressForecastClient({
     }
   }
 
+  const fetchMarketSuggestion = async (claimText: string, resolveBy: string | undefined) => {
+    const requestId = ++suggestionRequest.current
+    try {
+      const deadline = resolveBy && !Number.isNaN(new Date(resolveBy).getTime())
+        ? new Date(resolveBy).toISOString()
+        : undefined
+      const res = await fetch('/api/forecasts/suggest-market', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimText, ...(deadline ? { deadline } : {}) }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.match && requestId === suggestionRequest.current) setMarketSuggestion(data.match)
+    } catch {
+      // best-effort — a missing suggestion never blocks creation
+    }
+  }
+
+  const linkSuggestedMarket = () => {
+    if (!marketSuggestion) return
+    const linked = {
+      externalMarketId: marketSuggestion.externalMarketId,
+      market: {
+        provider: marketSuggestion.provider,
+        providerLabel: marketSuggestion.providerLabel,
+        question: marketSuggestion.question,
+        url: marketSuggestion.url,
+        probability: marketSuggestion.yesProbability,
+      },
+    }
+    setGenerated(g => (g ? { ...g, ...linked } : g))
+    setEditForm(f => (f ? { ...f, ...linked } : f))
+    setMarketSuggestion(null)
+  }
+
   const handleTryAgain = () => {
+    suggestionRequest.current++
+    setMarketSuggestion(null)
     setStep('input')
     setPhase(0)
     setError('')
@@ -1050,6 +1099,14 @@ export default function ExpressForecastClient({
               </div>
             )}
 
+            {!generated.market && marketSuggestion && (
+              <MarketSuggestionCard
+                match={marketSuggestion}
+                onLink={linkSuggestedMarket}
+                onDismiss={() => setMarketSuggestion(null)}
+              />
+            )}
+
             {/* Linked market */}
             {generated.market && (
               <div>
@@ -1060,9 +1117,12 @@ export default function ExpressForecastClient({
                   rel="noopener noreferrer"
                   className="flex items-center justify-between gap-4 p-4 border border-emerald-500/30 bg-emerald-500/10 rounded-xl hover:border-emerald-400 transition-colors"
                 >
-                  <div>
-                    <p className="font-medium text-white mb-1">{generated.market.question}</p>
-                    <p className="text-sm text-gray-500">{generated.market.providerLabel}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-white mb-1 break-words" dir="auto">{generated.market.question}</p>
+                    <p className="text-sm text-gray-500 inline-flex items-center gap-1">
+                      {generated.market.providerLabel}
+                      <ExternalLink className="w-3 h-3" />
+                    </p>
                   </div>
                   {generated.market.probability != null && (
                     <div className="text-2xl font-black text-emerald-400 shrink-0">
@@ -1070,6 +1130,10 @@ export default function ExpressForecastClient({
                     </div>
                   )}
                 </a>
+                <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-400">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  <span>{t('marketNotIdentical', { provider: generated.market.providerLabel })}</span>
+                </p>
               </div>
             )}
 
