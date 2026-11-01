@@ -74,6 +74,27 @@ describe('ProbabilityChart gating', () => {
     expect(screen.getByText(HEADING)).toBeInTheDocument()
   })
 
+  it('says the linked market is related, not the same question (daatan#2069)', () => {
+    render(
+      <ProbabilityChart
+        commitments={[]}
+        snapshots={[]}
+        outcomeType="BINARY"
+        options={[]}
+        marketSnapshots={[
+          { createdAt: '2026-06-01', probability: 60 },
+          { createdAt: '2026-06-02', probability: 65 },
+        ]}
+        marketQuestion="Will X happen by June 30?"
+        marketUrl="https://polymarket.com/event/x"
+      />,
+    )
+    const note = screen.getByTestId('market-not-identical')
+    expect(note).toHaveTextContent('“Will X happen by June 30?”')
+    expect(note).toHaveTextContent(/not the same question/)
+    expect(note.querySelector('a')).toHaveAttribute('href', 'https://polymarket.com/event/x')
+  })
+
   it('renders with ≥2 AI updates even when there are <3 commitments', () => {
     render(
       <ProbabilityChart

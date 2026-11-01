@@ -256,7 +256,7 @@ Returns `{ similar: [] }` when no embedding is available (Gemini API key not con
 ---
 
 ### `POST /api/forecasts/suggest-market` — Auth
-Called by the create wizard after the claim step to offer linking a "same question" external market. **Body** `{ claimText, deadline? }` — `deadline` is an optional ISO 8601 datetime the wizard sends only once the resolution date is known (prefilled express / AI-extract / market-import flows), penalizing candidates that resolve far from it. Keyword-prefilters candidates, embeds the claim + each candidate, and returns `{ match }` with the single best market only when its deadline-adjusted cosine similarity clears the auto-link threshold, else `{ match: null }`. Best-effort; returns `{ match: null }` when external markets are disabled or embeddings are unavailable.
+Called by the create wizard after the claim step, and by the Express review screen once a draft is generated (unless the input already linked a market), to offer linking a "same question" external market (daatan#2069). **Body** `{ claimText, deadline? }` — `deadline` is an optional ISO 8601 datetime the wizard sends only once the resolution date is known (prefilled express / AI-extract / market-import flows), penalizing candidates that resolve far from it. Keyword-prefilters candidates, embeds the claim + each candidate, and returns `{ match }` with the single best market only when its deadline-adjusted cosine similarity clears the auto-link threshold, else `{ match: null }`. Best-effort; returns `{ match: null }` when external markets are disabled or embeddings are unavailable.
 
 ---
 

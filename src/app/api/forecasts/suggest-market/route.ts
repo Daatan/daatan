@@ -19,7 +19,8 @@ const suggestSchema = z.object({
 /**
  * POST /api/forecasts/suggest-market  body: { claimText, deadline? }
  *
- * Called from the create wizard after the claim step. Keyword-prefilters
+ * Called from the create wizard after the claim step and from the Express
+ * review screen (daatan#2069). Keyword-prefilters
  * candidate markets, embeds the claim + candidates, and returns the single
  * best match when it's "very similar / the same question" (cosine ≥ threshold),
  * so the wizard can offer to link it. Returns `{ match: null }` otherwise.
