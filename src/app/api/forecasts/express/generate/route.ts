@@ -126,7 +126,7 @@ export const POST = withAuth(async (request, user) => {
           const errorMessage = JSON.stringify({
             stage: 'error',
             error: 'SEARCH_UNAVAILABLE',
-            message: 'Search service is temporarily unavailable. Please try again later or create a forecast manually.'
+            message: 'Search service is temporarily unavailable. Please try again in a few minutes.'
           }) + '\n'
           controller.enqueue(encoder.encode(errorMessage))
         } else {

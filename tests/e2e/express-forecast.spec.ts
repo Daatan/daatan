@@ -26,8 +26,8 @@ test.describe('Express Forecast Flow — Routing', () => {
     } else {
       // Authenticated — verify the create page renders
       await expect(page.locator('h1')).toContainText('Create Forecast')
-      await expect(page.getByText('Express')).toBeVisible()
-      await expect(page.getByText('Manual')).toBeVisible()
+      // daatan#2067: Manual mode removed — no Express/Manual toggle
+      await expect(page.getByRole('button', { name: 'Manual' })).toHaveCount(0)
     }
   })
 

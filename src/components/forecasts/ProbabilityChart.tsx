@@ -16,6 +16,7 @@ import {
 // Canonical community-probability lives in @/lib/forecast-math so the feed card
 // and this chart agree.
 import { communityProbability } from '@/lib/forecast-math'
+import { marketNotIdenticalHint } from '@/lib/market-display'
 
 type ChartSnapshot = {
   createdAt: string
@@ -66,6 +67,9 @@ type Props = {
   marketSnapshots?: ChartMarketPoint[]
   /** Legend name for the market line, e.g. "Polymarket, inverted". */
   marketLabel?: string
+  /** The linked market's own question + URL — shown in the "not identical" hint. */
+  marketQuestion?: string
+  marketUrl?: string
   /** Per-member AI-panel series. Only rendered when `showAiPanel` is true. */
   panelSeries?: ChartPanelMember[]
   /** The viewer opted into the AI panel in Settings. Off by default. */
@@ -192,6 +196,8 @@ export default function ProbabilityChart({
   options,
   marketSnapshots = [],
   marketLabel = 'Polymarket',
+  marketQuestion,
+  marketUrl,
   panelSeries = [],
   showAiPanel = false,
 }: Props) {
@@ -446,7 +452,22 @@ export default function ProbabilityChart({
             labelFormatter={(ts) => (typeof ts === 'number' ? fmtDateTime(ts) : ts)}
             formatter={(value, name) => [typeof value === 'number' ? `${Math.round(value)}%` : value, name as string]}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: '#A0AEC0', paddingTop: '8px' }} />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: '#A0AEC0', paddingTop: '8px' }}
+            formatter={(value: string) =>
+              showMarket && value === marketLabel ? (
+                <span
+                  title={marketNotIdenticalHint(marketQuestion)}
+                  className="cursor-help underline decoration-dotted underline-offset-2"
+                  data-testid="market-legend"
+                >
+                  {value}
+                </span>
+              ) : (
+                value
+              )
+            }
+          />
 
           {dragStart != null && dragEnd != null && dragStart !== dragEnd && (
             <ReferenceArea
@@ -543,6 +564,18 @@ export default function ProbabilityChart({
           )}
         </LineChart>
       </ResponsiveContainer>
+      {showMarket && (
+        <p className="mt-1 px-1 text-[11px] text-gray-500" data-testid="market-not-identical">
+          <span className="text-pink-400">●</span>{' '}
+          {marketUrl ? (
+            <a href={marketUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 underline decoration-dotted">
+              {marketLabel}
+            </a>
+          ) : marketLabel}
+          {': '}
+          {marketNotIdenticalHint(marketQuestion)}
+        </p>
+      )}
       {showPresets && (
         <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-500">
           <span>Drag across the chart to zoom · double-click to reset</span>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import CreateForecastClient from '../CreateForecastClient'
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -38,40 +38,12 @@ describe('CreateForecastClient', () => {
 
   // ── Default mode (no query params) ──────────────────────────────────────
 
-  it('renders the Express/Manual mode toggle by default', () => {
-    render(<CreateForecastClient userId="user-1" />)
-
-    expect(screen.getByText('Express')).toBeInTheDocument()
-    expect(screen.getByText('Manual')).toBeInTheDocument()
-  })
-
-  it('renders ExpressForecastClient when mode is express (default)', () => {
+  it('renders ExpressForecastClient by default, with no Express/Manual toggle (daatan#2067)', () => {
     render(<CreateForecastClient userId="user-1" />)
 
     expect(screen.getByTestId('express-client')).toBeInTheDocument()
     expect(screen.queryByTestId('forecast-wizard')).not.toBeInTheDocument()
-  })
-
-  it('switches to ForecastWizard (manual) when Manual button is clicked', () => {
-    render(<CreateForecastClient userId="user-1" />)
-
-    fireEvent.click(screen.getByText('Manual'))
-
-    expect(screen.getByTestId('forecast-wizard')).toBeInTheDocument()
-    expect(screen.queryByTestId('express-client')).not.toBeInTheDocument()
-
-    // Wizard should NOT be in express flow mode
-    expect(screen.getByTestId('forecast-wizard')).toHaveAttribute('data-express', 'false')
-  })
-
-  it('switches back to Express when Express button is clicked after Manual', () => {
-    render(<CreateForecastClient userId="user-1" />)
-
-    fireEvent.click(screen.getByText('Manual'))
-    expect(screen.getByTestId('forecast-wizard')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByText('Express'))
-    expect(screen.getByTestId('express-client')).toBeInTheDocument()
+    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
   })
 
   // ── from=express query param (the bug scenario) ────────────────────────
@@ -105,14 +77,13 @@ describe('CreateForecastClient', () => {
 
   // ── Edge cases ──────────────────────────────────────────────────────────
 
-  it('treats ?from=manual as default (no special handling)', () => {
+  it('treats ?from=manual as default — Express, not the wizard', () => {
     mockGet.mockImplementation((key: string) => (key === 'from' ? 'manual' : null))
 
     render(<CreateForecastClient userId="user-1" />)
 
-    // Should show the normal mode toggle, not the wizard
-    expect(screen.getByText('Express')).toBeInTheDocument()
-    expect(screen.getByText('Manual')).toBeInTheDocument()
+    expect(screen.getByTestId('express-client')).toBeInTheDocument()
+    expect(screen.queryByTestId('forecast-wizard')).not.toBeInTheDocument()
   })
 
   it('treats ?from= (empty value) as default', () => {
@@ -120,6 +91,6 @@ describe('CreateForecastClient', () => {
 
     render(<CreateForecastClient userId="user-1" />)
 
-    expect(screen.getByText('Express')).toBeInTheDocument()
+    expect(screen.getByTestId('express-client')).toBeInTheDocument()
   })
 })

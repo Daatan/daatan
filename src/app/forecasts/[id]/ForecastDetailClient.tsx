@@ -920,6 +920,8 @@ export default function ForecastDetailClient({
           prediction.externalMarketInverted ?? false,
           trackedOutcomeLabel(prediction.externalMarket?.outcomes),
         )}
+        marketQuestion={prediction.externalMarket?.question}
+        marketUrl={prediction.externalMarket?.url}
         panelSeries={aiPanelSeries}
         showAiPanel={showAiPanel}
       />

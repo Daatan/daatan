@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import type { GroundedDateOutcome } from '@/lib/llm/expressPrediction'
 import ExpressForecastClient, { localizedValidationError, type GeneratedPrediction } from '../ExpressForecastClient'
 import messages from '../../../../../messages/en.json'
+import { CapabilitiesProvider } from '@/components/CapabilitiesProvider'
 
 // Mock next/navigation
 const mockRouter = {
@@ -14,8 +15,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
 }))
 
-const renderWithIntl = (ui: React.ReactElement) =>
-  render(<NextIntlClientProvider locale="en" messages={messages}>{ui}</NextIntlClientProvider>)
+// External markets off by default so the review-screen market suggestion
+// (daatan#2069) doesn't add a fetch to tests that index fetch calls.
+const NO_MARKETS = { ai: true, aiResearch: true, externalMarkets: false, selfHosted: false }
+const renderWithIntl = (ui: React.ReactElement, caps = NO_MARKETS) =>
+  render(
+    <CapabilitiesProvider value={caps}>
+      <NextIntlClientProvider locale="en" messages={messages}>{ui}</NextIntlClientProvider>
+    </CapabilitiesProvider>,
+  )
 
 describe('ExpressForecastClient', () => {
   beforeEach(() => {
@@ -764,5 +772,100 @@ describe('localizedValidationError (#1787)', () => {
   it('returns null when there are no field details (non-Zod 400)', () => {
     expect(localizedValidationError({}, t)).toBeNull()
     expect(localizedValidationError(null, t)).toBeNull()
+  })
+})
+
+describe('ExpressForecastClient market suggestion (daatan#2069)', () => {
+  const WITH_MARKETS = { ...NO_MARKETS, externalMarkets: true }
+  const data: GeneratedPrediction = {
+    claimText: 'Bitcoin will reach $100k by the end of 2026',
+    resolveByDatetime: '2026-12-31T23:59:59Z',
+    detailsText: 'Context',
+    tags: ['Crypto'],
+    resolutionRules: 'Resolved by CoinMarketCap closing price on Dec 31',
+    outcomeType: 'BINARY',
+    options: [],
+    probabilitySuggestion: 60,
+    probabilityReasoning: 'Momentum',
+    newsAnchor: { url: 'https://example.com', title: 'Bitcoin News', snippet: 'x' },
+    additionalLinks: [],
+  }
+  const match = {
+    externalMarketId: 'mkt-1',
+    provider: 'POLYMARKET',
+    providerLabel: 'Polymarket',
+    question: 'Will Bitcoin reach $100,000 at any point before January 1, 2027, according to the Binance BTC/USDT 1-minute candle high?',
+    yesProbability: 42,
+    url: 'https://polymarket.com/event/btc-100k',
+    score: 88,
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+    mockRouter.push.mockClear()
+  })
+
+  const streamOf = (d: GeneratedPrediction) => new Response(new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode(JSON.stringify({ stage: 'complete', data: d }) + '\n'))
+      c.close()
+    },
+  }), { status: 200 })
+
+  const generate = async (d: GeneratedPrediction, suggest: unknown) => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(streamOf(d))
+      .mockResolvedValueOnce(new Response(JSON.stringify(suggest), { status: 200 }))
+    renderWithIntl(<ExpressForecastClient userId="u" />, WITH_MARKETS)
+    fireEvent.change(screen.getByPlaceholderText(/Describe your event OR paste/), { target: { value: 'Bitcoin 100k' } })
+    await act(async () => { fireEvent.click(screen.getByText('Generate Forecast')) })
+    await screen.findByText('Confirm & Publish', {}, { timeout: 3000 })
+    return fetchSpy
+  }
+
+  it('offers a high-similarity market with its full question, opening the market in a new tab', async () => {
+    const fetchSpy = await generate(data, { match })
+
+    const card = await screen.findByTestId('market-suggestion')
+    expect(card).toHaveTextContent(match.question)
+    const link = screen.getByText(match.question).closest('a')
+    expect(link).toHaveAttribute('href', match.url)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(card).toHaveTextContent(/rarely ask exactly the same question/)
+
+    const suggestCall = fetchSpy.mock.calls[1]
+    expect(suggestCall[0]).toBe('/api/forecasts/suggest-market')
+    expect(JSON.parse(suggestCall[1]?.body as string)).toEqual({
+      claimText: data.claimText,
+      deadline: '2026-12-31T23:59:59.000Z',
+    })
+  })
+
+  it('links the suggested market on publish when the author accepts it', async () => {
+    const fetchSpy = await generate(data, { match })
+    await screen.findByTestId('market-suggestion')
+
+    await act(async () => { fireEvent.click(screen.getByText('Link this market')) })
+    expect(screen.queryByTestId('market-suggestion')).not.toBeInTheDocument()
+    expect(screen.getByText('Linked Market')).toBeInTheDocument()
+
+    fetchSpy
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'p1' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'p1' }), { status: 200 }))
+    await act(async () => { fireEvent.click(screen.getByText('Confirm & Publish')) })
+    await vi.waitFor(() => expect(mockRouter.push).toHaveBeenCalled())
+
+    const create = fetchSpy.mock.calls.find(c => c[0] === '/api/forecasts')
+    expect(JSON.parse(create?.[1]?.body as string).externalMarketId).toBe('mkt-1')
+  })
+
+  it('does not ask for a suggestion when the input already linked a market', async () => {
+    const fetchSpy = await generate(
+      { ...data, externalMarketId: 'pasted', market: { provider: 'POLYMARKET', providerLabel: 'Polymarket', question: 'Q?', url: 'https://polymarket.com/event/q', probability: 30 } },
+      { match },
+    )
+    expect(fetchSpy.mock.calls.some(c => c[0] === '/api/forecasts/suggest-market')).toBe(false)
+    expect(screen.queryByTestId('market-suggestion')).not.toBeInTheDocument()
   })
 })
