@@ -13,10 +13,8 @@
 # it never touches the instance resource itself — the hard rule "never
 # terraform apply aws_instance.staging" still holds; target these by name:
 #   terraform apply -target=aws_scheduler_schedule.staging_stop \
-#                   -target=aws_scheduler_schedule.staging_start \
 #                   -target=aws_iam_role.staging_scheduler \
 #                   -target=aws_iam_role_policy.staging_scheduler
-# (staging_start is listed so that the apply destroys it; drop it afterwards.)
 # --------------------------------------------------------------------
 
 resource "aws_iam_role" "staging_scheduler" {
