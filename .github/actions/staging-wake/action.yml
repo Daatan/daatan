@@ -1,0 +1,43 @@
+name: 'Wake staging'
+description: 'Start the staging box if it is off and wait for its SSM agent (it is normally off, #2089)'
+
+outputs:
+  instance-id:
+    description: 'Staging EC2 instance ID'
+    value: ${{ steps.wake.outputs.instance-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: wake
+      shell: bash
+      run: |
+        INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
+          --query "Reservations[0].Instances[0].InstanceId" \
+          --output text)
+        echo "instance-id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+        STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+          --query "Reservations[0].Instances[0].State.Name" --output text)
+        echo "Instance $INSTANCE_ID state: $STATE"
+        if [[ "$STATE" == "stopped" ]]; then
+          echo "⏰ Staging is off — starting it"
+          aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
+        elif [[ "$STATE" == "stopping" ]]; then
+          echo "⏳ Staging is stopping — waiting, then starting"
+          aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID"
+          aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
+        fi
+
+        for i in $(seq 1 30); do
+          PING_STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query "InstanceInformationList[0].PingStatus" \
+            --output text)
+          echo "SSM PingStatus: $PING_STATUS ($i/30)"
+          [[ "$PING_STATUS" == "Online" ]] && exit 0
+          sleep 10
+        done
+        echo "❌ Error: staging SSM agent not Online after 5 min. Please check or reboot the instance."
+        exit 1

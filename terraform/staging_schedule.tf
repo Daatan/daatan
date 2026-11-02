@@ -1,14 +1,13 @@
 # --------------------------------------------------------------------
-# Staging off-hours sleep (#1526)
+# Staging nightly backstop stop (#1526, #2089)
 #
-# Staging idles at ~2% CPU 24/7. Two EventBridge Scheduler schedules stop it
-# at 20:00 UTC and start it at 06:00 UTC on weekdays; the Friday stop and the
-# Monday start cover the weekend. ~60% of staging compute (~$9–10/mo).
+# Staging is normally off. Merges wake it through deploy.yml and it stops itself
+# 20 minutes after the last deploy; staging-up.yml turns it on for manual use
+# (.github/actions/staging-stop-timer sets both timers). This schedule only catches
+# a box whose timer never fired: a failed timer, a manual start, a reboot. 03:00 UTC
+# is late enough not to cut an evening session short.
 #
 # The EIP stays attached (and billed) so staging.daatan.com never changes.
-# deploy.yml / rollback.yml wake the box before sending SSM commands, so a
-# merge outside the window still deploys, just ~90 s slower. watchdog.yml
-# skips staging probes during the sleep window.
 #
 # Lives in the PROD state next to aws_instance.staging (see ec2.tf). Applying
 # it never touches the instance resource itself — the hard rule "never
@@ -17,11 +16,12 @@
 #                   -target=aws_scheduler_schedule.staging_start \
 #                   -target=aws_iam_role.staging_scheduler \
 #                   -target=aws_iam_role_policy.staging_scheduler
+# (staging_start is listed so that the apply destroys it; drop it afterwards.)
 # --------------------------------------------------------------------
 
 resource "aws_iam_role" "staging_scheduler" {
   name        = "daatan-staging-scheduler"
-  description = "EventBridge Scheduler role: may only start/stop the staging EC2 instance"
+  description = "EventBridge Scheduler role: may only stop the staging EC2 instance"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy" "staging_scheduler" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["ec2:StartInstances", "ec2:StopInstances"]
+      Action   = ["ec2:StopInstances"]
       Resource = aws_instance.staging.arn
     }]
   })
@@ -52,10 +52,10 @@ resource "aws_iam_role_policy" "staging_scheduler" {
 
 resource "aws_scheduler_schedule" "staging_stop" {
   name        = "daatan-staging-stop"
-  description = "Stop staging at 20:00 UTC on weekdays (#1526)"
+  description = "Backstop: stop staging at 03:00 UTC if its timer did not (#2089)"
   state       = "ENABLED"
 
-  schedule_expression          = "cron(0 20 ? * MON-FRI *)"
+  schedule_expression          = "cron(0 3 * * ? *)"
   schedule_expression_timezone = "UTC"
 
   flexible_time_window {
@@ -64,25 +64,6 @@ resource "aws_scheduler_schedule" "staging_stop" {
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
-    role_arn = aws_iam_role.staging_scheduler.arn
-    input    = jsonencode({ InstanceIds = [aws_instance.staging.id] })
-  }
-}
-
-resource "aws_scheduler_schedule" "staging_start" {
-  name        = "daatan-staging-start"
-  description = "Start staging at 06:00 UTC on weekdays (#1526)"
-  state       = "ENABLED"
-
-  schedule_expression          = "cron(0 6 ? * MON-FRI *)"
-  schedule_expression_timezone = "UTC"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  target {
-    arn      = "arn:aws:scheduler:::aws-sdk:ec2:startInstances"
     role_arn = aws_iam_role.staging_scheduler.arn
     input    = jsonencode({ InstanceIds = [aws_instance.staging.id] })
   }

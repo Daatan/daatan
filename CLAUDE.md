@@ -55,7 +55,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 ## Infra cheat-sheet
 
 - Production EC2: `i-04ea44d4243d35624`, EIP `3.126.238.216` → `daatan.com`
-- Staging EC2:    `i-0406d237ca5d92cdf` → `staging.daatan.com`
+- Staging EC2:    `i-0406d237ca5d92cdf` → `staging.daatan.com`. **Normally off** (#2089): connection errors there mean it is off, not an outage. Turn it on with `gh workflow run staging-up.yml -R Daatan/daatan` (3 h; `-f hours=N` for 1–12), and don't `aws ec2 start-instances` it, which sets no stop timer.
 - SSH port 22 is closed — server access is via AWS SSM `send-command` (use the `ssm-exec` skill in Claude Code)
 - Use `docker compose` (v2 plugin, no hyphen) on prod, not `docker-compose`
 - Production uses containers `daatan-app`, `daatan-nginx`, `daatan-postgres`, `daatan-certbot`

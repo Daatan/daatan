@@ -298,10 +298,9 @@ resource "aws_cloudwatch_metric_alarm" "staging_ec2_status_check" {
   evaluation_periods  = 2
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  # notBreaching (prod/oracle use breaching): staging is stopped on a schedule
-  # every night and weekend (staging_schedule.tf, #1526), and a stopped
-  # instance publishes no StatusCheckFailed datapoints — "breaching" would
-  # page at every scheduled stop and clear at every start.
+  # notBreaching (prod/oracle use breaching): staging is normally off (#2089),
+  # and a stopped instance publishes no StatusCheckFailed datapoints —
+  # "breaching" would page at every stop and clear at every start.
   treat_missing_data = "notBreaching"
   alarm_actions      = [aws_sns_topic.infra_alerts.arn]
   ok_actions         = [aws_sns_topic.infra_alerts.arn]
@@ -406,8 +405,11 @@ resource "aws_cloudwatch_metric_alarm" "ec2_cpu_high" {
   evaluation_periods  = 3
   threshold           = 85
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.infra_alerts.arn]
-  ok_actions          = [aws_sns_topic.infra_alerts.arn]
+  # Staging is normally off (#2089). With "missing", every wake would send an OK
+  # notification (INSUFFICIENT_DATA -> OK). Prod and Oracle keep "missing".
+  treat_missing_data = each.key == "staging" ? "notBreaching" : "missing"
+  alarm_actions      = [aws_sns_topic.infra_alerts.arn]
+  ok_actions         = [aws_sns_topic.infra_alerts.arn]
 
   dimensions = {
     InstanceId = each.value
@@ -502,8 +504,11 @@ resource "aws_cloudwatch_metric_alarm" "ec2_disk_high" {
   evaluation_periods  = 1
   threshold           = 85
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.infra_alerts.arn]
-  ok_actions          = [aws_sns_topic.infra_alerts.arn]
+  # Staging is normally off (#2089). With "missing", every wake would send an OK
+  # notification (INSUFFICIENT_DATA -> OK). Prod and Oracle keep "missing".
+  treat_missing_data = each.key == "staging" ? "notBreaching" : "missing"
+  alarm_actions      = [aws_sns_topic.infra_alerts.arn]
+  ok_actions         = [aws_sns_topic.infra_alerts.arn]
 
   dimensions = {
     InstanceId = each.value
@@ -535,8 +540,11 @@ resource "aws_cloudwatch_metric_alarm" "ec2_swap_high" {
   evaluation_periods  = 3
   threshold           = 50
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_actions       = [aws_sns_topic.infra_alerts.arn]
-  ok_actions          = [aws_sns_topic.infra_alerts.arn]
+  # Staging is normally off (#2089). With "missing", every wake would send an OK
+  # notification (INSUFFICIENT_DATA -> OK). Prod and Oracle keep "missing".
+  treat_missing_data = each.key == "staging" ? "notBreaching" : "missing"
+  alarm_actions      = [aws_sns_topic.infra_alerts.arn]
+  ok_actions         = [aws_sns_topic.infra_alerts.arn]
 
   dimensions = {
     InstanceId = each.value

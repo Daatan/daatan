@@ -33,7 +33,7 @@ jobs:
         env:
           - name: production
             url: https://daatan.com
-          # staging sleeps nights + weekends (terraform/staging_schedule.tf, #1526/#1952)
+          # staging is normally off (#2089), so scheduled runs skip it (#1952)
 
     steps:
       - name: Trigger external-market sync

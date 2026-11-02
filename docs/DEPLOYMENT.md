@@ -149,7 +149,7 @@ always names an image whose tests passed.
 ### `deploy-staging` job
 
 1. Configure AWS credentials (OIDC)
-2. Wake staging if asleep (see [Staging sleep schedule](#staging-sleep-schedule)) and wait for SSM `Online`
+2. Wake staging if it is off and set its stop timer (see [Staging is normally off](#staging-is-normally-off)) and wait for SSM `Online`
 3. SSM command to server:
    - Download deploy scripts from GitHub
    - Pull the app and migrations images **by the digests this run pushed**
@@ -163,8 +163,8 @@ always names an image whose tests passed.
 1. Resolve the version from the tag (or the required `version` input on a production dispatch)
 2. **Tag only:** wait (up to 30 min) for this commit's `main` run to finish `Deploy to Staging`
    successfully. Fails if it failed, was cancelled or superseded by a newer merge — tag the
-   current `main` HEAD instead. Does not touch staging itself, so weekend releases work while
-   staging sleeps. Needs no AWS credentials.
+   current `main` HEAD instead. Does not touch staging itself, so releases work while staging
+   is off. Needs no AWS credentials.
 
 ### `deploy-production` job (`environment: production`)
 
@@ -466,27 +466,35 @@ build — the standalone runner is the only place this bites.
 - **Access**: AWS SSM only — port 22 is closed on both instances
 - **SSL**: Each instance has its own Let's Encrypt certificate via `certbot/dns-route53`
 
-### Staging sleep schedule
+### Staging is normally off
 
-Staging is **stopped 20:00–06:00 UTC on weekdays and all weekend** by two EventBridge
-Scheduler schedules (`terraform/staging_schedule.tf`, #1526) — it idles at ~2% CPU and this
-saves ~60% of its compute. The EIP stays attached, so `staging.daatan.com` never changes.
+Staging runs only when something needs it (#2089). The EIP stays attached, so
+`staging.daatan.com` never changes, and the disk and database survive every stop.
 
-What this means in practice:
+**To use it, run one command:**
 
-- **Merges outside the window still deploy.** `deploy-staging` (and `rollback.yml` for
-  staging) starts the instance if it is `stopped` and waits up to 5 min for the SSM agent
-  to report `Online` before sending commands — roughly 90 s extra. A `v*` tag release at
-  night wakes staging the same way, since `deploy-production` depends on `deploy-staging`.
-- The box stays up after a wake-up until the next scheduled stop (20:00 UTC) — there is no
-  "stop again after deploy".
-- `watchdog.yml` skips its staging probes during the window (until 06:15 UTC to allow for
-  boot); the `staging-ec2-status-check-failed` alarm treats missing data as OK for the
-  same reason. Production probing and alarms are unchanged.
-- Need staging outside hours? `aws ec2 start-instances --instance-ids i-0406d237ca5d92cdf`
-  (or just trigger a staging deploy). To pause the schedule without a TF change:
-  `aws scheduler update-schedule --name daatan-staging-stop --state DISABLED ...` — but
-  prefer a TF change so the state does not drift.
+```bash
+gh workflow run staging-up.yml -R Daatan/daatan            # on for 3 hours
+gh workflow run staging-up.yml -R Daatan/daatan -f hours=6 # 1 to 12 hours
+```
+
+The run finishes when the app answers and prints how long that took. Staging already has the
+latest `main`, because every merge deploys there.
+
+- **A merge** wakes staging, deploys and verifies it. The box stops 20 minutes after the last
+  deploy, so several merges share one wake. `rollback.yml` for staging does the same.
+- **Timers only move later.** A merge during a manual session cannot shorten that session.
+- **The timer lives on the box** (`shutdown` over SSM, `.github/actions/staging-stop-timer`), so a
+  cancelled run or a GitHub outage still stops it.
+- **Backstop:** an EventBridge Scheduler schedule stops the box at 03:00 UTC every day
+  (`terraform/staging_schedule.tf`), including during a manual session. It catches a box whose
+  timer never fired, such as after a manual `aws ec2 start-instances` or a reboot.
+- **`watchdog.yml` and `cert-expiry.yml`** check staging only while it is running. A staging probe
+  is rare, so the deploy's own HTTPS health check is the main signal. Every deploy also runs
+  `certbot renew`.
+- **No cron or timer of ours runs on the box**, so nothing is lost while it is off.
+- **Releases are unaffected.** A tag waits for that commit's `Deploy to Staging` to succeed, and
+  that job wakes the box.
 
 ### DB backups (S3)
 

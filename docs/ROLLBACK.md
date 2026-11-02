@@ -63,7 +63,7 @@ Version tags follow semver (e.g. `1.7.140`). ECR stores images tagged with the v
 4. Click **Run workflow**
 5. Monitor the run — it will:
    - Verify the ECR image exists before touching the server
-   - For staging, wake the instance if it is asleep (see the staging sleep schedule in `docs/DEPLOYMENT.md`)
+   - For staging, wake the instance if it is off (see "Staging is normally off" in `docs/DEPLOYMENT.md`)
    - Pull the image and run `blue-green-deploy.sh` with `SKIP_BUILD=true`
    - Send a Telegram notification on success or failure
 
