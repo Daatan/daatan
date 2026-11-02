@@ -18,16 +18,23 @@ export const PUBLISH_PERCENT_MIN = 1
 export const PUBLISH_PERCENT_MAX = 99
 
 /**
- * A probability move below this many points, against the current evidence
- * anchor, carries no new information — used both by the requote cron
- * (temporal-clock.ts, to skip a near-noise clock write) and by
- * `recordEstimate` (context.ts, F17/daatan#1236, to decide whether a write
- * is material enough to become the glide clock's next anchor). One shared
- * constant so the two thresholds can't drift apart; lives here rather than
- * in either service to avoid a context.ts <-> temporal-clock.ts import cycle
+ * The requote cron (temporal-clock.ts) skips a clock write that moves the
+ * published number by less than this many points. Lives here rather than in
+ * either service to avoid a context.ts <-> temporal-clock.ts import cycle
  * (temporal-clock.ts already imports from context.ts).
  */
 export const MATERIAL_CHANGE_PTS = 1
+
+/**
+ * An evidence write must move this many points from the current evidence anchor
+ * to become the glide clock's next anchor (`recordEstimate`, F17/daatan#1236).
+ * Deliberately coarser than MATERIAL_CHANGE_PTS (daatan#2073): at 1 pt, 87% of
+ * re-anchors over 14 days on prod were 1–2 pt pool wobble, and 20 of 62 glide
+ * forecasts re-anchored 10+ times, so the glide never ran on them. Measured
+ * against the anchor, not the previous write, so small moves still accumulate
+ * into a re-anchor.
+ */
+export const EVIDENCE_ANCHOR_PTS = 3
 
 /**
  * Map an aggregated Oracul stance/CI bound in [-1, 1] to a probability percent

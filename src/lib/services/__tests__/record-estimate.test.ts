@@ -397,7 +397,19 @@ describe('material-change anchor tagging (F17, daatan#1236)', () => {
     expect(snapshotData()).toMatchObject({ materialChange: false })
   })
 
-  it('tags materialChange: true on a genuine update — probability moved by at least MATERIAL_CHANGE_PTS from the anchor', async () => {
+  it('tags materialChange: false on a 2-pt wobble — below EVIDENCE_ANCHOR_PTS (daatan#2073)', async () => {
+    findFirst.mockResolvedValue({ externalProbability: 60, createdAt: new Date('2026-08-01'), evidenceAt: null } as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 58, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: false })
+  })
+
+  it('tags materialChange: true at exactly EVIDENCE_ANCHOR_PTS from the anchor', async () => {
+    findFirst.mockResolvedValue({ externalProbability: 60, createdAt: new Date('2026-08-01'), evidenceAt: null } as never)
+    await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 63, oracleSnapshot: { sources: [] } })
+    expect(snapshotData()).toMatchObject({ materialChange: true })
+  })
+
+  it('tags materialChange: true on a genuine update — probability moved by at least EVIDENCE_ANCHOR_PTS from the anchor', async () => {
     findFirst.mockResolvedValue({ externalProbability: 60, createdAt: new Date('2026-08-01'), evidenceAt: null } as never)
     await recordEstimate({ predictionId: 'pred-1', origin: 'news-indexer', probability: 65, oracleSnapshot: { sources: [] } })
     expect(snapshotData()).toMatchObject({ materialChange: true })
