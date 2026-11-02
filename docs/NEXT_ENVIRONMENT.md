@@ -22,7 +22,7 @@ certificate, and `scripts/blue-green-deploy.sh next`). To revive the testbed, bu
 shared with staging, so branch migrations do not belong here.
 
 ## Technical Configuration
-- **Hostname**: `next.daatan.com`
+- **Hostname**: `next.daatan.com`. It runs on the staging box, which is normally off, so turn that on first with `gh workflow run staging-up.yml -R Daatan/daatan` (see `docs/DEPLOYMENT.md`).
 - **Nginx Config**: `infra/nginx/nginx-staging-ssl.conf` (proxies to `http://app-next:3000`)
 - **Docker Service**: `app-next` in `docker-compose.staging.yml`
 - **Environment Variable**: `APP_ENV=next`

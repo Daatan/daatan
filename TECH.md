@@ -99,7 +99,7 @@ Production and staging run on **two independent EC2 instances** in `eu-central-1
       └──────────────────────────────────────┘
 ```
 
-(1) `daatan-app-next` serves the NEXT testbed (`next.daatan.com`, shares the staging DB; no workflow deploys it any more — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is stopped outside working hours by EventBridge Scheduler (`terraform/staging_schedule.tf`, #1526); `deploy.yml` wakes it before deploying; scheduled workflows no longer target staging (#1952).
+(1) `daatan-app-next` serves the NEXT testbed (`next.daatan.com`, shares the staging DB; no workflow deploys it any more — see [docs/NEXT_ENVIRONMENT.md](./docs/NEXT_ENVIRONMENT.md)). The staging box is normally off (#2089): `deploy.yml` wakes it for each merge and it stops 20 minutes after the last deploy, `staging-up.yml` turns it on for manual use, and scheduled workflows no longer target it (#1952).
 
 ### Request Flow
 
@@ -293,7 +293,7 @@ terraform/
 ├── ses.tf / iam_smtp.tf        # SES domain, mail forwarding, SMTP users
 ├── monitoring.tf               # CloudWatch alarms, SNS topics, budgets
 ├── telegram_alerts.tf          # Lambda forwarding infra alerts to Telegram (#1726)
-├── staging_schedule.tf         # EventBridge Scheduler off-hours staging stop/start (#1526)
+├── staging_schedule.tf         # EventBridge Scheduler daily backstop stop for staging (#2089)
 ├── backup_schedule.tf          # EventBridge Scheduler → SSM: primary prod DB backup trigger, 04:00/16:00 UTC (#1957)
 ├── logging.tf                  # CloudWatch log group for app/nginx/postgres container logs (#1788)
 ├── variables.tf                # Input variables
@@ -380,7 +380,7 @@ tests/
 | S3 Bucket | Staging DB backups | `daatan-db-backups-staging-272007598366` |
 | S3 Bucket | Avatar/upload storage | `daatan-uploads-prod-272007598366`, `daatan-uploads-staging-272007598366` |
 | ECR | Container registry | `daatan-app` repository (app + `-migrations` images) |
-| EventBridge Scheduler | Staging off-hours sleep | Stops staging 20:00 UTC Mon–Fri, starts 06:00 UTC Mon–Fri — so it is also off all weekend (`terraform/staging_schedule.tf`) |
+| EventBridge Scheduler | Staging backstop stop | Stops staging at 03:00 UTC every day, in case its own stop timer did not fire (`terraform/staging_schedule.tf`, #2089) |
 | Security Group | Firewall | HTTP, HTTPS (port 22 blocked — use SSM for server access) |
 | IAM Role | EC2 Profile (prod) | `daatan-ec2-role-prod` — SSM + S3 backup/upload access (prod buckets) + Secrets Manager (`daatan-env-prod`) |
 | IAM Role | EC2 Profile (staging) | `daatan-ec2-role-staging` — SSM + S3 backup/upload access (staging buckets) + Secrets Manager (`daatan-env-staging`) |
@@ -514,7 +514,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 
 Since #1952 the scheduled workflows target production only (staging is normally off, #2089); `cert-expiry.yml` checks staging only while it is running.
 
-Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` runs on `android-v*` tags; `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
+Manual-only workflows: `rollback.yml`, `staging-up.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` runs on `android-v*` tags; `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
 
 #### Deploy Workflow (`deploy.yml`)
 
@@ -541,7 +541,7 @@ Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english
 - On `v*` tags the test jobs are skipped — the tagged commit already passed them on `main` (#1990)
 
 **Deploy Stage (Staging):**
-- Wake the staging instance if the off-hours schedule has stopped it, and wait for SSM to come online
+- Wake the staging instance if it is off, wait for SSM to come online, and set its 20-minute stop timer
 - Send command via AWS SSM (SSH port 22 is blocked)
 - Download deploy scripts from GitHub at the current commit SHA
 - Retag the tested images `X.Y.Z` / `staging-latest` and pull them **by digest** (#1954)
