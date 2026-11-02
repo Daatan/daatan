@@ -20,6 +20,9 @@ export interface LLMRequest {
   model?: string
   /** Which call site this is (#1800) — logged, and what `LLM_STAGE_MODELS` keys on. */
   stage?: LlmStage
+  /** Gemini `thinkingConfig.thinkingBudget` in tokens (0 = off). Unset keeps the
+   *  model's default dynamic thinking. Vertex and Gemini legs only. */
+  thinkingBudget?: number
 }
 
 export interface LLMResponse {

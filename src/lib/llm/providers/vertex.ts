@@ -119,6 +119,7 @@ export class VertexProvider implements LLMProvider {
             responseMimeType: request.schema ? 'application/json' : 'text/plain',
             ...(request.schema ? { responseSchema: request.schema } : {}),
             ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+            ...(request.thinkingBudget !== undefined ? { thinkingConfig: { thinkingBudget: request.thinkingBudget } } : {}),
           },
         }),
         signal: controller.signal,
