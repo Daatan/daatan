@@ -877,6 +877,16 @@ boolean }` — archetypes defaults to `["diffuse"]` and comes from the
 the server is a hard kill switch (returns `{ok: true, disabled: true}`).
 Triggered by `.github/workflows/requote.yml` daily at 05:31 UTC.
 
+The glide only touches `ACTIVE` forecasts, so its c=0 end value (ARRIVAL 3,
+SURVIVAL 97) is usually **not** what gets published at the deadline. The
+forecast turns `PENDING` first, and a fresh evidence anchor near the deadline
+restarts the glide anyway. This is deliberate (daatan#2074): the end value is
+right only if the event did not happen, and the clock can't know that, because
+`settled` often fails to latch. A forced final pin, measured on 18 past-deadline
+forecasts (2026-11-02), would have moved 7 toward the outcome and 5 away from it
+(e.g. a resolved-CORRECT 97 → 3). The last published value (`p_final`) stays as
+is, and resolution decides the rest.
+
 Each non-dry run also performs the **stuck-PENDING sweep** (#1185),
 independent of the archetype allowlist: any `PENDING` prediction whose
 `claimDeadline` passed >12h ago with no `deadlinePassedAlertAt` gets a
