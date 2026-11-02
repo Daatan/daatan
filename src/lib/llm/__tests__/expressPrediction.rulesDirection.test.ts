@@ -4,7 +4,7 @@ vi.mock('../../services/moderation', () => ({ checkContent: vi.fn(async () => ({
 vi.mock('../index', () => ({ llmService: { generateContent: vi.fn() } }))
 vi.mock('../bedrock-prompts', () => ({ getPromptTemplate: vi.fn(async () => 'TEMPLATE'), fillPrompt: vi.fn(() => 'PROMPT') }))
 vi.mock('../../services/translation', () => ({ localizeForecastForAuthor: vi.fn(async () => null), callGeminiTranslate: vi.fn() }))
-vi.mock('../groundedDateLookup', () => ({ lookupGroundedEventDate: vi.fn() }))
+vi.mock('../groundedDateLookup', () => ({ lookupGroundedEventDate: vi.fn(async () => ({ status: 'unavailable' })) }))
 vi.mock('../rulesDirection', () => ({ ensureRulesDirection: vi.fn() }))
 
 import { generateExpressPrediction } from '../expressPrediction'

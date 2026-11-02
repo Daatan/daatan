@@ -83,6 +83,16 @@ describe('lookupGroundedEventDate', () => {
     expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'no_date' })
   })
 
+  it('passes a caller abort through to the request and returns "unavailable" without logging a failure', async () => {
+    const caller = new AbortController()
+    fetchMock.mockImplementationOnce(async (_url: string, init: { signal: AbortSignal }) => {
+      caller.abort()
+      expect(init.signal.aborted).toBe(true)
+      throw new DOMException('aborted', 'AbortError')
+    })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW, caller.signal)).toEqual({ status: 'unavailable' })
+  })
+
   it('swallows an HTTP error, a thrown fetch and unparseable text as "unavailable"', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'quota' })
     expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable' })

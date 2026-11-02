@@ -85,12 +85,16 @@ export async function lookupGroundedEventDate(
   userInput: string,
   claimText: string,
   now: Date = new Date(),
+  /** Aborted by the caller when the draft turns out not to need the date — not a failure. */
+  signal?: AbortSignal,
 ): Promise<GroundedDateLookup> {
   const env = vertexEnv()
   if (!env) return { status: 'unavailable' }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS)
+  const onCallerAbort = () => controller.abort()
+  signal?.addEventListener('abort', onCallerAbort, { once: true })
   try {
     const token = await vertexAccessToken(env)
     const res = await fetch(vertexEndpoint(env, stageModel('grounded_date', LOOKUP_MODEL), 'generateContent'), {
@@ -121,10 +125,12 @@ export async function lookupGroundedEventDate(
     if (!event) return { status: 'no_date' }
     return { status: 'found', event, date, sourceUrl: cleanSourceUrl(parsed.source_url) }
   } catch (error) {
+    if (signal?.aborted) return { status: 'unavailable' }
     // Swallowed: the degrade path is the draft as it was, with its "assumed" warning.
     log.warn({ err: error }, 'Grounded date lookup failed; keeping the assumed date')
     return { status: 'unavailable' }
   } finally {
     clearTimeout(timer)
+    signal?.removeEventListener('abort', onCallerAbort)
   }
 }
