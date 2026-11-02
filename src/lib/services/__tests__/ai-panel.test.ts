@@ -370,6 +370,27 @@ describe('runPanelForPrediction', () => {
 })
 
 describe('runPanelSweep', () => {
+  // daatan#2090: one at a time, a slow member stretched the sweep past the workflow's curl limit.
+  it('works on several forecasts at once, capped, and counts every one of them', async () => {
+    const forecasts = Array.from({ length: 10 }, (_, i) => ({ ...prediction, id: `p${i}` }))
+    findManyPredictions.mockResolvedValue(forecasts as never)
+    const inFlight = new Set<string>()
+    let peak = 0
+    findFirst.mockImplementation((async (args: { where: { predictionId: string } }) => {
+      inFlight.add(args.where.predictionId)
+      peak = Math.max(peak, inFlight.size)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight.delete(args.where.predictionId)
+      return null
+    }) as never)
+
+    const summary = await runPanelSweep({ now: NOW })
+
+    expect(peak).toBe(4)
+    expect(summary.considered).toBe(10)
+    expect(summary.written).toBe(10)
+  })
+
   // The whole reason the Bedrock/Vertex members exist: no OpenRouter key must NOT stop the panel.
   it('runs Bedrock/Vertex members only when no OpenRouter key is configured', async () => {
     getKey.mockReturnValue('')
@@ -435,8 +456,7 @@ describe('runPanelSweep', () => {
   it('a rejected key disables OpenRouter members without silencing Bedrock ones', async () => {
     findManyPredictions.mockResolvedValue([
       prediction,
-      { ...prediction, id: 'pred-2' },
-      { ...prediction, id: 'pred-3' },
+      ...Array.from({ length: 9 }, (_, i) => ({ ...prediction, id: `pred-${i + 2}` })),
     ] as never)
     callMember.mockImplementation(async (m) => {
       if (m.route === 'openrouter') throw new PanelAuthError(401, 'User not found.')
@@ -447,14 +467,15 @@ describe('runPanelSweep', () => {
 
     // Reported as an incident even though the sweep produced data.
     expect(summary.unauthorized).toBe(true)
-    // The Bedrock member carried all three forecasts.
-    expect(summary.written).toBe(3)
+    // The Bedrock member carried all ten forecasts.
+    expect(summary.written).toBe(10)
 
     const openRouterCalls = callMember.mock.calls.filter(([m]) => m.route === 'openrouter')
     const bedrockCalls = callMember.mock.calls.filter(([m]) => m.route === 'bedrock')
-    // Latched: at most one 401 per concurrent worker, not 4 members × 3 forecasts = 12.
-    expect(openRouterCalls.length).toBeLessThanOrEqual(3)
-    expect(bedrockCalls.length).toBe(3)
+    // Latched: at most the calls already in flight (4 forecasts × 3 workers), not
+    // 4 members × 10 forecasts = 40.
+    expect(openRouterCalls.length).toBeLessThanOrEqual(12)
+    expect(bedrockCalls.length).toBe(10)
   })
 
   it('writes nothing when every route is unauthenticated', async () => {

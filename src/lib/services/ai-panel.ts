@@ -27,6 +27,12 @@ const log = createLogger('ai-panel')
  *  not latency-critical, and OpenRouter would rather we didn't burst. */
 const MEMBER_CONCURRENCY = 3
 
+/** How many forecasts a sweep works on at once (daatan#2090). One at a time, a slow
+ *  member set the pace for the whole sweep: DeepSeek at 10 s per call stretched it to 28
+ *  minutes, past the workflow's 600 s curl limit. Multiplies with MEMBER_CONCURRENCY, so
+ *  at most 12 calls are in flight. */
+const FORECAST_CONCURRENCY = 4
+
 export type PanelRunStatus =
   /** input hash unchanged since the last run — nothing to do, previous run stays current */
   | 'skipped-unchanged'
@@ -597,30 +603,34 @@ export async function runPanelSweep(opts?: {
     dryRun: 0,
   }
 
-  for (const prediction of predictions) {
-    try {
-      const result = await runPanelForPrediction(
-        groundedIds?.has(prediction.id) ? { ...prediction, grounded: true } : prediction,
-        {
-          now,
-          dryRun: opts?.dryRun,
-          apiKey,
-          template,
-          groundedTemplate,
-          ctx,
-        },
-      )
-      if (result.status === 'written') summary.written += 1
-      else if (result.status === 'completed-partial') summary.completedPartial += 1
-      else if (result.status === 'dry-run') summary.dryRun += 1
-      else if (result.status === 'failed') summary.failed += 1
-      else summary.skipped += 1
-    } catch (err) {
-      // One bad forecast must not abort the sweep.
-      log.error({ err, predictionId: prediction.id }, 'Panel run threw')
-      summary.failed += 1
+  const queue = [...predictions]
+  const worker = async (): Promise<void> => {
+    for (let prediction = queue.shift(); prediction; prediction = queue.shift()) {
+      try {
+        const result = await runPanelForPrediction(
+          groundedIds?.has(prediction.id) ? { ...prediction, grounded: true } : prediction,
+          {
+            now,
+            dryRun: opts?.dryRun,
+            apiKey,
+            template,
+            groundedTemplate,
+            ctx,
+          },
+        )
+        if (result.status === 'written') summary.written += 1
+        else if (result.status === 'completed-partial') summary.completedPartial += 1
+        else if (result.status === 'dry-run') summary.dryRun += 1
+        else if (result.status === 'failed') summary.failed += 1
+        else summary.skipped += 1
+      } catch (err) {
+        // One bad forecast must not abort the sweep.
+        log.error({ err, predictionId: prediction.id }, 'Panel run threw')
+        summary.failed += 1
+      }
     }
   }
+  await Promise.all(Array.from({ length: FORECAST_CONCURRENCY }, worker))
 
   // Reported even when Bedrock members carried the sweep: a dead OpenRouter key is an
   // incident to fix, not a state to tolerate, and the route turns this into a 502 so
