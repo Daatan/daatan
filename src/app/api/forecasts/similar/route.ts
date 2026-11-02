@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleRouteError } from '@/lib/api-error'
-import { getPredictionWithTags, findSimilarForecasts } from '@/lib/services/forecast'
+import { getPredictionWithTags, findSimilarForecasts, DUPLICATE_WARNING_MIN_SCORE } from '@/lib/services/forecast'
 import { getCachedClaimTranslations } from '@/lib/services/translation'
 import { aiFeaturesEnabled } from '@/lib/capabilities'
 import { locales } from '@/i18n/config'
@@ -8,6 +8,8 @@ import { locales } from '@/i18n/config'
 
 // GET /api/forecasts/similar?id=<id>&limit=3&language=ru
 // GET /api/forecasts/similar?q=<text>&tags=<csv>&limit=3
+// GET /api/forecasts/similar?q=<text>&purpose=duplicate  — stricter bar for the
+//   create-time duplicate warning (daatan#2083); default is the related-list bar.
 export async function GET(request: NextRequest) {
   try {
     // Similar-forecasts relies on embeddings (an AI feature). When AI is off
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest) {
     const q = (searchParams.get('q') || '').slice(0, 200)
     const tagsParam = searchParams.get('tags') || ''
     const limit = Math.min(parseInt(searchParams.get('limit') || '3'), 10)
+    const isDuplicateCheck = searchParams.get('purpose') === 'duplicate'
     const languageParam = searchParams.get('language')
     const language =
       languageParam && languageParam !== 'en' && locales.includes(languageParam as (typeof locales)[number])
@@ -43,7 +46,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ similar: [] })
     }
 
-    const similar = await findSimilarForecasts({ claimText, tags, excludeId: id, limit })
+    const similar = await findSimilarForecasts({
+      claimText,
+      tags,
+      excludeId: id,
+      limit,
+      ...(isDuplicateCheck ? { minScore: DUPLICATE_WARNING_MIN_SCORE } : {}),
+    })
 
     // Cache-only translation overlay: a miss keeps the English claimText and
     // reports translated: false so the client can fill it via /translate.

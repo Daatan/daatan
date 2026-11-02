@@ -9,6 +9,7 @@ vi.mock('@/lib/api-error', () => ({
 vi.mock('@/lib/services/forecast', () => ({
   getPredictionWithTags: vi.fn(),
   findSimilarForecasts: vi.fn(),
+  DUPLICATE_WARNING_MIN_SCORE: 0.87,
 }))
 
 vi.mock('@/lib/services/translation', () => ({
@@ -86,6 +87,20 @@ describe('GET /api/forecasts/similar', () => {
     expect(vi.mocked(findSimilarForecasts)).toHaveBeenCalledWith(
       expect.objectContaining({ claimText: 'Will inflation drop below 3%?', tags: ['economics', 'usa'] })
     )
+  })
+
+  it('uses the stricter duplicate bar for purpose=duplicate (daatan#2083)', async () => {
+    vi.mocked(findSimilarForecasts).mockResolvedValue([])
+    await GET(makeRequest({ q: 'Bitcoin will reach $150,000 by December 31, 2026.', purpose: 'duplicate' }))
+    expect(vi.mocked(findSimilarForecasts)).toHaveBeenCalledWith(
+      expect.objectContaining({ minScore: 0.87 })
+    )
+  })
+
+  it('keeps the default (related-list) bar without purpose=duplicate', async () => {
+    vi.mocked(findSimilarForecasts).mockResolvedValue([])
+    await GET(makeRequest({ q: 'Bitcoin will reach $150,000 by December 31, 2026.', purpose: 'other' }))
+    expect(vi.mocked(findSimilarForecasts).mock.calls[0][0]).not.toHaveProperty('minScore')
   })
 
   it('caps limit at 10', async () => {

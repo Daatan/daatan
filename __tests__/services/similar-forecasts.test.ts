@@ -78,6 +78,23 @@ describe('findSimilarForecasts — vector search', () => {
     expect(results[0].author).toEqual({ name: 'Alice', username: 'alice' })
   })
 
+  it('filters at 0.75 by default and at minScore when given (daatan#2083)', async () => {
+    const { embedText } = await import('@/lib/services/embedding')
+    const { prisma } = await import('@/lib/prisma')
+    const { findSimilarForecasts, DUPLICATE_WARNING_MIN_SCORE } = await import('@/lib/services/forecast')
+
+    vi.mocked(embedText).mockResolvedValue(FAKE_EMBEDDING)
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([])
+
+    await findSimilarForecasts({ claimText: 'Bitcoin 150k', tags: [] })
+    await findSimilarForecasts({ claimText: 'Bitcoin 150k', tags: [], minScore: DUPLICATE_WARNING_MIN_SCORE })
+
+    const [defaultSql, strictSql] = vi.mocked(prisma.$queryRaw).mock.calls.map(c => c[0] as unknown as { values: unknown[] })
+    expect(defaultSql.values).toContain(0.75)
+    expect(strictSql.values).toContain(DUPLICATE_WARNING_MIN_SCORE)
+    expect(strictSql.values).not.toContain(0.75)
+  })
+
   it('sorts by score descending', async () => {
     const { embedText } = await import('@/lib/services/embedding')
     const { prisma } = await import('@/lib/prisma')

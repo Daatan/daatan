@@ -41,7 +41,7 @@ export function SimilarForecastsWarning({
     const timer = setTimeout(async () => {
       lastQuery.current = queryKey
       try {
-        const params = new URLSearchParams({ q: claim, limit: String(limit), language: locale })
+        const params = new URLSearchParams({ q: claim, limit: String(limit), language: locale, purpose: 'duplicate' })
         if (tags.length > 0) params.set('tags', tags.join(','))
         const res = await fetch(`/api/forecasts/similar?${params}`)
         if (res.ok) {
