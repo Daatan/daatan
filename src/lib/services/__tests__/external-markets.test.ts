@@ -42,6 +42,8 @@ import {
   suggestMarkets,
   suggestMarketsForClaim,
   suggestMarketMatch,
+  thresholdDirection,
+  isOppositeDirection,
   buildMarketSearchQuery,
   deadlineWeight,
   parseHistoryPayload,
@@ -1023,6 +1025,24 @@ describe('suggestMarketMatch', () => {
     expect(match!.score).toBe(100)
   })
 
+  it('skips a near-identical market on the opposite side of the threshold (daatan#2072)', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ question: 'Will Bitcoin dip to $55,000 by December 31, 2026?' }),
+    ])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0]) // cosine 1 — only the guard can reject it
+
+    expect(await suggestMarketMatch('Bitcoin will reach $150,000 by December 31, 2026')).toBeNull()
+  })
+
+  it('keeps a same-direction market with a different threshold', async () => {
+    global.fetch = gammaFetchMock([
+      gammaRow({ question: 'Will Bitcoin reach $200,000 by December 31, 2026?' }),
+    ])
+    vi.mocked(embedText).mockResolvedValue([1, 0, 0])
+
+    expect(await suggestMarketMatch('Bitcoin will reach $150,000 by December 31, 2026')).not.toBeNull()
+  })
+
   it('reuses a cached candidate embedding instead of re-embedding it (daatan#1640)', async () => {
     global.fetch = gammaFetchMock([gammaRow()])
     vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
@@ -1331,5 +1351,28 @@ describe('resolveMarketByUrl (Kalshi)', () => {
     expect(prisma.externalMarketPriceSnapshot.create).toHaveBeenCalledWith({
       data: { marketId: 'm1', probability: 35 },
     })
+  })
+})
+
+describe('thresholdDirection / isOppositeDirection (daatan#2072)', () => {
+  it.each([
+    ['Bitcoin will reach $150,000 by December 31, 2026', 'up'],
+    ['Will Bitcoin dip to $55,000 by December 31, 2026?', 'down'],
+    ['Will Brent crude exceed $130 per barrel in 2026?', 'up'],
+    ['Will US unemployment fall below 4% this year?', 'down'],
+    ['Will inflation be above 3% in Q4?', 'up'],
+    ['Will the ECB cut rates under Lagarde?', null], // no number after "under"
+    ['Will turnout be over the 2022 level?', 'up'],
+    ['Will Bitcoin hit $100k or drop to $50k first?', null], // both sides
+    ['Will Netanyahu remain prime minister through 2026?', null],
+    ['ביטקוין יגיע ל-150,000 דולר', null], // non-English → never filtered
+  ])('%s → %s', (text, dir) => {
+    expect(thresholdDirection(text)).toBe(dir)
+  })
+
+  it('flags only when both sides have a direction and they differ', () => {
+    expect(isOppositeDirection('Bitcoin will reach $150,000', 'Will Bitcoin dip to $55,000?')).toBe(true)
+    expect(isOppositeDirection('Bitcoin will reach $150,000', 'Will Bitcoin reach $200,000?')).toBe(false)
+    expect(isOppositeDirection('Bitcoin will reach $150,000', 'Bitcoin price on Dec 31?')).toBe(false)
   })
 })

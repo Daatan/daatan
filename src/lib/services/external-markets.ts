@@ -1060,6 +1060,41 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0
 }
 
+/** Verbs/comparatives that put a threshold claim on the "goes up / at least"
+ *  or the "goes down / at most" side. Only counted when a number follows within a
+ *  few words ("dip to $55,000", "above 4%"), so prose like "under Trump" or
+ *  "over the year" doesn't register a direction. */
+const UP_WORDS = 'reach(?:es)?|hit(?:s)?|exceed(?:s)?|surpass(?:es)?|top(?:s)?|break(?:s)?|rise(?:s)?|climb(?:s)?|above|over|higher than|more than|greater than|at least'
+const DOWN_WORDS = 'dip(?:s)?|drop(?:s)?|fall(?:s)?|decline(?:s)?|sink(?:s)?|crash(?:es)?|below|under|lower than|less than|fewer than|at most'
+const NUMBER_AFTER = String.raw`\b[^.?!\d]{0,20}?[$€£₪]?\d`
+const UP_RE = new RegExp(String.raw`\b(?:${UP_WORDS})${NUMBER_AFTER}`, 'i')
+const DOWN_RE = new RegExp(String.raw`\b(?:${DOWN_WORDS})${NUMBER_AFTER}`, 'i')
+
+/**
+ * Direction of a numeric-threshold question: `up` ("reach $150k"), `down`
+ * ("dip to $55k"), or null when it has no threshold wording or mixes both
+ * ("between", "above X but below Y"). English-only; other languages return null
+ * and so are never filtered.
+ */
+export function thresholdDirection(text: string): 'up' | 'down' | null {
+  const up = UP_RE.test(text)
+  const down = DOWN_RE.test(text)
+  if (up === down) return null
+  return up ? 'up' : 'down'
+}
+
+/**
+ * True when claim and market are both threshold questions pointing in opposite
+ * directions (daatan#2072: "Bitcoin will reach $150,000" matched "Will Bitcoin
+ * dip to $55,000?" at 87%). The embedding is nearly blind to this, so it's
+ * checked deterministically after the cosine step.
+ */
+export function isOppositeDirection(claimText: string, marketQuestion: string): boolean {
+  const a = thresholdDirection(claimText)
+  const b = thresholdDirection(marketQuestion)
+  return a !== null && b !== null && a !== b
+}
+
 /**
  * Suggest-on-create: keyword-prefilter candidate markets for a claim, embed the
  * claim + each candidate question, and return the single best match if its cosine
@@ -1089,6 +1124,9 @@ export async function suggestMarketMatch(
   for (let i = 0; i < candidates.length; i++) {
     const vec = candidateVecs[i]
     if (!vec) continue
+    // Same topic and date but the opposite side of the threshold is a different
+    // question, however close the embeddings (daatan#2072).
+    if (isOppositeDirection(q, candidates[i].question)) continue
     // Deadline-adjusted so a same-question market resolving a year off can't
     // clear the auto-link threshold (the Knicks 2026↔2027 mislink).
     const score = cosineSimilarity(claimVec, vec) * deadlineWeight(candidates[i].endDate, deadline)
