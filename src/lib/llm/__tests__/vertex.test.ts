@@ -93,6 +93,17 @@ describe('VertexProvider', () => {
     expect('temperature' in cfg).toBe(false)
   })
 
+  it('sends thinkingConfig only when a thinkingBudget is given (#1890)', async () => {
+    const provider = new VertexProvider(CONFIG)
+    await provider.generateContent({ prompt: 'q', thinkingBudget: 512 })
+    await provider.generateContent({ prompt: 'q', thinkingBudget: 0 })
+    await provider.generateContent({ prompt: 'q' })
+    const cfgs = fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string).generationConfig)
+    expect(cfgs[0].thinkingConfig).toEqual({ thinkingBudget: 512 })
+    expect(cfgs[1].thinkingConfig).toEqual({ thinkingBudget: 0 })
+    expect('thinkingConfig' in cfgs[2]).toBe(false)
+  })
+
   it('returns the candidate text and maps usage', async () => {
     const res = await new VertexProvider(CONFIG).generateContent({ prompt: 'q' })
     expect(res.text).toBe('{"answer":42}')

@@ -20,6 +20,16 @@ import { ensureRulesDirection, type RulesDirectionOutcome } from './rulesDirecti
 import { checkRulesStrength, type RulesStrengthOutcome } from './rulesStrength'
 import { forStage } from '@/lib/llm/stageModels'
 
+/**
+ * Cap on gemini-2.5-flash's thinking for the draft (#1890 option B). Default (dynamic)
+ * thinking spent ~1,300 tokens and made the draft the slowest creation stage: bench on
+ * 16 polarity cases x 3, p50 7.5 s / p90 16.4 s / max 26.6 s. At 512: p50 4.6 s / p90
+ * 5.4 s / max 6.0 s, no polarity flips, every claim in English. 0 is faster still but
+ * copied 9 of 48 non-English inputs verbatim instead of translating them.
+ * Bench: scripts/bench-express-draft.ts.
+ */
+const EXPRESS_DRAFT_THINKING_BUDGET = 512
+
 const log = createLogger('express-prediction')
 
 export interface NoArticlesFoundDetails {
@@ -420,6 +430,7 @@ export async function generateExpressPrediction(
     const draft = async (text: string): Promise<ParsedPrediction> => {
       const result = await llmService.generateContent({
         ...forStage('express_draft'),
+      thinkingBudget: EXPRESS_DRAFT_THINKING_BUDGET,
         prompt: fillPrompt(template, {
           userInput,
           articlesText: text,
@@ -721,6 +732,7 @@ URL: ${article.url}
   const draft = async (text: string): Promise<ParsedPrediction> => {
     const result = await llmService.generateContent({
       ...forStage('express_draft'),
+      thinkingBudget: EXPRESS_DRAFT_THINKING_BUDGET,
       prompt: fillPrompt(template, {
         userInput,
         articlesText: text,

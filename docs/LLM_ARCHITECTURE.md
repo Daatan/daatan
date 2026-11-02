@@ -62,6 +62,12 @@ LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flas
 - Prod: set it in Secrets Manager `daatan-env-prod`, then redeploy — `blue-green-deploy.sh`
   and both compose files pass it (and `EVIDENCE_SECOND_OPINION_MODEL`, which before #1800
   never reached the container at all); empty = default.
+- **Thinking budget.** A request may set `thinkingBudget` (tokens, `0` = off), sent as Gemini
+  `thinkingConfig` by the Vertex and Gemini legs only; unset keeps the model's dynamic thinking.
+  Only `express_draft` sets it: 512 (#1890). Default thinking spent ~1,300 tokens and was the
+  slowest creation stage (p90 16 s → 5 s at 512 on `scripts/bench-express-draft.ts`). 0 copied
+  non-English inputs verbatim instead of translating them. If `LLM_STAGE_MODELS` moves
+  `express_draft` to a model without a token-count thinking budget, re-check this first.
 - When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
   with the `stage` — the stage ran on another vendor's model. Not paged.
 

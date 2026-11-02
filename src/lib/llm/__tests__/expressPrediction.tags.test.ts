@@ -63,6 +63,18 @@ describe('generateExpressPrediction — tag normalisation (#1787)', () => {
     expect(result.tags).toHaveLength(5)
   })
 
+  it('caps the draft call\'s thinking at 512 tokens on both paths (#1890)', async () => {
+    mockPrediction(['Economy'])
+    await generateExpressPrediction('some input', undefined, true)
+    vi.mocked(oracleSearch).mockResolvedValue([
+      { title: 'Regional news', url: 'https://example.com/a', snippet: 's', source: 'example.com', publishedDate: undefined },
+    ])
+    await generateExpressPrediction('Middle East event')
+    const drafts = vi.mocked(llmService.generateContent).mock.calls.map(([req]) => req).filter((r) => r.stage === 'express_draft')
+    expect(drafts.length).toBeGreaterThanOrEqual(2)
+    for (const r of drafts) expect(r.thinkingBudget).toBe(512)
+  })
+
   it('tolerates a missing tags field', async () => {
     mockPrediction(undefined as unknown as unknown[])
     const result = await generateExpressPrediction('some input', undefined, true)

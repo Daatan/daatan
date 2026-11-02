@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType, type GenerationConfig } from '@google/generative-ai'
 import { LLMProvider, LLMRequest, LLMResponse, LLMConfig } from '../types'
 
 /** Same order of magnitude as the other fallback legs (oracle.ts 60s, panel/client.ts
@@ -20,13 +20,16 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generateContent(request: LLMRequest): Promise<LLMResponse> {
+    // thinkingConfig is accepted by the API but missing from this SDK's GenerationConfig type.
+    const generationConfig: GenerationConfig & { thinkingConfig?: { thinkingBudget: number } } = {
+      responseMimeType: request.schema ? 'application/json' : 'text/plain',
+      responseSchema: request.schema,
+      temperature: request.temperature,
+      ...(request.thinkingBudget !== undefined ? { thinkingConfig: { thinkingBudget: request.thinkingBudget } } : {}),
+    }
     const model = this.genAI.getGenerativeModel({
       model: request.model ?? this.modelName,
-      generationConfig: {
-        responseMimeType: request.schema ? 'application/json' : 'text/plain',
-        responseSchema: request.schema,
-        temperature: request.temperature,
-      },
+      generationConfig,
     })
 
     const result = await model.generateContent(request.prompt, {
