@@ -252,6 +252,7 @@ async function draftWithGroundedDate(
   now: Date,
   draft: (articlesText: string) => Promise<ParsedPrediction>,
   onProgress?: (stage: string, data?: Record<string, unknown>) => void,
+  timings: StageTimings = {},
 ): Promise<{ prediction: ParsedPrediction; articlesText: string; groundedDate: GroundedDateOutcome }> {
   const first = await draft(articlesText)
   if (normalizeDateBasis(first.dateBasis) !== 'assumed') {
@@ -259,7 +260,8 @@ async function draftWithGroundedDate(
   }
 
   onProgress?.('analyzing', { message: 'Looking up the date of the deciding event…' })
-  const lookup = await lookupGroundedEventDate(userInput, first.claimText, now)
+  // Split out of draftMs (which wraps all three calls) so the lookup's own cost is visible (#1890).
+  const lookup = await timed(timings, 'lookupMs', () => lookupGroundedEventDate(userInput, first.claimText, now))
   if (lookup.status !== 'found') {
     return { prediction: first, articlesText, groundedDate: { fired: true, status: lookup.status } }
   }
@@ -271,7 +273,7 @@ async function draftWithGroundedDate(
     articlesText
   const found = { fired: true, status: 'found', event: lookup.event, date: lookup.date, sourceUrl: lookup.sourceUrl } as const
   try {
-    const second = await draft(withReference)
+    const second = await timed(timings, 'redraftMs', () => draft(withReference))
     return {
       prediction: second,
       articlesText: withReference,
@@ -456,7 +458,7 @@ export async function generateExpressPrediction(
     let groundedDate: GroundedDateOutcome
     try {
       ;({ prediction, articlesText, groundedDate } = await timed(stageTimings, 'draftMs', () => draftWithGroundedDate(
-        userInput, `[User Input]\n${userInput}`, now, draft, onProgress,
+        userInput, `[User Input]\n${userInput}`, now, draft, onProgress, stageTimings,
       )))
       onProgress?.('prediction_formed', {
         message: 'Forecast drafted — finalising…',
@@ -763,7 +765,7 @@ URL: ${article.url}
     // The reference block is prepended, so [Article N] numbering — and with it
     // relevantArticleIndices — is the same in both drafts.
     ;({ prediction, articlesText, groundedDate } = await timed(stageTimings, 'draftMs', () => draftWithGroundedDate(
-      userInput, searchedArticlesText, now, draft, onProgress,
+      userInput, searchedArticlesText, now, draft, onProgress, stageTimings,
     )))
   } catch (error) {
     log.error({ err: error }, 'Failed to generate express prediction')

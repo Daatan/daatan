@@ -93,6 +93,10 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
     expect(result.resolveByDatetime).toBe('2026-10-28T23:59:59Z')
     expect(result.dateBasis).toBe('from_sources')
     expect(result.groundedDate).toEqual({ fired: true, ...FOUND, adopted: true })
+    // lookup and re-draft are timed on their own, inside draftMs (#1890)
+    expect(result.stageTimings).toEqual(expect.objectContaining({
+      lookupMs: expect.any(Number), redraftMs: expect.any(Number), draftMs: expect.any(Number),
+    }))
     expect(result.newsAnchor?.url).toBe(ARTICLE.url)
   })
 
@@ -128,6 +132,8 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
     expect(lookupGroundedEventDate).not.toHaveBeenCalled()
     expect(draftPrompts()).toHaveLength(1)
     expect(result.groundedDate).toEqual({ fired: false })
+    expect(result.stageTimings).not.toHaveProperty('lookupMs')
+    expect(result.stageTimings).not.toHaveProperty('redraftMs')
   })
 
   it.each(['no_date', 'unavailable'] as const)('keeps the first draft and its "assumed" warning when the lookup is %s', async status => {
@@ -140,6 +146,8 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
     expect(result.dateBasis).toBe('assumed')
     expect(result.resolveByDatetime).toBe(BASE.resolveByDatetime)
     expect(result.groundedDate).toEqual({ fired: true, status })
+    expect(result.stageTimings).toHaveProperty('lookupMs')
+    expect(result.stageTimings).not.toHaveProperty('redraftMs')
   })
 
   it('keeps the first draft when the re-draft fails — losing the date must not lose the forecast', async () => {
