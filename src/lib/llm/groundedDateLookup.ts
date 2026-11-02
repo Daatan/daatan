@@ -28,8 +28,12 @@ const log = createLogger('grounded-date-lookup')
  */
 
 const LOOKUP_MODEL = 'gemini-2.5-flash'
-/** Measured 4.4–10.4 s. Past this the draft goes out with the "assumed" warning instead. */
-const LOOKUP_TIMEOUT_MS = 15_000
+/**
+ * Measured 4.4–10.4 s (2026-09-18); p50 4.4 s / p90 8.4 s on 28 calls (2026-11-02, #1890).
+ * Past this the draft goes out with the "assumed" warning instead — the slow tail is search
+ * round-trips, not thinking (a thinkingBudget cap cost accuracy for ~0.3 s), so it's cut here.
+ */
+const LOOKUP_TIMEOUT_MS = 10_000
 /** A "scheduled event" further out than this is a misread, not a calendar fact. */
 const MAX_YEARS_AHEAD = 10
 const MAX_EVENT_CHARS = 160

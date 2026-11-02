@@ -103,7 +103,8 @@ describe('generateExpressPrediction — moderation gating', () => {
     const result = await generateExpressPrediction('a perfectly fine free-text claim')
 
     expect(Object.keys(result.stageTimings).sort()).toEqual([
-      'draftMs', 'localizationMs', 'moderationMs', 'rulesDirectionMs', 'searchMs', 'searchQueryMs', 'totalMs',
+      // the mocked draft reports no dateBasis ("assumed"), so the date lookup runs and is timed
+      'draftMs', 'localizationMs', 'lookupMs', 'moderationMs', 'rulesDirectionMs', 'searchMs', 'searchQueryMs', 'totalMs',
     ])
     expect(result.stageTimings.totalMs).toBeGreaterThanOrEqual(0)
   })
