@@ -23,6 +23,7 @@ import { generateExpressPrediction } from '../expressPrediction'
 import { llmService } from '../index'
 import { oracleSearch } from '../../services/oracleSearch'
 import { lookupGroundedEventDate } from '../groundedDateLookup'
+import { fetchUrlContent } from '../../utils/scraper'
 
 // daatan#1706 option 2: when the first draft admits its resolution date is "assumed",
 // look the deciding event's date up on the web and draft again with it in front of the
@@ -81,8 +82,9 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
 
     const result = await generateExpressPrediction('The Fed cuts rates at its next meeting')
 
+    // Started beside the first draft on the author's own words (#1890), so no drafted claim yet.
     expect(lookupGroundedEventDate).toHaveBeenCalledWith(
-      'The Fed cuts rates at its next meeting', BASE.claimText, expect.any(Date),
+      'The Fed cuts rates at its next meeting', 'The Fed cuts rates at its next meeting', expect.any(Date), expect.any(AbortSignal),
     )
     const [first, second] = draftPrompts()
     expect(first).not.toContain('[Reference')
@@ -124,12 +126,14 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
     expect(oracleSearch).not.toHaveBeenCalled()
   })
 
-  it.each(['explicit_in_claim', 'from_sources'])('does not look anything up when the first draft reports %s', async basis => {
+  it.each(['explicit_in_claim', 'from_sources'])('aborts the speculative lookup when the first draft reports %s', async basis => {
     mockDrafts({ ...BASE, dateBasis: basis })
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable' })
 
     const result = await generateExpressPrediction('some input')
 
-    expect(lookupGroundedEventDate).not.toHaveBeenCalled()
+    expect(lookupGroundedEventDate).toHaveBeenCalledTimes(1)
+    expect((vi.mocked(lookupGroundedEventDate).mock.calls[0][3] as AbortSignal).aborted).toBe(true)
     expect(draftPrompts()).toHaveLength(1)
     expect(result.groundedDate).toEqual({ fired: false })
     expect(result.stageTimings).not.toHaveProperty('lookupMs')
@@ -184,7 +188,43 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
   it('still propagates a failure of the first draft — there is nothing to fall back to', async () => {
     mockDrafts(new Error('all providers failed'))
 
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable' })
+
     await expect(generateExpressPrediction('some input')).rejects.toThrow('all providers failed')
-    expect(lookupGroundedEventDate).not.toHaveBeenCalled()
+    // the speculative lookup was already running; it's aborted, not left to finish
+    expect((vi.mocked(lookupGroundedEventDate).mock.calls[0][3] as AbortSignal).aborted).toBe(true)
+  })
+
+  it('overlaps the lookup with the first draft instead of running it after (#1890)', async () => {
+    let releaseDraft!: () => void
+    const draftGate = new Promise<void>(r => { releaseDraft = r })
+    const queue: Array<Record<string, unknown>> = [BASE, REDRAFT]
+    vi.mocked(llmService.generateContent).mockImplementation((async ({ schema }: { schema?: unknown }) => {
+      if (!schema) return { text: 'topic' }
+      const next = queue.shift()
+      if (next === BASE) await draftGate
+      return { text: JSON.stringify(next) }
+    }) as never)
+    vi.mocked(lookupGroundedEventDate).mockImplementation(async () => {
+      // the first draft is still blocked here, so the lookup cannot have waited for it
+      releaseDraft()
+      return FOUND
+    })
+
+    const result = await generateExpressPrediction('The Fed cuts rates at its next meeting')
+
+    expect(result.groundedDate).toMatchObject({ status: 'found', adopted: true })
+    expect(result.stageTimings).toEqual(expect.objectContaining({ lookupMs: expect.any(Number), lookupWaitMs: expect.any(Number) }))
+  })
+
+  it('waits for the drafted claim before looking up a bare URL — the URL names no event', async () => {
+    vi.mocked(fetchUrlContent).mockResolvedValue('Fed Watch. Markets expect a cut at the next meeting.')
+    mockDrafts(BASE)
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'no_date' })
+
+    await generateExpressPrediction('https://example.com/fed-watch')
+
+    expect(lookupGroundedEventDate).toHaveBeenCalledTimes(1)
+    expect(lookupGroundedEventDate).toHaveBeenCalledWith('https://example.com/fed-watch', BASE.claimText, expect.any(Date))
   })
 })

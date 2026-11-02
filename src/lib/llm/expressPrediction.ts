@@ -254,14 +254,36 @@ async function draftWithGroundedDate(
   onProgress?: (stage: string, data?: Record<string, unknown>) => void,
   timings: StageTimings = {},
 ): Promise<{ prediction: ParsedPrediction; articlesText: string; groundedDate: GroundedDateOutcome }> {
-  const first = await draft(articlesText)
+  // The lookup is started beside the first draft on the user's own words, not after it on the
+  // drafted claim, so its 4–15 s mostly overlaps the draft instead of following it (#1890). It's
+  // aborted when the draft turns out to have its date. A bare URL says nothing about the event,
+  // so that input still waits for the drafted claim.
+  const speculate = !/^https?:\/\/\S+$/i.test(userInput.trim())
+  const abort = new AbortController()
+  const lookupStart = Date.now()
+  let lookupEnd = 0
+  const early = speculate
+    ? lookupGroundedEventDate(userInput, userInput, now, abort.signal).then(r => { lookupEnd = Date.now(); return r })
+    : null
+
+  let first: ParsedPrediction
+  try {
+    first = await draft(articlesText)
+  } catch (error) {
+    abort.abort()
+    throw error
+  }
   if (normalizeDateBasis(first.dateBasis) !== 'assumed') {
+    abort.abort()
     return { prediction: first, articlesText, groundedDate: { fired: false } }
   }
 
   onProgress?.('analyzing', { message: 'Looking up the date of the deciding event…' })
-  // Split out of draftMs (which wraps all three calls) so the lookup's own cost is visible (#1890).
-  const lookup = await timed(timings, 'lookupMs', () => lookupGroundedEventDate(userInput, first.claimText, now))
+  // lookupMs is the lookup's own duration; lookupWaitMs the part of it the author actually waited for.
+  const waitStart = Date.now()
+  const lookup = early ? await early : await lookupGroundedEventDate(userInput, first.claimText, now)
+  timings.lookupMs = early ? lookupEnd - lookupStart : Date.now() - waitStart
+  timings.lookupWaitMs = Date.now() - waitStart
   if (lookup.status !== 'found') {
     return { prediction: first, articlesText, groundedDate: { fired: true, status: lookup.status } }
   }

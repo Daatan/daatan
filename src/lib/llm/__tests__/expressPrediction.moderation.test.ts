@@ -104,7 +104,7 @@ describe('generateExpressPrediction — moderation gating', () => {
 
     expect(Object.keys(result.stageTimings).sort()).toEqual([
       // the mocked draft reports no dateBasis ("assumed"), so the date lookup runs and is timed
-      'draftMs', 'localizationMs', 'lookupMs', 'moderationMs', 'rulesDirectionMs', 'searchMs', 'searchQueryMs', 'totalMs',
+      'draftMs', 'localizationMs', 'lookupMs', 'lookupWaitMs', 'moderationMs', 'rulesDirectionMs', 'searchMs', 'searchQueryMs', 'totalMs',
     ])
     expect(result.stageTimings.totalMs).toBeGreaterThanOrEqual(0)
   })
