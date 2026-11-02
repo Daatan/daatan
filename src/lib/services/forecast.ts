@@ -435,8 +435,20 @@ export async function createForecast(input: CreateForecastInput) {
 
 // ── Similar forecasts ──────────────────────────────────────────────────────────
 
-// Cosine similarity threshold: 1 - distance. 0.75 means reasonably similar.
+// Cosine similarity threshold: 1 - distance. 0.75 means reasonably similar —
+// the bar for the "Similar forecasts" (related) block on a forecast page.
 const COSINE_THRESHOLD = 0.75
+
+/**
+ * Stricter bar for the create-time "is yours a duplicate?" warning (daatan#2083).
+ * Short claims embed by shape ("X will reach $N by December 31, 2026"), so
+ * different-topic claims of the same shape score ~0.80–0.85 against each other
+ * (BTC $150k ↔ Brent $130 0.817, Netanyahu PM ↔ Modi PM 0.853). On the 156
+ * active prod forecasts (2026-11-02) every pair at ≥ 0.87 shared a topic, and
+ * true duplicates / rewordings sat at 0.93–0.99. A Hebrew draft of an existing
+ * English claim scored 0.885, so the bar keeps some cross-lingual headroom.
+ */
+export const DUPLICATE_WARNING_MIN_SCORE = 0.87
 
 export interface SimilarForecast {
   id: string
@@ -465,11 +477,14 @@ export async function findSimilarForecasts({
   tags,
   excludeId,
   limit = 3,
+  minScore = COSINE_THRESHOLD,
 }: {
   claimText: string
   tags: string[]
   excludeId?: string
   limit?: number
+  /** Minimum cosine similarity; defaults to the related-list bar (0.75). */
+  minScore?: number
 }): Promise<SimilarForecast[]> {
   const embedding = await embedText(claimText)
 
@@ -517,7 +532,7 @@ export async function findSimilarForecasts({
         AND p.embedding IS NOT NULL
         AND p.id != ${excludeId ?? ''}${tagGate}
       GROUP BY p.id, u.name, u.username, p.embedding
-      HAVING (1 - (p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)})) >= ${COSINE_THRESHOLD}
+      HAVING (1 - (p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)})) >= ${minScore}
       ORDER BY p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)}
       LIMIT ${fetchLimit}
     `
