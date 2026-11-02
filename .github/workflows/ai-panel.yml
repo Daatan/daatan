@@ -91,7 +91,7 @@ jobs:
           #
           # --max-time is a transport guard, NOT the sweep budget: route.ts's
           # maxDuration is inert on the self-hosted deployment, and a healthy
-          # first-of-day sweep (sequential forecasts, 30s per-call timeout) can
+          # first-of-day sweep (4 forecasts at once, 30s per-call timeout) can
           # legitimately run several minutes. 600s buys headroom without letting a
           # dead server hang the job.
           HTTP=$(curl -s -o /tmp/panel_body.txt -w "%{http_code}" \

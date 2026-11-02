@@ -351,6 +351,8 @@ second sentinel member, `'market'`, in v1.51.0.)
 16:43 UTC (off the hour, off the requote cron at 05:31).
 
 - Selects `status = ACTIVE`, `outcomeType = BINARY`, deadline not passed.
+- Up to 4 forecasts at once (`FORECAST_CONCURRENCY`, daatan#2090), up to 3 member calls at
+  once per forecast (`MEMBER_CONCURRENCY`), so at most 12 calls are in flight.
 - Per forecast: compute hash → skip, or call all members concurrently → write one run.
 - **A matching hash with a partial member set triggers a completion pass** (§4): only the
   missing-and-askable members are called and their estimates appended to the day's run
@@ -365,8 +367,9 @@ second sentinel member, `'market'`, in v1.51.0.)
 - **A rejected OpenRouter key (401/403) disables those members for the rest of the
   sweep.** Auth failure is a property of the *shared key*, not of the member: if one
   OpenRouter member 401s they all will, so retrying is guaranteed to fail.
-  `PanelAuthError` latches on the first rejection, so a dead key costs one rejected
-  request per sweep, not one per member per forecast.
+  `PanelAuthError` latches on the first rejection, so a dead key costs at most a
+  dozen rejected requests per sweep (the calls already in flight), not one per member per
+  forecast.
 
   It is **scoped to the OpenRouter route.** Bedrock members authenticate with the app's
   IAM role and keep producing — that is the entire reason one exists. Conversely a
