@@ -2,7 +2,7 @@ import { Prisma, type ContextSnapshot } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { notifyHighConfidence, notifySettled } from '@/lib/services/telegram'
-import { MATERIAL_CHANGE_PTS } from '@/lib/services/oracle-snapshot'
+import { EVIDENCE_ANCHOR_PTS } from '@/lib/services/oracle-snapshot'
 
 const log = createLogger('context-service')
 
@@ -411,7 +411,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
   let anchor: EvidenceAnchor | null = null
   if (policy.kind === 'evidence' && !input.insufficientData && input.probability !== null) {
     anchor = await getLatestEvidenceEstimate(input.predictionId)
-    materialChange = anchor === null || Math.abs(input.probability - anchor.externalProbability) >= MATERIAL_CHANGE_PTS
+    materialChange = anchor === null || Math.abs(input.probability - anchor.externalProbability) >= EVIDENCE_ANCHOR_PTS
     evidenceAt = evidencePublishedAt(input.sources, input.oracleSnapshot)
   }
 
