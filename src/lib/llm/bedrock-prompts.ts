@@ -132,19 +132,21 @@ Resolution Rules: {{resolutionRules}}
 Claim Deadline: {{forecastEndStr}} — the claim counts qualifying events up to this date.
 Claim Created: {{forecastStartStr}} — metadata, NOT a lower bound: unless the claim text or resolution rules state an explicit start date, an event that happened BEFORE this date still resolves the claim (e.g. "X will happen by <deadline>" is satisfied by an occurrence at any earlier time, including before the claim existed).
 Current Date: {{currentDate}}
+Deadline Status: {{deadlineStatus}}
 
 {{context}}
 
 Instructions:
 1. Read the Resolution Rules first and restate their operative test in your reasoning: what exactly must have happened, by when, and according to which sources. Where the rules are more specific than the generic guidance below, the rules govern.
-2. If the Resolution Rules contain an explicit default clause (e.g. "Otherwise, it will resolve as 'No'"), that clause decides every case the rules' positive condition does not confirm. Apply the default — do NOT return 'unresolvable' for a case the rules already decide.
+2. If the Resolution Rules contain an explicit default clause (e.g. "Otherwise, it will resolve as 'No'"), that clause decides every case the rules' positive condition does not confirm — but ONLY once the deadline has passed (see Deadline Status). Once it has, apply the default — do NOT return 'unresolvable' for a case the rules already decide.
+2a. If Deadline Status says the deadline has NOT yet passed: an event that has not happened yet can still happen, so "not confirmed so far" is NOT a 'wrong' outcome and the default clause does not apply yet. Return 'correct' only if the event already happened; return 'wrong' only if a source affirmatively shows the claim can no longer come true before the deadline (cancelled, officially ruled out, a fixed date already missed). Otherwise return 'unresolvable' with premature=true, and say in your reasoning that it is too early to resolve and when the deadline is.
 3. Determine whether the claim's outcome occurred by {{forecastEndStr}} — including before the claim was created on {{forecastStartStr}}, unless the claim text or resolution rules explicitly bound the start.
 4. Use the context above as your primary evidence. A "Curated evidence pool" section, when present, lists evidence already extracted for this exact claim — rows marked SETTLEMENT ASSERTED report the resolving event itself and are the strongest signal. If the context is insufficient or irrelevant, draw on your own knowledge of events during that period.
 5. In your reasoning, explicitly list the decisive sources or facts (from context or your own knowledge), each with its date and URL where available.
 6. For claims about measured quantities (territory, prices, vote shares, counts): when reputable trackers disagree on the direction or the margin is within measurement noise, the claim is NOT confirmed — apply the rules' default clause if one exists; conflicting measurements are non-confirmation, not grounds for 'unresolvable'.
 7. For BINARY predictions:
    - If the claim is clearly true (the event happened as stated), use 'correct'.
-   - Use 'wrong' when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen), OR when the resolution rules' default clause resolves an unconfirmed case to 'No'. A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
+   - Use 'wrong' when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen), OR — only after the deadline has passed — when the resolution rules' default clause resolves an unconfirmed case to 'No'. A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
    - Only use 'unresolvable' if you genuinely have no reliable information for the period AND no default clause decides the case.
 8. For MULTIPLE_CHOICE predictions:
    - If one option clearly occurred, use 'correct' AND provide correctOptionId.

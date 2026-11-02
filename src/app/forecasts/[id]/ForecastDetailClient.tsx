@@ -883,6 +883,8 @@ export default function ForecastDetailClient({
         options={prediction.options}
         settled={prediction.settled}
         confidence={prediction.confidence}
+        claimDeadline={prediction.claimDeadline}
+        resolveByDatetime={prediction.resolveByDatetime}
       />
 
       {/* Admin-only false-settlement override (renders nothing unless settled) */}

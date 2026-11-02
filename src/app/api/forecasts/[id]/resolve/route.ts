@@ -14,7 +14,7 @@ const log = createLogger('forecast-resolve')
 
 export const POST = withAuth(async (request, user, { params }) => {
   const body = await request.json()
-  const { outcome, evidenceLinks, resolutionNote, correctOptionId, resolutionOverrodePin } = resolvePredictionSchema.parse(body)
+  const { outcome, evidenceLinks, resolutionNote, correctOptionId, resolutionOverrodePin, earlyResolutionAcknowledged } = resolvePredictionSchema.parse(body)
 
   let resolveResult: Awaited<ReturnType<typeof resolvePrediction>>
   try {
@@ -25,6 +25,7 @@ export const POST = withAuth(async (request, user, { params }) => {
       resolutionNote,
       correctOptionId,
       resolutionOverrodePin,
+      earlyResolutionAcknowledged,
     })
   } catch (err) {
     const e = toError(err) as Error & { statusCode?: number }

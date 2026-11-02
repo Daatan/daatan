@@ -83,6 +83,18 @@ export function composeResearchResults(
   return dedup([...primary, ...reservedPre, ...deadlineTargeted]).slice(0, caps.total)
 }
 
+/**
+ * Plain-language deadline status for the verdict prompt (daatan#2076). Computed
+ * here rather than asking the model to compare two ISO dates, which it does
+ * unreliably.
+ */
+export function deadlineStatus(deadline: Date, now: Date): string {
+  const ms = deadline.getTime() - now.getTime()
+  if (ms <= 0) return 'PASSED — the claim window is closed.'
+  const days = Math.ceil(ms / 86_400_000)
+  return `NOT YET PASSED — ${days === 1 ? '1 day remains' : `${days} days remain`} until the deadline.`
+}
+
 /** Minimal shape `runResolutionResearch` needs — matches `getForecastForResearch`'s return. */
 export interface ResolutionResearchPrediction {
   id: string
@@ -100,6 +112,8 @@ export interface ResolutionResearchResult {
   correctOptionId?: string
   reasoning: string
   evidenceLinks: string[]
+  /** daatan#2076: deadline not passed and the claim is neither confirmed nor impossible yet. */
+  premature?: boolean
   timings: { searchMs: number; llmMs: number; totalMs: number }
 }
 
@@ -274,6 +288,7 @@ export async function runResolutionResearch(
     forecastStartStr,
     forecastEndStr,
     currentDate: now.toISOString().split('T')[0],
+    deadlineStatus: deadlineStatus(forecastEnd, now),
     context: [
       poolContext,
       context
@@ -292,5 +307,8 @@ export async function runResolutionResearch(
 
   const llmMs = Date.now() - llmStart
   const findings = JSON.parse(response.text) as Omit<ResolutionResearchResult, 'timings'>
+  // A premature verdict must never carry a decisive outcome: the form would
+  // prefill it, and bornTrueCheck would alert on it.
+  if (findings.premature) findings.outcome = 'unresolvable'
   return { ...findings, timings: { searchMs, llmMs, totalMs: Date.now() - routeStart } }
 }

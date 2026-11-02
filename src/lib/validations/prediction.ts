@@ -162,6 +162,10 @@ export const resolvePredictionSchema = z.object({
   // pin / extreme AI confidence contradicts this outcome. Ignored when no
   // contradiction exists; required (server-enforced) when one does.
   resolutionOverrodePin: z.boolean().optional(),
+  // daatan#2076: resolver's explicit acknowledgment that a 'wrong'/'unresolvable'
+  // outcome is being declared before the claim's deadline. Required (server-enforced)
+  // in that case, ignored otherwise.
+  earlyResolutionAcknowledged: z.boolean().optional(),
 })
 
 export const rejectForecastSchema = z.object({

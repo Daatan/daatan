@@ -122,12 +122,12 @@
       "schema_chars": 219
     },
     "resolution-research": {
-      "version": "v1",
-      "hash": "e613c34d9ebc0134",
-      "chars": 3513,
+      "version": "v2",
+      "hash": "a2426001402bf309",
+      "chars": 4231,
       "schema": "researchSchema",
-      "schema_hash": "3b50a9e8623d44e6",
-      "schema_chars": 607
+      "schema_hash": "a9dd19a6febb5ef7",
+      "schema_chars": 829
     },
     "rules-direction": {
       "version": "v1",

@@ -14,6 +14,8 @@ interface ModeratorResolutionSectionProps {
   options: Array<{ id: string; text: string }>
   settled?: boolean
   confidence?: number | null
+  claimDeadline?: string | Date | null
+  resolveByDatetime?: string | Date | null
 }
 
 export function ModeratorResolutionSection({
@@ -22,7 +24,9 @@ export function ModeratorResolutionSection({
   outcomeType,
   options,
   settled,
-  confidence
+  confidence,
+  claimDeadline,
+  resolveByDatetime,
 }: ModeratorResolutionSectionProps) {
   const { data: session } = useSession()
   const router = useRouter()
@@ -60,6 +64,8 @@ export function ModeratorResolutionSection({
             options={options}
             settled={settled}
             confidence={confidence}
+            claimDeadline={claimDeadline}
+            resolveByDatetime={resolveByDatetime}
             onResolved={() => router.refresh()}
           />
         </div>

@@ -90,3 +90,38 @@ describe('runResolutionResearch — legs run concurrently (#1856)', () => {
     await expect(runResolutionResearch(prediction, { userId: 'u1' })).rejects.toThrow('oracle down')
   })
 })
+
+describe('runResolutionResearch — premature verdicts (#2076)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    search.mockResolvedValue([hit('https://t/1')] as never)
+    oracle.mockResolvedValue([hit('https://a/1'), hit('https://a/2'), hit('https://a/3')] as never)
+  })
+
+  it('forces outcome to unresolvable when the model flags premature', async () => {
+    generate.mockImplementation((async () => ({
+      text: JSON.stringify({ outcome: 'wrong', premature: true, reasoning: 'too early', evidenceLinks: [] }),
+    })) as never)
+    const res = await runResolutionResearch(prediction, { userId: 'u1' })
+    expect(res.outcome).toBe('unresolvable')
+    expect(res.premature).toBe(true)
+  })
+
+  it('passes a computed deadline status to the prompt', async () => {
+    const { fillPrompt } = await import('@/lib/llm/bedrock-prompts')
+    generate.mockImplementation((async () => ({ text: verdict })) as never)
+    await runResolutionResearch(prediction, { userId: 'u1' })
+    const vars = vi.mocked(fillPrompt).mock.calls.map(([, v]) => v).find((v) => 'deadlineStatus' in v)
+    expect(vars?.deadlineStatus).toMatch(/^(PASSED|NOT YET PASSED)/)
+  })
+})
+
+describe('deadlineStatus', () => {
+  it('reports days remaining before the deadline and PASSED after it', async () => {
+    const { deadlineStatus } = await import('@/lib/services/resolutionResearch')
+    const now = new Date('2026-11-01T15:20:00Z')
+    expect(deadlineStatus(new Date('2026-12-31T23:59:59Z'), now)).toBe('NOT YET PASSED — 61 days remain until the deadline.')
+    expect(deadlineStatus(new Date('2026-11-02T00:00:00Z'), now)).toBe('NOT YET PASSED — 1 day remains until the deadline.')
+    expect(deadlineStatus(new Date('2026-10-31T00:00:00Z'), now)).toBe('PASSED — the claim window is closed.')
+  })
+})
