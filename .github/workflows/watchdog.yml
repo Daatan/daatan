@@ -33,6 +33,9 @@ jobs:
     name: Check ${{ matrix.env.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -43,20 +46,29 @@ jobs:
             base_url: https://staging.daatan.com
 
     steps:
-      # Staging is stopped by schedule 20:00–06:00 UTC Mon–Fri and all weekend
-      # (terraform/staging_schedule.tf, #1526); probing it then is a guaranteed
-      # failure, not a signal. The window here is slightly wider than the
-      # schedule (until 06:15) so the box has time to boot after the 06:00 start.
+      - name: Configure AWS credentials (staging)
+        if: matrix.env.name == 'staging'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      # Staging is normally off (#2089), and probing it then is a guaranteed failure,
+      # not a signal. Probe it only when it is running and has had 5 minutes to boot.
       # Production is always probed.
-      - name: Skip staging during its sleep window
+      - name: Skip staging unless it is running
         id: sleep_window
         run: |
           SKIP=false
           if [ "${{ matrix.env.name }}" = "staging" ]; then
-            H=$((10#$(date -u +%H))); M=$((10#$(date -u +%M))); D=$(date -u +%u)
-            if [ "$D" -ge 6 ] || [ "$H" -ge 20 ] || [ "$H" -lt 6 ] || { [ "$H" -eq 6 ] && [ "$M" -lt 15 ]; }; then
+            INSTANCE=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
+              --query "Reservations[0].Instances[0].[State.Name,LaunchTime]" --output text)
+            read -r STATE LAUNCH <<< "$INSTANCE"
+            UPTIME=$(( $(date +%s) - $(date -d "$LAUNCH" +%s) ))
+            if [ "$STATE" != "running" ] || [ "$UPTIME" -lt 300 ]; then
               SKIP=true
-              echo "Staging is in its scheduled sleep window ($(date -u +'%a %H:%M') UTC) — skipping"
+              echo "Staging is $STATE, launched ${UPTIME}s ago — skipping"
             fi
           fi
           echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
@@ -167,6 +179,17 @@ jobs:
           check "Forecast feed" "$BASE/forecasts"   ""
           check "Leaderboard"   "$BASE/leaderboard" ""
           check "About/login"   "$BASE/auth/signin" ""
+
+          # The stop timer may have fired during the probes: that is not an outage.
+          if [ ${#FAILED[@]} -gt 0 ] && [ "${{ matrix.env.name }}" = "staging" ]; then
+            STATE=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
+              --query "Reservations[0].Instances[0].State.Name" --output text)
+            if [ "$STATE" != "running" ]; then
+              echo "Staging went $STATE during the probes — ignoring ${#FAILED[@]} failure(s)"
+              FAILED=()
+            fi
+          fi
 
           if [ ${#FAILED[@]} -gt 0 ]; then
             echo "failed=true" >> "$GITHUB_OUTPUT"

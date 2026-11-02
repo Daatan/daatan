@@ -29,6 +29,9 @@ jobs:
     name: Cert expiry ${{ matrix.env.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -52,18 +55,32 @@ jobs:
             host: elections.daatan.com
             clean: true
     steps:
+      - name: Configure AWS credentials (staging)
+        if: matrix.env.name == 'staging'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
       - name: Check days until expiry
         id: check
         run: |
           WARN_DAYS=14
           HOST="${{ matrix.env.host }}"
 
-          # Staging sleeps on weekends (terraform/staging_schedule.tf, #1526): nothing
-          # answers on :443, so a handshake failure there is not a cert problem.
-          if [ "${{ matrix.env.name }}" = "staging" ] && [ "$(date -u +%u)" -ge 6 ]; then
-            echo "Staging is asleep on weekends — skipping"
-            echo "failed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          # Staging is normally off (#2089): nothing answers on :443, so a handshake
+          # failure there is not a cert problem. This daily check will often skip it.
+          # Every deploy still runs `certbot renew`, and an expired cert fails the
+          # deploy's HTTPS health check.
+          if [ "${{ matrix.env.name }}" = "staging" ]; then
+            STATE=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
+              --query "Reservations[0].Instances[0].State.Name" --output text)
+            if [ "$STATE" != "running" ]; then
+              echo "Staging is $STATE — skipping"
+              echo "failed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
           # Read the served leaf cert's notAfter. -servername sets SNI so we get

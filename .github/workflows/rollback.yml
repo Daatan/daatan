@@ -126,8 +126,8 @@ jobs:
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
       - name: Check Instance SSM Health
-        # Staging sleeps 20:00–06:00 UTC + weekends (terraform/staging_schedule.tf,
-        # #1526): wake it and wait for SSM. Production is never started from CI —
+        # Staging is normally off (#2089): wake it and wait for SSM. Production is
+        # never started from CI —
         # if it is not Online that is an incident, not a schedule.
         run: |
           INSTANCE_ID="${{ steps.instance.outputs.instance_id }}"
@@ -136,7 +136,7 @@ jobs:
               --query "Reservations[0].Instances[0].State.Name" --output text)
             echo "Instance $INSTANCE_ID state: $STATE"
             if [[ "$STATE" == "stopped" ]]; then
-              echo "Staging is asleep — starting it"
+              echo "Staging is off — starting it"
               aws ec2 start-instances --instance-ids "$INSTANCE_ID" >/dev/null
             elif [[ "$STATE" == "stopping" ]]; then
               aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID"
@@ -156,6 +156,13 @@ jobs:
           done
           echo "ERROR: Instance is $PING_STATUS. SSM command will fail."
           exit 1
+
+      - name: Set the staging stop timer
+        if: env.ROLLBACK_ENV != 'production'
+        uses: ./.github/actions/staging-stop-timer
+        with:
+          instance-id: ${{ steps.instance.outputs.instance_id }}
+          minutes: 20
 
       - name: Send rollback command via SSM
         env:
@@ -303,6 +310,13 @@ jobs:
           done
           echo "⚠️ Warning: health endpoint reports version '$RUNNING_VER', expected '$ROLLBACK_VERSION'"
           echo "The deployment may still be stabilizing — check manually."
+
+      - name: Restart the staging stop timer
+        if: always() && env.ROLLBACK_ENV != 'production' && steps.instance.outputs.instance_id != ''
+        uses: ./.github/actions/staging-stop-timer
+        with:
+          instance-id: ${{ steps.instance.outputs.instance_id }}
+          minutes: 20
 
       - name: Notify Telegram - Rollback Success
         if: success()

@@ -512,7 +512,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `evidence-second-opinion.yml` | Mon/Thu 09:00 | `/api/cron/evidence-second-opinion` |
 | `cost-report-monthly.yml` | 1st of month 12:00 | Monthly cost report |
 
-Since #1952 the scheduled workflows target production only (staging sleeps nights and weekends); `cert-expiry.yml` checks staging on weekdays only.
+Since #1952 the scheduled workflows target production only (staging is normally off, #2089); `cert-expiry.yml` checks staging only while it is running.
 
 Manual-only workflows: `rollback.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` runs on `android-v*` tags; `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
 

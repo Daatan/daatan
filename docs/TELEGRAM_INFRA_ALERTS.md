@@ -33,7 +33,7 @@ function; no second function is needed.
    from the app's own `daatan-env-<environment>` Secrets Manager secret — no separate secret is
    provisioned for this Lambda, and credentials are cached for the life of the warm container.
    Staging alarms (`staging-*` / `daatan-staging-*` names) go to the **noisy** channel
-   (`TELEGRAM_CHAT_ID`) instead, so staging's nightly sleep/wake transitions don't page the
+   (`TELEGRAM_CHAT_ID`) instead, so staging's stop/wake transitions don't page the
    clean channel (#1980).
 3. Posts `🔴 ALARM: <name> (<region>)\n<reason>` or `🟢 OK: ...` (`⚪ INSUFFICIENT_DATA: ...`
    for that state) to `https://api.telegram.org/bot<token>/sendMessage`.

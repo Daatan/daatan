@@ -1,0 +1,61 @@
+name: 'Staging stop timer'
+description: 'Make the staging box power itself off N minutes from now, unless a later stop is already set (#2089)'
+
+# Runs `shutdown` on the box rather than a stop call from CI, so the timer still
+# fires if the run is cancelled or GitHub is down. The instance's shutdown
+# behaviour is "stop", and a stop keeps the disk and the EIP. The timer only ever
+# moves later, so a merge cannot cut short a manual staging-up.yml session.
+#
+# Never fails the job: a missed timer costs a few cents until the nightly backstop
+# (terraform/staging_schedule.tf), while a red staging deploy blocks production
+# releases.
+
+inputs:
+  instance-id:
+    description: 'Staging EC2 instance ID'
+    required: true
+  minutes:
+    description: 'Minutes from now until the box stops'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        INSTANCE_ID: ${{ inputs.instance-id }}
+        MINUTES: ${{ inputs.minutes }}
+      run: |
+        PARAMS=$(jq -n --arg m "$MINUTES" '{commands: [
+          "MIN=\($m)",
+          "set -- $(busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager ScheduledShutdown)",
+          "if [ \"$3\" = 18446744073709551615 ] || [ \"$3\" = 0 ]; then CURRENT=0; else CURRENT=$(( $3 / 1000000 )); fi",
+          "TARGET=$(( $(date +%s) + MIN * 60 ))",
+          "if [ \"$CURRENT\" -ge \"$TARGET\" ]; then echo \"Keeping the later stop: $(date -u -d @$CURRENT)\"; else shutdown -P --no-wall +$MIN && echo \"Stop set for $(date -u -d @$TARGET)\"; fi"
+        ]}')
+
+        if ! COMMAND_ID=$(aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --instance-ids "$INSTANCE_ID" \
+          --comment "Staging stop timer: ${MINUTES} min" \
+          --timeout-seconds 120 \
+          --parameters "$PARAMS" \
+          --query "Command.CommandId" --output text); then
+          echo "::warning::Could not send the staging stop timer; the nightly backstop will stop the box"
+          exit 0
+        fi
+
+        for i in $(seq 1 24); do
+          sleep 5
+          STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query "Status" --output text 2>/dev/null || echo Pending)
+          case "$STATUS" in
+            Success)
+              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                --query "StandardOutputContent" --output text
+              exit 0 ;;
+            Pending|InProgress|Delayed) ;;
+            *) break ;;
+          esac
+        done
+        echo "::warning::Staging stop timer ended as $STATUS; the nightly backstop will stop the box"

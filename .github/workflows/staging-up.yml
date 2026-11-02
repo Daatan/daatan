@@ -1,0 +1,73 @@
+name: Staging up
+
+# Staging is normally off (#2089). This turns it on for manual use:
+#   gh workflow run staging-up.yml -R Daatan/daatan
+# It already runs the latest main, because every merge deploys there. Merges during
+# the session still deploy and never shorten it. The nightly backstop stop
+# (terraform/staging_schedule.tf) still applies.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'Hours to keep staging on'
+        required: true
+        default: '3'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  up:
+    name: Turn staging on
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate hours
+        id: duration
+        env:
+          HOURS: ${{ inputs.hours }}
+        run: |
+          [[ "$HOURS" =~ ^([1-9]|1[0-2])$ ]] || { echo "::error::hours must be a whole number from 1 to 12"; exit 1; }
+          echo "minutes=$(( HOURS * 60 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Note the start time
+        run: echo "STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Wake staging
+        id: wake
+        uses: ./.github/actions/staging-wake
+
+      - name: Set the stop timer
+        uses: ./.github/actions/staging-stop-timer
+        with:
+          instance-id: ${{ steps.wake.outputs.instance-id }}
+          minutes: ${{ steps.duration.outputs.minutes }}
+
+      - name: Wait for the app
+        env:
+          HOURS: ${{ inputs.hours }}
+        run: |
+          for i in $(seq 1 60); do
+            BODY=$(curl -s --max-time 5 https://staging.daatan.com/api/health || true)
+            if [ "$(echo "$BODY" | jq -r '.status // empty' 2>/dev/null)" = "ok" ]; then
+              ELAPSED=$(( $(date +%s) - STARTED_AT ))
+              VERSION=$(echo "$BODY" | jq -r '.version // "unknown"')
+              echo "✅ Staging v$VERSION is up after ${ELAPSED}s, on for $HOURS h" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::staging.daatan.com/api/health not ok after 5 min"
+          exit 1

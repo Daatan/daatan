@@ -129,9 +129,9 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
         Resource = "*"
       },
       {
-        # deploy.yml / rollback.yml wake staging when a run lands inside its
-        # scheduled sleep window (staging_schedule.tf, #1526). Start only,
-        # staging only — prod is never started/stopped from CI.
+        # deploy.yml / rollback.yml / staging-up.yml wake staging, which is normally
+        # off (#2089). Start only, staging only — prod is never started/stopped
+        # from CI. The box stops itself, through `shutdown` over SSM.
         Sid      = "WakeStaging"
         Effect   = "Allow"
         Action   = ["ec2:StartInstances"]
