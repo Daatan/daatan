@@ -19,7 +19,10 @@ runs:
       shell: bash
       run: |
         COMMAND_ID="${{ inputs.command-id }}"
-        echo "⏳ Waiting for SSM command $COMMAND_ID (timeout: 10m)..."
+        # A migration deploy includes the pre-migrate DB dump (about 9.5 min on prod in
+        # v1.66.38, and it grows with the DB). Stay under the jobs' 30 min timeout-minutes.
+        TIMEOUT_MINUTES=25
+        echo "⏳ Waiting for SSM command $COMMAND_ID (timeout: ${TIMEOUT_MINUTES}m)..."
         START_TIME=$(date +%s)
         while true; do
           STATUS=$(aws ssm list-command-invocations \
@@ -37,8 +40,8 @@ runs:
             exit 1
           fi
           ELAPSED=$(( $(date +%s) - START_TIME ))
-          if [[ $ELAPSED -gt 600 ]]; then
-            echo "❌ Timed out after 10 minutes waiting for SSM command"
+          if [[ $ELAPSED -gt $(( TIMEOUT_MINUTES * 60 )) ]]; then
+            echo "❌ Timed out after ${TIMEOUT_MINUTES} minutes waiting for SSM command. It may still be running on the host."
             exit 1
           fi
           sleep 5
