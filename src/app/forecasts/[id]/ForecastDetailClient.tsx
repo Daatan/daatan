@@ -43,6 +43,7 @@ import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import { AwaitingResolutionAdmin } from './_forecast/AwaitingResolutionAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
+import { RevertResolutionAdmin } from './_forecast/RevertResolutionAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
@@ -891,6 +892,15 @@ export default function ForecastDetailClient({
         confidence={prediction.confidence}
         claimDeadline={prediction.claimDeadline}
         resolveByDatetime={prediction.resolveByDatetime}
+      />
+
+      {/* Admin-only revert of a mistaken resolution (renders nothing unless resolved) */}
+      <RevertResolutionAdmin
+        prediction={prediction}
+        onReverted={async () => {
+          const updated = await fetch(`/api/forecasts/${id}`).then(r => r.json())
+          setPrediction(updated)
+        }}
       />
 
       {/* Admin-only false-settlement override (renders nothing unless settled) */}
