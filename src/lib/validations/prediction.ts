@@ -152,6 +152,10 @@ export const listCommitmentsQuerySchema = z.object({
 // RESOLUTION SCHEMAS
 // ============================================
 
+export const unresolvePredictionSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+})
+
 export const resolvePredictionSchema = z.object({
   outcome: z.enum(['correct', 'wrong', 'void', 'unresolvable']),
   evidenceLinks: z.array(z.string().url()).optional(),

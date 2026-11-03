@@ -57,6 +57,7 @@ import {
   setArticleExcluded,
   recomputeFromPool,
   pushCredibilityFeedback,
+  retractCredibilityFeedback,
   claimArticleForExtraction,
   claimArticlesForExtraction,
   failClaimedArticles,
@@ -1889,5 +1890,42 @@ describe('retireLegacyNullRows', () => {
       data: { statusReason: 'retired_legacy' },
     })
     expect(count).not.toHaveBeenCalled()
+  })
+})
+
+describe('retractCredibilityFeedback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
+  })
+
+  it('does nothing when the Oracul is not configured', async () => {
+    mockGetOracleConfig.mockReturnValue(null)
+    await retractCredibilityFeedback('pred-1')
+    expect(mockOraculFetch).not.toHaveBeenCalled()
+  })
+
+  it('sends a DELETE for the prediction', async () => {
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ feedback_removed: 1, settlement_pins_removed: 0, tags_removed: true }),
+    } as never)
+
+    await retractCredibilityFeedback('pred-1')
+
+    expect(mockOraculFetch).toHaveBeenCalledWith(
+      expect.anything(),
+      '/leaderboard/ingest/pred-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
+  it.each([
+    ['a refusal', () => Promise.resolve({ ok: false, status: 404 })],
+    ['a network failure', () => Promise.reject(new Error('down'))],
+  ])('%s does not throw', async (_name, impl) => {
+    mockOraculFetch.mockImplementation(impl as never)
+
+    await expect(retractCredibilityFeedback('pred-1')).resolves.toBeUndefined()
   })
 })

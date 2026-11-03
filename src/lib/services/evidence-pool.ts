@@ -1348,6 +1348,33 @@ async function getSettlementPinSnapshot(
 }
 
 /**
+ * Undo `pushCredibilityFeedback` for a reverted resolution (daatan#2077), via retro's
+ * `DELETE /leaderboard/ingest/{id}`. Idempotent there. A failure leaves the old outcome in
+ * retro's ledgers and blocks a re-resolution's push as a duplicate, so it logs at error.
+ */
+export async function retractCredibilityFeedback(predictionId: string): Promise<void> {
+  const cfg = getOracleConfig()
+  if (!cfg) return
+
+  let res: Response
+  try {
+    res = await oracleFetch(cfg, `/leaderboard/ingest/${encodeURIComponent(predictionId)}`, {
+      method: 'DELETE',
+      // Retro replays both boards before answering.
+      timeoutMs: 30_000,
+    })
+  } catch (err) {
+    log.error({ predictionId, err }, 'event=credibility_feedback_retract_failed')
+    return
+  }
+  if (!res.ok) {
+    log.error({ predictionId, status: res.status }, 'event=credibility_feedback_retract_failed')
+    return
+  }
+  log.info({ predictionId, ...(await res.json()) }, 'event=credibility_feedback_retracted')
+}
+
+/**
  * Credibility feedback loop, step 2 (retro docs/ORACLE_VARIABLES.md §9):
  * push one resolved forecast's per-source stances to retro's
  * `POST /leaderboard/ingest` so real outcomes can eventually score source
