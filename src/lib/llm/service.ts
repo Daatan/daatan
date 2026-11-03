@@ -20,7 +20,8 @@ export class ResilientLLMService {
     let lastError: Error | null = null
 
     const stage = request.stage
-    for (const [i, provider] of this.providers.entries()) {
+    const providers = request.primaryOnly ? this.providers.slice(0, 1) : this.providers
+    for (const [i, provider] of providers.entries()) {
       // The caller gave up (its overall deadline passed): starting another leg
       // would only fail instantly, and is not a provider outage worth paging.
       if (request.signal?.aborted) throw new Error('LLM call aborted by caller')
@@ -43,6 +44,7 @@ export class ResilientLLMService {
             { stage, provider: provider.name, primary: this.providers[0].name, requestedModel: request.model },
             'llm: served by fallback provider',
           )
+          return { ...response, fallbackProvider: provider.name }
         }
         return response
       } catch (error) {
@@ -56,6 +58,8 @@ export class ResilientLLMService {
         continue // Try next provider
       }
     }
+
+    if (request.primaryOnly && lastError) throw lastError
 
     // Every provider failed (or none were configured) — now it's a real outage.
     const providerChain = this.providers.map((p) => p.name).join(' → ') || 'none'

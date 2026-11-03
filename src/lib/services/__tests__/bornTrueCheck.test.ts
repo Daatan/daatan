@@ -92,7 +92,23 @@ describe('checkBornTrueAtCreation', () => {
       'correct',
       'Chess.com already reports 250M+ registered users.',
       ['https://chess.com/about'],
+      undefined,
     )
+  })
+
+  it('passes a fallback provider on to the alert (#2096)', async () => {
+    ;(prisma.prediction.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(basePrediction)
+    runResolutionResearchMock.mockResolvedValue({
+      outcome: 'correct',
+      reasoning: 'r',
+      evidenceLinks: [],
+      fallbackProvider: 'Oracul',
+      timings: { searchMs: 1, llmMs: 1, totalMs: 2 },
+    })
+
+    await checkBornTrueAtCreation('pred-1')
+
+    expect(notifyBornTrueAtCreationMock).toHaveBeenCalledWith(expect.anything(), 'correct', 'r', [], 'Oracul')
   })
 
   it('flags to Telegram when the research leg comes back "wrong" (born-false)', async () => {

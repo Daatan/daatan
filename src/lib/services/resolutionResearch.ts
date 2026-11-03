@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { getPoolArticlesForResearch } from '@/lib/services/evidence-pool'
 import { oracleSearch, type SearchResult } from '@/lib/services/oracleSearch'
 import type { OracleCallSource } from '@/lib/services/oracleClient'
@@ -23,6 +24,19 @@ const TOTAL_RESULTS_CAP = 20
 // rules-reasoning task where the pro tier beats flash. Query generation stays
 // on the chain default. Non-Google fallback legs ignore the override.
 const RESEARCH_VERDICT_MODEL = 'gemini-2.5-pro'
+
+// #2096: the 30 s default cut Pro off in 3 of 15 prod verdicts, and its slowest success took
+// 27.5 s. nginx allows 120 s for /api/, and this has to leave room for the search before it.
+const RESEARCH_VERDICT_TIMEOUT_MS = 75_000
+
+// The Oracul leg has no native schema mode, so a verdict can arrive without a field.
+const verdictSchema = z.object({
+  outcome: z.enum(['correct', 'wrong', 'void', 'unresolvable']),
+  correctOptionId: z.string().nullish().transform((id) => id ?? undefined),
+  reasoning: z.string(),
+  evidenceLinks: z.array(z.string()).catch([]),
+  premature: z.boolean().nullish().transform((p) => p ?? undefined),
+})
 const POOL_CONTEXT_LIMIT = 12
 
 /**
@@ -114,6 +128,8 @@ export interface ResolutionResearchResult {
   evidenceLinks: string[]
   /** daatan#2076: deadline not passed and the claim is neither confirmed nor impossible yet. */
   premature?: boolean
+  /** #2096: the verdict came from this fallback leg, not the stage's own model. */
+  fallbackProvider?: string
   timings: { searchMs: number; llmMs: number; totalMs: number }
 }
 
@@ -303,10 +319,15 @@ export async function runResolutionResearch(
     schema: researchSchema,
     temperature: 0,
     ...forStage('research_verdict', RESEARCH_VERDICT_MODEL),
+    googleTimeoutMs: RESEARCH_VERDICT_TIMEOUT_MS,
+    // #2096: a resolver can retry, and acts on this verdict at once. The born-true check
+    // only asks a human to look, so a fallback verdict still beats no alert there.
+    primaryOnly: source === 'research',
   })
 
   const llmMs = Date.now() - llmStart
-  const findings = JSON.parse(response.text) as Omit<ResolutionResearchResult, 'timings'>
+  const findings: Omit<ResolutionResearchResult, 'timings'> = verdictSchema.parse(JSON.parse(response.text))
+  if (response.fallbackProvider) findings.fallbackProvider = response.fallbackProvider
   // A premature verdict must never carry a decisive outcome: the form would
   // prefill it, and bornTrueCheck would alert on it.
   if (findings.premature) findings.outcome = 'unresolvable'

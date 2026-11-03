@@ -84,6 +84,48 @@ describe('runResolutionResearch — legs run concurrently (#1856)', () => {
     expect(search).not.toHaveBeenCalled() // oracle returned ≥3, no local fallback, targeted leg failed
   })
 
+  describe('verdict call (#2096)', () => {
+    const run = (source?: 'research' | 'born-true-check') => {
+      generate.mockReset()
+      generate
+        .mockResolvedValueOnce({ text: JSON.stringify({ queries: [] }) } as never)
+        .mockResolvedValueOnce({ text: verdict } as never)
+      return runResolutionResearch(prediction as never, { userId: 'u', source })
+    }
+    const verdictRequest = () => generate.mock.calls[1][0]
+
+    it('a manual run uses the first leg only, with the longer budget', async () => {
+      await run('research')
+      expect(verdictRequest()).toMatchObject({ primaryOnly: true, googleTimeoutMs: 75_000 })
+    })
+
+    it('the born-true check may still fall back', async () => {
+      await run('born-true-check')
+      expect(verdictRequest()).toMatchObject({ primaryOnly: false, googleTimeoutMs: 75_000 })
+    })
+
+    it('a verdict without evidenceLinks gets an empty list, and its leg is reported', async () => {
+      generate.mockReset()
+      generate
+        .mockResolvedValueOnce({ text: JSON.stringify({ queries: [] }) } as never)
+        .mockResolvedValueOnce({ text: JSON.stringify({ outcome: 'correct', reasoning: 'r' }), fallbackProvider: 'Oracul' } as never)
+
+      const res = await runResolutionResearch(prediction as never, { userId: 'u', source: 'born-true-check' })
+
+      expect(res.evidenceLinks).toEqual([])
+      expect(res.fallbackProvider).toBe('Oracul')
+    })
+
+    it('rejects a verdict with an unknown outcome', async () => {
+      generate.mockReset()
+      generate
+        .mockResolvedValueOnce({ text: JSON.stringify({ queries: [] }) } as never)
+        .mockResolvedValueOnce({ text: JSON.stringify({ outcome: 'maybe', reasoning: 'r', evidenceLinks: [] }) } as never)
+
+      await expect(runResolutionResearch(prediction as never, { userId: 'u' })).rejects.toThrow()
+    })
+  })
+
   it('propagates a raw-claim leg failure, as before', async () => {
     oracle.mockRejectedValue(new Error('oracle down'))
     generate.mockResolvedValue({ text: JSON.stringify({ queries: [] }) } as never)

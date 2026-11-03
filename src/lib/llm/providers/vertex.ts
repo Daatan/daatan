@@ -98,7 +98,7 @@ export class VertexProvider implements LLMProvider {
     // the abort. Same 30s budget as the Gemini leg: without it a hung connection
     // stalls the whole fallback chain instead of failing over.
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), VERTEX_TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), request.googleTimeoutMs ?? VERTEX_TIMEOUT_MS)
     const onCallerAbort = () => controller.abort()
     if (request.signal?.aborted) controller.abort()
     else request.signal?.addEventListener('abort', onCallerAbort)
