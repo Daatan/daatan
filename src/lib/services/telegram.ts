@@ -1268,11 +1268,13 @@ export function notifyBornTrueAtCreation(
   outcome: 'correct' | 'wrong',
   reasoning: string,
   evidenceLinks: string[],
+  fallbackProvider?: string,
 ): void {
   if (isDevEnv()) return
 
   const msg = [
     `🍼 <b>Forecast may already be resolved at creation</b>`,
+    fallbackProvider ? `⚠️ Verdict from fallback model ${escapeHtml(fallbackProvider)}, not the usual one. Check it by hand.` : '',
     `"${truncate(prediction.claimText, 120)}"`,
     `Research run immediately after creation already came back "${outcome}": ${truncate(reasoning, 300)}`,
     evidenceLinks.length ? `Evidence: ${evidenceLinks.slice(0, 3).map(escapeHtml).join(', ')}` : '',

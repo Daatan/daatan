@@ -51,6 +51,7 @@ export async function checkBornTrueAtCreation(predictionId: string): Promise<voi
     result.outcome,
     result.reasoning,
     result.evidenceLinks,
+    result.fallbackProvider,
   )
 }
 

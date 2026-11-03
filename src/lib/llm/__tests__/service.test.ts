@@ -37,6 +37,24 @@ describe('ResilientLLMService', () => {
     expect(mockNotify).not.toHaveBeenCalled()
   })
 
+  it('reports the fallback leg that answered, and nothing when the first leg did (#2096)', async () => {
+    const rescued = await new ResilientLLMService([fail('Vertex', 'slow'), ok('Oracul', 'r')]).generateContent({ prompt: 'x' })
+    const direct = await new ResilientLLMService([ok('Vertex', 'd'), ok('Oracul', 'r')]).generateContent({ prompt: 'x' })
+
+    expect(rescued.fallbackProvider).toBe('Oracul')
+    expect(direct.fallbackProvider).toBeUndefined()
+  })
+
+  it('primaryOnly throws the first leg error, skips the rest and does not page (#2096)', async () => {
+    const backup = ok('Oracul', 'r')
+    const svc = new ResilientLLMService([fail('Vertex', 'timed out'), backup])
+
+    await expect(svc.generateContent({ prompt: 'x', primaryOnly: true })).rejects.toThrow('timed out')
+
+    expect(backup.generateContent).not.toHaveBeenCalled()
+    expect(mockNotify).not.toHaveBeenCalled()
+  })
+
   it('falls through to a later provider and does NOT page when one rescues the call', async () => {
     const primary = fail('Gemini', '503 Service Unavailable')
     const backup = ok('Oracul', 'rescued')

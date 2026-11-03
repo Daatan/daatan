@@ -13,6 +13,12 @@ export interface LLMRequest {
    *  chain its own timeout instead of letting a slow first leg spend the whole
    *  shared `signal` and start the fallbacks already aborted (#1947). */
   legTimeoutMs?: number
+  /** Replaces the Vertex and Gemini legs' default timeout, for a model known to be slower
+   *  (#2096). `signal` and `legTimeoutMs` can still end the call sooner. */
+  googleTimeoutMs?: number
+  /** Use the first leg only. A failure throws and does not page: for a call where an
+   *  answer from another vendor's model is worse than an error the caller can retry. */
+  primaryOnly?: boolean
   /** Per-call Google model override (e.g. 'gemini-2.5-pro' for the
    *  resolution-research verdict). Honored by the Vertex and Gemini legs only;
    *  the non-Google fallback legs keep their own pinned models, so the chain's
@@ -27,6 +33,8 @@ export interface LLMRequest {
 
 export interface LLMResponse {
   text: string
+  /** Set when a later leg answered, so the model is not the one the stage asked for. */
+  fallbackProvider?: string
   usage?: {
     promptTokens: number
     completionTokens: number

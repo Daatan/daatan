@@ -70,6 +70,10 @@ LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flas
   `express_draft` to a model without a token-count thinking budget, re-check this first.
 - When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
   with the `stage` — the stage ran on another vendor's model. Not paged.
+- **`research_verdict` (#2096).** The Vertex and Gemini legs get 75 s instead of 30 s
+  (`googleTimeoutMs`). A resolver's manual research uses the first leg only (`primaryOnly`), so
+  a failure is an error to retry, not a verdict from another vendor's model. The born-true
+  check may still fall back, and its Telegram alert then names the fallback model.
 
 Not covered, by design: embeddings (`embedding.ts`, `gemini-embedding-2` @ 768 dims — a change
 means re-embedding every row), the LLM panel roster (a model change starts a new Brier series)

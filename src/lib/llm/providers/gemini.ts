@@ -33,7 +33,7 @@ export class GeminiProvider implements LLMProvider {
     })
 
     const result = await model.generateContent(request.prompt, {
-      timeout: GEMINI_TIMEOUT_MS,
+      timeout: request.googleTimeoutMs ?? GEMINI_TIMEOUT_MS,
       signal: request.signal,
     })
     const response = result.response

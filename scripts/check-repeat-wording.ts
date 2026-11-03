@@ -15,8 +15,9 @@
  * RESEARCH_TEMPLATE_FILE and EXPRESS_TEMPLATE_FILE swap in another text of that prompt, to
  * compare against an older version. RESEARCH_MODEL overrides the verdict model. RUNS sets
  * the run count (default 3). Auth: VERTEX_ACCESS_TOKEN if set, else
- * `gcloud auth print-access-token`. Project: GOOGLE_VERTEX_PROJECT_ID, else `daatan`. Costs
- * live LLM calls, so it is manual.
+ * `gcloud auth print-access-token`. GOOGLE_VERTEX_PROJECT_ID is required and should be prod's
+ * project: `gemini-2.5-pro` is not available on every project. Costs live LLM calls, so it is
+ * manual.
  */
 process.env.SKIP_ENV_VALIDATION = '1'
 import { execSync } from 'node:child_process'
@@ -133,7 +134,8 @@ async function main() {
     const { stageModel } = await import('../src/lib/llm/stageModels')
     const { deadlineStatus } = await import('../src/lib/services/resolutionResearch')
 
-    const project = process.env.GOOGLE_VERTEX_PROJECT_ID || 'daatan'
+    const project = process.env.GOOGLE_VERTEX_PROJECT_ID
+    if (!project) throw new Error('Set GOOGLE_VERTEX_PROJECT_ID')
     const token = process.env.VERTEX_ACCESS_TOKEN || execSync('gcloud auth print-access-token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 
     async function call(model: string, text: string, schema: unknown, temperature: number, attempt = 0): Promise<Record<string, unknown>> {
