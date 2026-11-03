@@ -353,8 +353,11 @@ unreachable) dumps first:
   half-size guard can trip after a legitimately large data deletion — delete the older
   dumps in the directory and redeploy.
 - **Cost:** the status check is one short container run (seconds). The dump itself only
-  happens on migration deploys; on prod expect roughly 1–3 min (not yet measured), on
-  top of a ~3 min deploy, inside the 10 min wait in `.github/actions/ssm-deploy`.
+  happens on migration deploys; on prod it took about 9.5 min in v1.66.38 and grows with
+  the DB. It runs inside the 25 min wait in `.github/actions/ssm-deploy`. If a deploy
+  ever outlasts that wait, the run reports failure while the host keeps going: check
+  the SSM command's own result, and if it succeeded add the skipped `release-X.Y.Z` ECR
+  tags by hand (see the "Mark images as released" step in `deploy.yml`).
 
 These are separate from, and do not replace, the twice-daily S3 backups (see
 [DB backups (S3)](#db-backups-s3)).
