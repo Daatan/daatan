@@ -58,9 +58,9 @@
       "schema_chars": null
     },
     "express-prediction": {
-      "version": "v7",
-      "hash": "62b9bcb023a9b56a",
-      "chars": 8319,
+      "version": "v8",
+      "hash": "f2ca88acabb1ca5b",
+      "chars": 9222,
       "schema": "expressPredictionSchema",
       "schema_hash": "5cfec4f1255aef42",
       "schema_chars": 2266
@@ -122,9 +122,9 @@
       "schema_chars": 219
     },
     "resolution-research": {
-      "version": "v2",
-      "hash": "a2426001402bf309",
-      "chars": 4231,
+      "version": "v3",
+      "hash": "c12635325aa8f176",
+      "chars": 4906,
       "schema": "researchSchema",
       "schema_hash": "a9dd19a6febb5ef7",
       "schema_chars": 829
