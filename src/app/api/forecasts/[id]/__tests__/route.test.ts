@@ -35,10 +35,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: mockPrisma }
 })
 
-vi.mock('@/lib/services/prediction-lifecycle', () => ({
-  transitionIfExpired: vi.fn().mockResolvedValue(undefined),
-}))
-
 // ─── shared fixtures ──────────────────────────────────────────────────────────
 
 const BASE_PREDICTION = {

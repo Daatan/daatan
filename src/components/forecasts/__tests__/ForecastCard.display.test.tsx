@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useSession } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import ForecastCard, { Prediction } from '../ForecastCard'
@@ -150,5 +150,27 @@ describe('ForecastCard navigation link', () => {
     renderWithIntl(<ForecastCard prediction={prediction} />)
     const link = screen.getByRole('link', { name: basePrediction.claimText })
     expect(link).toHaveAttribute('href', '/forecasts/will-x-happen')
+  })
+
+  describe('deadline day (daatan#2030)', () => {
+    const deadline = '2026-11-03T23:59:59.000Z'
+
+    afterEach(() => vi.useRealTimers())
+
+    it('labels an active forecast "Expires today" on its deadline day', () => {
+      vi.useFakeTimers({ now: new Date('2026-11-03T10:00:00.000Z'), toFake: ['Date'] })
+      renderWithIntl(<ForecastCard prediction={{ ...basePrediction, status: 'ACTIVE', resolveByDatetime: deadline }} />)
+      expect(screen.getByText('Expires today')).toBeInTheDocument()
+    })
+
+    it('keeps the date the day before, and on a non-active forecast', () => {
+      vi.useFakeTimers({ now: new Date('2026-11-02T10:00:00.000Z'), toFake: ['Date'] })
+      const { unmount } = renderWithIntl(<ForecastCard prediction={{ ...basePrediction, status: 'ACTIVE', resolveByDatetime: deadline }} />)
+      expect(screen.queryByText('Expires today')).not.toBeInTheDocument()
+      unmount()
+      vi.setSystemTime(new Date('2026-11-03T10:00:00.000Z'))
+      renderWithIntl(<ForecastCard prediction={{ ...basePrediction, status: 'PENDING', resolveByDatetime: deadline }} />)
+      expect(screen.queryByText('Expires today')).not.toBeInTheDocument()
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDdmmyyyy, normalizeResolveByDatetime, parseDdmmyyyy, parseTime24 } from '../date'
+import { deadlineEndsAt, isDeadlineToday, formatDdmmyyyy, normalizeResolveByDatetime, parseDdmmyyyy, parseTime24 } from '../date'
 
 describe('formatDdmmyyyy', () => {
   it('converts YYYY-MM-DD to DD/MM/YYYY', () => {
@@ -108,5 +108,47 @@ describe('normalizeResolveByDatetime', () => {
     const result = normalizeResolveByDatetime(midnightStart, 'UTC')
     expect(result.getUTCDate()).toBe(10)
     expect(result.toISOString()).toBe('2027-03-10T23:59:59.999Z')
+  })
+})
+
+describe('deadlineEndsAt', () => {
+  it('ends a calendar-date stamp at midnight Israel summer time (UTC+3)', () => {
+    expect(deadlineEndsAt(new Date('2026-10-23T23:59:59.000Z')).toISOString()).toBe('2026-10-23T21:00:00.000Z')
+  })
+
+  it('ends a calendar-date stamp at midnight Israel winter time (UTC+2)', () => {
+    expect(deadlineEndsAt(new Date('2026-11-03T23:59:59.999Z')).toISOString()).toBe('2026-11-03T22:00:00.000Z')
+  })
+
+  it('uses the offset in force on the day before a DST change', () => {
+    // Israel leaves summer time on Sunday 2026-10-25 at 02:00, after that midnight
+    expect(deadlineEndsAt(new Date('2026-10-24T23:59:59.000Z')).toISOString()).toBe('2026-10-24T21:00:00.000Z')
+    // and enters it on Friday 2027-03-26 at 02:00, also after that midnight
+    expect(deadlineEndsAt(new Date('2027-03-25T23:59:59.000Z')).toISOString()).toBe('2027-03-25T22:00:00.000Z')
+  })
+
+  it('leaves an exact time as written', () => {
+    expect(deadlineEndsAt(new Date('2026-11-03T14:30:00.000Z')).toISOString()).toBe('2026-11-03T14:30:00.000Z')
+    expect(deadlineEndsAt(new Date('2026-11-03T22:59:00.000Z')).toISOString()).toBe('2026-11-03T22:59:00.000Z')
+  })
+})
+
+describe('isDeadlineToday', () => {
+  const deadline = '2026-11-03T23:59:59.000Z' // ends 22:00 UTC, Israel winter time
+  const at = (iso: string) => new Date(iso).getTime()
+
+  it('is true from Israeli midnight until the deadline ends', () => {
+    expect(isDeadlineToday(deadline, at('2026-11-02T22:00:00.000Z'))).toBe(true)
+    expect(isDeadlineToday(deadline, at('2026-11-03T21:59:59.000Z'))).toBe(true)
+  })
+
+  it('is false the day before and once it has ended', () => {
+    expect(isDeadlineToday(deadline, at('2026-11-02T21:59:59.000Z'))).toBe(false)
+    expect(isDeadlineToday(deadline, at('2026-11-03T22:00:00.000Z'))).toBe(false)
+  })
+
+  it('handles an exact-time deadline by its Israeli date', () => {
+    expect(isDeadlineToday('2026-11-03T14:30:00.000Z', at('2026-11-03T06:00:00.000Z'))).toBe(true)
+    expect(isDeadlineToday('2026-11-03T14:30:00.000Z', at('2026-11-02T06:00:00.000Z'))).toBe(false)
   })
 })

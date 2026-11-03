@@ -46,7 +46,7 @@ import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
-import { formatDisplayDate } from '@/lib/utils/date'
+import { formatDisplayDate, isDeadlineToday } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
 
 const log = createClientLogger('ForecastDetail')
@@ -407,6 +407,12 @@ export default function ForecastDetailClient({
             {prediction.status !== 'ACTIVE' && (
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(prediction.status)}`}>
                 {prediction.status.replace('_', ' ')}
+              </span>
+            )}
+
+            {prediction.status === 'ACTIVE' && isDeadlineToday(prediction.resolveByDatetime, nowMs) && (
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge('PENDING')}`}>
+                {t('expiresToday')}
               </span>
             )}
 

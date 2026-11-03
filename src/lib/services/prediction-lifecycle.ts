@@ -1,38 +1,32 @@
 import { prisma } from '@/lib/prisma'
+import { deadlineEndsAt } from '@/lib/utils/date'
+
+// Israel is at most UTC+3, so nothing further out can have ended yet.
+const MAX_EARLY_END_MS = 4 * 3_600_000
 
 /**
- * Transition ACTIVE predictions past their resolveByDatetime to PENDING status.
- * Called opportunistically from listing/detail API routes to keep statuses current
- * without requiring a cron job.
+ * Transition ACTIVE predictions whose resolve-by deadline has ended to PENDING.
+ * The deadline ends at midnight in Israel (see deadlineEndsAt, daatan#2030).
+ *
+ * This keys off resolveByDatetime, not claimDeadline. PENDING closes staking and
+ * takes the forecast out of the feeds and the news-indexer, and claimDeadline is
+ * parsed from the claim text and can be months away from resolveByDatetime.
  *
  * Returns the number of predictions transitioned.
  */
-export async function transitionExpiredPredictions(): Promise<number> {
-  const result = await prisma.prediction.updateMany({
+export async function transitionExpiredPredictions(now: Date = new Date()): Promise<number> {
+  const candidates = await prisma.prediction.findMany({
     where: {
       status: 'ACTIVE',
-      resolveByDatetime: { lt: new Date() },
+      resolveByDatetime: { lt: new Date(now.getTime() + MAX_EARLY_END_MS) },
     },
-    data: {
-      status: 'PENDING',
-    },
+    select: { id: true, resolveByDatetime: true },
+  })
+  const ids = candidates.filter((p) => deadlineEndsAt(p.resolveByDatetime) <= now).map((p) => p.id)
+  if (ids.length === 0) return 0
+  const result = await prisma.prediction.updateMany({
+    where: { id: { in: ids }, status: 'ACTIVE' },
+    data: { status: 'PENDING' },
   })
   return result.count
-}
-
-/**
- * Transition a single prediction to PENDING if it's ACTIVE and past its deadline.
- * Used for individual prediction detail pages.
- */
-export async function transitionIfExpired(predictionId: string): Promise<void> {
-  await prisma.prediction.updateMany({
-    where: {
-      id: predictionId,
-      status: 'ACTIVE',
-      resolveByDatetime: { lt: new Date() },
-    },
-    data: {
-      status: 'PENDING',
-    },
-  })
 }

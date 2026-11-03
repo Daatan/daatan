@@ -41,6 +41,38 @@ export function toLocalDatetimeInput(date: Date): string {
  * input. Use UTC-stable display anywhere the value must appear in the server HTML
  * (SEO); use the locale-aware `toLocaleString` only for client-only chrome.
  */
+const DEADLINE_TIME_ZONE = 'Asia/Jerusalem'
+
+function israelDay(instant: Date): string {
+  return instant.toLocaleDateString('en-CA', { timeZone: DEADLINE_TIME_ZONE })
+}
+
+/**
+ * When a resolve-by deadline actually ends. A 23:59 UTC stamp means "by that
+ * calendar date", which ends at midnight in Israel, 2-3 h before the stamp
+ * (daatan#2030). Any other stamp is an exact time and stands as written.
+ */
+export function deadlineEndsAt(deadline: Date): Date {
+  if (deadline.getUTCHours() !== 23 || deadline.getUTCMinutes() !== 59) return deadline
+  const y = deadline.getUTCFullYear()
+  const m = deadline.getUTCMonth()
+  const d = deadline.getUTCDate()
+  // Read the offset at 20:00 UTC, which is late on that same Israeli day. DST
+  // changes at about 02:00 local, so this is the offset in force at midnight.
+  const offset = new Intl.DateTimeFormat('en-US', { timeZone: DEADLINE_TIME_ZONE, timeZoneName: 'longOffset' })
+    .formatToParts(new Date(Date.UTC(y, m, d, 20)))
+    .find((part) => part.type === 'timeZoneName')?.value
+  const offsetHours = Number(offset?.match(/[+-]\d{2}/)?.[0] ?? 2)
+  return new Date(Date.UTC(y, m, d + 1) - offsetHours * 3_600_000)
+}
+
+/** True on the Israeli calendar day the deadline falls on, until it ends. */
+export function isDeadlineToday(deadline: string | Date, nowMs: number): boolean {
+  const endsAt = deadlineEndsAt(new Date(deadline))
+  if (Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= nowMs) return false
+  return israelDay(new Date(endsAt.getTime() - 1)) === israelDay(new Date(nowMs))
+}
+
 export function formatDisplayDate(date: string | Date | null | undefined): string {
   if (!date) return ''
   const d = typeof date === 'string' ? new Date(date) : date

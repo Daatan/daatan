@@ -50,6 +50,21 @@ describe('ForecastDetailClient — Deadline panel', () => {
     })
   })
 
+  it('shows "Expires today" on an active forecast on its deadline day only', async () => {
+    vi.useFakeTimers({ now: new Date('2026-04-16T10:00:00.000Z'), toFake: ['Date'] })
+    try {
+      const { unmount } = render(wrap(<ForecastDetailClient initialData={makePrediction() as any} />))
+      expect(screen.getByText('Expires today')).toBeTruthy()
+      unmount()
+      vi.setSystemTime(new Date('2026-04-15T10:00:00.000Z'))
+      render(wrap(<ForecastDetailClient initialData={makePrediction() as any} />))
+      expect(screen.queryByText('Expires today')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+    await act(async () => {})
+  })
+
   it('renders the Resolution date label', async () => {
     await act(async () => {
       render(wrap(<ForecastDetailClient initialData={makePrediction() as any} />))

@@ -205,6 +205,7 @@
     "resolveByTooltip": "Deadline — the date by which this forecast will be resolved",
     "committedTooltip": "You have voted on this forecast",
     "openForecastTooltip": "Open forecast details",
+    "expiresToday": "Expires today",
     "statusHints": {
       "draft": "Draft — not published yet",
       "active": "Active — open for votes",
