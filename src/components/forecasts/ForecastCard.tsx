@@ -3,6 +3,7 @@
 import type { UserRole } from '@prisma/client'
 import { useState, useRef, useEffect } from 'react'
 import { useNowMs } from '@/lib/hooks/useNowMs'
+import { isDeadlineToday } from '@/lib/utils/date'
 import { useIsClient } from '@/lib/hooks/useIsClient'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -418,7 +419,11 @@ export default function ForecastCard({
                   title={t('resolveByTooltip')}
                 >
                   <Calendar className="w-3 h-3" />
-                  <span suppressHydrationWarning>{formatDate(prediction.resolveByDatetime)}</span>
+                  <span suppressHydrationWarning>
+                    {prediction.status === 'ACTIVE' && isDeadlineToday(prediction.resolveByDatetime, nowMs)
+                      ? t('expiresToday')
+                      : formatDate(prediction.resolveByDatetime)}
+                  </span>
                 </div>
               )
             })()}

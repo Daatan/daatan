@@ -205,6 +205,7 @@
     "resolveByTooltip": "Limdato — la dato ĝis kiu ĉi tiu prognozo estos solvita",
     "committedTooltip": "Vi voĉdonis pri ĉi tiu prognozo",
     "openForecastTooltip": "Malfermi detalojn de la prognozo",
+    "expiresToday": "Finiĝas hodiaŭ",
     "statusHints": {
       "draft": "Malneto — ankoraŭ ne publikigita",
       "active": "Aktiva — malfermita por voĉdonoj",

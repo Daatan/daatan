@@ -8,7 +8,7 @@ const log = createLogger('cron-transition-expired-predictions')
 
 /**
  * GET /api/cron/transition-expired-predictions
- * Transitions ACTIVE predictions past their resolveByDatetime to PENDING.
+ * Transitions ACTIVE predictions whose deadline has ended to PENDING.
  * Moved off the GET /api/forecasts hot read path (daatan#1202) — every feed
  * load was paying for this write-scan before doing any read. Doesn't gate
  * commitment eligibility (getCommitmentLockReason checks resolveByDatetime
