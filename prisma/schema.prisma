@@ -1312,6 +1312,8 @@ model ResolutionSnapshot {
   affectedUserIds String[]  @map("affected_user_ids")
   payload         Json
   revertedAt      DateTime? @map("reverted_at")
+  revertedById    String?   @map("reverted_by_id")
+  revertReason    String?   @map("revert_reason") @db.Text
   createdAt       DateTime  @default(now()) @map("created_at")
 
   @@index([predictionId, resolvedAt])

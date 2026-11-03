@@ -17,7 +17,7 @@ vi.mock('@/env', () => ({
   },
 }))
 
-import { notifyNewsIndexerResolution } from '../news-indexer'
+import { notifyNewsIndexerResolution, notifyNewsIndexerUnresolve } from '../news-indexer'
 
 function lastBody(fetchMock: ReturnType<typeof vi.fn>) {
   const [, init] = fetchMock.mock.calls.at(-1)!
@@ -57,5 +57,29 @@ describe('notifyNewsIndexerResolution', () => {
   it('can send only one probability', () => {
     notifyNewsIndexerResolution('fc-5', 'correct', undefined, 0.4)
     expect(lastBody(fetchMock)).toEqual({ forecastId: 'fc-5', outcome: 'YES', aiProbability: 0.4 })
+  })
+})
+
+describe('notifyNewsIndexerUnresolve', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('posts the forecast id to /unresolve', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ reverted: 3, clampedSources: [] }) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    notifyNewsIndexerUnresolve('fc-1')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://scrapper.daatan.com/unresolve')
+    expect(lastBody(fetchMock)).toEqual({ forecastId: 'fc-1' })
+  })
+
+  it.each([
+    ['a refusal', () => Promise.resolve({ ok: false, status: 404 })],
+    ['a network failure', () => Promise.reject(new Error('down'))],
+  ])('%s does not throw', async (_name, impl) => {
+    vi.stubGlobal('fetch', vi.fn(impl))
+
+    expect(() => notifyNewsIndexerUnresolve('fc-1')).not.toThrow()
+    await new Promise((r) => setTimeout(r))
   })
 })

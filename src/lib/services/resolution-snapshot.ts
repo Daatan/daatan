@@ -47,6 +47,47 @@ type SnapshotCommitment = {
   }
 }
 
+export interface ResolutionSnapshotPayload {
+  version: number
+  prediction: {
+    status: string
+    resolvedAt: string | null
+    resolvedById: string | null
+    resolutionOutcome: string | null
+    evidenceLinks: Prisma.InputJsonValue | null
+    resolutionNote: string | null
+    resolutionOverrodePin: boolean | null
+    awaitingAiResolution: boolean
+    awaitingDismissedAt: string | null
+    awaitingDismissedConfidence: number | null
+  }
+  options: { id: string; isCorrect: boolean | null }[]
+  commitments: {
+    id: string
+    userId: string
+    rsChange: number | null
+    brierScore: number | null
+    peerScore: number | null
+    aiScore: number | null
+    klDivergence: number | null
+    eloChange: number | null
+  }[]
+  users: {
+    id: string
+    rs: number
+    mu: number
+    sigma: number
+    volatility: number
+    eloRating: number
+    totalPredictions: number
+    correctPredictions: number
+  }[]
+  tagRatings: (
+    | { userId: string; tagId: string; existed: true; elo: number; mu: number; sigma: number; volatility: number; updatedAt: string }
+    | { userId: string; tagId: string; existed: false }
+  )[]
+}
+
 const iso = (d: Date | null | undefined) => d?.toISOString() ?? null
 
 export function buildResolutionSnapshotPayload(
