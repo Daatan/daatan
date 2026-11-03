@@ -503,6 +503,7 @@ model Prediction {
   aiEstimateRuns          AiEstimateRun[]
   aiMemberScores          AiMemberScore[]
   calibrationRecord       CalibrationRecord?
+  resolutionSnapshots     ResolutionSnapshot[]
 
   @@index([status])
   @@index([authorId])
@@ -1292,6 +1293,29 @@ model AiEstimate {
   @@unique([runId, model, mode])
   @@index([runId])
   @@map("ai_estimates")
+}
+
+/// What a resolution overwrote, written inside the resolve transaction so an admin can
+/// revert it (daatan#2077). `payload` shape: buildResolutionSnapshotPayload. Not unique
+/// per prediction: resolve -> revert -> resolve leaves two rows, and only the newest with
+/// `revertedAt` null can still be reverted.
+///
+/// `affectedUserIds` is stored rather than derived because "Forget History" (daatan#1701)
+/// later nulls `commitment.userId`, and the revert guard has to know who was touched.
+model ResolutionSnapshot {
+  id           String     @id @default(cuid())
+  predictionId String     @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  outcome         String    @db.VarChar(50)
+  resolvedAt      DateTime  @map("resolved_at")
+  affectedUserIds String[]  @map("affected_user_ids")
+  payload         Json
+  revertedAt      DateTime? @map("reverted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([predictionId, resolvedAt])
+  @@map("resolution_snapshots")
 }
 
 /// Matched-time Brier for one panel member on one commitment (docs/LASSO.md §7).

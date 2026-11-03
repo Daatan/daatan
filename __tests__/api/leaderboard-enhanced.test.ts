@@ -27,7 +27,7 @@ vi.mock('@/lib/prisma', () => ({
 // tag-ratings: ensureTagRatingsSeeded is a no-op in unit tests
 vi.mock('@/lib/services/tag-ratings', () => ({
   ensureTagRatingsSeeded: vi.fn().mockResolvedValue(undefined),
-  updateTagRatingsInTx: vi.fn().mockResolvedValue(undefined),
+  updateTagRatingsInTx: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('@/lib/services/expertise', () => ({

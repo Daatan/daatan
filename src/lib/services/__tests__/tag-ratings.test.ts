@@ -254,4 +254,27 @@ describe('updateTagRatingsInTx', () => {
     const createData = mockTx.userTagRating.upsert.mock.calls[0][0].create
     expect(createData.elo).toBe(1500)
   })
+
+  it('returns each row as it stood before the update, flagging the ones it created', async () => {
+    const updatedAt = new Date('2026-07-01T00:00:00Z')
+    const mockTx = {
+      userTagRating: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: 'u1', tagId: 't1', elo: 1510, mu: 1500, sigma: 300, volatility: 0.06, updatedAt },
+        ]),
+        upsert: vi.fn().mockResolvedValue({}),
+      },
+    } as never
+    const { updateTagRatingsInTx } = await import('../tag-ratings')
+
+    const before = await updateTagRatingsInTx(mockTx, [{ id: 't1' }], [
+      { userId: 'u1', brierScore: 0.1 },
+      { userId: 'u2', brierScore: 0.3 },
+    ])
+
+    expect(before).toEqual([
+      { userId: 'u1', tagId: 't1', existed: true, elo: 1510, mu: 1500, sigma: 300, volatility: 0.06, updatedAt },
+      { userId: 'u2', tagId: 't1', existed: false },
+    ])
+  })
 })

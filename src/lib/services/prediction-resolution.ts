@@ -4,6 +4,7 @@ import { applyGlicko2Update } from '@/lib/services/expertise'
 import { calculateEloUpdates } from '@/lib/services/elo'
 import { computeMemberScores, computeMarketScore, MARKET_MEMBER, SENTINEL_MODE } from '@/lib/services/ai-panel-score'
 import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
+import { buildResolutionSnapshotPayload } from '@/lib/services/resolution-snapshot'
 import { notifySearchEngines } from '@/lib/services/indexnow'
 import { recordCalibration } from '@/lib/services/calibration'
 import { detectPinContradiction } from '@/lib/utils/pin-contradiction'
@@ -142,11 +143,12 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
 
   const { prediction: resolvedPrediction, scoringMs, updatingMs } = await prisma.$transaction(async (tx) => {
     const tScoringStart = Date.now()
+    const resolvedAt = new Date()
     const updatedPrediction = await tx.prediction.update({
       where: { id: predictionId },
       data: {
         status: newStatus,
-        resolvedAt: new Date(),
+        resolvedAt,
         resolvedById,
         resolutionOutcome: outcome,
         evidenceLinks: evidenceLinks ?? undefined,
@@ -329,9 +331,24 @@ export async function resolvePrediction(predictionId: string, options: Resolutio
     }
 
     // Per-tag ELO + Glicko-2: update stored tag ratings for all tags on this prediction
-    if (!isVoidOutcome && prediction.tags.length > 0) {
-      await updateTagRatingsInTx(tx, prediction.tags, eloInputs)
-    }
+    const tagRatingsBefore =
+      !isVoidOutcome && prediction.tags.length > 0
+        ? await updateTagRatingsInTx(tx, prediction.tags, eloInputs)
+        : []
+
+    // Inside the transaction on purpose (unlike recordCalibration below): a resolution
+    // that can't be reverted is the failure daatan#2077 exists to remove, so a failed
+    // snapshot rolls the resolution back. Its position is free: everything but the tag
+    // rows comes from `prediction`, loaded before any of the writes above.
+    await tx.resolutionSnapshot.create({
+      data: {
+        predictionId: prediction.id,
+        outcome,
+        resolvedAt,
+        affectedUserIds: [...new Set(commitments.map((c) => c.userId))],
+        payload: buildResolutionSnapshotPayload(prediction, commitments, tagRatingsBefore),
+      },
+    })
 
     return { prediction: updatedPrediction, scoringMs, updatingMs: Date.now() - tUpdatingStart }
   },
