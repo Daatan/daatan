@@ -120,6 +120,7 @@ describe('POST /api/predictions/[id]/resolve', () => {
         predictionOption: { update: vi.fn() },
         commitment: { update: vi.fn() },
         user: { update: vi.fn() },
+        resolutionSnapshot: { create: vi.fn() },
       }
       return fn(tx as never) as never
     })
@@ -159,6 +160,7 @@ describe('POST /api/predictions/[id]/resolve', () => {
         predictionOption: { update: vi.fn() },
         commitment: { update: vi.fn() },
         user: { update: vi.fn() },
+        resolutionSnapshot: { create: vi.fn() },
       }
       return fn(tx as never) as never
     })

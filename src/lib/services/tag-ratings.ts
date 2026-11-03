@@ -76,16 +76,32 @@ interface CommitmentResult {
   brierScore: number
 }
 
+/** A (user, tag) row as it stood before a resolution. `existed: false` = the upsert created it. */
+export type TagRatingPreState =
+  | {
+      userId: string
+      tagId: string
+      existed: true
+      elo: number
+      mu: number
+      sigma: number
+      volatility: number
+      updatedAt: Date
+    }
+  | { userId: string; tagId: string; existed: false }
+
 // Update per-tag ELO and Glicko-2 ratings inside an existing transaction.
 // Called at resolution for each non-void prediction.
 // Uses per-tag ratings as the baseline (not global), so per-tag ELO evolves
 // independently from global ELO. Falls back to 1500/350/0.06 for new users.
+// Returns the pre-update state of every row it writes, for the resolution snapshot
+// (daatan#2077), taken from the same read the update is computed from.
 export async function updateTagRatingsInTx(
   tx: Prisma.TransactionClient,
   tags: { id: string }[],
   commitments: CommitmentResult[],
-): Promise<void> {
-  if (tags.length === 0 || commitments.length === 0) return
+): Promise<TagRatingPreState[]> {
+  if (tags.length === 0 || commitments.length === 0) return []
 
   const userIds = commitments.map(c => c.userId)
   const tagIds = tags.map(t => t.id)
@@ -93,7 +109,7 @@ export async function updateTagRatingsInTx(
   // Load all existing per-tag rows in one batch
   const existing = await tx.userTagRating.findMany({
     where: { userId: { in: userIds }, tagId: { in: tagIds } },
-    select: { userId: true, tagId: true, elo: true, mu: true, sigma: true, volatility: true },
+    select: { userId: true, tagId: true, elo: true, mu: true, sigma: true, volatility: true, updatedAt: true },
   })
 
   const byKey = new Map(existing.map(r => [`${r.userId}:${r.tagId}`, r]))
@@ -141,4 +157,11 @@ export async function updateTagRatingsInTx(
       })
     }
   }
+
+  return tags.flatMap((tag) =>
+    [...new Set(userIds)].map((userId): TagRatingPreState => {
+      const row = byKey.get(`${userId}:${tag.id}`)
+      return row ? { ...row, existed: true } : { userId, tagId: tag.id, existed: false }
+    }),
+  )
 }

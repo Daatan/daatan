@@ -6,6 +6,7 @@ const mockTx = {
   predictionOption: { update: vi.fn() },
   commitment: { update: vi.fn() },
   user: { update: vi.fn() },
+  resolutionSnapshot: { create: vi.fn() },
 }
 
 vi.mock('@/lib/prisma', () => ({

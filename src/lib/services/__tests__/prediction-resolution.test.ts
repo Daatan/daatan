@@ -13,12 +13,13 @@ vi.mock('@/lib/prisma', () => ({
 }))
 vi.mock('@/lib/services/expertise', () => ({ applyGlicko2Update: vi.fn() }))
 vi.mock('@/lib/services/elo', () => ({ calculateEloUpdates: vi.fn(() => new Map()) }))
-vi.mock('@/lib/services/tag-ratings', () => ({ updateTagRatingsInTx: vi.fn() }))
+vi.mock('@/lib/services/tag-ratings', () => ({ updateTagRatingsInTx: vi.fn(async () => []) }))
 vi.mock('@/lib/services/indexnow', () => ({ notifySearchEngines: vi.fn() }))
 vi.mock('@/lib/services/calibration', () => ({ recordCalibration: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { recordCalibration } from '@/lib/services/calibration'
+import { updateTagRatingsInTx } from '@/lib/services/tag-ratings'
 import { resolvePrediction, binaryKLDivergence } from '../prediction-resolution'
 
 const findUnique = vi.mocked(prisma.prediction.findUnique)
@@ -31,6 +32,7 @@ function makeTx() {
     aiMemberScore: { upsert: vi.fn().mockResolvedValue({}) },
     commitment: { update: vi.fn().mockResolvedValue({}) },
     user: { update: vi.fn().mockResolvedValue({}) },
+    resolutionSnapshot: { create: vi.fn().mockResolvedValue({}) },
   }
 }
 type Tx = ReturnType<typeof makeTx>
@@ -532,5 +534,80 @@ describe('resolvePrediction — pre-deadline gate', () => {
     await expect(
       resolvePrediction('p1', { outcome: 'wrong', resolvedById: 'admin' }),
     ).rejects.toMatchObject({ statusCode: 400 })
+  })
+})
+
+describe('resolvePrediction — resolution snapshot (daatan#2077)', () => {
+  const snapshotArg = () => tx.resolutionSnapshot.create.mock.calls[0][0].data
+
+  it('records the values from before the resolution, not the ones it writes', async () => {
+    findUnique.mockResolvedValue(
+      prediction({
+        commitments: [commitment({ rsChange: null, brierScore: null, eloChange: null })],
+      }) as never,
+    )
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' } as never)
+
+    expect(tx.resolutionSnapshot.create).toHaveBeenCalledTimes(1)
+    const data = snapshotArg()
+    expect(data).toMatchObject({ predictionId: 'p1', outcome: 'correct', affectedUserIds: ['u1'] })
+    // The same instant as the prediction row, so the revert guard can compare the two.
+    expect(data.resolvedAt).toBe(tx.prediction.update.mock.calls[0][0].data.resolvedAt)
+    expect(data.payload.prediction).toMatchObject({ status: 'ACTIVE' })
+    expect(data.payload.commitments[0]).toMatchObject({ id: 'c1', rsChange: null, brierScore: null })
+    expect(data.payload.users).toEqual([
+      expect.objectContaining({ id: 'u1', rs: 100, mu: 25, totalPredictions: 1, correctPredictions: 1 }),
+    ])
+  })
+
+  it('a void outcome still gets a snapshot, because it still writes rsChange 0 and the status', async () => {
+    findUnique.mockResolvedValue(prediction() as never)
+
+    await resolvePrediction('p1', { outcome: 'void', resolvedById: 'admin' } as never)
+
+    expect(snapshotArg()).toMatchObject({ outcome: 'void', affectedUserIds: ['u1'] })
+  })
+
+  it('stores what updateTagRatingsInTx reports, and skips it on void', async () => {
+    const before = [
+      { userId: 'u1', tagId: 't1', existed: true, elo: 1510, mu: 1500, sigma: 300, volatility: 0.06, updatedAt: new Date('2026-07-01T00:00:00Z') },
+      { userId: 'u1', tagId: 't2', existed: false },
+    ]
+    vi.mocked(updateTagRatingsInTx).mockResolvedValueOnce(before as never)
+    findUnique.mockResolvedValue(prediction({ tags: [{ id: 't1' }, { id: 't2' }] }) as never)
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' } as never)
+
+    expect(snapshotArg().payload.tagRatings).toEqual([
+      { userId: 'u1', tagId: 't1', existed: true, elo: 1510, mu: 1500, sigma: 300, volatility: 0.06, updatedAt: '2026-07-01T00:00:00.000Z' },
+      { userId: 'u1', tagId: 't2', existed: false },
+    ])
+
+    vi.mocked(updateTagRatingsInTx).mockClear()
+    tx.resolutionSnapshot.create.mockClear()
+    await resolvePrediction('p1', { outcome: 'void', resolvedById: 'admin' } as never)
+    expect(updateTagRatingsInTx).not.toHaveBeenCalled()
+    expect(snapshotArg().payload.tagRatings).toEqual([])
+  })
+
+  it('a failed snapshot fails the resolution', async () => {
+    findUnique.mockResolvedValue(prediction() as never)
+    tx.resolutionSnapshot.create.mockRejectedValueOnce(new Error('boom'))
+
+    await expect(resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' } as never)).rejects.toThrow('boom')
+  })
+
+  it('lists a user once when they hold two commitments', async () => {
+    findUnique.mockResolvedValue(
+      prediction({ commitments: [commitment(), commitment({ id: 'c2' })] }) as never,
+    )
+
+    await resolvePrediction('p1', { outcome: 'correct', resolvedById: 'admin' } as never)
+
+    const data = snapshotArg()
+    expect(data.affectedUserIds).toEqual(['u1'])
+    expect(data.payload.users).toHaveLength(1)
+    expect(data.payload.commitments).toHaveLength(2)
   })
 })
