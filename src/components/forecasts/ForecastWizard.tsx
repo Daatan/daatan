@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Check,
+  ExternalLink,
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -420,7 +421,16 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       {/* Linked-market confirmation */}
       {formData.externalMarketId && marketMatch && (
         <div className="mb-6 p-3 rounded-xl border border-pink-500/40 bg-pink-500/5 flex items-center gap-2 text-sm text-pink-300">
-          <Check className="w-4 h-4" /> {t('linkedToMarket', { provider: marketMatch.providerLabel })}
+          <Check className="w-4 h-4 shrink-0" />
+          <a
+            href={marketMatch.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-pink-200 underline"
+          >
+            {t('linkedToMarket', { provider: marketMatch.providerLabel })}
+            <ExternalLink className="w-3 h-3 shrink-0" />
+          </a>
         </div>
       )}
 
