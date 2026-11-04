@@ -9,7 +9,7 @@ name: Android release build
 #   pull_request (android/**)   build + verify only, never uploads (same-repo PRs only: needs the keystore)
 #   push to main (android/**)   build + upload to the internal track
 #   push tag android-v*         build + upload to the internal track, versionName taken from the tag
-#   schedule (monthly)          rebuild + upload to internal so toolchain rot (SDK, runner image) shows up early
+#   schedule (monthly)          build + verify only, never uploads, so toolchain rot (SDK, runner image) shows up early
 #   workflow_dispatch           pick a testing track (internal/alpha/beta), status and release notes by hand
 #
 # Promotion to production is deliberately a human step in the Play Console; this workflow only uploads to
@@ -235,7 +235,7 @@ jobs:
 
       - name: Upload to Google Play
         id: play
-        if: github.event_name != 'pull_request' && steps.playcfg.outputs.configured == 'true'
+        if: github.event_name != 'pull_request' && github.event_name != 'schedule' && steps.playcfg.outputs.configured == 'true'
         # r0adkll/upload-google-play v1.1.5, pinned to the commit
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
         with:
@@ -259,6 +259,8 @@ jobs:
             echo "- targetSdkVersion: \`${{ steps.target.outputs.sdk }}\` (floor ${MIN_TARGET_SDK})"
             if [ "${{ github.event_name }}" = "pull_request" ]; then
               echo "- Pull request: build verified, nothing uploaded."
+            elif [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "- Scheduled run: build verified, nothing uploaded."
             elif [ "$PLAY_CONFIGURED" = "true" ]; then
               echo "- Play upload to \`$TRACK\`: ${PLAY_OUTCOME}"
             else
