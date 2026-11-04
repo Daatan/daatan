@@ -987,6 +987,44 @@ describe('POST /api/news-indexer/context', () => {
     })
   })
 
+  describe('pool recompute failed (daatan#2113)', () => {
+    beforeEach(() => {
+      vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+      vi.mocked(recomputeFromPool).mockResolvedValue({ kind: 'unavailable' } as never)
+    })
+
+    it('keeps the previous estimate: nothing stored, nobody notified', async () => {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...ACTIVE_PREDICTION, confidence: 48 } as never)
+
+      const res = await POST(post('test-secret'))
+      const body = await res.json()
+
+      expect(saveNewsIndexerMatch).not.toHaveBeenCalled()
+      expect(notifyNewsArticleMatched).not.toHaveBeenCalled()
+      expect(body).toMatchObject({ ok: true, scored: false, probability: null, previousProbability: 48 })
+    })
+
+    it('still pools the article and returns its enrichment, so the next recompute and news-indexer have it', async () => {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...ACTIVE_PREDICTION, confidence: 48 } as never)
+
+      const res = await POST(post('test-secret'))
+      const body = await res.json()
+
+      expect(addArticlesToPool).toHaveBeenCalledTimes(1)
+      expect(body).toMatchObject({ stance: 0.42, certainty: 0.77, claim: 'First extracted claim' })
+    })
+
+    it('stores the single run when the forecast has no estimate yet', async () => {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...ACTIVE_PREDICTION, confidence: null } as never)
+
+      const res = await POST(post('test-secret'))
+      const body = await res.json()
+
+      expect(saveNewsIndexerMatch).toHaveBeenCalledTimes(1)
+      expect(body).toMatchObject({ scored: true, probability: 75 })
+    })
+  })
+
   describe('the estimate is the pool aggregate, not the single-article run', () => {
     // Two pooled articles, neither of them this push's bbc.com article — so a snapshot
     // built from the pool is visibly the whole evidence set, not just what fired the push.

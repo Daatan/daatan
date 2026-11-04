@@ -483,6 +483,7 @@ export async function POST(request: NextRequest) {
       // run's extractions into the pool, then aggregate the WHOLE pool. `resolvePooledEstimate`
       // is the shared decision (also used by analyze/backfill): pool aggregate when usable,
       // this run as fallback when the pool can't be read, ABSTAIN when the pool is off-topic.
+      // If the aggregate call itself failed, the branch below keeps the published estimate.
       // Pass the authors already fetched for this push so overlapping pool URLs aren't re-queried.
       let resolved: ResolvedPoolEstimate | null = null
       try {
@@ -589,6 +590,22 @@ export async function POST(request: NextRequest) {
             singleRunMean: est.singleRunMean,
           },
           'news-indexer: oracle abstained (off-topic pool)',
+        )
+      } else if (est.estimateSource === 'pool-unavailable' && prediction.confidence != null) {
+        // The aggregate call failed, so `est` is this one article's number, not the pool's.
+        // Keep the published estimate rather than let one article move it until the next
+        // recompute (daatan#2113). This run's articles are already pooled above, so that
+        // recompute includes them. A forecast with no estimate yet still takes the single run.
+        log.info(
+          {
+            predictionId: prediction.id,
+            articles: items.length,
+            similarity: triggerSimilarity,
+            estimateSource: est.estimateSource,
+            stored: false,
+            singleRunMean: est.singleRunMean,
+          },
+          'news-indexer: pool unavailable, keeping previous estimate',
         )
       } else {
         probability = stanceToPercent(est.mean)
@@ -746,7 +763,8 @@ export async function POST(request: NextRequest) {
       // instead of making news-indexer infer it from an all-null payload (news-indexer#293).
       // True on both recorded outcomes — an estimate and an abstention — because both are a
       // verdict this push produced; false only when nothing was written: the Oracul returned
-      // null (transport/timeout, worth a retry) or every article was already claimed. The
+      // null (transport/timeout, worth a retry), every article was already claimed, or the
+      // pool recompute failed and the previous estimate was kept (daatan#2113). The
       // null-shape inference stays valid for older daatan versions, so this is additive.
       scored: wasStored,
       stance: triggerEnrich?.stance ?? null,
