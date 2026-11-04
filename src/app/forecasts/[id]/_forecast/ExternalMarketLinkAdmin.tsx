@@ -220,25 +220,37 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
           {suggestions && suggestions.length > 0 && (
             <ul className="space-y-1">
               {suggestions.map(s => (
-                <li key={`${s.provider}-${s.externalId}`}>
-                  <button
-                    onClick={() => link(s.url)}
-                    disabled={busy}
-                    className="w-full text-left text-xs px-2 py-1.5 rounded bg-navy-800 hover:bg-navy-600 text-gray-300 flex items-center justify-between gap-2 disabled:opacity-50"
+                <li
+                  key={`${s.provider}-${s.externalId}`}
+                  className="text-xs px-2 py-1.5 rounded bg-navy-800 text-gray-300 flex items-center justify-between gap-2"
+                >
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={s.question}
+                    className="inline-flex items-center gap-1.5 min-w-0 hover:text-pink-300"
                   >
-                    <span className="inline-flex items-center gap-1.5 min-w-0">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/80 shrink-0">
-                        {PROVIDER_LABEL[s.provider] ?? s.provider}
-                      </span>
-                      <span className="truncate">{s.question}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-pink-400/80 shrink-0">
+                      {PROVIDER_LABEL[s.provider] ?? s.provider}
                     </span>
-                    <span className="inline-flex items-center gap-2 shrink-0">
-                      {typeof s.score === 'number' && (
-                        <span className="text-[10px] font-medium text-gray-500">{s.score}% match</span>
-                      )}
-                      <span className="text-pink-400 font-semibold">{s.yesProbability}%</span>
-                    </span>
-                  </button>
+                    <span className="truncate">{s.question}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                  <span className="inline-flex items-center gap-2 shrink-0">
+                    {typeof s.score === 'number' && (
+                      <span className="text-[10px] font-medium text-gray-500">{s.score}% match</span>
+                    )}
+                    <span className="text-pink-400 font-semibold">{s.yesProbability}%</span>
+                    <button
+                      onClick={() => link(s.url)}
+                      disabled={busy}
+                      aria-label={`Link ${s.question}`}
+                      className="px-2 py-0.5 font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded disabled:opacity-50"
+                    >
+                      Link
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
