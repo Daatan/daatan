@@ -770,6 +770,11 @@ credibility_weight, evidence_weight, plus the boolean outcome). Storage-only
 on retro's side today — accumulates real resolution data ahead of a future
 scoring step; does not affect any live `credibility_weight`.
 
+Only `APP_ENV=production` writes to these ledgers, for both the push and its
+retraction. Other environments log
+`event=credibility_feedback_skipped_non_production` instead: staging's database
+is a copy of production and its Oracul key reaches production retro.
+
 The same push carries the author-scoring lane (`author_signals`): every
 non-excluded row with an `author_lean`, opinion-class INCLUDED (that lane
 scores the author's own lean; opinion is the signal). Retro replays it per

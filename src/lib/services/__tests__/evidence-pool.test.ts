@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => {
   const prisma = {
@@ -922,9 +922,25 @@ describe('pushCredibilityFeedback', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('APP_ENV', 'production')
     mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
     snapshotFindFirst.mockResolvedValue(null as never)
     predictionFindUnique.mockResolvedValue(null as never)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it.each(['staging', 'next', 'development'])('never writes to retro on %s', async (appEnv) => {
+    vi.stubEnv('APP_ENV', appEnv)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(findMany).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      { predictionId: 'pred-1', action: 'push', appEnv },
+      'event=credibility_feedback_skipped_non_production',
+    )
   })
 
   it('does nothing when the Oracul is not configured', async () => {
@@ -1896,7 +1912,22 @@ describe('retireLegacyNullRows', () => {
 describe('retractCredibilityFeedback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('APP_ENV', 'production')
     mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it.each(['staging', 'next', 'development'])('never writes to retro on %s', async (appEnv) => {
+    vi.stubEnv('APP_ENV', appEnv)
+    await retractCredibilityFeedback('pred-1')
+    expect(mockOraculFetch).not.toHaveBeenCalled()
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      { predictionId: 'pred-1', action: 'retract', appEnv },
+      'event=credibility_feedback_skipped_non_production',
+    )
   })
 
   it('does nothing when the Oracul is not configured', async () => {
