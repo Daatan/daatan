@@ -1348,11 +1348,26 @@ async function getSettlementPinSnapshot(
 }
 
 /**
+ * Only production may write to retro's ledgers. Staging's database is a copy of production,
+ * so its forecasts carry real ids, and its Oracul URL and key reach production retro: a test
+ * resolve or revert there would change the real ledgers. Staging's other Oracul calls
+ * (forecast, search, pool aggregate) are intended and stay as they are.
+ */
+function retroLedgerWritesAllowed(predictionId: string, action: 'push' | 'retract'): boolean {
+  const appEnv = process.env.APP_ENV
+  if (appEnv === 'production') return true
+  log.info({ predictionId, action, appEnv }, 'event=credibility_feedback_skipped_non_production')
+  return false
+}
+
+/**
  * Undo `pushCredibilityFeedback` for a reverted resolution (daatan#2077), via retro's
  * `DELETE /leaderboard/ingest/{id}`. Idempotent there. A failure leaves the old outcome in
  * retro's ledgers and blocks a re-resolution's push as a duplicate, so it logs at error.
  */
 export async function retractCredibilityFeedback(predictionId: string): Promise<void> {
+  if (!retroLedgerWritesAllowed(predictionId, 'retract')) return
+
   const cfg = getOracleConfig()
   if (!cfg) return
 
@@ -1421,6 +1436,8 @@ export async function pushCredibilityFeedback(
   outcome: boolean,
   resolvedAt: Date,
 ): Promise<void> {
+  if (!retroLedgerWritesAllowed(predictionId, 'push')) return
+
   const cfg = getOracleConfig()
   if (!cfg) return
 
