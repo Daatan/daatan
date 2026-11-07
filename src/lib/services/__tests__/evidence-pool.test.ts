@@ -56,6 +56,7 @@ import {
   getPublicArticlesByAuthorOutlet,
   setArticleExcluded,
   recomputeFromPool,
+  POOL_RECOMPUTE_TIMEOUT_MS,
   pushCredibilityFeedback,
   retractCredibilityFeedback,
   claimArticleForExtraction,
@@ -618,6 +619,22 @@ describe('recomputeFromPool', () => {
       nEff: null,
       ageAdjustedMass: null,
     })
+  })
+
+  it('gives /pool/aggregate a 30 s budget, not 10 s (daatan#2118)', async () => {
+    // At ~1,100 usable rows retro's recompute no longer fit in 10 s and the largest
+    // forecasts stopped updating. news-indexer's push client is sized on this value.
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+
+    await recomputeFromPool('pred-1', null, null)
+
+    expect(POOL_RECOMPUTE_TIMEOUT_MS).toBe(30_000)
+    expect(mockOraculFetch).toHaveBeenCalledWith(
+      expect.anything(),
+      '/pool/aggregate',
+      expect.objectContaining({ timeoutMs: 30_000 }),
+    )
   })
 
   it('surfaces evidence_mass/n_eff/age_adjusted_mass from the pool aggregate (daatan#1563)', async () => {
