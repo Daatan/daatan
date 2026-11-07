@@ -248,6 +248,9 @@ const FAILED_RECLAIM_BACKOFF_MS = 24 * 60 * 60 * 1000
  */
 const TRANSPORT_RECLAIM_BACKOFF_MS = 60 * 1000
 
+/** Client budget for retro's `/pool/aggregate` in `recomputeFromPool` (daatan#2118, was 10 s). */
+export const POOL_RECOMPUTE_TIMEOUT_MS = 30_000
+
 /**
  * Reasons that mean "stop asking about this row" — a verdict, not a transient miss.
  *
@@ -1255,7 +1258,13 @@ export async function recomputeFromPool(
         ...(claimCreatedAt ? { claim_created_at: claimCreatedAt.toISOString() } : {}),
         ...(claimArchetypeParam(claimArchetype) ? { claim_archetype: claimArchetypeParam(claimArchetype) } : {}),
       }),
-      timeoutMs: 10_000,
+      // 30 s, was 10 s (daatan#2118). retro's /pool/aggregate cost grows faster than
+      // linearly with the usable rows sent: at ~1,100 rows it no longer fit in 10 s
+      // (dedupe alone ~6 s on 1,148 rows), so the largest forecasts stopped updating
+      // and kept their previous estimate on every push. Nothing waits on this
+      // interactively. news-indexer's push client budget sits above
+      // FORECAST_TIMEOUT_MS + this + margin; move both together.
+      timeoutMs: POOL_RECOMPUTE_TIMEOUT_MS,
     })
   } catch (err) {
     // Transport failure (timeout, connection reset) — the aggregate could not be reached,
