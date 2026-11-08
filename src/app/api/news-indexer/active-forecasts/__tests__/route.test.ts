@@ -39,16 +39,19 @@ describe('GET /api/news-indexer/active-forecasts', () => {
     expect(prisma.prediction.findMany).not.toHaveBeenCalled()
   })
 
-  it('queries only ACTIVE, public predictions — daatan#1603', async () => {
+  it('queries public ACTIVE predictions plus recently-expired PENDING ones — daatan#1603, #2122', async () => {
     vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
 
     await GET(get('test-secret'))
 
-    expect(prisma.prediction.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { status: 'ACTIVE', isPublic: true },
-      }),
-    )
+    const { where } = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as {
+      where: { isPublic: boolean; OR: Array<{ status: string; resolveByDatetime?: { gte: Date } }> }
+    }
+    expect(where.isPublic).toBe(true)
+    expect(where.OR.map((c) => c.status)).toEqual(['ACTIVE', 'PENDING'])
+    const cutoff = where.OR[1].resolveByDatetime!.gte.getTime()
+    expect(Date.now() - cutoff).toBeGreaterThan(59 * 86_400_000)
+    expect(Date.now() - cutoff).toBeLessThan(61 * 86_400_000)
   })
 
   it('shapes the response from the query result', async () => {

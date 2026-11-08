@@ -144,6 +144,31 @@ describe('POST /api/news-indexer/context', () => {
     expect(getOraculForecast).not.toHaveBeenCalled()
   })
 
+  it('accepts a push for a recently-expired PENDING forecast (daatan#2122)', async () => {
+    vi.mocked(prisma.prediction.findUnique).mockResolvedValue({
+      ...ACTIVE_PREDICTION,
+      status: 'PENDING',
+      resolveByDatetime: new Date(Date.now() - 10 * 86_400_000),
+    } as never)
+    vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
+
+    const res = await POST(post('test-secret'))
+    expect(res.status).toBe(200)
+    expect(getOraculForecast).toHaveBeenCalled()
+  })
+
+  it('rejects a PENDING forecast past the evidence grace period, and a resolved one, with 409', async () => {
+    for (const p of [
+      { status: 'PENDING', resolveByDatetime: new Date(Date.now() - 61 * 86_400_000) },
+      { status: 'RESOLVED_CORRECT', resolveByDatetime: new Date() },
+    ]) {
+      vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ ...ACTIVE_PREDICTION, ...p } as never)
+      const res = await POST(post('test-secret'))
+      expect(res.status).toBe(409)
+    }
+    expect(getOraculForecast).not.toHaveBeenCalled()
+  })
+
   it('returns the per-article Oracul output so news-indexer can store it', async () => {
     vi.mocked(getOraculForecast).mockResolvedValue({ forecast: ORACLE_WITH_SOURCE, logId: null } as never)
 

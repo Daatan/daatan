@@ -15,6 +15,7 @@ import {
   failClaimedArticles,
 } from '@/lib/services/evidence-pool'
 import { resolvePooledEstimate, type ResolvedPoolEstimate } from '@/lib/services/pooled-estimate'
+import { acceptsEvidence } from '@/lib/services/evidence-eligibility'
 import { notifyNewsArticleMatched } from '@/lib/services/telegram'
 import { createLogger } from '@/lib/logger'
 
@@ -173,11 +174,12 @@ export async function POST(request: NextRequest) {
         createdAt: true,
         claimArchetype: true,
         resolutionRules: true,
+        resolveByDatetime: true,
       },
     })
 
     if (!prediction) return apiError('Prediction not found', 404)
-    if (prediction.status !== 'ACTIVE') return apiError('Prediction is not active', 409)
+    if (!acceptsEvidence(prediction)) return apiError('Prediction is not accepting evidence', 409)
 
     // Normalize to a single evidence set, regardless of which shape arrived.
     const items =

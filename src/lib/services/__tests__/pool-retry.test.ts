@@ -62,9 +62,9 @@ describe('retryPoolExtractions', () => {
 
     expect(r.processed).toBe(2)
     expect(mockRefresh.mock.calls.map((c) => (c[0] as { id: string }).id)).toEqual(['big', 'mid'])
-    // Only ACTIVE predictions were even considered
-    const predWhere = mockPredictions.mock.calls[0][0] as { where: { status: string } }
-    expect(predWhere.where.status).toBe('ACTIVE')
+    // Only evidence-eligible predictions (ACTIVE + recently-expired PENDING, #2122) were considered
+    const predWhere = mockPredictions.mock.calls[0][0] as { where: { OR: Array<{ status: string }> } }
+    expect(predWhere.where.OR.map((c) => c.status)).toEqual(['ACTIVE', 'PENDING'])
   })
 
   it('re-pushes the snippet the original attempt carried, not title-only', async () => {
