@@ -592,6 +592,44 @@ describe('the settlement bar — a pin must be backed by its pool (#1525)', () =
     expect(updateData()).not.toHaveProperty('settled')
   })
 
+  // daatan#2121: on a long-running forecast the pool is mostly pre-event articles, so the
+  // share became unreachable — 13 settling of 499 (9 outlets) on a pin that was right.
+  const bigPool = (outlets: string[], total: number) => ({
+    mean: 3,
+    sources: Array.from({ length: total }, (_, i) =>
+      i < outlets.length ? { settled: true, outletName: outlets[i] } : { settled: false, outletName: 'pre-event' }),
+  })
+
+  it('latches a large pool once at least 4 distinct outlets report the outcome (#2121)', async () => {
+    await pin(bigPool(['PBS', 'France24', 'BBC', 'UPI'], 499))
+    expect(updateData()).toMatchObject({ settled: true })
+  })
+
+  it('still refuses a large pool with only 3 distinct outlets', async () => {
+    await pin(bigPool(['PBS', 'France24', 'BBC'], 499))
+    expect(updateData()).not.toHaveProperty('settled')
+  })
+
+  it('counts syndicated echoes of one outlet once, falling back to sourceName', async () => {
+    await pin(bigPool(['Reuters', 'reuters', 'Reuters ', 'BBC', 'BBC'], 499))
+    expect(updateData()).not.toHaveProperty('settled')
+
+    update.mockClear()
+    await pin({
+      mean: 3,
+      sources: [
+        ...['a', 'b', 'c', 'd'].map((n) => ({ settled: true, sourceName: n })),
+        ...Array.from({ length: 400 }, () => ({ settled: false })),
+      ],
+    })
+    expect(updateData()).toMatchObject({ settled: true })
+  })
+
+  it('does not count settling rows that carry no outlet identity', async () => {
+    await pin({ mean: 3, sources: [...Array.from({ length: 10 }, () => ({ settled: true })), ...Array.from({ length: 400 }, () => ({ settled: false }))] })
+    expect(updateData()).not.toHaveProperty('settled')
+  })
+
   it('refuses 1 of 1 — unanimous, but the count floor is what stops a share test there', async () => {
     await pin(settledPool(1, 1))
     expect(updateData()).not.toHaveProperty('settled')
@@ -628,7 +666,7 @@ describe('the settlement bar — a pin must be backed by its pool (#1525)', () =
   it('logs the rejection with both counts, so the rate is visible immediately', async () => {
     await pin(settledPool(2, 97))
     expect(logInfo).toHaveBeenCalledWith(
-      expect.objectContaining({ predictionId: 'pred-1', settling: 2, total: 97, backed: false }),
+      expect.objectContaining({ predictionId: 'pred-1', settling: 2, total: 97, outlets: 0, backed: false }),
       expect.stringContaining('settlement pin rejected'),
     )
   })
