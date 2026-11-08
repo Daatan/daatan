@@ -90,8 +90,12 @@ The central table (`Prediction`). Field groups:
   write, never sticky) and only affects the Awaiting-Resolution tab, never
   `status`. A **settlement pin** is its own class (daatan#1248): its
   `confidence` is the Oracul's `settlement_stance` constant (~97), not a level,
-  so a pinned write enters the band only when its snapshot pool carries ≥2
-  settling votes — an unverifiable pin sets the flag false and skips the
+  so a pinned write enters the band only when its snapshot pool backs it —
+  ≥2 settling votes **and** either ≥25% of the pool (daatan#1525) or ≥4
+  distinct settling outlets (daatan#2121: on a long-running forecast the pool
+  is mostly pre-event articles, so the share alone became unreachable). The
+  same bar gates the latch and the alert (`settlementBacking` in
+  `context.ts`); an unbacked pin sets the flag false and skips the
   high-confidence Telegram alert.
 - **Settlement latch**: `settled`/`settledAt` — set when the Oracul reports the
   outcome as an accomplished fact (≥2 independent sources). **One-way**: only

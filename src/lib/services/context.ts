@@ -38,12 +38,37 @@ const MIN_SETTLING_SOURCES = 2
  *  is `settling / total >= 0.25` without the float. */
 const MIN_SETTLING_SHARE_DENOM = 4
 
+/** The large-pool branch of the bar (daatan#2121). The share above divides by the WHOLE
+ *  pool, and on a long-running forecast that pool is mostly articles written before the
+ *  event — so it became unreachable however many outlets reported the outcome (13 settling
+ *  of 499 on the Netanyahu-first-tasked forecast, 9 outlets; bar = 125). Over the 30 days
+ *  to 2026-11-08 it rejected pins on 6 forecasts and every one agreed with the outcome
+ *  (4/4 later human-resolved the same way); all 6 reach this many distinct outlets at the
+ *  first pin or within the hour. Distinct outlets, not rows, so syndicated echoes of one
+ *  wire story — the concern #1248 raised — still count once. */
+const MIN_SETTLING_OUTLETS = 4
+
 /** Rows of the persisted Oracul pool that carried a settlement-grade vote.
  *  Defensive over unvalidated Json, same as `maxPublishedAt` below. */
 function settlingSourceCount(oracleSnapshot: unknown): number {
   const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
   if (!Array.isArray(sources)) return 0
   return sources.filter((s) => (s as { settled?: unknown } | null)?.settled === true).length
+}
+
+/** Distinct outlets among the settling rows. A row with no outlet/source identity is not
+ *  counted — fails closed rather than letting anonymous rows each pose as an outlet. */
+function settlingOutletCount(oracleSnapshot: unknown): number {
+  const sources = (oracleSnapshot as { sources?: unknown } | null | undefined)?.sources
+  if (!Array.isArray(sources)) return 0
+  const outlets = new Set<string>()
+  for (const raw of sources) {
+    const s = raw as { settled?: unknown; outletName?: unknown; sourceName?: unknown } | null
+    if (s?.settled !== true) continue
+    const name = typeof s.outletName === 'string' && s.outletName.trim() ? s.outletName : s.sourceName
+    if (typeof name === 'string' && name.trim()) outlets.add(name.trim().toLowerCase())
+  }
+  return outlets.size
 }
 
 /** Pool rows behind an estimate, settling or not — the denominator of the share. */
@@ -65,13 +90,17 @@ function sourceCount(oracleSnapshot: unknown): number {
  *
  * Fails closed on a pin that arrives without its snapshot: no pool, no backing.
  */
-function settlementBacking(oracleSnapshot: unknown): { settling: number; total: number; backed: boolean } {
+function settlementBacking(oracleSnapshot: unknown): { settling: number; total: number; outlets: number; backed: boolean } {
   const settling = settlingSourceCount(oracleSnapshot)
   const total = sourceCount(oracleSnapshot)
+  const outlets = settlingOutletCount(oracleSnapshot)
   return {
     settling,
     total,
-    backed: settling >= MIN_SETTLING_SOURCES && settling * MIN_SETTLING_SHARE_DENOM >= total,
+    outlets,
+    backed:
+      settling >= MIN_SETTLING_SOURCES &&
+      (settling * MIN_SETTLING_SHARE_DENOM >= total || outlets >= MIN_SETTLING_OUTLETS),
   }
 }
 
@@ -450,7 +479,7 @@ export async function recordEstimate(input: RecordEstimateInput) {
   }
   const backing = pinned
     ? settlementBacking(input.oracleSnapshot)
-    : { settling: 0, total: 0, backed: false }
+    : { settling: 0, total: 0, outlets: 0, backed: false }
   if (pinned && !backing.backed) {
     // Visible from day one rather than inferred later: this is the rate at which the
     // Oracul claims settlement on a pool that does not carry it (daatan#1525).
