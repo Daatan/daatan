@@ -53,4 +53,8 @@ describe('rankSearchMatches (daatan#1878)', () => {
     const rows = [c('tagFuzzy', 'Chip export controls', { tags: [{ name: 'Elektions' }] }), c('word', 'The election is near')]
     expect(rankSearchMatches('election', rows)).toEqual(['word', 'tagFuzzy'])
   })
+  it('ranks a claim prefix above a tag match, as the scores say', () => {
+    const rows = [c('prefix', 'Elections will be held early'), c('tag', 'Coalition talks', { tags: [{ name: 'election' }] })]
+    expect(rankSearchMatches('election', rows)).toEqual(['prefix', 'tag'])
+  })
 })

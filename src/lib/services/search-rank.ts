@@ -47,11 +47,12 @@ export function rankSearchMatches(
     const tagNames = c.tags.map(t => t.name)
     if (word.test(c.claimText)) return SCORE.claimWord
     if (translations.some(t => word.test(t))) return SCORE.translationWord
-    if (tagNames.some(n => n.toLowerCase() === lower)) return SCORE.tagExact
-    if (tagNames.some(n => word.test(n))) return SCORE.tagWord
-    if (isShort) return 0
+    const tagScore = tagNames.some(n => n.toLowerCase() === lower) ? SCORE.tagExact
+      : tagNames.some(n => word.test(n)) ? SCORE.tagWord : 0
+    if (isShort) return tagScore
     if (prefix.test(c.claimText)) return SCORE.claimPrefix
     if (translations.some(t => prefix.test(t))) return SCORE.translationPrefix
+    if (tagScore) return tagScore
     const all = [c.claimText, ...translations, ...tagNames]
     if (all.some(s => s.toLowerCase().includes(lower))) return SCORE.substring
     const fr = fuzzyRank.get(c.id)
