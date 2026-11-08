@@ -227,6 +227,43 @@ describe('/api/forecasts', () => {
             expect(searches[1][0].qLen).toBe(150)
         })
 
+        it('orders a search with no explicit sort by relevance and drops short-query substring hits (daatan#1878)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            const row = (id: string, claimText: string, day: number) => ({
+                id, claimText, createdAt: new Date(Date.UTC(2026, 9, day)), tags: [], translations: [],
+                status: 'ACTIVE', author: { id: 'u', username: 'u' }, _count: { commitments: 0 }, options: [],
+            })
+            const candidates = [
+                row('noise', 'Eisenkot will try again', 9),
+                row('old', 'An AI model will pass the bar exam', 1),
+                row('new', 'AI chips will face new export limits', 5),
+            ]
+            vi.mocked(prisma.prediction.findMany)
+                .mockResolvedValueOnce(candidates as any)
+                .mockResolvedValueOnce([candidates[1], candidates[2]] as any)
+            vi.mocked(prisma.prediction.count).mockResolvedValue(2)
+
+            const res = await GET(new NextRequest('http://localhost/api/forecasts?q=AI&limit=50'))
+            const data = await res.json()
+
+            expect(data.predictions.map((p: { id: string }) => p.id)).toEqual(['new', 'old'])
+            expect(data.pagination.total).toBe(2)
+            const pageCall = vi.mocked(prisma.prediction.findMany).mock.calls[1][0] as any
+            expect(pageCall.where).toEqual({ id: { in: ['new', 'old'] } })
+        })
+
+        it('keeps the requested sort when sortBy is explicit, even with a search', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            await GET(new NextRequest('http://localhost/api/forecasts?q=AI&sortBy=deadline&sortOrder=asc'))
+
+            expect(vi.mocked(prisma.prediction.findMany)).toHaveBeenCalledTimes(1)
+            const call = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
+            expect(call.orderBy).toEqual({ resolveByDatetime: 'asc' })
+        })
+
         it('adds trigram-matched predictions and tags to the search OR-clause', async () => {
             const { prisma } = await import('@/lib/prisma')
             const { findFuzzyMatches } = await import('@/lib/services/fuzzy-search')
