@@ -35,7 +35,7 @@
     "@aws-sdk/client-s3": "^3.1159.0",
     "@aws-sdk/client-ssm": "^3.1159.0",
     "@google/generative-ai": "^0.24.1",
-    "@hookform/resolvers": "^5.7.1",
+    "@hookform/resolvers": "^7.0.3",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@swc/helpers": "^0.5.18",
