@@ -22,6 +22,9 @@ const log = createLogger('search-query')
  */
 const QUERY_TIMEOUT_MS = 5_000
 
+/** Thinking tokens for the query extraction; 0 = off (daatan#1890). */
+export const SEARCH_QUERY_THINKING_BUDGET = 0
+
 /**
  * Strip a leading emoji prefix (e.g. the "🤖 " on bot forecasts) and take the
  * segment before a title separator. Mirrors the cleanup the context route used
@@ -57,7 +60,17 @@ export async function buildSearchQuery(claim: string): Promise<string> {
 
   const extraction = (async (): Promise<string> => {
     const prompt = EXTRACTION_PROMPT.replace('{claim}', () => cleaned)
-    const res = await llmService.generateContent({ ...forStage('search_query'), prompt, temperature: 0 })
+    // Thinking off (daatan#1890): the answer is 3-8 words, but default dynamic thinking on
+    // gemini-2.5-flash spent ~630 tokens reasoning about it. That made p50 3.1 s and p90
+    // 6.2 s, and 7 of 26 prod calls hit QUERY_TIMEOUT_MS, so search fell back to the raw
+    // claim sentence. With a budget of 0, 41 real claims took p50 0.65 s / p90 0.79 s and
+    // produced the same entities (A/B in the #1890 thread).
+    const res = await llmService.generateContent({
+      ...forStage('search_query'),
+      prompt,
+      temperature: 0,
+      thinkingBudget: SEARCH_QUERY_THINKING_BUDGET,
+    })
     return res.text.trim().replace(/^["']+|["']+$/g, '').replace(/\s+/g, ' ').trim()
   })()
 
