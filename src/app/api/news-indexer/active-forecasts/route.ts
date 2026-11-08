@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/env'
 import { prisma } from '@/lib/prisma'
 import { apiError } from '@/lib/api-error'
+import { evidenceEligibleWhere } from '@/lib/services/evidence-eligibility'
 
 
 export async function GET(request: NextRequest) {
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest) {
     // default, but this feed queried on status alone, so a private forecast burned the same
     // matching+judging cost as a public one while being invisible to any review that only
     // browses the public listing.
-    where: { status: 'ACTIVE', isPublic: true },
+    // ACTIVE plus recently-expired PENDING (daatan#2122) — see evidence-eligibility.ts.
+    where: { ...evidenceEligibleWhere(), isPublic: true },
     select: {
       id: true,
       claimText: true,

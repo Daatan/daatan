@@ -4,6 +4,7 @@ import { DEFAULT_MAX_ARTICLES, ORACLE_NULL_REASONS, ATTRIBUTABLE_NULL_REASONS } 
 import { TERMINAL_POOL_REASONS } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
+import { evidenceEligibleWhere } from '@/lib/services/evidence-eligibility'
 
 const log = createLogger('pool-retry')
 
@@ -77,7 +78,7 @@ export async function retryPoolExtractions(limit: number): Promise<RetrySweepRes
   })
   const backlogById = new Map(groups.map((g) => [g.predictionId, g._count._all]))
   const active = await prisma.prediction.findMany({
-    where: { id: { in: [...backlogById.keys()] }, status: 'ACTIVE' },
+    where: { id: { in: [...backlogById.keys()] }, ...evidenceEligibleWhere() },
     select: { id: true, claimText: true, claimDirection: true, claimDeadline: true, createdAt: true, claimArchetype: true, resolutionRules: true },
   })
   const candidates = active
