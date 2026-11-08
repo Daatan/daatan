@@ -29,10 +29,10 @@ List predictions. Public; optional session for user-context fields.
 | `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE`. `PENDING` ("Awaiting Resolution") also matches still-`ACTIVE` forecasts where `awaitingAiResolution` is true (organic AI estimate >=90% or <=10%; a settlement pin instead needs >=2 settling votes in its snapshot — see `context.ts`, daatan#1248) — status itself doesn't change, so staking stays open until the real deadline |
 | `authorId` | cuid | — | Filter by author |
 | `tags` | string | — | Comma-separated tag names |
-| `q` | string | — | Free-text search over `claimText`, its translations (`prediction_translations`, `fieldName='claimText'` — so a Hebrew/Russian/Esperanto query finds forecasts whose canonical claim is English, daatan#1804) and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169) |
+| `q` | string | — | Free-text search over `claimText`, its translations (`prediction_translations`, `fieldName='claimText'` — so a Hebrew/Russian/Esperanto query finds forecasts whose canonical claim is English, daatan#1804) and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169). With no explicit `sortBy`, results are ordered by relevance (whole word in the claim > in a translation > tag > word prefix > substring > trigram; newest first within a tier), and a query of ≤3 characters keeps only whole-word and tag matches, so `AI` no longer returns every claim containing "ai" (daatan#1878) |
 | `page` | number | 1 | |
 | `limit` | number | 20 | max 100 |
-| `sortBy` | enum | `newest` | `newest`, `deadline`, `cu`, `updated` |
+| `sortBy` | enum | `newest` (relevance when `q` is set) | `newest`, `deadline`, `cu`, `updated` |
 | `sortOrder` | enum | `desc` | `asc`, `desc` |
 | `resolvedOnly` | bool | false | |
 | `closingSoon` | bool | false | Within 7 days |

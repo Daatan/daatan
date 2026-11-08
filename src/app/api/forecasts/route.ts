@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { createPredictionSchema, listPredictionsQuerySchema } from '@/lib/validations/prediction'
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
@@ -7,7 +8,8 @@ import { checkContent } from '@/lib/services/moderation'
 import { translatePredictionToAllLocales } from '@/lib/services/translation'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { listForecasts, enrichPredictions, upsertNewsAnchor, verifyUserExists, createForecast } from '@/lib/services/forecast'
-import { findFuzzyMatches } from '@/lib/services/fuzzy-search'
+import { findFuzzyMatches, type FuzzyMatches } from '@/lib/services/fuzzy-search'
+import { rankSearchMatches } from '@/lib/services/search-rank'
 import { createLogger } from '@/lib/logger'
 import { toError } from '@/lib/utils/error'
 import { withRetry } from '@/lib/utils/retry'
@@ -15,6 +17,8 @@ import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
 import { formatDisplayDate } from '@/lib/utils/date'
 
 const log = createLogger('api-forecasts')
+
+const SEARCH_CANDIDATE_CAP = 2000
 
 
 // GET /api/predictions - List predictions (public, with optional session for user context)
@@ -83,11 +87,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    let fuzzy: FuzzyMatches | null = null
     if (query.q) {
       // Search demand is otherwise unobservable (daatan#1878): the query text is the only
       // thing recorded — no user id, no IP — and it is capped so a pasted blob can't flood logs.
       log.info({ event: 'forecast_search', q: query.q.slice(0, 100), qLen: query.q.length }, 'forecast search')
-      const fuzzy = await findFuzzyMatches(query.q)
+      fuzzy = await findFuzzyMatches(query.q)
       andConditions.push({
         OR: [
           { claimText: { contains: query.q, mode: 'insensitive' } },
@@ -127,6 +132,41 @@ export async function GET(request: NextRequest) {
       : query.sortBy === 'updated'
         ? { updatedAt: query.sortOrder as 'asc' | 'desc' }
         : { createdAt: query.sortOrder as 'asc' | 'desc' }
+
+    // A search with no explicit sort is ordered by relevance (daatan#1878): rank the whole
+    // match set (bounded by public forecasts), then load only the requested page.
+    if (query.q && fuzzy && !searchParams.get('sortBy') && !closingSoon) {
+      const candidates = await prisma.prediction.findMany({
+        where,
+        select: {
+          id: true, claimText: true, createdAt: true,
+          tags: { select: { name: true } },
+          translations: { where: { fieldName: 'claimText' }, select: { translatedText: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: SEARCH_CANDIDATE_CAP,
+      })
+      const ranked = rankSearchMatches(query.q, candidates, fuzzy.predictionIds)
+      const pageIds = ranked.slice((query.page - 1) * query.limit, query.page * query.limit)
+      const { predictions } = await listForecasts({
+        where: { id: { in: pageIds } }, orderBy, page: 1, limit: query.limit,
+        isCuSort: false, sortOrder: query.sortOrder as 'asc' | 'desc',
+        userId: session?.user?.id,
+      })
+      const pos = new Map(pageIds.map((id, i) => [id, i]))
+      predictions.sort((a, b) => (pos.get(a.id) ?? 0) - (pos.get(b.id) ?? 0))
+      return NextResponse.json({
+        predictions: enrichPredictions(predictions, {
+          page: 1, limit: query.limit, sortOrder: query.sortOrder as 'asc' | 'desc', isCuSort: false,
+        }),
+        pagination: {
+          page: query.page,
+          limit: query.limit,
+          total: ranked.length,
+          totalPages: Math.ceil(ranked.length / query.limit),
+        },
+      })
+    }
 
     const { predictions, total } = await listForecasts({
       where, orderBy, page: query.page, limit: query.limit,
