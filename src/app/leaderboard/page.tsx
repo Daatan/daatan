@@ -124,16 +124,34 @@ export default function LeaderboardPage() {
     return (sortDir === 'best') !== Boolean(LOWER_IS_BETTER[key]) ? 'descending' : 'ascending'
   }
 
+  // Column hints reuse the legend text. Shown on hover and on keyboard focus; on
+  // touch screens a tap triggers hover, so the hint appears with the sort.
+  const HINT_KEY: Record<SortBy, string> = {
+    elo: 'legend.eloDesc',
+    accuracy: 'legend.accuracyDesc',
+    brierScore: 'legend.brierDesc',
+    peerScore: 'legend.peerScoreDesc',
+    aiScore: 'legend.aiScoreDesc',
+  }
+
   const sortHeader = (sortKey: SortBy, children: ReactNode) => (
-    <th className={headerClass(sortKey)} aria-sort={ariaSort(sortKey)}>
+    <th className={`${headerClass(sortKey)} relative group`} aria-sort={ariaSort(sortKey)}>
       <button
         type="button"
         onClick={() => handleSort(sortKey)}
+        aria-describedby={`lb-hint-${sortKey}`}
         className="uppercase tracking-wider font-bold text-right hover:text-white transition-colors"
       >
         {children}
         {sortArrow(sortKey)}
       </button>
+      <span
+        id={`lb-hint-${sortKey}`}
+        role="tooltip"
+        className="pointer-events-none invisible opacity-0 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100 transition-opacity absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
+      >
+        {t(HINT_KEY[sortKey])}
+      </span>
     </th>
   )
 
