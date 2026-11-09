@@ -768,13 +768,15 @@ export default function ExpressForecastClient({
             </div>
             <div className="flex gap-2">
               {isEditing ? (
+                // Deliberately low-key: Save Changes below is the primary action. Rewrite sends
+                // the claim back to the AI, which can undo the author's own fixes (#2135).
                 <button
                   onClick={handleRegenerateFromEdit}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-600 bg-purple-900/20 rounded-lg hover:bg-purple-100 transition-colors"
-                  title={t('regenerateFromClaimTooltip')}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 rounded-lg hover:text-gray-200 hover:bg-navy-600 transition-colors"
+                  title={t('rewriteWithAiTooltip')}
                 >
                   <Sparkles className="w-4 h-4" />
-                  {t('regenerate')}
+                  {t('rewriteWithAi')}
                 </button>
               ) : (
                 <>
@@ -1229,8 +1231,9 @@ export default function ExpressForecastClient({
                     disabled={isPublishing}
                     variant="outline"
                     size="xl"
+                    leftIcon={<ArrowLeft className="w-5 h-5" />}
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    {t('startOver')}
                   </Button>
                 </>
               )}
