@@ -1,33 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Trophy, Loader2, Medal, Target, TrendingDown, Swords, Bot, Newspaper } from 'lucide-react'
+import { Trophy, Loader2, Medal, Target, TrendingDown, Swords, Bot, Newspaper, Users } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
+import { FETCH_LIMIT, LOWER_IS_BETTER, formatSigned, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
 
 const log = createClientLogger('Leaderboard')
-
-// The API still ranks by every registered scoring system; the page surfaces the
-// three we ask people to care about. ELO is the headline rating, accuracy and
-// Brier are the two plain-language checks on it.
-type SortBy = 'elo' | 'accuracy' | 'brierScore'
-
-type LeaderboardUser = {
-  id: string
-  name: string | null
-  username: string | null
-  image: string | null
-  eloRating: number | null
-  totalCorrect: number
-  totalResolved: number
-  accuracy: number | null
-  avgBrierScore: number | null
-  brierCount: number
-}
 
 type TagOption = { name: string; slug: string }
 
@@ -40,13 +23,29 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState<LeaderboardUser[]>([])
   const [tags, setTags] = useState<TagOption[]>([])
   const [sortBy, setSortBy] = useState<SortBy>('elo')
+  const [sortDir, setSortDir] = useState<SortDir>('best')
   const [selectedTag, setSelectedTag] = useState<string | null>(searchParams.get('tag'))
 
   const SORT_OPTIONS: { value: SortBy; label: string; icon: typeof Target }[] = [
     { value: 'elo', label: t('sortBy.elo'), icon: Swords },
     { value: 'accuracy', label: t('sortBy.accuracy'), icon: Target },
     { value: 'brierScore', label: t('sortBy.brierScore'), icon: TrendingDown },
+    { value: 'peerScore', label: t('sortBy.peerScore'), icon: Users },
+    { value: 'aiScore', label: t('sortBy.aiScore'), icon: Bot },
   ]
+
+  // A new column starts best-first; clicking the active column flips the order.
+  const handleSort = (key: SortBy) => {
+    if (key === sortBy) {
+      setSortDir(d => (d === 'best' ? 'worst' : 'best'))
+    } else {
+      setSortBy(key)
+      setSortDir('best')
+    }
+  }
+
+  const rankById = new Map(users.map((u, i) => [u.id, i]))
+  const displayed = orderForDisplay(users, sortBy, sortDir)
 
   const fetchLeaderboardKey = `${sortBy}|${selectedTag}`
   const [fetchLeaderboardLoadedKey, setFetchLeaderboardLoadedKey] = useState<string | null>(null)
@@ -55,7 +54,7 @@ export default function LeaderboardPage() {
   const fetchLeaderboard = useCallback(async () => {
     try {
       try {
-        const params = new URLSearchParams({ limit: '50', sortBy })
+        const params = new URLSearchParams({ limit: FETCH_LIMIT, sortBy })
         if (selectedTag) params.set('tag', selectedTag)
         const response = await fetch(`/api/leaderboard?${params}`)
         if (response.ok) {
@@ -104,10 +103,39 @@ export default function LeaderboardPage() {
     }
   }
 
+  // The two extra columns only fit from sm up; the active one always shows.
+  const isExtra = (key: SortBy) => key === 'peerScore' || key === 'aiScore'
+  const cellVisibility = (key: SortBy) => (isExtra(key) && sortBy !== key ? 'hidden sm:table-cell' : '')
+
   const headerClass = (key: SortBy) =>
-    `px-2 sm:px-6 py-4 text-xs font-bold uppercase tracking-wider break-words text-right w-20 sm:w-28 ${
+    `px-2 sm:px-4 py-4 text-xs font-bold uppercase tracking-wider break-words text-right w-20 sm:w-24 ${cellVisibility(key)} ${
       sortBy === key ? 'text-white' : 'text-gray-500'
     }`
+
+  // Arrow shows the value order: best-first is descending, except where lower is better.
+  const sortArrow = (key: SortBy) => {
+    if (sortBy !== key) return null
+    const descending = (sortDir === 'best') !== Boolean(LOWER_IS_BETTER[key])
+    return <span aria-hidden="true">{descending ? ' ↓' : ' ↑'}</span>
+  }
+
+  const ariaSort = (key: SortBy): 'ascending' | 'descending' | 'none' => {
+    if (sortBy !== key) return 'none'
+    return (sortDir === 'best') !== Boolean(LOWER_IS_BETTER[key]) ? 'descending' : 'ascending'
+  }
+
+  const sortHeader = (sortKey: SortBy, children: ReactNode) => (
+    <th className={headerClass(sortKey)} aria-sort={ariaSort(sortKey)}>
+      <button
+        type="button"
+        onClick={() => handleSort(sortKey)}
+        className="uppercase tracking-wider font-bold text-right hover:text-white transition-colors"
+      >
+        {children}
+        {sortArrow(sortKey)}
+      </button>
+    </th>
+  )
 
   const valueClass = (key: SortBy) =>
     sortBy === key ? 'font-black text-white text-base sm:text-lg' : 'font-bold text-text-secondary text-sm'
@@ -144,7 +172,7 @@ export default function LeaderboardPage() {
         {SORT_OPTIONS.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
-            onClick={() => setSortBy(value)}
+            onClick={() => handleSort(value)}
             className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               sortBy === value
                 ? 'bg-blue-600 text-white shadow-sm'
@@ -207,23 +235,25 @@ export default function LeaderboardPage() {
               <tr className="bg-navy-800 border-b border-navy-600">
                 <th className="px-1.5 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words w-12 sm:w-16">{t('rank')}</th>
                 <th className="px-2 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words">{t('predictor')}</th>
-                <th className={headerClass('elo')}>
+                {sortHeader('elo', <>
                   {t('sortBy.elo')}
                   {selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>}
-                </th>
-                <th className={headerClass('accuracy')}>{t('sortBy.accuracy')}</th>
-                <th className={headerClass('brierScore')}>{t('sortBy.brierScore')} ↓</th>
+                </>)}
+                {sortHeader('accuracy', t('sortBy.accuracy'))}
+                {sortHeader('brierScore', t('sortBy.brierScore'))}
+                {sortHeader('peerScore', t('sortBy.peerScore'))}
+                {sortHeader('aiScore', t('sortBy.aiScore'))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100/10">
-              {users.map((user, index) => (
+              {displayed.map((user) => { const index = rankById.get(user.id) ?? 0; return (
                 <tr
                   key={user.id}
                   onClick={() => router.push(`/profile/${user.id}`)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/profile/${user.id}`) } }}
                   role="button"
                   tabIndex={0}
-                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index < 3 ? 'bg-amber-400/5' : ''}`}
+                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''}`}
                 >
                   <td className="px-1.5 sm:px-6 py-3 sm:py-4">
                     <div className="flex justify-center">
@@ -249,12 +279,12 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
+                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
                     <span className={valueClass('elo')}>
                       {user.eloRating !== null ? Math.round(user.eloRating) : '—'}
                     </span>
                   </td>
-                  <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
+                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
                     <div className="flex flex-col items-end">
                       <span className={valueClass('accuracy')}>
                         {user.accuracy !== null ? `${user.accuracy}%` : '—'}
@@ -266,7 +296,7 @@ export default function LeaderboardPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
+                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
                     <div className="flex flex-col items-end">
                       <span className={valueClass('brierScore')}>
                         {user.avgBrierScore !== null ? user.avgBrierScore.toFixed(3) : '—'}
@@ -278,15 +308,21 @@ export default function LeaderboardPage() {
                       )}
                     </div>
                   </td>
+                  <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('peerScore')}`}>
+                    <span className={valueClass('peerScore')}>{formatSigned(user.peerScoreSum)}</span>
+                  </td>
+                  <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('aiScore')}`}>
+                    <span className={valueClass('aiScore')}>{formatSigned(user.aiScoreSum)}</span>
+                  </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
       )}
 
       {/* Legend */}
-      <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
           <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
             <Swords className="w-4 h-4 text-orange-400" />
@@ -307,6 +343,20 @@ export default function LeaderboardPage() {
             {t('legend.brierTitle')}
           </h2>
           <p className="text-xs text-gray-500 leading-relaxed">{t('legend.brierDesc')}</p>
+        </div>
+        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+            <Users className="w-4 h-4 text-cyan-400" />
+            {t('legend.peerScoreTitle')}
+          </h2>
+          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.peerScoreDesc')}</p>
+        </div>
+        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
+          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-cyan-400" />
+            {t('legend.aiScoreTitle')}
+          </h2>
+          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.aiScoreDesc')}</p>
         </div>
       </div>
       <p className="mt-4 text-center text-xs text-gray-500">
