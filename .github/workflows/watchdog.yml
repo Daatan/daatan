@@ -329,6 +329,27 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
+      # Staging is normally off (#2089): send-command to a stopped box fails with
+      # InvalidInstanceId and turned every watchdog run red. Run the on-box checks
+      # only once it has been running 5 minutes (SSM agent registered), as the page
+      # probes above do; production is always checked.
+      - name: Skip staging unless it is running
+        id: awake
+        run: |
+          SKIP=false
+          if [ "${{ matrix.env.tag }}" = "staging" ]; then
+            INSTANCE=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=staging" \
+              --query "Reservations[0].Instances[0].[State.Name,LaunchTime]" --output text)
+            read -r STATE LAUNCH <<< "$INSTANCE"
+            UPTIME=$(( $(date +%s) - $(date -d "$LAUNCH" +%s) ))
+            if [ "$STATE" != "running" ] || [ "$UPTIME" -lt 300 ]; then
+              SKIP=true
+              echo "Staging is $STATE, launched ${UPTIME}s ago — skipping on-box checks"
+            fi
+          fi
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
       # SSM's own send-command dispatches without awaiting delivery: if the agent is
       # unreachable, the two script steps below still exit 0 having done nothing (this
       # is exactly what happened during the 2026-09-04 outage — the watchdog run just
@@ -366,6 +387,7 @@ jobs:
           fi
 
       - name: Run Disk Check via SSM
+        if: steps.awake.outputs.skip != 'true'
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=${{ matrix.env.tag }}" \
@@ -401,6 +423,7 @@ jobs:
             --output text
 
       - name: Run System Health Check via SSM
+        if: steps.awake.outputs.skip != 'true'
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=daatan-backend" "Name=tag:Environment,Values=${{ matrix.env.tag }}" \
