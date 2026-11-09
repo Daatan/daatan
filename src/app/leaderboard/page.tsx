@@ -108,7 +108,7 @@ export default function LeaderboardPage() {
   const cellVisibility = (key: SortBy) => (isExtra(key) && sortBy !== key ? 'hidden sm:table-cell' : '')
 
   const headerClass = (key: SortBy) =>
-    `px-2 sm:px-4 py-4 text-xs font-bold uppercase tracking-wider break-words text-right w-20 sm:w-24 ${cellVisibility(key)} ${
+    `px-1 sm:px-4 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider text-right w-16 sm:w-24 ${cellVisibility(key)} ${
       sortBy === key ? 'text-white' : 'text-gray-500'
     }`
 
@@ -251,8 +251,12 @@ export default function LeaderboardPage() {
           <table className="w-full text-left table-fixed">
             <thead>
               <tr className="bg-navy-800 border-b border-navy-600">
-                <th className="px-1.5 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words w-12 sm:w-16">{t('rank')}</th>
-                <th className="px-2 sm:px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider break-words">{t('predictor')}</th>
+                <th className="px-1 sm:px-4 py-4 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider text-center w-10 sm:w-20">
+                  {/* "#" on phones: the word does not fit the narrow rank column. */}
+                  <span className="sm:hidden" aria-hidden="true">#</span>
+                  <span className="sr-only sm:not-sr-only">{t('rank')}</span>
+                </th>
+                <th className="px-2 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">{t('predictor')}</th>
                 {sortHeader('elo', <>
                   {t('sortBy.elo')}
                   {selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>}
@@ -273,7 +277,7 @@ export default function LeaderboardPage() {
                   tabIndex={0}
                   className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''}`}
                 >
-                  <td className="px-1.5 sm:px-6 py-3 sm:py-4">
+                  <td className="px-1 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-center">
                       {getRankIcon(index)}
                     </div>
@@ -297,12 +301,12 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
+                  <td className="px-1 sm:px-4 py-3 sm:py-4 text-right">
                     <span className={valueClass('elo')}>
                       {user.eloRating !== null ? Math.round(user.eloRating) : '—'}
                     </span>
                   </td>
-                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
+                  <td className="px-1 sm:px-4 py-3 sm:py-4 text-right">
                     <div className="flex flex-col items-end">
                       <span className={valueClass('accuracy')}>
                         {user.accuracy !== null ? `${user.accuracy}%` : '—'}
@@ -314,7 +318,7 @@ export default function LeaderboardPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right">
+                  <td className="px-1 sm:px-4 py-3 sm:py-4 text-right">
                     <div className="flex flex-col items-end">
                       <span className={valueClass('brierScore')}>
                         {user.avgBrierScore !== null ? user.avgBrierScore.toFixed(3) : '—'}
@@ -326,10 +330,10 @@ export default function LeaderboardPage() {
                       )}
                     </div>
                   </td>
-                  <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('peerScore')}`}>
+                  <td className={`px-1 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('peerScore')}`}>
                     <span className={valueClass('peerScore')}>{formatSigned(user.peerScoreSum)}</span>
                   </td>
-                  <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('aiScore')}`}>
+                  <td className={`px-1 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('aiScore')}`}>
                     <span className={valueClass('aiScore')}>{formatSigned(user.aiScoreSum)}</span>
                   </td>
                 </tr>
