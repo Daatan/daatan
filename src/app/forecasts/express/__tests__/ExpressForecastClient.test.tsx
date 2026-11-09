@@ -414,6 +414,30 @@ describe('ExpressForecastClient', () => {
       expect(screen.queryByText(/Unlisted — only people with the link/)).not.toBeInTheDocument()
     })
 
+    it('edit mode offers a low-key Rewrite with AI that warns about losing edits (#2135)', async () => {
+      await renderInReviewState()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+      })
+
+      const rewrite = screen.getByRole('button', { name: messages.expressForecast.rewriteWithAi })
+      expect(rewrite).toHaveAttribute('title', messages.expressForecast.rewriteWithAiTooltip)
+      expect(screen.queryByRole('button', { name: messages.expressForecast.regenerate })).not.toBeInTheDocument()
+      expect(screen.getByText('Save Changes')).toBeInTheDocument()
+    })
+
+    it('the labelled Start over button returns to an empty input step (#2135)', async () => {
+      await renderInReviewState()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: messages.expressForecast.startOver }))
+      })
+
+      expect(screen.queryByText('Confirm & Publish')).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox')).toBeInTheDocument()
+    })
+
     it('entering a valid date and 24h time in edit mode updates the field values', async () => {
       await renderInReviewState()
 
