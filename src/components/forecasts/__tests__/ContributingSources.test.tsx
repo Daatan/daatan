@@ -52,8 +52,8 @@ describe('ContributingSources', () => {
   })
 
   it('shows a press-lean summary from the stances', () => {
-    // Two YES (certainty 0.5 → P(YES) 0.75 each) and one NO (0.75 → 0.125):
-    // mean ≈ 0.54 → leans toward "will happen".
+    // Two YES (stance .6 → P(YES) 0.8 each) and one NO (stance −.6 → 0.2):
+    // mean 0.6 → leans toward "will happen" at 60%. Certainty does not move it.
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -63,21 +63,41 @@ describe('ContributingSources', () => {
         ]}
       />,
     )
-    expect(screen.getByText(/Press leans toward 'will happen' · \d+%/)).toBeInTheDocument()
+    expect(screen.getByText("Press leans toward 'will happen' · 60%")).toBeInTheDocument()
   })
 
   it('shows the outlet name, its headline, and an aggregate side badge', () => {
     // Single-article outlet → a plain link card. stance 0.5, certainty 0.72 →
-    // badge shows implied P(YES) = 0.5 + 0.72/2 = 86% (the will/won't word is
-    // dropped; the arrow + colour + column carry the side). One scale everywhere
-    // (#1249): NOT the article's raw 72% certainty.
+    // badge shows implied P(YES) = (1 + 0.5)/2 = 75% — the vote the Oracul pool
+    // casts for it (#2139). The will/won't word is dropped; the arrow + colour +
+    // column carry the side. One scale everywhere (#1249): neither raw 72%
+    // certainty nor the old certainty-derived 86%.
     renderWithIntl(
       <ContributingSources
         sources={[src({ source: 'Reuters', title: 'Big scoop', certainty: 0.72, stance: 0.5 })]} />,
     )
     expect(screen.getByText('Reuters')).toBeInTheDocument()
     expect(screen.getByText('Big scoop')).toBeInTheDocument()
-    expect(screen.getByText('↑ 86%')).toBeInTheDocument()
+    expect(screen.getByText('↑ 75%')).toBeInTheDocument()
+    expect(screen.queryByText('↑ 86%')).toBeNull()
+  })
+
+  it('derives each badge from stance, not certainty — the panel agrees with the pooled estimate (#2139)', () => {
+    // Real rows from the Knesset Speaker forecast (2026-11-10, Oracul 62%): a ynet
+    // article at stance +0.30 / certainty 0.75 showed ↑88% while voting 65% in the
+    // pool. Same stance at a lower certainty must show the same number — certainty
+    // is the vote's weight, not its location.
+    renderWithIntl(
+      <ContributingSources
+        sources={[
+          src({ url: 'https://ynet.co.il/a', source: 'ynet.co.il', title: 'High certainty', stance: 0.3, certainty: 0.75 }),
+          src({ url: 'https://srugim.co.il/b', source: 'srugim.co.il', title: 'Low certainty', stance: 0.3, certainty: 0.3 }),
+        ]}
+      />,
+    )
+    expect(screen.getAllByText('↑ 65%').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('↑ 88%')).toBeNull()
+    expect(screen.getByText("Press leans toward 'will happen' · 65%")).toBeInTheDocument()
   })
 
   it('falls back to the outlet host when there is no source name', () => {
@@ -123,7 +143,7 @@ describe('ContributingSources', () => {
     // would cancel the strong signal down to "neutral"; picking by certainty alone
     // would pick the wrong (irrelevant) article. Signal strength (|stance| ×
     // certainty) correctly picks the on-topic one, and the badge shows ITS implied
-    // P(YES) (0.5 + .725/2 → 86%) — the same number its own row shows (#1249).
+    // P(YES) ((1 + .724)/2 → 86%) — the same number its own row shows (#1249).
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -140,9 +160,9 @@ describe('ContributingSources', () => {
 
   it("shows the outlet-wide P(YES) range next to the lead badge, on the same scale as the press-lean bar", () => {
     // Same domain, three articles the lead pct alone can't tell apart from:
-    // A: yes, certainty .9 → P(YES) 95%, signalStrength .54 (the lead)
-    // B: no,  certainty .3 → P(YES) 35%, signalStrength .18
-    // C: stance .1 (neutral band) → P(YES) 50% regardless of its .9 certainty
+    // A: stance .6  → P(YES) 80%, signalStrength .54 (the lead)
+    // B: stance −.6 → P(YES) 20%, signalStrength .18
+    // C: stance .1 (neutral band, no number on its badge) → P(YES) 55% in the range
     renderWithIntl(
       <ContributingSources
         sources={[
@@ -153,10 +173,10 @@ describe('ContributingSources', () => {
       />,
     )
     // Appears twice: the outlet-header badge and lead article A's own row badge —
-    // and the badge number (95%) IS the range's upper endpoint, the literal
+    // and the badge number (80%) IS the range's upper endpoint, the literal
     // correspondence #1249 was filed about.
-    expect(screen.getAllByText('↑ 95%')).toHaveLength(2)
-    const range = screen.getByText('35–95%')
+    expect(screen.getAllByText('↑ 80%')).toHaveLength(2)
+    const range = screen.getByText('20–80%')
     expect(range).toHaveAttribute('title', 'Implied-probability range across 3 articles')
   })
 

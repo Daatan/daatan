@@ -575,7 +575,7 @@
     "count": "{count} publikaĵo",
     "countPlural": "{count} publikaĵoj",
     "sourceRange": "Amplekso de implicita probablo trans {count} artikoloj",
-    "badgeHint": "{pct}% implicita probablo ke ĝi okazos — laŭ la sinteno kaj certeco de la artikolo",
+    "badgeHint": "{pct}% implicita probablo ke ĝi okazos — la voĉo de ĉi tiu artikolo en la takso de la Orakulo (laŭ ĝia sinteno)",
     "originOracul": "AI-analizita",
     "originIndexer": "Indeksita",
     "settledBadge": "decidiga",

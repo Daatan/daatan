@@ -575,7 +575,7 @@
     "count": "{count} publication",
     "countPlural": "{count} publications",
     "sourceRange": "Implied-probability range across {count} articles",
-    "badgeHint": "{pct}% implied chance it will happen — from this article's stance and certainty",
+    "badgeHint": "{pct}% implied chance it will happen — this article's own vote in the Oracul estimate (from its stance)",
     "originOracul": "AI-analysed",
     "originIndexer": "Indexed",
     "settledBadge": "settling",
