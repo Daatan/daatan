@@ -1046,6 +1046,26 @@ replaying the SAME `calculateEloUpdates`/`glicko2Update` functions used above,
 just fed evidence-pool rows. To force a recompute,
 `POST /api/admin/pundit-ratings/recalculate?tag=<slug>` deletes the tag's rows and
 reseeds them; the `Pundit Ratings Recalculate` workflow calls it daily (06:15 UTC).
+
+**Outcome-time cutoff (daatan#2144).** A reading scores as a prediction only if it was
+*published* before the forecast's outcome was publicly known. `prediction_outcome_cutoffs`
+holds that instant per forecast — the earliest reliably verifiable public confirmation of
+the specific outcome, with its basis and evidence URLs. It is **append-only** (never
+`UPDATE`/`DELETE`; the newest row per prediction decides, a correction is a new row).
+`status` is `approved` (has `cutoff_at`) or `insufficient` (no reliable cutoff could be
+established). A resolved forecast with no approved cutoff keeps its resolution but
+contributes nothing to pundit ratings. Never derive a cutoff from the deadline, the
+resolution time or `added_at`. The rule lives in `src/lib/services/outcome-cutoff.ts`
+(`isScorableReading`): undated readings never score; a day-precision `published_date`
+(date-only, or a midnight-UTC placeholder) scores only when that whole day, in any
+timezone, precedes the cutoff; a reading flagged `settled` never scores. It is applied in
+`loadResolvedPunditStances` (so every recalculation path) and, fix-forward, in
+`pushCredibilityFeedback` when a cutoff is on record at push time — retro's ledger is not
+rewritten. The elections app applies the same rule from the same table.
+
+`pundit_tag_rating_archives` keeps the rows each recalculation replaced (`payload`, the
+previous row set verbatim) whenever the result changed. `scoring_version` names the rule
+set that produced the archived rows: `v1-uncut` is the pre-cutoff ranking, kept for audit.
 Elections' pundit leaderboard reads this (not `user_tag_ratings`, and not
 `getSourceLeaderboard`'s retro-backed `/leaderboard/sources` — that one is
 global/all-topics and string-keyed by `(author, outlet)`, not tag-scoped or

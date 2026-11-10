@@ -10,6 +10,9 @@ vi.mock('@/lib/prisma', () => {
       updateMany: vi.fn(),
       count: vi.fn(),
     },
+    predictionOutcomeCutoff: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     contextSnapshot: {
       findFirst: vi.fn(),
     },

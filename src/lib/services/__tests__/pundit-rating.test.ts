@@ -8,8 +8,24 @@ vi.mock('@/lib/prisma', () => ({
     evidenceDispute: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    predictionOutcomeCutoff: {
+      findMany: vi.fn(),
+    },
   },
 }))
+
+// Every fixture row below is published before this, so the outcome cutoff (daatan#2144)
+// is transparent to the tests that predate it.
+const PUB = '2026-01-01T10:00:00+00:00'
+const CUTOFF = new Date('2026-06-01T00:00:00Z')
+const approved = (...ids: string[]) =>
+  ids.map((predictionId) => ({ predictionId, status: 'approved', cutoffAt: CUTOFF }))
+
+beforeEach(async () => {
+  vi.clearAllMocks()
+  const { prisma } = await import('@/lib/prisma')
+  vi.mocked(prisma.predictionOutcomeCutoff.findMany).mockResolvedValue(approved('p1', 'p2') as never)
+})
 
 describe('stanceToProbability / computePunditBrierScore', () => {
   it('maps stance -1..1 onto probability 0..1', async () => {
@@ -37,13 +53,12 @@ describe('stanceToProbability / computePunditBrierScore', () => {
 })
 
 describe('replayPunditEloHistory', () => {
-  beforeEach(() => vi.clearAllMocks())
 
   it('skips predictions with fewer than 2 distinct pundits', async () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
       {
-        predictionId: 'p1', personId: 'ben-caspit', personName: 'Ben Caspit', stance: 0.8,
+        predictionId: 'p1', publishedDate: PUB, personId: 'ben-caspit', personName: 'Ben Caspit', stance: 0.8,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
     ] as any)
@@ -58,11 +73,11 @@ describe('replayPunditEloHistory', () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
       {
-        predictionId: 'p1', personId: 'right-pundit', personName: 'Right Pundit', stance: 1,
+        predictionId: 'p1', publishedDate: PUB, personId: 'right-pundit', personName: 'Right Pundit', stance: 1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
       {
-        predictionId: 'p1', personId: 'wrong-pundit', personName: 'Wrong Pundit', stance: -1,
+        predictionId: 'p1', publishedDate: PUB, personId: 'wrong-pundit', personName: 'Wrong Pundit', stance: -1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
     ] as any)
@@ -78,15 +93,15 @@ describe('replayPunditEloHistory', () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
       {
-        predictionId: 'p1', personId: 'a', personName: 'A', stance: 1,
+        predictionId: 'p1', publishedDate: PUB, personId: 'a', personName: 'A', stance: 1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
       {
-        predictionId: 'p1', personId: 'a', personName: 'A', stance: 0,
+        predictionId: 'p1', publishedDate: PUB, personId: 'a', personName: 'A', stance: 0,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
       {
-        predictionId: 'p1', personId: 'b', personName: 'B', stance: -1,
+        predictionId: 'p1', publishedDate: PUB, personId: 'b', personName: 'B', stance: -1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
     ] as any)
@@ -101,21 +116,20 @@ describe('replayPunditEloHistory', () => {
 })
 
 describe('replayPunditGlickoHistory', () => {
-  beforeEach(() => vi.clearAllMocks())
 
   it('tracks totalPredictions and correctPredictions per pundit', async () => {
     const { prisma } = await import('@/lib/prisma')
     vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
       {
-        predictionId: 'p1', personId: 'a', personName: 'A', stance: 1,
+        predictionId: 'p1', publishedDate: PUB, personId: 'a', personName: 'A', stance: 1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-01-01') },
       },
       {
-        predictionId: 'p2', personId: 'a', personName: 'A', stance: -1,
+        predictionId: 'p2', publishedDate: PUB, personId: 'a', personName: 'A', stance: -1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-02-01') },
       },
       {
-        predictionId: 'p2', personId: 'b', personName: 'B', stance: 1,
+        predictionId: 'p2', publishedDate: PUB, personId: 'b', personName: 'B', stance: 1,
         prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-02-01') },
       },
     ] as any)
@@ -162,5 +176,58 @@ describe('replayPunditGlickoHistory', () => {
 
     const whereClause = vi.mocked(prisma.evidencePoolArticle.findMany).mock.calls[0][0]!.where as any
     expect(whereClause.urlHash).toEqual({ notIn: ['h-1'] })
+  })
+})
+
+describe('outcome cutoff (daatan#2144)', () => {
+  const row = (predictionId: string, personId: string, stance: number, publishedDate: string | null, settled = false) => ({
+    predictionId, personId, personName: personId, stance, publishedDate, settled,
+    prediction: { status: 'RESOLVED_CORRECT', resolvedAt: new Date('2026-07-01') },
+  })
+
+  it('scores only readings published before the cutoff', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
+      row('p1', 'a', -1, PUB), // wrong, written before the outcome was known
+      row('p1', 'a', 1, '2026-06-02T09:00:00+00:00'), // "right" after the fact: must not rescue the average
+      row('p1', 'b', 1, PUB),
+    ] as any)
+
+    const { replayPunditGlickoHistory } = await import('../pundit-rating')
+    const ratings = await replayPunditGlickoHistory('israeli-elections-2026')
+
+    expect(ratings.get('a')!.correctPredictions).toBe(0)
+    expect(ratings.get('b')!.correctPredictions).toBe(1)
+  })
+
+  it('gives no credit to a pundit whose only reading came after the cutoff', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
+      row('p1', 'late', 1, '2026-06-02T09:00:00+00:00'),
+      row('p1', 'undated', 1, null),
+      row('p1', 'reporter', 1, PUB, true), // reports the outcome as fact
+      row('p1', 'b', 1, PUB),
+    ] as any)
+
+    const { replayPunditGlickoHistory } = await import('../pundit-rating')
+    const ratings = await replayPunditGlickoHistory('israeli-elections-2026')
+
+    expect([...ratings.keys()]).toEqual(['b'])
+  })
+
+  it('leaves a forecast with no approved cutoff out of scoring entirely', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.predictionOutcomeCutoff.findMany).mockResolvedValue([
+      { predictionId: 'p2', status: 'insufficient', cutoffAt: null },
+    ] as never)
+    vi.mocked(prisma.evidencePoolArticle.findMany).mockResolvedValue([
+      row('p1', 'a', 1, PUB), // p1: no cutoff row at all
+      row('p2', 'a', 1, PUB), // p2: cutoff could not be established
+    ] as any)
+
+    const { replayPunditGlickoHistory, replayPunditEloHistory } = await import('../pundit-rating')
+
+    expect((await replayPunditGlickoHistory('israeli-elections-2026')).size).toBe(0)
+    expect((await replayPunditEloHistory('israeli-elections-2026')).size).toBe(0)
   })
 })
