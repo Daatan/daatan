@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { embedText, embedAndStoreExternalMarket } from '@/lib/services/embedding'
 import { getLatestEvidenceEstimate } from '@/lib/services/context'
 import { notifyMarketDivergence } from '@/lib/services/telegram'
+import { marketDivergenceBound, marketDivergenceGap } from '@/lib/market-display'
 import type { ExternalMarket, MarketProvider as MarketProviderEnum } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 
@@ -810,7 +811,16 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
       externalId: true,
       provider: true,
       predictions: {
-        select: { id: true, claimText: true, slug: true, externalMarketInverted: true, marketDivergenceAlertAt: true },
+        select: {
+          id: true,
+          claimText: true,
+          slug: true,
+          externalMarketInverted: true,
+          marketDivergenceAlertAt: true,
+          confidence: true,
+          claimDeadline: true,
+          claimDirection: true,
+        },
       },
     },
   })
@@ -877,7 +887,7 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
         }),
       ])
       synced++
-      await checkMarketDivergence(cached.predictions ?? [], latest.yesProbability)
+      await checkMarketDivergence(cached.predictions ?? [], latest.yesProbability, latest.endDate)
     } catch (err) {
       log.error({ marketId: cached.id, err: String(err) }, 'Failed to sync market')
       failed++
@@ -894,26 +904,37 @@ type DivergenceCandidate = {
   slug: string | null
   externalMarketInverted: boolean
   marketDivergenceAlertAt: Date | null
+  /** Published estimate (0–100); null → fall back to the latest evidence anchor. */
+  confidence?: number | null
+  claimDeadline?: Date | null
+  claimDirection?: string | null
 }
 
 /**
  * For every prediction linked to a just-synced market, compare the market's
  * implied probability (inverted per-prediction if the link asks the opposite
- * question) against our latest Oracul estimate. Alerts once when the gap first
- * crosses MARKET_DIVERGENCE_THRESHOLD_PTS, then stays quiet until the gap
- * closes — re-arming for a later re-crossing. Best-effort, never throws.
+ * question) against our published estimate (`Prediction.confidence`, falling
+ * back to the latest evidence anchor when nothing is published). Alerts once when
+ * the gap first crosses MARKET_DIVERGENCE_THRESHOLD_PTS, then stays quiet until
+ * the gap closes — re-arming for a later re-crossing. Best-effort, never throws.
+ *
+ * daatan#2141: when the market resolves more than a few days off our deadline it
+ * is only a one-sided bound on our claim (see marketDivergenceBound), so only a
+ * gap on the contradicting side counts — for both the alert and the re-arm.
  */
 async function checkMarketDivergence(
   predictions: DivergenceCandidate[],
   marketYesProbability: number,
+  marketEndDate: Date | null,
 ): Promise<void> {
   for (const p of predictions) {
     try {
       const marketProbability = p.externalMarketInverted ? 100 - marketYesProbability : marketYesProbability
-      const anchor = await getLatestEvidenceEstimate(p.id)
-      if (!anchor) continue
+      const ours = p.confidence ?? (await getLatestEvidenceEstimate(p.id))?.externalProbability ?? null
+      if (ours === null) continue
 
-      const gapPts = Math.abs(marketProbability - anchor.externalProbability)
+      const bound = marketDivergenceBound(p.claimDirection, p.claimDeadline, marketEndDate)
+      const gapPts = marketDivergenceGap(marketProbability, ours, bound)
 
       if (gapPts > MARKET_DIVERGENCE_THRESHOLD_PTS && p.marketDivergenceAlertAt === null) {
         // Atomic claim-then-notify: only the runner that actually flips this
@@ -924,7 +945,7 @@ async function checkMarketDivergence(
           data: { marketDivergenceAlertAt: new Date() },
         })
         if (claimed.count > 0) {
-          notifyMarketDivergence({ id: p.id, claimText: p.claimText, slug: p.slug }, marketProbability, anchor.externalProbability, gapPts)
+          notifyMarketDivergence({ id: p.id, claimText: p.claimText, slug: p.slug }, marketProbability, ours, gapPts, bound)
         }
       } else if (gapPts <= MARKET_DIVERGENCE_REARM_PTS && p.marketDivergenceAlertAt !== null) {
         await prisma.prediction.update({ where: { id: p.id }, data: { marketDivergenceAlertAt: null } })

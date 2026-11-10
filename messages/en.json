@@ -192,6 +192,8 @@
     "temporalClockAnnotation": "includes time-remaining adjustment — deadline in {days} days",
     "signInToVote": "Sign in to vote",
     "marketDistribution": "Market Distribution",
+    "marketResolvesLater": "Market resolves {date} — later than this forecast's deadline",
+    "marketResolvesEarlier": "Market resolves {date} — earlier than this forecast's deadline",
     "confidencePercent": "Confidence: {value}%",
     "low": "Low",
     "high": "High",

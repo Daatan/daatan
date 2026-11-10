@@ -138,6 +138,7 @@ async function getPrediction(idOrSlug: string) {
           question: prediction.externalMarket.question,
           outcomes: prediction.externalMarket.outcomes,
           resolved: prediction.externalMarket.resolved,
+          endDate: prediction.externalMarket.endDate?.toISOString() ?? null,
           snapshots: prediction.externalMarket.snapshots.map(s => ({
             createdAt: s.createdAt.toISOString(),
             probability: s.probability,

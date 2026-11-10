@@ -653,6 +653,7 @@ describe('syncLinkedMarkets', () => {
         68,
         40,
         28,
+        'two-sided',
       )
     })
 
@@ -731,6 +732,90 @@ describe('syncLinkedMarkets', () => {
       await syncLinkedMarkets()
 
       expect(notifyMarketDivergence).not.toHaveBeenCalled()
+    })
+
+    // daatan#2141 — gammaRow's market (YES 68) gets an explicit endDate below;
+    // our claim deadline is set relative to it.
+    const MARKET_END = '2026-12-31T00:00:00Z'
+    const withEnd = (predictions: unknown[]) => {
+      global.fetch = gammaFetchMock([], [gammaRow({ endDate: MARKET_END })])
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions },
+      ] as never)
+    }
+
+    it('compares against the published confidence, not the evidence anchor', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction({ confidence: 40 })] },
+      ] as never)
+      // Anchor agrees with the market (8pt) but the published estimate is 28pt off.
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 60, createdAt: new Date() } as never)
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 } as never)
+
+      await syncLinkedMarkets()
+
+      expect(getLatestEvidenceEstimate).not.toHaveBeenCalled()
+      expect(notifyMarketDivergence).toHaveBeenCalledWith(expect.anything(), 68, 40, 28, 'two-sided')
+    })
+
+    it('ARRIVAL + later market: ours below the market is consistent — no alert', async () => {
+      withEnd([prediction({ confidence: 40, claimDirection: 'ARRIVAL', claimDeadline: new Date('2026-12-09T00:00:00Z') })])
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('ARRIVAL + later market: ours above the upper bound alerts', async () => {
+      withEnd([prediction({ confidence: 95, claimDirection: 'ARRIVAL', claimDeadline: new Date('2026-12-09T00:00:00Z') })])
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).toHaveBeenCalledWith(expect.anything(), 68, 95, 27, 'upper')
+    })
+
+    it('ARRIVAL + later market: re-arms a stale alert when the gap is on the benign side', async () => {
+      // The Knesset-Speaker shape: market 68, ours 40, alert already stamped by the
+      // old two-sided rule. Directional gap is −28 → clears.
+      withEnd([prediction({
+        confidence: 40,
+        claimDirection: 'ARRIVAL',
+        claimDeadline: new Date('2026-12-09T00:00:00Z'),
+        marketDivergenceAlertAt: new Date('2026-11-09'),
+      })])
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+      expect(prisma.prediction.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { marketDivergenceAlertAt: null } })
+    })
+
+    it('ARRIVAL + earlier market: only ours below the lower bound alerts', async () => {
+      withEnd([prediction({ confidence: 40, claimDirection: 'ARRIVAL', claimDeadline: new Date('2027-03-01T00:00:00Z') })])
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).toHaveBeenCalledWith(expect.anything(), 68, 40, 28, 'lower')
+    })
+
+    it('SURVIVAL + later market: market is a lower bound — ours above it is fine', async () => {
+      withEnd([prediction({ confidence: 95, claimDirection: 'SURVIVAL', claimDeadline: new Date('2026-12-09T00:00:00Z') })])
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
+    })
+
+    it('same deadline (within 3 days) keeps the two-sided rule', async () => {
+      withEnd([prediction({ confidence: 40, claimDirection: 'ARRIVAL', claimDeadline: new Date('2026-12-29T00:00:00Z') })])
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 } as never)
+
+      await syncLinkedMarkets()
+
+      expect(notifyMarketDivergence).toHaveBeenCalledWith(expect.anything(), 68, 40, 28, 'two-sided')
     })
 
     it('skips a prediction with no Oracul estimate yet', async () => {
