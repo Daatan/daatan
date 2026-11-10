@@ -12,9 +12,9 @@ const wrap = (marketEndDate: string | null | undefined, claimDeadline: string | 
   )
 
 describe('MarketDeadlineNote (daatan#2141)', () => {
-  it('says the market resolves later, with a UTC-formatted date', () => {
-    // 23:30 UTC — would read as Jan 1 in a UTC+ zone if not pinned to UTC.
-    wrap('2026-12-31T23:30:00Z', '2026-12-09T00:00:00Z')
+  it('says the market resolves later, with the date in US Eastern time', () => {
+    // Polymarket "by December 31" closes 2027-01-01T04:59Z = Dec 31 23:59 ET.
+    wrap('2027-01-01T04:59:00Z', '2026-12-09T23:59:59Z')
     expect(screen.getByTestId('market-deadline-note')).toHaveTextContent(
       "Market resolves Dec 31, 2026 — later than this forecast's deadline",
     )
