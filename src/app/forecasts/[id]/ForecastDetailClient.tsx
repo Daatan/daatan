@@ -41,6 +41,7 @@ import { CommitmentsHistory } from './_forecast/CommitmentsHistory'
 import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
+import { MarketDeadlineNote } from './_forecast/MarketDeadlineNote'
 import { AwaitingResolutionAdmin } from './_forecast/AwaitingResolutionAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { RevertResolutionAdmin } from './_forecast/RevertResolutionAdmin'
@@ -940,6 +941,12 @@ export default function ForecastDetailClient({
         )}
         marketQuestion={prediction.externalMarket?.question}
         marketUrl={prediction.externalMarket?.url}
+        marketNote={
+          <MarketDeadlineNote
+            marketEndDate={prediction.externalMarket?.endDate}
+            claimDeadline={prediction.claimDeadline}
+          />
+        }
         panelSeries={aiPanelSeries}
         showAiPanel={showAiPanel}
       />

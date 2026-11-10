@@ -1356,13 +1356,23 @@ export function notifyMarketDivergence(
   marketProbability: number,
   oracleProbability: number,
   gapPts: number,
+  /** daatan#2141: 'upper'/'lower' when the market resolves on a different
+   *  deadline and only bounds our claim from one side. */
+  bound: 'upper' | 'lower' | 'two-sided' = 'two-sided',
 ): void {
   if (isDevEnv()) return
 
+  const boundNote =
+    bound === 'upper'
+      ? 'Market deadline differs — it is an upper bound on this claim, and Oracul is above it.'
+      : bound === 'lower'
+        ? 'Market deadline differs — it is a lower bound on this claim, and Oracul is below it.'
+        : null
   const msg = [
     `📊 <b>Market ⇄ Oracul divergence</b>`,
     `"${truncate(prediction.claimText, 120)}"`,
     `Market ${marketProbability}% vs Oracul ${oracleProbability}% (Δ ${gapPts}pt).`,
+    ...(boundNote ? [boundNote] : []),
     `<a href="${forecastUrl(prediction)}">View forecast →</a>`,
   ].join('\n')
 

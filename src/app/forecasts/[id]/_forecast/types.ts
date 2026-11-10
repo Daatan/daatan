@@ -89,6 +89,9 @@ export type Prediction = {
     /** Outcome labels in price order (Json column), e.g. ["Yes","No"]. */
     outcomes?: unknown
     resolved: boolean
+    /** When the market resolves (ISO). Compared to claimDeadline for the
+     *  deadline-mismatch note (daatan#2141). */
+    endDate?: string | null
     /** Raw provider prices — NOT polarity-adjusted. Display through
      *  marketDisplayProbability() so externalMarketInverted is honored. */
     snapshots: Array<{ createdAt: string; probability: number }>

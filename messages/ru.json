@@ -192,6 +192,8 @@
     "temporalClockAnnotation": "с учётом оставшегося времени — срок через {days} дн.",
     "signInToVote": "Войдите, чтобы голосовать",
     "marketDistribution": "Распределение рынка",
+    "marketResolvesLater": "Рынок закрывается {date} — позже срока этого прогноза",
+    "marketResolvesEarlier": "Рынок закрывается {date} — раньше срока этого прогноза",
     "confidencePercent": "Уверенность: {value}%",
     "low": "Низкая",
     "high": "Высокая",

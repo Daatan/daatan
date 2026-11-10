@@ -192,6 +192,8 @@
     "temporalClockAnnotation": "כולל התאמת זמן שנותר — המועד האחרון בעוד {days} ימים",
     "signInToVote": "התחברו כדי להצביע",
     "marketDistribution": "התפלגות השוק",
+    "marketResolvesLater": "השוק נסגר ב-{date} — מאוחר מהמועד של תחזית זו",
+    "marketResolvesEarlier": "השוק נסגר ב-{date} — מוקדם מהמועד של תחזית זו",
     "confidencePercent": "ביטחון: {value}%",
     "low": "נמוך",
     "high": "גבוה",

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -70,6 +70,8 @@ type Props = {
   /** The linked market's own question + URL — shown in the "not identical" hint. */
   marketQuestion?: string
   marketUrl?: string
+  /** Extra note under the market hint, e.g. the deadline-mismatch line (daatan#2141). */
+  marketNote?: ReactNode
   /** Per-member AI-panel series. Only rendered when `showAiPanel` is true. */
   panelSeries?: ChartPanelMember[]
   /** The viewer opted into the AI panel in Settings. Off by default. */
@@ -198,6 +200,7 @@ export default function ProbabilityChart({
   marketLabel = 'Polymarket',
   marketQuestion,
   marketUrl,
+  marketNote,
   panelSeries = [],
   showAiPanel = false,
 }: Props) {
@@ -576,6 +579,7 @@ export default function ProbabilityChart({
           {marketNotIdenticalHint(marketQuestion)}
         </p>
       )}
+      {showMarket && marketNote}
       {showPresets && (
         <div className="flex items-center justify-between mt-1 px-1 text-[10px] text-gray-500">
           <span>Drag across the chart to zoom · double-click to reset</span>

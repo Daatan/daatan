@@ -721,6 +721,7 @@ export async function getForecastById(idOrSlug: string) {
           question: true,
           outcomes: true,
           resolved: true,
+          endDate: true,
           snapshots: {
             orderBy: { createdAt: 'asc' },
             select: { createdAt: true, probability: true },

@@ -192,6 +192,8 @@
     "temporalClockAnnotation": "inkluzivas alĝustigon laŭ la restanta tempo — templimo post {days} tagoj",
     "signInToVote": "Ensalutu por voĉdoni",
     "marketDistribution": "Merkata Distribuo",
+    "marketResolvesLater": "La merkato solviĝas je {date} — pli malfrue ol la limdato de ĉi tiu prognozo",
+    "marketResolvesEarlier": "La merkato solviĝas je {date} — pli frue ol la limdato de ĉi tiu prognozo",
     "confidencePercent": "Fido: {value}%",
     "low": "Malalta",
     "high": "Alta",
