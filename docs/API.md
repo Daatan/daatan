@@ -193,6 +193,11 @@ Return the public context timeline for a forecast (list of dated context snapsho
 }
 ```
 
+Snapshots are newest first. The response is a slim projection of the stored row (daatan#2152; `src/lib/slim-context-snapshots.ts`):
+- `oracleSnapshot.sources` is populated **only on the newest snapshot**, and only with the fields shown above (plus `settled`). Older snapshots return `sources: []`; their `mean`/`std`/`ciLow`/`ciHigh`/`articlesUsed`/`settled` stay.
+- The per-claim shadow layer stored on each Oracul source (`claimsDetail`, `eventActors`, model/prompt provenance, …) and the `sourcesSummary` mirror are never returned. Before the trim the Knesset Speaker forecast's timeline was 7.4 MB; it is now ~96 KB.
+- Beyond the 25 newest snapshots, rows already come back without `sources`/`oracleSnapshot` (`CONTEXT_TIMELINE_HEAVY_LIMIT`).
+
 ---
 
 ### `POST /api/forecasts/[id]/context` — Auth
@@ -207,7 +212,7 @@ Refresh the AI context for a forecast: fetches web articles for the claim, asks 
 
 The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMachine Oracle (calibrated multi-source estimate)"` vs the LLM-generated justification).
 
-**Response** — `{ success, newContext, contextUpdatedAt, snapshot, timeline }` where `snapshot` and each `timeline` entry use the same `ContextSnapshot` shape documented under `GET /api/forecasts/[id]/context` above (including the optional `oracleSnapshot` field).
+**Response** — an SSE stream. A `summary` event carries `{ newContext, contextUpdatedAt }`; the final `done` event carries `{ success, snapshot, timeline, timings }`, where `snapshot` and each `timeline` entry use the same slim `ContextSnapshot` shape documented under `GET /api/forecasts/[id]/context` above (including the optional `oracleSnapshot` field; `snapshot` is the newest row, so it keeps its `oracleSnapshot.sources`).
 
 ---
 

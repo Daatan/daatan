@@ -71,8 +71,9 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
-import { POST, CONTEXT_SEARCH_WINDOW_DAYS, CONTEXT_SEARCH_MIN_RESULTS } from '../route'
+import { GET, POST, CONTEXT_SEARCH_WINDOW_DAYS, CONTEXT_SEARCH_MIN_RESULTS } from '../route'
 import {
+  getContextTimeline,
   getForecastForContextUpdate,
   countUserContextUpdates,
   saveContextUpdate,
@@ -388,5 +389,83 @@ describe('POST /api/forecasts/[id]/context', () => {
 
       expect(failClaimedArticles).toHaveBeenCalledWith('pred-1', ['https://b.com/2'], 'oracle_null')
     })
+  })
+})
+
+// daatan#2152: the timeline used to ship every heavy row's full Oracul payload (claimsDetail,
+// provenance, sourcesSummary mirror) — 7.4 MB on the Knesset Speaker forecast.
+describe('context timeline payload trim (daatan#2152)', () => {
+  const heavyRow = (id: string) => ({
+    id,
+    predictionId: 'pred-1',
+    summary: 's',
+    sources: [{ url: 'https://b.com/2', title: 'B', source: 'b.com' }],
+    externalProbability: 40,
+    insufficientData: false,
+    createdAt: new Date('2026-11-10T00:00:00.000Z'),
+    sourcesSummary: [{ sourceId: 'b', stance: 0.4 }],
+    oracleSnapshot: {
+      mean: 40, std: 10, ciLow: 20, ciHigh: 60, articlesUsed: 1, settled: false,
+      sources: [{
+        sourceId: 'b', sourceName: 'B', url: 'https://b.com/2', stance: 0.4, certainty: 0.7,
+        credibilityWeight: 1, claims: ['claim'], settled: null,
+        claimsDetail: [{ claim: 'claim', antecedent_text_en: 'x'.repeat(500) }], extractorModel: 'm',
+      }],
+    },
+  })
+
+  function expectTrimmed(timeline: Array<Record<string, unknown>>) {
+    expect(timeline).toHaveLength(2)
+    for (const snap of timeline) expect(snap).not.toHaveProperty('sourcesSummary')
+    const latest = timeline[0].oracleSnapshot as { sources: Array<Record<string, unknown>> }
+    expect(latest.sources).toHaveLength(1)
+    expect(latest.sources[0]).toMatchObject({ sourceName: 'B', url: 'https://b.com/2', settled: null })
+    expect(latest.sources[0]).not.toHaveProperty('claimsDetail')
+    expect(latest.sources[0]).not.toHaveProperty('extractorModel')
+    expect(timeline[1].oracleSnapshot).toMatchObject({ mean: 40, ciLow: 20, ciHigh: 60, sources: [] })
+    expect(timeline[1].sources).toEqual([{ url: 'https://b.com/2', title: 'B', source: 'b.com' }])
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getForecastForContextUpdate).mockResolvedValue(BASE_PREDICTION as never)
+    vi.mocked(countUserContextUpdates).mockResolvedValue(0)
+    vi.mocked(buildSearchQuery).mockResolvedValue('x query')
+    vi.mocked(oracleSearch).mockResolvedValue(SEARCH_RESULTS as never)
+    vi.mocked(addArticlesToPool).mockResolvedValue(undefined)
+    vi.mocked(failClaimedArticles).mockResolvedValue(undefined)
+    generateContentMock.mockResolvedValue({ text: 'A fresh summary.' })
+    vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+      { result: 'claimed', articleId: 'row-1' },
+      { result: 'claimed', articleId: 'row-2' },
+    ])
+    vi.mocked(getOraculForecast).mockResolvedValue({
+      forecast: ORACLE_FORECAST_ONE_SOURCE, logId: 'log-1', insufficientData: false,
+    } as never)
+    vi.mocked(resolvePooledEstimate).mockResolvedValue({
+      mean: 0.4, std: 0.1, ciLow: 0.2, ciHigh: 0.6, settled: false, articlesUsed: 1,
+      snapshotSources: ORACLE_FORECAST_ONE_SOURCE.sources.map((s) => ({ ...s, sourceName: s.source_name })),
+      estimateSource: 'pool', insufficientData: false, reason: null, poolSize: 2, singleRunMean: 0.4,
+    } as never)
+    vi.mocked(saveContextUpdate).mockResolvedValue(heavyRow('a') as never)
+    vi.mocked(listContextSnapshots).mockResolvedValue([heavyRow('a'), heavyRow('b')] as never)
+  })
+
+  it('GET returns the slim timeline', async () => {
+    vi.mocked(getContextTimeline).mockResolvedValue({
+      id: 'pred-1', detailsText: null, contextUpdatedAt: null, contextSnapshots: [heavyRow('a'), heavyRow('b')],
+    } as never)
+    const res = await GET(new NextRequest('http://localhost/api/forecasts/pred-1/context'), {
+      params: Promise.resolve({ id: 'pred-1' }),
+    })
+    const body = await res.json()
+    expectTrimmed(body.snapshots)
+  })
+
+  it('the POST done event carries the slim timeline and a slim snapshot', async () => {
+    const done = await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+    expectTrimmed(done.timeline)
+    expect(done.snapshot).not.toHaveProperty('sourcesSummary')
+    expect(done.snapshot.oracleSnapshot.sources[0]).not.toHaveProperty('claimsDetail')
   })
 })

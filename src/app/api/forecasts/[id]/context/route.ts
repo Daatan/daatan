@@ -23,6 +23,7 @@ import {
   listContextSnapshots,
 } from '@/lib/services/context'
 import { forStage } from '@/lib/llm/stageModels'
+import { slimTimelineRows } from '@/lib/slim-context-snapshots'
 
 const log = createLogger('forecast-context')
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest, { params }: RawRouteContext) {
         return NextResponse.json({
             currentContext: prediction.detailsText,
             contextUpdatedAt: prediction.contextUpdatedAt,
-            snapshots: prediction.contextSnapshots,
+            snapshots: slimTimelineRows(prediction.contextSnapshots),
         })
     } catch (error) {
         return handleRouteError(error, 'Failed to fetch context timeline')
@@ -594,8 +595,8 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                     send({
                         type: 'done',
                         success: true,
-                        snapshot,
-                        timeline: snapshots,
+                        snapshot: slimTimelineRows([snapshot])[0],
+                        timeline: slimTimelineRows(snapshots),
                         timings: { searchMs, llmMs, oracleMs, totalMs },
                     })
                 } catch (err) {
