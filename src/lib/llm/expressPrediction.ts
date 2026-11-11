@@ -912,13 +912,23 @@ URL: ${article.url}
 }
 
 /**
- * Specifically guess the chances of a prediction based on provided sources.
- *
- * `probability` is null when the model judges the claim too vague to estimate
- * (#1657) — the same abstain contract both panel prompts already offer. A forced
- * number on an unanswerable claim is noise presented to a drafter as a suggestion;
- * `reasoning` then says what is missing, which is the more useful answer.
+ * daatan#2151: bounds for an ungrounded single LLM read. The "Analyze context"
+ * fallback persists this value as an evidence snapshot, so it must never publish a
+ * literal 0 or 100. It also must not sit above the settlement pin: one LLM reading
+ * snippets is weaker evidence than a pinned settlement. These are therefore the pin's
+ * own 3/97 values (`PIN_LOW`/`PIN_HIGH`, temporal-clock.ts), copied rather than
+ * imported because temporal-clock pulls prisma and the temporal classifier into this
+ * module.
  */
+export const GUESS_PERCENT_MIN = 3
+export const GUESS_PERCENT_MAX = 97
+
+/** Rounded and clamped to [GUESS_PERCENT_MIN, GUESS_PERCENT_MAX]. Null (abstain) and non-finite values become null. */
+export function clampGuessedProbability(p: number | null | undefined): number | null {
+  if (p == null || !Number.isFinite(p)) return null
+  return Math.min(GUESS_PERCENT_MAX, Math.max(GUESS_PERCENT_MIN, Math.round(p)))
+}
+
 export async function guessChances(
   claimText: string,
   detailsText: string,
@@ -953,7 +963,8 @@ Snippet: ${article.snippet}
       schema: guessChancesSchema,
       temperature: 0,
     })
-    return JSON.parse(result.text)
+    const parsed = JSON.parse(result.text) as { probability: number | null; reasoning: string }
+    return { ...parsed, probability: clampGuessedProbability(parsed.probability) }
   } catch (error) {
     log.error({ err: error }, 'Failed to guess chances')
     throw error
