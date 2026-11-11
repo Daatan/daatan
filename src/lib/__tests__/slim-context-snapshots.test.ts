@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { slimContextSnapshots } from '../slim-context-snapshots'
+import { slimContextSnapshots, slimTimelineRows } from '../slim-context-snapshots'
 import type { Snapshot } from '@/components/forecasts/ContextTimeline'
 
 const fatSource = {
@@ -59,5 +59,49 @@ describe('slimContextSnapshots', () => {
     const before = JSON.stringify(big).length
     const after = JSON.stringify(slimContextSnapshots([big])[0]).length
     expect(after).toBeLessThan(before / 3)
+  })
+})
+
+describe('slimTimelineRows (daatan#2152)', () => {
+  const row = (id: string) => ({
+    id,
+    predictionId: 'p1',
+    summary: 's',
+    sources: [{ url: 'https://example.com/a', title: 't', source: 'example.com' }],
+    externalProbability: 47,
+    insufficientData: false,
+    origin: 'news-indexer',
+    articlesUsed: 1,
+    createdAt: new Date('2026-10-13T00:00:00.000Z'),
+    sourcesSummary: [{ sourceId: 's1', stance: -0.4 }],
+    oracleSnapshot: {
+      mean: 47, std: 15, ciLow: 33, ciHigh: 60, articlesUsed: 1, settled: true,
+      sources: [fatSource],
+    } as unknown,
+  })
+
+  it('keeps whitelisted oracle sources on the newest row only and drops sourcesSummary', () => {
+    const [latest, older] = slimTimelineRows([row('a'), row('b')])
+    expect(latest).not.toHaveProperty('sourcesSummary')
+    expect(older).not.toHaveProperty('sourcesSummary')
+    expect(latest.oracleSnapshot!.sources).toEqual([{
+      sourceId: 's1', sourceName: 'example.com', url: 'https://example.com/a',
+      stance: -0.4, certainty: 0.5, credibilityWeight: 1, claims: ['c'], settled: true,
+    }])
+    expect(older.oracleSnapshot).toEqual({ mean: 47, std: 15, ciLow: 33, ciHigh: 60, articlesUsed: 1, settled: true, sources: [] })
+  })
+
+  it('passes scalar columns and the cited-article sources through unchanged', () => {
+    const r = row('a')
+    const [out] = slimTimelineRows([r, row('b')])
+    expect(out).toMatchObject({
+      id: 'a', predictionId: 'p1', summary: 's', sources: r.sources, externalProbability: 47,
+      insufficientData: false, origin: 'news-indexer', articlesUsed: 1, createdAt: r.createdAt,
+    })
+  })
+
+  it('maps a missing oracle payload to null', () => {
+    const [out] = slimTimelineRows([{ ...row('a'), oracleSnapshot: null }])
+    expect(out.oracleSnapshot).toBeNull()
   })
 })
