@@ -694,7 +694,7 @@ export async function dismissAwaitingResolution(predictionId: string, dismissedB
 const CONTEXT_TIMELINE_HEAVY_LIMIT = 25
 
 /** Every ContextSnapshot column except the JSON blobs (`sources`, `oracleSnapshot` and
- *  its per-source `sourcesSummary` mirror). The two scalar mirrors are narrow, so they ride
+ *  its per-source `sourcesSummary` / `sourcesDelta` mirrors). The two scalar mirrors are narrow, so they ride
  *  along. */
 const LIGHT_SNAPSHOT_SELECT = {
   id: true,
@@ -745,7 +745,7 @@ async function loadTimelineSnapshots(predictionId: string): Promise<ContextSnaps
   })
   return [
     ...head,
-    ...tail.map((snap): ContextSnapshot => ({ ...snap, sources: [], oracleSnapshot: null, sourcesSummary: null })),
+    ...tail.map((snap): ContextSnapshot => ({ ...snap, sources: [], oracleSnapshot: null, sourcesSummary: null, sourcesDelta: null })),
   ]
 }
 
