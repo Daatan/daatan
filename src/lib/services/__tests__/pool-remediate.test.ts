@@ -2,12 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { mockRefresh } = vi.hoisted(() => ({ mockRefresh: vi.fn() }))
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    evidencePoolArticle: { findMany: vi.fn(), count: vi.fn(), updateMany: vi.fn() },
-    prediction: { findMany: vi.fn(), findUnique: vi.fn() },
-  },
-}))
+vi.mock('@/lib/prisma', () => {
+  const evidencePoolArticle = {
+    findMany: vi.fn(),
+    count: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+    update: vi.fn(),
+  }
+  return {
+    prisma: {
+      evidencePoolArticle,
+      prediction: { findMany: vi.fn(), findUnique: vi.fn() },
+      $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({ evidencePoolArticle })),
+    },
+  }
+})
 vi.mock('@/lib/services/oracle-backfill', () => ({
   refreshOracleSnapshot: (...a: unknown[]) => mockRefresh(...a),
 }))
@@ -16,8 +26,10 @@ vi.mock('@/lib/logger', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
+import { hashArticleContent } from '@/lib/services/evidence-pool'
 import {
   remediatePool,
+  restoreUnfinishedHeads,
   remediableWhere,
   usablePoolWhere,
   amnestyWhere,
@@ -29,6 +41,8 @@ import {
 const mockRows = vi.mocked(prisma.evidencePoolArticle.findMany)
 const mockCount = vi.mocked(prisma.evidencePoolArticle.count)
 const mockUpdateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
+const mockDeleteMany = vi.mocked(prisma.evidencePoolArticle.deleteMany)
+const mockUpdate = vi.mocked(prisma.evidencePoolArticle.update)
 const mockPredictions = vi.mocked(prisma.prediction.findMany)
 const mockPrediction = vi.mocked(prisma.prediction.findUnique)
 
@@ -64,6 +78,8 @@ describe('remediatePool', () => {
     mockRows.mockResolvedValue([row(1)] as never)
     mockCount.mockResolvedValue(20)
     mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+    mockDeleteMany.mockResolvedValue({ count: 1 } as never)
+    mockUpdate.mockResolvedValue({} as never)
   })
 
   it('nulls contentHash on the batch BEFORE re-extracting it', async () => {
@@ -250,5 +266,86 @@ describe('remediatePool', () => {
     const where = (mockRows.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where
     expect(where).not.toHaveProperty('OR')
     expect(where).toMatchObject({ predictionId: 'p1', status: 'COMPLETE' })
+  })
+})
+
+describe('restoreUnfinishedHeads (daatan#2159)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDeleteMany.mockResolvedValue({ count: 1 } as never)
+    mockUpdate.mockResolvedValue({} as never)
+  })
+
+  it('deletes an unfinished head and un-supersedes its parent with the content hash back', async () => {
+    mockRows.mockResolvedValueOnce([{ id: 'h1', supersedesId: 'r1' }] as never)
+
+    const n = await restoreUnfinishedHeads([row(1)])
+
+    expect(n).toBe(1)
+    expect(mockRows).toHaveBeenCalledWith({
+      where: { supersedesId: { in: ['r1'] }, supersededAt: null, status: { in: ['FAILED'] } },
+      select: { id: true, supersedesId: true },
+    })
+    expect(mockDeleteMany).toHaveBeenCalledWith({
+      where: { id: 'h1', supersededAt: null, status: { in: ['FAILED'] } },
+    })
+    // Delete before un-supersede: the partial unique index allows one current row per URL.
+    expect(mockDeleteMany.mock.invocationCallOrder[0]).toBeLessThan(mockUpdate.mock.invocationCallOrder[0])
+    const data = (mockUpdate.mock.calls[0][0] as { where: { id: string }; data: { supersededAt: null; contentHash: string } })
+    expect(data.where.id).toBe('r1')
+    expect(data.data.supersededAt).toBeNull()
+    expect(data.data.contentHash).toBe(hashArticleContent('Headline 1', 'Body 1'))
+  })
+
+  it('leaves the parent superseded when a concurrent claim already moved the head on', async () => {
+    mockRows.mockResolvedValueOnce([{ id: 'h1', supersedesId: 'r1' }] as never)
+    mockDeleteMany.mockResolvedValueOnce({ count: 0 } as never)
+
+    const n = await restoreUnfinishedHeads([row(1)])
+
+    expect(n).toBe(0)
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  it('never throws', async () => {
+    mockRows.mockRejectedValueOnce(new Error('db down'))
+
+    await expect(restoreUnfinishedHeads([row(1)])).resolves.toBe(0)
+  })
+})
+
+describe('remediatePool restore wiring (daatan#2159)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPredictions.mockResolvedValue([PRED] as never)
+    mockPrediction.mockResolvedValue({ confidence: 34 } as never)
+    mockCount.mockResolvedValue(20)
+    mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+    mockDeleteMany.mockResolvedValue({ count: 1 } as never)
+    mockUpdate.mockResolvedValue({} as never)
+  })
+
+  it('reports rows the Oracul left out of an `ok` batch as restored, not lost', async () => {
+    // 2026-11-12: every batch reported ok and failed:0 while 37 of 113 rows left the pool.
+    mockRows
+      .mockResolvedValueOnce([row(1), row(2), row(3)] as never) // target rows
+      .mockResolvedValueOnce([{ id: 'h2', supersedesId: 'r2' }] as never) // unfinished heads
+    mockRefresh.mockResolvedValue({ status: 'ok', sources: 2 })
+
+    const r = await remediatePool(['p1'], true)
+
+    expect(r.forecasts[0].ok).toBe(1)
+    expect(r.forecasts[0].restored).toBe(1)
+  })
+
+  it('also restores still-PENDING heads when the batch threw', async () => {
+    mockRows.mockResolvedValueOnce([row(1)] as never).mockResolvedValueOnce([] as never)
+    mockRefresh.mockRejectedValue(new Error('boom'))
+
+    await remediatePool(['p1'], true)
+
+    expect(mockRows).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: { in: ['FAILED', 'PENDING'] } }) }),
+    )
   })
 })

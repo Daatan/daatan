@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
-import { USABLE_POOL_ROW_WHERE, CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
+import { USABLE_POOL_ROW_WHERE, CURRENT_VERSION_ONLY, hashArticleContent } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
 
@@ -95,6 +95,75 @@ export interface RemediationForecast {
   noOracul: number
   insufficient: number
   failed: number
+  /** Rows whose re-extraction did not come back (Oracul timeout/omission, null run, or a
+   *  thrown batch) and were put back on their previous reading — see
+   *  {@link restoreUnfinishedHeads}. Non-zero means the run re-extracted fewer rows than
+   *  it targeted, even when every batch reports `ok`. */
+  restored: number
+}
+
+/** Row shape {@link remediatePool} reads for a target row — the parent of any new head. */
+interface RemediationRow {
+  id: string
+  title: string | null
+  snippet: string | null
+}
+
+/**
+ * Put a remediated row back when its re-extraction did not finish (daatan#2159).
+ *
+ * The supersede-and-insert arm marks the old row superseded the moment the new head is
+ * claimed. If the Oracul then leaves the article out of its response — in practice a
+ * per-article timeout (`event=article_timeout`, 35 s), which the response does not tell
+ * apart from a gatekeeper rejection — the head is stamped `FAILED/oracle_omitted`, which is
+ * terminal. The old, usable reading stays superseded and the article silently leaves the
+ * pool: 37 of 113 rows on 2026-11-12.
+ *
+ * A remediation re-reads content that has not changed, so a head that did not complete
+ * carries no new verdict: the previous reading is still the best one we have. For each
+ * such head this deletes it and un-supersedes its parent in one transaction (delete first:
+ * the partial unique index allows one current row per URL), and restores the parent's
+ * `contentHash` so the next organic push — and the run's own scheduled re-ask — sees
+ * unchanged content and leaves the restored row alone instead of versioning it again.
+ *
+ * The delete is guarded on the head still being current and unfinished, so a concurrent
+ * claim that already moved the chain on is left untouched. Never throws.
+ */
+export async function restoreUnfinishedHeads(
+  parents: RemediationRow[],
+  statuses: Array<'FAILED' | 'PENDING'> = ['FAILED'],
+): Promise<number> {
+  if (parents.length === 0) return 0
+  const parentById = new Map(parents.map((r) => [r.id, r]))
+  let restored = 0
+  try {
+    const heads = await prisma.evidencePoolArticle.findMany({
+      where: { supersedesId: { in: [...parentById.keys()] }, ...CURRENT_VERSION_ONLY, status: { in: statuses } },
+      select: { id: true, supersedesId: true },
+    })
+    for (const head of heads) {
+      const parent = head.supersedesId ? parentById.get(head.supersedesId) : undefined
+      if (!parent) continue
+      const done = await prisma.$transaction(async (tx) => {
+        const { count } = await tx.evidencePoolArticle.deleteMany({
+          where: { id: head.id, ...CURRENT_VERSION_ONLY, status: { in: statuses } },
+        })
+        if (count === 0) return false
+        await tx.evidencePoolArticle.update({
+          where: { id: parent.id },
+          data: {
+            supersededAt: null,
+            contentHash: parent.title ? hashArticleContent(parent.title, parent.snippet ?? '') : null,
+          },
+        })
+        return true
+      })
+      if (done) restored++
+    }
+  } catch (err) {
+    log.warn({ parents: parents.map((r) => r.id), err }, 'pool-remediate.restore_failed')
+  }
+  return restored
 }
 
 export interface RemediationResult {
@@ -166,6 +235,7 @@ export async function remediatePool(
       noOracul: 0,
       insufficient: 0,
       failed: 0,
+      restored: 0,
     }
     forecasts.push(f)
     if (!apply || rows.length === 0) continue
@@ -184,6 +254,7 @@ export async function remediatePool(
           ? [{ url: r.url, title: r.title, snippet: r.snippet ?? '', source: r.source ?? undefined, publishedDate: r.publishedDate ?? undefined }]
           : [],
       )
+      let threw = false
       try {
         const r = await refreshOracleSnapshot(p, { articles, origin: 'remediate', reask: true })
         if (r.status === 'ok') f.ok++
@@ -191,8 +262,18 @@ export async function remediatePool(
         else if (r.status === 'insufficient') f.insufficient++
         else f.noOracul++
       } catch (err) {
+        threw = true
         f.failed++
         log.warn({ predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, err }, 'pool-remediate.batch_failed')
+      }
+      // A batch that threw never reached the claim release, so its heads may still be PENDING.
+      const restored = await restoreUnfinishedHeads(chunk, threw ? ['FAILED', 'PENDING'] : ['FAILED'])
+      if (restored > 0) {
+        f.restored += restored
+        log.warn(
+          { predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, batchRows: chunk.length, restored },
+          'event=pool_remediate_restored — re-extraction did not finish for these rows; previous readings kept (daatan#2159)',
+        )
       }
     }
 
