@@ -556,6 +556,11 @@ model ContextSnapshot {
   oracleSettled  Boolean @default(false) @map("oracle_settled")
   oracleMean     Float?  @map("oracle_mean")
   sourcesSummary Json?   @map("sources_summary")
+  // `sourcesSummary` as a change against the previous evidence snapshot of the same
+  // prediction — { base, upsert, removed } — derived by the same trigger (migration
+  // 20261112000000, daatan#2158). Never written by app code; elections reads it instead of the
+  // whole re-listed pool, falling back to `sourcesSummary` where the chain doesn't line up.
+  sourcesDelta   Json?   @map("sources_delta")
 
   // True when this run abstained: the Oracle had no evidence bearing on the claim
   // (off-topic / all-hedged / too thin), so no probability was produced. The UI

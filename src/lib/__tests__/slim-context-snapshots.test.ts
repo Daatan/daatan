@@ -74,16 +74,19 @@ describe('slimTimelineRows (daatan#2152)', () => {
     articlesUsed: 1,
     createdAt: new Date('2026-10-13T00:00:00.000Z'),
     sourcesSummary: [{ sourceId: 's1', stance: -0.4 }],
+    sourcesDelta: { base: null, upsert: [{ sourceId: 's1', stance: -0.4 }], removed: [] },
     oracleSnapshot: {
       mean: 47, std: 15, ciLow: 33, ciHigh: 60, articlesUsed: 1, settled: true,
       sources: [fatSource],
     } as unknown,
   })
 
-  it('keeps whitelisted oracle sources on the newest row only and drops sourcesSummary', () => {
+  it('keeps whitelisted oracle sources on the newest row only and drops sourcesSummary/sourcesDelta', () => {
     const [latest, older] = slimTimelineRows([row('a'), row('b')])
     expect(latest).not.toHaveProperty('sourcesSummary')
     expect(older).not.toHaveProperty('sourcesSummary')
+    expect(latest).not.toHaveProperty('sourcesDelta')
+    expect(older).not.toHaveProperty('sourcesDelta')
     expect(latest.oracleSnapshot!.sources).toEqual([{
       sourceId: 's1', sourceName: 'example.com', url: 'https://example.com/a',
       stance: -0.4, certainty: 0.5, credibilityWeight: 1, claims: ['c'], settled: true,

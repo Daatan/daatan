@@ -50,13 +50,13 @@ export function slimContextSnapshots(snapshots: Snapshot[]): Snapshot[] {
 /**
  * The same projection for raw `ContextSnapshot` rows (newest first) returned by
  * `GET`/`POST /api/forecasts/[id]/context` (daatan#2152). Scalar columns pass through
- * unchanged; `sourcesSummary` (a per-source mirror no client reads) is dropped.
+ * unchanged; `sourcesSummary` and `sourcesDelta` (per-source mirrors no client reads) are dropped.
  */
-export function slimTimelineRows<T extends { oracleSnapshot: unknown; sourcesSummary?: unknown }>(
+export function slimTimelineRows<T extends { oracleSnapshot: unknown; sourcesSummary?: unknown; sourcesDelta?: unknown }>(
   rows: T[],
-): Array<Omit<T, 'oracleSnapshot' | 'sourcesSummary'> & { oracleSnapshot: OracleSnapshot | null }> {
+): Array<Omit<T, 'oracleSnapshot' | 'sourcesSummary' | 'sourcesDelta'> & { oracleSnapshot: OracleSnapshot | null }> {
   return rows.map((row, i) => {
-    const { oracleSnapshot, sourcesSummary: _sourcesSummary, ...rest } = row
+    const { oracleSnapshot, sourcesSummary: _sourcesSummary, sourcesDelta: _sourcesDelta, ...rest } = row
     return {
       ...rest,
       oracleSnapshot: oracleSnapshot ? slimOracleSnapshot(oracleSnapshot as OracleSnapshot, i === 0) : null,
