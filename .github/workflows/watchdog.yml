@@ -180,6 +180,22 @@ jobs:
           check "Leaderboard"   "$BASE/leaderboard" ""
           check "About/login"   "$BASE/auth/signin" ""
 
+          # elections.daatan.com runs on the prod box (separate container) and crash-looped
+          # 309 times unnoticed (Daatan/elections#237, #2155): every check above stayed green.
+          # Probe its home page plus the most-covered forecast — the index lists forecasts
+          # by coverage, so its first /forecast/ link is the heaviest page, the one that
+          # took 12–17 s or 502'd. Picked at runtime so a renamed slug can't stale the probe.
+          if [ "${{ matrix.env.name }}" = "production" ]; then
+            EL=https://elections.daatan.com
+            check "Elections home" "$EL/" ""
+            HEAVY=$(curl -s --compressed --max-time 15 "$EL/" | grep -oE 'href="/forecast/[^"]+"' | head -1 | cut -d'"' -f2 || true)
+            # No link means the home fetch itself failed — already reported (with retry)
+            # by the check above, so don't page twice for one outage.
+            if [ -n "$HEAVY" ]; then
+              check "Elections top forecast" "$EL$HEAVY" ""
+            fi
+          fi
+
           # The stop timer may have fired during the probes: that is not an outage.
           if [ ${#FAILED[@]} -gt 0 ] && [ "${{ matrix.env.name }}" = "staging" ]; then
             STATE=$(aws ec2 describe-instances \
