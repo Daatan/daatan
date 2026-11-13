@@ -200,6 +200,31 @@ Snapshots are newest first. The response is a slim projection of the stored row 
 
 ---
 
+### `GET /api/forecasts/[id]/estimate-series`
+The forecast's estimate over time — numbers only, oldest first (daatan#2162; Oracul 1.5 Phase 2 item 2.2, umbrella #1644). `[id]` is the forecast id or slug. Same visibility as `GET /api/forecasts/[id]`: a non-public forecast is a 404 unless the caller is its author or an admin.
+
+Only `kind = 'evidence'` snapshots are returned — clock-tick rows (and any future kind) are excluded. Only scalar columns are read; the `oracleSnapshot`/`sources` blobs are never loaded, so the cost does not grow with source volume.
+
+**Response** — `{ predictionId, points: EstimateSeriesPoint[] }`:
+
+```jsonc
+{
+  "id": "cuid",
+  "createdAt": "ISO-8601",
+  "probability": 64,          // published estimate, 0–100; null on abstention / legacy row
+  "oracleMean": 61,           // Oracul pool mean, 0–100; null when the LLM fallback wrote the row
+  "insufficientData": false,
+  "materialChange": true,
+  "origin": "news-indexer",   // creation | analyze | news-indexer | backfill; null on pre-funnel rows
+  "engine": "v1",             // 'v1' | 'v2' (retro engine), or null
+  "schemaVersion": "1.3",     // or null
+  "articlesUsed": 12,         // or null
+  "evidenceAt": "ISO-8601"    // or null
+}
+```
+
+---
+
 ### `POST /api/forecasts/[id]/context` — Auth
 Refresh the AI context for a forecast: fetches web articles for the claim, asks an LLM to summarise them, computes an "AI %" probability, and appends a new snapshot to the context timeline. Author-only and rate-limited to once per 24h per forecast.
 

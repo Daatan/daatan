@@ -1165,3 +1165,57 @@ export async function saveClockSnapshot(input: SaveClockSnapshotInput): Promise<
     meta: input.meta,
   })
 }
+
+/** One point of a forecast's estimate series (daatan#2162, Oracul 1.5 Phase 2 item 2.2). */
+export interface EstimateSeriesPoint {
+  id: string
+  createdAt: Date
+  /** The published probability, percent 0-100. Null on an abstention or a legacy row. */
+  probability: number | null
+  /** The Oracul pool mean, percent 0-100 (trigger-derived mirror of `oracleSnapshot.mean`). */
+  oracleMean: number | null
+  insufficientData: boolean
+  materialChange: boolean
+  origin: string | null
+  engine: string | null
+  schemaVersion: string | null
+  articlesUsed: number | null
+  evidenceAt: Date | null
+}
+
+/**
+ * The forecast's estimate over time, for Phase 3's scripts (retro#678): EVIDENCE snapshots
+ * only, oldest first. Selects scalars only and never touches the ~1 GB of TOAST behind
+ * `oracleSnapshot`/`sources`/`sourcesSummary`/`sourcesDelta`; `oracleMean` is the mirror the
+ * trigger keeps for exactly this. Filters `kind = 'evidence'` explicitly rather than NOT_CLOCK:
+ * the schema reserves room for more kinds, and a series must not silently absorb them.
+ * Served by `@@index([predictionId, createdAt])`.
+ */
+export async function getEvidenceEstimateSeries(predictionId: string): Promise<EstimateSeriesPoint[]> {
+  const rows = await prisma.contextSnapshot.findMany({
+    where: { predictionId, kind: 'evidence' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      createdAt: true,
+      externalProbability: true,
+      oracleMean: true,
+      insufficientData: true,
+      materialChange: true,
+      origin: true,
+      engine: true,
+      schemaVersion: true,
+      articlesUsed: true,
+      evidenceAt: true,
+    },
+  })
+  return rows.map(({ externalProbability, ...rest }) => ({ ...rest, probability: externalProbability }))
+}
+
+/** The visibility fields of a forecast by id or slug, for read endpoints that gate on them. */
+export async function getForecastVisibility(idOrSlug: string) {
+  return prisma.prediction.findFirst({
+    where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+    select: { id: true, isPublic: true, authorId: true },
+  })
+}
