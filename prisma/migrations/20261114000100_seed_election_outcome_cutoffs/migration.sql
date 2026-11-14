@@ -11,7 +11,7 @@
 -- this is a no-op on dev, CI and staging databases. Append-only table — a correction is a
 -- new row via POST /api/admin/forecasts/[id]/outcome-cutoff, never an edit of these.
 INSERT INTO "prediction_outcome_cutoffs" ("id", "prediction_id", "status", "cutoff_at", "basis", "evidence_urls", "recorded_by")
-SELECT 'cutoff_seed_' || v.pid, v.pid, v.status, v.cutoff_at, v.basis, v.urls, 'migration 20261110000100 (daatan#2144)'
+SELECT 'cutoff_seed_' || v.pid, v.pid, v.status, v.cutoff_at, v.basis, v.urls, 'migration 20261114000100 (daatan#2144)'
 FROM (VALUES
   ('cmr4kxces000o01l1xwfaxbc3', 'approved', TIMESTAMP '2026-07-15 21:00:00',
    'Deadline-based: the claim is that the Knesset is dissolved by July 15, 2026. A "did not happen by the deadline" outcome is known when the deadline passes: end of July 15 in Israel time (UTC+3).',
