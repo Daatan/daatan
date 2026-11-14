@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hashUrl } from '@/lib/utils/hash'
+import { approvedCutoffs, isScorableReading } from '@/lib/services/outcome-cutoff'
 import { percentToStance, toClaimsDetail, type EnrichedOracleSource } from '@/lib/services/oracle-snapshot'
 import type { EvidenceDispute, EvidencePoolArticle, ClaimArchetype, ClaimDirection, PredictionStatus } from '@prisma/client'
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
@@ -1450,7 +1451,13 @@ export async function pushCredibilityFeedback(
   const cfg = getOracleConfig()
   if (!cfg) return
 
-  const pool = await getPoolArticles(predictionId)
+  const allRows = await getPoolArticles(predictionId)
+  // Outcome-time cutoff (daatan#2144): once a cutoff is on record, only readings published
+  // before the outcome was publicly known feed the source/author ledgers. Fix-forward only:
+  // retro's ledger keeps what earlier pushes stored. With no cutoff on record the push is
+  // unchanged, so record the cutoff before resolving where it matters.
+  const cutoff = (await approvedCutoffs([predictionId])).get(predictionId)
+  const pool = cutoff ? allRows.filter((a) => isScorableReading(a, cutoff)) : allRows
   const usable = pool.filter(
     (a) => !a.excluded && a.evidenceClass !== 'opinion' && a.source !== null && a.stance !== null,
   )

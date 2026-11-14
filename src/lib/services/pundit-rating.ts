@@ -2,6 +2,14 @@ import { prisma } from '@/lib/prisma'
 import { CURRENT_VERSION_ONLY, unscoredDisputeUrlHashes } from '@/lib/services/evidence-pool'
 import { calculateEloUpdates } from '@/lib/services/elo'
 import { glicko2Update } from '@/lib/services/expertise'
+import { approvedCutoffs, isScorableReading } from '@/lib/services/outcome-cutoff'
+
+// Names the rule set behind the rows in pundit_tag_ratings, for the archive written when a
+// recalculation replaces them. Bump when what counts as a scorable reading changes.
+// 'v1-uncut' (before daatan#2144) scored every pooled reading, including ones published
+// after the outcome was publicly known.
+export const PUNDIT_SCORING_VERSION = 'v2-outcome-cutoff'
+export const PREVIOUS_PUNDIT_SCORING_VERSION = 'v1-uncut'
 
 const DEFAULT_ELO = 1500
 const DEFAULT_MU = 1500
@@ -42,7 +50,7 @@ async function loadResolvedPunditStances(tagSlug: string): Promise<Map<string, P
   // A URL under public dispute, or hidden after one, doesn't score (elections#225) — keyed
   // by URL so a row written after the dispute was opened is left out too.
   const unscoredUrlHashes = await unscoredDisputeUrlHashes()
-  const rows = await prisma.evidencePoolArticle.findMany({
+  const allRows = await prisma.evidencePoolArticle.findMany({
     where: {
       ...(unscoredUrlHashes.length > 0 ? { urlHash: { notIn: unscoredUrlHashes } } : {}),
       personId: { not: null },
@@ -66,10 +74,19 @@ async function loadResolvedPunditStances(tagSlug: string): Promise<Map<string, P
       personId: true,
       personName: true,
       stance: true,
+      publishedDate: true,
+      settled: true,
       prediction: { select: { status: true, resolvedAt: true } },
     },
     orderBy: { prediction: { resolvedAt: 'asc' } },
   })
+
+  // Only a reading PUBLISHED before the outcome was publicly known is a prediction
+  // (daatan#2144). A forecast with no approved cutoff contributes nothing: every caller
+  // (daily cron, manual recalculate, lazy seed) comes through here, so none of them can
+  // score a post-outcome reading.
+  const cutoffs = await approvedCutoffs([...new Set(allRows.map((r) => r.predictionId))])
+  const rows = allRows.filter((r) => isScorableReading(r, cutoffs.get(r.predictionId)))
 
   // Group by (predictionId, personId), preserving first-seen order for the
   // outer per-prediction grouping (chronological, via the orderBy above).

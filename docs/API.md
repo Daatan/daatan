@@ -578,7 +578,10 @@ Same for `external_markets` rows with no embedding (chiefly those written before
 Bulk-submit every URL in the sitemap to IndexNow. No-op without `INDEXNOW_KEY`; the sitemap is empty off-production, so it only does real work on prod. Returns `{ success, discovered, ... }` plus the submission result. See [SEO.md](./SEO.md).
 
 ### `POST /api/admin/pundit-ratings/recalculate` — Admin or `x-cron-secret`
-Recompute `PunditTagRating` for one tag: delete the tag's rows, then replay full history (`ensurePunditTagRatingsSeeded`). The only path that computes pundit ratings (daatan#1293). `?tag=` (default `israeli-elections-2026`); `404` for an unknown tag. Returns `{ tagSlug, updated, elapsedMs }`. Driven daily at 06:15 UTC by `.github/workflows/pundit-ratings-recalculate.yml`.
+Recompute `PunditTagRating` for one tag: archive the tag's rows to `pundit_tag_rating_archives`, delete them, then replay full history (`ensurePunditTagRatingsSeeded`). The replay scores only readings published before each forecast's outcome cutoff, and skips forecasts with no approved cutoff (daatan#2144). The only path that computes pundit ratings (daatan#1293). `?tag=` (default `israeli-elections-2026`); `404` for an unknown tag. Returns `{ tagSlug, updated, changed, scoringVersion, elapsedMs }`; an archive is kept only when `changed`. Driven daily at 06:15 UTC by `.github/workflows/pundit-ratings-recalculate.yml`.
+
+### `GET|POST /api/admin/forecasts/[id]/outcome-cutoff` — Admin
+The outcome-time cutoff for a forecast (daatan#2144): the earliest reliably verifiable public confirmation that its specific outcome occurred. `POST { status: 'approved' | 'insufficient', cutoffAt?, basis, evidenceUrls? }` appends a decision (`201 { cutoff }`); `approved` needs `cutoffAt` (ISO 8601 with an explicit offset) and at least one evidence URL, `insufficient` records that no reliable cutoff can be established. Append-only: a correction is another `POST`, and the newest row is in force. `GET` → `{ cutoffs }`, newest first. `404` for an unknown forecast.
 
 ### `GET /api/admin/rating-feedback` — Admin
 Aggregates the manual number-rating feedback loop (daatan#1223) for the admin Ratings tab: `{ promptsSent, totalVotes, responseRate, ratingDistribution, byRater, votes }`, where each vote joins the article, the forecast and the frozen Oracul numbers the rater saw.

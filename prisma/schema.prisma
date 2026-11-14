@@ -217,6 +217,7 @@ model Tag {
   predictions      Prediction[]
   userTagRatings   UserTagRating[]
   punditTagRatings PunditTagRating[]
+  punditTagRatingArchives PunditTagRatingArchive[]
 
   @@map("tags")
 }
@@ -247,6 +248,52 @@ model PunditTagRating {
   @@unique([personId, tagId])
   @@index([tagId])
   @@map("pundit_tag_ratings")
+}
+
+/// Outcome-time cutoff for predictive scoring (daatan#2144): the earliest reliably verifiable
+/// public confirmation that the forecast's specific outcome occurred. A source reading scores
+/// only if it was PUBLISHED before this instant (see src/lib/services/outcome-cutoff.ts).
+///
+/// APPEND-ONLY: never update or delete a row. The newest row per prediction decides — a
+/// correction is a new row, so every past decision stays auditable. `insufficient` records
+/// that no reliable cutoff could be established; such a forecast (like one with no row) keeps
+/// its resolution but is left out of pundit/source scoring. Never invent a cutoff.
+///
+/// The elections app reads this table through its read-only subset schema.
+model PredictionOutcomeCutoff {
+  id           String     @id @default(cuid())
+  predictionId String     @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  /// 'approved' | 'insufficient'
+  status       String    @db.VarChar(20)
+  /// Null exactly when status = 'insufficient'.
+  cutoffAt     DateTime? @map("cutoff_at")
+  /// What happened, when, and why this instant is the earliest reliable confirmation.
+  basis        String    @db.Text
+  evidenceUrls String[]  @map("evidence_urls")
+  recordedBy   String    @map("recorded_by") @db.VarChar(200)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([predictionId, createdAt])
+  @@map("prediction_outcome_cutoffs")
+}
+
+/// The pundit_tag_ratings rows a recalculation replaced (daatan#2144). Recalculate deletes
+/// and replays, so without this the previous published ranking is unrecoverable. One row per
+/// recalculation that changed anything; `payload` is the full previous row set, verbatim.
+/// `scoringVersion` names the rule set that PRODUCED the archived rows.
+model PunditTagRatingArchive {
+  id    String @id @default(cuid())
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  scoringVersion String   @map("scoring_version") @db.VarChar(40)
+  payload        Json
+  archivedAt     DateTime @default(now()) @map("archived_at")
+
+  @@index([tagId, archivedAt])
+  @@map("pundit_tag_rating_archives")
 }
 
 model UserTagRating {
@@ -504,6 +551,7 @@ model Prediction {
   aiMemberScores          AiMemberScore[]
   calibrationRecord       CalibrationRecord?
   resolutionSnapshots     ResolutionSnapshot[]
+  outcomeCutoffs          PredictionOutcomeCutoff[]
 
   @@index([status])
   @@index([authorId])
