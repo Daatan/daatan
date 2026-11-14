@@ -582,7 +582,9 @@
     "originIndexer": "Indexed",
     "settledBadge": "settling",
     "settledHint": "This article reports the outcome as already decided — it is what triggered the Oracul's settlement pin.",
-    "originBoth": "Both"
+    "originBoth": "Both",
+    "showAll": "Show all ({count})",
+    "showFewer": "Show fewer"
   },
   "footer": {
     "privacy": "Privacy Policy",

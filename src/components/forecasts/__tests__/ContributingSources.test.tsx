@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
-import { ContributingSources } from '../ContributingSources'
+import { ContributingSources, OUTLETS_PER_COLUMN } from '../ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import enMessages from '../../../../messages/en.json'
 
@@ -334,5 +334,25 @@ describe('ContributingSources', () => {
       // One flag on the collapsed summary + one on the settled article's row.
       expect(screen.getAllByTestId('settling-source-flag')).toHaveLength(2)
     })
+  })
+  it('caps each column at OUTLETS_PER_COLUMN outlet cards behind a Show all toggle (#2169)', () => {
+    const n = OUTLETS_PER_COLUMN + 3
+    const sources = Array.from({ length: n }, (_, i) =>
+      src({ url: `https://outlet${i}.com/a`, source: `Outlet${i}`, stance: 0.6 }),
+    )
+    renderWithIntl(<ContributingSources sources={sources} />)
+    // Header keeps the full count; only the first N cards render.
+    expect(screen.getByText(new RegExp(`^Will happen \\(${n}\\)$`))).toBeInTheDocument()
+    expect(screen.queryAllByText(/^Outlet\d+$/)).toHaveLength(OUTLETS_PER_COLUMN)
+    const toggle = screen.getByTestId('sources-toggle-yes')
+    expect(toggle).toHaveTextContent(`Show all (${n})`)
+    fireEvent.click(toggle)
+    expect(screen.queryAllByText(/^Outlet\d+$/)).toHaveLength(n)
+    expect(toggle).toHaveTextContent('Show fewer')
+  })
+
+  it('shows no toggle when a column fits under the cap', () => {
+    renderWithIntl(<ContributingSources sources={[src({ url: 'https://a.com/1', stance: 0.6 })]} />)
+    expect(screen.queryByTestId('sources-toggle-yes')).toBeNull()
   })
 })
