@@ -18,8 +18,11 @@ if ! flock -n 9; then
 fi
 
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
-BACKUP_FILE="/tmp/daatan-backup-${TIMESTAMP}.sql.gz"
 S3_BUCKET="${S3_BACKUP_BUCKET:-daatan-db-backups-272007598366}"
+S3_KEY="backups/${TIMESTAMP}.sql.gz"
+# Set once the upload has started: from then on a failure must take the object back
+# out of backups/, or a truncated dump would become the "latest" one.
+UPLOAD_STARTED=0
 DB_CONTAINER="${DB_CONTAINER:-daatan-postgres}"
 DB_NAME="${DB_NAME:-daatan}"
 DB_USER="${DB_USER:-daatan}"
@@ -31,7 +34,12 @@ DB_USER="${DB_USER:-daatan}"
 # nothing else in it changes this script's settings.
 on_exit() {
   local rc=$?
-  rm -f "$BACKUP_FILE"
+  if [ "$rc" -ne 0 ] && [ "$UPLOAD_STARTED" = 1 ]; then
+    # Object Lock keeps the version for its retention; the delete marker hides it from
+    # `aws s3 ls`, so neither verify-backup.sh nor the keep-60 prune sees it.
+    aws s3 rm "s3://${S3_BUCKET}/${S3_KEY}" >/dev/null 2>&1 \
+      && echo "🗑️ Removed incomplete s3://${S3_BUCKET}/${S3_KEY}"
+  fi
   if [ "$rc" -ne 0 ] && [ "${BACKUP_ALERT_ON_FAILURE:-0}" = 1 ] && [ -f "$HOME/app/.env" ]; then
     (
       set +eu
@@ -51,17 +59,30 @@ trap on_exit EXIT
 
 echo "📦 Starting DB backup at $TIMESTAMP"
 
-# Dump and compress. pipefail: a failed pg_dump must fail the run, not upload
-# a truncated file.
-docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
-echo "✅ Dump complete: $BACKUP_FILE ($(du -sh "$BACKUP_FILE" | cut -f1))"
+# Size of the newest existing backup, the baseline for the sanity check below.
+PREV_BYTES=$(aws s3 ls "s3://${S3_BUCKET}/backups/" | sort | tail -1 | awk '{print $3}')
+PREV_BYTES=${PREV_BYTES:-0}
 
-# Upload to S3
-aws s3 cp "$BACKUP_FILE" "s3://${S3_BUCKET}/backups/${TIMESTAMP}.sql.gz"
-echo "✅ Uploaded to s3://${S3_BUCKET}/backups/${TIMESTAMP}.sql.gz"
+# Dump, compress and stream straight to S3 — nothing touches the local disk
+# (daatan#2168: staging a ~4 GB dump in /tmp failed every backup for ~42 h once the
+# root disk filled). pipefail: a failed pg_dump fails the run, and on_exit then removes
+# the object the upload completed from the truncated stream. A single-stream upload
+# is limited to 10,000 parts (80 GB at the CLI's 8 MB default); pass --expected-size
+# before the dump gets anywhere near that.
+UPLOAD_STARTED=1
+docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip \
+  | aws s3 cp --no-progress - "s3://${S3_BUCKET}/${S3_KEY}"
 
-# Cleanup local file
-rm -f "$BACKUP_FILE"
+# A dump that errored early still gzips to a small valid file. Same rule as the
+# pre-migrate dump in blue-green-deploy.sh: under 256 KiB, or under half the previous
+# backup, means something is missing — not that the data shrank.
+BYTES=$(aws s3api head-object --bucket "$S3_BUCKET" --key "$S3_KEY" --query ContentLength --output text)
+if [ "$BYTES" -lt 262144 ] || [ "$BYTES" -lt $(( PREV_BYTES / 2 )) ]; then
+  echo "❌ Uploaded dump is $BYTES bytes (previous backup: $PREV_BYTES) — treating it as incomplete"
+  exit 1
+fi
+UPLOAD_STARTED=0
+echo "✅ Uploaded s3://${S3_BUCKET}/${S3_KEY} ($(( BYTES / 1048576 )) MiB)"
 
 # Keep only the newest 60 backups (30 days at two a day)
 aws s3 ls "s3://${S3_BUCKET}/backups/" | awk '{print $4}' | sort | head -n -60 | while read -r key; do
