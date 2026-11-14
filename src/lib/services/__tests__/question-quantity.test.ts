@@ -65,8 +65,10 @@ describe('parseQuestionQuantity — prod golden fixture', () => {
 
   it('parses every prod question that states a numeric bar, and nothing else', () => {
     const parsed = PROD.filter(([q]) => parseQuestionQuantity(q).quantity !== null).length
-    // 19 of 43. The other 24 have no single numeric bar (comparatives, ranks,
-    // verbs with no comparator, "4 of the seven", two bars) or no unit.
+    // 21 of 43. 16 state no numeric bar at all (comparatives, ranks, "return to
+    // normal"); 6 state one the parser declines: a bar after a verb with no
+    // comparator ("earn 30,000 shekels", "a rating of 2800", "a net worth of
+    // $1 trillion"), "4 of the seven", two bars, and a bar with no unit.
     expect(parsed).toBe(PROD.filter(([, e]) => typeof e !== 'string').length)
   })
 })
