@@ -30,7 +30,10 @@ resource "aws_instance" "production" {
   associate_public_ip_address = true
 
   root_block_device {
-    volume_size           = 40
+    # 60, not 40: Postgres (~10 GB volume, ~4 GB gzip dump), the kept pre-migrate dump and
+    # ~2.9 GB of images per release filled 40 GB and broke backups and a deploy (daatan#2168).
+    # Grows in place (ModifyVolume); the partition/filesystem are then grown on the box.
+    volume_size           = 60
     volume_type           = "gp3"
     delete_on_termination = true
     encrypted             = true
