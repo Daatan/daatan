@@ -696,6 +696,23 @@ describe('recomputeFromPool', () => {
     expect(body.claim_archetype).toBe('scheduled')
   })
 
+  // daatan#2176 — the question's numeric bar rides with the recompute, parsed from
+  // the same text sent as `question`, for THRESHOLD claims only.
+  it('sends question_quantity for a THRESHOLD claim with a parseable bar, and omits it otherwise', async () => {
+    findMany.mockResolvedValue([poolArticle()] as never)
+    mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)
+    const claim = 'The price of Brent crude oil will reach or exceed $130 per barrel before December 31, 2026.'
+
+    await recomputeFromPool('pred-1', null, null, null, 'THRESHOLD' as never, claim)
+    await recomputeFromPool('pred-1', null, null, null, 'DIFFUSE' as never, claim)
+    await recomputeFromPool('pred-1', null, null, null, 'THRESHOLD' as never, 'Kalshi will become more popular than Polymarket.')
+
+    const bodies = mockOraculFetch.mock.calls.map((c) => JSON.parse((c[2] as { body: string }).body))
+    expect(bodies[0].question_quantity).toEqual({ comparator: '>=', value: 130, unit: 'USD per barrel' })
+    expect('question_quantity' in bodies[1]).toBe(false)
+    expect('question_quantity' in bodies[2]).toBe(false)
+  })
+
   it('omits claim_created_at/claim_archetype entirely when unclassified — retro must fail open', async () => {
     findMany.mockResolvedValue([poolArticle()] as never)
     mockOraculFetch.mockResolvedValue({ ok: true, json: async () => AGGREGATE } as never)

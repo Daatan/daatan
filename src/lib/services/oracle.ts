@@ -1,5 +1,6 @@
 import { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { createLogger } from '@/lib/logger'
+import { withQuestionQuantity } from './question-quantity'
 import {
   getOracleBaseUrl,
   getOracleConfig,
@@ -717,6 +718,9 @@ export const getOraculForecast = async (
         ...(claimArchetypeParam(options?.claimArchetype)
           ? { claim_archetype: claimArchetypeParam(options?.claimArchetype) }
           : {}),
+        // The question's numeric bar (daatan#2176). Log-only on retro's side
+        // (confusion-flag rule 2); omitted unless THRESHOLD and parseable.
+        ...withQuestionQuantity(question, options?.claimArchetype, meta.predictionId),
         // What the question actually means (retro #353) — e.g. that only an
         // official announcement settles it. Omitted when the claim has no rules
         // rather than defaulted, so retro's cache key (retro#510) separates
