@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Newspaper, ExternalLink, ChevronDown, Gavel } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -8,6 +9,10 @@ import { canonicalKey } from '@/lib/utils/canonical-url'
 import { Avatar } from '@/components/Avatar'
 
 type Side = 'yes' | 'no' | 'neutral'
+
+/** Outlet cards shown per column before "Show all" (#2169). Columns are sorted by
+ *  article count, so the cut keeps the outlets that carry most of the pool. */
+export const OUTLETS_PER_COLUMN = 5
 
 /** Stance → side: same thresholds as the Oracul-snapshot source chips. */
 function getSide(stance: number | null): Side {
@@ -124,6 +129,7 @@ type OutletGroup = {
  */
 export function ContributingSources({ sources }: { sources: ContributingSource[] }) {
   const t = useTranslations('sources')
+  const [expanded, setExpanded] = useState<Record<Side, boolean>>({ yes: false, no: false, neutral: false })
 
   // One voter per article — dedupe by canonical URL (same key the merge service uses).
   const seen = new Set<string>()
@@ -371,8 +377,18 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
         {sideMeta[side].label} ({byCol[side].length})
       </p>
       <div className="space-y-1.5">
-        {byCol[side].map((g) => <OutletCard key={g.domain} g={g} />)}
+        {(expanded[side] ? byCol[side] : byCol[side].slice(0, OUTLETS_PER_COLUMN)).map((g) => <OutletCard key={g.domain} g={g} />)}
       </div>
+      {byCol[side].length > OUTLETS_PER_COLUMN && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => ({ ...e, [side]: !e[side] }))}
+          className="mt-2 text-xs text-gray-400 hover:text-gray-200 hover:underline"
+          data-testid={`sources-toggle-${side}`}
+        >
+          {expanded[side] ? t('showFewer') : t('showAll', { count: byCol[side].length })}
+        </button>
+      )}
     </div>
   )
 

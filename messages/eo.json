@@ -582,7 +582,9 @@
     "originIndexer": "Indeksita",
     "settledBadge": "decidiga",
     "settledHint": "Ĉi tiu artikolo raportas la rezulton kiel jam deciditan — ĝi ekigis la decid-fikson de la Orakulo.",
-    "originBoth": "Ambaŭ"
+    "originBoth": "Ambaŭ",
+    "showAll": "Montri ĉiujn ({count})",
+    "showFewer": "Montri malpli"
   },
   "footer": {
     "privacy": "Privateca Politiko",

@@ -582,7 +582,9 @@
     "originIndexer": "באינדקס",
     "settledBadge": "מכריע",
     "settledHint": "מאמר זה מדווח שהתוצאה כבר הוכרעה — הוא שהפעיל את נעיצת ההכרעה של האוראקול.",
-    "originBoth": "שניהם"
+    "originBoth": "שניהם",
+    "showAll": "הצג הכל ({count})",
+    "showFewer": "הצג פחות"
   },
   "footer": {
     "privacy": "מדיניות פרטיות",
