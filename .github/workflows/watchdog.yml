@@ -423,6 +423,9 @@ jobs:
           # (daatan#1726); the script itself carries no secrets (it sources .env on the
           # box for Telegram creds), so shipping its source is safe to expose.
           SCRIPT_B64=$(base64 -w 0 scripts/check-disk-space.sh)
+          # SSM runs as root, so a bare ~ is /root: the script then found no .env, could
+          # not alert, and prod sat at 92-99% for days in silence (daatan#2168). Same
+          # HOME/cwd as the EventBridge backup command (terraform/backup_schedule.tf).
 
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
@@ -430,8 +433,9 @@ jobs:
             --comment "Disk Check ${{ matrix.env.name }}" \
             --parameters commands='[
               "set -e",
-              "mkdir -p ~/app/scripts",
-              "cd ~/app",
+              "export HOME=/home/ubuntu",
+              "mkdir -p /home/ubuntu/app/scripts",
+              "cd /home/ubuntu/app",
               "echo '"$SCRIPT_B64"' | base64 -d > scripts/check-disk-space.sh",
               "chmod +x scripts/check-disk-space.sh",
               "./scripts/check-disk-space.sh '"${{ matrix.env.name }}"'"
