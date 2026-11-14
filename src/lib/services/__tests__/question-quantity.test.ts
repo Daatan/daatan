@@ -19,7 +19,7 @@ const PROD: Case[] = [
   ['The number of Israelis emigrating abroad will be higher in the 12 months following the next general elections in Israel than in the 12 months preceding them, by September 9, 2031.', 'no_bar'],
   ['Am Yisrael will not pass the electoral threshold in the next general elections for the Knesset by December 31, 2026.', 'no_bar'],
   ['Cultivated meat will comprise more than 50% of global meat consumption by weight by December 31, 2056.', { comparator: '>', value: 50, unit: 'percent' }],
-  ["JPMorgan Chase's market capitalization will exceed $1 trillion by January 1, 2027.", { comparator: '>', value: 1e12, unit: 'USD' }],
+  ["JPMorgan Chase's market capitalization will exceed $1 trillion by January 1, 2027.", { comparator: '>', value: 1, unit: 'trillion USD' }],
   ['Chess.com will have more than 500,000,000 registered users by December 31, 2030.', { comparator: '>', value: 500_000_000, unit: 'registered users' }],
   ['Most children aged 6-18 in all Western countries will be educated through home learning, using artificial intelligence, by August 27, 2036.', 'no_bar'],
   ['The global fertility rate in 2050 will be less than 2 children per woman.', { comparator: '<', value: 2, unit: 'children per woman' }],
@@ -81,8 +81,13 @@ describe('parseQuestionQuantity — edge cases', () => {
     ['Tesla market cap will top $2 trillion by 2027.', 'no_bar'],
     ['The ceasefire will hold for more than 6 months.', 'time_span'],
     ['Will it happen over 2027?', 'year_like'],
-    ['Revenue will exceed $2bn in 2027.', { comparator: '>', value: 2e9, unit: 'USD' }],
-    ['The company will sell at least 5 million cars in 2027.', { comparator: '>=', value: 5e6, unit: 'cars' }],
+    ['Revenue will exceed $2bn in 2027.', { comparator: '>', value: 2, unit: 'billion USD' }],
+    ['The company will sell at least 5 million cars in 2027.', { comparator: '>=', value: 5, unit: 'million cars' }],
+    ['Brent crude will not exceed $100 per barrel in 2027.', 'negated'],
+    ["Brent crude won't reach $100 per barrel in 2027.", 'negated'],
+    ['Brent crude will fail to reach $100 per barrel in 2027.', 'negated'],
+    ['Brent will never trade above $150 per barrel.', 'negated'],
+    ['The party will no longer poll over 10% by June.', 'negated'],
   ])('%s', (question, expected) => {
     const parsed = parseQuestionQuantity(question)
     if (typeof expected === 'string') expect(parsed).toEqual({ quantity: null, reason: expected })

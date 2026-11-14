@@ -39,7 +39,7 @@ vi.mock('@/lib/services/oracleClient', async (importOriginal) => {
   }
 })
 
-import { ClaimDirection } from '@prisma/client'
+import { ClaimArchetype, ClaimDirection } from '@prisma/client'
 import { getOraculForecast, getOraculProbability, getAuthorShadowLeaderboard, checkOracleHealth, BOT_FORECAST_TIMEOUT_MS, FORECAST_TIMEOUT_MS, INTERACTIVE_FORECAST_TIMEOUT_MS } from '../oracle'
 import { logOracleCall } from '@/lib/services/oracleClient'
 
@@ -457,6 +457,18 @@ describe('getOraculForecast', () => {
       const result = await getOraculForecast('Q?')
       expect(result.failureClass).toBe('oracle_timeout')
       expect(result.outcomeCounts ?? null).toBeNull()
+    })
+  })
+
+  describe('question_quantity (daatan#2176)', () => {
+    it('sends the parsed bar for a THRESHOLD question and omits it otherwise', async () => {
+      const q = 'Bitcoin will reach $100k by end of 2026'
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => fullPayload })
+      await getOraculForecast(q, { claimArchetype: ClaimArchetype.THRESHOLD })
+      await getOraculForecast(q, { claimArchetype: ClaimArchetype.DIFFUSE })
+      const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string))
+      expect(bodies[0].question_quantity).toEqual({ comparator: '>=', value: 100000, unit: 'USD' })
+      expect('question_quantity' in bodies[1]).toBe(false)
     })
   })
 

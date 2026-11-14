@@ -20,10 +20,12 @@
  * - "reach", "hit", "cross" and "reach or exceed" mean `>=`. The bar itself
  *   counts, which is how these questions resolve.
  * - "over", "more than", "exceed" and "above" mean `>`.
- * - A currency symbol becomes an ISO code (`$` → `USD`). A word magnitude
- *   ("1 trillion", "$100k") is folded into `value`. The claim side is NOT
- *   normalised, so a scale mismatch makes retro's unit check abstain rather
- *   than guess.
+ * - A currency symbol becomes an ISO code (`$` → `USD`). A magnitude stays in
+ *   the unit, unscaled ("$1 trillion" → `1 / "trillion USD"`), matching how
+ *   the extractor writes claims. Only "k" is folded ("$100k" → `100000 USD`).
+ *   Neither side is normalised, so a scale mismatch makes retro's unit check
+ *   abstain rather than guess.
+ * - A negated bar ("will not exceed $100") is left unparsed (`negated`).
  * - Rank phrasing ("top 10"), comparatives with no number ("more popular
  *   than…") and verbs with no comparator ("earn 30,000 shekels") have no bar,
  *   so they return null.
@@ -49,6 +51,7 @@ export type QuestionQuantityMiss =
   | 'year_like'
   | 'time_span'
   | 'no_unit'
+  | 'negated'
 
 export type QuestionQuantityParse =
   | { quantity: QuestionQuantity; reason: null }
@@ -85,12 +88,10 @@ const NUMBER_WORDS: Record<string, number> = {
   seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
 }
 
-const WORD_MAGNITUDES: Record<string, number> = {
-  thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12,
-}
 // Attached abbreviations ("$100k", "$2bn") only count after a currency symbol.
-// Without one, "100 m" is as likely metres as millions.
-const ATTACHED_MAGNITUDES: Record<string, number> = { k: 1e3, m: 1e6, bn: 1e9, b: 1e9 }
+// Without one, "100 m" is as likely metres as millions. "k" folds into the value;
+// the others become the same word magnitude the extractor writes.
+const ATTACHED_MAGNITUDES: Record<string, string> = { m: 'million', bn: 'billion', b: 'billion' }
 
 const CURRENCY_SYMBOLS: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₪': 'ILS' }
 const CURRENCY_WORDS: Record<string, string> = {
@@ -181,6 +182,7 @@ export function parseQuestionQuantity(question: string): QuestionQuantityParse {
   let sawYear = false
   let sawTimeSpan = false
   let sawNoUnit = false
+  let sawNegated = false
 
   for (const m of text.matchAll(NUMBER_RE)) {
     const start = m.index ?? 0
@@ -198,11 +200,17 @@ export function parseQuestionQuantity(question: string): QuestionQuantityParse {
     let value = parseNumber(numRaw)
     if (!Number.isFinite(value)) continue
     const currency = symbol ? CURRENCY_SYMBOLS[symbol] : null
+    // A magnitude stays in the UNIT, unscaled, because that is how the extractor
+    // writes the claim side ("1 / trillion USD", "5 / million graduates", prod
+    // 2026-11-14). retro compares units exactly, so folding "$1 trillion" into
+    // 1e12 USD would abstain against every claim stated in trillions.
+    let magnitude: string | null = wordMag ? wordMag.toLowerCase() : null
     if (attached) {
       if (!currency) continue
-      value *= ATTACHED_MAGNITUDES[attached.toLowerCase()]
+      const a = attached.toLowerCase()
+      if (a === 'k') value *= 1e3
+      else magnitude = ATTACHED_MAGNITUDES[a]
     }
-    if (wordMag) value *= WORD_MAGNITUDES[wordMag.toLowerCase()]
 
     let unit: string
     let consumed = 0
@@ -219,6 +227,7 @@ export function parseQuestionQuantity(question: string): QuestionQuantityParse {
       } else {
         unit = u.unit
       }
+      if (magnitude && unit) unit = `${magnitude} ${unit}`
     }
 
     let postfix: Comparator | null = null
@@ -228,12 +237,19 @@ export function parseQuestionQuantity(question: string): QuestionQuantityParse {
     if (comparator === null) comparator = postfix
     if (comparator === null) continue
 
+    // "Will not exceed $100": YES means the opposite side of the bar. Inverting the
+    // comparator would be a guess about scope ("not ... at least once"), so the
+    // question is left unparsed instead.
+    if (/\b(?:not|never|no\s+longer|fail(?:s|ed)?\s+to)\b|n't\b/i.test(before.slice(-60))) {
+      sawNegated = true
+      continue
+    }
     // "At least 4 of the seven problems": the bar counts a subset, not a quantity.
     if (/^\s+(?:out\s+)?of\s+(?:the\s+)?(?:\d|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i.test(afterNumber)) {
       sawKOfN = true
       continue
     }
-    if (!currency && !percent && !wordMag && unit === '' && Number.isInteger(value) && value >= 1900 && value <= 2100) {
+    if (!currency && !percent && !magnitude && unit === '' && Number.isInteger(value) && value >= 1900 && value <= 2100) {
       sawYear = true
       continue
     }
@@ -269,6 +285,7 @@ export function parseQuestionQuantity(question: string): QuestionQuantityParse {
     const [c] = distinct.values()
     return { quantity: { comparator: c.comparator, value: c.value, unit: c.unit }, reason: null }
   }
+  if (sawNegated) return { quantity: null, reason: 'negated' }
   if (sawKOfN) return { quantity: null, reason: 'k_of_n' }
   if (sawTimeSpan) return { quantity: null, reason: 'time_span' }
   if (sawYear) return { quantity: null, reason: 'year_like' }
