@@ -74,7 +74,7 @@ describe('lookupGroundedEventDate', () => {
 
   it('is "unavailable" without touching the network when Vertex is not provisioned', async () => {
     vi.stubEnv('GOOGLE_VERTEX_PRIVATE_KEY', '')
-    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable' })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable', reason: 'no_vertex' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -90,18 +90,42 @@ describe('lookupGroundedEventDate', () => {
       expect(init.signal.aborted).toBe(true)
       throw new DOMException('aborted', 'AbortError')
     })
-    expect(await lookupGroundedEventDate('in', 'claim', NOW, caller.signal)).toEqual({ status: 'unavailable' })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW, caller.signal)).toEqual({ status: 'unavailable', reason: 'cancelled' })
   })
 
   it('swallows an HTTP error, a thrown fetch and unparseable text as "unavailable"', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'quota' })
-    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable' })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable', reason: 'error' })
 
     fetchMock.mockRejectedValueOnce(new Error('network down'))
-    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable' })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable', reason: 'error' })
 
     fetchMock.mockResolvedValueOnce(answer('The next meeting is in late October.'))
-    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable' })
+    expect(await lookupGroundedEventDate('in', 'claim', NOW)).toEqual({ status: 'unavailable', reason: 'error' })
+  })
+
+  // daatan#2199: all 4 prod `unavailable`s in a month were this timeout, logged as a bare AbortError.
+  it('reports its own timeout as reason "timeout", distinct from an error', async () => {
+    vi.useFakeTimers()
+    try {
+      fetchMock.mockImplementationOnce((_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))),
+      )
+      const pending = lookupGroundedEventDate('in', 'claim', NOW)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(await pending).toEqual({ status: 'unavailable', reason: 'timeout' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks for legal deadlines and season ends, not only scheduled events (#2199)', async () => {
+    fetchMock.mockResolvedValueOnce(answer('{"event": "E", "date": null, "source_url": ""}'))
+    await lookupGroundedEventDate('in', 'claim', NOW)
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text as string
+    expect(prompt).toMatch(/legal or statutory deadline/)
+    expect(prompt).toMatch(/government is formed/)
+    expect(prompt).toMatch(/end of a season/)
   })
 
   it('drops Vertex grounding-redirect links and non-http values rather than storing them as a source', async () => {

@@ -80,6 +80,9 @@ export const POST = withAuth(async (request, user) => {
         controller.enqueue(encoder.encode(finalMessage))
         recordAttempt(user.id, userInput, isUrl, ForecastAttemptOutcome.SUCCESS, {
           skipSources,
+          // The AI's own date, before any author edit — compare with the published
+          // resolveByDatetime to count date fixes (daatan#2199).
+          resolveByDatetime: result.resolveByDatetime,
           dateBasis: result.dateBasis,
           isDefaultHorizonDate: result.isDefaultHorizonDate,
           groundedDate: result.groundedDate,

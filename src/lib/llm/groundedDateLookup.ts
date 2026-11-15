@@ -32,8 +32,11 @@ const LOOKUP_MODEL = 'gemini-2.5-flash'
  * Measured 4.4–10.4 s (2026-09-18); p50 4.4 s / p90 8.4 s on 28 calls (2026-11-02, #1890).
  * Past this the draft goes out with the "assumed" warning instead — the slow tail is search
  * round-trips, not thinking (a thinkingBudget cap cost accuracy for ~0.3 s), so it's cut here.
+ * Raised from 10 s (daatan#2199): every `unavailable` in prod 2026-10-16..11-15 (4/4) was this
+ * timeout, not a Vertex error — Hebrew government-formation claims, which need more searching.
+ * The lookup starts beside the first draft, so the author waits only for the part past it.
  */
-const LOOKUP_TIMEOUT_MS = 10_000
+const LOOKUP_TIMEOUT_MS = 15_000
 /** A "scheduled event" further out than this is a misread, not a calendar fact. */
 const MAX_YEARS_AHEAD = 10
 const MAX_EVENT_CHARS = 160
@@ -42,8 +45,11 @@ export type GroundedDateLookup =
   | { status: 'found'; event: string; date: string; sourceUrl: string }
   /** The lookup ran and found no officially scheduled event date. */
   | { status: 'no_date' }
-  /** Vertex isn't configured, or the call failed — indistinguishable to the caller on purpose. */
-  | { status: 'unavailable' }
+  /** Vertex isn't configured, or the call failed. The caller treats every reason alike; `reason`
+   *  is recorded with the attempt so the failure mix is measurable (daatan#2199). */
+  | { status: 'unavailable'; reason: UnavailableReason }
+
+export type UnavailableReason = 'no_vertex' | 'timeout' | 'error' | 'cancelled'
 
 interface GroundedVertexResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
@@ -55,10 +61,13 @@ A user is creating a forecast. Their input and the drafted claim are inside the 
 <input>${userInput}</input>
 <claim>${claimText}</claim>
 
-Decide whether the forecast's outcome is decided at one specific, officially scheduled real-world event (an election, a central-bank meeting, a court date, a summit, a statutory deadline, a fixture). If it is, find the calendar date of the next occurrence of that event after the current date.
+Find the date by which the forecast's outcome will be known. That is one of:
+- an officially scheduled real-world event that decides it (an election, a central-bank meeting, a court date, a summit, a fixture) — the next occurrence after the current date;
+- a legal or statutory deadline that bounds when it must be decided, when the outcome hangs on a process rather than one event — e.g. for whether or how a government is formed after an election, the last date the law allows for forming it before new elections are triggered (count from the dates the law and current reporting give; use the outer limit, including allowed extensions);
+- the scheduled end of a season, tournament, term or reporting period the forecast is about (e.g. the last day of a league's regular season).
 Answer with ONLY a JSON object, no prose:
-{"event": "<the deciding event>", "date": "YYYY-MM-DD" or null, "source_url": "<url or empty>"}
-Use null for date when the forecast does not hinge on a scheduled event, when the event has no officially announced date, or when you cannot find the date. Do not guess.`
+{"event": "<the deciding event or deadline, in English>", "date": "YYYY-MM-DD" or null, "source_url": "<url or empty>"}
+Use null for date when none of these applies, when the date has not been announced and cannot be worked out from the law and current reporting, or when you cannot find it. Do not guess.`
 }
 
 /** http(s) only, and never Vertex's own opaque grounding redirects — they expire and name no source. */
@@ -89,7 +98,8 @@ export async function lookupGroundedEventDate(
   signal?: AbortSignal,
 ): Promise<GroundedDateLookup> {
   const env = vertexEnv()
-  if (!env) return { status: 'unavailable' }
+  if (!env) return { status: 'unavailable', reason: 'no_vertex' }
+  const started = Date.now()
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS)
@@ -125,10 +135,15 @@ export async function lookupGroundedEventDate(
     if (!event) return { status: 'no_date' }
     return { status: 'found', event, date, sourceUrl: cleanSourceUrl(parsed.source_url) }
   } catch (error) {
-    if (signal?.aborted) return { status: 'unavailable' }
+    if (signal?.aborted) return { status: 'unavailable', reason: 'cancelled' }
+    // Our own timer is the only other abort source.
+    const reason: UnavailableReason = controller.signal.aborted ? 'timeout' : 'error'
     // Swallowed: the degrade path is the draft as it was, with its "assumed" warning.
-    log.warn({ err: error }, 'Grounded date lookup failed; keeping the assumed date')
-    return { status: 'unavailable' }
+    log.warn(
+      { reason, elapsedMs: Date.now() - started, ...(reason === 'error' ? { err: error } : {}) },
+      'Grounded date lookup failed; keeping the assumed date',
+    )
+    return { status: 'unavailable', reason }
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', onCallerAbort)
