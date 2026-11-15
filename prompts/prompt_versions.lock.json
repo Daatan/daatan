@@ -58,9 +58,9 @@
       "schema_chars": null
     },
     "express-prediction": {
-      "version": "v10",
-      "hash": "2e8a96de088122ba",
-      "chars": 10647,
+      "version": "v11",
+      "hash": "6f687860837f0936",
+      "chars": 11739,
       "schema": "expressPredictionSchema",
       "schema_hash": "5cfec4f1255aef42",
       "schema_chars": 2266
