@@ -71,7 +71,7 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
-import { GET, POST, CONTEXT_SEARCH_WINDOW_DAYS, CONTEXT_SEARCH_MIN_RESULTS } from '../route'
+import { GET, POST, CONTEXT_SEARCH_WINDOW_DAYS, CONTEXT_SEARCH_MIN_RESULTS, CONTEXT_SEARCH_WIDEN_BELOW, CONTEXT_SEARCH_WIDE_WINDOW_DAYS } from '../route'
 import {
   getContextTimeline,
   getForecastForContextUpdate,
@@ -328,6 +328,77 @@ describe('POST /api/forecasts/[id]/context', () => {
       expect(CONTEXT_SEARCH_MIN_RESULTS).toBeGreaterThan(0)
       expect(options?.minResults).toBe(CONTEXT_SEARCH_MIN_RESULTS)
       expect(options?.minResults).toBeLessThanOrEqual(limit as number)
+    })
+
+    describe('widening a near-empty window (daatan#2210)', () => {
+      const THIRD = { title: 'C', url: 'https://c.com/3', snippet: 's3', source: 'c.com', publishedDate: '2026-07-01' }
+      const OLDER = { title: 'D', url: 'https://d.com/4', snippet: 's4', source: 'd.com', publishedDate: '2026-06-20' }
+
+      it('does not widen when the narrow window has enough hits', async () => {
+        vi.mocked(oracleSearch).mockResolvedValue([...SEARCH_RESULTS, THIRD] as never)
+        vi.mocked(claimArticlesForExtraction).mockResolvedValue([
+          { result: 'claimed', articleId: 'row-1' },
+          { result: 'claimed', articleId: 'row-2' },
+          { result: 'claimed', articleId: 'row-3' },
+        ])
+        expect(SEARCH_RESULTS.length + 1).toBeGreaterThanOrEqual(CONTEXT_SEARCH_WIDEN_BELOW)
+
+        await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+        expect(oracleSearch).toHaveBeenCalledTimes(1)
+      })
+
+      it('runs one bounded wider search and appends only new URLs after the narrow hits', async () => {
+        vi.mocked(oracleSearch)
+          .mockResolvedValueOnce([SEARCH_RESULTS[0]] as never)
+          .mockResolvedValueOnce([SEARCH_RESULTS[0], OLDER] as never)
+        const before = Date.now()
+
+        await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+        expect(oracleSearch).toHaveBeenCalledTimes(2)
+        const [, , wideOptions] = vi.mocked(oracleSearch).mock.calls[1]
+        const ageMs = before - (wideOptions?.dateFrom as Date).getTime()
+        const wideMs = CONTEXT_SEARCH_WIDE_WINDOW_DAYS * 24 * 60 * 60 * 1000
+        expect(ageMs).toBeGreaterThanOrEqual(wideMs - 1)
+        expect(ageMs).toBeLessThan(wideMs + 5_000)
+        expect(wideOptions?.minResults).toBe(CONTEXT_SEARCH_MIN_RESULTS)
+
+        const [, articles] = vi.mocked(claimArticlesForExtraction).mock.calls[0]
+        expect(articles.map((a: { url: string }) => a.url)).toEqual(['https://a.com/1', 'https://d.com/4'])
+      })
+
+      it('widens an empty narrow window instead of failing', async () => {
+        vi.mocked(oracleSearch)
+          .mockResolvedValueOnce([] as never)
+          .mockResolvedValueOnce([OLDER] as never)
+
+        const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+
+        expect(res.status).toBe(200)
+        await collectDoneEvent(res)
+        expect(oracleSearch).toHaveBeenCalledTimes(2)
+      })
+
+      it('keeps the narrow hits when the wider search fails', async () => {
+        vi.mocked(oracleSearch)
+          .mockResolvedValueOnce([SEARCH_RESULTS[0]] as never)
+          .mockRejectedValueOnce(new Error('search down'))
+
+        await collectDoneEvent(await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) }))
+
+        const [, articles] = vi.mocked(claimArticlesForExtraction).mock.calls[0]
+        expect(articles.map((a: { url: string }) => a.url)).toEqual(['https://a.com/1'])
+      })
+
+      it('still answers 503 when both windows are empty', async () => {
+        vi.mocked(oracleSearch).mockResolvedValue([] as never)
+
+        const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'pred-1' }) })
+
+        expect(res.status).toBe(503)
+        expect(oracleSearch).toHaveBeenCalledTimes(2)
+      })
     })
 
     it('releases the claims the Oracul omitted after pooling a successful run', async () => {
