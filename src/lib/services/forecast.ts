@@ -77,6 +77,8 @@ type CommitmentStats = {
   noCu: number
   optionCounts: Map<string, number>
   userHasCommitted: boolean
+  /** The viewer's own commitment (daatan#2202): -100..100 confidence and picked option. */
+  userCommitment: { cuCommitted: number; optionId: string | null } | null
 }
 
 const EMPTY_COMMITMENT_STATS: CommitmentStats = {
@@ -86,6 +88,7 @@ const EMPTY_COMMITMENT_STATS: CommitmentStats = {
   noCu: 0,
   optionCounts: new Map(),
   userHasCommitted: false,
+  userCommitment: null,
 }
 
 // Aggregates commitment stats DB-side instead of fetching every commitment row
@@ -131,7 +134,7 @@ async function getCommitmentStats(
     userId
       ? prisma.commitment.findMany({
           where: { predictionId: { in: predictionIds }, userId },
-          select: { predictionId: true },
+          select: { predictionId: true, cuCommitted: true, optionId: true },
         })
       : Promise.resolve([]),
   ])
@@ -155,7 +158,9 @@ async function getCommitmentStats(
   }
   for (const row of userCommitted) {
     const entry = stats.get(row.predictionId)
-    if (entry) entry.userHasCommitted = true
+    if (!entry) continue
+    entry.userHasCommitted = true
+    entry.userCommitment = { cuCommitted: row.cuCommitted, optionId: row.optionId }
   }
 
   return stats
@@ -193,12 +198,30 @@ export async function listForecasts(query: ListForecastsQuery) {
   }
 }
 
+/**
+ * What the viewer forecast, for the card (daatan#2202): binary → their P(YES) in percent,
+ * on the same (cuCommitted + 100) / 200 scale as the community figure beside it;
+ * option-based → the picked option's text.
+ */
+export function toUserForecast(
+  outcomeType: string,
+  commitment: CommitmentStats['userCommitment'],
+  options: { id: string; text: string }[] | undefined,
+): { probability: number | null; optionText: string | null } | null {
+  if (!commitment) return null
+  if (outcomeType === 'BINARY') {
+    return { probability: Math.round((commitment.cuCommitted + 100) / 2), optionText: null }
+  }
+  const option = options?.find((o) => o.id === commitment.optionId)
+  return option ? { probability: null, optionText: option.text } : null
+}
+
 export function enrichPredictions(
   predictions: Awaited<ReturnType<typeof listForecasts>>['predictions'],
   query: Pick<ListForecastsQuery, 'page' | 'limit' | 'sortOrder' | 'isCuSort'>,
 ) {
   const enriched = predictions.map(({ commitmentStats, ...pred }) => {
-    const { totalCuCommitted, avgCuCommitted, yesCu, noCu, optionCounts, userHasCommitted } = commitmentStats
+    const { totalCuCommitted, avgCuCommitted, yesCu, noCu, optionCounts, userHasCommitted, userCommitment } = commitmentStats
 
     // communityProbability(commits) averages (cuCommitted+100)/200 per commit — a
     // linear transform, so plugging the DB-computed avg into the same formula is
@@ -216,6 +239,7 @@ export function enrichPredictions(
       ...pred,
       totalCuCommitted,
       userHasCommitted,
+      userForecast: toUserForecast(pred.outcomeType, userCommitment, pred.options),
       yesCount: yesCu,
       noCount: noCu,
       communityProbability: communityProb,

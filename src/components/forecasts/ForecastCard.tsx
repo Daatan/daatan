@@ -75,6 +75,7 @@ export type Prediction = {
   }
   totalCuCommitted?: number
   userHasCommitted?: boolean
+  userForecast?: { probability: number | null; optionText: string | null } | null
   yesCount?: number
   noCount?: number
   communityProbability?: number | null
@@ -611,11 +612,17 @@ export default function ForecastCard({
               "you committed" indicator remains down here. */}
           {prediction.userHasCommitted && (
             <div
-              className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-[10px] font-medium"
+              className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-xs font-semibold max-w-[14rem]"
               title={t('committedTooltip')}
             >
-              <CheckCircle2 className="w-3 h-3" />
-              <span>{t('committedLabel')}</span>
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate" dir="auto">
+                {prediction.userForecast?.probability != null
+                  ? t('yourForecastLabel', { value: `${prediction.userForecast.probability}%` })
+                  : prediction.userForecast?.optionText
+                    ? t('yourForecastLabel', { value: prediction.userForecast.optionText })
+                    : t('committedLabel')}
+              </span>
             </div>
           )}
         </div>

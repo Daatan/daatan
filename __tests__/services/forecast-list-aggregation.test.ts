@@ -128,6 +128,32 @@ describe('listForecasts + enrichPredictions — DB-side commitment aggregation',
     )
   })
 
+  it("returns the viewer's own forecast: binary percent, picked option text (daatan#2202)", async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { listForecasts, enrichPredictions } = await import('@/lib/services/forecast')
+
+    vi.mocked(prisma.prediction.findMany).mockResolvedValue([
+      basePrediction({ id: 'bin' }),
+      basePrediction({ id: 'mc', outcomeType: 'MULTIPLE_CHOICE', options: [{ id: 'o1', text: 'Likud' }, { id: 'o2', text: 'Yesh Atid' }] }),
+      basePrediction({ id: 'none' }),
+    ] as any)
+    vi.mocked(prisma.commitment.groupBy).mockResolvedValue([] as any)
+    vi.mocked(prisma.commitment.findMany).mockResolvedValue([
+      { predictionId: 'bin', cuCommitted: 40, optionId: null },
+      { predictionId: 'mc', cuCommitted: 10, optionId: 'o2' },
+    ] as any)
+
+    const { predictions } = await listForecasts({
+      where: {}, orderBy: { createdAt: 'desc' }, page: 1, limit: 20, isCuSort: false, sortOrder: 'desc',
+      userId: 'user-1',
+    })
+    const result = enrichPredictions(predictions, { page: 1, limit: 20, sortOrder: 'desc', isCuSort: false })
+
+    expect(result.find(p => p.id === 'bin')?.userForecast).toEqual({ probability: 70, optionText: null })
+    expect(result.find(p => p.id === 'mc')?.userForecast).toEqual({ probability: null, optionText: 'Yesh Atid' })
+    expect(result.find(p => p.id === 'none')?.userForecast).toBeNull()
+  })
+
   it('skips the userHasCommitted lookup entirely when no userId is given (SSR path)', async () => {
     const { prisma } = await import('@/lib/prisma')
     const { listForecasts } = await import('@/lib/services/forecast')
