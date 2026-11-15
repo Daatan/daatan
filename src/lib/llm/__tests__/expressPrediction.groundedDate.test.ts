@@ -128,7 +128,7 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
 
   it.each(['explicit_in_claim', 'from_sources'])('aborts the speculative lookup when the first draft reports %s', async basis => {
     mockDrafts({ ...BASE, dateBasis: basis })
-    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable' })
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable', reason: 'cancelled' })
 
     const result = await generateExpressPrediction('some input')
 
@@ -140,16 +140,20 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
     expect(result.stageTimings).not.toHaveProperty('redraftMs')
   })
 
-  it.each(['no_date', 'unavailable'] as const)('keeps the first draft and its "assumed" warning when the lookup is %s', async status => {
+  it.each([
+    [{ status: 'no_date' } as const, { fired: true, status: 'no_date' }],
+    [{ status: 'unavailable', reason: 'timeout' } as const, { fired: true, status: 'unavailable', reason: 'timeout' }],
+  ])('keeps the first draft and its "assumed" warning when the lookup is %o', async (lookup, outcome) => {
     mockDrafts(BASE)
-    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status })
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue(lookup)
 
     const result = await generateExpressPrediction('some input')
 
     expect(draftPrompts()).toHaveLength(1)
     expect(result.dateBasis).toBe('assumed')
     expect(result.resolveByDatetime).toBe(BASE.resolveByDatetime)
-    expect(result.groundedDate).toEqual({ fired: true, status })
+    // daatan#2199: the unavailable reason is recorded with the attempt
+    expect(result.groundedDate).toEqual(outcome)
     expect(result.stageTimings).toHaveProperty('lookupMs')
     expect(result.stageTimings).not.toHaveProperty('redraftMs')
   })
@@ -188,7 +192,7 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
   it('still propagates a failure of the first draft — there is nothing to fall back to', async () => {
     mockDrafts(new Error('all providers failed'))
 
-    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable' })
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue({ status: 'unavailable', reason: 'cancelled' })
 
     await expect(generateExpressPrediction('some input')).rejects.toThrow('all providers failed')
     // the speculative lookup was already running; it's aborted, not left to finish
