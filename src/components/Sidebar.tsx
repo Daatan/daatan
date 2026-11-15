@@ -158,20 +158,13 @@ const Sidebar = () => {
     ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
     : navItems
 
-  // Filter nav items based on auth status (only after mount to avoid hydration mismatch)
+  // Filter nav items based on auth status (only after mount to avoid hydration mismatch).
+  // /activity is public but hidden from guests (daatan#2201): at current traffic it reads
+  // as an empty room, which is the wrong first impression.
+  const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments', '/activity']
   const filteredNavItems = hasMounted
-    ? editionNavItems.filter((item) => {
-      const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
-      if (authRequiredRoutes.includes(item.href)) {
-        return status === 'authenticated'
-      }
-      return true
-    })
-    : editionNavItems.filter((item) => {
-      // During SSR/pre-mount, show all non-auth routes
-      const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
-      return !authRequiredRoutes.includes(item.href)
-    })
+    ? editionNavItems.filter((item) => !authRequiredRoutes.includes(item.href) || status === 'authenticated')
+    : editionNavItems.filter((item) => !authRequiredRoutes.includes(item.href))
 
   const currentLocale = useLocale()
 
