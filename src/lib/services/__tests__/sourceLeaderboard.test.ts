@@ -375,6 +375,32 @@ describe('per-topic board (#1917)', () => {
   })
 })
 
+describe('rows hidden by the sample-size floor (#2179)', () => {
+  it('counts the authors and outlets the floor leaves off, after merging', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 4,
+      authors: [
+        entry({ author: 'Big One', outlet_name: 'big.com', predictions: 5 }),
+        entry({ author: 'Small One', outlet_name: 'big.com', predictions: 1 }),
+        entry({ author: 'Lone', outlet_name: 'small.com', predictions: 2 }),
+        entry({ author: 'Other', outlet_name: 'small.com', predictions: 1 }),
+      ],
+    })
+    const r = await getSourceLeaderboard('authors', 'skillConservative', 4)
+    expect(r.authorRows.map(a => a.author)).toEqual(['Big One'])
+    expect(r.outletRows.map(o => o.outletName)).toEqual(['big.com'])
+    expect(r).toMatchObject({ minPredictions: 4, hiddenAuthors: 3, hiddenOutlets: 1 })
+  })
+
+  it('hides nothing without a floor', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 1,
+      authors: [entry({ author: 'Lone', outlet_name: 'small.com', predictions: 1 })],
+    })
+    expect(await getSourceLeaderboard('authors')).toMatchObject({ hiddenAuthors: 0, hiddenOutlets: 0 })
+  })
+})
+
 describe('desk bylines: newsroom, agency or the outlet itself (#1904 item 3)', () => {
   it('recognises agencies, newsroom credits and an outlet named in another script', () => {
     for (const b of ['Reuters', 'News Agencies', 'JPOST EDITORIAL', 'Times of Israel Staff', 'מערכת וואלה', 'الجزيرة نت', 'חדשות סרוגים']) {

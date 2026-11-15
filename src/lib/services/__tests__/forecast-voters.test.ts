@@ -30,6 +30,9 @@ function mockScoredAuthors(pairs: Array<{ author: string; outletName: string }>)
   mockLeaderboard.mockResolvedValue({
     view: 'authors',
     sortBy: 'skillConservative',
+    minPredictions: 0,
+    hiddenAuthors: 0,
+    hiddenOutlets: 0,
     authorRows: pairs.map((p, i) => ({
       id: `row-${i}`, author: p.author, outletName: p.outletName,
       skillConservative: 0.1, brierScore: 0.2, predictions: 3, articles: 5,

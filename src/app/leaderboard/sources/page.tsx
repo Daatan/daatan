@@ -55,6 +55,8 @@ export default function SourceLeaderboardPage() {
 
   const [authorRows, setAuthorRows] = useState<AuthorLeaderboardRow[]>([])
   const [outletRows, setOutletRows] = useState<OutletLeaderboardRow[]>([])
+  // Scored rows the sample-size floor kept off this view (daatan#2179).
+  const [hidden, setHidden] = useState<{ authors: number; outlets: number; min: number }>({ authors: 0, outlets: 0, min: 0 })
   const loadKey = `${view}|${tag ?? ''}`
   const [loadedKey, setLoadedKey] = useState<string | null>(null)
   const isLoading = loadedKey !== loadKey
@@ -68,6 +70,7 @@ export default function SourceLeaderboardPage() {
         if (cancelled) return
         setAuthorRows(data.authorRows ?? [])
         setOutletRows(data.outletRows ?? [])
+        setHidden({ authors: data.hiddenAuthors ?? 0, outlets: data.hiddenOutlets ?? 0, min: data.minPredictions ?? 0 })
       })
       .catch(err => log.error({ err }, 'Failed to fetch source leaderboard'))
       .finally(() => {
@@ -110,6 +113,13 @@ export default function SourceLeaderboardPage() {
         brierScore: r.brierScore,
         predictions: r.predictions,
       }))
+
+  const hiddenCount = view === 'outlets' ? hidden.outlets : hidden.authors
+  const hiddenNote = hiddenCount > 0 && (
+    <p className="text-sm text-gray-500 mt-3">
+      {t(view === 'outlets' ? 'hiddenOutlets' : 'hiddenAuthors', { count: hiddenCount, min: hidden.min })}
+    </p>
+  )
 
   const sign = dir === 'asc' ? 1 : -1
   const sortValue = (r: (typeof rows)[number]): string | number =>
@@ -185,63 +195,69 @@ export default function SourceLeaderboardPage() {
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState
-          icon={<Newspaper className="w-10 h-10" />}
-          title={t('emptyTitle')}
-          description={t('emptyDesc')}
-        />
+        <>
+          <EmptyState
+            icon={<Newspaper className="w-10 h-10" />}
+            title={t('emptyTitle')}
+            description={t('emptyDesc')}
+          />
+          {hiddenNote}
+        </>
       ) : (
-        <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b border-navy-600">
-                <th className="px-4 sm:px-6 py-3 font-medium w-10">#</th>
-                {columns.map(c => {
-                  const active = c.key === sort
-                  const nextDir: SortDir = active ? (dir === 'asc' ? 'desc' : 'asc') : DEFAULT_DIR[c.key]
-                  const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
-                  return (
-                    <th
-                      key={c.key}
-                      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
-                    >
-                      <Link
-                        href={boardHref(view, c.key, nextDir, tag)}
-                        replace
-                        className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
+        <>
+          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-navy-600">
+                  <th className="px-4 sm:px-6 py-3 font-medium w-10">#</th>
+                  {columns.map(c => {
+                    const active = c.key === sort
+                    const nextDir: SortDir = active ? (dir === 'asc' ? 'desc' : 'asc') : DEFAULT_DIR[c.key]
+                    const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
+                    return (
+                      <th
+                        key={c.key}
+                        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
                       >
-                        {c.label}
-                        {active && <Arrow className="w-3 h-3" aria-hidden="true" />}
-                      </Link>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((row, i) => (
-                <tr key={row.id} className="border-b border-navy-600/50 last:border-0">
-                  <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
-                  <td className="px-2 py-3 text-white font-medium">
-                    <Link href={row.href} className="hover:underline hover:text-cyan-300">
-                      {row.primary}
-                    </Link>
-                    {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
-                  </td>
-                  <td className="px-2 py-3 text-gray-400">{row.secondary}</td>
-                  <td className="px-2 py-3 text-right font-mono text-cyan-300">
-                    {row.skillConservative.toFixed(3)}
-                  </td>
-                  <td className={`px-2 py-3 text-right font-mono font-semibold ${brierTone(row.brierScore)}`}>
-                    {row.brierScore.toFixed(3)}
-                  </td>
-                  <td className="px-4 sm:px-6 py-3 text-right text-gray-500">{row.predictions}</td>
+                        <Link
+                          href={boardHref(view, c.key, nextDir, tag)}
+                          replace
+                          className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
+                        >
+                          {c.label}
+                          {active && <Arrow className="w-3 h-3" aria-hidden="true" />}
+                        </Link>
+                      </th>
+                    )
+                  })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sortedRows.map((row, i) => (
+                  <tr key={row.id} className="border-b border-navy-600/50 last:border-0">
+                    <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
+                    <td className="px-2 py-3 text-white font-medium">
+                      <Link href={row.href} className="hover:underline hover:text-cyan-300">
+                        {row.primary}
+                      </Link>
+                      {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
+                    </td>
+                    <td className="px-2 py-3 text-gray-400">{row.secondary}</td>
+                    <td className="px-2 py-3 text-right font-mono text-cyan-300">
+                      {row.skillConservative.toFixed(3)}
+                    </td>
+                    <td className={`px-2 py-3 text-right font-mono font-semibold ${brierTone(row.brierScore)}`}>
+                      {row.brierScore.toFixed(3)}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 text-right text-gray-500">{row.predictions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {hiddenNote}
+        </>
       )}
 
       <p className="text-xs text-gray-600 mt-4 max-w-2xl">{t('footnote')}</p>

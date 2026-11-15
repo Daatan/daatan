@@ -5,7 +5,8 @@ name: Backfill Topic Tags
 # POST /api/admin/forecasts/backfill-tags page by page until nextCursor is null. Idempotent.
 # Auth is the x-cron-secret (BOT_RUNNER_SECRET) header — the secret only lives in the runner.
 #
-# Manual, on-demand: Actions → Backfill Topic Tags → Run workflow.
+# Manual, on-demand: Actions → Backfill Topic Tags → Run workflow. Paced to the Oracul's
+# 60/minute ingest limit, so ~1 minute per 50 forecasts.
 
 on:
   workflow_dispatch:
@@ -54,6 +55,8 @@ jobs:
               echo "✅ Done — $total forecasts re-pushed"
               exit 0
             fi
-            sleep 2
+            # Each forecast is one POST /leaderboard/ingest, which the Oracul limits to 60/minute.
+            # A 50-forecast page per 65 s stays under it; a 2 s gap 429'd the tail (daatan#2179).
+            sleep 65
           done
           echo "⚠️ Hit the page cap after $total forecasts — re-run to repeat from the start (idempotent)"
