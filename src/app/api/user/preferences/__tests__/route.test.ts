@@ -31,41 +31,41 @@ function patchReq(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  findUnique.mockResolvedValue({ showAiPanel: true } as never)
-  update.mockResolvedValue({ showAiPanel: true } as never)
+  findUnique.mockResolvedValue({ showAiPanel: true, feedTags: ['AI'] } as never)
+  update.mockResolvedValue({ showAiPanel: true, feedTags: [] } as never)
 })
 
 describe('GET /api/user/preferences', () => {
-  it("returns the current user's flag, scoped to their own row", async () => {
+  it("returns the current user's preferences, scoped to their own row", async () => {
     const res = await GET(new NextRequest('http://localhost/api/user/preferences'), CTX)
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body).toEqual({ showAiPanel: true })
+    expect(body).toEqual({ showAiPanel: true, feedTags: ['AI'] })
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      select: { showAiPanel: true },
+      select: { showAiPanel: true, feedTags: true },
     })
   })
 
-  it('defaults to false when the row is missing', async () => {
+  it('defaults to false / no tags when the row is missing', async () => {
     findUnique.mockResolvedValue(null as never)
     const res = await GET(new NextRequest('http://localhost/api/user/preferences'), CTX)
-    expect(await res.json()).toEqual({ showAiPanel: false })
+    expect(await res.json()).toEqual({ showAiPanel: false, feedTags: [] })
   })
 })
 
 describe('PATCH /api/user/preferences', () => {
   it('updates only the whitelisted boolean, only for the session user', async () => {
-    update.mockResolvedValue({ showAiPanel: false } as never)
+    update.mockResolvedValue({ showAiPanel: false, feedTags: [] } as never)
     const res = await PATCH(patchReq({ showAiPanel: false }), CTX)
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ showAiPanel: false })
+    expect(await res.json()).toEqual({ showAiPanel: false, feedTags: [] })
     expect(update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: { showAiPanel: false },
-      select: { showAiPanel: true },
+      select: { showAiPanel: true, feedTags: true },
     })
   })
 
@@ -82,5 +82,25 @@ describe('PATCH /api/user/preferences', () => {
 
     expect(update).toHaveBeenCalledTimes(1)
     expect(update.mock.calls[0][0].data).toEqual({ showAiPanel: true })
+  })
+
+  // daatan#2203
+  it('a tags-only PATCH writes only feedTags (deduped), leaving showAiPanel untouched', async () => {
+    const res = await PATCH(patchReq({ feedTags: ['AI', 'Economy', 'AI'] }), CTX)
+    expect(res.status).toBe(200)
+    expect(update.mock.calls[0][0].data).toEqual({ feedTags: ['AI', 'Economy'] })
+  })
+
+  it('accepts an empty list (clearing the remembered filter)', async () => {
+    await PATCH(patchReq({ feedTags: [] }), CTX)
+    expect(update.mock.calls[0][0].data).toEqual({ feedTags: [] })
+  })
+
+  it('400s on bad feedTags or an empty body, writing nothing', async () => {
+    for (const bad of [{ feedTags: 'AI' }, { feedTags: [1] }, { feedTags: [''] }, { feedTags: ['x'.repeat(51)] }, { feedTags: Array(21).fill('AI') }, {}]) {
+      const res = await PATCH(patchReq(bad), CTX)
+      expect(res.status).toBe(400)
+    }
+    expect(update).not.toHaveBeenCalled()
   })
 })

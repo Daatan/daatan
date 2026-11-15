@@ -42,6 +42,9 @@ model User {
   // Off by default: the panel is a hidden source, opt-in per user via Settings. Read
   // server-side in the forecast page loader, so it takes effect without re-login.
   showAiPanel        Boolean @default(false) @map("show_ai_panel")
+  // Remembered home-feed tag filter (daatan#2203). Applied when the feed URL carries no
+  // explicit ?tags=; written only on an explicit tag toggle/clear, never from a URL.
+  feedTags           String[] @default([]) @map("feed_tags")
 
   // Roles
   role UserRole @default(USER)

@@ -1079,6 +1079,11 @@ RESOLVER | APPROVER | ADMIN. Self-hosted edition adds `invites` (SHA-256 of
 the token, single-use via `acceptedAt`) and `settings` (key/value overrides of
 .env — SaaS never writes rows).
 
+`users.feed_tags` (`feedTags String[]`, default `{}`) is the remembered home-feed tag filter
+(daatan#2203). It is written only by `PATCH /api/user/preferences` on an explicit tag toggle or
+clear, and applied by `FeedClient` when the URL carries no `?tags=`. Guests keep the same filter in
+`localStorage` (`daatan_feed_tags`). Unknown tags are dropped on read.
+
 ## Social & i18n
 
 `comments` (threaded via `parentId`, soft-deleted via `deletedAt`),

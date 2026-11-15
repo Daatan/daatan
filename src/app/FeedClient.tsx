@@ -23,6 +23,40 @@ const VALID_STATUSES: FilterStatus[] = ['ACTIVE', 'PENDING', 'RESOLVED', 'CLOSIN
 
 import { STANDARD_TAGS } from '@/lib/constants'
 
+// Remembered tag filter (daatan#2203): guests keep it in localStorage, signed-in users on
+// their account (/api/user/preferences). Written only on an explicit toggle/clear — never
+// from a ?tags= URL, so opening a shared link doesn't overwrite someone's saved topics.
+const FEED_TAGS_STORAGE_KEY = 'daatan_feed_tags'
+
+function knownTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return []
+  return tags.filter((t): t is string => typeof t === 'string' && (STANDARD_TAGS as readonly string[]).includes(t))
+}
+
+function readGuestTags(): string[] {
+  try {
+    return knownTags(JSON.parse(localStorage.getItem(FEED_TAGS_STORAGE_KEY) ?? '[]'))
+  } catch {
+    return []
+  }
+}
+
+function saveRememberedTags(tags: string[], signedIn: boolean) {
+  if (signedIn) {
+    fetch('/api/user/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedTags: tags }),
+    }).catch((err) => log.warn({ err }, 'Failed to save feed tags'))
+    return
+  }
+  try {
+    localStorage.setItem(FEED_TAGS_STORAGE_KEY, JSON.stringify(tags))
+  } catch {
+    // Storage unavailable (private mode, blocked site data) — the filter just isn't remembered.
+  }
+}
+
 interface FeedClientProps {
   initialPredictions?: Prediction[]
 }
@@ -30,7 +64,7 @@ interface FeedClientProps {
 export default function FeedClient({ initialPredictions }: FeedClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const { selfHosted } = useCapabilities()
   // "Needs Review" is the bot-forecast approval queue; bots (and the
   // PENDING_APPROVAL status) don't exist on self-host, so hide the filter there.
@@ -63,6 +97,30 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
   const [sortBy, setSortBy] = useState<SortBy>(initialSort)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialSortOrder)
   const [tagsVisible, setTagsVisible] = useState(selectedTags.length > 0)
+
+  // Restore the remembered tags once, after mount and once the session is known, unless the
+  // URL already names tags. A toggle made while the account fetch is in flight wins.
+  const urlHasTags = searchParams.get('tags') != null
+  const restoreStarted = useRef(false)
+  const userChangedTags = useRef(false)
+  useEffect(() => {
+    if (restoreStarted.current || urlHasTags || sessionStatus === 'loading') return
+    restoreStarted.current = true
+    const apply = (tags: string[]) => {
+      if (userChangedTags.current || tags.length === 0) return
+      setSelectedTags(tags)
+      setTagsVisible(true)
+    }
+    if (sessionStatus === 'authenticated') {
+      fetch('/api/user/preferences', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => apply(knownTags(data?.feedTags)))
+        .catch((err) => log.warn({ err }, 'Failed to load feed tags'))
+    } else {
+      // Browser-only: localStorage is unreadable during SSR, hence an effect.
+      apply(readGuestTags())
+    }
+  }, [urlHasTags, sessionStatus])
 
   // Sync state to URL search params
   const syncToUrl = useCallback((status: FilterStatus, tags: string[], sort: SortBy, order: 'asc' | 'desc') => {
@@ -102,13 +160,17 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
     const newTags = selectedTags.includes(tag)
       ? selectedTags.filter(t => t !== tag)
       : [...selectedTags, tag]
+    userChangedTags.current = true
     setSelectedTags(newTags)
     syncToUrl(filter, newTags, sortBy, sortOrder)
+    saveRememberedTags(newTags, sessionStatus === 'authenticated')
   }
 
   const handleClearTags = () => {
+    userChangedTags.current = true
     setSelectedTags([])
     syncToUrl(filter, [], sortBy, sortOrder)
+    saveRememberedTags([], sessionStatus === 'authenticated')
   }
 
   useEffect(() => {
