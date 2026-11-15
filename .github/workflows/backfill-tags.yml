@@ -6,7 +6,7 @@ name: Backfill Topic Tags
 # Auth is the x-cron-secret (BOT_RUNNER_SECRET) header — the secret only lives in the runner.
 #
 # Manual, on-demand: Actions → Backfill Topic Tags → Run workflow. Paced to the Oracul's
-# 60/minute ingest limit, so ~1 minute per 50 forecasts.
+# 60/minute ingest limit, so ~1 minute per 20 forecasts.
 
 on:
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
           for i in $(seq 1 200); do
             BODY=$(curl -s --max-time 180 -X POST \
               -H "x-cron-secret: $BOT_RUNNER_SECRET" \
-              "$BASE/api/admin/forecasts/backfill-tags?limit=50${after:+&after=$after}") || BODY=""
+              "$BASE/api/admin/forecasts/backfill-tags?limit=20${after:+&after=$after}") || BODY=""
             echo "page $i: ${BODY:-<no response>}"
             N=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['processed'])" 2>/dev/null || echo ERR)
             if [ "$N" = "ERR" ]; then echo "❌ bad response — aborting (re-run resumes safely)"; exit 1; fi
@@ -55,8 +55,9 @@ jobs:
               echo "✅ Done — $total forecasts re-pushed"
               exit 0
             fi
-            # Each forecast is one POST /leaderboard/ingest, which the Oracul limits to 60/minute.
-            # A 50-forecast page per 65 s stays under it; a 2 s gap 429'd the tail (daatan#2179).
+            # Each forecast is one POST /leaderboard/ingest, limited by the Oracul to 60/minute per
+            # client IP — a budget the app's other ingest traffic shares. 50-forecast pages 429'd
+            # their tail even 65 s apart (daatan#2179); 20 per page leaves headroom.
             sleep 65
           done
           echo "⚠️ Hit the page cap after $total forecasts — re-run to repeat from the start (idempotent)"
