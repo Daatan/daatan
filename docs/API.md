@@ -416,10 +416,14 @@ Upload avatar image. Accepts multipart form with `file` field.
 Set preferred display language.
 
 ### `GET|PATCH /api/user/preferences` — Auth
-Chart/display preferences. Currently one whitelisted boolean: `showAiPanel`
-(the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8). PATCH body
-`{ showAiPanel: boolean }`, 400 on anything else; nothing here can touch
-scoring, roles, or profile identity.
+Display preferences. GET returns `{ showAiPanel, feedTags }`.
+
+- `showAiPanel` (boolean) is the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8.
+- `feedTags` (string[], ≤ 20 tags, each 1–50 chars) is the remembered home-feed tag filter
+  (daatan#2203). It is deduped on write, and `[]` clears it.
+
+PATCH accepts either field or both, and writes only the fields that were sent. It returns 400 on an
+empty body or a bad value. Nothing here can touch scoring, roles, or profile identity.
 
 ---
 

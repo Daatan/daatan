@@ -29,7 +29,16 @@ export const suggestTagsBodySchema = z.object({
 const runMode = z.enum(['dry-run', 'apply'])
 
 /** PATCH /api/user/preferences. */
-export const userPreferencesSchema = z.object({ showAiPanel: z.boolean() })
+export const FEED_TAGS_MAX = 20
+
+export const userPreferencesSchema = z
+  .object({
+    showAiPanel: z.boolean().optional(),
+    feedTags: z.array(z.string().trim().min(1).max(50)).max(FEED_TAGS_MAX).optional(),
+  })
+  .refine((b) => b.showAiPanel !== undefined || b.feedTags !== undefined, {
+    message: 'Nothing to update',
+  })
 
 /** POST /api/cron/requote. Empty `archetypes` is a deliberate no-op (see requote.yml). */
 export const requoteBodySchema = z.object({
