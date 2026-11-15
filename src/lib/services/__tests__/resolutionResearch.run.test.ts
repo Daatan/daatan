@@ -208,6 +208,18 @@ describe('per-condition verdicts (#2180)', () => {
     expect(res.conditions).toEqual([])
   })
 
+  it('flags settlement assertions on both sides of the pool', async () => {
+    const { getPoolArticlesForResearch } = await import('@/lib/services/evidence-pool')
+    const row = (stance: number, settled: boolean) => ({ url: `https://p/${stance}`, title: 't', source: 's', publishedDate: null, stance, settled, settlementEventDate: null, evidenceClass: null, claimsDetail: null })
+    respond({ outcome: 'wrong' })
+
+    vi.mocked(getPoolArticlesForResearch).mockResolvedValueOnce([row(-1, true), row(1, true), row(0.4, false)] as never)
+    expect((await runResolutionResearch(prediction, { userId: 'u1' })).settlementConflict).toBe(true)
+
+    vi.mocked(getPoolArticlesForResearch).mockResolvedValueOnce([row(1, true), row(-0.6, false)] as never)
+    expect((await runResolutionResearch(prediction, { userId: 'u1' })).settlementConflict).toBeUndefined()
+  })
+
   it('passes the resolution rules to query generation', async () => {
     const { fillPrompt } = await import('@/lib/llm/bedrock-prompts')
     respond({ outcome: 'wrong' })

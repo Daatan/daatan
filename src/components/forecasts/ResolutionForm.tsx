@@ -30,6 +30,19 @@ function saveResearchTimings(timings: { searchMs: number; llmMs: number }) {
   } catch { /* storage full or private mode */ }
 }
 
+type AiCondition = { condition: string; status: 'met' | 'failed' | 'unconfirmed'; evidence?: string }
+
+/** daatan#2180: a verdict shown as advice only, with nothing preselected. */
+interface AiCaution {
+  suggested: string
+  reasoning: string
+  conditions: AiCondition[]
+  unconfirmed: boolean
+  conflict: boolean
+}
+
+const CONDITION_LABEL: Record<AiCondition['status'], string> = { met: '✓ met', failed: '✗ failed', unconfirmed: '? unconfirmed' }
+
 interface ResolutionFormProps {
   predictionId: string
   outcomeType: string
@@ -50,6 +63,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
   const [pinAcknowledged, setPinAcknowledged] = useState(false)
   const [earlyAcknowledged, setEarlyAcknowledged] = useState(false)
   const [prematureNote, setPrematureNote] = useState<string | null>(null)
+  const [aiCaution, setAiCaution] = useState<AiCaution | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResearching, setIsResearching] = useState(false)
   const [researchStep, setResearchStep] = useState<'searching' | 'analyzing' | null>(null)
@@ -87,6 +101,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
     setResearchStep('searching')
     setError(null)
     setPrematureNote(null)
+    setAiCaution(null)
 
     researchTimers.current = [
       setTimeout(() => setResearchStep('analyzing'), timings.searchMs),
@@ -110,6 +125,18 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       // preselect anything the resolver could confirm by reflex.
       if (data.premature) {
         setPrematureNote(data.reasoning)
+        return
+      }
+      // daatan#2180: a condition the AI could not confirm, or settlement claims
+      // on both sides of the pool — show the verdict, preselect nothing.
+      if (data.unconfirmedConditions || data.settlementConflict) {
+        setAiCaution({
+          suggested: data.outcome,
+          reasoning: data.reasoning,
+          conditions: data.conditions ?? [],
+          unconfirmed: Boolean(data.unconfirmedConditions),
+          conflict: Boolean(data.settlementConflict),
+        })
         return
       }
       setOutcome(data.outcome)
@@ -248,6 +275,35 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
             Too early to resolve{deadlineLabel ? ` — deadline is ${deadlineLabel}` : ''}
           </div>
           <p className="text-sm text-text-secondary">{prematureNote}</p>
+        </div>
+      )}
+
+      {aiCaution && (
+        <div className="p-4 border border-amber-500/30 rounded-xl bg-navy-700 space-y-2" data-testid="ai-caution-banner">
+          <div className="flex items-start gap-2 text-sm font-medium text-amber-300">
+            <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              {aiCaution.unconfirmed
+                ? 'AI Assist could not confirm every condition. Nothing is preselected.'
+                : `AI Assist suggests "${aiCaution.suggested}". Nothing is preselected.`}
+            </span>
+          </div>
+          {aiCaution.conflict && (
+            <p className="text-sm text-amber-200">
+              The evidence pool has settlement claims on both sides. Check what each one says before resolving.
+            </p>
+          )}
+          {aiCaution.conditions.length > 0 && (
+            <ul className="text-sm text-text-secondary space-y-1">
+              {aiCaution.conditions.map((c, i) => (
+                <li key={i}>
+                  <span className="font-medium">{CONDITION_LABEL[c.status]}</span>: {c.condition}
+                  {c.evidence ? <span className="text-text-subtle"> ({c.evidence})</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-sm text-text-secondary">{aiCaution.reasoning}</p>
         </div>
       )}
 
