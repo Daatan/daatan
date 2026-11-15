@@ -58,6 +58,7 @@ const REQUIRED_CSP_ORIGINS = [
   'https://fonts.gstatic.com',           // Google Fonts files
   'https://lh3.googleusercontent.com',   // Google OAuth avatars
   'https://www.google-analytics.com',    // GA beacons
+  'https://geo.lipu.dev',                // consent-banner region check
   'https://www.google.com',              // GA4 GTM server-side beacon endpoint
 ]
 

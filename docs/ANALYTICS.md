@@ -1,6 +1,6 @@
 # Analytics
 
-Google Analytics 4 with GDPR/CCPA consent mode. Data is only sent after explicit user acceptance; declining keeps the site fully functional.
+Google Analytics 4 with consent mode, gated by region. In the EU/EEA, the UK and Switzerland (and whenever the region can't be determined) analytics cookies are set only after the visitor accepts the banner. Elsewhere analytics is on by default, a one-time notice says so, and the visitor can opt out. Declining keeps the site fully functional. There has been no legal review of the region split.
 
 ## Environment variables
 
@@ -15,7 +15,8 @@ Google Analytics 4 with GDPR/CCPA consent mode. Data is only sent after explicit
 ## Key files
 
 - `src/components/GoogleAnalytics.tsx` — renders the three GA scripts
-- `src/components/CookieConsent.tsx` — GDPR banner; reads/writes `daatan_analytics_consent` in localStorage
+- `src/components/CookieConsent.tsx` — banner (opt-in regions) or notice (elsewhere); reads/writes `daatan_analytics_consent` and `daatan_analytics_notice_seen` in localStorage
+- `src/lib/consent-region.ts` — the geo.lipu.dev region check constants (Worker source: `komapc/lipu-hub`, `geo/worker.js`; `connect-src` in `infra/nginx/*.conf` must allow it)
 - `src/components/AnalyticsUserSync.tsx` — associates the authenticated user ID with the GA session via `gtag('set', { user_id })`
 - `src/lib/analytics.ts` — `trackEvent()` wrapper + named events (`analytics.forecastCreated`, etc.)
 
@@ -24,11 +25,12 @@ Google Analytics 4 with GDPR/CCPA consent mode. Data is only sent after explicit
 1. **Page load** — the consent script runs `beforeInteractive` (injected into `<head>`, blocks parse). It reads `localStorage` synchronously:
    - Key present and `'granted'` → sets `analytics_storage: 'granted'` immediately
    - Key present and `'denied'` → sets `analytics_storage: 'denied'` immediately, no wait
-   - Key absent (new visitor) → sets `analytics_storage: 'denied'` with `wait_for_update: 500`
+   - Key absent (new visitor) → sets `analytics_storage: 'denied'` with `wait_for_update: 1500`, and starts a `fetch` to `https://geo.lipu.dev/` (1.5 s timeout), storing the promise on `window.__daatanConsentNotRequired`. Only a literal `{"consentRequired": false}` resolves it `true`, and then the script itself calls `gtag('consent', 'update', { analytics_storage: 'granted' })`. Errors, timeouts and CSP blocks resolve `false`: denied, banner shown (the old behaviour).
 2. **GA library** loads `afterInteractive` and processes the already-established consent state.
-3. **New visitor** — `CookieConsent` banner appears. Accept → `gtag('consent', 'update', { analytics_storage: 'granted' })` + persists to localStorage. Decline → persists `'denied'`, banner disappears.
+3. **New visitor, opt-in region** — `CookieConsent` banner appears. Accept → `gtag('consent', 'update', { analytics_storage: 'granted' })` + persists to localStorage. Decline → persists `'denied'`, banner disappears.
+   **New visitor, other region** — analytics is already granted; a notice with **OK** / **Opt out** appears once. OK stores only `daatan_analytics_notice_seen`; the implied grant is never written to `daatan_analytics_consent`, so it is re-checked against the region on every visit. Opt out stores `'denied'`.
 4. **Returning visitor** — consent applied synchronously in step 1; banner not shown again unless reopened.
-5. **Changing the choice** — the "Cookie settings" link in the home-v5 footer (`src/components/CookieSettingsLink.tsx`) dispatches `daatan:open-cookie-settings` (`COOKIE_SETTINGS_EVENT`), which reopens the banner; declining there also revokes an earlier grant (#1935).
+5. **Changing the choice** — the "Cookie settings" link in the home-v5 footer (`src/components/CookieSettingsLink.tsx`) dispatches `daatan:open-cookie-settings` (`COOKIE_SETTINGS_EVENT`), which reopens the full Accept/Decline banner; declining there also revokes an earlier grant (#1935) and deletes the `_ga*` cookies. The same link sits in Privacy Policy §5. `/privacy` is linked from the home footer, About, sign-in/sign-up and the banner/notice itself — not from every page.
 
 The `beforeInteractive` strategy guarantees consent is set before the GA library runs — no race condition is possible.
 
@@ -45,7 +47,7 @@ All events are no-ops when GA isn't loaded or consent is denied — `trackEvent(
 
 ## GA console setup (required)
 
-**Consent Mode modeling must be enabled** or declined users are invisible in reports entirely (zero data, not estimates).
+**Consent Mode modeling must be enabled** or declined users are invisible in reports entirely (zero data, not estimates). Modeling also needs roughly 1,000 denied events a day for 7 days, which Daatan's opt-in-region traffic does not reach, so those visitors are simply missing from reports.
 
 For each property (`G-XZWVJM9KH4` prod, `G-Z4XXM7GYHW` staging):
 > analytics.google.com → Admin → Data collection and modification → Data collection → **Consent mode** → Enable

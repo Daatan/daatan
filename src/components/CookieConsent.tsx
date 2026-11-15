@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
+import { consentNotRequired } from '@/lib/consent-region'
 
 const STORAGE_KEY = 'daatan_analytics_consent'
+/** Set once the no-banner-region notice has been acknowledged; not a consent record. */
+const NOTICE_KEY = 'daatan_analytics_notice_seen'
 /** Dispatched on window by the footer "Cookie settings" link to re-open the banner. */
 export const COOKIE_SETTINGS_EVENT = 'daatan:open-cookie-settings'
 
@@ -35,17 +38,40 @@ function applyConsent(value: ConsentValue) {
     analytics_storage: value,
     ad_storage: 'denied', // we never use ads
   })
+  if (value === 'denied') clearGaCookies()
 }
 
+/** GA keeps its cookies after consent is withdrawn; drop them so opting out is complete. */
+function clearGaCookies() {
+  const host = window.location.hostname
+  const domains = ['', `; domain=${host}`, `; domain=.${host}`, `; domain=.${host.split('.').slice(-2).join('.')}`]
+  for (const part of document.cookie.split(';')) {
+    const name = part.split('=')[0].trim()
+    if (!name.startsWith('_ga')) continue
+    for (const d of domains) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${d}`
+    }
+  }
+}
+
+function noticeSeen(): boolean {
+  try { return localStorage.getItem(NOTICE_KEY) !== null } catch { return false }
+}
+
+type Mode = 'banner' | 'notice'
+
 /**
- * Shows a minimal GDPR/CCPA consent banner on first visit.
- * - Sets gtag consent to 'denied' by default (done in GoogleAnalytics.tsx).
- * - On accept: updates consent to 'granted' and persists to localStorage.
- * - On decline: persists 'denied', banner disappears.
- * - On subsequent visits: reads from localStorage and applies silently.
+ * Analytics consent UI. Consent defaults to 'denied' (GoogleAnalytics.tsx).
+ * - Stored choice: applied silently, nothing shown.
+ * - No choice, region needs opt-in (EU/EEA/UK/CH, or the geo check failed):
+ *   'banner' — Accept / Decline; nothing is collected until Accept.
+ * - No choice, region needs no opt-in: the consent script has already granted
+ *   analytics; 'notice' says so once, with an Opt out button. The implied grant
+ *   is not stored, so it is re-checked on every visit.
+ * - The footer "Cookie settings" link always opens the full banner.
  */
 export default function CookieConsent() {
-  const [visible, setVisible] = useState(false)
+  const [mode, setMode] = useState<Mode | null>(null)
   const declineRef = useRef<HTMLButtonElement & HTMLAnchorElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
@@ -56,9 +82,14 @@ export default function CookieConsent() {
       applyConsent(stored)
       return
     }
-    previouslyFocused.current = document.activeElement as HTMLElement | null
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage after mount; must stay out of SSR/hydration
-    setVisible(true)
+    let cancelled = false
+    consentNotRequired().then((notRequired) => {
+      if (cancelled || getStoredConsent() !== null) return
+      if (notRequired && noticeSeen()) return
+      previouslyFocused.current = document.activeElement as HTMLElement | null
+      setMode(notRequired ? 'notice' : 'banner')
+    })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -66,7 +97,7 @@ export default function CookieConsent() {
     // withdrawn as easily as it was given.
     const reopen = () => {
       previouslyFocused.current = document.activeElement as HTMLElement | null
-      setVisible(true)
+      setMode('banner')
     }
     window.addEventListener(COOKIE_SETTINGS_EVENT, reopen)
     return () => window.removeEventListener(COOKIE_SETTINGS_EVENT, reopen)
@@ -77,11 +108,13 @@ export default function CookieConsent() {
     // immediately. Not a focus trap — the banner has no backdrop and doesn't
     // block the rest of the page, so trapping Tab here would hold keyboard
     // users hostage to a decision that mouse users can freely ignore.
-    if (visible) declineRef.current?.focus()
-  }, [visible])
+    // Notice mode doesn't take focus: it asks for nothing, and a stray key
+    // press shouldn't opt the visitor out.
+    if (mode === 'banner') declineRef.current?.focus()
+  }, [mode])
 
   const dismiss = () => {
-    setVisible(false)
+    setMode(null)
     // Return focus to wherever the user was, but only if that element is
     // still attached — a route change while the banner was up could have
     // unmounted it.
@@ -103,7 +136,13 @@ export default function CookieConsent() {
     dismiss()
   }
 
-  if (!visible) return null
+  const handleNoticeOk = () => {
+    try { localStorage.setItem(NOTICE_KEY, '1') } catch { /* ignore */ }
+    dismiss()
+  }
+
+  if (!mode) return null
+  const isNotice = mode === 'notice'
 
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-dismiss listener on the region, catching bubbled keydowns from its content; the region itself isn't made interactive
@@ -111,12 +150,14 @@ export default function CookieConsent() {
       role="region"
       aria-label="Cookie consent"
       aria-describedby="cookie-consent-description"
-      onKeyDown={(e) => { if (e.key === 'Escape') handleDecline() }}
+      onKeyDown={(e) => { if (e.key === 'Escape') (isNotice ? handleNoticeOk : handleDecline)() }}
       className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-navy-700 border-t border-navy-600 shadow-lg"
     >
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <p id="cookie-consent-description" className="flex-1 text-sm text-gray-200">
-          We use analytics cookies to understand how the app is used and improve it.
+          {isNotice
+            ? 'We use Google Analytics cookies to understand how the app is used and improve it. You can opt out at any time.'
+            : 'We use analytics cookies to understand how the app is used and improve it.'}{' '}
           No ads. No cross-site tracking.{' '}
           <Link href="/privacy" className="underline hover:text-white">Privacy Policy</Link>.
         </p>
@@ -127,13 +168,13 @@ export default function CookieConsent() {
             variant="outline"
             size="sm"
           >
-            Decline
+            {isNotice ? 'Opt out' : 'Decline'}
           </Button>
           <Button
-            onClick={handleAccept}
+            onClick={isNotice ? handleNoticeOk : handleAccept}
             size="sm"
           >
-            Accept
+            {isNotice ? 'OK' : 'Accept'}
           </Button>
         </div>
       </div>
