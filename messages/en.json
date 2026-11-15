@@ -354,7 +354,10 @@
       "glickoDesc": "Skill estimate with uncertainty bounds (μ − 3σ). Accounts for how many predictions you have made — rewards consistent accuracy.",
       "weightedPeerScoreTitle": "Weighted Peer Score",
       "weightedPeerScoreDesc": "Metaculus-style time-weighted peer score. Recent predictions count more than older ones (exponential decay, half-weight every ~14 months). Positive = consistently beat the crowd."
-    }
+    },
+    "lowSampleBadge": "low sample",
+    "lowSampleHint": "Fewer than {min} resolved forecasts — too few to rank, the score is mostly noise.",
+    "lowSampleSection": "Not ranked yet: fewer than {min} resolved forecasts"
   },
   "activity": {
     "title": "Activity Feed",

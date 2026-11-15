@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, useCallback, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -8,7 +8,7 @@ import { Trophy, Loader2, Medal, Target, TrendingDown, Swords, Bot, Newspaper, U
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
-import { FETCH_LIMIT, LOWER_IS_BETTER, formatSigned, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
+import { FETCH_LIMIT, LOWER_IS_BETTER, MIN_RANKED_RESOLVED, formatSigned, isLowSample, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
 
 const log = createClientLogger('Leaderboard')
 
@@ -22,7 +22,7 @@ export default function LeaderboardPage() {
 
   const [users, setUsers] = useState<LeaderboardUser[]>([])
   const [tags, setTags] = useState<TagOption[]>([])
-  const [sortBy, setSortBy] = useState<SortBy>('elo')
+  const [sortBy, setSortBy] = useState<SortBy>('brierScore')
   const [sortDir, setSortDir] = useState<SortDir>('best')
   const [selectedTag, setSelectedTag] = useState<string | null>(searchParams.get('tag'))
 
@@ -44,7 +44,8 @@ export default function LeaderboardPage() {
     }
   }
 
-  const rankById = new Map(users.map((u, i) => [u.id, i]))
+  // Rank = position among the users who qualify, in the API's best-first order.
+  const rankById = new Map(users.filter(u => !isLowSample(u)).map((u, i) => [u.id, i]))
   const displayed = orderForDisplay(users, sortBy, sortDir)
 
   const fetchLeaderboardKey = `${sortBy}|${selectedTag}`
@@ -268,18 +269,25 @@ export default function LeaderboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100/10">
-              {displayed.map((user) => { const index = rankById.get(user.id) ?? 0; return (
+              {displayed.map((user, row) => { const index = rankById.get(user.id); const lowSample = index === undefined; return (
+                <Fragment key={user.id}>
+                {lowSample && (row === 0 || !isLowSample(displayed[row - 1])) && (
+                  <tr className="bg-navy-800">
+                    <td colSpan={7} className="px-4 sm:px-6 py-2 text-xs text-gray-500">
+                      {t('lowSampleSection', { min: MIN_RANKED_RESOLVED })}
+                    </td>
+                  </tr>
+                )}
                 <tr
-                  key={user.id}
                   onClick={() => router.push(`/profile/${user.id}`)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/profile/${user.id}`) } }}
                   role="button"
                   tabIndex={0}
-                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''}`}
+                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index !== undefined && index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''} ${lowSample ? 'opacity-70' : ''}`}
                 >
                   <td className="px-1 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-center">
-                      {getRankIcon(index)}
+                      {lowSample ? <span className="text-gray-600" aria-hidden="true">·</span> : getRankIcon(index)}
                     </div>
                   </td>
                   <td className="px-2 sm:px-6 py-3 sm:py-4">
@@ -294,6 +302,14 @@ export default function LeaderboardPage() {
                       <div className="min-w-0">
                         <p className="font-bold text-white truncate text-sm sm:text-base">
                           {user.name || user.username || 'Anonymous'}
+                          {lowSample && (
+                            <span
+                              className="ms-2 align-middle inline-block px-1.5 py-0.5 rounded bg-navy-600 text-[10px] font-medium text-gray-400"
+                              title={t('lowSampleHint', { min: MIN_RANKED_RESOLVED })}
+                            >
+                              {t('lowSampleBadge')}
+                            </span>
+                          )}
                         </p>
                         {user.username && (
                           <p className="text-xs text-gray-500 truncate">@{user.username}</p>
@@ -337,6 +353,7 @@ export default function LeaderboardPage() {
                     <span className={valueClass('aiScore')}>{formatSigned(user.aiScoreSum)}</span>
                   </td>
                 </tr>
+                </Fragment>
               )})}
             </tbody>
           </table>

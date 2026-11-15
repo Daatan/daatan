@@ -34,12 +34,19 @@ export function sortValue(user: LeaderboardUser, key: SortBy): number | null {
   }
 }
 
-/** Worst first = the ranked users reversed, with unranked (null) users still last. */
+/** Resolved forecasts a user needs before the board ranks them (#2187): with one or two, a lucky
+ *  call tops the Brier column. Users below it are listed after the ranked ones, unnumbered. */
+export const MIN_RANKED_RESOLVED = 5
+
+export const isLowSample = (user: LeaderboardUser) => user.totalResolved < MIN_RANKED_RESOLVED
+
+/** Worst first = the ranked users reversed, with unranked (null) users still last. Low-sample
+ *  users always follow everyone else, in the same order among themselves. */
 export function orderForDisplay(users: LeaderboardUser[], key: SortBy, dir: SortDir): LeaderboardUser[] {
-  if (dir === 'best') return users
-  const ranked = users.filter(u => sortValue(u, key) !== null)
-  const unranked = users.filter(u => sortValue(u, key) === null)
-  return [...ranked].reverse().concat(unranked)
+  const ordered = dir === 'best'
+    ? users
+    : users.filter(u => sortValue(u, key) !== null).reverse().concat(users.filter(u => sortValue(u, key) === null))
+  return ordered.filter(u => !isLowSample(u)).concat(ordered.filter(isLowSample))
 }
 
 export const formatSigned = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(2)}`)
