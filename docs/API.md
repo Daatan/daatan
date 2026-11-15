@@ -256,7 +256,8 @@ AI-assisted resolution research for resolvers. Searches for recent articles abou
   "conditions": [                // daatan#2180: each condition the rules require; [] when the answering provider skipped it
     { "condition": "string", "status": "met", "evidence": "string" }  // status: "met" | "failed" | "unconfirmed"; evidence optional
   ],
-  "unconfirmedConditions": true, // daatan#2180: the model said "correct" for a BINARY forecast with a condition not "met"; outcome is then forced to "unresolvable"
+  "unconfirmedConditions": true, // daatan#2180: the model said "correct" for a BINARY forecast with a condition not "met"; outcome is then forced to "unresolvable", and the form shows the conditions instead of prefilling
+  "settlementConflict": true,    // daatan#2180: the pool rows sent to the model include settlement assertions on both sides; the form shows the verdict as advice instead of prefilling
   "timings": { "searchMs": 8200, "llmMs": 9400, "totalMs": 17600 }
 }
 ```

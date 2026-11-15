@@ -204,6 +204,8 @@ export interface ResolutionResearchResult {
   conditions?: VerdictCondition[]
   /** daatan#2180: the model said `correct` with a condition not met; `guardVerdict` downgraded it. */
   unconfirmedConditions?: boolean
+  /** daatan#2180: the pool context had settlement assertions on both sides, so the form doesn't prefill. */
+  settlementConflict?: boolean
   /** #2096: the verdict came from this fallback leg, not the stage's own model. */
   fallbackProvider?: string
   timings: { searchMs: number; llmMs: number; totalMs: number }
@@ -354,6 +356,8 @@ export async function runResolutionResearch(
   const poolRows = await getPoolArticlesForResearch(prediction.id, POOL_CONTEXT_LIMIT)
     .catch(() => [])
   const poolContext = formatPoolContext(poolRows)
+  const settledStances = poolRows.filter((r) => r.settled && r.stance != null).map((r) => r.stance as number)
+  const settlementConflict = settledStances.some((s) => s > 0) && settledStances.some((s) => s < 0)
 
   // Include options in the prompt if MULTIPLE_CHOICE
   const optionsContext = prediction.outcomeType === 'MULTIPLE_CHOICE'
@@ -401,5 +405,6 @@ export async function runResolutionResearch(
   // prefill it, and bornTrueCheck would alert on it.
   if (parsed.premature) parsed.outcome = 'unresolvable'
   const findings = guardVerdict(parsed, prediction.outcomeType)
+  if (settlementConflict) findings.settlementConflict = true
   return { ...findings, timings: { searchMs, llmMs, totalMs: Date.now() - routeStart } }
 }

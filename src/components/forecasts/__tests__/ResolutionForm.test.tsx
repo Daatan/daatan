@@ -408,5 +408,49 @@ describe('ResolutionForm', () => {
       expect(screen.getByText('Too early: not published yet.')).toBeInTheDocument()
       expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).toBeDisabled()
     })
+
+    it('shows the conditions and preselects nothing when the guard fired (#2180)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          outcome: 'unresolvable',
+          unconfirmedConditions: true,
+          reasoning: 'No House seat count found.',
+          evidenceLinks: ['https://a/1'],
+          conditions: [
+            { condition: 'Senate seat won', status: 'met', evidence: 'AP, 2026-11-04' },
+            { condition: 'Majority of the 38 House seats', status: 'unconfirmed' },
+          ],
+        }),
+      })
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+      fireEvent.click(screen.getByText('AI Assist'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ai-caution-banner')).toHaveTextContent('could not confirm every condition')
+      })
+      const banner = screen.getByTestId('ai-caution-banner')
+      expect(banner).toHaveTextContent('✓ met: Senate seat won (AP, 2026-11-04)')
+      expect(banner).toHaveTextContent('? unconfirmed: Majority of the 38 House seats')
+      expect(banner).toHaveTextContent('No House seat count found.')
+      expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).toBeDisabled()
+    })
+
+    it('warns on settlement claims both ways and preselects nothing (#2180)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ outcome: 'wrong', settlementConflict: true, reasoning: 'House 24-14.', evidenceLinks: [], conditions: [] }),
+      })
+      render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+      fireEvent.click(screen.getByText('AI Assist'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ai-caution-banner')).toHaveTextContent('AI Assist suggests "wrong". Nothing is preselected.')
+      })
+      expect(screen.getByTestId('ai-caution-banner')).toHaveTextContent('settlement claims on both sides')
+      expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).toBeDisabled()
+    })
   })
 })
