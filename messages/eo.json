@@ -354,7 +354,10 @@
       "glickoDesc": "Takso de lerteco kun necerteco. Konsideras kiom da prognozoj vi faris — ju pli, des pli fidinda la takso.",
       "weightedPeerScoreTitle": "Pezita Samula Poentaro",
       "weightedPeerScoreDesc": "Tempopezita samula poentaro: lastatempaj prognozoj pezas pli ol malnovaj (la pezo duoniĝas ĉirkaŭ ĉiujn 14 monatojn)."
-    }
+    },
+    "lowSampleBadge": "malmultaj datumoj",
+    "lowSampleHint": "Malpli ol {min} solvitaj prognozoj — tro malmultaj por rangigo, la poentaro estas ĉefe bruo.",
+    "lowSampleSection": "Ankoraŭ ne rangigitaj: malpli ol {min} solvitaj prognozoj"
   },
   "activity": {
     "title": "Agad-Fluo",
