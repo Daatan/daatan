@@ -17,15 +17,28 @@ export default async function Header({ locale, links, signedIn }: { locale: stri
     { href: links.howItWorks, label: t('howItWorks') },
     { href: links.about, label: t('about') },
   ]
+  // The desktop row is capped at 1144px of content (CONTAINER), so lower-priority links
+  // drop out by breakpoint instead of wrapping to a second row (#2183). Russian labels are
+  // ~20% wider than en/he/eo, so ru gets one tier less. Every link stays in the footer and in
+  // the mobile menu (shown below lg).
+  const compact = locale === 'ru'
+  const desktopVisibility = [
+    '',
+    '',
+    '',
+    compact ? 'hidden xl:block' : '',
+    'hidden xl:block',
+    compact ? 'hidden' : 'hidden xl:block',
+  ]
   const logo = (
     <Link href={links.home} aria-label={t('home')} className="flex shrink-0 items-center">
-      <Image src="/home-v5/logo.png" alt="" width={292} height={129} priority className="h-8 w-auto md:h-10" />
+      <Image src="/home-v5/logo.png" alt="" width={292} height={129} priority className="h-8 w-auto lg:h-10" />
     </Link>
   )
 
   return (
     <header className="border-b border-[var(--hv5-line)] bg-[var(--hv5-bg)]">
-      <div className="flex h-16 items-center justify-between ps-2 pe-5 md:hidden">
+      <div className="flex h-16 items-center justify-between ps-2 pe-5 lg:hidden">
         {logo}
         <MobileMenu
           links={links}
@@ -47,16 +60,21 @@ export default async function Header({ locale, links, signedIn }: { locale: stri
           }}
         />
       </div>
-      <div className={`${CONTAINER} hidden min-h-[76px] items-center gap-10 md:flex`}>
+      <div className={`${CONTAINER} hidden min-h-[76px] items-center gap-8 lg:flex`}>
         {logo}
-        <nav aria-label={t('label')} className="flex flex-1 flex-wrap items-center gap-[30px]">
-          {items.map((i) => (
-            <Link key={i.href + i.label} href={i.href} className="text-base font-medium text-[var(--hv5-body)] no-underline hover:text-white">
+        {/* h-6 + overflow-clip: if a future label still doesn't fit, it disappears instead of wrapping. */}
+        <nav aria-label={t('label')} className="flex h-6 min-w-0 flex-1 flex-wrap items-center gap-x-5 overflow-clip">
+          {items.map((i, idx) => (
+            <Link
+              key={i.href + i.label}
+              href={i.href}
+              className={`${desktopVisibility[idx]} whitespace-nowrap text-base leading-6 font-medium text-[var(--hv5-body)] no-underline hover:text-white`}
+            >
               {i.label}
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-[18px]">
+        <div className="flex shrink-0 items-center gap-[18px]">
           <Link href={links.forecasts} aria-label={t('search')} className="flex h-11 w-11 items-center justify-center text-[var(--hv5-body)] hover:text-white">
             <Search className="h-[22px] w-[22px]" strokeWidth={1.75} aria-hidden="true" />
           </Link>
