@@ -770,7 +770,7 @@ docker compose -f ~/app/docker-compose.prod.yml restart nginx
 | `style-src` | `'self' https://fonts.googleapis.com 'unsafe-inline'` | Tailwind + Google Fonts + Next.js inline |
 | `font-src` | `'self' https://fonts.gstatic.com` | Google Fonts woff2 files |
 | `img-src` | `'self' https://lh3.googleusercontent.com https://www.googletagmanager.com data:` | App images + Google OAuth avatars + GA |
-| `connect-src` | `'self' https://www.google-analytics.com https://*.google-analytics.com https://www.google.com` | GA event beacons |
+| `connect-src` | `'self' https://geo.lipu.dev https://www.google-analytics.com https://*.google-analytics.com https://www.google.com` | consent region check (see `docs/ANALYTICS.md`), GA event beacons |
 | `frame-ancestors` | `'none'` | Blocks embedding |
 | `object-src` | `'none'` | Blocks Flash/Java plugins |
 | `base-uri` | `'self'` | Prevents `<base>` tag hijacking |
