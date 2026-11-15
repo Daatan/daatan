@@ -36,8 +36,80 @@ const verdictSchema = z.object({
   reasoning: z.string(),
   evidenceLinks: z.array(z.string()).catch([]),
   premature: z.boolean().nullish().transform((p) => p ?? undefined),
+  conditions: z
+    .array(z.object({
+      condition: z.string(),
+      status: z.enum(['met', 'failed', 'unconfirmed']),
+      evidence: z.string().nullish().transform((e) => e ?? undefined),
+    }))
+    .catch([]),
 })
 const POOL_CONTEXT_LIMIT = 12
+
+export type VerdictCondition = { condition: string; status: 'met' | 'failed' | 'unconfirmed'; evidence?: string }
+
+/**
+ * daatan#2180: a BINARY `correct` needs every condition the rules require to be met. On the
+ * Texas conjunction the model admitted it had no House seat count and still returned `correct`
+ * from "blue tsunami" coverage. The guard stops such a verdict from reaching the form as a
+ * `correct` prefill and from raising a bornTrueCheck alert. Multiple-choice is exempt: listing the
+ * losing options as failed is normal there.
+ */
+export function guardVerdict<T extends { outcome: ResolutionResearchResult['outcome']; conditions?: VerdictCondition[]; unconfirmedConditions?: boolean }>(
+  findings: T,
+  outcomeType: string,
+): T {
+  if (outcomeType !== 'BINARY' || findings.outcome !== 'correct') return findings
+  if (!findings.conditions?.some((c) => c.status !== 'met')) return findings
+  return { ...findings, outcome: 'unresolvable', unconfirmedConditions: true }
+}
+
+export interface ResearchPoolRow {
+  url: string
+  title: string | null
+  source: string | null
+  publishedDate: string | null
+  stance: number | null
+  settled: boolean | null
+  settlementEventDate: string | null
+  evidenceClass: string | null
+  claimsDetail?: unknown
+}
+
+/**
+ * The claim that drives a pool row's stance: a settled claim first, else the one with the
+ * largest |stance|. One article often holds a decisive claim next to a weak one (daatan#2180:
+ * "Democrats hold 14 Texas US House seats, short of a majority" sat beside a +0.2 aside).
+ */
+export function drivingClaim(claimsDetail: unknown): string | null {
+  if (!Array.isArray(claimsDetail)) return null
+  let best: { text: string; settled: boolean; abs: number } | null = null
+  for (const c of claimsDetail) {
+    if (!c || typeof c !== 'object') continue
+    const { claim, stance, settled } = c as { claim?: unknown; stance?: unknown; settled?: unknown }
+    if (typeof claim !== 'string' || !claim.trim()) continue
+    const cand = {
+      text: claim.trim(),
+      settled: settled === true || settled === 'true',
+      abs: Math.abs(typeof stance === 'number' ? stance : Number(stance) || 0),
+    }
+    if (!best || (cand.settled && !best.settled) || (cand.settled === best.settled && cand.abs > best.abs)) best = cand
+  }
+  return best ? best.text.slice(0, 240) : null
+}
+
+export function formatPoolContext(rows: ResearchPoolRow[]): string {
+  if (rows.length === 0) return ''
+  return `Curated evidence pool (${rows.length} articles extracted for this exact claim — settlement assertions first, then the most recently added; stance is in [-1, 1], +1 = supports the claim; "claim" is what the extractor read in that article):\n`
+    + rows.map((r) => {
+      const claim = drivingClaim(r.claimsDetail)
+      return `- ${r.publishedDate ?? 'undated'} | ${r.source ?? 'unknown source'} | "${r.title ?? r.url}" | stance ${r.stance}`
+        + (r.evidenceClass ? ` | ${r.evidenceClass}` : '')
+        + (r.settled ? ` | SETTLEMENT ASSERTED${r.settlementEventDate ? ` on ${r.settlementEventDate}` : ''}` : '')
+        + ` | ${r.url}`
+        + (claim ? `\n  claim: ${claim}` : '')
+    }).join('\n')
+}
 
 /**
  * Strip common English stopwords and future-tense helpers from a claim to get
@@ -128,6 +200,10 @@ export interface ResolutionResearchResult {
   evidenceLinks: string[]
   /** daatan#2076: deadline not passed and the claim is neither confirmed nor impossible yet. */
   premature?: boolean
+  /** daatan#2180: each condition the rules require, with its status as the model judged it. */
+  conditions?: VerdictCondition[]
+  /** daatan#2180: the model said `correct` with a condition not met; `guardVerdict` downgraded it. */
+  unconfirmedConditions?: boolean
   /** #2096: the verdict came from this fallback leg, not the stage's own model. */
   fallbackProvider?: string
   timings: { searchMs: number; llmMs: number; totalMs: number }
@@ -215,6 +291,7 @@ export async function runResolutionResearch(
       const template = await getPromptTemplate('research-query-generation')
       const prompt = fillPrompt(template, {
         claimText: prediction.claimText,
+        resolutionRules: prediction.resolutionRules || '(none)',
         forecastStartStr,
         forecastEndStr,
       })
@@ -276,15 +353,7 @@ export async function runResolutionResearch(
   // search snippets alone.
   const poolRows = await getPoolArticlesForResearch(prediction.id, POOL_CONTEXT_LIMIT)
     .catch(() => [])
-  const poolContext = poolRows.length > 0
-    ? `Curated evidence pool (${poolRows.length} highest-weight articles extracted for this exact claim; stance is in [-1, 1], +1 = supports the claim):\n`
-      + poolRows.map(r =>
-          `- ${r.publishedDate ?? 'undated'} | ${r.source ?? 'unknown source'} | "${r.title ?? r.url}" | stance ${r.stance}`
-          + (r.evidenceClass ? ` | ${r.evidenceClass}` : '')
-          + (r.settled ? ` | SETTLEMENT ASSERTED${r.settlementEventDate ? ` on ${r.settlementEventDate}` : ''}` : '')
-          + ` | ${r.url}`
-        ).join('\n')
-    : ''
+  const poolContext = formatPoolContext(poolRows)
 
   // Include options in the prompt if MULTIPLE_CHOICE
   const optionsContext = prediction.outcomeType === 'MULTIPLE_CHOICE'
@@ -326,10 +395,11 @@ export async function runResolutionResearch(
   })
 
   const llmMs = Date.now() - llmStart
-  const findings: Omit<ResolutionResearchResult, 'timings'> = verdictSchema.parse(JSON.parse(response.text))
-  if (response.fallbackProvider) findings.fallbackProvider = response.fallbackProvider
+  const parsed: Omit<ResolutionResearchResult, 'timings'> = verdictSchema.parse(JSON.parse(response.text))
+  if (response.fallbackProvider) parsed.fallbackProvider = response.fallbackProvider
   // A premature verdict must never carry a decisive outcome: the form would
   // prefill it, and bornTrueCheck would alert on it.
-  if (findings.premature) findings.outcome = 'unresolvable'
+  if (parsed.premature) parsed.outcome = 'unresolvable'
+  const findings = guardVerdict(parsed, prediction.outcomeType)
   return { ...findings, timings: { searchMs, llmMs, totalMs: Date.now() - routeStart } }
 }

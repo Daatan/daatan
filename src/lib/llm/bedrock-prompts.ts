@@ -142,20 +142,23 @@ Deadline Status: {{deadlineStatus}}
 
 Instructions:
 1. Read the Resolution Rules first and restate their operative test in your reasoning: what exactly must have happened, by when, and according to which sources. Where the rules are more specific than the generic guidance below, the rules govern.
+1a. Split that test into its separate conditions and report them in "conditions", one entry each: a single-condition claim has one entry, "A and B" has two, and a count or threshold ("a majority of", "at least N") is a condition of its own. For each, set status 'met' only when a specific source in the context, or a specific fact you know, states it, and put that fact with its source and date in "evidence"; 'failed' when a source states the opposite; otherwise 'unconfirmed'. A count or threshold is 'met' or 'failed' only on the actual number (e.g. seats won out of the total). Descriptions of the overall result ("landslide", "blue wave", "rout", "sweep"), national trends, and the results of other races or offices are not evidence for a condition, however strong.
 2. If the Resolution Rules contain an explicit default clause (e.g. "Otherwise, it will resolve as 'No'"), that clause decides every case the rules' positive condition does not confirm — but ONLY once the deadline has passed (see Deadline Status). Once it has, apply the default — do NOT return 'unresolvable' for a case the rules already decide.
 2a. If Deadline Status says the deadline has NOT yet passed: an event that has not happened yet can still happen, so "not confirmed so far" is NOT a 'wrong' outcome and the default clause does not apply yet. Return 'correct' only if the event already happened; return 'wrong' only if a source affirmatively shows the claim can no longer come true before the deadline (cancelled, officially ruled out, a fixed date already missed). Otherwise return 'unresolvable' with premature=true, and say in your reasoning that it is too early to resolve and when the deadline is.
 3. Determine whether the claim's outcome occurred by {{forecastEndStr}} — including before the claim was created on {{forecastStartStr}}, unless the claim text or resolution rules explicitly bound the start.
 3a. If the claim text describes the event as a repeat or fresh occurrence ("new", "another", "again", "one more", "a further", "an additional", "a second", or the same meaning in any language), the claim's creation date {{forecastStartStr}} IS the lower bound: only an occurrence on or after that date counts. An earlier occurrence is what the claim is measured against, so it never resolves the claim 'correct', even if the resolution rules leave the word out. The claim text decides this. A name that merely contains such a word ("New York", "New Zealand") is not repeat wording.
-4. Use the context above as your primary evidence. A "Curated evidence pool" section, when present, lists evidence already extracted for this exact claim — rows marked SETTLEMENT ASSERTED report the resolving event itself and are the strongest signal. If the context is insufficient or irrelevant, draw on your own knowledge of events during that period.
+4. Use the context above as your primary evidence. A "Curated evidence pool" section, when present, lists evidence already extracted for this exact claim; each row's "claim" line is what an automated extractor read in that article. Rows marked SETTLEMENT ASSERTED are ones the extractor read as reporting the resolving event: weigh the facts their claim lines state, not the label, because the extractor can mark a row settled when only one part of a multi-part claim happened. When rows disagree, judge each condition from the facts the rows state; never decide by counting rows. If the context is insufficient or irrelevant, draw on your own knowledge of events during that period.
 5. In your reasoning, explicitly list the decisive sources or facts (from context or your own knowledge), each with its date and URL where available.
 6. For claims about measured quantities (territory, prices, vote shares, counts): when reputable trackers disagree on the direction or the margin is within measurement noise, the claim is NOT confirmed — apply the rules' default clause if one exists; conflicting measurements are non-confirmation, not grounds for 'unresolvable'.
 7. For BINARY predictions:
-   - If the claim is clearly true (the event happened as stated), use 'correct'.
-   - Use 'wrong' when at least one source affirmatively contradicts the claim (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen), OR — only after the deadline has passed — when the resolution rules' default clause resolves an unconfirmed case to 'No'. A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
+   - Use 'correct' only when every entry in "conditions" is 'met': the event happened as stated, in full.
+   - A 'failed' condition makes the whole claim 'wrong', even when the other conditions are met.
+   - Use 'wrong' when at least one source affirmatively contradicts the claim or one of its conditions (reports the event was cancelled, that a different outcome occurred, or that it explicitly did not happen), OR — only after the deadline has passed — when the resolution rules' default clause resolves an unconfirmed case to 'No'. A roundup or summary article that simply does not mention the entity or event is NOT evidence it didn't happen — never conclude 'wrong' from absence of mention alone.
    - Only use 'unresolvable' if you genuinely have no reliable information for the period AND no default clause decides the case.
 8. For MULTIPLE_CHOICE predictions:
    - If one option clearly occurred, use 'correct' AND provide correctOptionId.
    - If no option clearly matches, use 'unresolvable'.
+   - "conditions" lists what the option you pick requires.
 9. Use 'void' only if the event was cancelled or the claim cannot be judged fairly by its own rules.
 10. Do NOT default to 'unresolvable' simply because the news context is empty or irrelevant — use your knowledge. However, if neither the context, your own knowledge, nor a rules default clause decides the claim, return 'unresolvable' rather than guessing.
 
@@ -163,9 +166,10 @@ Return your findings in JSON format.`,
 
     'research-query-generation': `You are helping find news articles to verify a forecast.
 Forecast: "{{claimText}}"
+Resolution rules: {{resolutionRules}}
 Deadline: {{forecastEndStr}} (created {{forecastStartStr}} — qualifying events may pre-date creation, so queries must also find the event if it had already happened by then)
 
-Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim.`,
+Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim. If the forecast or its rules require more than one condition ("A and B", or a count or threshold such as "a majority of the seats"), write one query per condition, each aimed at the fact that decides it (e.g. the final seat count, not who won overall).`,
 
     'dedupe-check': `You are a fact-checking assistant reviewing whether a news topic already has an active forecast.
 

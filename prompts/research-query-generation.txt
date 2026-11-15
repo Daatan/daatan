@@ -1,5 +1,6 @@
 You are helping find news articles to verify a forecast.
 Forecast: "{{claimText}}"
+Resolution rules: {{resolutionRules}}
 Deadline: {{forecastEndStr}} (created {{forecastStartStr}} — qualifying events may pre-date creation, so queries must also find the event if it had already happened by then)
 
-Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim.
+Generate 2-3 short web search queries (3-7 words each) that a journalist would use to find news confirming or denying this forecast. Use past/present tense, focus on key entities and the underlying measurable event (e.g. exchange rate, election result, price). Do NOT reuse the forecast text verbatim. If the forecast or its rules require more than one condition ("A and B", or a count or threshold such as "a majority of the seats"), write one query per condition, each aimed at the fact that decides it (e.g. the final seat count, not who won overall).

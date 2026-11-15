@@ -132,7 +132,7 @@ async function main() {
     const { researchSchema } = await import('../src/lib/llm/schemas')
     const { expressPredictionSchema } = await import('../src/lib/llm/expressPrediction')
     const { stageModel } = await import('../src/lib/llm/stageModels')
-    const { deadlineStatus } = await import('../src/lib/services/resolutionResearch')
+    const { deadlineStatus, guardVerdict } = await import('../src/lib/services/resolutionResearch')
 
     const project = process.env.GOOGLE_VERTEX_PROJECT_ID
     if (!project) throw new Error('Set GOOGLE_VERTEX_PROJECT_ID')
@@ -176,7 +176,11 @@ async function main() {
         context: `News Context:\n${c.context}`,
     }), researchSchema, 0)))))
     if (!expressFile) RESEARCH_CASES.forEach((c, i) => {
-        const outcomes = researchRuns[i].map((r) => String(r.outcome))
+        // As in the app: a `correct` with a condition not met is downgraded (#2180).
+        const outcomes = researchRuns[i].map((r) => guardVerdict({
+            outcome: String(r.outcome) as 'correct' | 'wrong' | 'void' | 'unresolvable',
+            conditions: Array.isArray(r.conditions) ? r.conditions : undefined,
+        }, 'BINARY').outcome)
         const ok = outcomes.every((o) => (o === 'correct') === c.correct)
         if (!ok) failed += 1
         console.log(`${ok ? 'PASS' : 'FAIL'}  ${c.name}: ${outcomes.join(', ')} (want ${c.correct ? 'correct' : 'not correct'})`)

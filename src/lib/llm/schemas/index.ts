@@ -92,8 +92,30 @@ export const researchSchema: Schema = {
       description:
         "True when the deadline has not passed yet and the claim is neither already confirmed nor already impossible — it is too early to resolve. outcome must then be 'unresolvable'.",
     },
+    conditions: {
+      type: SchemaType.ARRAY,
+      description:
+        "Each separate condition the resolution rules require (one entry for a single-condition claim). outcome may be 'correct' only when every status is 'met'.",
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          condition: { type: SchemaType.STRING, description: 'One condition, in your own words' },
+          evidence: {
+            type: SchemaType.STRING,
+            description: 'The specific fact that decides it, with its source and date; empty when unconfirmed',
+          },
+          status: {
+            type: SchemaType.STRING,
+            format: 'enum',
+            enum: ['met', 'failed', 'unconfirmed'],
+            description: "'met' only when a source states it (a count or threshold needs the number)",
+          },
+        },
+        required: ['condition', 'status'],
+      },
+    },
   },
-  required: ['outcome', 'reasoning', 'evidenceLinks'],
+  required: ['outcome', 'reasoning', 'evidenceLinks', 'conditions'],
 }
 
 // ============================================
