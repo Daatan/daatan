@@ -80,6 +80,7 @@ export const GLOBAL_KEYWORDS: Record<KeywordLocale, readonly string[]> = {
     'calibrated forecasts',
     'Brier score',
     'forecaster leaderboard',
+    'expert ratings',
     'who predicted correctly',
   ],
   he: [
@@ -89,6 +90,7 @@ export const GLOBAL_KEYWORDS: Record<KeywordLocale, readonly string[]> = {
     'דיוק תחזיות',
     'ציון ברייר',
     'דירוג חוזים',
+    'דירוג מומחים',
     'מי חזה נכון',
   ],
   ru: [
@@ -98,6 +100,7 @@ export const GLOBAL_KEYWORDS: Record<KeywordLocale, readonly string[]> = {
     'калиброванные прогнозы',
     'оценка Брайера',
     'рейтинг прогнозистов',
+    'рейтинг экспертов',
     'кто предсказал правильно',
   ],
 }
