@@ -20,6 +20,7 @@ import {
   translatePredictionToAllLocales,
   sourceHash,
   TRANSLATABLE_FIELDS,
+  type NormalizedForecast,
 } from '@/lib/services/translation'
 
 const log = createLogger('forecast')
@@ -271,6 +272,11 @@ export interface CreateForecastInput {
   externalMarketId?: string
   /** daatan#1318: checkContent() threw instead of returning a verdict — flag for manual review. */
   moderationCheckFailed?: boolean
+  /**
+   * daatan#2195: English normalization already computed by the caller (the create
+   * route runs it in parallel with moderation). Omitted → computed here.
+   */
+  normalized?: NormalizedForecast
 }
 
 export async function createForecast(input: CreateForecastInput) {
@@ -279,7 +285,7 @@ export async function createForecast(input: CreateForecastInput) {
   // Canonicalize to English so the URL slug and the default UI are English. The
   // author's original-language text is preserved below as a translation. On a
   // pure-English input (or any failure) this is a no-op returning the original.
-  const normalized = await normalizeForecastToEnglish({
+  const normalized = input.normalized ?? await normalizeForecastToEnglish({
     claimText: input.claimText,
     detailsText: input.detailsText,
     resolutionRules: input.resolutionRules,

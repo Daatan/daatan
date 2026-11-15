@@ -800,6 +800,8 @@
     "saveChanges": "שמור שינויים",
     "cancel": "ביטול",
     "confirmPublish": "אשר ופרסם",
+    "publishingProgress": "בודקים ושומרים… זה יכול לקחת כ־10 שניות",
+    "waitForGuess": "ממתינים להערכת ההסתברות…",
     "createFailed": "נכשלה יצירת התחזית",
     "publishFailed": "נוצר כטיוטה, אך הפרסום נכשל",
     "publishError": "נכשל פרסום התחזית",

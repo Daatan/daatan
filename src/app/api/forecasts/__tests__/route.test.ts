@@ -367,6 +367,39 @@ describe('/api/forecasts', () => {
             expect(prisma.prediction.create).toHaveBeenCalled()
         })
 
+        it('runs moderation and English normalization in parallel, normalizing once (#2195)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            mockAuth.mockResolvedValue({ user: { id: 'user1', email: 'user@example.com' } } as any)
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user1', rs: 100 } as any)
+            vi.mocked(prisma.prediction.create).mockResolvedValue({ id: 'new-2', status: 'DRAFT' } as any)
+            vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ id: 'new-2', status: 'DRAFT' } as any)
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            mockNormalize.mockClear()
+
+            let releaseModeration!: () => void
+            mockCheckContent.mockImplementationOnce(
+                () => new Promise(res => { releaseModeration = () => res({ isOffensive: false, reason: '' }) }),
+            )
+
+            const pending = POST(new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify({
+                    claimText: 'Parallel Forecast',
+                    resolveByDatetime: '2027-12-31T23:59:59Z',
+                    outcomeType: 'BINARY',
+                    resolutionRules: 'Resolves YES if the event occurs as described.',
+                }),
+            }), { params: {} } as any)
+
+            // Normalization starts while moderation is still pending.
+            await vi.waitFor(() => expect(mockNormalize).toHaveBeenCalledTimes(1))
+            releaseModeration()
+            const response = await pending
+            expect(response.status).toBe(201)
+            // createForecast reuses the route's result instead of normalizing again.
+            expect(mockNormalize).toHaveBeenCalledTimes(1)
+        })
+
         it('returns 401 when not authenticated', async () => {
             mockAuth.mockResolvedValue(null)
 

@@ -800,6 +800,8 @@
     "saveChanges": "Konservi ŝanĝojn",
     "cancel": "Nuligi",
     "confirmPublish": "Konfirmi kaj publikigi",
+    "publishingProgress": "Kontrolante kaj konservante… tio povas daŭri ~10 s",
+    "waitForGuess": "Atendante la probablecan takson…",
     "createFailed": "Malsukcesis krei prognozon",
     "publishFailed": "Kreita kiel malneto, sed malsukcesis publikigi",
     "publishError": "Malsukcesis publikigi prognozon",

@@ -800,6 +800,8 @@
     "saveChanges": "Save Changes",
     "cancel": "Cancel",
     "confirmPublish": "Confirm & Publish",
+    "publishingProgress": "Checking and saving… this can take ~10 s",
+    "waitForGuess": "Waiting for the probability guess…",
     "createFailed": "Failed to create forecast",
     "publishFailed": "Created as draft, but failed to publish",
     "publishError": "Failed to publish prediction",
