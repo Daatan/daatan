@@ -31,6 +31,11 @@ export interface SourceLeaderboardResult {
   sortBy: SourceSortBy
   authorRows: AuthorLeaderboardRow[]
   outletRows: OutletLeaderboardRow[]
+  /** The sample-size floor applied, and how many scored rows it left off each view (daatan#2179):
+   *  a topic board can be 70 authors deep and still show 3. Both 0 when nothing was filtered. */
+  minPredictions: number
+  hiddenAuthors: number
+  hiddenOutlets: number
 }
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
@@ -295,11 +300,20 @@ export async function getSourceLeaderboard(
   const data = await getAuthorShadowLeaderboard(undefined, tag)
   const entries = data?.authors ?? []
 
-  const authorRows = sortRows(mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow))), sortBy)
-    .filter(r => r.predictions >= minPredictions)
-  const outletRows = sortRows(aggregateByOutlet(entries), sortBy).filter(r => r.predictions >= minPredictions)
+  const allAuthors = sortRows(mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow))), sortBy)
+  const allOutlets = sortRows(aggregateByOutlet(entries), sortBy)
+  const authorRows = allAuthors.filter(r => r.predictions >= minPredictions)
+  const outletRows = allOutlets.filter(r => r.predictions >= minPredictions)
 
-  return { view, sortBy, authorRows, outletRows }
+  return {
+    view,
+    sortBy,
+    authorRows,
+    outletRows,
+    minPredictions,
+    hiddenAuthors: allAuthors.length - authorRows.length,
+    hiddenOutlets: allOutlets.length - outletRows.length,
+  }
 }
 
 /**

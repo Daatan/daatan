@@ -50,7 +50,7 @@ describe('getTopicBoards (#2050)', () => {
       await new Promise(r => setTimeout(r, 1))
       inFlight--
       return {
-        view: 'outlets', sortBy: 'skillConservative',
+        view: 'outlets', sortBy: 'skillConservative', minPredictions: 0, hiddenAuthors: 0, hiddenOutlets: 0,
         outletRows: [outlet(`${tag}.com`, 1)], authorRows: [author('Ann', `${tag}.com`, 1)],
       }
     })
