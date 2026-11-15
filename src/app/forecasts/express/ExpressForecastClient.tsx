@@ -140,6 +140,10 @@ export default function ExpressForecastClient({
   const { externalMarkets } = useCapabilities()
   const [marketSuggestion, setMarketSuggestion] = useState<MarketMatch | null>(null)
   const suggestionRequest = useRef(0)
+  // daatan#2195: the guess call takes ~25 s; keep a handle so "Start over" and
+  // leaving the page cancel it instead of leaving a request dangling.
+  const guessAbort = useRef<AbortController | null>(null)
+  useEffect(() => () => guessAbort.current?.abort(), [])
   const [progressMessage, setProgressMessage] = useState('')
   const [articlesFound, setArticlesFound] = useState(0)
   const [sourcesSummary, setSourcesSummary] = useState('')
@@ -342,6 +346,9 @@ export default function ExpressForecastClient({
 
   const handleTryAgain = () => {
     suggestionRequest.current++
+    guessAbort.current?.abort()
+    guessAbort.current = null
+    setIsGuessing(false)
     setMarketSuggestion(null)
     setStep('input')
     setPhase(0)
@@ -378,6 +385,9 @@ export default function ExpressForecastClient({
 
   const handleGuessChances = async () => {
     if (!generated) return
+    guessAbort.current?.abort()
+    const controller = new AbortController()
+    guessAbort.current = controller
     setIsGuessing(true)
     setError('')
 
@@ -396,21 +406,27 @@ export default function ExpressForecastClient({
           articles,
           marketProbability: generated.market?.probability ?? undefined,
         }),
+        signal: controller.signal,
       })
 
       if (!response.ok) throw new Error(t('guessError'))
       const result = await response.json()
 
-      setGenerated({
-        ...generated,
+      // Functional update: the user may have edited fields while the guess ran.
+      setGenerated(g => (g ? {
+        ...g,
         probabilitySuggestion: result.probability,
-        probabilityReasoning: result.reasoning
-      })
+        probabilityReasoning: result.reasoning,
+      } : g))
     } catch (err) {
+      if (controller.signal.aborted) return
       log.error({ err }, 'Guess chances error')
       setError(t('guessError'))
     } finally {
-      setIsGuessing(false)
+      if (guessAbort.current === controller) {
+        guessAbort.current = null
+        setIsGuessing(false)
+      }
     }
   }
 
@@ -1220,11 +1236,13 @@ export default function ExpressForecastClient({
                   <Button
                     onClick={handleCreatePrediction}
                     loading={isPublishing}
+                    // daatan#2195: publishing mid-guess left the phone stuck on this screen.
+                    disabled={isGuessing}
                     fullWidth
                     size="xl"
                     leftIcon={<Sparkles className="w-5 h-5" />}
                   >
-                    {t('confirmPublish')}
+                    {isPublishing ? t('publishingProgress') : isGuessing ? t('waitForGuess') : t('confirmPublish')}
                   </Button>
                   <Button
                     onClick={handleTryAgain}

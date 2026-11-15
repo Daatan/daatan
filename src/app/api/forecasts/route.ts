@@ -5,7 +5,7 @@ import { createPredictionSchema, listPredictionsQuerySchema } from '@/lib/valida
 import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { checkContent } from '@/lib/services/moderation'
-import { translatePredictionToAllLocales } from '@/lib/services/translation'
+import { translatePredictionToAllLocales, normalizeForecastToEnglish } from '@/lib/services/translation'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { listForecasts, enrichPredictions, upsertNewsAnchor, verifyUserExists, createForecast } from '@/lib/services/forecast'
 import { findFuzzyMatches, type FuzzyMatches } from '@/lib/services/fuzzy-search'
@@ -227,7 +227,17 @@ export const POST = withAuth(async (request, user) => {
     )
   }
 
-  const moderationResult = await checkContent(`${data.claimText}\n\n${data.detailsText || ''}`, 'forecast')
+  // daatan#2195: moderation and English normalization are independent LLM calls
+  // (~4 s and ~7 s on a Hebrew claim). Run them together instead of back to back;
+  // on a moderation reject the normalization result is simply discarded.
+  const [moderationResult, normalized] = await Promise.all([
+    checkContent(`${data.claimText}\n\n${data.detailsText || ''}`, 'forecast'),
+    normalizeForecastToEnglish({
+      claimText: data.claimText,
+      detailsText: data.detailsText,
+      resolutionRules: data.resolutionRules,
+    }),
+  ])
   if (moderationResult.isOffensive) {
     const cleanReason = moderationResult.reason.replace('OFFENSIVE_INPUT:', '').trim()
     return apiError(`Moderation: ${cleanReason}`, 400)
@@ -260,6 +270,7 @@ export const POST = withAuth(async (request, user) => {
       tags: data.tags,
       externalMarketId: data.externalMarketId,
       moderationCheckFailed: moderationResult.checkFailed,
+      normalized,
     })
 
     withRetry(() => translatePredictionToAllLocales(prediction!.id), {

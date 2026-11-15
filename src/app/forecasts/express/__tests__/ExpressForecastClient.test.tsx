@@ -243,9 +243,9 @@ describe('ExpressForecastClient', () => {
         fireEvent.click(confirmButton)
       })
 
-      // Verify immediate feedback (button is disabled while loading)
+      // Verify immediate feedback (button is disabled while loading, and says why — #2195)
       expect(confirmButton).toBeDisabled()
-      expect(screen.getByText('Confirm & Publish')).toBeInTheDocument()
+      expect(screen.getByText(messages.expressForecast.publishingProgress)).toBeInTheDocument()
 
       // Wait for redirect
       await vi.waitFor(() => {
@@ -734,6 +734,48 @@ describe('ExpressForecastClient', () => {
       expect(box).toHaveTextContent(messages.expressForecast.guessAbstainTitle)
       expect(box).toHaveTextContent(`${messages.expressForecast.guessAbstainMissing} not enough information`)
       expect(screen.getByText('Guess chances')).toBeInTheDocument()
+    })
+
+    // daatan#2195: publishing mid-guess left a phone stuck on /create.
+    it('blocks Confirm & Publish while a guess is in flight, then applies the guess', async () => {
+      await renderInReviewState({ ...generatedData, probabilitySuggestion: null, probabilityReasoning: '' })
+
+      let resolveGuess!: (r: Response) => void
+      vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
+        String(url).includes('/express/guess')
+          ? new Promise<Response>(res => { resolveGuess = res })
+          : Promise.resolve(new Response('{}', { status: 200 })),
+      )
+
+      await act(async () => { fireEvent.click(screen.getByText('Guess chances')) })
+      const waiting = screen.getByText(messages.expressForecast.waitForGuess).closest('button')!
+      expect(waiting).toBeDisabled()
+
+      await act(async () => {
+        resolveGuess(new Response(JSON.stringify({ probability: 42, reasoning: 'Coin flip-ish' }), { status: 200 }))
+      })
+      expect(await screen.findByText('42%')).toBeInTheDocument()
+      expect(screen.getByText('Confirm & Publish').closest('button')).not.toBeDisabled()
+    })
+
+    it('Start over aborts an in-flight guess without showing an error (#2195)', async () => {
+      await renderInReviewState({ ...generatedData, probabilitySuggestion: null, probabilityReasoning: '' })
+
+      let guessSignal: AbortSignal | undefined
+      vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+        if (!String(url).includes('/express/guess')) return Promise.resolve(new Response('{}', { status: 200 }))
+        guessSignal = init?.signal ?? undefined
+        return new Promise<Response>((_, reject) => {
+          guessSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        })
+      })
+
+      await act(async () => { fireEvent.click(screen.getByText('Guess chances')) })
+      expect(guessSignal?.aborted).toBe(false)
+
+      await act(async () => { fireEvent.click(screen.getByText(messages.expressForecast.startOver)) })
+      expect(guessSignal?.aborted).toBe(true)
+      expect(screen.queryByText(messages.expressForecast.guessError)).not.toBeInTheDocument()
     })
 
     it('never asked: shows the hint, not the abstain heading (#1806)', async () => {
