@@ -54,6 +54,8 @@ interface ResolutionFormProps {
   onResolved?: () => void
 }
 
+const RESOLVE_TIMEOUT_MS = 90_000
+
 export function ResolutionForm({ predictionId, outcomeType, options, settled, confidence, claimDeadline, resolveByDatetime, onResolved }: ResolutionFormProps) {
   const { aiResearch } = useCapabilities()
   const [outcome, setOutcome] = useState<'correct' | 'wrong' | 'void' | 'unresolvable' | null>(null)
@@ -198,6 +200,10 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
 
       const response = await fetch(`/api/forecasts/${predictionId}/resolve`, {
         method: 'POST',
+        // Without a deadline a request to a server that went away mid-flight (e.g. staging
+        // powering itself off) leaves the button spinning forever. The server's own
+        // transaction timeout is 60s, so 90s only fires when no answer is coming.
+        signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome,
@@ -210,8 +216,9 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to resolve prediction')
+        // A proxy error page (502/504) is HTML, not JSON — don't surface a parse error.
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || `Failed to resolve prediction (HTTP ${response.status})`)
       }
 
       const data = await response.json()
@@ -223,7 +230,13 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
       setResolved(true)
       onResolved?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resolve prediction')
+      if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+        setError('The server did not respond in time. Reload the page to check whether the forecast was resolved before retrying.')
+      } else if (err instanceof TypeError) {
+        setError('Could not reach the server. Reload the page to check whether the forecast was resolved before retrying.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to resolve prediction')
+      }
     } finally {
       resolveTimers.current.forEach(clearTimeout)
       resolveTimers.current = []

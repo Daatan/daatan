@@ -34,6 +34,7 @@ describe('ResolutionForm', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/forecasts/pred-1/resolve', {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome: 'correct',
@@ -102,6 +103,51 @@ describe('ResolutionForm', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Prediction not found')).toBeInTheDocument()
+    })
+  })
+
+  it('shows the HTTP status, not a parse error, when an error body is not JSON', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: async () => { throw new SyntaxError('Unexpected token <') },
+    })
+
+    render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+    fireEvent.click(screen.getByText('Correct'))
+    fireEvent.click(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0])
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to resolve prediction (HTTP 502)')).toBeInTheDocument()
+    })
+  })
+
+  it('stops spinning with a clear error when the request times out', async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException('signal timed out', 'TimeoutError'))
+
+    render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+    fireEvent.click(screen.getByText('Correct'))
+    fireEvent.click(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0])
+
+    await waitFor(() => {
+      expect(screen.getByText(/did not respond in time/)).toBeInTheDocument()
+    })
+    expect(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0]).not.toBeDisabled()
+    expect(mockFetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('shows a reachability error when the network request fails', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    render(<ResolutionForm predictionId="pred-1" outcomeType="BINARY" options={[]} />)
+
+    fireEvent.click(screen.getByText('Correct'))
+    fireEvent.click(screen.getAllByRole('button', { name: /Confirm Resolution/i })[0])
+
+    await waitFor(() => {
+      expect(screen.getByText(/Could not reach the server/)).toBeInTheDocument()
     })
   })
 
