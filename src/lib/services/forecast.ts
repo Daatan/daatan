@@ -441,9 +441,13 @@ export async function createForecast(input: CreateForecastInput) {
 
 // ── Similar forecasts ──────────────────────────────────────────────────────────
 
-// Cosine similarity threshold: 1 - distance. 0.75 means reasonably similar —
-// the bar for the "Similar forecasts" (related) block on a forecast page.
-const COSINE_THRESHOLD = 0.75
+// Cosine similarity threshold: 1 - distance — the bar for the "Similar forecasts"
+// (related) block on a forecast page. Was 0.75, which let shape-alike, topic-unrelated
+// claims through the tag gate on a broad shared tag (daatan#2198: "Alice Huang will be
+// convicted…" ↔ "Netanyahu will be pardoned…" = 0.770, shared tag Law). On prod
+// (2026-11-15, 165 forecasts, tag-sharing pairs) 0.80–0.81 still held clear junk;
+// 0.83–0.85 was mostly same-topic. At 0.85, 81/165 forecasts still show ≥1 related item.
+export const RELATED_MIN_SCORE = 0.85
 
 /**
  * Stricter bar for the create-time "is yours a duplicate?" warning (daatan#2083).
@@ -483,13 +487,13 @@ export async function findSimilarForecasts({
   tags,
   excludeId,
   limit = 3,
-  minScore = COSINE_THRESHOLD,
+  minScore = RELATED_MIN_SCORE,
 }: {
   claimText: string
   tags: string[]
   excludeId?: string
   limit?: number
-  /** Minimum cosine similarity; defaults to the related-list bar (0.75). */
+  /** Minimum cosine similarity; defaults to the related-list bar (`RELATED_MIN_SCORE`). */
   minScore?: number
 }): Promise<SimilarForecast[]> {
   const embedding = await embedText(claimText)

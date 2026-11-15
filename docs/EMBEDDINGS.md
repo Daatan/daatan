@@ -8,7 +8,7 @@ Vector embeddings power the "similar forecasts" lookup on the forecast detail pa
 - **Dimensionality:** `768` (set via `outputDimensionality=768` request parameter; the model natively emits 3072 dims)
 - **Storage:** PostgreSQL with the `pgvector` extension, `vector(768)` column on `predictions` (also on `external_markets` and `latent_nodes` — see Generation)
 - **Index:** HNSW with cosine operator (`vector_cosine_ops`)
-- **Distance metric:** Cosine; threshold `>= 0.75` for "similar"
+- **Distance metric:** Cosine; threshold `>= 0.85` for "similar" (related list; was 0.75 until daatan#2198), `>= 0.87` for the create-time duplicate warning
 
 ## Generation
 
@@ -101,14 +101,14 @@ WHERE p.status IN ('ACTIVE', 'PENDING_APPROVAL')
   AND EXISTS (SELECT 1 FROM "_PredictionToTag" pt2 JOIN tags t2 ON t2.id = pt2."B"
               WHERE pt2."A" = p.id AND lower(t2.name) = ANY($tags))
 GROUP BY p.id, u.name, u.username, p.embedding
-HAVING (1 - (p.embedding <=> $vector::vector)) >= 0.75
+HAVING (1 - (p.embedding <=> $vector::vector)) >= $minScore  -- 0.85 default
 ORDER BY p.embedding <=> $vector::vector
 LIMIT $limit * 5
 ```
 
 The app then sorts by score, breaking ties by shared-tag count, and keeps the top `limit`. The tag gate exists because short claim embeddings cluster by sentence structure more than topic; with no tags (e.g. the create-time duplicate check before tags are picked) it falls back to pure cosine.
 
-`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The 0.75 threshold means "≥75% cosine similarity"; tune by editing `COSINE_THRESHOLD` in `forecast.ts`.
+`<=>` is pgvector's cosine distance operator. `1 - distance` gives cosine similarity in `[-1, 1]`. The related-list bar is `RELATED_MIN_SCORE` (0.85) in `forecast.ts`, raised from 0.75 in daatan#2198: short claims embed by sentence shape, so same-shape different-topic pairs sharing one broad tag scored 0.75–0.83 (e.g. a Huang conviction ↔ Netanyahu pardon = 0.770).
 
 > **Known limitation / planned redesign:** this matches on `claimText` alone, so the
 > deadline is embedded as text while the structured `resolveByDatetime` is unused —

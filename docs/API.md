@@ -265,7 +265,7 @@ AI-assisted resolution research for resolvers. Searches for recent articles abou
 ---
 
 ### `GET /api/forecasts/similar`
-Find forecasts similar to a given forecast (by ID) or query text, using pgvector cosine similarity on Gemini `gemini-embedding-2` embeddings. Public — no auth required. Returns results from `ACTIVE` and `PENDING_APPROVAL` forecasts only, filtered to cosine similarity ≥ 0.75.
+Find forecasts similar to a given forecast (by ID) or query text, using pgvector cosine similarity on Gemini `gemini-embedding-2` embeddings. Public — no auth required. Returns results from `ACTIVE` and `PENDING_APPROVAL` forecasts only, filtered to cosine similarity ≥ 0.85 (`RELATED_MIN_SCORE`; ≥ 0.87 with `purpose=duplicate`).
 
 **Query params**
 
