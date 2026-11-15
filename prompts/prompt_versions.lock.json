@@ -114,20 +114,20 @@
       "schema_chars": 497
     },
     "research-query-generation": {
-      "version": "v1",
-      "hash": "a83890a1c1f9fe73",
-      "chars": 559,
+      "version": "v2",
+      "hash": "14bd755829476387",
+      "chars": 850,
       "schema": "queryGenerationSchema",
       "schema_hash": "bfe4d75fe81d70fb",
       "schema_chars": 219
     },
     "resolution-research": {
-      "version": "v3",
-      "hash": "c12635325aa8f176",
-      "chars": 4906,
+      "version": "v4",
+      "hash": "1dddfd883315f87d",
+      "chars": 6212,
       "schema": "researchSchema",
-      "schema_hash": "a9dd19a6febb5ef7",
-      "schema_chars": 829
+      "schema_hash": "b93236f952e555cd",
+      "schema_chars": 1496
     },
     "rules-direction": {
       "version": "v1",

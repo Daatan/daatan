@@ -242,7 +242,7 @@ The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMac
 ---
 
 ### `POST /api/forecasts/[id]/research` — Auth
-AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracul → 3-way parallel local fallback; the window extends 3 days past the deadline to catch post-event confirmation coverage), always adds LLM-generated targeted queries on top — raw-claim searches tend to surface roundups whose snippets omit the specific entity (daatan#1467) — then asks an LLM to suggest a resolution outcome and evidence links. Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
+AI-assisted resolution research for resolvers. Searches for recent articles about the forecast claim (Oracul → 3-way parallel local fallback; the window extends 3 days past the deadline to catch post-event confirmation coverage), always adds LLM-generated targeted queries on top — raw-claim searches tend to surface roundups whose snippets omit the specific entity (daatan#1467) — then asks an LLM to suggest a resolution outcome and evidence links. The verdict prompt also gets up to 12 rows of the forecast's evidence pool: settlement assertions first, then the most recently added, each with the claim the extractor read in that article (daatan#2180). Rate-limited to 10 calls per hour per user. Requires `RESOLVER` or `ADMIN` role.
 
 **Response**
 
@@ -253,6 +253,10 @@ AI-assisted resolution research for resolvers. Searches for recent articles abou
   "evidenceLinks": ["https://..."],  // URLs found that support the resolution
   "correctOptionId": "opt_cuid", // only set for MULTIPLE_CHOICE predictions
   "premature": true,             // daatan#2076: deadline not passed, claim neither confirmed nor impossible yet; outcome is then forced to "unresolvable" and the form shows a "too early" banner instead of prefilling
+  "conditions": [                // daatan#2180: each condition the rules require; [] when the answering provider skipped it
+    { "condition": "string", "status": "met", "evidence": "string" }  // status: "met" | "failed" | "unconfirmed"; evidence optional
+  ],
+  "unconfirmedConditions": true, // daatan#2180: the model said "correct" for a BINARY forecast with a condition not "met"; outcome is then forced to "unresolvable"
   "timings": { "searchMs": 8200, "llmMs": 9400, "totalMs": 17600 }
 }
 ```

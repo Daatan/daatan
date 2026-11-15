@@ -1,0 +1,838 @@
+{
+ "_about": "retro#1075 / daatan#2180. Texas 2026 conjunction forecast cmv1s9y8u00t701qvofcy6fex as AI Assist saw it on 2026-11-15, when it returned correct. Truth: NO (House 24 R / 14 D). poolRows = the 12 rows the legacy selection sent (settled first, then evidenceWeight) plus the 30 most recently added; news = the 5 sources the verdict cited, with their og:description as snippet (the live snippets were not captured).",
+ "claimText": "Democrats will win a majority of the total US House seats and US Senate seats contested in Texas in the 2026 midterm elections.",
+ "resolutionRules": "This claim resolves YES if, following the 2026 midterm elections, the Democratic Party wins a majority of the total number of US House seats allocated to Texas and a majority of the US Senate seats contested in Texas. If only one US Senate seat is contested, winning that seat will count as a majority. Official election results reported by the Texas Secretary of State or a consensus of major news outlets (e.g., AP, Reuters, New York Times) will be used for resolution.",
+ "created": "2026-10-10",
+ "deadline": "2026-11-30",
+ "now": "2026-11-15T12:00:00Z",
+ "poolRows": [
+  {
+   "url": "https://aljazeera.com/news/2026/11/6/why-one-republican-won-a-redrawn-texas-district-despite-blue-tsunami?traffic_source=rss",
+   "title": "Why one Republican won a redrawn Texas district despite blue tsunami",
+   "source": "aljazeera.com",
+   "publishedDate": "2026-11-06T05:03:57+00:00",
+   "stance": -1,
+   "settled": true,
+   "settlementEventDate": "2026-11-03",
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-06T05:21:31.391",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "After the 2026-11-03 midterms, Democrats hold 14 Texas US House seats, short of a majority of the state's delegation",
+     "stance": -1,
+     "settled": true
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/opinion/campaign/6208918-hispanic-voters-revolt-immigration/",
+   "title": "How Republicans lost the Hispanic vote",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-10T17:30:00+00:00",
+   "stance": 1,
+   "settled": true,
+   "settlementEventDate": "2026-11-03",
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-10T18:05:23.803",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico won the contested Texas US Senate seat over Ken Paxton in the 2026 midterms, on 2026-11-03.",
+     "stance": 1,
+     "settled": true
+    },
+    {
+     "claim": "Hispanic voters in the Rio Grande Valley swung toward Democrats, a weak signal that Democrats may gain Texas House seats.",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://abcnews.com/Politics/latino-vote-helped-thwart-texas-republicans-redistricting-effort/story?id=137880812",
+   "title": "Latino vote helped thwart Texas Republicans' redistricting effort",
+   "source": "abcnews.com",
+   "publishedDate": "2026-11-07T00:44:59+00:00",
+   "stance": 0.9,
+   "settled": true,
+   "settlementEventDate": "2026-11-03",
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-07T06:28:53.36",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats gained only two Texas House seats, and Republicans lost a net of one seat, so Democrats did not win a majority of Texas's US House seats",
+     "stance": -0.8,
+     "settled": false
+    },
+    {
+     "claim": "Democrats won the 2026 Texas US Senate race, which satisfies the Senate-majority part of the claim",
+     "stance": 0.9,
+     "settled": true
+    }
+   ]
+  },
+  {
+   "url": "https://cnbc.com/2026/11/02/prediction-market-traders-now-see-nearly-75percent-chance-of-democrats-winning-the-senate.html",
+   "title": "Prediction market traders now see nearly 75% chance of Democrats winning the Senate",
+   "source": "cnbc.com",
+   "publishedDate": "2026-11-02T19:15:26+00:00",
+   "stance": 0.4,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_probability",
+   "addedAt": "2026-11-02T19:23:04.647",
+   "evidenceWeight": 4,
+   "claims": [
+    {
+     "claim": "Kalshi traders price a 74% chance that Democrats win the Texas U.S. Senate race, which would supply the Senate half of the claim",
+     "stance": 0.4,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/homenews/6187749-democrats-edge-out-gop-senate-poll/",
+   "title": "Democrats edge out Republicans in 7 heated Senate races: NYT polls",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-02T03:03:49+00:00",
+   "stance": 0.4,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-02T03:15:16.768",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "A New York Times/Siena poll shows Democrats leading in the Texas Senate race by 7 points, two days before the election",
+     "stance": 0.4,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://aa.com.tr/en/americas/democrats-lead-in-5-republican-held-senate-races-ahead-of-us-midterms-polls/4108452",
+   "title": "Democrats lead in 5 Republican-held Senate races ahead of US midterms: Polls",
+   "source": "aa.com.tr",
+   "publishedDate": "2026-11-02T08:30:35+00:00",
+   "stance": 0.35,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-02T08:33:56.642",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "A New York Times/Siena poll has Democrat James Talarico ahead of Republican Ken Paxton 50% to 43% in the Texas Senate race, a lead that favors the Senate half of the claim but says nothing about the House seats",
+     "stance": 0.35,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://independent.co.uk/news/world/americas/us-politics/trump-midterms-youth-vote-2026-b3071784.html",
+   "title": "Young voters are turning to Democrats after they clinched 2024 for Trump",
+   "source": "independent.co.uk",
+   "publishedDate": "2026-10-22T20:03:10+00:00",
+   "stance": 0.1,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-10-22T20:12:47.338",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "Nationally, Democrats lead Republicans 63% to 26% among likely young voters, a weak indication of a Democratic lean that says nothing specific about Texas seats",
+     "stance": 0.1,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/homenews/campaign/6126023-talarico-paxton-texas-poll/",
+   "title": "Talarico leads Paxton by 2 points in tightening Texas Senate race: Survey",
+   "source": "thehill.com",
+   "publishedDate": "2026-10-02T15:31:58+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-10-25T19:11:32.428",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "A Fox News poll gives Democrat Talarico a narrow 51-49 lead over Republican Paxton among likely Texas voters, a lead within the margin of error",
+     "stance": 0.2,
+     "settled": false
+    },
+    {
+     "claim": "Talarico leads Paxton by seven points among registered Texas voters, a wider margin than among likely voters",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://aljazeera.com/news/2026/10/20/trumps-approval-ratings-plummet-what-that-means-for-the-us-midterms?traffic_source=rss",
+   "title": "Trump’s approval ratings plummet: what that means for the US midterms",
+   "source": "aljazeera.com",
+   "publishedDate": "2026-10-20T10:13:19+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-10-20T10:54:12.731",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "A national generic-ballot poll shows Democrats ahead by 12 points, a national signal that only weakly bears on Democratic wins in Texas",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://independent.co.uk/news/world/americas/us-politics/us-midterm-elections-poll-donald-trump-senate-b3069747.html",
+   "title": "What polling predicts will happen at the US midterm elections",
+   "source": "independent.co.uk",
+   "publishedDate": "2026-10-20T09:38:57+00:00",
+   "stance": 0.15,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-10-20T09:51:59.954",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "Nationwide House voting intentions favor Democrats by seven points, a weak signal about Democratic prospects in Texas",
+     "stance": 0.15,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/homenews/campaign/6162170-democrats-hold-poll-advantage-midterms/",
+   "title": "Democrats holding 10-point advantage ahead of midterms: Survey",
+   "source": "thehill.com",
+   "publishedDate": "2026-10-21T14:13:27+00:00",
+   "stance": 0.15,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-10-21T14:44:21.233",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "A national generic-ballot poll shows Democrats ahead 49% to 39%, weak context for Democratic gains in Texas",
+     "stance": 0.15,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://pbs.org/newshour/show/breaking-down-the-democrats-big-majorities-after-the-blue-wave",
+   "title": "Breaking down the Democrats’ big majorities after the blue wave",
+   "source": "pbs.org",
+   "publishedDate": "2026-11-04T23:45:30+00:00",
+   "stance": 0.5,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-04T23:58:03.574",
+   "evidenceWeight": 1.5,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico is leading Republican Ken Paxton by about 55 percent to the Texas U.S. Senate race, a sign the Democrats will carry the Texas Senate contest",
+     "stance": 0.5,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://aljazeera.net/news/2026/11/13/%d9%87%d9%84-%d9%8a%d9%81%d8%aa%d8%ad-%d8%a7%d9%84%d8%af%d9%8a%d9%85%d9%82%d8%b1%d8%a7%d8%b7%d9%8a%d9%88%d9%86-%d8%a3%d8%a8%d9%88%d8%a7%d8%a8-%d8%a7%d9%84%d8%ac%d8%ad%d9%8a%d9%85-%d8%b9%d9%84%d9%89?traffic_source=rss",
+   "title": "هل يفتح الديمقراطيون أبواب الجحيم على إمبراطورية ماسك؟",
+   "source": "aljazeera.net",
+   "publishedDate": "2026-11-12T18:53:18+00:00",
+   "stance": 0.8,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-12T22:17:11.266",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won the Texas US Senate seat, governor and attorney general races in the November 3, 2026 midterms, so the Senate half of the claim is met; Texas House results are not reported",
+     "stance": 0.8,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://pbs.org/newshour/politics/democrats-gather-in-denver-for-post-midterms-introspection-turned-celebration",
+   "title": "Democrats gather in Denver for post-midterms introspection-turned-celebration",
+   "source": "pbs.org",
+   "publishedDate": "2026-11-12T21:22:47+00:00",
+   "stance": 0.3,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-12T21:38:19.453",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico has won the Texas U.S. Senate seat in the 2026 midterms, a reported win for one of the two Texas Senate components of the claim; the Texas House seats are not reported in this article",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://fortune.com/2026/11/11/companies-gridlock-2027-congress-midterms-bipartisan/",
+   "title": "The next Congress could be more productive than you expect. Here’s what that means for your company | Fortune",
+   "source": "fortune.com",
+   "publishedDate": "2026-11-11T12:30:00+00:00",
+   "stance": 0.3,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-11T13:04:36.174",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "The Republican Senate nominee in Texas, Ken Paxton, lost the 2026 Texas Senate race by 12 points, which supports a Democratic win of that contested Senate seat. The House seats are not addressed.",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://foxnews.com/politics/gop-wipeout-goes-bad-worse-dems-quietly-score-another-major-win-big-ramifications",
+   "title": "GOP wipeout goes from bad to worse as Dems quietly score another major win with big ramifications",
+   "source": "foxnews.com",
+   "publishedDate": "2026-11-10T14:45:47+00:00",
+   "stance": 0.15,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-11T01:26:51.383",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped the Texas state House in 2026, a state legislative chamber and not the US House seats the claim concerns",
+     "stance": 0.15,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/the-120/6212040-cornyn-talarico-senate-transition/",
+   "title": "Cornyn: Talarico will have ‘interesting time navigating a red state as a Democrat’",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-10T22:07:12+00:00",
+   "stance": 0.676,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "opinion",
+   "addedAt": "2026-11-10T22:31:25.411",
+   "evidenceWeight": 0.425,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico won the only US Senate seat contested in Texas in 2026, which satisfies the Senate-majority part of the claim",
+     "stance": 0.8,
+     "settled": false
+    },
+    {
+     "claim": "Democrats captured every Texas statewide race and flipped the Texas state house, a weak signal about the US House seat majority",
+     "stance": 0.15,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://yahoo.com/news/politics/articles/house-seats-democrats-didnt-expect-050649423.html",
+   "title": "Here are some of the House seats that Democrats didn't expect to win this year",
+   "source": "yahoo.com",
+   "publishedDate": "2026-11-10T05:06:49+00:00",
+   "stance": -0.6,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-10T22:10:20.603",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "A Democrat won Texas's 23rd district by 8 points, a single Texas House seat, which is far short of the majority of Texas seats the claim requires",
+     "stance": -0.6,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://aljazeera.com/video/lets-focus/2026/11/10/2026-midterms-blue-wave-or-anti-establishment-backlash?traffic_source=rss",
+   "title": "2026 Midterms: Blue wave or anti-establishment backlash?",
+   "source": "aljazeera.com",
+   "publishedDate": "2026-11-10T21:00:55+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-10T21:20:27.985",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won a decisive national victory in the 2026 midterms, a weak signal for their Texas seat-majority claim",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://oilprice.com/Energy/Energy-General/US-Midterm-Shake-Up-Could-Reshape-Global-Oil-and-Gas-Markets.html",
+   "title": "U.S. Midterm Shake-Up Could Reshape Global Oil and Gas Markets | OilPrice.com",
+   "source": "oilprice.com",
+   "publishedDate": "2026-11-10T19:00:00+00:00",
+   "stance": 0.6,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-10T19:08:19.263",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped the Texas US Senate seat in the 2026 midterms, which satisfies the Senate half of the claim; the Texas House half is not reported",
+     "stance": 0.6,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/opinion/campaign/6208743-historic-diversity-election-victories/",
+   "title": "Inclusion was the big winner in the midterms",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-10T16:00:00+00:00",
+   "stance": 0.154,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-10T16:31:42.201",
+   "evidenceWeight": 1.05,
+   "claims": [
+    {
+     "claim": "Democrats gained Texas House seats in the 2026 midterms, but the article gives no total showing a majority of Texas's House seats",
+     "stance": 0.2,
+     "settled": false
+    },
+    {
+     "claim": "An overtly Christian candidate won the 2026 U.S. Senate race in Texas; the article does not state that candidate's party",
+     "stance": 0.1,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/homenews/analysis/6209156-midterm-election-democrat-surge/",
+   "title": "Withered MAGA coalition opened door to Democratic wave",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-10T11:00:00+00:00",
+   "stance": 0.4,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "opinion",
+   "addedAt": "2026-11-10T11:34:47.802",
+   "evidenceWeight": 0.625,
+   "claims": [
+    {
+     "claim": "Texas Republicans lost every statewide race in the 2026 midterms, which points toward Democrats winning the contested Texas Senate seat (a partial, Senate-only signal; the House majority is not addressed)",
+     "stance": 0.5,
+     "settled": false
+    },
+    {
+     "claim": "Hispanic voter defection from the GOP in Texas suggests Democratic gains in the state's House seats, though no seat count is given",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://yahoo.com/news/politics/article/lots-of-2026-midterm-races-havent-been-called-yet-heres-where-things-stand-right-now-235850171.html",
+   "title": "Lots of 2026 midterm races haven’t been called yet. Here’s where things stand right now.",
+   "source": "yahoo.com",
+   "publishedDate": "2026-11-09T23:58:50+00:00",
+   "stance": 0.6,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-10T01:27:54.054",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped the Texas U.S. Senate seat from Republican control in the 2026 midterms, satisfying the Senate half of the claim; the House half is not addressed in this article",
+     "stance": 0.6,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/the-120/6208891-talarico-cornyn-texas-senate-transition/",
+   "title": "Talarico, Cornyn meet in Washington",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-09T20:44:33+00:00",
+   "stance": 0.3,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-09T21:11:02.4",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico won the Texas US Senate seat on 2026-11-03, which covers only the Senate half of the claim; the House half is not reported",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://pbs.org/newshour/politics/watch-live-house-returns-to-washington-after-blowout-election-for-democrats",
+   "title": "WATCH LIVE: House returns to Washington after blowout election for Democrats",
+   "source": "pbs.org",
+   "publishedDate": "2026-11-09T17:00:34+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-09T17:35:49.849",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won a national midterm sweep, which weakly raises the odds they win Texas House and Senate seats, though the article does not mention Texas",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/opinion/campaign/6205285-voters-reject-gop-collapse/",
+   "title": "Democrats won big — why and what comes next may matter more",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-09T13:30:00+00:00",
+   "stance": 0.38,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "opinion",
+   "addedAt": "2026-11-09T13:57:19.447",
+   "evidenceWeight": 0.625,
+   "claims": [
+    {
+     "claim": "Texas State Rep. James Talarico, a Democratic Senate candidate, won his race, which is the Texas Senate seat contested in 2026",
+     "stance": 0.5,
+     "settled": false
+    },
+    {
+     "claim": "Democrats flipped some Texas-based House seats, but the article does not establish that they won a majority of Texas's House seats",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/opinion/campaign/6203630-conservatives-find-silver-lining-midterms/",
+   "title": "They left no doubt: There’s a bright side for everyone about the midterm result",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-09T12:00:00+00:00",
+   "stance": 0.5,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-09T12:34:53.374",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico won the 2026 Texas US Senate race by 12 points on November 3, 2026, one of the Texas seats needed for the Democratic majority claim",
+     "stance": 0.5,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://fortune.com/2026/11/08/tocqueville-democracy-in-america-midterms-data-centers-texas/",
+   "title": "How a Frenchman’s book on democracy in America nearly 200 years ago explains the midterms, from data centers to Texas | ",
+   "source": "fortune.com",
+   "publishedDate": "2026-11-08T21:09:19+00:00",
+   "stance": 0.265,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-08T21:50:16.754",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won the Texas US Senate race on Nov. 3, 2026, one of the two components needed; the US House seat majority is not reported",
+     "stance": 0.3,
+     "settled": false
+    },
+    {
+     "claim": "Democrats took the Texas state House, a body different from the US House seats the claim requires",
+     "stance": 0.1,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://cnbc.com/2026/11/08/democrats-trump-oversight-blanche-doj-investigations.html",
+   "title": "Democrats amp up Trump investigation threats, Blanche counters he may probe lawmakers",
+   "source": "cnbc.com",
+   "publishedDate": "2026-11-08T18:57:56+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-08T19:06:28.244",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won national majorities in both the US House and Senate in the 2026 midterms, a national result that only weakly bears on Texas seat outcomes",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/policy/healthcare/6205511-younger-candidates-win-midterm-wave/",
+   "title": "Midterm results deliver ‘youth quake’ to American politics",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-08T11:00:00+00:00",
+   "stance": 0.3,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-08T11:13:51.038",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democratic candidates, including James Talarico and Gina Hinojosa in Texas, won their 2026 midterm races, suggesting Democrats carried Texas contests",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://gatestoneinstitute.org/22969/america-the-pendulum-swings",
+   "title": "America: The Pendulum Swings",
+   "source": "gatestoneinstitute.org",
+   "publishedDate": "2026-11-08T09:00:00+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-08T10:03:40.243",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won the Texas US Senate seat contested in the 2026 midterms, a partial component of the claim, while the House seat count is not reported",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://aljazeera.net/opinions/2026/11/8/7-%d9%85%d8%ad%d8%b7%d8%a7%d8%aa-%d8%b4%d8%a7%d9%87%d8%af%d8%a9-%d9%85%d9%86-%d9%82%d8%a8%d9%84-%d8%aa%d8%b1%d9%85%d8%a8-%d9%84%d9%85-%d9%8a%d9%86%d8%aa%d9%87?traffic_source=rss",
+   "title": "ترمب لم ينتهِ والجمهوريون سيعودون",
+   "source": "aljazeera.net",
+   "publishedDate": "2026-11-08T05:57:59+00:00",
+   "stance": 0.15,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-08T09:31:39.283",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats have recently come to dominate Texas politics, though they have not won a statewide race there in over 30 years",
+     "stance": 0.15,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://thehill.com/homenews/sunday-talk-shows/6206302-congress-leadership-fight-democrats-agenda-midterms/",
+   "title": "Sunday shows preview: Democrats lay out legislative agenda; Congress leadership sparks infighting",
+   "source": "thehill.com",
+   "publishedDate": "2026-11-07T23:27:18+00:00",
+   "stance": 0.4,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-07T23:58:33.13",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped some GOP-held seats in Texas in the 2026 midterms, but the article does not establish a Texas majority of House or Senate seats",
+     "stance": 0.4,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://dw.com/en/after-victory-in-the-midterms-what-next-for-us-democrats/a-79884957?maca=en-rss-en-all-1573-rdf",
+   "title": "After victory in the midterms, what next for US Democrats?",
+   "source": "dw.com",
+   "publishedDate": "2026-11-07T14:15:00+00:00",
+   "stance": 0.3,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-07T14:20:44.46",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "The national Democratic midterm wave, including a gubernatorial win in Texas, makes a Democratic majority of Texas House and Senate seats somewhat more likely",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://theguardian.com/news/ng-interactive/2026/nov/07/the-end-of-maga-as-we-know-it",
+   "title": "The end of Maga as we know it",
+   "source": "theguardian.com",
+   "publishedDate": "2026-11-07T06:00:05+00:00",
+   "stance": 0.7,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-07T06:09:51.335",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrat James Talarico won the contested Texas US Senate seat in the 2026 midterms, which satisfies the Senate half of the claim; the House half is not reported",
+     "stance": 0.7,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://timesofindia.indiatimes.com/world/us/us-mid-term-elections/news/republicans-spent-more-democrats-won-more-inside-the-costliest-us-midterm-battle/articleshow/135626137.cms",
+   "title": "Republicans spent more, Democrats won more: Inside the costliest US midterm battle",
+   "source": "timesofindia.indiatimes.com",
+   "publishedDate": "2026-11-07T04:17:53+00:00",
+   "stance": 0.16,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "cited_share",
+   "addedAt": "2026-11-07T04:35:46.033",
+   "evidenceWeight": 1.25,
+   "claims": [
+    {
+     "claim": "Republican support fell sharply in Hidalgo County, Texas, a Texas-specific shift toward Democrats that weakly favors Democratic gains in Texas races",
+     "stance": 0.2,
+     "settled": false
+    },
+    {
+     "claim": "The Republican Senate candidate in Texas, Ken Paxton, struggled to raise money, a weak signal for Republican retention of the contested Texas Senate seat",
+     "stance": 0.1,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://yahoo.com/news/politics/articles/arizona-democrats-gain-trifecta-control-183915097.html",
+   "title": "Democrats win the Arizona House, Senate and governor's office for the first time since 1966",
+   "source": "yahoo.com",
+   "publishedDate": "2026-11-06T18:39:15+00:00",
+   "stance": 0.2,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-06T22:58:51.41",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped the Texas state House in the 2026 elections, a weak signal of Democratic strength in Texas but not a result for US House or US Senate seats",
+     "stance": 0.2,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://middleeasteye.net/opinion/us-midterms-blue-tsunami-has-rebuked-trump-will-it-end-washingtons-wars",
+   "title": "US midterms: A blue tsunami has rebuked Trump. Will it end Washington's wars?",
+   "source": "middleeasteye.net",
+   "publishedDate": "2026-11-06T19:39:09+00:00",
+   "stance": 0.6,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-06T19:43:10.844",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats won the Texas US Senate seat in the 2026 midterms, which covers one of the two conditions the claim requires",
+     "stance": 0.6,
+     "settled": false
+    }
+   ]
+  },
+  {
+   "url": "https://pbs.org/newshour/politics/latino-voters-propel-democrats-to-big-wins-with-leftward-swing",
+   "title": "Latino voters propel Democrats to big wins with leftward swing",
+   "source": "pbs.org",
+   "publishedDate": "2026-11-06T19:07:57+00:00",
+   "stance": 0.627,
+   "settled": null,
+   "settlementEventDate": null,
+   "evidenceClass": "reported_fact",
+   "addedAt": "2026-11-06T19:12:47.996",
+   "evidenceWeight": 1,
+   "claims": [
+    {
+     "claim": "Democrats flipped the Texas U.S. Senate seat in the 2026 midterms, which by itself would give them a majority of the Senate seats contested in Texas.",
+     "stance": 0.9,
+     "settled": false
+    },
+    {
+     "claim": "Democrats swept Texas's 2026 statewide and congressional contests, pointing toward a Texas House seat majority.",
+     "stance": 0.3,
+     "settled": false
+    }
+   ]
+  }
+ ],
+ "news": [
+  {
+   "title": "For first time in decades, Texas elects Dem to Senate, as GOP faces nationwide rout",
+   "source": "jns.org",
+   "publishedDate": "2026-11-04T06:00:24.150Z",
+   "snippet": "“It’s going to be a very big night for Democrats, and a big night for Democrats in the House means that the half-a-dozen or so new DSA new members aren’t going to have much influence,” Brian Romick, of Democratic Majorit",
+   "url": "https://jns.org/news/u-s-news/for-first-time-in-decades-texas-elects-dem-to-senate-as-gop-faces-nationwide-rout"
+  },
+  {
+   "title": "Talarico wins Senate race, ending decades of Republican dominance in Texas",
+   "source": "aljazeera.com",
+   "publishedDate": "2026-11-04T04:03:41Z",
+   "snippet": "Democrats celebrate Talarico's and Hinojosa's victories, redefining Texas politics after decades of Republican reign.",
+   "url": "https://www.aljazeera.com/news/2026/11/4/talarico-wins-texas-senate-race-ending-decades-of-republican-dominance"
+  },
+  {
+   "title": "First since 1988: Democrat James Talarico breaks Republican stronghold in Texas",
+   "source": "timesofindia.indiatimes.com",
+   "publishedDate": "2026-11-04T10:44:00+05:30",
+   "snippet": "Democrat James Talarico has pulled off a historic victory in Texas, defeating Republican Ken Paxton to end nearly four decades of Republican dominance in the state's US Senate elections and deliver a major blow to Presid",
+   "url": "https://timesofindia.indiatimes.com/world/us/us-mid-term-elections/news/first-since-1988-democrat-james-talarico-breaks-republican-stronghold-in-texas/articleshow/135524642.cms"
+  },
+  {
+   "title": "Midterms: Was die Demokraten aus Texas lernen können",
+   "source": "tagesschau.de",
+   "publishedDate": "2026-11-05T09:12:33.790Z",
+   "snippet": "Zum ersten Mal seit 1988 schickt Texas mit James Talarico wieder einen Demokraten in den US-Senat. Auch das Gouverneursamt und andere Spitzenpositionen gehen an die Demokraten. Wie ist ihnen das in diesem Bundesstaat gel",
+   "url": "https://www.tagesschau.de/ausland/amerika/midterms-texas-demokraten-100.html"
+  },
+  {
+   "title": "Why one Republican won a redrawn Texas district despite blue tsunami",
+   "source": "aljazeera.com",
+   "publishedDate": "2026-11-06T05:03:57Z",
+   "snippet": "Republican redistricting largely backfired in Texas and beyond, but one redrawn district delivered for the party.",
+   "url": "https://www.aljazeera.com/news/2026/11/6/why-one-republican-won-a-redrawn-texas-district-despite-blue-tsunami"
+  }
+ ]
+}

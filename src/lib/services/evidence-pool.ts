@@ -721,9 +721,13 @@ export async function getPoolArticles(
  * Oracul's curated, stance-scored evidence for exactly this claim — better
  * grounded than fresh search snippets, and the only place settlement
  * assertions live. Settled rows first (they assert the resolving event
- * itself), then by evidence weight. Looser than USABLE_POOL_ROW_WHERE on
- * purpose: a pre-relevanceScore row with a stance is still evidence a
- * resolver should see, even though aggregation skips it.
+ * itself), then the most recently added. Not by evidence weight: at
+ * resolution time the reports of the outcome are the newest rows, and on the
+ * Texas conjunction (daatan#2180) weight ordering filled every slot with
+ * pre-election polls. `claimsDetail` lets the prompt show what each article
+ * actually said. Looser than USABLE_POOL_ROW_WHERE on purpose: a
+ * pre-relevanceScore row with a stance is still evidence a resolver should
+ * see, even though aggregation skips it.
  */
 export async function getPoolArticlesForResearch(predictionId: string, limit = 12) {
   return prisma.evidencePoolArticle.findMany({
@@ -736,7 +740,7 @@ export async function getPoolArticlesForResearch(predictionId: string, limit = 1
     },
     orderBy: [
       { settled: { sort: 'desc', nulls: 'last' } },
-      { evidenceWeight: { sort: 'desc', nulls: 'last' } },
+      { addedAt: 'desc' },
     ],
     take: limit,
     select: {
@@ -748,6 +752,7 @@ export async function getPoolArticlesForResearch(predictionId: string, limit = 1
       settled: true,
       settlementEventDate: true,
       evidenceClass: true,
+      claimsDetail: true,
     },
   })
 }

@@ -167,3 +167,85 @@ describe('deadlineStatus', () => {
     expect(deadlineStatus(new Date('2026-10-31T00:00:00Z'), now)).toBe('PASSED — the claim window is closed.')
   })
 })
+
+describe('per-condition verdicts (#2180)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    search.mockResolvedValue([hit('https://t/1')] as never)
+    oracle.mockResolvedValue([hit('https://a/1'), hit('https://a/2'), hit('https://a/3')] as never)
+  })
+
+  const respond = (v: object) => generate.mockImplementation((async () => ({ text: JSON.stringify({ reasoning: 'r', evidenceLinks: [], ...v }) })) as never)
+
+  it('downgrades a BINARY correct with an unconfirmed condition to unresolvable', async () => {
+    respond({
+      outcome: 'correct',
+      conditions: [
+        { condition: 'Senate seat won', status: 'met', evidence: 'AP, 2026-11-04' },
+        { condition: 'House majority of 38', status: 'unconfirmed' },
+      ],
+    })
+    const res = await runResolutionResearch(prediction, { userId: 'u1' })
+    expect(res.outcome).toBe('unresolvable')
+    expect(res.unconfirmedConditions).toBe(true)
+    expect(res.conditions).toHaveLength(2)
+  })
+
+  it('keeps correct when every condition is met, and wrong on a failed condition', async () => {
+    respond({ outcome: 'correct', conditions: [{ condition: 'a', status: 'met' }, { condition: 'b', status: 'met' }] })
+    expect((await runResolutionResearch(prediction, { userId: 'u1' })).outcome).toBe('correct')
+
+    respond({ outcome: 'wrong', conditions: [{ condition: 'a', status: 'met' }, { condition: 'b', status: 'failed' }] })
+    const res = await runResolutionResearch(prediction, { userId: 'u1' })
+    expect(res.outcome).toBe('wrong')
+    expect(res.unconfirmedConditions).toBeUndefined()
+  })
+
+  it('a verdict without conditions (fallback provider) passes through', async () => {
+    respond({ outcome: 'correct' })
+    const res = await runResolutionResearch(prediction, { userId: 'u1' })
+    expect(res.outcome).toBe('correct')
+    expect(res.conditions).toEqual([])
+  })
+
+  it('passes the resolution rules to query generation', async () => {
+    const { fillPrompt } = await import('@/lib/llm/bedrock-prompts')
+    respond({ outcome: 'wrong' })
+    await runResolutionResearch({ ...prediction, resolutionRules: 'Both A and B.' }, { userId: 'u1' })
+    const vars = vi.mocked(fillPrompt).mock.calls.map(([, v]) => v).find((v) => !('deadlineStatus' in v))
+    expect(vars?.resolutionRules).toBe('Both A and B.')
+  })
+})
+
+describe('guardVerdict', () => {
+  it('leaves multiple-choice verdicts alone: losing options are listed as failed', async () => {
+    const { guardVerdict } = await import('@/lib/services/resolutionResearch')
+    const v = { outcome: 'correct' as const, conditions: [{ condition: 'option A', status: 'failed' as const }] }
+    expect(guardVerdict(v, 'MULTIPLE_CHOICE')).toBe(v)
+    expect(guardVerdict(v, 'BINARY').outcome).toBe('unresolvable')
+  })
+})
+
+describe('pool context (#2180)', () => {
+  it('drivingClaim prefers a settled claim, then the largest |stance|', async () => {
+    const { drivingClaim } = await import('@/lib/services/resolutionResearch')
+    expect(drivingClaim([
+      { claim: 'Talarico leads by 2', stance: 0.9, settled: false },
+      { claim: 'Democrats hold 14 Texas US House seats, short of a majority', stance: -1, settled: true },
+    ])).toBe('Democrats hold 14 Texas US House seats, short of a majority')
+    expect(drivingClaim([{ claim: 'weak', stance: 0.2 }, { claim: 'strong', stance: -0.7 }])).toBe('strong')
+    expect(drivingClaim(null)).toBeNull()
+    expect(drivingClaim([{ stance: 1 }])).toBeNull()
+  })
+
+  it('formatPoolContext shows each row with the claim the extractor read', async () => {
+    const { formatPoolContext } = await import('@/lib/services/resolutionResearch')
+    const text = formatPoolContext([{
+      url: 'https://aj/1', title: 'Why one Republican won', source: 'aljazeera.com', publishedDate: '2026-11-06',
+      stance: -1, settled: true, settlementEventDate: '2026-11-03', evidenceClass: 'cited_share',
+      claimsDetail: [{ claim: 'Democrats hold 14 Texas US House seats', stance: -1, settled: true }],
+    }])
+    expect(text).toContain('| stance -1 | cited_share | SETTLEMENT ASSERTED on 2026-11-03 | https://aj/1\n  claim: Democrats hold 14 Texas US House seats')
+    expect(formatPoolContext([])).toBe('')
+  })
+})
