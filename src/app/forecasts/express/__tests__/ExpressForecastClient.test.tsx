@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Activity } from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import type { GroundedDateOutcome } from '@/lib/llm/expressPrediction'
@@ -431,7 +432,7 @@ describe('ExpressForecastClient', () => {
       await renderInReviewState()
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: messages.expressForecast.startOver }))
+        fireEvent.click(screen.getAllByRole('button', { name: messages.expressForecast.startOver })[0])
       })
 
       expect(screen.queryByText('Confirm & Publish')).not.toBeInTheDocument()
@@ -773,9 +774,52 @@ describe('ExpressForecastClient', () => {
       await act(async () => { fireEvent.click(screen.getByText('Guess chances')) })
       expect(guessSignal?.aborted).toBe(false)
 
-      await act(async () => { fireEvent.click(screen.getByText(messages.expressForecast.startOver)) })
+      await act(async () => { fireEvent.click(screen.getAllByText(messages.expressForecast.startOver)[0]) })
       expect(guessSignal?.aborted).toBe(true)
       expect(screen.queryByText(messages.expressForecast.guessError)).not.toBeInTheDocument()
+    })
+
+    it('offers Start over at the top of the review screen too, not only below the fold (#2195)', async () => {
+      await renderInReviewState()
+      const buttons = screen.getAllByRole('button', { name: messages.expressForecast.startOver })
+      expect(buttons).toHaveLength(2)
+      expect(buttons[0]).not.toBeDisabled()
+    })
+
+    // daatan#2195 (Andrey): with cacheComponents, Next keeps /create alive in a hidden
+    // <Activity> after the publish redirect; going back must not restore the published
+    // review stuck on "Publishing…".
+    it('resets to an empty input step when shown again after a successful publish (#2195)', async () => {
+      const streamBody = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(JSON.stringify({ stage: 'complete', data: generatedData }) + '\n'))
+          controller.close()
+        },
+      })
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(streamBody, { status: 200 }))
+      const tree = (mode: 'visible' | 'hidden') => (
+        <CapabilitiesProvider value={NO_MARKETS}>
+          <NextIntlClientProvider locale="en" messages={messages}>
+            <Activity mode={mode}><ExpressForecastClient userId="test-user" /></Activity>
+          </NextIntlClientProvider>
+        </CapabilitiesProvider>
+      )
+      const { rerender } = render(tree('visible'))
+      fireEvent.change(screen.getByPlaceholderText(/Describe your event OR paste/), {
+        target: { value: 'Bitcoin will reach $100k this year' },
+      })
+      await act(async () => { fireEvent.click(screen.getByText('Generate Forecast')) })
+      await screen.findByText('Confirm & Publish', {}, { timeout: 3000 })
+
+      await publishAndReadCreateBody()
+      expect(screen.getByText(messages.expressForecast.publishingProgress)).toBeInTheDocument()
+
+      await act(async () => { rerender(tree('hidden')) })
+      await act(async () => { rerender(tree('visible')) })
+
+      expect(screen.queryByText(messages.expressForecast.publishingProgress)).not.toBeInTheDocument()
+      expect(screen.queryByText('Confirm & Publish')).not.toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/Describe your event OR paste/)).toHaveValue('')
     })
 
     it('never asked: shows the hint, not the abstain heading (#1806)', async () => {
