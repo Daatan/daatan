@@ -8,6 +8,7 @@ import {
     researchSchema,
     rulesDirectionSchema,
     rulesStrengthSchema,
+    claimDefinednessSchema,
     rulesSchema,
     voteDecisionSchema,
 } from './schemas'
@@ -60,6 +61,7 @@ export const PROMPT_SCHEMAS: Record<PromptName, Schema | null> = {
     'panel-estimate-grounded': null,
     'rules-direction': rulesDirectionSchema,
     'rules-strength': rulesStrengthSchema,
+    'claim-definedness': claimDefinednessSchema,
 }
 
 /**
@@ -85,6 +87,7 @@ export const PROMPT_SCHEMA_NAMES: Partial<Record<PromptName, string>> = {
     'backfill-rules': 'rulesSchema',
     'rules-direction': 'rulesDirectionSchema',
     'rules-strength': 'rulesStrengthSchema',
+    'claim-definedness': 'claimDefinednessSchema',
 }
 
 export interface PromptFingerprint {

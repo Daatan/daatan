@@ -814,7 +814,14 @@
     "claimDeadlineMismatchWarningTitle": "Data malkonsekvenco: {date}",
     "claimDeadlineMismatchWarningHint": "La asertteksto mencias alian daton ol la solva dato sube. Redaktu unu el ili por ke ili konkordu — alie ĉi tiu prognozo estos rifuzita kiam vi provos publikigi ĝin.",
     "rulesDirectionWarningTitle": "La solvaj reguloj eble kontraŭdiras la aserton",
-    "rulesDirectionWarningHint": "Ŝajnas, ke ĉi tiuj reguloj solvas JES kiam la aserto montriĝas malvera. Redaktu la regulojn por ke JES signifu, ke via aserto realiĝis."
+    "rulesDirectionWarningHint": "Ŝajnas, ke ĉi tiuj reguloj solvas JES kiam la aserto montriĝas malvera. Redaktu la regulojn por ke JES signifu, ke via aserto realiĝis.",
+    "definednessTitle": "Ĉi tiun prognozon oni povas kompreni dumaniere",
+    "definednessRechecking": "Ni kontrolas vian redakton…",
+    "definednessEditMyself": "Mi mem redaktos la aserton",
+    "definednessBlockedHint": "Antaŭ ol publikigi, elektu la version, kiun vi celas, aŭ redaktu la aserton. Voĉdonantoj bezonas unu klaran demandon por konsenti, kiel ĝi solviĝos.",
+    "definednessAdvisoryHint": "Elektu la version, kiun vi celas, aŭ redaktu la aserton. Voĉdonantoj bezonas unu klaran demandon por konsenti, kiel ĝi solviĝos.",
+    "definednessStillUnclearHint": "Ŝajnas, ke oni ankoraŭ povas kompreni ĝin dumaniere. Vi povas redakti denove aŭ tamen publikigi.",
+    "definednessPublishAnyway": "Tamen publikigi"
   },
   "admin": {
     "panel": "Administra Panelo",

@@ -41,6 +41,14 @@
       "schema_hash": "760c1ac2e80b7285",
       "schema_chars": 166
     },
+    "claim-definedness": {
+      "version": "v1",
+      "hash": "90bc40719b3ebc21",
+      "chars": 3293,
+      "schema": "claimDefinednessSchema",
+      "schema_hash": "ced428afb74eff8d",
+      "schema_chars": 1344
+    },
     "content-moderation": {
       "version": "v4",
       "hash": "640b6a873c827a17",
@@ -59,8 +67,8 @@
     },
     "express-prediction": {
       "version": "v11",
-      "hash": "6f687860837f0936",
-      "chars": 11739,
+      "hash": "6f1a641f8b4b8033",
+      "chars": 11338,
       "schema": "expressPredictionSchema",
       "schema_hash": "5cfec4f1255aef42",
       "schema_chars": 2266

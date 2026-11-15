@@ -814,7 +814,14 @@
     "claimDeadlineMismatchWarningTitle": "Claim/date mismatch: {date}",
     "claimDeadlineMismatchWarningHint": "The claim text names a different date than the resolution date below. Edit one of them so they agree — otherwise this forecast will be rejected when you try to publish it.",
     "rulesDirectionWarningTitle": "Resolution rules may contradict the claim",
-    "rulesDirectionWarningHint": "These rules seem to resolve YES when the claim turns out false. Edit the rules so that YES means your claim came true."
+    "rulesDirectionWarningHint": "These rules seem to resolve YES when the claim turns out false. Edit the rules so that YES means your claim came true.",
+    "definednessTitle": "This forecast can be read two ways",
+    "definednessRechecking": "Checking your edit…",
+    "definednessEditMyself": "Edit the claim myself",
+    "definednessBlockedHint": "Pick the version you mean, or edit the claim, before publishing. Voters need one clear question to agree on how it resolves.",
+    "definednessAdvisoryHint": "Pick the version you mean, or edit the claim. Voters need one clear question to agree on how it resolves.",
+    "definednessStillUnclearHint": "This still looks open to two readings. You can edit it again, or publish anyway.",
+    "definednessPublishAnyway": "Publish anyway"
   },
   "admin": {
     "panel": "Admin Panel",

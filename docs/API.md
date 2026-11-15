@@ -317,6 +317,17 @@ When the first draft reports its resolution date as `assumed` (#1706), one extra
 
 Every binary draft then goes through the #1813 rules-direction check (`src/lib/llm/rulesDirection.ts`): inverted rules are rewritten when a second check accepts the rewrite, otherwise the review screen warns. The result's `rulesDirection` field (`direction`, `initial`, `fixed`) records the outcome; the check is fail-open (`direction: 'error'`).
 
+Binary drafts also go through the #2166 claim-definedness judge (`src/lib/llm/claimDefinedness.ts`), beside rules-strength. The result's `definedness` field is `{ verdict: 'ok' | 'unclear' | 'error', enforced, fault, term, question, options, … }`. On `unclear` the review screen shows `question` and the corrected claims in `options` (in the author's language). Picking one re-drafts from it; "Edit the claim myself" re-checks the edit once through the route below. When `enforced` is true (`DEFINEDNESS_BLOCKS_PUBLISH`, currently off), Publish stays disabled until one of those happens. A claim that is still unclear afterwards can be published anyway. Fail-open: `verdict: 'error'` never blocks. Recorded in `forecast_creation_attempts.details.definedness`.
+
+---
+
+### `POST /api/forecasts/express/definedness` — Auth
+The review screen's escape hatch (#2166). **Body** `{ kind: 'recheck' | 'override', userInput, claimText, resolutionRules, term? }`.
+- `recheck` runs the judge on the author's edited claim and returns `{ definedness }`.
+- `override` records a publish over a still-unclear verdict and returns `{ definedness: null }`.
+
+Each call writes a `forecast_creation_attempts` row with outcome `DEFINEDNESS_CHECK`. Rate-limited to 20/hour per user. Returns 404 when AI features are off.
+
 ---
 
 ### `POST /api/forecasts/express/guess` — Auth

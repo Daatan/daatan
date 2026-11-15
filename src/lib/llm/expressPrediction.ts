@@ -18,6 +18,7 @@ import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
 import { lookupGroundedEventDate } from './groundedDateLookup'
 import { ensureRulesDirection, type RulesDirectionOutcome } from './rulesDirection'
 import { checkRulesStrength, type RulesStrengthOutcome } from './rulesStrength'
+import { checkClaimDefinedness, type ClaimDefinednessOutcome } from './claimDefinedness'
 import { forStage } from '@/lib/llm/stageModels'
 
 /**
@@ -190,6 +191,11 @@ export interface ExpressPredictionResult {
   // on the attempt only — never changes the rules or the review screen. Null for
   // MULTIPLE_CHOICE.
   rulesStrength: RulesStrengthOutcome | null
+  // #2166: whether the claim has a deciding term with two common readings, or rules that
+  // contradict it. `verdict: 'unclear'` blocks publishing on the review screen until the
+  // author picks one of `options` (re-drafted from it) or edits the claim (re-checked once).
+  // Null for MULTIPLE_CHOICE.
+  definedness: ClaimDefinednessOutcome | null
   // Author-facing text translated into the language the user typed in (non-Latin input
   // only), for the create preview. The English fields above stay canonical. Null/absent
   // for English input or on translation failure.
@@ -381,6 +387,16 @@ function startRulesStrength(prediction: ParsedPrediction): Promise<RulesStrength
 }
 
 /**
+ * #2166: runs beside rules-strength, after the direction check (it may have rewritten the
+ * rules), so it adds no wall-clock in the common case. Fails open.
+ */
+function startDefinedness(prediction: ParsedPrediction, userInput: string, stageTimings: StageTimings): Promise<ClaimDefinednessOutcome | null> {
+  if (prediction.outcomeType !== 'BINARY') return Promise.resolve(null)
+  return timed(stageTimings, 'definednessMs', () =>
+    checkClaimDefinedness(prediction.claimText, prediction.resolutionRules, userInput))
+}
+
+/**
  * #1890 C: the direction check and the author's localized preview run side by side. The
  * preview is translated from the rules as drafted; in the rare case the check rewrites them,
  * only the rules are translated again, so the preview never shows the inverted text.
@@ -392,6 +408,7 @@ async function checkRulesAndLocalize(prediction: ParsedPrediction, userInput: st
   ))
   const rulesDirection = await timed(stageTimings, 'rulesDirectionMs', () => applyRulesDirection(prediction))
   const rulesStrengthP = startRulesStrength(prediction)
+  const definednessP = startDefinedness(prediction, userInput, stageTimings)
   let localized = await localizedP
   if (localized && rulesDirection?.fixed) {
     const { language } = localized
@@ -404,7 +421,7 @@ async function checkRulesAndLocalize(prediction: ParsedPrediction, userInput: st
       localized = null
     }
   }
-  return { rulesDirection, localized, rulesStrength: await rulesStrengthP }
+  return { rulesDirection, localized, rulesStrength: await rulesStrengthP, definedness: await definednessP }
 }
 
 export async function generateExpressPrediction(
@@ -513,7 +530,7 @@ export async function generateExpressPrediction(
 
     onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-    const { rulesDirection, localized, rulesStrength } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
+    const { rulesDirection, localized, rulesStrength, definedness } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
     const ungroundedYears = findUngroundedYears(
       prediction.claimText,
       prediction.resolveByDatetime,
@@ -538,6 +555,7 @@ export async function generateExpressPrediction(
       claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
       rulesDirection,
       rulesStrength,
+      definedness,
       localized,
       stageTimings: finish(),
     }
@@ -875,7 +893,7 @@ URL: ${article.url}
 
   onProgress?.('finalizing', { message: 'Almost done — preparing your forecast for review…' })
 
-  const { rulesDirection, localized, rulesStrength } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
+  const { rulesDirection, localized, rulesStrength, definedness } = await checkRulesAndLocalize(prediction, userInput, stageTimings)
 
   const claimDeadlineMismatch = findClaimTextDeadlineMismatch(prediction.claimText, new Date(prediction.resolveByDatetime))
 
@@ -906,6 +924,7 @@ URL: ${article.url}
     claimDeadlineMismatch: claimDeadlineMismatch ? claimDeadlineMismatch.toISOString() : null,
     rulesDirection,
     rulesStrength,
+    definedness,
     localized,
     stageTimings: finish(),
   }

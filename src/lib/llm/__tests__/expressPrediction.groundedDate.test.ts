@@ -18,6 +18,9 @@ vi.mock('../rulesDirection', () => ({
 vi.mock('../rulesStrength', () => ({
   checkRulesStrength: vi.fn(async () => ({ verdict: 'ok', kind: 'none', yesTrigger: '', fixedRules: '' })),
 }))
+vi.mock('../claimDefinedness', () => ({
+  checkClaimDefinedness: vi.fn(async () => ({ verdict: 'ok' })),
+}))
 
 import { generateExpressPrediction } from '../expressPrediction'
 import { llmService } from '../index'

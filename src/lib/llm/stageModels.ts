@@ -27,6 +27,7 @@ export const LLM_STAGES = [
   'headline',
   'rules_direction',
   'rules_strength',
+  'claim_definedness',
 ] as const
 
 export type LlmStage = (typeof LLM_STAGES)[number]

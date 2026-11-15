@@ -70,6 +70,16 @@ export interface GeneratedPrediction {
   // #1813: 'inverted' when the server could not make the rules resolve YES on the
   // claim being true. Inverted rules it could fix arrive already fixed.
   rulesDirection?: { direction: string } | null
+  // #2166: 'unclear' when a deciding term has two common readings or the rules contradict
+  // the claim. The author picks a corrected claim (re-drafted from it) or edits by hand
+  // (re-checked once). `enforced` = publishing stays blocked until then.
+  definedness?: {
+    verdict: 'ok' | 'unclear' | 'error'
+    enforced: boolean
+    term: string
+    question: string
+    options: string[]
+  } | null
   localized?: {
     language: string
     claimText: string
@@ -160,6 +170,10 @@ export default function ExpressForecastClient({
   // that language; the English canonical is re-derived on create (createForecast).
   const [originalLang, setOriginalLang] = useState<string | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
+  // #2166: the one re-check the author gets — a picked option or a hand edit. After it, a
+  // claim that is still unclear can be published anyway (the override is logged).
+  const [definednessRechecked, setDefinednessRechecked] = useState(false)
+  const [isRechecking, setIsRechecking] = useState(false)
   const [isGuessing, setIsGuessing] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
   const [editForm, setEditForm] = useState<GeneratedPrediction | null>(null)
@@ -193,15 +207,16 @@ export default function ExpressForecastClient({
     t('exampleOlympics'),
   ]
 
-  const handleGenerate = async () => {
-    if (!userInput.trim() || userInput.length < 5) {
+  const handleGenerate = async (inputOverride?: string) => {
+    const input = inputOverride ?? userInput
+    if (!input.trim() || input.length < 5) {
       setError(t('minCharError'))
       return
     }
 
     // URL detection for UI feedback — a link pasted anywhere (even alongside
     // text) is honored as the news anchor server-side, so flag it here too.
-    const isUrl = /https?:\/\/[^\s]+/i.test(userInput)
+    const isUrl = /https?:\/\/[^\s]+/i.test(input)
 
     setError('')
     setStep('checking')
@@ -215,7 +230,7 @@ export default function ExpressForecastClient({
       const response = await fetch('/api/forecasts/express/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput, skipSources }),
+        body: JSON.stringify({ userInput: input, skipSources }),
       })
 
       if (!response.ok) {
@@ -362,7 +377,38 @@ export default function ExpressForecastClient({
     setSourcesSummary('')
     setPredictionPreview(null)
     setNoArticlesDetails(null)
+    setDefinednessRechecked(false)
   }
+
+  // #2166: a picked reading is re-drafted through the whole pipeline, so the deadline, rules,
+  // estimate and checks all follow it. It uses up the author's one re-check.
+  const handlePickDefinednessOption = (option: string) => {
+    handleUserInputChange(option)
+    setDefinednessRechecked(true)
+    setMarketSuggestion(null)
+    void handleGenerate(option)
+  }
+
+  const recheckDefinedness = async (draft: GeneratedPrediction) => {
+    setIsRechecking(true)
+    try {
+      const res = await fetch('/api/forecasts/express/definedness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'recheck', userInput, claimText: draft.claimText, resolutionRules: draft.resolutionRules }),
+      })
+      const data = res.ok ? await res.json() : null
+      setGenerated(g => (g ? { ...g, definedness: data?.definedness ?? null } : g))
+    } catch {
+      // Fails open, like the check itself.
+      setGenerated(g => (g ? { ...g, definedness: null } : g))
+    } finally {
+      setIsRechecking(false)
+    }
+  }
+
+  const definedness = generated?.definedness?.verdict === 'unclear' ? generated.definedness : null
+  const definednessBlocksPublish = !!definedness?.enforced && !definednessRechecked
 
   const handleSkipSourcesAndRetry = () => {
     setSkipSources(true)
@@ -442,6 +488,15 @@ export default function ExpressForecastClient({
 
     setIsPublishing(true)
     setError('')
+
+    if (definedness) {
+      // Published over a claim the judge still calls unclear (#2166) — logged, never blocking.
+      void fetch('/api/forecasts/express/definedness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'override', userInput, claimText: finalData.claimText, resolutionRules: finalData.resolutionRules, term: definedness.term }),
+      }).catch(() => {})
+    }
 
     try {
       // 1. Create the prediction (as draft)
@@ -527,8 +582,14 @@ export default function ExpressForecastClient({
       const rulesDirection = claimChanged || editForm.resolutionRules !== generated?.resolutionRules
         ? null
         : generated?.rulesDirection
-      setGenerated({ ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate, probabilitySuggestion, probabilityReasoning, rulesDirection })
+      const edited = { ...editForm, ungroundedYears, dateBasis, claimDeadlineMismatch, groundedDate, probabilitySuggestion, probabilityReasoning, rulesDirection }
+      setGenerated(edited)
       setIsEditing(false)
+      // #2166 escape hatch: an unclear claim the author rewrote is checked once more.
+      if (definedness && !definednessRechecked && (claimChanged || editForm.resolutionRules !== generated?.resolutionRules)) {
+        setDefinednessRechecked(true)
+        void recheckDefinedness(edited)
+      }
     }
   }
 
@@ -645,7 +706,7 @@ export default function ExpressForecastClient({
           )}
 
           <Button
-            onClick={handleGenerate}
+            onClick={() => { setDefinednessRechecked(false); void handleGenerate() }}
             disabled={!userInput.trim() || userInput.length < 5}
             fullWidth
             size="xl"
@@ -797,7 +858,7 @@ export default function ExpressForecastClient({
               ) : (
                 <>
                   <button
-                    onClick={handleGenerate}
+                    onClick={() => { setDefinednessRechecked(false); void handleGenerate() }}
                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-cobalt/10 rounded-lg transition-colors"
                     title={t('regenerate')}
                   >
@@ -846,6 +907,43 @@ export default function ExpressForecastClient({
 
             {!isEditing && (
               <SimilarForecastsWarning claimText={generated.claimText} tags={generated.tags} />
+            )}
+
+            {!isEditing && (definedness || isRechecking) && (
+              <WarningBanner icon={<AlertCircle className="w-4 h-4" />} title={isRechecking ? t('definednessRechecking') : t('definednessTitle')}>
+                {definedness && !isRechecking && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-text-secondary" dir="auto">{definedness.question}</p>
+                    {!definednessRechecked && (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          {definedness.options.map(option => (
+                            <button
+                              key={option}
+                              type="button"
+                              dir="auto"
+                              onClick={() => handlePickDefinednessOption(option)}
+                              className="text-start text-sm px-3 py-2 rounded-lg border border-cobalt/40 text-text-primary hover:bg-cobalt/10 transition-colors"
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditing(true); setEditForm(generated) }}
+                          className="text-xs text-blue-500 hover:underline"
+                        >
+                          {t('definednessEditMyself')}
+                        </button>
+                      </>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      {definednessRechecked ? t('definednessStillUnclearHint') : definedness.enforced ? t('definednessBlockedHint') : t('definednessAdvisoryHint')}
+                    </p>
+                  </div>
+                )}
+              </WarningBanner>
             )}
 
             {!isEditing && generated.ungroundedYears && generated.ungroundedYears.length > 0 && (
@@ -1237,12 +1335,16 @@ export default function ExpressForecastClient({
                     onClick={handleCreatePrediction}
                     loading={isPublishing}
                     // daatan#2195: publishing mid-guess left the phone stuck on this screen.
-                    disabled={isGuessing}
+                    disabled={isGuessing || definednessBlocksPublish || isRechecking}
                     fullWidth
                     size="xl"
                     leftIcon={<Sparkles className="w-5 h-5" />}
                   >
-                    {isPublishing ? t('publishingProgress') : isGuessing ? t('waitForGuess') : t('confirmPublish')}
+                    {isPublishing
+                      ? t('publishingProgress')
+                      : isGuessing
+                        ? t('waitForGuess')
+                        : definedness && definednessRechecked ? t('definednessPublishAnyway') : t('confirmPublish')}
                   </Button>
                   <Button
                     onClick={handleTryAgain}
