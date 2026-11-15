@@ -8,6 +8,7 @@ import type { EvidenceDispute, EvidencePoolArticle, ClaimArchetype, ClaimDirecti
 import { getOracleConfig, oracleFetch } from '@/lib/services/oracleClient'
 import { claimArchetypeParam, claimDirectionParam, TRANSPORT_NULL_REASONS } from '@/lib/services/oracle'
 import { createLogger } from '@/lib/logger'
+import { withQuestionQuantity } from './question-quantity'
 
 const log = createLogger('evidence-pool')
 
@@ -1258,6 +1259,10 @@ export async function recomputeFromPool(
         ...(claimDeadline ? { claim_deadline: claimDeadline.toISOString() } : {}),
         ...(claimCreatedAt ? { claim_created_at: claimCreatedAt.toISOString() } : {}),
         ...(claimArchetypeParam(claimArchetype) ? { claim_archetype: claimArchetypeParam(claimArchetype) } : {}),
+        // The question's numeric bar (daatan#2176), parsed from the same text sent as
+        // `question`. Log-only on retro's side (confusion-flag rule 2); omitted when
+        // there is no question or no parse.
+        ...withQuestionQuantity(claimText && claimText.trim().length >= 5 ? claimText.trim() : null, claimArchetype, predictionId),
       }),
       // 30 s, was 10 s (daatan#2118). retro's /pool/aggregate cost grows faster than
       // linearly with the usable rows sent: at ~1,100 rows it no longer fit in 10 s
