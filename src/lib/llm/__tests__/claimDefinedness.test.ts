@@ -38,10 +38,14 @@ describe('checkClaimDefinedness (#2166)', () => {
     expect((await checkClaimDefinedness(CLAIM, RULES)).verdict).toBe('ok')
   })
 
-  it('calls a literal rules conflict unclear whatever its chance, and an interpretive one ok', () => {
-    const conflict = { fault: 'rules_conflict', splitChance: 1, readerShare: 100, options: OPTIONS }
+  it('calls a literal rules conflict that can change the result unclear, and an interpretive one ok', () => {
+    const conflict = { fault: 'rules_conflict', splitChance: 30, readerShare: 100, options: OPTIONS }
     expect(definednessBlocks(conflict)).toBe(true)
     expect(definednessBlocks({ ...conflict, readerShare: 80 })).toBe(false)
+  })
+
+  it('lets a literal conflict on an unlikely outcome through (two spellings of one venue)', () => {
+    expect(definednessBlocks({ fault: 'rules_conflict', splitChance: 20, readerShare: 100, options: OPTIONS })).toBe(false)
   })
 
   it('never blocks without two options to pick from', () => {

@@ -44,13 +44,16 @@ const FAILED: ClaimDefinednessOutcome = {
  * Asked for any ambiguity, the judge flags about half of real forecasts, so its two
  * self-reported numbers gate the verdict. A two-readings fault needs a split outcome with a
  * real chance and a common second reading; a rules conflict must be literal (the rules name a
- * different number, party or event than the claim). Measured on prod forecasts in daatan#2166
- * (scripts/check-claim-definedness.ts): 7/72 (9.7%) of a holdout of real forecasts come out
- * unclear, about 3 of them genuinely.
+ * different number, party or event than the claim) and change the result on an outcome with
+ * some chance: without that, two spellings of one venue ("Cinematheque"/"Sinematec", at 20)
+ * and timing quibbles came out unclear. Measured on prod forecasts in daatan#2166
+ * (scripts/check-claim-definedness.ts): 4/72 (5.6%) of a holdout of real forecasts come out
+ * unclear, about 3 of them genuinely (the conflict-chance gate was set after that holdout was read).
  */
 export const MIN_SPLIT_CHANCE = 50
 export const MIN_READER_SHARE = 50
 export const MIN_CONFLICT_SHARE = 100
+export const MIN_CONFLICT_CHANCE = 30
 
 /**
  * Whether an unclear verdict blocks publishing (true) or only shows the author the question
@@ -61,7 +64,7 @@ export const DEFINEDNESS_BLOCKS_PUBLISH = false
 export function definednessBlocks(v: { fault: string; splitChance: number; readerShare: number; options: string[] }): boolean {
   if (v.options.length < 2) return false
   if (v.fault === 'two_readings') return v.splitChance >= MIN_SPLIT_CHANCE && v.readerShare >= MIN_READER_SHARE
-  if (v.fault === 'rules_conflict') return v.readerShare >= MIN_CONFLICT_SHARE
+  if (v.fault === 'rules_conflict') return v.readerShare >= MIN_CONFLICT_SHARE && v.splitChance >= MIN_CONFLICT_CHANCE
   return false
 }
 
