@@ -8,14 +8,11 @@ import { Trophy, Loader2, Medal, Target, TrendingDown, Swords, Bot, Newspaper, U
 import EmptyState from '@/components/ui/EmptyState'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
-import { FETCH_LIMIT, LOWER_IS_BETTER, MIN_RANKED_RESOLVED, formatSigned, isLowSample, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
+import { FETCH_LIMIT, INITIAL_SORT, LOWER_IS_BETTER, MIN_RANKED_RESOLVED, formatSigned, isLowSample, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
 
 const log = createClientLogger('Leaderboard')
 
 export type TagOption = { name: string; slug: string }
-
-/** Server-rendered first view (#2212): the default sort for `initialTag`, so crawlers get the table. */
-export const INITIAL_SORT: SortBy = 'brierScore'
 
 const profileHref = (user: LeaderboardUser) => `/profile/${user.username ?? user.id}`
 

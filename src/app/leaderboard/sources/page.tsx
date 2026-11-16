@@ -1,6 +1,7 @@
 import { getCachedSourceLeaderboard } from '@/lib/services/leaderboard-cached'
 import { listTags } from '@/lib/services/tag'
-import SourceLeaderboardClient, { parseView } from './SourceLeaderboardClient'
+import SourceLeaderboardClient from './SourceLeaderboardClient'
+import { parseView } from './view'
 
 // Server-rendered so crawlers see the ranked outlets/authors and their links (#2212).
 export default async function SourceLeaderboardPage({
