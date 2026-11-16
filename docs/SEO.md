@@ -17,7 +17,12 @@ Forecast detail pages (`src/app/forecasts/[id]/page.tsx`) override with per-fore
 `<title>`: forecast pages set `title: { absolute: '<claim> | <appName>' }` — the route does not inherit
 the root `%s | DAATAN` template, so without `absolute` the bare claim was the whole title
 (daatan#1870). `/about` is `absolute` too (brand-led, ≤ ~60 chars). Meta descriptions are cut at a
-word boundary (`truncate()` in `src/lib/forecast-seo.ts`).
+word boundary (`truncate()` in `src/lib/forecast-seo.ts`). Other pages set a **bare** title and let
+the template add the brand — a title that already carries it doubles it ("Ukraine forecasts | Daatan |
+DAATAN", daatan#2060); `og:title` / `twitter:title` add the brand explicitly. Profiles read
+"<name> — Forecast Track Record". The site root's title and description are `HomeV5.metaTitle` /
+`HomeV5.metaDescription` in `messages/*.json` (en: "Daatan — Forecasting Platform & Expert Ratings",
+daatan#2194).
 
 **Metadata placement (`htmlLimitedBots`, daatan#2055).** Routes with a `loading.tsx`
 (`/forecasts/[id]`, `/tags/[slug]`, `/profile/[id]`, `/sources/[name]`, …) stream: Next.js emits

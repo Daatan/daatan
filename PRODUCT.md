@@ -88,7 +88,7 @@ Every feature must pass ALL checks before implementation:
 ## Core Concepts
 
 ### ELO Rating (headline rating)
-Since #1764, **ELO is the one rating shown to users**: the leaderboard (default sort), profile header, sidebar pill, forecast author line, activity feed and profile OG image all lead with `User.eloRating` (per-tag value when a tag is selected). The only other user-facing scores are **Accuracy** and **Brier**. Glicko, RS, peer/AI/truth scores and ROI are still computed but hidden. See [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md).
+Since #1764, **ELO is the one rating shown to users**: the profile header, sidebar pill, forecast author line, activity feed and profile OG image all lead with `User.eloRating` (per-tag value when a tag is selected). The other user-facing scores are **Accuracy** and **Brier**, plus the leaderboard's **Peer Score** and **AI Score** columns (#2130); the leaderboard opens sorted by Brier and ranks only users with at least 5 resolved forecasts (#2187). Glicko, RS, truth scores and ROI are still computed but hidden. See [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md).
 
 ### Reputation Score (RS)
 A user's long-term credibility/accuracy score based on past resolved predictions. Updates over time in an ELO-like way (expected outcome vs. actual outcome). Can increase or decrease (including becoming negative). Still computed (`User.rs`), but no longer displayed since ELO became the headline rating.
@@ -143,20 +143,21 @@ for the full formulas.
 
 ---
 
-## Current Features (October 2026)
+## Current Features (November 2026)
 
 Shipped on `main` for the SaaS edition; pointers to the owning code or doc:
 
-- **Two creation flows** — Express (type an idea; the AI drafts claim, deadline, resolution rules and tags from a web/news search) and the step-by-step wizard (`src/components/forecasts/ForecastWizard.tsx`). See [FORECASTS_FLOW.md](./FORECASTS_FLOW.md).
+- **Creation** — Express (type an idea; the AI drafts claim, deadline, resolution rules and tags from a web/news search), reviewed in the step wizard (`src/components/forecasts/ForecastWizard.tsx`). The separate Manual mode was removed (#2068): `/forecasts/new` redirects to `/create`, and the wizard on its own is the create path only when AI features are off (self-host). See [FORECASTS_FLOW.md](./FORECASTS_FLOW.md).
 - **Prediction-market links** — Polymarket/Kalshi markets can be imported in the wizard or pasted into Express (#1545); the linked market's live price is shown on the forecast and fed to the AI as a prior. Linked prices refresh hourly (`external-market-sync.yml`).
 - **Landing page** — first-time anonymous visitors get the home-v5 intro served at `/` in place (rewrite, not redirect); the feed takes over once they open Forecasts (#1840). See [docs/SEO.md](./docs/SEO.md).
 - **Card headlines** — feed cards show a short AI-written headline above the claim; the claim stays canonical (#1814).
 - **Evidence estimate** (labelled "AI estimate" before #1790) — each forecast gets a calibrated probability from the Oracul evidence pool, starting at creation (#1777), with a line saying what it rests on (N sources / model estimate / no sources yet, #1806), plus a multi-model AI panel with its own leaderboard (`/leaderboard/ai`).
-- **Ratings** — ELO headline rating, Accuracy and Brier (#1764); global and per-tag leaderboards.
-- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); defaults to outlets, sortable columns, topic (tag) chips (#1897, #1917); sources with fewer than 4 scored predictions are hidden from the public board. Per-source pages at `/sources/[name]` list the scored authors and a per-topic track record (also on author pages, #1928), pundit pages at `/authors/[author]`.
+- **Ratings** — ELO headline rating, Accuracy and Brier (#1764), Peer/AI Score columns (#2130); global and per-tag leaderboards with sortable column headers, opening on Brier; users with fewer than 5 resolved forecasts are listed unranked with a "low sample" badge (#2187).
+- **Feed and cards** — a logged-in viewer's card shows their own forecast ("You: 70%" or the chosen option, #2208); the home-feed tag filter is remembered per account or browser (#2209); the Activity sidebar item is hidden from logged-out visitors (the page stays public, #2206).
+- **Sources leaderboard** — public at `/leaderboard/sources` (#1588); defaults to outlets, sortable columns, topic (tag) chips (#1897, #1917); sources with fewer than 4 scored predictions are hidden from the public board, which says how many it hides ("+ N more … not ranked yet", #2181); newsroom and wire-service bylines stay on the authors board with a "Desk" badge (#2042). Per-source pages at `/sources/[name]` list the scored authors and a per-topic track record (also on author pages, #1928), pundit pages at `/authors/[author]`.
 - **Retroanalysis case studies** — `/retroanalysis` (SaaS-only): Ukraine 2022, Israel 2022 election (E02) and Energy 2022 (E03, Brent + TTF, #1882) reports rating what commentators said before the outcome (#1765–#1773); each Method section links the study's `pool.csv` (#1916); index and reports translated to Hebrew and Russian (#1906, #1914).
 - **Forget History** — in Settings, a user can detach themselves from their own already-resolved commitments without deleting the rows (so other users' scoring is unchanged); refused while they hold a commitment on an unresolved forecast (#1701, #1724). `POST /api/account/forget-history`.
-- **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page.
+- **Resolution** — AI resolution research plus moderator/resolver adjudication on the forecast page. Admins can revert a mistaken resolution, with a required reason (#2105–#2107, `POST /api/admin/forecasts/[id]/unresolve`).
 - **Social** — comments with reactions, share cards (OG images), notifications (in-app, email, browser push, Telegram).
 - **Languages** — English, Hebrew (RTL, sidebar mirrored, #1893), Russian, Esperanto.
 - **Elections** — the separate `elections.daatan.com` app (Daatan/elections), linked from the sidebar and the landing page. The old in-app `/elections` matrix was removed; `/elections` (and `/<locale>/elections`) now 301-redirect there (#2011).

@@ -527,6 +527,9 @@ Dismiss a forecast from the Awaiting Resolution queue (daatan#1659); sticky unti
 ### `DELETE /api/admin/forecasts/[id]/settled`
 Clear a false-positive settlement latch (`Prediction.settled`, which `recordEstimate` can only ever set true — see `docs/DATABASE.md` "Settlement latch"). `409` if the forecast is not settled.
 
+### `POST /api/admin/forecasts/[id]/unresolve` — Admin
+Revert a mistaken resolution (daatan#2077) from the snapshot the resolve route wrote (`unresolvePrediction` in `src/lib/services/prediction-unresolve.ts`). **Body** `{ reason }` (1–2000 chars, `400` otherwise). Restores the recorded ratings and commitments and puts the forecast back to `ACTIVE`, or `PENDING` if its deadline has passed, so it can be resolved again; notifications already sent are kept. Then tells news-indexer the forecast is unresolved and, for a binary `correct`/`wrong` resolution, retracts the credibility feedback it sent. Returns `{ status }`. `404` unknown forecast; `400` not resolved; `409` when no matching snapshot exists (admin status override, or a resolution older than snapshots — revert by hand), or a later scored resolution touched the same users (revert that one first).
+
 ### `GET /api/admin/forecasts/[id]/external-market`
 Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search (at most 2 markets kept per source event) re-ranked by embedding similarity with a deadline-gap penalty. Only candidates whose similarity clears a relevance floor are returned, each with a `score` (0–100 match); a claim with no real equivalent returns `[]` rather than the least-bad markets, and suggestions are suppressed entirely when embeddings are unavailable. Suggestion only; an admin confirms via POST.
 

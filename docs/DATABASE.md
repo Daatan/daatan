@@ -183,6 +183,7 @@ v1.33.0; design: retro `docs/ORACLE_VARIABLES.md` §6).
 | `articlesUsed` | Oracul evidence volume; null on legacy/LLM-fallback/clock rows |
 | `oracleSnapshot` | full Oracle payload (see scale table above); null on the LLM-fallback path |
 | `oracleSettled` / `oracleMean` / `sourcesSummary` | scalar mirrors of `oracleSnapshot.settled`, `.mean` (when a JSON number) and `.sources` reduced to `{author, sourceName, stance, url, publishedAt}` (query audit 2026-09-05), so read paths stop detoasting the whole blob. **Derived by the DB, never written by app code**: the `BEFORE INSERT OR UPDATE OF oracle_snapshot` trigger `context_snapshot_mirrors` (migration `20260905000000`) fills them on every write, whoever writes. The partial index `context_snapshots_settled_pin_idx ("predictionId", "createdAt" DESC) WHERE oracle_settled` lives in migration SQL only |
+| `sourcesDelta` | `sourcesSummary` as a change against the previous evidence snapshot of the same prediction — `{ base, upsert, removed }`, keyed by url (daatan#2158). Derived by the same trigger (migration `20261112000000`, backfilled by `20261112000001`), never written by app code; null when a url is missing/duplicated and on non-evidence rows. elections reads it instead of the whole re-listed pool, falling back to `sourcesSummary` when `base` isn't the row it just applied |
 | `materialChange` | F17 (daatan#1236): false when this write's probability moved less than `EVIDENCE_ANCHOR_PTS` (3, daatan#2073; was 1) from the current evidence anchor — the row is still written, but excluded from anchor selection so it can't reset the glide clock. It also leaves `Prediction.confidence`/band untouched when a clock row was written since the anchor, so the published number stays at the glide (daatan#2047). Default true (historical rows stay anchor-eligible) |
 | `evidenceAt` | F17: newest publish time among the sources behind this estimate, not the row's write time — lets the glide anchor to when the evidence happened. Null when unavailable; callers fall back to `createdAt` |
 | `insufficientData` | the run abstained — UI shows "Insufficient evidence". Since daatan#1473 the prediction's published estimate is left standing, not cleared (below) |
@@ -702,7 +703,13 @@ and the two "no pool number" cases are deliberately different:
 - **pool** — the aggregate is the estimate.
 - **single-run fallback** — the pool could not be *read* (Oracul unreachable, nothing usable
   pooled yet, transport error). Fall back to this run's `/forecast` so a flaky Oracul degrades
-  the estimate rather than dropping it.
+  the estimate rather than dropping it. **Exception — the news-indexer route** (daatan#2113): when
+  the forecast already has an estimate it stores nothing and notifies nobody (the response carries
+  `scored: false` and `previousProbability`), because a push usually holds one article and its
+  single-run number would replace the whole pool's until the next recompute. The article is
+  still pooled, so that recompute includes it. A forecast with no estimate yet still takes the
+  single run. The recompute itself has a 30 s budget (`POOL_RECOMPUTE_TIMEOUT_MS`, 10 s before
+  daatan#2118 — retro's cost grows faster than linearly with pool size).
 - **abstain** — the pool *was* aggregated and returned `insufficient_data`. In prod there are
   two reasons: `all_articles_off_topic` (every article scored below `relevance_weight_floor`)
   and, since the Oracul's 2026-08-01 R3 release, `no_usable_weight` (rows exist but every one
@@ -997,6 +1004,16 @@ market's YES price (0–1, polarity-adjusted for `externalMarketInverted`) snaps
 commit time from `external_market_price_snapshots` — null when unlinked or no snapshot
 yet, never backfilled — and D_KL(user ‖ market) computed at resolution when that price
 is present. Storage only: not wired into any ranking formula yet.
+
+**Resolution snapshots — `resolution_snapshots`** (daatan#2077). Written inside the resolve
+transaction: the pre-resolution state (`payload` — the prediction's resolution fields, its commitments' scoring results and the
+affected users' ratings, versioned by `RESOLUTION_SNAPSHOT_VERSION`),
+`outcome`, `resolvedAt` and `affectedUserIds`. Several rows per prediction are expected
+(resolve → revert → resolve). `POST /api/admin/forecasts/[id]/unresolve` restores from the newest
+unreverted row and stamps it `revertedAt` / `revertedById` / `revertReason` — the reverted row is
+the audit record. It restores recorded values rather than subtracting (Glicko-2 has no inverse),
+so it refuses while a later scored resolution touched the same users. Resolutions from before
+the table existed, and statuses set through the admin override, have no snapshot.
 
 `commitment_revisions` (daatan#1281): append-only history of the mutable
 fields, written by `updateCommitment` in the same transaction *before* each
