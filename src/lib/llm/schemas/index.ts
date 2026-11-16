@@ -220,3 +220,42 @@ export const rulesDirectionSchema: Schema = {
   },
   required: ['yesCondition', 'direction', 'fixedRules'],
 }
+
+export const claimDefinednessSchema: Schema = {
+  description: 'Whether the claim has a deciding term with two common readings, or rules that conflict with it',
+  type: SchemaType.OBJECT,
+  properties: {
+    splitOutcome: {
+      type: SchemaType.STRING,
+      description: 'An ordinary outcome on which the two readings settle differently, or the conflict in one sentence. Empty string when there is no fault.',
+    },
+    splitChance: {
+      type: SchemaType.INTEGER,
+      description: '0-100: how likely the split outcome is to happen. 0 when there is no fault.',
+    },
+    readerShare: {
+      type: SchemaType.INTEGER,
+      description: '0-100: share of ordinary readers who would take the reading the rules do not use (100 for a literal rules conflict). 0 when there is no fault.',
+    },
+    fault: {
+      type: SchemaType.STRING,
+      format: 'enum',
+      enum: ['none', 'two_readings', 'rules_conflict'],
+      description: 'two_readings, rules_conflict, or none.',
+    },
+    term: {
+      type: SchemaType.STRING,
+      description: 'The deciding word or phrase, quoted from the claim (or the conflicting part of the rules). Empty when fault is none.',
+    },
+    question: {
+      type: SchemaType.STRING,
+      description: 'One short question asking the author which they mean. Empty when fault is none.',
+    },
+    options: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: 'Two or three corrected one-sentence versions of the claim, each fixing one reading. Empty when fault is none.',
+    },
+  },
+  required: ['splitOutcome', 'splitChance', 'readerShare', 'fault', 'term', 'question', 'options'],
+}

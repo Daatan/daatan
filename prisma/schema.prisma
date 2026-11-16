@@ -1923,6 +1923,8 @@ enum ForecastAttemptOutcome {
   MODERATED
   SEARCH_UNAVAILABLE
   GENERATION_FAILED
+  // #2166: an edited claim's re-check, or a publish over a still-unclear verdict ({kind: 'recheck' | 'override'})
+  DEFINEDNESS_CHECK
 }
 
 model ForecastCreationAttempt {

@@ -1123,7 +1123,9 @@ carries `dateBasis`/`isDefaultHorizonDate` — #1706's measurement of how often
 `groundedDate`, what the web-grounded event-date lookup did on that draft:
 `{fired:false}`, `{fired:true,status:"no_date"|"unavailable"}`, or
 `{fired:true,status:"found",event,date,sourceUrl,adopted}`; `dateBasis` is the
-value *after* the lookup, so `found`+`adopted` rows read `from_sources`).
+value *after* the lookup, so `found`+`adopted` rows read `from_sources`). Every attempt's `details.definedness` holds the #2166 claim-definedness verdict; the
+author's re-check of an edited claim, or a publish over an unclear verdict, adds a
+`DEFINEDNESS_CHECK` row.
 See [bots.md](./bots.md) and [BOT_APPROVAL_WORKFLOW.md](./BOT_APPROVAL_WORKFLOW.md).
 
 ## News anchors

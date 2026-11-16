@@ -35,6 +35,9 @@ vi.mock('@/lib/llm/rulesStrength', () => ({
   checkRulesStrength: vi.fn(async () => ({ verdict: 'ok', kind: 'none', yesTrigger: '', fixedRules: '' })),
 }))
 
+vi.mock('@/lib/llm/claimDefinedness', () => ({
+  checkClaimDefinedness: vi.fn(async () => ({ verdict: 'ok' })),
+}))
 vi.mock('@/lib/llm/bedrock-prompts', () => ({
   getPromptTemplate: vi.fn().mockImplementation((name) => {
     if (name === 'topic-extraction') return 'Extract the main topic: {{articleContent}}'

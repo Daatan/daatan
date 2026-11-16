@@ -88,6 +88,7 @@ export const POST = withAuth(async (request, user) => {
           groundedDate: result.groundedDate,
           rulesDirection: result.rulesDirection,
           rulesStrength: result.rulesStrength,
+          definedness: result.definedness,
           stageTimings: result.stageTimings,
         })
         controller.close()
