@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { unstable_cache } from 'next/cache'
 import { handleRouteError } from '@/lib/api-error'
-import {
-  getSourceLeaderboard,
-  type SourceLeaderboardView,
-  type SourceSortBy,
-} from '@/lib/services/sourceLeaderboard'
+import { type SourceLeaderboardView, type SourceSortBy } from '@/lib/services/sourceLeaderboard'
+import { getCachedSourceLeaderboard } from '@/lib/services/leaderboard-cached'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-
-// Rows below this sample size are too noisy to rank publicly (a single lucky/unlucky
-// call shouldn't top or bottom the board) — see daatan#1587. Single-row lookups
-// (/sources/[name], /authors/[author]/[outlet]) call getSourceLeaderboard directly
-// with the default minPredictions=0 and are unaffected. Lowered 5 -> 4 on 2026-10-11: with
-// ~10 resolutions a month, 5 left two author rows on the board.
-const MIN_PREDICTIONS = 4
-
-// Shadow-scoring rows move slowly — 5min TTL matches /api/leaderboard's.
-const getCachedSourceLeaderboard = unstable_cache(
-  async (view: SourceLeaderboardView, sortBy: SourceSortBy, tag: string | null) =>
-    getSourceLeaderboard(view, sortBy, MIN_PREDICTIONS, tag ?? undefined),
-  ['leaderboard-sources-api'],
-  { revalidate: 300, tags: ['leaderboard-sources'] },
-)
 
 // GET /api/leaderboard/sources - author/outlet shadow-scoring leaderboard
 export async function GET(request: NextRequest) {
