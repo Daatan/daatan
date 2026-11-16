@@ -90,7 +90,9 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
     const params = new URLSearchParams(searchParams.toString())
     if (slug) params.set('tag', slug)
     else params.delete('tag')
-    router.replace(`${pathname}?${params}`)
+    // replaceState, not router.replace: the client fetch below loads the new topic, so a
+    // server re-render of the page would only duplicate it.
+    window.history.replaceState(null, '', `${pathname}?${params}`)
   }
 
   const selectedTagName = selectedTag

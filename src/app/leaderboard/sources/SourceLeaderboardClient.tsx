@@ -133,6 +133,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         {VIEWS.map(v => (
           <Link
             key={v}
+            rel="nofollow"
             href={boardHref(v, sort, dir, tag)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               v === view ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
@@ -149,6 +150,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
           {[{ slug: null, name: tl('allTopics') }, ...tags].map(tg => (
             <Link
               key={tg.slug ?? 'all'}
+              rel="nofollow"
               href={boardHref(view, sort, dir, tg.slug)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 (tag ?? null) === tg.slug ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
@@ -187,6 +189,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                         className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
                       >
                         <Link
+                          rel="nofollow"
                           href={boardHref(view, c.key, nextDir, tag)}
                           replace
                           className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}

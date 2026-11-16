@@ -10,11 +10,10 @@ export default async function SourceLeaderboardPage({
 }) {
   const sp = await searchParams
   const view = parseView(sp.view)
-  const tag = sp.tag?.slice(0, 80) || null
-  const [board, tags] = await Promise.all([
-    getCachedSourceLeaderboard(view, 'skillConservative', tag),
-    listTags(),
-  ])
+  const tags = await listTags()
+  // Known slugs only — see the same guard in ../page.tsx.
+  const tag = tags.some(t => t.slug === sp.tag) ? sp.tag! : null
+  const board = await getCachedSourceLeaderboard(view, 'skillConservative', tag)
   return (
     <SourceLeaderboardClient
       authorRows={board.authorRows ?? []}
