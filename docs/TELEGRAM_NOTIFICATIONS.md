@@ -47,6 +47,7 @@ Sent directly by `watchdog.yml` from the **GitHub Actions runner**. Both `produc
 - `Forecast feed` — `/forecasts` HTTP 200
 - `Leaderboard` — `/leaderboard` HTTP 200
 - `About/login` — `/auth/signin` HTTP 200
+- `Elections home` / `Elections top forecast` (production only, #2155) — `https://elections.daatan.com/` HTTP 200, then its first `/forecast/` link (the most-covered, heaviest page), picked at run time
 
 Any unexpected redirect also counts as a failure (guards against redirect loops).
 
@@ -66,7 +67,7 @@ Sent by shell scripts **executing on the EC2 server** via SSM from `watchdog.yml
 
 | Script | Event | Icon | Threshold |
 |---|---|---|---|
-| `scripts/check-disk-space.sh` | Root partition usage high | 💾 | > 90% |
+| `scripts/check-disk-space.sh` | Root partition usage high | 💾 | > 85% (`DISK_ALERT_THRESHOLD`; 90% before daatan#2168, when the check also stopped silently finding no `.env` under SSM's root user) |
 | `scripts/check-system-health.sh` | Memory usage high | 🧠 | > 90% |
 | `scripts/check-system-health.sh` | CPU load high | 🔥 | > cores × 2 (1-min avg) |
 
@@ -74,7 +75,7 @@ Sent by shell scripts **executing on the EC2 server** via SSM from `watchdog.yml
 
 ## News-indexer watchdog (`news-indexer-watchdog.yml` — every 2h, even UTC hours)
 
-Monitors the **news-indexer** (`scrapper.daatan.com`) — free disk + DB / pipeline health — which `watchdog.yml`'s `disk-watchdog` does **not** cover (that targets the `daatan-backend` instances only). Runs from the **GitHub Actions runner** by polling the public `/stats` endpoint (disk usage comes from `.disk.used_percent`, which reflects the EC2 root volume).
+Monitors the **news-indexer** (`scrapper.daatan.com`) — free disk + DB / pipeline health — which `watchdog.yml`'s `disk-watchdog` does **not** cover (that targets the `daatan-backend` instances only). Runs from the **GitHub Actions runner** by probing the public `/health` (liveness) and then `/stats` (disk usage comes from `.disk.used_percent`, which reflects the EC2 root volume).
 
 ALERT-ONLY every 2 hours (even UTC hours, at :17) → 🚨 to **both** channels (clean + noisy); silent when healthy. Once a day at **08:00 UTC** it also posts a plain digest to the **noisy** channel (the digest hour must be even so an even-hour run lands on it).
 
@@ -86,7 +87,8 @@ Only **acute** conditions alert. Each one starts, gets fixed, and stops, so a re
 | Worker unhealthy | ⚙️ | `worker.status` ≠ `ok` | 🚨 both channels |
 | Pipeline stalled | 📰 | 0 articles indexed in 24h | 🚨 both channels |
 | Queue backed up | 📮 | DLQ depth > 0, or queue depth > 500 | 🚨 both channels |
-| Indexer down | 🚨 | `/stats` unreachable after 3 attempts (12s/attempt, 3s between retries — rides out a normal deploy restart) | 🚨 both channels |
+| Indexer down | 🚨 | `/health` unreachable after 3 attempts (12s/attempt, 3s between retries — rides out a normal deploy restart). Liveness is probed on the cheap `/health`, not `/stats` (#2062) | 🚨 both channels |
+| Stats failed | 🚨 | `/health` OK but `/stats` failed or took over 90 s (2 attempts) — the content checks could not run | 🚨 both channels |
 | Stale feed | 🕸️ | an enabled feed stopped producing > 7d | digest only (chronic) |
 | Daily digest | 📊 | always at 08:00 UTC (disk, DB, articles, worker, matches, stale feeds) | noisy |
 

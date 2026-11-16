@@ -64,7 +64,10 @@ LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flas
   never reached the container at all); empty = default.
 - **Thinking budget.** A request may set `thinkingBudget` (tokens, `0` = off), sent as Gemini
   `thinkingConfig` by the Vertex and Gemini legs only; unset keeps the model's dynamic thinking.
-  Only `express_draft` sets it: 512 (#1890). Default thinking spent ~1,300 tokens and was the
+  Two stages set it (#1890). `search_query` sends 0 (`SEARCH_QUERY_THINKING_BUDGET`): dynamic
+  thinking spent ~630 tokens on a 3–8 word answer, and 7 of 26 prod calls hit the 5 s query timeout.
+  In an A/B on 41 real claims, 0 took p50 3.07 → 0.65 s with the same entities.
+  `express_draft` sends 512. Default thinking spent ~1,300 tokens and was the
   slowest creation stage (p90 16 s → 5 s at 512 on `scripts/bench-express-draft.ts`). 0 copied
   non-English inputs verbatim instead of translating them. If `LLM_STAGE_MODELS` moves
   `express_draft` to a model without a token-count thinking budget, re-check this first.
@@ -227,8 +230,8 @@ When the Oracle path produces a probability for `POST /api/forecasts/[id]/contex
     clamped by its `per_article_timeout_seconds = 25`), not from its nominal
     `forecast_timeout_seconds = 90`, which had fired once in 93 days (daatan#1254). retro#760 raised
     that clamp to 35 s, so the same margin gives 40 s (#1709). news-indexer's push client
-    (`PUSH_TIMEOUT_SECONDS`, 45 s) wraps this route, so don't raise it past ~40 s without raising that too.
-2.  **LLM `guessChances`** (Gemini → Oracul → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracul path is not configured, times out, returns a placeholder response, or has zero usable articles.
+    (`PUSH_TIMEOUT_SECONDS`, 75 s since news-indexer#522, was 45 s) wraps this route, which can run a `/forecast` and then a 30 s `/pool/aggregate` recompute, so check that headroom before raising either.
+2.  **LLM `guessChances`** (Gemini → Oracul → OpenRouter → Ollama via the provider chain above) — used if the forecast Oracul path is not configured, times out, returns a placeholder response, or has zero usable articles. Its number is rounded and clamped to 3–97 (`clampGuessedProbability`, `GUESS_PERCENT_MIN`/`MAX` in `src/lib/llm/expressPrediction.ts`, daatan#2151), so the fallback never publishes 0% or 100%.
 
 ### Call sites
 

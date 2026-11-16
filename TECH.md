@@ -514,7 +514,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 
 Since #1952 the scheduled workflows target production only (staging is normally off, #2089); `cert-expiry.yml` checks staging only while it is running.
 
-Manual-only workflows: `rollback.yml`, `staging-up.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` runs on `android-v*` tags; `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
+Manual-only workflows: `rollback.yml`, `staging-up.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` uploads to a Play testing track on `android-v*` tags, `android/**` pushes to `main` and dispatch, and on the 1st of each month (05:23) builds without uploading (see `android/README.md`); `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
 
 #### Deploy Workflow (`deploy.yml`)
 

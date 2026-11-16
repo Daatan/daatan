@@ -208,7 +208,7 @@ The feed (`src/app/FeedClient.tsx`) supports status filters, tag filters and sor
    - Standard tags (`STANDARD_TAGS` in `src/lib/constants.ts`): Politics, Geopolitics, Economy, Technology, AI, Crypto, Sports, Entertainment, Science, Climate, Health, Business, Conflict, Elections, US Politics, Europe, Middle East, Asia, Energy, Space, Israeli Elections 2026
 3. **Sort** — Newest, By Deadline, Most Staked (`cu`), Last Updated (`?sortBy=`, `?sortOrder=`)
 
-Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so filters survive page refresh and can be shared via link.
+Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so filters survive page refresh and can be shared via link. The tag selection is also remembered across visits (#2209): on the account (`users.feed_tags`, `PATCH /api/user/preferences`) for signed-in users, in `localStorage` for guests. It is applied only when the URL names no tags, and written only on an explicit toggle/clear, so opening a shared `?tags=` link never overwrites the saved topics.
 
 ### Prediction Statuses
 
@@ -228,7 +228,7 @@ Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so
 ## Step 6: Resolution Trigger
 
 Resolution starts when:
-1. `resolve_by_datetime` arrives (the `transition-expired-predictions` cron, every 15 min, moves `active` → `pending`), **OR**
+1. `resolve_by_datetime` arrives (the `transition-expired-predictions` cron, every 15 min, moves `active` → `pending`). A date-only deadline (stored as 23:59 UTC) ends at **midnight in Israel** at the end of that date, 2–3 h before the stamp; any other stamp is an exact time (`deadlineEndsAt` in `src/lib/utils/date.ts`, daatan#2030), **OR**
 2. An earlier authoritative source enables resolution
 
 ---
