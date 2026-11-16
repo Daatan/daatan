@@ -46,3 +46,16 @@ describe('leaderboard server render', () => {
     expect(html).toContain('href="/sources/Haaretz"')
   })
 })
+
+// A server page that imports a named export from a 'use client' module gets a client reference,
+// not the value: calling it throws at render, which no unit test or build catches (#2212).
+describe('server/client boundary', () => {
+  it('server pages take only the default export from client modules', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    for (const page of ['page.tsx', 'sources/page.tsx']) {
+      const src = readFileSync(join(__dirname, '..', page), 'utf-8')
+      expect(src).not.toMatch(/import\s+\w*\s*,?\s*\{[^}]*\}\s+from\s+'\.\/\w*Client'/)
+    }
+  })
+})

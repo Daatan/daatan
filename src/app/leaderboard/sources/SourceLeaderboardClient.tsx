@@ -11,6 +11,7 @@ import type {
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import DeskBadge from '@/components/sources/DeskBadge'
+import { parseView } from './view'
 
 const VIEWS: SourceLeaderboardView[] = ['outlets', 'authors']
 
@@ -32,10 +33,6 @@ function brierTone(brier: number): string {
 
 function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir, tag: string | null): string {
   return `/leaderboard/sources?view=${view}&sort=${sort}&dir=${dir}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`
-}
-
-export function parseView(raw: string | null | undefined): SourceLeaderboardView {
-  return raw === 'authors' ? 'authors' : 'outlets'
 }
 
 /** Rows for the URL's view and tag, rendered on the server (#2212); a view or tag change is a

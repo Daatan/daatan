@@ -1,7 +1,7 @@
 import { getCachedLeaderboard } from '@/lib/services/leaderboard-cached'
 import { listTags } from '@/lib/services/tag'
-import LeaderboardClient, { INITIAL_SORT } from './LeaderboardClient'
-import { FETCH_LIMIT } from './sort'
+import LeaderboardClient from './LeaderboardClient'
+import { FETCH_LIMIT, INITIAL_SORT } from './sort'
 
 // Server-rendered so crawlers see the ranked table and profile links, not a spinner (#2212).
 export default async function LeaderboardPage({ searchParams }: { searchParams: Promise<{ tag?: string }> }) {
