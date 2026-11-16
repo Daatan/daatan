@@ -228,7 +228,7 @@ Only `kind = 'evidence'` snapshots are returned — clock-tick rows (and any fut
 ### `POST /api/forecasts/[id]/context` — Auth
 Refresh the AI context for a forecast: fetches web articles for the claim, asks an LLM to summarise them, computes an "AI %" probability, and appends a new snapshot to the context timeline. Author-only and rate-limited to once per 24h per forecast.
 
-**Article search** goes through the Oracul `POST /search` with the last `CONTEXT_SEARCH_WINDOW_DAYS` (2) days as `date_from` (daatan#1754) and `min_results = CONTEXT_SEARCH_MIN_RESULTS` (= the 15-article budget, daatan#1757): when the Oracul's news-indexer alone serves fewer hits than that, it tops the set up from the paid providers (dedup by URL) so the update also sees sources the index does not hold. Both constants live in `src/app/api/forecasts/[id]/context/route.ts`.
+**Article search** goes through the Oracul `POST /search` with the last `CONTEXT_SEARCH_WINDOW_DAYS` (2) days as `date_from` (daatan#1754) and `min_results = CONTEXT_SEARCH_MIN_RESULTS` (= the 15-article budget, daatan#1757): when the Oracul's news-indexer alone serves fewer hits than that, it tops the set up from the paid providers (dedup by URL) so the update also sees sources the index does not hold. If that pass returns fewer than `CONTEXT_SEARCH_WIDEN_BELOW` (3) hits, one more search runs over the last `CONTEXT_SEARCH_WIDE_WINDOW_DAYS` (30) days and its new URLs are appended after the narrow-window ones (daatan#2210), so rarely covered topics (a monthly index) don't come back empty; a failed wide search keeps the narrow hits, and the 503 fires only when both are empty. All four constants live in `src/app/api/forecasts/[id]/context/route.ts`.
 
 **Probability source (tried in order):**
 

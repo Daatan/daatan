@@ -39,6 +39,14 @@ const CONTEXT_UPDATE_COOLDOWN_HOURS = 1
  * pass the Oracul's post-filter; the claim step excludes those downstream.
  */
 export const CONTEXT_SEARCH_WINDOW_DAYS = 2
+/**
+ * daatan#2210: a topic covered rarely (a monthly index, a scheduled release) has nothing in
+ * the 2-day window, so the Oracul abstains on an empty set. Below this many hits, one more
+ * search runs over CONTEXT_SEARCH_WIDE_WINDOW_DAYS — still bounded, so #1754's years-old
+ * pages stay out — and its new URLs are appended after the narrow-window ones.
+ */
+export const CONTEXT_SEARCH_WIDEN_BELOW = 3
+export const CONTEXT_SEARCH_WIDE_WINDOW_DAYS = 30
 // Ask the Oracul to fill the set from paid providers whenever the news-indexer alone can't
 // (daatan#1757): the point of Update Context is sources the index does *not* already hold.
 // Lower this to trade non-indexed sources for latency — every top-up is a SERP round trip.
@@ -135,6 +143,23 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
             )
             return apiError('No recent articles found for this forecast. Try again later.', 503)
         }
+        let widened = false
+        if (searchResults.length < CONTEXT_SEARCH_WIDEN_BELOW) {
+            widened = true
+            const wideDateFrom = new Date(t0 - CONTEXT_SEARCH_WIDE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+            try {
+                const wide = (await oracleSearch(
+                    searchQuery,
+                    DEFAULT_MAX_ARTICLES,
+                    { dateFrom: wideDateFrom, minResults: CONTEXT_SEARCH_MIN_RESULTS },
+                    { source: 'context-update', userId: user.id, predictionId: prediction.id },
+                )) ?? []
+                const seen = new Set(searchResults.map((r) => r.url))
+                searchResults = [...searchResults, ...wide.filter((r) => !seen.has(r.url))].slice(0, DEFAULT_MAX_ARTICLES)
+            } catch (err) {
+                log.warn({ predictionId: prediction.id, searchQuery, err }, 'context.widened_search_failed')
+            }
+        }
         const searchMs = Date.now() - t0
 
         log.info(
@@ -143,6 +168,7 @@ export const POST = withAuth(async (request: NextRequest, user, { params }: Rout
                 searchQuery,
                 dateFrom: searchDateFrom.toISOString().slice(0, 10),
                 minResults: CONTEXT_SEARCH_MIN_RESULTS,
+                widened,
                 resultCount: searchResults.length,
                 resultDomains: searchResults.map((r) => {
                     try { return new URL(r.url).hostname } catch { return r.url }
