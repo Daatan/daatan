@@ -348,11 +348,11 @@ signs a service-account JWT (via `jose`), exchanges it for an access token, and 
 > The sitemap remains the authoritative discovery path — resubmit it in Search Console after large
 > backfills (e.g. the English-canonicalization re-slug pass).
 
-## Site root: first-visit rewrite to `/home-v5`
+## Site root: first-visit rewrite to `/home`
 
 `src/proxy.ts` + `src/lib/first-visit.ts` (#1840). An anonymous visitor without the
 `daatan_home_v5_seen` cookie who opens `/`, `/he`, `/ru` or `/eo` gets the matching
-`/home-v5` page **served in place** (`src/proxy.ts` rewrite, status 200, URL stays `/`; query string kept; the
+`/home` page **served in place** (`src/proxy.ts` rewrite, status 200, URL stays `/`; query string kept; the
 page's canonical is the root — see below). It was a 307 redirect until 1.65.416 (#1867); a rewrite saves a request and gives
 crawlers a 200. Crawlers have no cookie, so they get the same page as a first-time visitor — no
 user-agent sniffing, nothing cloaked. Not rewritten: signed-in users,
@@ -364,10 +364,15 @@ The cookie is set client-side by `HomeSeenMarker` when the home-v5 page itself i
 After that the root shows the
 forecast feed as before. The feed itself stays indexable at `/forecasts`; the root's own
 indexable content is now the home-v5 page. The left menu has "Forecasts" → `/forecasts` and
-"Home" → `/home-v5` (hidden on self-host).
+"Home" → `/home` (hidden on self-host).
+
+**Path (2026-11-16):** the page lived at the preview path `/home-v5` until v1.70.5; it is now
+`/home` (`/he/home`, …), and `/home-v5` (with or without a locale prefix) 301-redirects there
+(`next.config.js`). The component directory is still `src/components/home-v5/`, and so is the
+cookie name — renaming the cookie would show the page again to everyone who has seen it.
 
 **Canonical = the root (daatan#2057, 2026-10-29).** `homeV5Metadata` declares `/`, `/he`, `/ru` as
-canonical and hreflang, so the `/home-v5` paths fold onto the root, and the sitemap lists `/`, `/he`,
+canonical and hreflang, so the `/home` paths fold onto the root, and the sitemap lists `/`, `/he`,
 `/ru`. Until then the canonical was `/home-v5`, and GSC split the homepage across two URLs
 (`/` 91 vs `/home-v5` 66 impressions per 28 days). The page emits the site-level `Organization` +
 `WebSite` JSON-LD (with a `SearchAction` to `/forecasts?q=`). Its metadata sets `og:image` /
