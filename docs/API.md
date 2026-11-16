@@ -228,7 +228,7 @@ Only `kind = 'evidence'` snapshots are returned — clock-tick rows (and any fut
 ### `POST /api/forecasts/[id]/context` — Auth
 Refresh the AI context for a forecast: fetches web articles for the claim, asks an LLM to summarise them, computes an "AI %" probability, and appends a new snapshot to the context timeline. Author-only and rate-limited to once per 24h per forecast.
 
-**Article search** goes through the Oracul `POST /search` with the last `CONTEXT_SEARCH_WINDOW_DAYS` (2) days as `date_from` (daatan#1754) and `min_results = CONTEXT_SEARCH_MIN_RESULTS` (= the 15-article budget, daatan#1757): when the Oracul's news-indexer alone serves fewer hits than that, it tops the set up from the paid providers (dedup by URL) so the update also sees sources the index does not hold. Both constants live in `src/app/api/forecasts/[id]/context/route.ts`.
+**Article search** goes through the Oracul `POST /search` with the last `CONTEXT_SEARCH_WINDOW_DAYS` (2) days as `date_from` (daatan#1754) and `min_results = CONTEXT_SEARCH_MIN_RESULTS` (= the 15-article budget, daatan#1757): when the Oracul's news-indexer alone serves fewer hits than that, it tops the set up from the paid providers (dedup by URL) so the update also sees sources the index does not hold. If that pass returns fewer than `CONTEXT_SEARCH_WIDEN_BELOW` (3) hits, one more search runs over the last `CONTEXT_SEARCH_WIDE_WINDOW_DAYS` (30) days and its new URLs are appended after the narrow-window ones (daatan#2210), so rarely covered topics (a monthly index) don't come back empty; a failed wide search keeps the narrow hits, and the 503 fires only when both are empty. All four constants live in `src/app/api/forecasts/[id]/context/route.ts`.
 
 **Probability source (tried in order):**
 
@@ -265,7 +265,7 @@ AI-assisted resolution research for resolvers. Searches for recent articles abou
 ---
 
 ### `GET /api/forecasts/similar`
-Find forecasts similar to a given forecast (by ID) or query text, using pgvector cosine similarity on Gemini `gemini-embedding-2` embeddings. Public — no auth required. Returns results from `ACTIVE` and `PENDING_APPROVAL` forecasts only, filtered to cosine similarity ≥ 0.75.
+Find forecasts similar to a given forecast (by ID) or query text, using pgvector cosine similarity on Gemini `gemini-embedding-2` embeddings. Public — no auth required. Returns results from `ACTIVE` and `PENDING_APPROVAL` forecasts only, filtered to cosine similarity ≥ 0.85 (`RELATED_MIN_SCORE`; ≥ 0.87 with `purpose=duplicate`).
 
 **Query params**
 
@@ -317,7 +317,7 @@ When the first draft reports its resolution date as `assumed` (#1706), one extra
 
 Every binary draft then goes through the #1813 rules-direction check (`src/lib/llm/rulesDirection.ts`): inverted rules are rewritten when a second check accepts the rewrite, otherwise the review screen warns. The result's `rulesDirection` field (`direction`, `initial`, `fixed`) records the outcome; the check is fail-open (`direction: 'error'`).
 
-Binary drafts also go through the #2166 claim-definedness judge (`src/lib/llm/claimDefinedness.ts`), beside rules-strength. The result's `definedness` field is `{ verdict: 'ok' | 'unclear' | 'error', enforced, fault, term, question, options, … }`. On `unclear` the review screen shows `question` and the corrected claims in `options` (in the author's language). Picking one re-drafts from it; "Edit the claim myself" re-checks the edit once through the route below. When `enforced` is true (`DEFINEDNESS_BLOCKS_PUBLISH`, currently off), Publish stays disabled until one of those happens. A claim that is still unclear afterwards can be published anyway. Fail-open: `verdict: 'error'` never blocks. Recorded in `forecast_creation_attempts.details.definedness`.
+Binary drafts also go through the #2166 claim-definedness judge (`src/lib/llm/claimDefinedness.ts`), beside rules-strength. The result's `definedness` field is `{ verdict: 'ok' | 'unclear' | 'error', enforced, fault, term, question, options, … }`. On `unclear` the review screen shows `question` and the corrected claims in `options` (in the author's language). Picking one re-drafts from it; "Edit the claim myself" re-checks the edit once through the route below. When `enforced` is true (`DEFINEDNESS_BLOCKS_PUBLISH`, on since 2026-11-16), Publish stays disabled until one of those happens. A claim that is still unclear afterwards can be published anyway. Fail-open: `verdict: 'error'` never blocks. Recorded in `forecast_creation_attempts.details.definedness`.
 
 ---
 
@@ -427,10 +427,14 @@ Upload avatar image. Accepts multipart form with `file` field.
 Set preferred display language.
 
 ### `GET|PATCH /api/user/preferences` — Auth
-Chart/display preferences. Currently one whitelisted boolean: `showAiPanel`
-(the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8). PATCH body
-`{ showAiPanel: boolean }`, 400 on anything else; nothing here can touch
-scoring, roles, or profile identity.
+Display preferences. GET returns `{ showAiPanel, feedTags }`.
+
+- `showAiPanel` (boolean) is the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8.
+- `feedTags` (string[], ≤ 20 tags, each 1–50 chars) is the remembered home-feed tag filter
+  (daatan#2203). It is deduped on write, and `[]` clears it.
+
+PATCH accepts either field or both, and writes only the fields that were sent. It returns 400 on an
+empty body or a bad value. Nothing here can touch scoring, roles, or profile identity.
 
 ---
 

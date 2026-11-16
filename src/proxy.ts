@@ -35,7 +35,7 @@ export default auth((req) => {
 
   if (homeTarget) {
     // Served in place (rewrite, not a redirect): one request fewer for a first visit, and crawlers
-    // get a 200 at "/" instead of a temporary redirect. The page's own canonical stays /home-v5.
+    // get a 200 at "/" instead of a temporary redirect. The page's own canonical stays /home.
     requestHeaders.set('x-pathname', homeTarget)
     const url = req.nextUrl.clone()
     url.pathname = homeTarget

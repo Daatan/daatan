@@ -10,10 +10,10 @@ const base = {
 
 describe('homeV5RootTarget', () => {
   it.each([
-    ['/', '/home-v5'],
-    ['/he', '/he/home-v5'],
-    ['/ru/', '/ru/home-v5'],
-    ['/eo', '/eo/home-v5'],
+    ['/', '/home'],
+    ['/he', '/he/home'],
+    ['/ru/', '/ru/home'],
+    ['/eo', '/eo/home'],
   ])('sends a first-time anonymous visitor from %s to %s', (pathname, target) => {
     expect(homeV5RootTarget({ ...base, pathname })).toBe(target)
   })
@@ -37,10 +37,10 @@ describe('homeV5RootTarget', () => {
   })
 
   it('leaves tracking parameters alone', () => {
-    expect(homeV5RootTarget({ ...base, pathname: '/', searchParams: new URLSearchParams('utm_source=x') })).toBe('/home-v5')
+    expect(homeV5RootTarget({ ...base, pathname: '/', searchParams: new URLSearchParams('utm_source=x') })).toBe('/home')
   })
 
-  it.each(['/forecasts', '/home-v5', '/he/about', '/forecasts/abc', '/hex', '/api/health'])('ignores %s', (pathname) => {
+  it.each(['/forecasts', '/home', '/he/about', '/forecasts/abc', '/hex', '/api/health'])('ignores %s', (pathname) => {
     expect(homeV5RootTarget({ ...base, pathname })).toBeNull()
   })
 })

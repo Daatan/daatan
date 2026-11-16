@@ -43,7 +43,7 @@ function HeAboutPage() {
       </div>
 
       <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
-        <Link href="/he/home-v5" className="text-sm text-cobalt-light hover:underline">תצוגה מקדימה: עיצוב דף הבית החדש ←</Link>
+        <Link href="/he/home" className="text-sm text-cobalt-light hover:underline">תצוגה מקדימה: עיצוב דף הבית החדש ←</Link>
       </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
@@ -174,7 +174,7 @@ function RuAboutPage() {
       </div>
 
       <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
-        <Link href="/ru/home-v5" className="text-sm text-cobalt-light hover:underline">Предпросмотр: новый дизайн главной страницы →</Link>
+        <Link href="/ru/home" className="text-sm text-cobalt-light hover:underline">Предпросмотр: новый дизайн главной страницы →</Link>
       </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
@@ -316,7 +316,7 @@ function EoAboutPage() {
       </div>
 
       <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
-        <Link href="/eo/home-v5" className="text-sm text-cobalt-light hover:underline">Antaŭrigardo: nova dezajno de la hejmpaĝo →</Link>
+        <Link href="/eo/home" className="text-sm text-cobalt-light hover:underline">Antaŭrigardo: nova dezajno de la hejmpaĝo →</Link>
       </p>
 
       <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">

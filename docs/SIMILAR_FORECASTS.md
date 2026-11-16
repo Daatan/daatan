@@ -27,6 +27,9 @@ Same path, same `0.75` threshold, serves both discovery and dedup.
 > gate** — when the query has tags, a candidate must share at least one (`EXISTS` over
 > `_PredictionToTag`); with no tags it is pure cosine. Problem 2 below predates that: tags
 > now filter, but still don't enter the score. Current SQL is in [`EMBEDDINGS.md`](./EMBEDDINGS.md).
+>
+> Update (2026-11-15): problem 3 is now partly addressed — the related list uses `RELATED_MIN_SCORE` = 0.85
+> (daatan#2198) and the create-time duplicate warning 0.87 (daatan#2083). The `0.75` figures below are historical.
 
 ## Problems with the baseline
 

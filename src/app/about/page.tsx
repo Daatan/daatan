@@ -92,7 +92,7 @@ function SaasAboutPage() {
       </div>
 
       <p className="mb-6 -mt-3 lg:-mt-4 lg:mb-8">
-        <Link href="/home-v5" className="text-sm text-cobalt-light hover:underline">Preview: the new homepage design →</Link>
+        <Link href="/home" className="text-sm text-cobalt-light hover:underline">Preview: the new homepage design →</Link>
       </p>
 
       {/* Tagline */}

@@ -1,4 +1,5 @@
 import { getContactEmail } from '@/lib/branding'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 import LegalMeta from './LegalMeta'
 import { MINIMUM_AGE } from './version'
 
@@ -22,7 +23,7 @@ export default function PrivacyContent() {
           <li>Account data: your email address, name and profile picture from Google or GitHub sign-in, or the email, name and a salted password hash if you register with a password.</li>
           <li>Content you create: forecasts, commitments (stakes), comments and your resulting scores.</li>
           <li>Notification data: web-push subscriptions and Telegram identifiers, only if you enable those notifications.</li>
-          <li>Usage analytics, only with your consent: page views and an internal account ID (never your email) sent to Google Analytics.</li>
+          <li>Usage analytics: page views and an internal account ID (never your email) sent to Google Analytics. In the EU/EEA, the UK and Switzerland only after you accept; elsewhere by default, with an opt-out (see section 5).</li>
         </ul>
       </section>
 
@@ -32,7 +33,7 @@ export default function PrivacyContent() {
           <li>To run your account, record your predictions and compute the leaderboard and reputation system (performance of the contract).</li>
           <li>To send notifications about your forecasts, resolutions and account activity (performance of the contract; push and Telegram on your opt-in).</li>
           <li>To moderate content and keep the service secure (legitimate interests).</li>
-          <li>To understand and improve the product through analytics (consent).</li>
+          <li>To understand and improve the product through analytics (with your consent in the EU/EEA, the UK and Switzerland; elsewhere on by default with notice, and you can opt out).</li>
         </ul>
       </section>
 
@@ -41,9 +42,10 @@ export default function PrivacyContent() {
         <p>We do not sell your personal data. Providers that process data for us:</p>
         <ul className="list-disc ml-6 mt-2 space-y-1">
           <li><strong>Amazon Web Services:</strong> hosting, database, email delivery infrastructure and AI model access (Bedrock).</li>
-          <li><strong>Google:</strong> sign-in (OAuth), Google Analytics (with consent) and AI models (Vertex AI / Gemini).</li>
+          <li><strong>Google:</strong> sign-in (OAuth), Google Analytics and AI models (Vertex AI / Gemini).</li>
           <li><strong>GitHub:</strong> sign-in (OAuth).</li>
           <li><strong>Resend:</strong> transactional emails.</li>
+          <li><strong>Cloudflare:</strong> a region check (geo.lipu.dev) that tells the site whether to show the cookie banner. It receives your IP address, as any web request does, and returns only whether a banner is needed; we store nothing from it.</li>
           <li><strong>OpenRouter:</strong> fallback AI model access.</li>
           <li><strong>Telegram:</strong> notifications you opt into.</li>
         </ul>
@@ -55,7 +57,10 @@ export default function PrivacyContent() {
       <section>
         <h2 className={H2}>5. Cookies and Local Storage</h2>
         <p>
-          Essential cookies keep you signed in and remember your preferences. Analytics cookies are used only if you accept them in the cookie banner; the choice is stored in your browser and you can change it at any time with the &quot;Cookie settings&quot; link in the footer. We use no advertising and no cross-site tracking.
+          Essential cookies keep you signed in and remember your preferences. On your first visit the site checks which region you are in. In the EU/EEA, the UK and Switzerland — or when the region can&apos;t be determined — Google Analytics cookies are used only if you accept them in the cookie banner. Elsewhere they are on by default, a notice says so, and you can opt out. Your choice is stored in your browser and you can change it at any time here or with the &quot;Cookie settings&quot; link in the footer; opting out also deletes the Google Analytics cookies. We use no advertising and no cross-site tracking.
+        </p>
+        <p className="mt-2">
+          <CookieSettingsLink className="underline hover:text-white bg-transparent border-0 p-0 cursor-pointer" />
         </p>
       </section>
 

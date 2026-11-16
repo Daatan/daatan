@@ -25,6 +25,17 @@ const nextConfig = {
         destination: '/forecasts/:id',
         permanent: true,
       },
+      // The landing page moved from its preview path /home-v5 to /home.
+      {
+        source: '/home-v5',
+        destination: '/home',
+        permanent: true,
+      },
+      {
+        source: '/:locale(he|ru|eo)/home-v5',
+        destination: '/:locale/home',
+        permanent: true,
+      },
       // The in-app elections matrix was superseded by the standalone
       // elections.daatan.com app (Daatan/elections) and removed (daatan#2011).
       {

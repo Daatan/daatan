@@ -75,6 +75,31 @@ describe('ForecastCard voter pill', () => {
   })
 })
 
+describe("ForecastCard viewer's own forecast (daatan#2202)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as any)
+  })
+
+  it('shows the binary percent instead of the bare Committed pill', () => {
+    const prediction = { ...basePrediction, userHasCommitted: true, userForecast: { probability: 70, optionText: null } }
+    renderWithIntl(<ForecastCard prediction={prediction} />)
+    expect(screen.getByText('You: 70%')).toBeInTheDocument()
+    expect(screen.queryByText('Committed')).toBeNull()
+  })
+
+  it('shows the picked option for multiple choice', () => {
+    const prediction = { ...basePrediction, outcomeType: 'MULTIPLE_CHOICE', userHasCommitted: true, userForecast: { probability: null, optionText: 'Yesh Atid' } }
+    renderWithIntl(<ForecastCard prediction={prediction} />)
+    expect(screen.getByText('You: Yesh Atid')).toBeInTheDocument()
+  })
+
+  it('falls back to Committed when the value is unknown', () => {
+    renderWithIntl(<ForecastCard prediction={{ ...basePrediction, userHasCommitted: true }} />)
+    expect(screen.getByText('Committed')).toBeInTheDocument()
+  })
+})
+
 describe('ForecastCard AI estimate pill', () => {
   beforeEach(() => {
     vi.resetAllMocks()

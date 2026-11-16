@@ -3,6 +3,11 @@
 export type SortBy = 'elo' | 'accuracy' | 'brierScore' | 'peerScore' | 'aiScore'
 export type SortDir = 'best' | 'worst'
 
+/** The first view, rendered on the server (#2212) so crawlers get the table. Lives here, not in
+ *  the 'use client' component: a server import of a client module's export gets a reference,
+ *  not the value. */
+export const INITIAL_SORT: SortBy = 'brierScore'
+
 export const LOWER_IS_BETTER: Partial<Record<SortBy, true>> = { brierScore: true }
 
 // The API returns the top `limit` in best-first order; "worst first" reverses it

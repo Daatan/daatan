@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
   // Opening /forecasts also marks the feed as seen, so the site root shows the feed from then on
   // (src/lib/first-visit.ts). The root itself is the feed for returning visitors.
   { href: '/forecasts', labelKey: 'feed', icon: Home, alsoActiveOn: ['/'] },
-  { href: '/home-v5', labelKey: 'homePage', icon: Compass },
+  { href: '/home', labelKey: 'homePage', icon: Compass },
   { href: '/create', labelKey: 'create', icon: PlusCircle },
   { href: '/notifications', labelKey: 'notifications', icon: Bell },
   { href: '/commitments', labelKey: 'commitments', icon: BarChart3 },
@@ -72,7 +72,7 @@ const navItems: NavItem[] = [
 ]
 
 // Routes that exist under src/app/[locale]; the rest are served at the root path only.
-const LOCALIZED_NAV_ROUTES = ['/about', '/forecasts', '/home-v5']
+const LOCALIZED_NAV_ROUTES = ['/about', '/forecasts', '/home']
 
 const stripLocale = (pathname: string) => pathname.replace(/^\/(he|ru|eo)(?=\/|$)/, '') || '/'
 
@@ -153,25 +153,18 @@ const Sidebar = () => {
   // SaaS-only marketing/support pages are removed from the self-hosted edition.
   // `selfHosted` comes from the server-resolved CapabilitiesProvider value, so
   // it's stable across SSR + client (no hydration mismatch).
-  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', '/home-v5', ELECTIONS_URL]
+  const SELF_HOST_HIDDEN_ROUTES = ['/contact', '/retroanalysis', '/home', ELECTIONS_URL]
   const editionNavItems = selfHosted
     ? navItems.filter((item) => !SELF_HOST_HIDDEN_ROUTES.includes(item.href))
     : navItems
 
-  // Filter nav items based on auth status (only after mount to avoid hydration mismatch)
+  // Filter nav items based on auth status (only after mount to avoid hydration mismatch).
+  // /activity is public but hidden from guests (daatan#2201): at current traffic it reads
+  // as an empty room, which is the wrong first impression.
+  const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments', '/activity']
   const filteredNavItems = hasMounted
-    ? editionNavItems.filter((item) => {
-      const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
-      if (authRequiredRoutes.includes(item.href)) {
-        return status === 'authenticated'
-      }
-      return true
-    })
-    : editionNavItems.filter((item) => {
-      // During SSR/pre-mount, show all non-auth routes
-      const authRequiredRoutes = ['/create', '/notifications', '/profile', '/commitments']
-      return !authRequiredRoutes.includes(item.href)
-    })
+    ? editionNavItems.filter((item) => !authRequiredRoutes.includes(item.href) || status === 'authenticated')
+    : editionNavItems.filter((item) => !authRequiredRoutes.includes(item.href))
 
   const currentLocale = useLocale()
 

@@ -154,6 +154,13 @@ export default function ExpressForecastClient({
   // leaving the page cancel it instead of leaving a request dangling.
   const guessAbort = useRef<AbortController | null>(null)
   useEffect(() => () => guessAbort.current?.abort(), [])
+  // Set once a publish succeeds. With `cacheComponents` on, Next keeps a page the
+  // user navigated away from alive in a hidden React <Activity>, state and all —
+  // so coming back to /create via the menu restored the already-published review
+  // screen, stuck on "Publishing…" with Start over disabled; only a full reload
+  // cleared it (daatan#2195, Andrey 2026-11-15). Effects re-run when the hidden
+  // page is shown again, so the reset lives in the mount effect below.
+  const published = useRef(false)
   const [progressMessage, setProgressMessage] = useState('')
   const [articlesFound, setArticlesFound] = useState(0)
   const [sourcesSummary, setSourcesSummary] = useState('')
@@ -410,6 +417,15 @@ export default function ExpressForecastClient({
   const definedness = generated?.definedness?.verdict === 'unclear' ? generated.definedness : null
   const definednessBlocksPublish = !!definedness?.enforced && !definednessRechecked
 
+  useEffect(() => {
+    if (!published.current) return
+    published.current = false
+    handleTryAgain()
+    setUserInput('')
+    setIsPublishing(false)
+    // Mount/reveal only.
+  }, [])
+
   const handleSkipSourcesAndRetry = () => {
     setSkipSources(true)
     setNoArticlesDetails(null)
@@ -539,7 +555,10 @@ export default function ExpressForecastClient({
         throw new Error(localizedValidationError(errData, t) ?? (errData.error || t('publishFailed')))
       }
 
-      // Success: redirect to the new prediction page
+      // Success: redirect to the new prediction page. The form resets the next time
+      // this page is shown (see `published`), not now — resetting here would flash
+      // the empty input step before the navigation lands.
+      published.current = true
       router.push(`/forecasts/${prediction.id}?newly_created=true`)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('publishError'))
@@ -843,7 +862,17 @@ export default function ExpressForecastClient({
                 {t('reviewSubtitle')}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              {/* Start over is also at the bottom, below the fold on a desktop review —
+                  Andrey looked for it up here (daatan#2195). */}
+              <button
+                onClick={handleTryAgain}
+                disabled={isPublishing}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 rounded-lg hover:text-gray-200 hover:bg-navy-600 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {t('startOver')}
+              </button>
               {isEditing ? (
                 // Deliberately low-key: Save Changes below is the primary action. Rewrite sends
                 // the claim back to the AI, which can undo the author's own fixes (#2135).

@@ -36,6 +36,20 @@ describe('Sidebar Component', () => {
     expect(signInButtons.length).toBeGreaterThan(0)
   })
 
+  it('hides the Activity link from guests and shows it when signed in (daatan#2201)', () => {
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as any)
+    const { unmount } = render(<Sidebar />)
+    expect(document.querySelector('a[href="/activity"]')).toBeNull()
+    unmount()
+
+    vi.mocked(useSession).mockReturnValue({
+      data: { user: { name: 'Test User', email: 'test@example.com', image: null }, expires: 'any' },
+      status: 'authenticated',
+    } as any)
+    render(<Sidebar />)
+    expect(document.querySelector('a[href="/activity"]')).not.toBeNull()
+  })
+
   it('renders user info when authenticated', () => {
     vi.mocked(useSession).mockReturnValue({
       data: {

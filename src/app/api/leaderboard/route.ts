@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { unstable_cache } from 'next/cache'
 import { handleRouteError } from '@/lib/api-error'
-import { getLeaderboard, type SortBy } from '@/lib/services/leaderboard'
+import { type SortBy } from '@/lib/services/leaderboard'
+import { getCachedLeaderboard } from '@/lib/services/leaderboard-cached'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 
-
-// Rankings move slowly (only on resolution events) — 5min TTL matches the
-// leaderboard/layout.tsx JSON-LD cache. unstable_cache keys on the
-// serialized arguments in addition to keyParts, so each distinct
-// (limit, sortBy, tagSlug) combination gets its own cache entry.
-const getCachedLeaderboard = unstable_cache(
-  async (limit: number, sortBy: SortBy, tagSlug?: string) => getLeaderboard(limit, sortBy, tagSlug),
-  ['leaderboard-api'],
-  { revalidate: 300, tags: ['leaderboard'] },
-)
 
 // GET /api/leaderboard - Enhanced leaderboard with multiple sort modes
 export async function GET(request: NextRequest) {

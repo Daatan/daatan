@@ -122,6 +122,7 @@
     "anonymous": "אנונימי",
     "commitmentsLabel": "משתתפים",
     "committedLabel": "הותחייב",
+    "yourForecastLabel": "התחזית שלך: {value}",
     "resolve": "פתור",
     "edit": "ערוך",
     "delete": "מחק",

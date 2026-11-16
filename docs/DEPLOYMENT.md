@@ -161,7 +161,12 @@ always names an image whose tests passed.
 ### `resolve-release` job (tag / production dispatch)
 
 1. Resolve the version from the tag (or the required `version` input on a production dispatch)
-2. **Tag only:** wait (up to 30 min) for this commit's `main` run to finish `Deploy to Staging`
+2. **Tag only:** refuse a tag **lower** than the version live on `https://daatan.com/api/health`
+   (daatan#2188: a stale `v1.67.10` tag pushed after `v1.67.11` silently downgraded prod). An
+   equal version passes, so re-running the live tag still restores it. Deliberate downgrades
+   use the Rollback workflow or a manual production dispatch, which are not gated. Fails open
+   (warning only) if the live version can't be read.
+3. **Tag only:** wait (up to 30 min) for this commit's `main` run to finish `Deploy to Staging`
    successfully. Fails if it failed, was cancelled or superseded by a newer merge — tag the
    current `main` HEAD instead. Does not touch staging itself, so releases work while staging
    is off. Needs no AWS credentials.

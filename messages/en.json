@@ -122,6 +122,7 @@
     "anonymous": "Anonymous",
     "commitmentsLabel": "commitments",
     "committedLabel": "Committed",
+    "yourForecastLabel": "You: {value}",
     "resolve": "Resolve",
     "edit": "Edit",
     "delete": "Delete",

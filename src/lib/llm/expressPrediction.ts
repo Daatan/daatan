@@ -15,7 +15,7 @@ import { checkContent } from '../services/moderation'
 import { callGeminiTranslate, localizeForecastForAuthor, type LocalizedForecast } from '../services/translation'
 import { getProviderForUrl, resolveMarketByUrl, getLatestMarketPrice, PROVIDER_LABEL } from '../services/external-markets'
 import { findClaimTextDeadlineMismatch } from '../utils/extractDatesFromText'
-import { lookupGroundedEventDate } from './groundedDateLookup'
+import { lookupGroundedEventDate, type UnavailableReason } from './groundedDateLookup'
 import { ensureRulesDirection, type RulesDirectionOutcome } from './rulesDirection'
 import { checkRulesStrength, type RulesStrengthOutcome } from './rulesStrength'
 import { checkClaimDefinedness, type ClaimDefinednessOutcome } from './claimDefinedness'
@@ -238,7 +238,9 @@ export type GroundedDateOutcome =
   /** The first draft's date already had a stated basis — no lookup. */
   | { fired: false }
   /** Looked, and either found no scheduled date or couldn't look (no Vertex, call failed). */
-  | { fired: true; status: 'no_date' | 'unavailable' }
+  | { fired: true; status: 'no_date' }
+  /** `reason` added in daatan#2199; attempts recorded before it have none. */
+  | { fired: true; status: 'unavailable'; reason?: UnavailableReason }
   /** `adopted`: the re-draft's resolveByDatetime landed on the looked-up day. */
   | { fired: true; status: 'found'; event: string; date: string; sourceUrl: string; adopted: boolean }
 
@@ -290,12 +292,15 @@ async function draftWithGroundedDate(
   const lookup = early ? await early : await lookupGroundedEventDate(userInput, first.claimText, now)
   timings.lookupMs = early ? lookupEnd - lookupStart : Date.now() - waitStart
   timings.lookupWaitMs = Date.now() - waitStart
-  if (lookup.status !== 'found') {
-    return { prediction: first, articlesText, groundedDate: { fired: true, status: lookup.status } }
+  if (lookup.status === 'no_date') {
+    return { prediction: first, articlesText, groundedDate: { fired: true, status: 'no_date' } }
+  }
+  if (lookup.status === 'unavailable') {
+    return { prediction: first, articlesText, groundedDate: { fired: true, status: 'unavailable', reason: lookup.reason } }
   }
 
   const withReference =
-    `[Reference — scheduled event date, from a web lookup]\nEvent: ${lookup.event}\nDate: ${lookup.date}\n` +
+    `[Reference — deciding date (scheduled event or legal deadline), from a web lookup]\nEvent: ${lookup.event}\nDate: ${lookup.date}\n` +
     (lookup.sourceUrl ? `Source: ${lookup.sourceUrl}\n` : '') +
     'This date is stated by a reference source; treat it like a date stated in the provided articles.\n\n' +
     articlesText
@@ -320,6 +325,28 @@ async function draftWithGroundedDate(
 const RELATIVE_TIMING_HORIZON_YEARS = 5
 
 /**
+ * When the current year ends this close, "end of the current year" stops being a
+ * neutral default: on 2026-11-15 it gave "Huang will be convicted" and a TIOBE
+ * ranking claim six weeks (daatan#2199). Inside this window the default rolls to
+ * the end of next year.
+ */
+const DEFAULT_HORIZON_MIN_DAYS = 90
+
+/**
+ * Rule 3's fallback resolution date for a topic with no natural resolution point:
+ * the end of the current year, or of next year once fewer than
+ * DEFAULT_HORIZON_MIN_DAYS remain. Shared by the prompt fill and
+ * findUngroundedYears, which must not flag the rolled-over year.
+ */
+export function getDefaultHorizon(now: Date): { iso: string; human: string; year: number } {
+  const currentYear = now.getFullYear()
+  const endOfYear = new Date(`${currentYear}-12-31T23:59:59Z`)
+  const daysLeft = (endOfYear.getTime() - now.getTime()) / 86_400_000
+  const year = daysLeft < DEFAULT_HORIZON_MIN_DAYS ? currentYear + 1 : currentYear
+  return { iso: `${year}-12-31T23:59:59Z`, human: `December 31, ${year}`, year }
+}
+
+/**
  * Future years asserted in the claim or resolution date that appear nowhere in
  * the grounding text (user input + article snippets the model was shown). Such
  * a year came from the model's parametric memory, not from the sources — the
@@ -327,8 +354,9 @@ const RELATIVE_TIMING_HORIZON_YEARS = 5
  * invented 2027 deadline.
  *
  * Past and current years are context, not guesses, and the two documented
- * defaults are deliberate: end of the current year (rule 3) and the
- * relative-timing horizon (rule 3a). Only what's left is suspect.
+ * defaults are deliberate: the rule 3 default horizon (getDefaultHorizon — end of
+ * the current or next year) and the relative-timing horizon (rule 3a). Only
+ * what's left is suspect.
  */
 export function findUngroundedYears(
   claimText: string,
@@ -345,6 +373,7 @@ export function findUngroundedYears(
     .filter(y => {
       const year = Number(y)
       if (year <= currentYear || year === currentYear + RELATIVE_TIMING_HORIZON_YEARS) return false
+      if (year === getDefaultHorizon(now).year) return false
       return !groundingText.includes(y)
     })
     .sort()
@@ -463,8 +492,8 @@ export async function generateExpressPrediction(
 
     const now = new Date()
     const currentYear = now.getFullYear()
-    const endOfYear = `${currentYear}-12-31T23:59:59Z`
-    const endOfYearHuman = `December 31, ${currentYear}`
+    // Variable names kept for the prompt placeholders; the value may be next year (#2199).
+    const { iso: endOfYear, human: endOfYearHuman } = getDefaultHorizon(now)
     const { iso: fiveYearsFromNow, human: fiveYearsFromNowHuman } = getFiveYearsFromNow(now)
 
     const template = await getPromptTemplate('express-prediction')
@@ -766,8 +795,8 @@ URL: ${article.url}
   // Step 3: Generate prediction with LLM
   const now = new Date()
   const currentYear = now.getFullYear()
-  const endOfYear = `${currentYear}-12-31T23:59:59Z`
-  const endOfYearHuman = `December 31, ${currentYear}`
+  // Variable names kept for the prompt placeholders; the value may be next year (#2199).
+  const { iso: endOfYear, human: endOfYearHuman } = getDefaultHorizon(now)
   const { iso: fiveYearsFromNow, human: fiveYearsFromNowHuman } = getFiveYearsFromNow(now)
 
   const template = await getPromptTemplate('express-prediction')

@@ -122,6 +122,7 @@
     "anonymous": "Анонимно",
     "commitmentsLabel": "ставок",
     "committedLabel": "Поставлено",
+    "yourForecastLabel": "Вы: {value}",
     "resolve": "Решить",
     "edit": "Редактировать",
     "delete": "Удалить",

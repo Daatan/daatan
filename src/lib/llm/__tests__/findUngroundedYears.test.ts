@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findUngroundedYears } from '../expressPrediction'
+import { getDefaultHorizon, findUngroundedYears } from '../expressPrediction'
 
 // Frozen "today" for every case: mid-2026, matching the #1086 incident window.
 const NOW = new Date('2026-07-13T12:00:00Z')
@@ -102,5 +102,27 @@ describe('findUngroundedYears', () => {
         NOW,
       ),
     ).toEqual([])
+  })
+})
+
+// daatan#2199: "end of the current year" gave a six-week deadline on 2026-11-15.
+describe('getDefaultHorizon', () => {
+  it('is the end of the current year while 90+ days remain', () => {
+    expect(getDefaultHorizon(new Date('2026-09-15T12:00:00Z'))).toEqual({
+      iso: '2026-12-31T23:59:59Z', human: 'December 31, 2026', year: 2026,
+    })
+  })
+
+  it('rolls to the end of next year inside the last 90 days', () => {
+    expect(getDefaultHorizon(new Date('2026-11-15T17:00:00Z'))).toEqual({
+      iso: '2027-12-31T23:59:59Z', human: 'December 31, 2027', year: 2027,
+    })
+  })
+
+  it('does not flag the rolled-over default year as ungrounded', () => {
+    const now = new Date('2026-11-15T17:00:00Z')
+    expect(findUngroundedYears('Rust returns to the TIOBE top 10 by December 31, 2027', '2027-12-31T23:59:59Z', '', now)).toEqual([])
+    // ...but the same year is still suspect while the default is this year
+    expect(findUngroundedYears('X by December 31, 2027', '2027-12-31T23:59:59Z', '', new Date('2026-06-01T00:00:00Z'))).toEqual(['2027'])
   })
 })

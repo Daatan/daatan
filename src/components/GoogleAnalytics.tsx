@@ -1,4 +1,5 @@
 import Script from 'next/script'
+import { consentScript } from '@/lib/consent-region'
 
 interface GoogleAnalyticsProps {
   measurementId: string
@@ -34,20 +35,7 @@ const GoogleAnalytics = ({ measurementId, isStaging = false }: GoogleAnalyticsPr
           explicitly support beforeInteractive per Next.js docs. */}
       {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
       <Script id="google-analytics-consent" strategy="beforeInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          var _storedConsent;
-          try { _storedConsent = localStorage.getItem('daatan_analytics_consent'); } catch(e) {}
-          gtag('consent', 'default', {
-            analytics_storage: _storedConsent === 'granted' ? 'granted' : 'denied',
-            ad_storage: 'denied',
-            functionality_storage: 'denied',
-            personalization_storage: 'denied',
-            security_storage: 'granted',
-            wait_for_update: _storedConsent ? undefined : 500
-          });
-        `}
+        {consentScript()}
       </Script>
       <Script
         id="google-analytics-external"

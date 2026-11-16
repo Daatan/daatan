@@ -122,6 +122,7 @@
     "anonymous": "Anonima",
     "commitmentsLabel": "engaĝoj",
     "committedLabel": "Engaĝita",
+    "yourForecastLabel": "Vi: {value}",
     "resolve": "Solvi",
     "edit": "Redakti",
     "delete": "Forigi",

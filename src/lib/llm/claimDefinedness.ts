@@ -57,9 +57,10 @@ export const MIN_CONFLICT_CHANCE = 30
 
 /**
  * Whether an unclear verdict blocks publishing (true) or only shows the author the question
- * and the corrected claims (false). Off until the measured flag rate is accepted (#2166).
+ * and the corrected claims (false). On since 2026-11-16 (Mark accepted the gate, #2166): the
+ * author must pick a reading or use their one re-check before publishing.
  */
-export const DEFINEDNESS_BLOCKS_PUBLISH = false
+export const DEFINEDNESS_BLOCKS_PUBLISH = true
 
 export function definednessBlocks(v: { fault: string; splitChance: number; readerShare: number; options: string[] }): boolean {
   if (v.options.length < 2) return false
