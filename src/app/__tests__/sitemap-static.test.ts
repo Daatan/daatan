@@ -16,7 +16,7 @@ async function urls(): Promise<string[]> {
 }
 
 describe('sitemap static routes (daatan#2057)', () => {
-  it('lists the site root per locale, not the /home-v5 paths it serves', async () => {
+  it('lists the site root per locale, not the /home paths it serves', async () => {
     const list = await urls()
     expect(list).toEqual(expect.arrayContaining(['https://daatan.com', 'https://daatan.com/he', 'https://daatan.com/ru']))
     expect(list.filter((u) => u.includes('home-v5'))).toEqual([])

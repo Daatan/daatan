@@ -37,9 +37,9 @@ describe('LocaleAboutPage', () => {
   })
 
   it.each([
-    ['he', '/he/home-v5'],
-    ['ru', '/ru/home-v5'],
-    ['eo', '/eo/home-v5'],
+    ['he', '/he/home'],
+    ['ru', '/ru/home'],
+    ['eo', '/eo/home'],
   ])('links to the home-v5 preview for locale=%s', async (locale, href) => {
     const page = await LocaleAboutPage({ params: Promise.resolve({ locale }) })
     const { container } = render(page)

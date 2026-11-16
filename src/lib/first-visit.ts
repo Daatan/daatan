@@ -35,5 +35,5 @@ export function homeV5RootTarget({
   const m = ROOT.exec(pathname)
   if (!m) return null
   if (FEED_PARAMS.some((p) => searchParams.has(p))) return null
-  return m[1] ? `/${m[1]}/home-v5` : '/home-v5'
+  return m[1] ? `/${m[1]}/home` : '/home'
 }

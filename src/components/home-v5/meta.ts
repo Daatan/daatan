@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import { getAppUrl } from '@/lib/branding'
 
 // The root serves this page in place (src/lib/first-visit.ts), so it canonicalizes to the root;
-// /home-v5 itself folds onto it (daatan#2057).
+// /home itself folds onto it (daatan#2057).
 function urlFor(locale: string): string {
   const base = getAppUrl()
   return locale === 'en' ? base : `${base}/${locale}`
