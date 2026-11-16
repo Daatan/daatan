@@ -17,7 +17,7 @@ and locally, and is gitignored. Don't hand-edit the generated project; edit
 ## Building locally
 
 Requires JDK 17 (not 21+ — bubblewrap's Gradle project targets 17) and the
-Android SDK (`cmdline-tools`, `platform-tools`, `build-tools;34.0.0`,
+Android SDK (`cmdline-tools`, `platform-tools`, `build-tools;36.0.0`,
 `platforms;android-36`).
 
 ```bash
@@ -88,7 +88,7 @@ it to Google Play. Triggers:
 | Pull request touching `android/**` | Build + verify only (same-repo PRs; never uploads) |
 | Push to `main` touching `android/**` | Build + upload to the **internal** track |
 | Tag `android-v*` (e.g. `android-v1.1.0`) | Same, with `versionName` taken from the tag |
-| Monthly schedule (1st, 05:23 UTC) | Rebuild + upload to internal, so toolchain breakage shows up early |
+| Monthly schedule (1st, 05:23 UTC) | Build + verify only, never uploads, so toolchain breakage shows up early (#2112) |
 | `workflow_dispatch` | Choose a testing track (`internal`/`alpha`/`beta`), status (`completed`/`draft`) and en-US release notes |
 
 **Production promotion is a human step in Play Console.** The workflow only uploads to testing tracks; nothing here

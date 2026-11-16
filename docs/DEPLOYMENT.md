@@ -173,7 +173,8 @@ always names an image whose tests passed.
 
 ### `deploy-production` job (`environment: production`)
 
-1. Configure AWS credentials (the OIDC role trusts only `main` and this environment)
+1. Configure AWS credentials (the OIDC role trusts only `main` and this environment; the
+   `production` environment itself accepts deployments only from `main` and `v*` tags)
 2. Look up the ECR digests of `X.Y.Z` and `X.Y.Z-migrations`; on a tag, require they equal
    `sha-<commit>` / `sha-<commit>-migrations` (i.e. the images built from this very commit)
 3. Check EC2 SSM health (`Environment=prod` instance)
@@ -348,10 +349,10 @@ unreachable) dumps first:
   (`pg_dump -U daatan <db> | gzip` via `docker exec` into the postgres container). Staging
   and `next` share the staging DB and the same directory.
 - **Retention:** the newest `PRE_MIGRATE_DUMP_KEEP` (default 2) files; older ones are
-  pruned before each new dump. Prod's dump is ~1.1–1.5 GB compressed (the size of the S3
-  backups), so 2 dumps hold ~3 GB of the 40 GB root volume. Prod already peaks around
-  65% during deploys and the disk alarm fires at 85% — raise the count only with disk
-  headroom to match. Older restore points live in the S3 backups.
+  pruned before each new dump. Prod's dump is ~4.5 GB compressed (the size of the S3
+  backups in November 2026), so 2 dumps hold ~9 GB of the 60 GB root volume (40 GB until daatan#2168, when
+  dumps, images and Postgres filled it). The disk alarm fires at 85% — raise the count only
+  with disk headroom to match. Older restore points live in the S3 backups.
 - **Abort, before migrating or swapping traffic, when:** the postgres container can't be
   found; free disk is under twice the previous dump (3 GiB if there is none); `pg_dump`
   exits non-zero; or the result is under 256 KiB or under half the previous dump. The
@@ -520,6 +521,12 @@ kept, and every backup is restore-verified in a throwaway, memory-capped contain
   2026-10-27 after 12/12 on-time EventBridge runs: the late cron found the lock free and took
   a second full backup each time, so keep-newest-60 covered ~12.5 days instead of ~30. It ships
   the script inline from the checkout, so it does not depend on what is on the box.
+- **Streamed, nothing staged on disk.** `backup-db.sh` pipes `pg_dump | gzip | aws s3 cp -`
+  straight to S3 (daatan#2168: staging the ~4 GB dump in `/tmp` failed every backup for ~42 h
+  once the root disk filled). A failed `pg_dump` fails the run and the partial object is
+  removed; so is a result under 256 KiB or under half the newest existing backup.
+  `backup.yml` waits up to 25 min for the dump and 35 min for the restore verification, and
+  fails if either runs out.
 - **No double runs.** Both scripts take the same box-side `flock`
   (`/var/lock/daatan-db-backup.lock`). Whichever run comes second exits 0 with
   `BACKUP_SKIPPED` / `VERIFY_SKIPPED`; `backup.yml` reports that as a green no-op and skips its
@@ -662,7 +669,7 @@ fields @timestamp, @logStream, @message
 
 | Secret                         | Used by                              |
 |--------------------------------|--------------------------------------|
-| `AWS_ROLE_ARN`                 | OIDC auth for all AWS operations — the role (`terraform/oidc_github.tf`) only trusts runs on `main` and jobs in the `production` environment, and may `SendCommand` only to the prod, staging and Oracul instances; a workflow run from any other branch gets no AWS credentials |
+| `AWS_ROLE_ARN`                 | OIDC auth for all AWS operations — the role (`terraform/oidc_github.tf`) only trusts runs on `main` and jobs in the `production` environment (whose deployment policy admits only `main` and `v*` tags), and may `SendCommand` only to the prod, staging and Oracul instances; a workflow run from any other branch gets no AWS credentials |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Baked into Docker image at build     |
 | `TELEGRAM_BOT_TOKEN`           | Deploy success/failure notifications |
 | `TELEGRAM_CHAT_ID`             | Deploy notifications target          |
