@@ -164,6 +164,18 @@ through the sitemap. `src/lib/services/crawl-links.ts` (every reader wrapped in
 Links use the same visibility filter as `/forecasts` and `/tags/<slug>`, so each lands on a
 page that shows the target.
 
+`/leaderboard` and `/leaderboard/sources` are server-rendered too (daatan#2212). Before, they were
+client pages that fetched `/api/leaderboard*` after hydration. `robots.txt` disallows `/api/`, so
+Googlebot only ever saw "Calculating rankings..." and no profile or source links. The server
+pages read the same `unstable_cache` entries as the API routes
+(`src/lib/services/leaderboard-cached.ts`) and pass the first view as props.
+
+The user board renders the default Brier sort for the URL's `?tag=`, with a real
+`<a href="/profile/…">` on every name. A client fetch runs only when the sort or topic changes.
+The source board takes its rows entirely from props, because view, tag and sort changes are
+`<Link>` navigations that re-render the server page. Regression coverage:
+`src/app/leaderboard/__tests__/ssr.test.tsx`.
+
 ## Server-rendered content (Soft 404 prevention)
 
 A forecast page must carry **substantive, unique text in its initial SSR HTML** — not
