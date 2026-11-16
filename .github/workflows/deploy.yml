@@ -662,6 +662,31 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Refuse a tag older than the live production version
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # daatan#2188: a second session tagged v1.67.10 after v1.67.11 was live;
+          # the pipeline shipped it green and silently downgraded prod. A tag lower
+          # than the live version is refused here. An equal version passes, because
+          # re-running the live tag is how an accidental downgrade gets restored.
+          # Deliberate downgrades go through the Rollback workflow (docs/ROLLBACK.md)
+          # or a manual production dispatch, which this step does not gate.
+          # Fails open if the live version can't be read: an unreachable prod must
+          # not block the deploy that may be fixing it.
+          LIVE=$(curl -s --max-time 15 https://daatan.com/api/health | jq -r '.version // empty' 2>/dev/null || true)
+          if [[ ! "$LIVE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::warning::Could not read the live production version (got '${LIVE}'); skipping the downgrade check."
+            exit 0
+          fi
+          LOWEST=$(printf '%s\n%s\n' "$VERSION" "$LIVE" | sort -V | head -1)
+          if [[ "$VERSION" != "$LIVE" && "$LOWEST" == "$VERSION" ]]; then
+            echo "::error::v${VERSION} < live ${LIVE} — refusing a downgrade. Tag the current main HEAD with a version above ${LIVE}, or use the Rollback workflow (docs/ROLLBACK.md) for a deliberate rollback."
+            exit 1
+          fi
+          echo "✅ v${VERSION} >= live ${LIVE}."
+
       - name: Wait for this commit's staging deploy
         if: startsWith(github.ref, 'refs/tags/v')
         env:
