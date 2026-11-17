@@ -1,0 +1,105 @@
+name: Retro Simulations
+
+# The retro generator (daatan#2217): turns this week's reported events that no forecast asked
+# about into private "what Oracul would have said a week before" drafts in the approvals queue.
+#
+#   1. POST /api/admin/retro/candidates — cluster the evidence pool's reported facts, judge each
+#      cluster (one dated past event?), write nothing.
+#   2. POST /api/admin/retro/simulate — one candidate per request (one Oracul analysis, up to
+#      ~95 s): articles published before T0 from the whole news index, Oracul as of T0, and
+#      with mode=apply a PENDING_APPROVAL draft. Approving it resolves it; nothing is published.
+#
+# Manual only (Mark, 2026-11-16: a cron comes once dedup and the trend filter are proven), and
+# dry-run by default. Auth is the x-cron-secret (BOT_RUNNER_SECRET) header.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      mode:
+        description: dry-run shows what would be drafted; apply writes the drafts
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      days:
+        description: Evidence-pool window, days
+        default: '7'
+      max_clusters:
+        description: Clusters to judge (largest first)
+        default: '40'
+      max_events:
+        description: Candidates to simulate (each is one Oracul analysis)
+        default: '10'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: ${{ inputs.mode }} on ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Find candidates and simulate them one by one
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          TARGET: ${{ inputs.target }}
+          MODE: ${{ inputs.mode }}
+          DAYS: ${{ inputs.days }}
+          MAX_CLUSTERS: ${{ inputs.max_clusters }}
+          MAX_EVENTS: ${{ inputs.max_events }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::bad target"; exit 1; }
+          [[ "$MODE" =~ ^(dry-run|apply)$ ]] || { echo "::error::bad mode"; exit 1; }
+          [[ "$DAYS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::days must be an integer"; exit 1; }
+          [[ "$MAX_CLUSTERS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::max_clusters must be an integer"; exit 1; }
+          [[ "$MAX_EVENTS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::max_events must be an integer"; exit 1; }
+          if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
+          [ -n "$BASE" ] || { echo "::error::No URL configured for $TARGET"; exit 1; }
+
+          BODY=$(jq -nc --argjson d "$DAYS" --argjson m "$MAX_CLUSTERS" '{days:$d, maxClusters:$m}')
+          HTTP=$(curl -s -o candidates.json -w '%{http_code}' --max-time 118 -X POST \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" -H 'Content-Type: application/json' \
+            -d "$BODY" "$BASE/api/admin/retro/candidates")
+          [ "$HTTP" = "200" ] || { echo "::error::candidates HTTP $HTTP"; head -c 500 candidates.json; exit 1; }
+
+          {
+            echo "## Retro simulations — $MODE on $TARGET"
+            jq -r '"Pool claims \(.claims) → reports \(.reports) → clusters \(.clusters) → multi-source \(.multiSource) (already covered \(.known)) → judged \(.judged) → events \((.candidates | length) + .merged) → **candidates \(.candidates | length)** after folding \(.merged) same-event duplicates. Timings ms: \(.timingsMs | tostring)"' candidates.json
+            echo
+            echo "Skipped at the judge:"
+            jq -r '[.skipped[].reason] | group_by(.) | map("- \(.[0]): \(length)") | .[]' candidates.json
+            echo
+            echo "Candidates (largest first; folded duplicates and reports dated too early to move T0 shown per line):"
+            jq -r '.candidates | to_entries[] | "\(.key + 1). \(.value.sources) outlets · event \(.value.event.date) · T0 \(.value.preview.asOf[0:10])\(if .value.preview.earlyReports > 0 then " · \(.value.preview.earlyReports) early" else "" end) — \(.value.preview.claimText)\(if (.value.merged | length) > 0 then " — folded: " + ([.value.merged[].claimText] | join(" / ")) else "" end)"' candidates.json
+            echo
+            echo "| # | Status | P(T0) | Articles | T0 | Claim / reason |"
+            echo "|---|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          N=$(jq '.candidates | length' candidates.json)
+          [ "$N" -gt "$MAX_EVENTS" ] && N=$MAX_EVENTS
+          for i in $(seq 0 $((N - 1))); do
+            REQ=$(jq -c --argjson i "$i" --arg mode "$MODE" \
+              '.candidates[$i] | {reports, event, claimTemplate, rulesTemplate, mode:$mode}' candidates.json)
+            OUT=$(curl -s --max-time 125 -X POST \
+              -H "x-cron-secret: $BOT_RUNNER_SECRET" -H 'Content-Type: application/json' \
+              -d "$REQ" "$BASE/api/admin/retro/simulate") || OUT='{"status":"error","reason":"no response"}'
+            echo "event $((i + 1))/$N: $OUT" | head -c 2000; echo
+            echo "$OUT" | jq -r --argjson n "$((i + 1))" \
+              'if .status == "created" or .status == "dry_run"
+               then "| \($n) | \(.status) | \((.probability * 100) | round)% | \(.articlesUsed)/\(.articles | length) | \(.asOf[0:10]) | \(.claimText | gsub("\\|"; "/")) |"
+               else "| \($n) | \(.status // "error") | | | | \(.reason // .error // "?"): \((.claimText // "") | gsub("\\|"; "/")) |" end' \
+              >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "| $((i + 1)) | error | | | | unparseable response |" >> "$GITHUB_STEP_SUMMARY"
+            sleep 2
+          done

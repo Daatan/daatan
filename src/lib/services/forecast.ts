@@ -1094,7 +1094,12 @@ export async function listPendingApprovals({ page, limit }: { page: number; limi
       include: {
         author: { select: { id: true, name: true, username: true, email: true, image: true, isBot: true } },
         _count: { select: { commitments: true, comments: true } },
-        retroSimulation: { select: { asOf: true, cutoffAt: true, outcome: true } },
+        retroSimulation: {
+          select: {
+            asOf: true, cutoffAt: true, outcome: true,
+            eventText: true, eventDate: true, eventUrl: true, oraculProbability: true, articlesUsed: true,
+          },
+        },
       },
       skip: (page - 1) * limit,
       take: limit,
