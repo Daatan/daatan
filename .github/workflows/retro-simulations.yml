@@ -29,11 +29,14 @@ on:
         description: Evidence-pool window, days
         default: '7'
       max_clusters:
-        description: Clusters to judge (largest first)
-        default: '40'
+        description: Clusters to judge (largest first; 40 took 70–89 s against the 118 s limit)
+        default: '30'
       max_events:
         description: Candidates to simulate (each is one Oracul analysis)
         default: '10'
+      min_similarity:
+        description: news-indexer similarity floor for the pre-T0 articles (0.30–0.95; empty = the app default)
+        default: '0.40'
 
 permissions:
   contents: read
@@ -57,6 +60,7 @@ jobs:
           DAYS: ${{ inputs.days }}
           MAX_CLUSTERS: ${{ inputs.max_clusters }}
           MAX_EVENTS: ${{ inputs.max_events }}
+          MIN_SIMILARITY: ${{ inputs.min_similarity }}
         run: |
           set -euo pipefail
           [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::bad target"; exit 1; }
@@ -64,6 +68,7 @@ jobs:
           [[ "$DAYS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::days must be an integer"; exit 1; }
           [[ "$MAX_CLUSTERS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::max_clusters must be an integer"; exit 1; }
           [[ "$MAX_EVENTS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::max_events must be an integer"; exit 1; }
+          [[ -z "$MIN_SIMILARITY" || "$MIN_SIMILARITY" =~ ^0\.[0-9]{1,2}$ ]] || { echo "::error::min_similarity must look like 0.45"; exit 1; }
           if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
           [ -n "$BASE" ] || { echo "::error::No URL configured for $TARGET"; exit 1; }
 
@@ -74,7 +79,7 @@ jobs:
           [ "$HTTP" = "200" ] || { echo "::error::candidates HTTP $HTTP"; head -c 500 candidates.json; exit 1; }
 
           {
-            echo "## Retro simulations — $MODE on $TARGET"
+            echo "## Retro simulations — $MODE on $TARGET${MIN_SIMILARITY:+ (min_similarity $MIN_SIMILARITY)}"
             jq -r '"Pool claims \(.claims) → reports \(.reports) → clusters \(.clusters) → multi-source \(.multiSource) (already covered \(.known)) → judged \(.judged) → events \((.candidates | length) + .merged) → **candidates \(.candidates | length)** after folding \(.merged) same-event duplicates. Timings ms: \(.timingsMs | tostring)"' candidates.json
             echo
             echo "Skipped at the judge:"
@@ -90,12 +95,14 @@ jobs:
           N=$(jq '.candidates | length' candidates.json)
           [ "$N" -gt "$MAX_EVENTS" ] && N=$MAX_EVENTS
           for i in $(seq 0 $((N - 1))); do
-            REQ=$(jq -c --argjson i "$i" --arg mode "$MODE" \
-              '.candidates[$i] | {reports, event, claimTemplate, rulesTemplate, mode:$mode}' candidates.json)
+            REQ=$(jq -c --argjson i "$i" --arg mode "$MODE" --arg sim "$MIN_SIMILARITY" \
+              '.candidates[$i] | {reports, event, claimTemplate, rulesTemplate, mode:$mode}
+               + (if $sim == "" then {} else {minSimilarity: ($sim | tonumber)} end)' candidates.json)
             OUT=$(curl -s --max-time 125 -X POST \
               -H "x-cron-secret: $BOT_RUNNER_SECRET" -H 'Content-Type: application/json' \
               -d "$REQ" "$BASE/api/admin/retro/simulate") || OUT='{"status":"error","reason":"no response"}'
-            echo "event $((i + 1))/$N: $OUT" | head -c 2000; echo
+            # Whole response: the per-article similarities and stances are what a hand-read needs.
+            echo "event $((i + 1))/$N: $OUT" | head -c 60000; echo
             echo "$OUT" | jq -r --argjson n "$((i + 1))" \
               'if .status == "created" or .status == "dry_run"
                then "| \($n) | \(.status) | \((.probability * 100) | round)% | \(.articlesUsed)/\(.articles | length) | \(.asOf[0:10]) | \(.claimText | gsub("\\|"; "/")) |"

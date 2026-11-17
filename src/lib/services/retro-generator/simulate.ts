@@ -19,14 +19,31 @@ export const MAX_EVIDENCE_ARTICLES = 15
 /**
  * news-indexer similarity floor (Titan v2, 1024 d). Its own `/search` default (0.25) is a
  * recall bar for a min-hits gate; here the set is also what the page will show as "who wrote
- * about it", so it has to be on topic. A starting point, reported on every run.
+ * about it", so it has to be on topic. Hand-read on prod, 2026-11-18, with the full claim as
+ * the query: at 0.55 6 of 10 events found nothing; articles stayed on topic down to about
+ * 0.40; below it, one event's whole set was off-topic (best 0.386). Recheck it with the
+ * deadline-free query; the workflow's `min_similarity` input overrides it per run.
  */
-export const DEFAULT_MIN_SIMILARITY = 0.55
+export const DEFAULT_MIN_SIMILARITY = 0.4
 /** Inside nginx's 120 s `/api` read timeout with the dedupe and search in front of it. */
 const ORACUL_TIMEOUT_MS = 95_000
 
 const RETRO_BOT_USERNAME = 'retro_sim'
 const RETRO_BOT_EMAIL = `${RETRO_BOT_USERNAME}@daatan.internal`
+
+/**
+ * The search query: the claim without its deadline clause. "by November 30, 2026" only dilutes
+ * the similarity to coverage written before the event. Not the judge's event summary: that is
+ * hindsight text and ranks articles that already report the event highest.
+ */
+export function evidenceQuery(claimTemplate: string): string {
+  const q = claimTemplate
+    .replace(/\s*\b(?:by|before|until|no later than|on or before)\s+\{DEADLINE\}/gi, '')
+    .replace(/\{DEADLINE\}/g, '')
+    .replace(/^[\s,;:]+|[\s,;:]+(?=[.!?]?$)/g, '')
+    .trim()
+  return q || claimTemplate.replace(/\{DEADLINE\}/g, '').trim()
+}
 
 export interface SimulateInput {
   reports: PoolReport[]
@@ -196,7 +213,7 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
 
   const minSimilarity = input.minSimilarity ?? DEFAULT_MIN_SIMILARITY
   const search: EvidenceSearch = {
-    q: claimText,
+    q: evidenceQuery(input.claimTemplate),
     before: timeline.asOf.toISOString(),
     after: timeline.evidenceAfter.toISOString(),
     indexedBefore: timeline.cutoffAt.toISOString(),
@@ -206,7 +223,7 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
   let found: NewsBeforeArticle[]
   try {
     found = await searchNewsBefore({
-      q: claimText,
+      q: search.q,
       before: timeline.asOf,
       after: timeline.evidenceAfter,
       indexedBefore: timeline.cutoffAt,

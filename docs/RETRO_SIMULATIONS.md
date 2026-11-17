@@ -78,10 +78,24 @@ or more than 30 days before the first report (background, not this week's news).
    the create form's 0.87 warning on purpose: a retro event sits next to the live forecasts its
    articles were matched to. On 22 judged claims, 0.87 would have dropped 13 real events as
    "duplicates" of the forecast they were precursors of; the closest distinct pair was 0.936.
-3. **Evidence.** The news indexer's `POST /search/before` searches the whole index for the claim:
-   articles published in the evidence window and indexed before the cutoff, with similarity
-   ≥ 0.55. It returns the top 15, which is the Oracul's article budget. Anything dated at or
-   after T0 is dropped again here. Fewer than 2 articles is `thin_evidence`.
+3. **Evidence.** The news indexer's `POST /search/before` searches the whole index for the claim
+   without its deadline clause (`evidenceQuery`: "by November 30, 2026" only dilutes the match
+   to coverage written before the event; the judge's event summary is not used, because it is
+   hindsight text and ranks reports of the event itself highest). It takes articles published in
+   the evidence window and indexed before the cutoff, with similarity ≥ `minSimilarity` (default
+   0.40; the workflow's `min_similarity` input overrides it). It returns the top 15, which is
+   the Oracul's article budget. Anything dated at or after T0 is dropped again here. Fewer than
+   2 articles is `thin_evidence`.
+
+   **The floor**, hand-read on prod on 2026-11-18 (the full claim as the query, top 15 at 0.30):
+   - At the first default, 0.55, 6 of 10 events found nothing.
+   - Articles stayed on topic down to about 0.40.
+   - Below 0.40, one event's whole set was off-topic (best 0.386: other DOJ and Nvidia
+     stories). At 0.30 the Oracul still used 4 of those articles and gave 60%.
+   - The pre-T0 article that already reports the event (see Known limits) sat at 0.55 or
+     higher, so the floor does not stop it.
+
+   It is to be rechecked with the deadline-free query.
 4. **Oracul** answers the claim `as_of` T0 from exactly those articles. Each article always
    carries a body: the archived text, or title + snippet. Without a body the Oracul would fetch
    today's page, which may hold updates written after T0. If it uses fewer than 2 articles, the
@@ -100,8 +114,11 @@ or more than 30 days before the first report (background, not this week's news).
 
 ## Running it
 
-Actions → **Retro Simulations** → `target`, `mode`, `days`, `max_clusters`, `max_events`. Run a
-dry run first; it prints what would be drafted, with P at T0. The simulate step needs the news
+Actions → **Retro Simulations** → `target`, `mode`, `days`, `max_clusters`, `max_events`,
+`min_similarity`. Run a dry run first; it prints what would be drafted, with P at T0. The job
+log carries each event's whole response (every article sent with its similarity, and the
+Oracul's stance per source) for a hand-read. The workflow judges 30 clusters by default (the route's own
+default is 40): 40 took 70–89 s on prod, against the 118 s limit on the candidates call. The simulate step needs the news
 indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` and API key.
 
 ## Known limits
