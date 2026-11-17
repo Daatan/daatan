@@ -12,6 +12,7 @@ import {
   ForecastTranslationUnavailableError,
 } from '@/lib/services/forecast'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
+import { getRetroSimulation } from '@/lib/services/retro-simulation'
 
 
 const patchPredictionSchema = z.object({
@@ -104,6 +105,11 @@ export const PATCH = withAuth(async (request, user, { params }) => {
 
   if (isPublished && hasRestrictedChanges && !isAdmin) {
     return apiError(`Cannot edit core fields of a published forecast. Status: ${prediction.status}`, 400)
+  }
+
+  // daatan#2217: a retro simulation is shown only through its own page, never as a forecast.
+  if (data.isPublic === true && (await getRetroSimulation(id))) {
+    return apiError('A retro simulation cannot be made public', 409)
   }
 
   if (prediction.lockedAt && !isAdmin) {

@@ -37,6 +37,11 @@ export async function unresolvePrediction(predictionId: string, actorId: string,
   })
   if (!prediction) throw refuse('Prediction not found', 404)
   if (!RESOLVED_STATUSES.includes(prediction.status)) throw refuse('Prediction is not resolved', 400)
+  // daatan#2217: reverting would make a retro simulation live (ACTIVE/PENDING), where it takes
+  // evidence and refreshes its as-of number. A mistaken approval is fixed by deleting it.
+  if (await prisma.retroSimulation.findUnique({ where: { predictionId }, select: { predictionId: true } })) {
+    throw refuse('A retro simulation cannot be unresolved', 409)
+  }
 
   const snapshot = await prisma.resolutionSnapshot.findFirst({
     where: { predictionId, revertedAt: null },

@@ -1071,7 +1071,9 @@ forecasts stay out of the main scoring: `cutoff_at` is deliberately **not** a
 `prediction_outcome_cutoffs` row (with none, pundit ratings skip the forecast), and
 `pushCredibilityFeedback` returns early for one, so retro's credibility ledger behind the
 sources leaderboard never receives it. Only the planned retro-only source board reads
-`cutoff_at`. Approval resolves the forecast without a stake or `recordCalibration`.
+`cutoff_at`. Approval resolves the forecast without a stake or `recordCalibration`. It can
+never go live: the admin status PATCH refuses `ACTIVE`/`PENDING`, unresolve refuses (409),
+the forecast PATCH refuses `isPublic: true`, and `POST .../outcome-cutoff` refuses a row for it.
 
 **Outcome-time cutoff (daatan#2144).** A reading scores as a prediction only if it was
 *published* before the forecast's outcome was publicly known. `prediction_outcome_cutoffs`
