@@ -301,6 +301,18 @@ model RetroSimulation {
   outcome   String   @db.VarChar(16)
   createdAt DateTime @default(now()) @map("created_at")
 
+  // Written by the generator (daatan#2217 PR 2); null on rows made before it.
+  /// What happened, one sentence, as the event judge stated it.
+  eventText         String?   @map("event_text")
+  eventDate         DateTime? @map("event_date") @db.Date
+  /// The report the judge picked as the confirmation of the event.
+  eventUrl          String?   @map("event_url")
+  /// Oracul's as-of-T0 probability, frozen at generation time.
+  oraculProbability Float?    @map("oracul_probability")
+  articlesUsed      Int?      @map("articles_used")
+  /// What was searched, what was sent, Oracul's per-source verdicts, and the event reports.
+  evidence          Json?
+
   @@map("retro_simulations")
 }
 

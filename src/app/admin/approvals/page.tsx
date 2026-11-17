@@ -24,7 +24,16 @@ type PendingForecast = {
         isBot: boolean
     }
     _count: { commitments: number; comments: number }
-    retroSimulation: { asOf: string; cutoffAt: string; outcome: string } | null
+    retroSimulation: {
+        asOf: string
+        cutoffAt: string
+        outcome: string
+        eventText: string | null
+        eventDate: string | null
+        eventUrl: string | null
+        oraculProbability: number | null
+        articlesUsed: number | null
+    } | null
 }
 
 export default function ApprovalsPage() {
@@ -364,6 +373,25 @@ export default function ApprovalsPage() {
                                         <span>{p._count.comments} comments</span>
                                         <span>Resolves: {new Date(p.resolveByDatetime).toLocaleDateString()}</span>
                                     </div>
+
+                                    {p.retroSimulation && p.retroSimulation.oraculProbability != null && (
+                                        <div className="mt-2 text-xs text-gray-400 space-y-0.5">
+                                            <div>
+                                                <span className="text-purple-300 font-medium">Oracul as of {p.retroSimulation.asOf.slice(0, 10)}: {Math.round(p.retroSimulation.oraculProbability * 100)}%</span>
+                                                {' · '}{p.retroSimulation.articlesUsed ?? 0} articles used
+                                                {p.retroSimulation.eventDate && <>{' · '}event {p.retroSimulation.eventDate.slice(0, 10)}</>}
+                                            </div>
+                                            {p.retroSimulation.eventText && (
+                                                <div className="line-clamp-2">
+                                                    {p.retroSimulation.eventUrl ? (
+                                                        <a href={p.retroSimulation.eventUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 underline decoration-dotted">
+                                                            {p.retroSimulation.eventText}
+                                                        </a>
+                                                    ) : p.retroSimulation.eventText}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Per-item actions — hidden once resolved */}

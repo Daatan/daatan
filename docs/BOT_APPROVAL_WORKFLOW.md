@@ -89,7 +89,13 @@ When a forecast is rejected via `POST /api/forecasts/[id]/reject`, a `BotRejecte
 2. Auto-stake using bot's configured stake range
 3. Send Telegram notification of publication
 
-**Retro simulations (daatan#2217)** take a different path. A forecast with a `retro_simulations` row is a post-factum "what would the Oracul have said a week before" draft about an event that already happened. Approving it resolves it at once to the recorded outcome, never publishes it (`isPublic` stays false, no `ACTIVE` state), and skips the stake and the notification, so it stays out of user scoring, the calibration record and every evidence refresh. The Pending Approvals tab marks it "Retro · resolves YES/NO".
+**Retro simulations (daatan#2217)** take a different path. A forecast with a `retro_simulations` row is a post-factum "what would the Oracul have said a week before" draft about an event that already happened. Approving it resolves it at once to the recorded outcome, never publishes it (`isPublic` stays false, no `ACTIVE` state), and skips the stake and the notification, so it stays out of user scoring, the calibration record and every evidence refresh. The Pending Approvals tab marks it "Retro · resolves YES/NO". For a draft from the generator, the tab also shows:
+
+- the Oracul's probability as of T0;
+- how many articles it used;
+- the event day, with the event linked to its report.
+
+Check those against the event before approving. Where the drafts come from: [RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md).
 
 **Response:**
 ```json

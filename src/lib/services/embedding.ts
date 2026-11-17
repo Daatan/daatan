@@ -106,6 +106,61 @@ export async function embedText(text: string): Promise<number[] | null> {
   return embedViaDeveloperApi(text)
 }
 
+const BATCH_SIZE = 100
+const BATCH_CONCURRENCY = 4
+
+async function embedBatchViaVertex(env: VertexEnv, texts: string[]): Promise<number[][]> {
+  const token = await vertexAccessToken(env)
+  const res = await fetch(vertexEndpoint(env, EMBEDDING_MODEL, 'batchEmbedContents'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: texts.map(text => ({ content: { parts: [{ text }] }, outputDimensionality: EMBEDDING_DIM })),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Vertex batch ${res.status}: ${body.slice(0, 300)}`)
+  }
+  const data = (await res.json()) as { embeddings?: Array<{ values?: number[] }> }
+  const out = data.embeddings ?? []
+  if (out.length !== texts.length) throw new Error(`Vertex batch returned ${out.length} embeddings for ${texts.length} texts`)
+  return out.map(e => vectorFrom({ embedding: e }, 'Vertex batch'))
+}
+
+/**
+ * Embed many texts, same vectors as {@link embedText} (checked 2026-11-17: cosine 1.00000
+ * against single calls on 100 claims). Vertex `batchEmbedContents` takes 100 texts in ~4 s
+ * where 100 single calls take ~70 s, which is what lets the retro generator (daatan#2217)
+ * embed a week of pool claims inside one request. A failed batch, or no Vertex, falls back
+ * to single calls for that batch; an entry stays null when its text could not be embedded.
+ */
+export async function embedTexts(texts: string[]): Promise<Array<number[] | null>> {
+  const env = vertexEnv()
+  const out: Array<number[] | null> = new Array(texts.length).fill(null)
+  const starts: number[] = []
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) starts.push(i)
+
+  const runBatch = async (start: number) => {
+    const chunk = texts.slice(start, start + BATCH_SIZE)
+    if (env) {
+      try {
+        const vectors = await embedBatchViaVertex(env, chunk)
+        vectors.forEach((v, k) => { out[start + k] = v })
+        return
+      } catch (err) {
+        log.error({ err, event: 'vertex-embed-failed', batch: chunk.length }, 'Vertex batch embedding failed — falling back to single calls')
+      }
+    }
+    for (let k = 0; k < chunk.length; k++) out[start + k] = await embedText(chunk[k])
+  }
+
+  for (let i = 0; i < starts.length; i += BATCH_CONCURRENCY) {
+    await Promise.all(starts.slice(i, i + BATCH_CONCURRENCY).map(runBatch))
+  }
+  return out
+}
+
 /**
  * Embed `claimText` and write it to the prediction's vector column.
  *
@@ -129,6 +184,11 @@ export async function embedAndStoreForecast(id: string, claimText: string): Prom
   if (!embedding) {
     throw new Error(`No embedding returned for prediction ${id} — nothing stored`)
   }
+  await storeForecastEmbedding(id, embedding)
+}
+
+/** Write an already-computed vector to the prediction's column, for a caller that embedded the claim itself. */
+export async function storeForecastEmbedding(id: string, embedding: number[]): Promise<void> {
   if (!embedding.every(Number.isFinite)) {
     throw new Error(`Embedding for prediction ${id} contains non-finite values — nothing stored`)
   }

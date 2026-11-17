@@ -684,6 +684,10 @@ export const getOraculForecast = async (
      *  stronger model without reaching the gatekeeper or settlement paths, which
      *  retro deliberately keeps unaffected by this field. */
     model?: string
+    /** retro#1077: answer as of this past date instead of today (a retro simulation,
+     *  daatan#2217). The Oracul requires `articles` with it, already filtered to before
+     *  this date: its own search is not date-bounded. Sent as `as_of: YYYY-MM-DD`. */
+    asOf?: Date
   } & ClaimMeta,
   meta: OracleCallMeta = { source: 'other' },
 ): Promise<OracleForecastResult> => {
@@ -702,6 +706,7 @@ export const getOraculForecast = async (
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
         ...(options?.model ? { model: options.model } : {}),
+        ...(options?.asOf ? { as_of: options.asOf.toISOString().slice(0, 10) } : {}),
         // Log correlation only (retro #273) — lets gate_reused log lines join
         // directly to a context_snapshots row instead of by timestamp.
         ...(meta.predictionId ? { prediction_id: meta.predictionId } : {}),

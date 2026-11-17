@@ -148,6 +148,19 @@ describe('getOraculForecast', () => {
     expect(body.articles[0].publishedDate).toBeUndefined()
   })
 
+  it('sends asOf as the Oracul `as_of` date (retro#1077), and omits it otherwise', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => fullPayload })
+    await getOraculForecast('Q?', {
+      articles: [{ url: 'https://x.com/a', title: 'T', snippet: 'S', text: 'body' }],
+      asOf: new Date('2026-11-03T00:00:00.000Z'),
+    })
+    await getOraculForecast('Q?')
+    const [withAsOf, without] = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string))
+    expect(withAsOf.as_of).toBe('2026-11-03')
+    expect(withAsOf.asOf).toBeUndefined()
+    expect(without.as_of).toBeUndefined()
+  })
+
   it('threads the supplied gatekeeper verdict to the Oracul (both fields, snake_case)', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPayload })
     await getOraculForecast('Q?', {

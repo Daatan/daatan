@@ -31,6 +31,7 @@ export type OracleCallSource =
   | 'admin-outlet-detail'
   | 'news-indexer'
   | 'evidence-second-opinion'
+  | 'retro-simulation'
   | 'other'
 
 /** LLM token usage as the Oracul reports it (`token_usage` on /forecast,
