@@ -19,7 +19,7 @@ import { prisma } from '@/lib/prisma'
 import { embedText, storeForecastEmbedding } from '@/lib/services/embedding'
 import { searchNewsBefore, type NewsBeforeArticle } from '@/lib/services/news-indexer'
 import { getOraculForecast, type OracleForecastResponse } from '@/lib/services/oracle'
-import { simulateRetroEvent, type SimulateInput } from '../simulate'
+import { evidenceQuery, simulateRetroEvent, type SimulateInput } from '../simulate'
 
 const now = new Date('2026-11-17T12:00:00Z')
 const input: SimulateInput = {
@@ -63,7 +63,7 @@ describe('simulateRetroEvent', () => {
 
     expect(r).toMatchObject({ status: 'dry_run', claimText, asOf: '2026-11-03T00:00:00.000Z', probability: 0.6, articlesUsed: 2 })
     expect(searchNewsBefore).toHaveBeenCalledWith(expect.objectContaining({
-      q: claimText,
+      q: evidenceQuery(input.claimTemplate),
       before: new Date('2026-11-03T00:00:00Z'),
       after: new Date('2026-09-19T00:00:00Z'),
       indexedBefore: new Date('2026-11-10T00:00:00Z'),
@@ -152,5 +152,21 @@ describe('simulateRetroEvent', () => {
     expect(retro.evidence.oracul.sources[0]).toMatchObject({ url: 'https://x.com/1', stance: 0.4 })
     expect(retro.evidence.reports).toHaveLength(2)
     expect(storeForecastEmbedding).toHaveBeenCalledWith('new', [0.1, 0.2])
+  })
+})
+
+describe('evidenceQuery', () => {
+  it.each([
+    ["Israel's President will task Gadi Eisenkot with forming the next government by {DEADLINE}.", "Israel's President will task Gadi Eisenkot with forming the next government."],
+    ['By {DEADLINE}, the Fed will cut rates.', 'the Fed will cut rates.'],
+    ['Talks will resume before {DEADLINE} in Cairo.', 'Talks will resume in Cairo.'],
+    ['Turnout will exceed 70% no later than {DEADLINE}', 'Turnout will exceed 70%'],
+  ])('%s', (template, expected) => {
+    expect(evidenceQuery(template)).toBe(expected)
+  })
+
+  it('handles a bare or unprefixed token', () => {
+    expect(evidenceQuery('{DEADLINE}')).toBe('')
+    expect(evidenceQuery('Rates fall {DEADLINE}')).toBe('Rates fall')
   })
 })
