@@ -44,6 +44,10 @@ export const POST = withAuth(
     if (!parsed.success) return apiError(parsed.error.issues[0]?.message ?? 'Invalid body', 400)
     const exists = await prisma.prediction.findUnique({ where: { id: params.id }, select: { id: true } })
     if (!exists) return apiError('Forecast not found', 404)
+    // daatan#2217: a retro simulation keeps its cutoff on its own row, out of main scoring.
+    if (await prisma.retroSimulation.findUnique({ where: { predictionId: params.id }, select: { predictionId: true } })) {
+      return apiError('A retro simulation keeps its cutoff on retro_simulations', 409)
+    }
 
     const { status, cutoffAt, basis, evidenceUrls } = parsed.data
     const row = await recordOutcomeCutoff({

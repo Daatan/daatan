@@ -4,7 +4,7 @@
  * Covers status transitions, staking, Telegram notifications, and rejection tracking.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────
@@ -36,7 +36,12 @@ vi.mock('@/lib/prisma', () => ({
     prediction: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    retroSimulation: {
+      findUnique: vi.fn(),
     },
     botConfig: {
       findUnique: vi.fn(),
@@ -201,6 +206,94 @@ describe('POST /api/forecasts/[id]/approve', () => {
   })
 
 
+  describe('retro simulation (daatan#2217)', () => {
+    const RETRO = {
+      predictionId: 'pred-1',
+      asOf: new Date('2026-11-08T00:00:00Z'),
+      cutoffAt: new Date('2026-11-15T09:00:00Z'),
+      outcome: 'correct',
+    }
+
+    // clearAllMocks keeps queued Once values and implementations; neither may cross tests here.
+    beforeEach(async () => {
+      const { prisma } = await import('@/lib/prisma')
+      vi.mocked(prisma.prediction.findFirst).mockReset()
+    })
+    afterEach(async () => {
+      const { prisma } = await import('@/lib/prisma')
+      vi.mocked(prisma.retroSimulation.findUnique).mockReset()
+    })
+
+    it('resolves it to the recorded outcome without publishing, staking or notifying', async () => {
+      const { POST } = await import('@/app/api/forecasts/[id]/approve/route')
+      const { prisma } = await import('@/lib/prisma')
+      const { createCommitment } = await import('@/lib/services/commitment')
+      const { notifyBotForecastApproved } = await import('@/lib/services/telegram')
+      mockAuth.mockResolvedValue(APPROVER_SESSION)
+
+      vi.mocked(prisma.prediction.findFirst).mockResolvedValueOnce(makeBotPrediction() as any)
+      vi.mocked(prisma.retroSimulation.findUnique).mockResolvedValue(RETRO as any)
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 })
+      vi.mocked(prisma.prediction.findUniqueOrThrow).mockResolvedValue(
+        { id: 'pred-1', slug: null, status: 'RESOLVED_CORRECT' } as any,
+      )
+
+      const req = new NextRequest('http://localhost/api/forecasts/pred-1/approve', { method: 'POST' })
+      const res = await POST(req, { params: Promise.resolve({ id: 'pred-1' }) })
+
+      expect(res.status).toBe(200)
+      expect((await res.json()).status).toBe('RESOLVED_CORRECT')
+      expect(prisma.prediction.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pred-1', status: 'PENDING_APPROVAL' },
+        data: expect.objectContaining({
+          status: 'RESOLVED_CORRECT',
+          isPublic: false,
+          resolutionOutcome: 'correct',
+          resolvedById: 'approver-1',
+          resolvedAt: expect.any(Date),
+        }),
+      })
+      expect(prisma.prediction.update).not.toHaveBeenCalled()
+      expect(createCommitment).not.toHaveBeenCalled()
+      expect(notifyBotForecastApproved).not.toHaveBeenCalled()
+    })
+
+    it('resolves a recorded NO as RESOLVED_WRONG', async () => {
+      const { POST } = await import('@/app/api/forecasts/[id]/approve/route')
+      const { prisma } = await import('@/lib/prisma')
+      mockAuth.mockResolvedValue(APPROVER_SESSION)
+
+      vi.mocked(prisma.prediction.findFirst).mockResolvedValueOnce(makeBotPrediction() as any)
+      vi.mocked(prisma.retroSimulation.findUnique).mockResolvedValue({ ...RETRO, outcome: 'wrong' } as any)
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 1 })
+      vi.mocked(prisma.prediction.findUniqueOrThrow).mockResolvedValue(
+        { id: 'pred-1', slug: null, status: 'RESOLVED_WRONG' } as any,
+      )
+
+      const req = new NextRequest('http://localhost/api/forecasts/pred-1/approve', { method: 'POST' })
+      await POST(req, { params: Promise.resolve({ id: 'pred-1' }) })
+
+      expect(prisma.prediction.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: 'RESOLVED_WRONG', resolutionOutcome: 'wrong' }),
+      }))
+    })
+
+    it('returns 400 when a concurrent approve/reject already moved it', async () => {
+      const { POST } = await import('@/app/api/forecasts/[id]/approve/route')
+      const { prisma } = await import('@/lib/prisma')
+      mockAuth.mockResolvedValue(APPROVER_SESSION)
+
+      vi.mocked(prisma.prediction.findFirst).mockResolvedValueOnce(makeBotPrediction() as any)
+      vi.mocked(prisma.retroSimulation.findUnique).mockResolvedValue(RETRO as any)
+      vi.mocked(prisma.prediction.updateMany).mockResolvedValue({ count: 0 })
+
+      const req = new NextRequest('http://localhost/api/forecasts/pred-1/approve', { method: 'POST' })
+      const res = await POST(req, { params: Promise.resolve({ id: 'pred-1' }) })
+
+      expect(res.status).toBe(400)
+      expect(prisma.prediction.findUniqueOrThrow).not.toHaveBeenCalled()
+    })
+  })
 })
 
 // ─── POST /api/forecasts/[id]/reject ───────────────────────────────────────

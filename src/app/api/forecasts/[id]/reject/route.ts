@@ -48,7 +48,7 @@ export const POST = withAuth(async (request, user, { params }) => {
       notifyBotForecastRejected(updated, updated.author, rejector)
     }
 
-    notifySearchEngines(updated.slug ?? updated.id)
+    if (updated.isPublic) notifySearchEngines(updated.slug ?? updated.id)
 
     return NextResponse.json({
       success: true,

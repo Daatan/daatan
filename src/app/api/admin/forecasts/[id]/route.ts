@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { z } from 'zod'
 import { getForecastById, updateForecastStatus, deleteForecast } from '@/lib/services/forecast'
 import { notifySearchEngines } from '@/lib/services/indexnow'
+import { getRetroSimulation } from '@/lib/services/retro-simulation'
 
 const updateStatusSchema = z.object({
   status: z.enum(['DRAFT', 'ACTIVE', 'PENDING', 'PENDING_APPROVAL', 'RESOLVED_CORRECT', 'RESOLVED_WRONG', 'VOID', 'UNRESOLVABLE']),
@@ -25,6 +26,15 @@ export const PATCH = withAuth(async (req, user, { params }) => {
     if (prediction.status !== 'PENDING_APPROVAL' || result.data.status !== 'ACTIVE') {
       return NextResponse.json({ error: 'Approvers can only approve pending forecasts' }, { status: 403 })
     }
+  }
+
+  // daatan#2217: a retro simulation must never become live — it would take evidence and
+  // refresh its as-of number. It leaves PENDING_APPROVAL only through approve/reject.
+  if (
+    (result.data.status === 'ACTIVE' || result.data.status === 'PENDING') &&
+    (await getRetroSimulation(id))
+  ) {
+    return NextResponse.json({ error: 'A retro simulation cannot be made live' }, { status: 409 })
   }
 
   const prediction = await updateForecastStatus(id, result.data.status)

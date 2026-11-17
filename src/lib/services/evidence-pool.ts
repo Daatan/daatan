@@ -1457,6 +1457,11 @@ export async function pushCredibilityFeedback(
   resolvedAt: Date,
 ): Promise<void> {
   if (!retroLedgerWritesAllowed(predictionId, 'push')) return
+  // daatan#2217: a retro simulation is all-YES by selection, so its readings feed only the
+  // retro-only source board, never retro's main credibility ledger — including via the
+  // resolved-forecast backfills that call this for every match.
+  const retro = await prisma.retroSimulation.findUnique({ where: { predictionId }, select: { predictionId: true } })
+  if (retro) return
 
   const cfg = getOracleConfig()
   if (!cfg) return

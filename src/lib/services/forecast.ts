@@ -564,6 +564,7 @@ export async function findSimilarForecasts({
       LEFT JOIN tags t ON t.id = pt."B"
       WHERE p.status IN ('ACTIVE', 'PENDING_APPROVAL')
         AND p.embedding IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM retro_simulations r WHERE r.prediction_id = p.id)
         AND p.id != ${excludeId ?? ''}${tagGate}
       GROUP BY p.id, u.name, u.username, p.embedding
       HAVING (1 - (p.embedding <=> ${Prisma.raw(`'${vectorStr}'::vector`)})) >= ${minScore}
@@ -1093,6 +1094,7 @@ export async function listPendingApprovals({ page, limit }: { page: number; limi
       include: {
         author: { select: { id: true, name: true, username: true, email: true, image: true, isBot: true } },
         _count: { select: { commitments: true, comments: true } },
+        retroSimulation: { select: { asOf: true, cutoffAt: true, outcome: true } },
       },
       skip: (page - 1) * limit,
       take: limit,
