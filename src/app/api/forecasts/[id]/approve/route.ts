@@ -8,6 +8,7 @@ import { notifyBotForecastApproved } from '@/lib/services/telegram'
 import { findUserBasicInfo } from '@/lib/services/user'
 import { getBotConfigByUserId } from '@/lib/services/bot'
 import { createLogger } from '@/lib/logger'
+import { approveRetroSimulation, getRetroSimulation } from '@/lib/services/retro-simulation'
 
 const log = createLogger('approve-route')
 
@@ -29,6 +30,13 @@ export const POST = withAuth(async (_request, user, { params }) => {
 
     if (prediction.status !== 'PENDING_APPROVAL') {
       return apiError('Forecast is not awaiting approval', 400)
+    }
+
+    // daatan#2217: a retro simulation is resolved, not published — no stake, no notification.
+    if (await getRetroSimulation(params.id)) {
+      const retro = await approveRetroSimulation(params.id, user.id)
+      if (!retro.ok) return apiError(retro.error, retro.status)
+      return NextResponse.json(retro.prediction)
     }
 
     const updated = await approveForecast(params.id)

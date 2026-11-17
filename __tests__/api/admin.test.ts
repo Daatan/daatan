@@ -20,6 +20,9 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    retroSimulation: {
+      findUnique: vi.fn(),
+    },
     user: {
       findMany: vi.fn(),
       count: vi.fn(),
@@ -129,6 +132,17 @@ describe('PATCH /api/admin/forecasts/[id]', () => {
       where: { id: 'p1' },
       data: { status: 'ACTIVE' },
     }))
+  })
+
+  it('refuses to make a retro simulation live (daatan#2217)', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    const { PATCH } = await import('@/app/api/admin/forecasts/[id]/route')
+
+    vi.mocked(prisma.retroSimulation.findUnique).mockResolvedValueOnce({ predictionId: 'p1' } as any)
+
+    const res = await PATCH(makeRequest('http://localhost/api/admin/forecasts/p1', 'PATCH', { status: 'ACTIVE' }), CTX_WITH_ID('p1'))
+    expect(res.status).toBe(409)
+    expect(prisma.prediction.update).not.toHaveBeenCalled()
   })
 
   it('returns 400 for invalid status', async () => {

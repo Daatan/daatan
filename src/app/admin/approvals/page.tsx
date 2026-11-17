@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, CheckCircle, XCircle, ExternalLink, Bot } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, ExternalLink, Bot, History } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -24,6 +24,7 @@ type PendingForecast = {
         isBot: boolean
     }
     _count: { commitments: number; comments: number }
+    retroSimulation: { asOf: string; cutoffAt: string; outcome: string } | null
 }
 
 export default function ApprovalsPage() {
@@ -331,6 +332,14 @@ export default function ApprovalsPage() {
                                         {p.author.isBot && (
                                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700">
                                                 <Bot className="w-3 h-3" /> Bot
+                                            </span>
+                                        )}
+                                        {p.retroSimulation && (
+                                            <span
+                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700"
+                                                title={`Retro simulation as of ${p.retroSimulation.asOf.slice(0, 10)}. Approving resolves it as ${p.retroSimulation.outcome === 'correct' ? 'YES' : 'NO'} — it is not published.`}
+                                            >
+                                                <History className="w-3 h-3" /> Retro · resolves {p.retroSimulation.outcome === 'correct' ? 'YES' : 'NO'}
                                             </span>
                                         )}
                                         <span className="text-xs text-gray-400">

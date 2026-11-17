@@ -1064,6 +1064,15 @@ just fed evidence-pool rows. To force a recompute,
 `POST /api/admin/pundit-ratings/recalculate?tag=<slug>` deletes the tag's rows and
 reseeds them; the `Pundit Ratings Recalculate` workflow calls it daily (06:15 UTC).
 
+**Retro simulations (daatan#2217).** `retro_simulations` (one row per prediction, keyed by
+`prediction_id`) marks a post-factum forecast and holds its `as_of` (T0), `cutoff_at` and
+recorded `outcome` (`correct`/`wrong`). Outcomes are nearly all YES by selection, so these
+forecasts stay out of the main scoring: `cutoff_at` is deliberately **not** a
+`prediction_outcome_cutoffs` row (with none, pundit ratings skip the forecast), and
+`pushCredibilityFeedback` returns early for one, so retro's credibility ledger behind the
+sources leaderboard never receives it. Only the planned retro-only source board reads
+`cutoff_at`. Approval resolves the forecast without a stake or `recordCalibration`.
+
 **Outcome-time cutoff (daatan#2144).** A reading scores as a prediction only if it was
 *published* before the forecast's outcome was publicly known. `prediction_outcome_cutoffs`
 holds that instant per forecast — the earliest reliably verifiable public confirmation of

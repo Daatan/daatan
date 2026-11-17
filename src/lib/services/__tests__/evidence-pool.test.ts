@@ -13,6 +13,9 @@ vi.mock('@/lib/prisma', () => {
     predictionOutcomeCutoff: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    retroSimulation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     contextSnapshot: {
       findFirst: vi.fn(),
     },
@@ -978,6 +981,15 @@ describe('pushCredibilityFeedback', () => {
       { predictionId: 'pred-1', action: 'push', appEnv },
       'event=credibility_feedback_skipped_non_production',
     )
+  })
+
+  it('never pushes a retro simulation into the main ledger (daatan#2217)', async () => {
+    const { prisma } = await import('@/lib/prisma')
+    vi.mocked(prisma.retroSimulation.findUnique).mockResolvedValueOnce({ predictionId: 'pred-1' } as never)
+    findMany.mockResolvedValue([poolArticle({ id: 'art-1' })] as never)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(findMany).not.toHaveBeenCalled()
+    expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
   it('does nothing when the Oracul is not configured', async () => {

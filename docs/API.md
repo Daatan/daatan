@@ -108,6 +108,8 @@ Resolve a prediction. Processes all commitments, distributes rewards, updates ba
 ### `POST /api/forecasts/[id]/approve` — Admin / Approver
 Approve a bot `PENDING_APPROVAL` forecast → ACTIVE. Stakes on behalf of the bot.
 
+A **retro simulation** (a `retro_simulations` row exists, daatan#2217) is not published: approval resolves it straight to its recorded outcome (`RESOLVED_CORRECT`/`RESOLVED_WRONG`), keeps `isPublic=false`, and creates no stake, Telegram post or IndexNow ping. Returns `{ id, slug, status }`. `PATCH /api/admin/forecasts/[id]` refuses `ACTIVE`/`PENDING` for one (409).
+
 ---
 
 ### `POST /api/forecasts/[id]/reject` — Admin / Approver

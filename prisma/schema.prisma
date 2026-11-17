@@ -282,6 +282,28 @@ model PredictionOutcomeCutoff {
   @@map("prediction_outcome_cutoffs")
 }
 
+/// A post-factum forecast (daatan#2217): what the Oracul would have said at `asOf` about an
+/// event nobody forecast before it happened, built only from articles published before
+/// `asOf`. A row's existence is the marker; its prediction is never public and never ACTIVE —
+/// approval resolves it straight from PENDING_APPROVAL to the recorded outcome, with no stake,
+/// so it stays out of user scoring, the calibration record and every evidence refresh.
+/// `cutoffAt` is the outcome cutoff for the retro-only source board; it is deliberately NOT a
+/// prediction_outcome_cutoffs row, so the main source and pundit scoring never see it.
+model RetroSimulation {
+  predictionId String     @id @map("prediction_id")
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  /// T0: the simulated forecast date (event time minus the look-back). Evidence is pre-T0 only.
+  asOf      DateTime @map("as_of")
+  /// Earliest public confirmation of the outcome.
+  cutoffAt  DateTime @map("cutoff_at")
+  /// Claim truth, resolution vocabulary: 'correct' | 'wrong'.
+  outcome   String   @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("retro_simulations")
+}
+
 /// The pundit_tag_ratings rows a recalculation replaced (daatan#2144). Recalculate deletes
 /// and replays, so without this the previous published ranking is unrecoverable. One row per
 /// recalculation that changed anything; `payload` is the full previous row set, verbatim.
@@ -555,6 +577,7 @@ model Prediction {
   calibrationRecord       CalibrationRecord?
   resolutionSnapshots     ResolutionSnapshot[]
   outcomeCutoffs          PredictionOutcomeCutoff[]
+  retroSimulation         RetroSimulation?
 
   @@index([status])
   @@index([authorId])
