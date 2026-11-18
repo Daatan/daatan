@@ -115,24 +115,24 @@ describe('retro generator SQL against Postgres (daatan#2217)', () => {
 
     it('saves the draft, its frozen evidence and its vector on apply, then refuses the same event again', async () => {
       await makePrediction() // a forecast with no vector is not a duplicate
-      vi.mocked(searchNewsBefore).mockResolvedValue([article('https://x.com/1', -20), article('https://y.com/2', -18)])
+      vi.mocked(searchNewsBefore).mockResolvedValue([article('https://x.com/1', -20), article('https://y.com/2', -18), article('https://z.com/3', -16)])
       vi.mocked(getOraculForecast).mockResolvedValue({
         logId: 'log-1',
         forecast: {
-          mean: 0.2, articles_used: 2, std: 0.1, ci_low: 0, ci_high: 0.4, placeholder: false, question: 'q',
+          mean: 0.2, articles_used: 3, std: 0.1, ci_low: 0, ci_high: 0.4, placeholder: false, question: 'q',
           sources: [{ source_id: 's', source_name: 'x.com', url: 'https://x.com/1', stance: 0.4, certainty: 0.8, credibility_weight: 1, claims: ['c'] }],
         } as OracleForecastResponse,
       })
 
       const r = await simulateRetroEvent(input)
-      expect(r).toMatchObject({ status: 'created', probability: 0.6, articlesUsed: 2 })
+      expect(r).toMatchObject({ status: 'created', probability: 0.6, articlesUsed: 3 })
       const id = (r as { predictionId: string }).predictionId
 
       const saved = await prisma.prediction.findUniqueOrThrow({ where: { id }, include: { author: true, retroSimulation: true } })
       expect(saved).toMatchObject({ status: 'PENDING_APPROVAL', isPublic: false, source: 'retro_simulation', author: { email: 'retro_sim@daatan.internal', isBot: true } })
-      expect(saved.retroSimulation).toMatchObject({ eventUrl: 'https://b.com/2', oraculProbability: 0.6, articlesUsed: 2, outcome: 'correct' })
+      expect(saved.retroSimulation).toMatchObject({ eventUrl: 'https://b.com/2', oraculProbability: 0.6, articlesUsed: 3, outcome: 'correct' })
       const evidence = saved.retroSimulation?.evidence as { sent: Array<{ url: string }>; reports: unknown[] }
-      expect(evidence.sent.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2'])
+      expect(evidence.sent.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
       expect(evidence.reports).toHaveLength(2)
       const [{ has }] = await prisma.$queryRawUnsafe<Array<{ has: boolean }>>(`SELECT embedding IS NOT NULL AS has FROM predictions WHERE id = $1`, id)
       expect(has).toBe(true)
