@@ -23,9 +23,10 @@ const authed = withAuth(async (request: NextRequest) => {
 /**
  * Stage 2 of the retro generator (daatan#2217), one event per call: one candidate from
  * `POST /api/admin/retro/candidates`, passed through. Finds the articles published before T0,
- * asks Oracul as of T0, and with `"mode": "apply"` saves a private PENDING_APPROVAL draft.
- * **`mode` defaults to `dry-run`**, which does everything but the write. One Oracul analysis
- * per call (up to ~95 s), so it is paced by the caller.
+ * checks them against the event (daatan#2229), asks Oracul as of T0 from the on-topic ones, and
+ * with `"mode": "apply"` saves a private PENDING_APPROVAL draft. **`mode` defaults to
+ * `dry-run`**, which does everything but the write. One event check and one Oracul analysis per
+ * call (up to ~105 s), so it is paced by the caller.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header.
  */

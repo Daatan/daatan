@@ -5,9 +5,11 @@ name: Retro Simulations
 #
 #   1. POST /api/admin/retro/candidates — cluster the evidence pool's reported facts, judge each
 #      cluster (one dated past event?), write nothing.
-#   2. POST /api/admin/retro/simulate — one candidate per request (one Oracul analysis, up to
-#      ~95 s): articles published before T0 from the whole news index, Oracul as of T0, and
-#      with mode=apply a PENDING_APPROVAL draft. Approving it resolves it; nothing is published.
+#   2. POST /api/admin/retro/simulate — one candidate per request (an event check, up to 20 s,
+#      and one Oracul analysis, up to 85 s): articles published before T0 from the whole news
+#      index, the check (on topic? already reports the event? already forecast? — daatan#2229),
+#      Oracul as of T0 from the on-topic ones, and with mode=apply a PENDING_APPROVAL draft.
+#      Approving it resolves it; nothing is published.
 #
 # Manual only (Mark, 2026-11-16: a cron comes once dedup and the trend filter are proven), and
 # dry-run by default. Auth is the x-cron-secret (BOT_RUNNER_SECRET) header.
@@ -105,8 +107,8 @@ jobs:
             echo "event $((i + 1))/$N: $OUT" | head -c 60000; echo
             echo "$OUT" | jq -r --argjson n "$((i + 1))" \
               'if .status == "created" or .status == "dry_run"
-               then "| \($n) | \(.status) | \((.probability * 100) | round)% | \(.articlesUsed)/\(.articles | length) | \(.asOf[0:10]) | \(.claimText | gsub("\\|"; "/")) |"
-               else "| \($n) | \(.status // "error") | | | | \(.reason // .error // "?"): \((.claimText // "") | gsub("\\|"; "/")) |" end' \
+               then "| \($n) | \(.status) | \((.probability * 100) | round)% | \(.articlesUsed)/\(.articles | length) (\(.check.offTopic | length) off-topic) | \(.asOf[0:10]) | \(.claimText | gsub("\\|"; "/")) |"
+               else "| \($n) | \(.status // "error") | | | | \(.reason // .error // "?"): \((.claimText // "") | gsub("\\|"; "/"))\((.detail | if type == "object" then .why else null end) // "" | if . == "" then "" else " — " + gsub("\\|"; "/") end) |" end' \
               >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "| $((i + 1)) | error | | | | unparseable response |" >> "$GITHUB_STEP_SUMMARY"
             sleep 2
           done

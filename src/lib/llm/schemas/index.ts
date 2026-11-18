@@ -298,3 +298,33 @@ export const retroEventJudgeSchema: Schema = {
   },
   required: ['kind', 'reason', 'eventSummary', 'eventDate', 'eventIndex', 'claim', 'resolutionRules'],
 }
+
+/** daatan#2229: per-article verdicts on a retro event's pre-T0 evidence, and the forecast it duplicates. */
+export const retroEventCheckSchema: Schema = {
+  description: "Per-article verdicts on a retro simulation's evidence, and whether an existing forecast already covers the event",
+  type: SchemaType.OBJECT,
+  properties: {
+    articles: {
+      type: SchemaType.ARRAY,
+      description: 'One entry per article, in the order given.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          n: { type: SchemaType.INTEGER, description: 'The article number.' },
+          onTopic: { type: SchemaType.BOOLEAN, description: "About the matter the question's outcome turns on." },
+          reportsEvent: { type: SchemaType.BOOLEAN, description: 'Already says that what the question asks about has happened.' },
+        },
+        required: ['n', 'onTopic', 'reportsEvent'],
+      },
+    },
+    sameEventAs: {
+      type: SchemaType.INTEGER,
+      description: 'Number of the existing forecast this event settles; 0 for none.',
+    },
+    reason: {
+      type: SchemaType.STRING,
+      description: 'One short sentence on the most important thing found.',
+    },
+  },
+  required: ['articles', 'sameEventAs', 'reason'],
+}

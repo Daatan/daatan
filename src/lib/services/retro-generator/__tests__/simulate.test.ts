@@ -14,11 +14,14 @@ vi.mock('@/lib/logger', () => ({ createLogger: () => ({ info: vi.fn(), warn: vi.
 vi.mock('@/lib/services/embedding', () => ({ embedText: vi.fn(), storeForecastEmbedding: vi.fn() }))
 vi.mock('@/lib/services/news-indexer', () => ({ searchNewsBefore: vi.fn() }))
 vi.mock('@/lib/services/oracle', () => ({ getOraculForecast: vi.fn() }))
+vi.mock('@/lib/llm', () => ({ llmService: { generateContent: vi.fn() } }))
+vi.mock('../check', async (importOriginal) => ({ ...(await importOriginal<typeof import('../check')>()), checkRetroEvent: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { embedText, storeForecastEmbedding } from '@/lib/services/embedding'
 import { searchNewsBefore, type NewsBeforeArticle } from '@/lib/services/news-indexer'
 import { getOraculForecast, type OracleForecastResponse } from '@/lib/services/oracle'
+import { checkRetroEvent, type EventCheckInput } from '../check'
 import { evidenceQuery, simulateRetroEvent, type SimulateInput } from '../simulate'
 
 const now = new Date('2026-11-17T12:00:00Z')
@@ -47,9 +50,20 @@ const forecast = {
   }],
 } as OracleForecastResponse
 
+/** The check's answer by URL; anything not listed is on topic and does not report the event. */
+function checkSays(verdicts: Record<string, { onTopic?: boolean; reportsEvent?: boolean }>, sameEventAs = 0) {
+  vi.mocked(checkRetroEvent).mockImplementation(async (i: EventCheckInput) => ({
+    ok: true,
+    verdicts: i.articles.map((a) => ({ url: a.url, onTopic: verdicts[a.url]?.onTopic ?? true, reportsEvent: verdicts[a.url]?.reportsEvent ?? false })),
+    sameEventAs: sameEventAs ? i.near[sameEventAs - 1] : null,
+    reason: 'checked',
+  }))
+}
+
 describe('simulateRetroEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    checkSays({})
     vi.mocked(embedText).mockResolvedValue([0.1, 0.2])
     vi.mocked(prisma.retroSimulation.findFirst).mockResolvedValue(null)
     vi.mocked(prisma.$queryRaw).mockResolvedValue([])
@@ -108,9 +122,65 @@ describe('simulateRetroEvent', () => {
     expect(searchNewsBefore).not.toHaveBeenCalled()
   })
 
+  it('shows the check the event, the claim, the articles and the forecasts at 0.85 or more', async () => {
+    const near = [{ id: 'p1', claimText: 'Speaker changed', createdAt: new Date('2026-11-01'), status: 'ACTIVE', retro: false, score: 0.9 }]
+    vi.mocked(prisma.$queryRaw).mockResolvedValue(near)
+    await simulateRetroEvent(input)
+    const sql = vi.mocked(prisma.$queryRaw).mock.calls[0][0] as unknown as { values: unknown[] }
+    expect(sql.values).toEqual(expect.arrayContaining([0.85, 5]))
+    expect(vi.mocked(checkRetroEvent).mock.calls[0][0]).toMatchObject({
+      eventSummary: 'Herzog tasked Eisenkot.',
+      claimText,
+      asOf: new Date('2026-11-03T00:00:00Z'),
+      near,
+    })
+    expect(vi.mocked(checkRetroEvent).mock.calls[0][0].articles.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
+  })
+
+  it('skips an event an existing forecast below the cosine bar already asks about', async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: 'p1', claimText: 'Speaker changed', createdAt: new Date(), status: 'RESOLVED_CORRECT', retro: false, score: 0.9 }])
+    checkSays({}, 1)
+    const r = await simulateRetroEvent(input)
+    expect(r).toMatchObject({ status: 'skipped', reason: 'already_forecast', detail: { id: 'p1', claimText: 'Speaker changed', why: 'checked' } })
+    expect(getOraculForecast).not.toHaveBeenCalled()
+  })
+
+  it('skips an event a pre-T0 article already reports', async () => {
+    checkSays({ 'https://y.com/2': { reportsEvent: true } })
+    const r = await simulateRetroEvent(input)
+    expect(r).toMatchObject({ status: 'skipped', reason: 'event_before_t0', detail: { articles: [{ url: 'https://y.com/2' }] } })
+    expect(getOraculForecast).not.toHaveBeenCalled()
+  })
+
+  it('sends the Oracul only the on-topic articles, and is thin below three of them', async () => {
+    vi.mocked(searchNewsBefore).mockResolvedValue([
+      article('https://x.com/1', '2026-10-30T09:00:00Z'),
+      article('https://off.com/2', '2026-10-31T09:00:00Z'),
+      article('https://y.com/2', '2026-11-01T09:00:00Z'),
+      article('https://z.com/3', '2026-11-02T09:00:00Z'),
+    ])
+    checkSays({ 'https://off.com/2': { onTopic: false } })
+    const r = await simulateRetroEvent(input)
+    expect(r).toMatchObject({ status: 'dry_run', check: { offTopic: [{ url: 'https://off.com/2' }], reason: 'checked', modelNote: null } })
+    expect(r.status === 'dry_run' && r.articles.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
+    expect(vi.mocked(getOraculForecast).mock.calls[0][1]?.articles?.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
+
+    vi.mocked(getOraculForecast).mockClear()
+    checkSays({ 'https://off.com/2': { onTopic: false }, 'https://z.com/3': { onTopic: false } })
+    expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'thin_evidence', detail: { found: 4, onTopic: 2 } })
+    expect(getOraculForecast).not.toHaveBeenCalled()
+  })
+
+  it('skips when the check fails', async () => {
+    vi.mocked(checkRetroEvent).mockResolvedValue({ ok: false, reason: 'event_check_incomplete', detail: '2/3 articles judged' })
+    expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'event_check_incomplete', detail: '2/3 articles judged' })
+    expect(getOraculForecast).not.toHaveBeenCalled()
+  })
+
   it('skips an event already behind a retro row with the same event URL', async () => {
     vi.mocked(prisma.retroSimulation.findFirst).mockResolvedValue({ predictionId: 'r1' } as never)
-    expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'duplicate_retro' })
+    expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'duplicate_retro', detail: { id: 'r1', match: 'event_url' } })
+    expect(prisma.$queryRaw).not.toHaveBeenCalled()
   })
 
   it('skips when Oracul abstains or used fewer than three articles', async () => {
@@ -157,6 +227,7 @@ describe('simulateRetroEvent', () => {
       url: 'https://x.com/1', stance: 0.4, isOccurrence: false, publishedDate: '2026-11-01',
       credibilityWeight: 1.2, evidenceWeight: 0.9, recencyWeight: 0.5, relevanceScore: 0.75,
     })
+    expect(retro.evidence.check).toEqual({ offTopic: [], near: [], reason: 'checked', modelNote: null })
     expect(retro.evidence.reports).toHaveLength(2)
     expect(storeForecastEmbedding).toHaveBeenCalledWith('new', [0.1, 0.2])
   })

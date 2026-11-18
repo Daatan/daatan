@@ -11,8 +11,8 @@ published, staked, notified or fed into user scoring or the calibration record.
 Issue: [daatan#2217](https://github.com/Daatan/daatan/issues/2217). Decisions (Mark,
 2026-11-16/17): the drafts feed an event-centric "Who foresaw X?" page and a retro-only source
 board (PR 3 shipped the pages; the board is PR 4), never the main leaderboard; the generator runs by hand, weekly; an
-event needs at least three articles published before T0 (two until 2026-11-18, see step 4); the Oracul and the page see the same
-article set.
+event needs at least three on-topic articles published before T0 (two until 2026-11-18, see step 5); the Oracul and the page see the same
+article set, after the event check (step 4) has dropped the off-topic ones.
 
 ## Pipeline
 
@@ -21,7 +21,8 @@ only, **dry-run by default**) calls two admin routes with the `x-cron-secret` he
 
 1. `POST /api/admin/retro/candidates` (`findRetroCandidates`). Writes nothing.
 2. `POST /api/admin/retro/simulate` (`simulateRetroEvent`), once per candidate, largest first,
-   up to `max_events`. Each call is one Oracul analysis (up to ~95 s; nginx allows 120 s).
+   up to `max_events`. Each call is one event check (up to 20 s) and one Oracul analysis (up to
+   85 s; the 33 prod retro calls up to 2026-11-18 took 32 s median, 38 s max); nginx allows 120 s.
 
 The step summary lists the funnel counts, the judge's skip reasons, every candidate (with the
 duplicates folded into it) and one row per simulated event: P at T0, articles used/sent, T0
@@ -79,6 +80,8 @@ or more than 30 days before the first report (background, not this week's news).
    the create form's 0.87 warning on purpose: a retro event sits next to the live forecasts its
    articles were matched to. On 22 judged claims, 0.87 would have dropped 13 real events as
    "duplicates" of the forecast they were precursors of; the closest distinct pair was 0.936.
+   The up to 5 nearest predictions at ≥ 0.85 go on to the event check (step 4), which decides
+   below 0.95.
 3. **Evidence.** The news indexer's `POST /search/before` searches the whole index for the claim
    without its deadline clause (`evidenceQuery`: "by November 30, 2026" only dilutes the match
    to coverage written before the event; the judge's event summary is not used, because it is
@@ -94,21 +97,49 @@ or more than 30 days before the first report (background, not this week's news).
    - Below 0.40, one event's whole set was off-topic (best 0.386: other DOJ and Nvidia
      stories). At 0.30 the Oracul still used 4 of those articles and gave 60%.
    - The pre-T0 article that already reports the event (see Known limits) sat at 0.55 or
-     higher, so the floor does not stop it.
+     higher, so the floor does not stop it; the event check (step 4) does.
 
    It is to be rechecked with the deadline-free query.
-4. **Oracul** answers the claim `as_of` T0 from exactly those articles. Each article always
+4. **Event check** (daatan#2229). The `retro-event-check` prompt (stage `retro_event_check`,
+   temperature 0, `services/retro-generator/check.ts`) gets the judge's event summary
+   (hindsight, for the check only), the claim, T0, the articles found (date, outlet, title and
+   up to 400 characters of snippet or text) and the nearest predictions from step 2. It answers
+   per article `onTopic` and `reportsEvent`, plus `sameEventAs`: the prediction the event
+   settles YES or NO, whatever its deadline. In this order:
+   - `sameEventAs` set → `already_forecast` (the prediction, its status and the check's reason
+     in `detail`);
+   - any article `reportsEvent` → `event_before_t0` (those articles in `detail`): the
+     "forecast" would have been knowledge;
+   - fewer than 3 `onTopic` → `thin_evidence` (`detail.onTopic`, the off-topic titles);
+   - an error, or an answer that leaves an article without a verdict →
+     `event_check_failed` / `event_check_incomplete`. It fails closed: no draft.
+
+   Only the on-topic articles go to the Oracul, so the Oracul and the public page share that
+   set. Similarity can't make these calls: on 2026-11-18 the chip-rule junk scored 0.404–0.531
+   and on-topic Bab el-Mandeb 0.435–0.529; same-event forecast pairs sat at 0.889–0.934 and
+   distinct ones at 0.910–0.913.
+
+   **Replay** (2026-11-18, the 13 events of that day's runs, titles only, gemini-2.5-flash):
+   the chip rule (2/15 on topic) and Megaspeed (1/15) went thin; the two unity-call events
+   were `event_before_t0` (3 and 5 articles); Kahana-as-Speaker and the Eisenkot-bloc Speaker
+   were `already_forecast`; the 6 on-topic events kept 6–15 articles each. One more,
+   "Herzog tasks Eisenkot", was `already_forecast` against "Netanyahu will be the first leader
+   tasked…" (asked 2026-10-26), which the event settles NO. That is the rule as written.
+5. **Oracul** answers the claim `as_of` T0 from exactly the on-topic articles. Each article always
    carries a body: the archived text, or title + snippet. Without a body the Oracul would fetch
    today's page, which may hold updates written after T0. If it uses fewer than 3 articles, the
    result is `oracul_thin`. P = (mean + 1) / 2. The bar was 2 until 2026-11-18 (daatan#2229).
    Across the three prod runs of 2026-11-17/18, the off-topic chip-rule event passed twice, each
    time with 2 used, and every on-topic, non-duplicate event used at least 3. The other
-   off-topic event that got through (Megaspeed, 4 and 6 used) still passes.
-5. **Draft** (`mode: apply` only). The draft is a `PENDING_APPROVAL` binary prediction by the
+   off-topic event that got through (Megaspeed, 4 and 6 used) still passes the Oracul gate;
+   the event check (step 4) now stops it.
+6. **Draft** (`mode: apply` only). The draft is a `PENDING_APPROVAL` binary prediction by the
    bot user `retro_sim@daatan.internal`, `isPublic: false`. It gets a `retro_simulations` row with
    `outcome = correct` and an `evidence` JSON:
    - the search parameters;
    - the articles sent;
+   - the event check (`check`): the off-topic articles dropped, the nearest predictions it was
+     shown, its reason, and a note when a fallback model answered;
    - the Oracul's per-source stances and log id, and since 2026-11-18 each source's date and the
      four factors of its pooling weight (`credibilityWeight`, `evidenceWeight`, `recencyWeight`,
      `relevanceScore`) plus `isOccurrence`;
@@ -155,8 +186,9 @@ indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` a
 ## Known limits
 
 - **The event day is the judge's reading.** If it puts the event later than it really
-  happened, pre-T0 articles may already report it, and the "forecast" was knowledge. The
-  approval queue shows the event day, T0 and P at T0 for that check.
+  happened, pre-T0 articles may already report it, and the "forecast" was knowledge. The event
+  check skips the event when an article says so (`event_before_t0`); the approval queue still
+  shows the event day, T0 and P at T0.
 - **A looser paraphrase escapes the fold.** "Eisenkot will receive the mandate" scored 0.92–0.94
   against "the President will task Eisenkot", so it stays a separate draft to reject. Its
   reports stay on the rejected row, so the next run counts that cluster as covered.
@@ -164,7 +196,11 @@ indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` a
   sets score as high as on-topic ones (chip-rule junk 0.404–0.531, on-topic Bab el-Mandeb
   0.435–0.529). A forecast that already covered the event can sit below the 0.95 dedupe (0.889
   and 0.903 against "The Knesset Speaker will be changed"), while distinct pairs reach 0.913.
-  Both are rejected at approval until #2229 adds a per-event check.
+  The event check (step 4) handles both since daatan#2229; it is one model's reading, so the
+  approval gate stays.
+- **The event check shows titles and short excerpts, not whole articles.** An article whose
+  title hides that it already reports the event can still get through; the approval queue
+  shows the articles.
 - **Runs differ.** Candidates and P are re-drawn every run (the third carrier: 75%, 67% and 81%
   in three runs), so review the drafts an apply wrote, not the dry run before it.
 - **A page can look self-contradictory.** Bab el-Mandeb: 1 article called it and 8 said the

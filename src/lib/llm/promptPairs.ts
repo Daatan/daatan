@@ -10,6 +10,7 @@ import {
     rulesStrengthSchema,
     claimDefinednessSchema,
     retroEventJudgeSchema,
+    retroEventCheckSchema,
     rulesSchema,
     voteDecisionSchema,
 } from './schemas'
@@ -64,6 +65,7 @@ export const PROMPT_SCHEMAS: Record<PromptName, Schema | null> = {
     'rules-strength': rulesStrengthSchema,
     'claim-definedness': claimDefinednessSchema,
     'retro-event-judge': retroEventJudgeSchema,
+    'retro-event-check': retroEventCheckSchema,
 }
 
 /**
@@ -91,6 +93,7 @@ export const PROMPT_SCHEMA_NAMES: Partial<Record<PromptName, string>> = {
     'rules-strength': 'rulesStrengthSchema',
     'claim-definedness': 'claimDefinednessSchema',
     'retro-event-judge': 'retroEventJudgeSchema',
+    'retro-event-check': 'retroEventCheckSchema',
 }
 
 export interface PromptFingerprint {

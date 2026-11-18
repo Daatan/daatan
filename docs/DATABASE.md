@@ -1080,8 +1080,9 @@ on the row:
 - `event_text`, `event_date` (DATE) and `event_url` (the report that confirms the event);
 - `oracul_probability` (0..1, CHECK-constrained; the Oracul's answer as of T0);
 - `articles_used`;
-- `evidence` (JSONB, frozen at creation): the search parameters, the articles sent, the
-  Oracul's per-source stances and log id (since 2026-11-18 also each source's date and pooling
+- `evidence` (JSONB, frozen at creation): the search parameters, the articles sent, the event
+  check (`check`, since daatan#2229: the off-topic articles it dropped, the nearest forecasts it
+  was shown and its reason), the Oracul's per-source stances and log id (since 2026-11-18 also each source's date and pooling
   weight factors), the reports of the event, the judge's templates and the timeline.
 
 An approved row (prediction `RESOLVED_*`) with evidence is shown on the public `/who-foresaw`

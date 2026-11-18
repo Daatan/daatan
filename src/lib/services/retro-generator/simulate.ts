@@ -7,14 +7,15 @@ import { searchNewsBefore, type NewsBeforeArticle } from '@/lib/services/news-in
 import { getOraculForecast, type ArticleInput, type OracleForecastResponse } from '@/lib/services/oracle'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { SAME_EVENT_MIN_SCORE } from './cluster'
+import { checkRetroEvent, findNearForecasts, NEAR_FORECAST_MIN_SCORE, type ArticleVerdict, type NearForecast } from './check'
 import { parsePublished, retroTimeline, fillDeadline, type RetroTimeline } from './timeline'
 import type { PoolReport } from './types'
 
 const log = createLogger('retro-simulate')
 
 /**
- * The article gate, applied twice: to what the search found before T0, and to what the Oracul
- * actually used. Mark set two on 2026-11-16 (daatan#2217 Q4) and three on 2026-11-18
+ * The article gate, applied three times: to what the search found before T0, to what the event
+ * check kept as on topic, and to what the Oracul actually used. Mark set two on 2026-11-16 (daatan#2217 Q4) and three on 2026-11-18
  * (daatan#2229). Across the three prod runs of 2026-11-17/18, the off-topic chip-rule event
  * passed twice, each time with `articles_used` = 2, and every on-topic, non-duplicate event had
  * at least 3. A find below three can't reach three used, so the same bar on the search only saves
@@ -32,8 +33,12 @@ export const MAX_EVIDENCE_ARTICLES = 15
  * deadline-free query; the workflow's `min_similarity` input overrides it per run.
  */
 export const DEFAULT_MIN_SIMILARITY = 0.4
-/** Inside nginx's 120 s `/api` read timeout with the dedupe and search in front of it. */
-const ORACUL_TIMEOUT_MS = 95_000
+/**
+ * Inside nginx's 120 s `/api` read timeout with the dedupe, the search and the event check
+ * (up to 20 s) in front of it. The 33 retro Oracul calls on prod up to 2026-11-18 took 32 s at
+ * the median and 38 s at most.
+ */
+const ORACUL_TIMEOUT_MS = 85_000
 
 const RETRO_BOT_USERNAME = 'retro_sim'
 const RETRO_BOT_EMAIL = `${RETRO_BOT_USERNAME}@daatan.internal`
@@ -81,6 +86,15 @@ type SentArticle = {
   hadText: boolean
 }
 
+/** What the event check decided, kept on the draft and returned by a dry run for the hand-read. */
+type CheckSummary = {
+  /** Found before T0 but judged not about this event's subject: not sent, not shown. */
+  offTopic: SentArticle[]
+  near: Array<{ id: string; claimText: string; score: number; retro: boolean }>
+  reason: string
+  modelNote: string | null
+}
+
 export type SimulateResult =
   | {
       status: 'created' | 'dry_run'
@@ -93,6 +107,7 @@ export type SimulateResult =
       articlesUsed: number
       articles: SentArticle[]
       stances: Array<{ url: string; source: string; stance: number }>
+      check: CheckSummary
     }
   | { status: 'skipped'; reason: string; claimText?: string; detail?: unknown }
 
@@ -117,34 +132,14 @@ export async function getOrCreateRetroBotUser(): Promise<{ id: string }> {
   })
 }
 
-interface DuplicateRow {
-  id: string
-  claimText: string
-  status: string
-  retro: boolean
-  score: number
-}
-
 /**
  * A retro draft is only worth making for an event no forecast already covers, and only once.
- * Matches every forecast in every status — a resolved one asked it already, a rejected retro
- * row was already looked at — at {@link SAME_EVENT_MIN_SCORE}, not the create form's 0.87 warning
- * bar: a retro event sits next to the live forecasts its articles were matched to by construction.
+ * Matches every forecast in every status at {@link SAME_EVENT_MIN_SCORE}, not the create form's
+ * 0.87 warning bar: a retro event sits next to the live forecasts its articles were matched to
+ * by construction. Below that bar the event check reads the nearest ones and decides.
  */
-async function findDuplicate(vector: number[], threshold: number, eventUrl: string): Promise<DuplicateRow | null> {
-  const sameUrl = await prisma.retroSimulation.findFirst({ where: { eventUrl }, select: { predictionId: true } })
-  if (sameUrl) return { id: sameUrl.predictionId, claimText: '', status: 'retro_same_event_url', retro: true, score: 1 }
-  const v = Prisma.raw(`'[${vector.join(',')}]'::vector`)
-  const rows = await prisma.$queryRaw<DuplicateRow[]>(Prisma.sql`
-    SELECT p.id, p."claimText", p.status::text AS status,
-           EXISTS (SELECT 1 FROM retro_simulations r WHERE r.prediction_id = p.id) AS retro,
-           (1 - (p.embedding <=> ${v}))::float AS score
-    FROM predictions p
-    WHERE p.embedding IS NOT NULL AND (1 - (p.embedding <=> ${v})) >= ${threshold}
-    ORDER BY p.embedding <=> ${v}
-    LIMIT 1
-  `)
-  return rows[0] ?? null
+function duplicateOf(near: NearForecast[], threshold: number): NearForecast | null {
+  return near[0] && near[0].score >= threshold ? near[0] : null
 }
 
 function toArticleInput(a: NewsBeforeArticle): ArticleInput {
@@ -162,17 +157,30 @@ function toArticleInput(a: NewsBeforeArticle): ArticleInput {
   }
 }
 
+function toSent(a: NewsBeforeArticle): SentArticle {
+  return {
+    url: a.url,
+    title: a.title,
+    source: a.source,
+    publishedAt: a.published_at,
+    similarity: a.similarity,
+    hadText: Boolean(a.text?.trim()),
+  }
+}
+
 function frozenEvidence(
   input: SimulateInput,
   timeline: RetroTimeline,
   search: EvidenceSearch,
   sent: SentArticle[],
+  check: CheckSummary,
   forecast: OracleForecastResponse,
   logId: string | null,
 ): Prisma.InputJsonValue {
   return {
     search,
     sent,
+    check,
     oracul: {
       mean: forecast.mean,
       articlesUsed: forecast.articles_used,
@@ -205,8 +213,9 @@ function frozenEvidence(
 
 /**
  * Stage 2 of the retro generator (daatan#2217), one event per call: dedupe, collect the
- * articles published before T0 from the whole news index, ask Oracul what it would have said
- * as of T0 from exactly those, and — unless `dryRun` — save a private PENDING_APPROVAL draft
+ * articles published before T0 from the whole news index, check them and the nearest forecasts
+ * against the event (daatan#2229), ask Oracul what it would have said as of T0 from exactly the
+ * on-topic ones, and — unless `dryRun` — save a private PENDING_APPROVAL draft
  * with that answer frozen on its `RetroSimulation` row. Approving the draft resolves it (PR 1);
  * nothing here publishes, stakes, notifies or reaches the calibration record.
  *
@@ -225,7 +234,11 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
 
   const vector = await embedText(claimText)
   if (!vector) return { status: 'skipped', reason: 'embed_failed', claimText }
-  const dup = await findDuplicate(vector, input.dupThreshold ?? SAME_EVENT_MIN_SCORE, input.event.url)
+  const sameUrl = await prisma.retroSimulation.findFirst({ where: { eventUrl: input.event.url }, select: { predictionId: true } })
+  if (sameUrl) return { status: 'skipped', reason: 'duplicate_retro', claimText, detail: { id: sameUrl.predictionId, match: 'event_url' } }
+  const dupThreshold = input.dupThreshold ?? SAME_EVENT_MIN_SCORE
+  const near = await findNearForecasts(vector, Math.min(NEAR_FORECAST_MIN_SCORE, dupThreshold))
+  const dup = duplicateOf(near, dupThreshold)
   if (dup) return { status: 'skipped', reason: dup.retro ? 'duplicate_retro' : 'duplicate_forecast', claimText, detail: dup }
 
   const minSimilarity = input.minSimilarity ?? DEFAULT_MIN_SIMILARITY
@@ -257,19 +270,47 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
   if (evidence.length < MIN_PRE_T0_ARTICLES) {
     return { status: 'skipped', reason: 'thin_evidence', claimText, detail: { found: evidence.length, search } }
   }
-  const sent: SentArticle[] = evidence.map((a) => ({
-    url: a.url,
-    title: a.title,
-    source: a.source,
-    publishedAt: a.published_at,
-    similarity: a.similarity,
-    hadText: Boolean(a.text?.trim()),
-  }))
+
+  // daatan#2229: the search measures topic, not this event. One call reads what it found and
+  // the nearest forecasts; the Oracul and the "Who foresaw X?" page then share the kept set.
+  const checked = await checkRetroEvent({ eventSummary: input.event.summary, claimText, asOf: timeline.asOf, articles: evidence, near })
+  if (!checked.ok) return { status: 'skipped', reason: checked.reason, claimText, detail: checked.detail }
+  const verdict = new Map<string, ArticleVerdict>(checked.verdicts.map((v) => [v.url, v]))
+  const brief = (a: NewsBeforeArticle) => ({ url: a.url, title: a.title, source: a.source, publishedAt: a.published_at })
+  if (checked.sameEventAs) {
+    const f = checked.sameEventAs
+    return {
+      status: 'skipped',
+      reason: 'already_forecast',
+      claimText,
+      detail: { id: f.id, claimText: f.claimText, status: f.status, retro: f.retro, score: f.score, why: checked.reason },
+    }
+  }
+  const early = evidence.filter((a) => verdict.get(a.url)?.reportsEvent)
+  if (early.length > 0) {
+    return { status: 'skipped', reason: 'event_before_t0', claimText, detail: { articles: early.map(brief), why: checked.reason } }
+  }
+  const kept = evidence.filter((a) => verdict.get(a.url)?.onTopic)
+  const check: CheckSummary = {
+    offTopic: evidence.filter((a) => !verdict.get(a.url)?.onTopic).map(toSent),
+    near: near.map((f) => ({ id: f.id, claimText: f.claimText, score: f.score, retro: f.retro })),
+    reason: checked.reason,
+    modelNote: checked.modelNote ?? null,
+  }
+  if (kept.length < MIN_PRE_T0_ARTICLES) {
+    return {
+      status: 'skipped',
+      reason: 'thin_evidence',
+      claimText,
+      detail: { found: evidence.length, onTopic: kept.length, offTopic: check.offTopic.map((a) => a.title), why: checked.reason, search },
+    }
+  }
+  const sent = kept.map(toSent)
 
   const { forecast, logId, failureClass } = await getOraculForecast(
     claimText,
     {
-      articles: evidence.map(toArticleInput),
+      articles: kept.map(toArticleInput),
       asOf: timeline.asOf,
       claimCreatedAt: timeline.asOf,
       claimDeadline: timeline.deadline,
@@ -294,6 +335,7 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
     articlesUsed: forecast.articles_used,
     articles: sent,
     stances: forecast.sources.map((s) => ({ url: s.url, source: s.source_name, stance: s.stance })),
+    check,
   }
   if (input.dryRun) return { status: 'dry_run', predictionId: null, ...result }
 
@@ -335,7 +377,7 @@ export async function simulateRetroEvent(input: SimulateInput): Promise<Simulate
         eventUrl: input.event.url,
         oraculProbability: probability,
         articlesUsed: forecast.articles_used,
-        evidence: frozenEvidence(input, timeline, search, sent, forecast, logId),
+        evidence: frozenEvidence(input, timeline, search, sent, check, forecast, logId),
       },
     })
     return p
