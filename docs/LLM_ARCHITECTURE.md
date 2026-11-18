@@ -21,7 +21,8 @@ The main `llmService` tries providers in this order; each leg is **registered on
 3.  **Fallback 1**: **Oracul `/llm`** (**AWS Bedrock / Amazon Nova**, `bedrock/amazon.nova-pro-v1:0`)
     *   Calls the retro Oracul's `POST /llm` via `getOracleConfig()` + `oracleFetch`. A *different vendor* from Google, so it serves precisely during a Gemini/Google outage.
     *   Registered whenever the Oracle is configured (`ORACLE_URL` + `ORACLE_API_KEY`) — a no-op otherwise (e.g. self-host installs that don't reach Daatan's Oracle).
-    *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON).
+    *   No native JSON-schema mode: `schema` requests are steered with a system message (the caller still parses the JSON), so a prompt that falls back here has to spell out its JSON shape. `retro-event-check` v1 didn't, and Nova Pro answered 0 of 48 replays in a shape the check could read (keyed by article number, or `article` instead of `n`); v2's one-line shape made it 48 of 48 (daatan#2229).
+    *   The caller's `signal` reaches the `/llm` request (`oracleFetch` combines it with its own 60 s timeout), so a fallback stops at the caller's deadline instead of running on after it (daatan#2229).
 
 4.  **Fallback 2**: **OpenRouter**
     *   Registered whenever a key is configured (admin setting → SSM `OPENROUTER_API_KEY` → env, `getOpenRouterKey()`), for **both** editions.
@@ -77,6 +78,8 @@ LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flas
   (`googleTimeoutMs`). A resolver's manual research uses the first leg only (`primaryOnly`), so
   a failure is an error to retry, not a verdict from another vendor's model. The born-true
   check may still fall back, and its Telegram alert then names the fallback model.
+- **`retro_event_check` (daatan#2229).** The opposite: the Google legs get 25 s instead of 30 s,
+  so that the Oracul fallback has 10 s left of the check's 35 s.
 
 Not covered, by design: embeddings (`embedding.ts`, `gemini-embedding-2` @ 768 dims — a change
 means re-embedding every row), the LLM panel roster (a model change starts a new Brier series)

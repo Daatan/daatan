@@ -54,6 +54,21 @@ describe('OracleProvider', () => {
     expect(body.messages[1]).toEqual({ role: 'user', content: 'give json' })
   })
 
+  it("passes the caller's abort signal through (daatan#2229)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: '{}' }),
+    } as never)
+    const caller = new AbortController()
+
+    const provider = new OracleProvider(cfg, 'm')
+    await provider.generateContent({ prompt: 'x', signal: caller.signal })
+
+    expect(mockFetch.mock.calls[0][2].signal).toBe(caller.signal)
+    expect(mockFetch.mock.calls[0][2].timeoutMs).toBe(60_000)
+  })
+
   it('throws on a non-ok Oracul response', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

@@ -167,18 +167,21 @@ export function getOracleConfig(): OracleConfig | null {
 
 /**
  * `fetch()` against an authenticated Oracul endpoint: applies the `x-api-key`
- * header and an abort timeout. Callers own the response handling — services
- * fail open (return `null`), proxy routes pass the status through.
+ * header and an abort timeout. A caller's `signal` aborts it too, whichever
+ * fires first (it used to be replaced by the timeout, daatan#2229). Callers own
+ * the response handling — services fail open (return `null`), proxy routes pass
+ * the status through.
  */
 export function oracleFetch(
   cfg: OracleConfig,
   path: string,
   init: RequestInit & { timeoutMs: number },
 ): Promise<Response> {
-  const { timeoutMs, headers, ...rest } = init
+  const { timeoutMs, headers, signal, ...rest } = init
+  const timeout = AbortSignal.timeout(timeoutMs)
   return fetch(`${cfg.baseUrl}${path}`, {
     ...rest,
     headers: { 'x-api-key': cfg.key, ...headers },
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   })
 }
