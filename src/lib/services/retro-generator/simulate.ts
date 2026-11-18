@@ -35,10 +35,10 @@ export const MAX_EVIDENCE_ARTICLES = 15
 export const DEFAULT_MIN_SIMILARITY = 0.4
 /**
  * Inside nginx's 120 s `/api` read timeout with the dedupe, the search and the event check
- * (up to 20 s) in front of it. The 33 retro Oracul calls on prod up to 2026-11-18 took 32 s at
+ * (up to 35 s) in front of it. The 33 retro Oracul calls on prod up to 2026-11-18 took 32 s at
  * the median and 38 s at most.
  */
-const ORACUL_TIMEOUT_MS = 85_000
+const ORACUL_TIMEOUT_MS = 75_000
 
 const RETRO_BOT_USERNAME = 'retro_sim'
 const RETRO_BOT_EMAIL = `${RETRO_BOT_USERNAME}@daatan.internal`

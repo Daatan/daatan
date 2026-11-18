@@ -7,7 +7,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn() } }))
 import { llmService } from '@/lib/llm'
 import { retroEventCheckSchema } from '@/lib/llm/schemas'
 import type { NewsBeforeArticle } from '@/lib/services/news-indexer'
-import { buildEventCheckPrompt, checkRetroEvent, validateEventCheck, type EventCheckInput, type NearForecast } from '../check'
+import { buildEventCheckPrompt, checkRetroEvent, CHECK_TIMEOUT_MS, validateEventCheck, type EventCheckInput, type NearForecast } from '../check'
 
 const article = (url: string, title: string, snippet: string | null = 'snip', text: string | null = 'body'): NewsBeforeArticle => ({
   title, url, snippet, source: 'x.com', language: 'en', published_date: '2026-11-01',
@@ -117,10 +117,21 @@ describe('checkRetroEvent', () => {
     expect(await checkRetroEvent(input)).toMatchObject({ ok: true, modelNote: 'answered by openrouter' })
   })
 
-  it('fails closed on a model error or unparseable answer', async () => {
+  it('fails closed on a model error or unparseable answer, and says which', async () => {
     vi.mocked(llmService.generateContent).mockRejectedValueOnce(new Error('quota'))
-    expect(await checkRetroEvent(input)).toEqual({ ok: false, reason: 'event_check_failed' })
+    expect(await checkRetroEvent(input)).toEqual({ ok: false, reason: 'event_check_failed', detail: 'quota' })
     vi.mocked(llmService.generateContent).mockResolvedValueOnce({ text: 'not json' })
-    expect(await checkRetroEvent(input)).toEqual({ ok: false, reason: 'event_check_failed' })
+    expect(await checkRetroEvent(input)).toMatchObject({ ok: false, reason: 'event_check_failed', detail: expect.stringContaining('JSON') })
+  })
+
+  it('names a timeout as one', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(AbortSignal.abort())
+    try {
+      vi.mocked(llmService.generateContent).mockRejectedValueOnce(new Error('LLM call aborted by caller'))
+      expect(await checkRetroEvent(input)).toEqual({ ok: false, reason: 'event_check_failed', detail: 'timeout after 35 s' })
+      expect(timeout).toHaveBeenCalledWith(CHECK_TIMEOUT_MS)
+    } finally {
+      timeout.mockRestore()
+    }
   })
 })

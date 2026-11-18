@@ -5,8 +5,8 @@ name: Retro Simulations
 #
 #   1. POST /api/admin/retro/candidates — cluster the evidence pool's reported facts, judge each
 #      cluster (one dated past event?), write nothing.
-#   2. POST /api/admin/retro/simulate — one candidate per request (an event check, up to 20 s,
-#      and one Oracul analysis, up to 85 s): articles published before T0 from the whole news
+#   2. POST /api/admin/retro/simulate — one candidate per request (an event check, up to 35 s,
+#      and one Oracul analysis, up to 75 s): articles published before T0 from the whole news
 #      index, the check (on topic? already reports the event? already forecast? — daatan#2229),
 #      Oracul as of T0 from the on-topic ones, and with mode=apply a PENDING_APPROVAL draft.
 #      Approving it resolves it; nothing is published.

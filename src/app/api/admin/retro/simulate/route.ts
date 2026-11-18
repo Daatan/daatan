@@ -26,7 +26,7 @@ const authed = withAuth(async (request: NextRequest) => {
  * checks them against the event (daatan#2229), asks Oracul as of T0 from the on-topic ones, and
  * with `"mode": "apply"` saves a private PENDING_APPROVAL draft. **`mode` defaults to
  * `dry-run`**, which does everything but the write. One event check and one Oracul analysis per
- * call (up to ~105 s), so it is paced by the caller.
+ * call (up to ~110 s), so it is paced by the caller.
  *
  * Auth: an ADMIN session, OR the `x-cron-secret` (BOT_RUNNER_SECRET) header.
  */

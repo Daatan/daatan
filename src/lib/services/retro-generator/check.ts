@@ -17,8 +17,11 @@ const log = createLogger('retro-event-check')
 export const NEAR_FORECAST_MIN_SCORE = 0.85
 export const MAX_NEAR_FORECASTS = 5
 const MAX_EXCERPT_CHARS = 400
-/** One call with up to 15 articles; the Oracul after it took at most 38 s on 33 prod retro calls. */
-const CHECK_TIMEOUT_MS = 20_000
+/**
+ * One call with up to 15 articles. The retro judge, a smaller prompt on the same chain, took
+ * 6.3 s median, 11.9 s p90 and 21.4 s at most on Vertex over 140 prod calls (2026-11-16..18).
+ */
+export const CHECK_TIMEOUT_MS = 35_000
 
 export interface NearForecast {
   id: string
@@ -122,18 +125,20 @@ export function validateEventCheck(raw: Record<string, unknown>, articles: Array
  * identity, so none of the three is a threshold.
  */
 export async function checkRetroEvent(input: EventCheckInput): Promise<EventCheck> {
+  const signal = AbortSignal.timeout(CHECK_TIMEOUT_MS)
   try {
     const result = await llmService.generateContent({
       ...forStage('retro_event_check'),
       prompt: await buildEventCheckPrompt(input),
       schema: retroEventCheckSchema,
       temperature: 0,
-      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+      signal,
     })
     const checked = validateEventCheck(JSON.parse(result.text) as Record<string, unknown>, input.articles, input.near)
     return checked.ok && result.fallbackProvider ? { ...checked, modelNote: `answered by ${result.fallbackProvider}` } : checked
   } catch (err) {
     log.warn({ err }, 'retro event check failed')
-    return { ok: false, reason: 'event_check_failed' }
+    const detail = signal.aborted ? `timeout after ${CHECK_TIMEOUT_MS / 1000} s` : String((err as Error)?.message ?? err).slice(0, 200)
+    return { ok: false, reason: 'event_check_failed', detail }
   }
 }
