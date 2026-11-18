@@ -21,9 +21,12 @@ only, **dry-run by default**) calls two admin routes with the `x-cron-secret` he
 
 1. `POST /api/admin/retro/candidates` (`findRetroCandidates`). Writes nothing.
 2. `POST /api/admin/retro/simulate` (`simulateRetroEvent`), once per candidate, largest first,
-   up to `max_events`. Each call is one event check (up to 35 s; the retro judge, a smaller prompt, took 6 s median
-   and 21 s at most on prod) and one Oracul analysis (up to 75 s; the 33 prod retro calls up to
-   2026-11-18 took 32 s median, 38 s max); nginx allows 120 s.
+   up to `max_events`. Each call is one event check and one Oracul analysis. The check stops at
+   35 s, a fallback model included: Vertex gets 25 s, so the Oracul `/llm` fallback keeps 10 s
+   (24 prod Vertex calls on 2026-11-18: 12.3 s median, 23.5 s max, one timeout that the
+   fallback answered in 5 s). The Oracul analysis stops at 75 s (the 33 prod retro calls up to
+   2026-11-18: 32 s median, 38 s max). The news search before them is capped at 30 s and took
+   about a second; whole calls took 34–53 s. nginx allows 120 s.
 
 The step summary lists the funnel counts, the judge's skip reasons, every candidate (with the
 duplicates folded into it) and one row per simulated event: P at T0, articles used/sent, T0

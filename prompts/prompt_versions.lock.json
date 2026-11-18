@@ -138,9 +138,9 @@
       "schema_chars": 1496
     },
     "retro-event-check": {
-      "version": "v1",
-      "hash": "b55f92f552744a83",
-      "chars": 2149,
+      "version": "v2",
+      "hash": "6b69d8911d377dc5",
+      "chars": 2499,
       "schema": "retroEventCheckSchema",
       "schema_hash": "cdb8d186146bce62",
       "schema_chars": 853

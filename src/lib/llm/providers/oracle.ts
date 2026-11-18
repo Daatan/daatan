@@ -41,6 +41,9 @@ export class OracleProvider implements LLMProvider {
         temperature: request.temperature ?? 0.1,
       }),
       timeoutMs: ORACLE_TIMEOUT_MS,
+      // The caller's deadline (daatan#2229): without it a fallback leg ran on after the
+      // caller had given up, holding the request past nginx's 120 s.
+      signal: request.signal,
     })
 
     if (!res.ok) {
