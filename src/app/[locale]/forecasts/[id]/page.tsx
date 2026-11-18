@@ -7,7 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCachedPredictionTranslation } from '@/lib/services/translation'
 import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
-import { buildForecastDescription, buildForecastKeywords } from '@/lib/forecast-seo'
+import { buildForecastDescription, buildForecastKeywords, publicDetailsText } from '@/lib/forecast-seo'
+import { ogLocale } from '@/lib/og-locale'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
@@ -15,7 +16,7 @@ import { JsonLd } from '@/components/JsonLd'
 import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
-import { getAppUrl } from '@/lib/branding'
+import { getAppName, getAppUrl } from '@/lib/branding'
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { communityProbability } from '@/lib/forecast-math'
 import {
@@ -185,10 +186,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const translatedLangs = new Set(translatedLocales.map((t) => t.language))
   const hasTranslation = translatedLangs.has(locale)
   const title = translations.claimText || prediction.claimText
+  // No ctx here: its extras ("3 forecasters have committed", en-US dates) are English.
   const description = buildForecastDescription(
     title,
-    translations.detailsText || prediction.detailsText,
-    baseCtx,
+    publicDetailsText(prediction.detailsText, translations.detailsText),
   )
 
   const metaAppUrl = getAppUrl()
@@ -215,7 +216,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       type: 'article',
       url: `${metaAppUrl}/${locale}/forecasts/${slug}`,
-      locale,
+      siteName: getAppName(),
+      locale: ogLocale(locale),
     },
     twitter: {
       card: 'summary_large_image',
@@ -309,7 +311,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: localizedPrediction.claimText,
-    description: localizedPrediction.detailsText || undefined,
+    description: publicDetailsText(prediction.detailsText, translations.detailsText) || undefined,
     url: `${appUrl}/forecasts/${slug}`,
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     datePublished: prediction.publishedAt,
@@ -349,7 +351,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: localizedPrediction.claimText,
-    description: localizedPrediction.detailsText || localizedPrediction.claimText,
+    description: publicDetailsText(prediction.detailsText, translations.detailsText) || localizedPrediction.claimText,
     url: `${appUrl}/forecasts/${slug}`,
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     startDate: prediction.publishedAt ?? prediction.createdAt,

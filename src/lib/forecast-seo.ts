@@ -1,5 +1,37 @@
 const META_DESCRIPTION_MAX = 158
 
+// detailsText is usually the LLM context summary (context.ts overwrites it on every
+// refresh). A few of those describe their own inputs instead of the world — "The
+// provided articles do not offer…", "No relevant articles or context were provided…",
+// "The previous context noted…" (4 of 120 sampled forecast pages, 2026-11-18). As a
+// meta/OG/JSON-LD description that reads as a bug, so it falls back to the claim.
+// Anchored to the start on purpose: "Recent articles indicate X" is real content.
+const SELF_REFERENTIAL_LEADS: readonly RegExp[] = [
+  /^(?:the\s+)?(?:provided|given|supplied)\s+(?:news\s+)?articles?\b/i,
+  /^(?:the\s+)?(?:recent|available|current)\s+(?:news\s+)?articles?\s+(?:do|does|did|primarily|mainly|mostly|only)\b/i,
+  /^(?:there\s+(?:is|are|was|were)\s+)?no\s+(?:new|relevant|specific|recent)\s+(?:or\s+\w+\s+)?(?:articles?|information|context|news|updates?|developments?)\b/i,
+  /^no\s+(?:articles?|information|context)\b/i,
+  /^(?:the\s+)?previous\s+(?:context|summary)\b/i,
+]
+
+export function isSelfReferentialContext(text: string): boolean {
+  const t = text.trimStart()
+  return SELF_REFERENTIAL_LEADS.some((re) => re.test(t))
+}
+
+/**
+ * The details text a forecast page may hand to crawlers and link previews, or null.
+ * `translated` is the locale's copy of `original`; the check runs on the original
+ * (the patterns are English) and drops both, so he/ru pages follow the en decision.
+ */
+export function publicDetailsText(
+  original: string | null | undefined,
+  translated?: string | null,
+): string | null {
+  if (original && isSelfReferentialContext(original)) return null
+  return translated || original || null
+}
+
 interface ForecastDescriptionCtx {
   resolveByDatetime?: string | Date
   commitmentCount?: number
@@ -23,7 +55,7 @@ export function buildForecastDescription(
   }
 
   const trimmedDetails = detailsText?.trim()
-  if (trimmedDetails && trimmedDetails.length >= 30) {
+  if (trimmedDetails && trimmedDetails.length >= 30 && !isSelfReferentialContext(trimmedDetails)) {
     parts.push(trimmedDetails)
     return truncate(parts.join('. '), META_DESCRIPTION_MAX)
   }

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { buildForecastDescription, buildForecastKeywords, extractClaimEntities, globalKeywords } from '../forecast-seo'
+import {
+  buildForecastDescription,
+  buildForecastKeywords,
+  extractClaimEntities,
+  globalKeywords,
+  isSelfReferentialContext,
+  publicDetailsText,
+} from '../forecast-seo'
 
 describe('buildForecastDescription', () => {
   it('uses detailsText when long enough', () => {
@@ -81,6 +88,61 @@ describe('buildForecastDescription', () => {
     const claim = 'Will the market recover?'
     const result = buildForecastDescription(claim, null, {})
     expect(result).toBe(claim)
+  })
+})
+
+// Openings of real context summaries on daatan.com forecast pages (sampled 2026-11-18).
+const SELF_REFERENTIAL = [
+  "The previous context noted a lack of data on Esperanto Wikipedia's current article count.",
+  "The provided articles do not offer specific context regarding the Houthi movement's territorial control in Yemen.",
+  "The recent articles do not provide any new information or developments regarding the release of 'The Winds of Winter'.",
+  'No relevant articles or context were provided regarding the weather forecast for Ramat-Gan on February 26, 2026.',
+  'The recent articles primarily serve as general information portals for the club.',
+  'There is no new information about the negotiations in the recent coverage.',
+]
+const REAL_CONTENT = [
+  'Recent articles indicate AI is increasingly enabling non-technical individuals to code.',
+  'Recent reports indicate Israel has seized Palestinian land for military expansion.',
+  'Recent articles confirm Iron Maiden was active, having supported Killswitch Engage.',
+  'Significant new developments indicate the EU is actively discussing the proposal.',
+  'No country has left the eurozone since its creation, and none has formally applied to.',
+  'The Abraham Accords are a series of normalization agreements between Israel and Arab states.',
+]
+
+describe('isSelfReferentialContext', () => {
+  it.each(SELF_REFERENTIAL)('flags a summary that describes its inputs: %s', (text) => {
+    expect(isSelfReferentialContext(text)).toBe(true)
+  })
+
+  it.each(REAL_CONTENT)('keeps a summary about the world: %s', (text) => {
+    expect(isSelfReferentialContext(text)).toBe(false)
+  })
+
+  it('ignores leading whitespace', () => {
+    expect(isSelfReferentialContext('  The previous summary said nothing new.')).toBe(true)
+  })
+})
+
+describe('publicDetailsText', () => {
+  it('drops the translation too when the original describes its inputs', () => {
+    expect(publicDetailsText(SELF_REFERENTIAL[1], 'המאמרים שסופקו אינם מציעים הקשר')).toBeNull()
+  })
+
+  it('prefers the translation of real content', () => {
+    expect(publicDetailsText(REAL_CONTENT[0], 'Последние статьи показывают…')).toBe('Последние статьи показывают…')
+  })
+
+  it('falls back to the original, then null', () => {
+    expect(publicDetailsText(REAL_CONTENT[0], null)).toBe(REAL_CONTENT[0])
+    expect(publicDetailsText(null)).toBeNull()
+  })
+})
+
+describe('buildForecastDescription with a self-referential summary', () => {
+  it('uses the claim path instead of the summary', () => {
+    const claim = 'Esperanto Wikipedia will have more than 400,000 articles by December 31, 2026.'
+    const result = buildForecastDescription(claim, SELF_REFERENTIAL[0], { commitmentCount: 2 })
+    expect(result).toBe(`${claim}. 2 forecasters have committed`)
   })
 })
 

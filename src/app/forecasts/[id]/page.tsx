@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { buildForecastDescription, buildForecastKeywords } from '@/lib/forecast-seo'
+import { buildForecastDescription, buildForecastKeywords, publicDetailsText } from '@/lib/forecast-seo'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { listComments } from '@/lib/services/comment'
 import type { Comment } from '@/components/comments/CommentThread'
@@ -20,6 +20,7 @@ import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 import { JsonLd } from '@/components/JsonLd'
 import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getAppName, getAppUrl } from '@/lib/branding'
+import { ogLocale } from '@/lib/og-locale'
 
 async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
   const data = await getContextTimeline(predictionId)
@@ -228,6 +229,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       type: 'article',
       url: `${metaAppUrl}/forecasts/${slug}`,
+      siteName: getAppName(),
+      locale: ogLocale('en'),
     },
     twitter: {
       card: 'summary_large_image',
@@ -317,7 +320,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: prediction.claimText,
-    description: prediction.detailsText || undefined,
+    description: publicDetailsText(prediction.detailsText) || undefined,
     url: `${appUrl}/forecasts/${slug}`,
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     datePublished: prediction.publishedAt,
@@ -355,7 +358,7 @@ export default async function ForecastDetailPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: prediction.claimText,
-    description: prediction.detailsText || prediction.claimText,
+    description: publicDetailsText(prediction.detailsText) || prediction.claimText,
     url: `${appUrl}/forecasts/${slug}`,
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     startDate: prediction.publishedAt ?? prediction.createdAt,
