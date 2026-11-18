@@ -980,6 +980,7 @@ export default function ForecastDetailClient({
             image={prediction.author.image}
             showAvatar={true}
             avatarSize={24}
+            className="min-w-0"
           >
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="font-medium text-white truncate">{prediction.author.name}</span>

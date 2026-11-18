@@ -52,6 +52,7 @@ export function UserLink({
           src={image} 
           name={name || username || 'User'} 
           size={avatarSize} 
+          className="shrink-0"
         />
       )}
       {children || (showName && (
