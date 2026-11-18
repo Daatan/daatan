@@ -4,8 +4,8 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Mock next/link
 vi.mock('next/link', () => ({
-  default: ({ children, href, onClick, className }: any) => (
-    <a href={href} onClick={onClick} className={className}>
+  default: ({ children, href, onClick, className, ...rest }: any) => (
+    <a href={href} onClick={onClick} className={className} {...rest}>
       {children}
     </a>
   ),
@@ -72,5 +72,17 @@ describe('UserLink Component', () => {
     )
     expect(screen.queryByText('John Doe')).not.toBeInTheDocument()
     expect(screen.getByTestId('custom-child')).toHaveTextContent('Custom Content')
+  })
+
+  it('showName={false} renders the avatar only, with the name as the link label', () => {
+    render(<UserLink {...mockUser} showAvatar showName={false} />)
+    expect(screen.queryByText('John Doe')).not.toBeInTheDocument()
+    expect(screen.getByTestId('mock-avatar')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'John Doe' })).toHaveAttribute('href', '/profile/user-123')
+  })
+
+  it('shows the name and sets no aria-label by default', () => {
+    render(<UserLink {...mockUser} />)
+    expect(screen.getByRole('link')).not.toHaveAttribute('aria-label')
   })
 })

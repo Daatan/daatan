@@ -170,7 +170,10 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         </>
       ) : (
         <>
-          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden">
+          {/* overflow-x-auto, not overflow-hidden: on a phone the table is wider than the
+              screen (~570 px vs ~360 px) and must scroll sideways; any non-visible overflow
+              still clips to the rounded corners (#2236). */}
+          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-500 border-b border-navy-600">
