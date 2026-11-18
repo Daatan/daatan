@@ -137,6 +137,14 @@
       "schema_hash": "b93236f952e555cd",
       "schema_chars": 1496
     },
+    "retro-event-check": {
+      "version": "v1",
+      "hash": "b55f92f552744a83",
+      "chars": 2149,
+      "schema": "retroEventCheckSchema",
+      "schema_hash": "cdb8d186146bce62",
+      "schema_chars": 853
+    },
     "retro-event-judge": {
       "version": "v1",
       "hash": "68ac9951de51838b",

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const VECTOR = Array.from({ length: 768 }, (_, i) => ((i % 11) + 1) / 11)
+/** VECTOR pushed off by ±k on alternate dimensions: k 0.3 → cosine 0.899, k 0.5 → 0.776. */
+const offBy = (k: number) => VECTOR.map((x, i) => x + (i % 2 ? k : -k))
 
 vi.mock('@/lib/services/embedding', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/embedding')>()),
@@ -13,8 +15,13 @@ vi.mock('@/lib/services/retro-generator/judge', async (importOriginal) => ({
 }))
 vi.mock('@/lib/services/news-indexer', () => ({ searchNewsBefore: vi.fn(async () => []) }))
 vi.mock('@/lib/services/oracle', () => ({ getOraculForecast: vi.fn() }))
+vi.mock('@/lib/llm', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/llm')>()),
+  llmService: { generateContent: vi.fn() },
+}))
 
 import { prisma } from '@/lib/prisma'
+import { llmService } from '@/lib/llm'
 import { judgeCluster } from '@/lib/services/retro-generator/judge'
 import { searchNewsBefore } from '@/lib/services/news-indexer'
 import { getOraculForecast, type OracleForecastResponse } from '@/lib/services/oracle'
@@ -100,6 +107,7 @@ describe('retro generator SQL against Postgres (daatan#2217)', () => {
       rulesTemplate: 'YES if he is tasked by {DEADLINE}. NO otherwise.',
       dryRun: false,
     }
+    const verdicts = (n: number) => Array.from({ length: n }, (_, i) => ({ n: i + 1, onTopic: true, reportsEvent: false }))
     const article = (url: string, offsetDays: number) => ({
       title: `T ${url}`, url, snippet: 'snip', source: 'x.com', language: 'en', published_date: day(offsetDays).toISOString().slice(0, 10),
       published_at: day(offsetDays).toISOString(), published_at_source: 'meta', indexed_at: day(offsetDays).toISOString(), similarity: 0.7, text: 'body',
@@ -113,9 +121,32 @@ describe('retro generator SQL against Postgres (daatan#2217)', () => {
       expect(searchNewsBefore).not.toHaveBeenCalled()
     })
 
+    it('shows the event check the forecasts at 0.85 or more, and skips the event when it settles one', async () => {
+      const near = await makePrediction({ status: 'RESOLVED_CORRECT' })
+      const far = await makePrediction()
+      for (const [id, v] of [[near.id, offBy(0.3)], [far.id, offBy(0.5)]] as const) {
+        await prisma.$executeRawUnsafe(`UPDATE predictions SET embedding = '[${v.join(',')}]'::vector WHERE id = $1`, id)
+      }
+      vi.mocked(searchNewsBefore).mockResolvedValue([article('https://x.com/1', -20), article('https://y.com/2', -18), article('https://z.com/3', -16)])
+      vi.mocked(llmService.generateContent).mockResolvedValue({ text: JSON.stringify({ articles: verdicts(3), sameEventAs: 1, reason: 'settled' }) })
+
+      const r = await simulateRetroEvent(input)
+      expect(r).toMatchObject({
+        status: 'skipped',
+        reason: 'already_forecast',
+        detail: { id: near.id, claimText: near.claimText, status: 'RESOLVED_CORRECT', retro: false, why: 'settled' },
+      })
+      expect((r as { detail: { score: number } }).detail.score).toBeCloseTo(0.899, 2)
+      const prompt = vi.mocked(llmService.generateContent).mock.calls[0][0].prompt
+      expect(prompt).toContain(`[1] asked ${near.createdAt.toISOString().slice(0, 10)}: ${near.claimText}`)
+      expect(prompt).not.toContain(far.claimText)
+      expect(getOraculForecast).not.toHaveBeenCalled()
+    })
+
     it('saves the draft, its frozen evidence and its vector on apply, then refuses the same event again', async () => {
       await makePrediction() // a forecast with no vector is not a duplicate
       vi.mocked(searchNewsBefore).mockResolvedValue([article('https://x.com/1', -20), article('https://y.com/2', -18), article('https://z.com/3', -16)])
+      vi.mocked(llmService.generateContent).mockResolvedValue({ text: JSON.stringify({ articles: verdicts(3), sameEventAs: 0, reason: 'all on topic' }) })
       vi.mocked(getOraculForecast).mockResolvedValue({
         logId: 'log-1',
         forecast: {
@@ -131,8 +162,9 @@ describe('retro generator SQL against Postgres (daatan#2217)', () => {
       const saved = await prisma.prediction.findUniqueOrThrow({ where: { id }, include: { author: true, retroSimulation: true } })
       expect(saved).toMatchObject({ status: 'PENDING_APPROVAL', isPublic: false, source: 'retro_simulation', author: { email: 'retro_sim@daatan.internal', isBot: true } })
       expect(saved.retroSimulation).toMatchObject({ eventUrl: 'https://b.com/2', oraculProbability: 0.6, articlesUsed: 3, outcome: 'correct' })
-      const evidence = saved.retroSimulation?.evidence as { sent: Array<{ url: string }>; reports: unknown[] }
+      const evidence = saved.retroSimulation?.evidence as { sent: Array<{ url: string }>; reports: unknown[]; check: unknown }
       expect(evidence.sent.map((a) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
+      expect(evidence.check).toMatchObject({ offTopic: [], reason: 'all on topic', modelNote: null })
       expect(evidence.reports).toHaveLength(2)
       const [{ has }] = await prisma.$queryRawUnsafe<Array<{ has: boolean }>>(`SELECT embedding IS NOT NULL AS has FROM predictions WHERE id = $1`, id)
       expect(has).toBe(true)
