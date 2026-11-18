@@ -4,6 +4,7 @@ Each report is one sentence a reader extracted from an article, with the article
 
 Step 1. kind: pick exactly one.
 - "event": most reports say that one specific thing happened at a specific time: a decision, vote, appointment, resignation, strike, attack, signed deal, court ruling, launch, official announcement or published figure.
+- "routine": one specific thing happened, as for "event", but it is one more of a kind that recurs as a matter of course, or something nobody could have seen coming a week before: another prisoner swap, another missile, drone or shelling attack on a city or its infrastructure (even a heavy one, or on a new target), another call or meeting in a running series, another launch or test; an earthquake, a crash, a fire. Pick "event" for such a thing only when something about this one was distinct and known in advance: the talks, summit, vote or deadline it was tied to, or that it set a record ("the largest since …").
 - "trend": a gradual change or a running state over a period, with no single moment it happened: prices falling for days, fund flows, polls drifting, a war or a negotiation going on.
 - "not_yet": the reports say it is scheduled, planned, expected or threatened, but not that it has happened.
 - "mixed": the reports describe different events that only share a topic or actors.
@@ -16,9 +17,14 @@ Step 2. The event (kind "event" only).
 - eventIndex: the number of the report that most directly confirms that it happened.
 
 Step 3. The forecast question (kind "event" only), as someone would have asked it a week before the event.
-- claim: one declarative sentence in the future tense that the event makes true, ending with "by {DEADLINE}". Write the literal token {DEADLINE}; the date is filled in later. Example: "Israel's President will task Gadi Eisenkot with forming the next government by {DEADLINE}."
-- Name the actors and the action as plainly as the reports do. Keep only what someone could have asked in advance: no figures, vote counts, margins or details that only the outcome revealed, and no hint that it happened.
-- Ask about the event itself and nothing weaker: if the event was an official decision, ask about the decision, not about talks or reports of it.
+- claim: one declarative sentence in the future tense that the event makes true, ending with "by {DEADLINE}". Write the literal token {DEADLINE}; the date is filled in later. Example: "Israel's President will task Gadi Eisenkot with forming the next government by {DEADLINE}." When the event was a refusal, a rejection or something withheld that someone announced or carried out, the claim says so ("United Torah Judaism will decline to recommend a candidate …"); never ask about its opposite. Never write a claim that comes true merely because nothing happened by {DEADLINE} ("will not form", "will not be signed"); warnings, doubts, setbacks and talks that ended with no result are kind "other".
+- Ask at the level of detail that people argued about before the event, no finer and no coarser. A finer question is a lottery nobody could call; a coarser one would have come true anyway.
+- Time: never the exact day. When the day was set in advance (an election, a scheduled vote, a summit, a deadline), ask about that occasion: "at the talks in Abu Dhabi", "in the Knesset vote on the Speaker".
+- Figures: never a count, amount or measure that the outcome revealed: how many votes, signatures, seats, prisoners, casualties or targets ("two bridges"), a magnitude, a price. Keep a threshold only when the line matters by itself, such as a majority, a quorum or a record, or when the reports say that number was expected or announced beforehand. Never pick a threshold that sits just under the outcome.
+- Place and actors: name them as plainly as the reports do, at the level the matter was argued about: the country, city or institution rather than the exact spot, and a person only as one of the known sides or contenders.
+- Form: ask about the decisive act, not its packaging ("an interim final rule", "with missiles", "a formal request"), unless the form itself was in dispute.
+- A repeat with a distinct occasion: tie the question to that occasion or say "a new" or "another", so that an earlier one does not count.
+- Ask about the event itself and nothing weaker: if the event was an official decision, ask about the decision, not about talks or reports of it. Give no hint that it happened.
 - resolutionRules: two or three sentences. Say what counts as YES (the event as it actually happened, by {DEADLINE}, per official sources or credible news reports), and that the forecast resolves NO otherwise.
 
 reason: one short sentence on why you chose this kind.

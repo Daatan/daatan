@@ -43,10 +43,24 @@ and the claim, or the skip reason.
 - **Filters.** At least `minSources` outlets (default 2); clusters whose articles are mostly
   (≥ 50 %) already behind a retro row are dropped; the largest `maxClusters` (default 40) go on.
 - **Judge.** The `retro-event-judge` prompt (stage `retro_event_judge`, temperature 0) reads up
-  to 20 reports and returns a kind (`event`, `trend`, `not_yet`, `mixed`, `other`). For an event
-  it gives the day, the report that confirms it and a future-tense claim ending in a literal
-  `{DEADLINE}` token, with its resolution rules. Anything but a dated single past event is
-  skipped with a reason.
+  to 20 reports and returns a kind (`event`, `routine`, `trend`, `not_yet`, `mixed`, `other`).
+  For an event it gives the day, the report that confirms it and a future-tense claim ending in
+  a literal `{DEADLINE}` token, with its resolution rules. Anything but a dated single past event
+  is skipped with a reason (`not_event:<kind>`).
+- **How precise the question is** (v2, #2237). The page asks who foresaw an event, so the
+  question is asked at the level of detail people argued about before it: finer is a lottery
+  nobody could call, coarser would have come true anyway, and either way the board stops telling
+  sources apart. Never the exact day (a day set in advance becomes the occasion: "at the talks in
+  Abu Dhabi"); never the exact figure (a threshold only when the line matters by itself — a
+  majority, a quorum, a record — or the number was expected beforehand); the place and actors at
+  the level they were argued about; the decisive act, not its packaging. A refusal that someone
+  announced stays a refusal ("will decline to recommend"), but no claim may come true merely
+  because nothing happened by the deadline: warnings, setbacks and talks that ended with no result
+  are `other`. A repeat of a recurring kind (another prisoner swap, strike, call in a series,
+  launch) or a thing nobody could see a week ahead (an earthquake, a crash) is `routine` and
+  skipped, unless something distinct was known in advance — then the question is tied to that
+  occasion or says "a new …", so an earlier one does not settle it. The judge sees only the
+  reports, so a repeat they don't call one (a Witkoff–Putin meeting) still passes as `event`.
 - **Same-event fold.** One big story splits across clusters: on 2026-11-16's pool, "Herzog
   tasked Eisenkot" came out of 8. Judged claims at cosine ≥ **0.95** (`SAME_EVENT_MIN_SCORE`) are
   folded into the member with the most outlets, and their reports are pooled. Without the fold a
