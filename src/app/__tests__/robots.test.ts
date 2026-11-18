@@ -26,6 +26,8 @@ describe('robots.txt disallow rules', () => {
   it('still blocks the create-flow pages themselves', async () => {
     expect(await blocked('/forecasts/new')).toBe(true)
     expect(await blocked('/forecasts/express')).toBe(true)
+    expect(await blocked('/forecasts/new?ref=nav')).toBe(true)
+    expect(await blocked('/forecasts/express?topic=x')).toBe(true)
     expect(await blocked('/create')).toBe(true)
     expect(await blocked('/forecasts/some-forecast/edit')).toBe(true)
   })
