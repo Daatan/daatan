@@ -275,6 +275,10 @@ export interface OracleSource {
   /** Credibility weight from the leaderboard; 1.0 = neutral. */
   credibility_weight: number
   claims: string[]
+  /** The Oracul's date for the article (YYYY-MM-DD); drives `recency_weight`. */
+  published_date?: string | null
+  /** Time-decay factor of this source's pooling weight, relative to the request's as-of date. */
+  recency_weight?: number | null
   /** True when this source reports the event's outcome as an accomplished fact. */
   settled?: boolean | null
   /** Explicit modeled/poll/market probability this source cited for the event
@@ -684,6 +688,10 @@ export const getOraculForecast = async (
      *  stronger model without reaching the gatekeeper or settlement paths, which
      *  retro deliberately keeps unaffected by this field. */
     model?: string
+    /** retro#1077: answer as of this past date instead of today (a retro simulation,
+     *  daatan#2217). The Oracul requires `articles` with it, already filtered to before
+     *  this date: its own search is not date-bounded. Sent as `as_of: YYYY-MM-DD`. */
+    asOf?: Date
   } & ClaimMeta,
   meta: OracleCallMeta = { source: 'other' },
 ): Promise<OracleForecastResult> => {
@@ -702,6 +710,7 @@ export const getOraculForecast = async (
         question,
         max_articles: DEFAULT_MAX_ARTICLES,
         ...(options?.model ? { model: options.model } : {}),
+        ...(options?.asOf ? { as_of: options.asOf.toISOString().slice(0, 10) } : {}),
         // Log correlation only (retro #273) — lets gate_reused log lines join
         // directly to a context_snapshots row instead of by timestamp.
         ...(meta.predictionId ? { prediction_id: meta.predictionId } : {}),

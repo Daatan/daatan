@@ -78,3 +78,40 @@ export const backfillTemporalBodySchema = z.object({
 
 /** news-indexer author admin proxies: the body is forwarded as-is, upstream owns the field checks. */
 export const forwardedObjectBodySchema = z.object({}).passthrough()
+
+/** POST /api/admin/retro/candidates (daatan#2217). Every field optional: `{}` runs the weekly defaults. */
+export const retroCandidatesBodySchema = z.object({
+  days: z.number().int().min(1).max(14).optional(),
+  threshold: z.number().min(0.8).max(0.95).optional(),
+  minSources: z.number().int().min(2).max(10).optional(),
+  maxClusters: z.number().int().min(1).max(80).optional(),
+})
+
+const retroPoolReportSchema = z.object({
+  url: z.string().min(1).max(2000),
+  source: z.string().max(200).nullable(),
+  publishedDate: z.string().max(64).nullable(),
+  claim: z.string().min(1).max(2000),
+  quote: z.string().max(1000).nullable(),
+})
+
+/** POST /api/admin/retro/simulate: one candidate from the candidates route, passed through. */
+export const retroSimulateBodySchema = z
+  .object({
+    reports: z.array(retroPoolReportSchema).min(2).max(20),
+    event: z.object({
+      summary: z.string().min(1).max(1000),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'event.date must be YYYY-MM-DD'),
+      url: z.string().min(1).max(2000),
+      reason: z.string().max(1000).optional(),
+    }),
+    claimTemplate: z.string().min(1).max(600),
+    rulesTemplate: z.string().min(1).max(3000),
+    mode: runMode.optional(),
+    minSimilarity: z.number().min(0.3).max(0.95).optional(),
+    dupThreshold: z.number().min(0.8).max(0.99).optional(),
+  })
+  .refine((b) => b.reports.some((r) => r.url === b.event.url), {
+    message: 'event.url must be one of the reports',
+    path: ['event', 'url'],
+  })

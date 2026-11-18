@@ -259,3 +259,42 @@ export const claimDefinednessSchema: Schema = {
   },
   required: ['splitOutcome', 'splitChance', 'readerShare', 'fault', 'term', 'question', 'options'],
 }
+
+/** daatan#2217: whether a cluster of pool reports is one past event, and the forecast it settles. */
+export const retroEventJudgeSchema: Schema = {
+  description: 'Whether grouped news reports describe one discrete past event, and the forecast question it settles',
+  type: SchemaType.OBJECT,
+  properties: {
+    kind: {
+      type: SchemaType.STRING,
+      format: 'enum',
+      enum: ['event', 'trend', 'not_yet', 'mixed', 'other'],
+      description: 'event, trend, not_yet, mixed, or other.',
+    },
+    reason: {
+      type: SchemaType.STRING,
+      description: 'One short sentence on why this kind.',
+    },
+    eventSummary: {
+      type: SchemaType.STRING,
+      description: 'One past-tense sentence: who did what. Empty unless kind is event.',
+    },
+    eventDate: {
+      type: SchemaType.STRING,
+      description: 'The day the event happened, YYYY-MM-DD. Empty when it cannot be told, or unless kind is event.',
+    },
+    eventIndex: {
+      type: SchemaType.INTEGER,
+      description: 'Number of the report that most directly confirms the event happened; 0 unless kind is event.',
+    },
+    claim: {
+      type: SchemaType.STRING,
+      description: 'Future-tense declarative forecast the event makes true, ending with "by {DEADLINE}". Empty unless kind is event.',
+    },
+    resolutionRules: {
+      type: SchemaType.STRING,
+      description: 'Two or three sentences: what counts as YES by {DEADLINE}, and NO otherwise. Empty unless kind is event.',
+    },
+  },
+  required: ['kind', 'reason', 'eventSummary', 'eventDate', 'eventIndex', 'claim', 'resolutionRules'],
+}

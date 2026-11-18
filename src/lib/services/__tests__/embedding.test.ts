@@ -12,7 +12,7 @@ vi.mock('@/lib/services/google-auth', () => ({
   googleAccessToken: vi.fn(async () => 'ya29.test-token'),
 }))
 
-import { embedText, embedAndStoreForecast, embedAndStoreExternalMarket } from '../embedding'
+import { embedText, embedTexts, embedAndStoreForecast, embedAndStoreExternalMarket } from '../embedding'
 import { prisma } from '@/lib/prisma'
 
 const FAKE_768 = Array.from({ length: 768 }, (_, i) => i / 768)
@@ -270,3 +270,67 @@ describe('embedAndStoreExternalMarket', () => {
     expect(prisma.$executeRaw).not.toHaveBeenCalled()
   })
 })
+
+describe('embedTexts (daatan#2217)', () => {
+  const originalEnv = process.env.GEMINI_API_KEY
+
+  beforeEach(() => {
+    setVertexEnv()
+    process.env.GEMINI_API_KEY = 'fake-key'
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    clearVertexEnv()
+    process.env.GEMINI_API_KEY = originalEnv
+    vi.unstubAllGlobals()
+  })
+
+  function batchResponse(n: number) {
+    return new Response(JSON.stringify({ embeddings: Array.from({ length: n }, () => ({ values: FAKE_768 })) }), { status: 200 })
+  }
+
+  it('sends batches of 100 to Vertex batchEmbedContents and keeps input order', async () => {
+    vi.mocked(fetch).mockImplementation(async (_url, init) => {
+      const n = JSON.parse((init as RequestInit).body as string).requests.length
+      return batchResponse(n)
+    })
+
+    const out = await embedTexts(Array.from({ length: 250 }, (_, i) => `text ${i}`))
+
+    expect(out).toHaveLength(250)
+    expect(out.every((v) => v?.length === 768)).toBe(true)
+    const calls = vi.mocked(fetch).mock.calls
+    expect(calls.map(([url]) => String(url).endsWith('gemini-embedding-2:batchEmbedContents'))).toEqual([true, true, true])
+    const sizes = calls.map(([, init]) => JSON.parse((init as RequestInit).body as string).requests.length)
+    expect(sizes).toEqual([100, 100, 50])
+    const first = JSON.parse((calls[0][1] as RequestInit).body as string).requests[0]
+    expect(first).toEqual({ content: { parts: [{ text: 'text 0' }] }, outputDimensionality: 768 })
+  })
+
+  it('falls back to single calls for a batch Vertex refuses, leaving null where nothing embedded', async () => {
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const u = String(url)
+      if (u.includes('batchEmbedContents')) return new Response('quota', { status: 429 })
+      if (u.includes('aiplatform')) return new Response('down', { status: 503 })
+      return u.includes('generativelanguage') ? embedResponse() : new Response('', { status: 500 })
+    })
+    process.env.GEMINI_API_KEY = 'fake-key'
+
+    const out = await embedTexts(['a', 'b'])
+
+    expect(out).toEqual([FAKE_768, FAKE_768])
+  })
+
+  it('rejects a batch answer of the wrong length rather than misaligning vectors', async () => {
+    vi.mocked(fetch).mockImplementation(async (url) =>
+      String(url).includes('batchEmbedContents') ? batchResponse(1) : embedResponse(),
+    )
+
+    const out = await embedTexts(['a', 'b'])
+
+    expect(out).toEqual([FAKE_768, FAKE_768])
+    expect(vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes(':embedContent'))).toHaveLength(2)
+  })
+})
+

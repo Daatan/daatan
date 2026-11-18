@@ -1074,6 +1074,21 @@ sources leaderboard never receives it. Only the planned retro-only source board 
 `cutoff_at`. Approval resolves the forecast without a stake or `recordCalibration`. It can
 never go live: the admin status PATCH refuses `ACTIVE`/`PENDING`, unresolve refuses (409),
 the forecast PATCH refuses `isPublic: true`, and `POST .../outcome-cutoff` refuses a row for it.
+The generator (PR 2, [RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md)) also fills nullable columns
+on the row:
+
+- `event_text`, `event_date` (DATE) and `event_url` (the report that confirms the event);
+- `oracul_probability` (0..1, CHECK-constrained; the Oracul's answer as of T0);
+- `articles_used`;
+- `evidence` (JSONB, frozen at creation): the search parameters, the articles sent, the
+  Oracul's per-source stances and log id (since 2026-11-18 also each source's date and pooling
+  weight factors), the reports of the event, the judge's templates and the timeline.
+
+An approved row (prediction `RESOLVED_*`) with evidence is shown on the public `/who-foresaw`
+pages (PR 3); `src/lib/services/retro-foresaw.ts` holds that gate.
+
+Hand-made rows from PR 1 leave them NULL. A retro draft's `predictions.embedding` is stored,
+so the generator's dedupe sees it; similar-forecasts excludes retro rows.
 
 **Outcome-time cutoff (daatan#2144).** A reading scores as a prediction only if it was
 *published* before the forecast's outcome was publicly known. `prediction_outcome_cutoffs`

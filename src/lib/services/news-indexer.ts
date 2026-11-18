@@ -71,3 +71,64 @@ export function notifyNewsIndexerResolution(
     log.warn({ err }, 'news-indexer /resolve call failed')
   })
 }
+
+/** One row of news-indexer `POST /search/before` (news-indexer#542). */
+export interface NewsBeforeArticle {
+  title: string
+  url: string
+  snippet: string | null
+  source: string | null
+  language: string | null
+  /** YYYY-MM-DD */
+  published_date: string
+  /** ISO timestamp */
+  published_at: string
+  published_at_source: string | null
+  indexed_at: string
+  similarity: number
+  /** Archived body, only with `includeText`; null when the archive has none. */
+  text?: string | null
+}
+
+export interface SearchBeforeParams {
+  q: string
+  /** Exclusive bound on publication time. */
+  before: Date
+  /** Inclusive lower bound on publication time. */
+  after?: Date
+  /** Exclusive bound on ingest time: drops articles that only reached the index later. */
+  indexedBefore?: Date
+  limit: number
+  minSimilarity: number
+  includeText?: boolean
+  timeoutMs?: number
+}
+
+/**
+ * Semantic search over the whole news index, bounded to articles published before a date —
+ * the evidence a retro simulation may use (daatan#2217). Unlike `/search` it has no
+ * freshness window and no min-hits gate. Throws when news-indexer is unconfigured or refuses:
+ * the caller has no fallback that keeps the "published before T0" guarantee.
+ */
+export async function searchNewsBefore(p: SearchBeforeParams): Promise<NewsBeforeArticle[]> {
+  if (!env.NEWS_INDEXER_URL || !env.NEWS_INDEXER_API_KEY) throw new Error('news-indexer is not configured')
+  const res = await fetch(`${env.NEWS_INDEXER_URL}/search/before`, {
+    method: 'POST',
+    headers: { 'x-api-key': env.NEWS_INDEXER_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      q: p.q,
+      before: p.before.toISOString(),
+      ...(p.after ? { after: p.after.toISOString() } : {}),
+      ...(p.indexedBefore ? { indexed_before: p.indexedBefore.toISOString() } : {}),
+      limit: p.limit,
+      min_similarity: p.minSimilarity,
+      include_text: p.includeText ?? false,
+    }),
+    signal: AbortSignal.timeout(p.timeoutMs ?? 30_000),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`news-indexer /search/before ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return (await res.json()) as NewsBeforeArticle[]
+}

@@ -2242,5 +2242,33 @@
     "brier": "Brier",
     "predictions": "Predictions",
     "hint": "Each topic is scored only on its own resolved forecasts, so samples are small — read the numbers with care."
+  },
+  "whoForesaw": {
+    "meta": {
+      "title": "Who foresaw it? Recent events and the sources that called them",
+      "description": "Events that already happened, and which news sources said a week before that they would, with what the Oracul would have forecast from the same articles."
+    },
+    "title": "Who foresaw it?",
+    "subtitle": "Events that already happened, and which sources said in advance that they would.",
+    "method": "For each event, only articles published at least a week before it count. A source called it when its stance toward the event was +0.3 or more on a scale from −1 to +1, and said the opposite at −0.3 or less. The Oracul number comes from the same articles.",
+    "empty": "No events yet.",
+    "eventTitle": "Who foresaw it: {event}",
+    "eventDate": "Event: {date}",
+    "eventReport": "report",
+    "oraculShort": "Oracul a week before: {p}%",
+    "oraculLong": "On {date}, a week before, the Oracul put it at {p}%, from {count} articles published before that day.",
+    "counts": "{called} called it · {against} said the opposite · {total} sources",
+    "back": "← All events",
+    "question": "The forecast it answered: {claim}",
+    "weightNote": "The share next to each article is its part of the Oracul weight: newer, more relevant and more credible articles weigh more.",
+    "recencyNote": "The Oracul weighs newer articles more, so the latest ones moved its number most.",
+    "sections": {
+      "called": "Called it ({count})",
+      "against": "Said the opposite ({count})",
+      "neutral": "Undecided ({count})"
+    },
+    "stance": "stance {value}",
+    "weightShare": "≈{share}% of the weight",
+    "reports": "How it was confirmed"
   }
 }
