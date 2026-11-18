@@ -275,6 +275,10 @@ export interface OracleSource {
   /** Credibility weight from the leaderboard; 1.0 = neutral. */
   credibility_weight: number
   claims: string[]
+  /** The Oracul's date for the article (YYYY-MM-DD); drives `recency_weight`. */
+  published_date?: string | null
+  /** Time-decay factor of this source's pooling weight, relative to the request's as-of date. */
+  recency_weight?: number | null
   /** True when this source reports the event's outcome as an accomplished fact. */
   settled?: boolean | null
   /** Explicit modeled/poll/market probability this source cited for the event

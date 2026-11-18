@@ -1081,8 +1081,11 @@ on the row:
 - `oracul_probability` (0..1, CHECK-constrained; the Oracul's answer as of T0);
 - `articles_used`;
 - `evidence` (JSONB, frozen at creation): the search parameters, the articles sent, the
-  Oracul's per-source stances and log id, the reports of the event, the judge's templates and
-  the timeline.
+  Oracul's per-source stances and log id (since 2026-11-18 also each source's date and pooling
+  weight factors), the reports of the event, the judge's templates and the timeline.
+
+An approved row (prediction `RESOLVED_*`) with evidence is shown on the public `/who-foresaw`
+pages (PR 3); `src/lib/services/retro-foresaw.ts` holds that gate.
 
 Hand-made rows from PR 1 leave them NULL. A retro draft's `predictions.embedding` is stored,
 so the generator's dedupe sees it; similar-forecasts excludes retro rows.

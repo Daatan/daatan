@@ -4,12 +4,13 @@ A retro simulation answers: **"what would the Oracul have said a week before thi
 for a real event that no forecast asked about. Each one is a private forecast draft
 (`source = 'retro_simulation'`) with a `retro_simulations` row that freezes the Oracul's
 answer as of T0, the articles it read and the reports of the event. Approving the draft
-resolves it (see [BOT_APPROVAL_WORKFLOW.md](BOT_APPROVAL_WORKFLOW.md)). Nothing here is
+resolves it (see [BOT_APPROVAL_WORKFLOW.md](BOT_APPROVAL_WORKFLOW.md)) and puts the event on
+the public "Who foresaw X?" pages (see [Public pages](#public-pages)). The forecast itself is never
 published, staked, notified or fed into user scoring or the calibration record.
 
 Issue: [daatan#2217](https://github.com/Daatan/daatan/issues/2217). Decisions (Mark,
 2026-11-16/17): the drafts feed an event-centric "Who foresaw X?" page and a retro-only source
-board (planned, PRs 3–4), never the main leaderboard; the generator runs by hand, weekly; an
+board (PR 3 shipped the pages; the board is PR 4), never the main leaderboard; the generator runs by hand, weekly; an
 event needs at least three articles published before T0 (two until 2026-11-18, see step 4); the Oracul and the page see the same
 article set.
 
@@ -108,12 +109,39 @@ or more than 30 days before the first report (background, not this week's news).
    `outcome = correct` and an `evidence` JSON:
    - the search parameters;
    - the articles sent;
-   - the Oracul's per-source stances and log id;
+   - the Oracul's per-source stances and log id, and since 2026-11-18 each source's date and the
+     four factors of its pooling weight (`credibilityWeight`, `evidenceWeight`, `recencyWeight`,
+     `relevanceScore`) plus `isOccurrence`;
    - the reports;
    - the judge's templates;
    - the timeline.
 
    The claim's embedding is stored, so the next run's dedupe sees it.
+
+## Public pages
+
+`/who-foresaw` (the hub) lists every approved event, newest first. Each event has a page at
+`/who-foresaw/<slug>`. The read side is `src/lib/services/retro-foresaw.ts`. Its query is the
+visibility gate: a `retro_simulations` row, a `RESOLVED_CORRECT` or `RESOLVED_WRONG` prediction,
+and generator evidence. Pending and rejected (`VOID`) drafts and every other forecast 404.
+
+- **Indexing** (Mark, Q3). The hub is indexed and is in the sitemap; it is `noindex` while it
+  has no events. Event pages are `noindex, follow` and stay out of the sitemap. Neither path is
+  under `/retroanalysis`, which `robots.txt` disallows.
+- **What a page shows.** The event, its date and the report that confirmed it; the Oracul's
+  probability as of T0; the question it answered; and the articles the Oracul used, newest
+  first. Articles are split by stance toward the event: **called it** at ≥ +0.3 in the outcome's
+  direction, **said the opposite** at ≤ −0.3, **undecided** in between (Mark, 2026-11-18;
+  inclusive, since many stances sit exactly on ±0.3). The event reports are listed separately as
+  the confirmation, never among the pre-T0 articles.
+- **Which article carried the number.** When the weight factors are stored, each article shows
+  its share of the Oracul's pooling weight: credibility × evidence × recency × relevance². The
+  relevance band table in retro `aggregation.relevance_weight` equals the square. The share is
+  approximate: cluster down-weighting and the per-source share cap are not in the stored factors.
+  The six events approved on 2026-11-18 were generated before the factors were stored, and the
+  Oracul's response isn't kept anywhere else (`oracle_call_logs` holds no body), so their pages
+  show a note that newer articles count more instead.
+- **Self-hosted installs** 404 on both routes.
 
 ## Running it
 
@@ -139,5 +167,8 @@ indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` a
   Both are rejected at approval until #2229 adds a per-event check.
 - **Runs differ.** Candidates and P are re-drawn every run (the third carrier: 75%, 67% and 81%
   in three runs), so review the drafts an apply wrote, not the dry run before it.
+- **A page can look self-contradictory.** Bab el-Mandeb: 1 article called it and 8 said the
+  opposite, yet the Oracul gave 66%, because the newest article (Guardian, 11-05) carried the
+  most weight. The page's recency note explains it; the weight share shows it for new events.
 - **Negative or trivial events.** For example, "talks will end without a breakthrough". These
   are left to the approval gate.

@@ -184,6 +184,16 @@ function frozenEvidence(
         certainty: s.certainty,
         evidenceClass: s.evidence_class ?? null,
         settled: s.settled ?? null,
+        isOccurrence: s.is_occurrence ?? null,
+        // The Oracul's date for the article, and the four factors its pooling weight multiplies
+        // (credibility × evidence × recency × relevance band). Stored raw, so the "Who foresaw X?"
+        // page can show which articles carried the number (daatan#2217 PR 3). Rows made before
+        // 2026-11-18 don't have them, and a re-run can't recover them: it gives a different P.
+        publishedDate: s.published_date ?? null,
+        credibilityWeight: s.credibility_weight ?? null,
+        evidenceWeight: s.evidence_weight ?? null,
+        recencyWeight: s.recency_weight ?? null,
+        relevanceScore: s.relevance_score ?? null,
         claims: s.claims.slice(0, 3).map((c) => c.slice(0, 300)),
       })),
     },

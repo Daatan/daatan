@@ -27,4 +27,10 @@ describe('sitemap static routes (daatan#2057)', () => {
     expect(list).toEqual(expect.arrayContaining(['https://daatan.com/privacy', 'https://daatan.com/terms', 'https://daatan.com/disclaimer']))
     expect(list.filter((u) => /\/(he|ru)\/(privacy|terms|disclaimer)$/.test(u))).toEqual([])
   })
+
+  it('lists the "Who foresaw X?" hub but none of its noindex event pages (daatan#2217)', async () => {
+    const list = await urls()
+    expect(list).toContain('https://daatan.com/who-foresaw')
+    expect(list.filter((u) => u.includes('/who-foresaw/'))).toEqual([])
+  })
 })

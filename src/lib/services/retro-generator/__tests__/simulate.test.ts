@@ -41,7 +41,10 @@ const article = (url: string, published_at: string, text: string | null = 'body'
 })
 const forecast = {
   mean: 0.2, articles_used: 3, std: 0.1, ci_low: 0, ci_high: 0.4, placeholder: false, question: claimText,
-  sources: [{ source_id: 's', source_name: 'x.com', url: 'https://x.com/1', stance: 0.4, certainty: 0.8, credibility_weight: 1, claims: ['c'] }],
+  sources: [{
+    source_id: 's', source_name: 'x.com', url: 'https://x.com/1', stance: 0.4, certainty: 0.8, credibility_weight: 1.2, claims: ['c'],
+    published_date: '2026-11-01', recency_weight: 0.5, evidence_weight: 0.9, relevance_score: 0.75, is_occurrence: false,
+  }],
 } as OracleForecastResponse
 
 describe('simulateRetroEvent', () => {
@@ -150,7 +153,10 @@ describe('simulateRetroEvent', () => {
       articlesUsed: 3,
     })
     expect(retro.evidence.sent.map((a: { url: string }) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
-    expect(retro.evidence.oracul.sources[0]).toMatchObject({ url: 'https://x.com/1', stance: 0.4 })
+    expect(retro.evidence.oracul.sources[0]).toMatchObject({
+      url: 'https://x.com/1', stance: 0.4, isOccurrence: false, publishedDate: '2026-11-01',
+      credibilityWeight: 1.2, evidenceWeight: 0.9, recencyWeight: 0.5, relevanceScore: 0.75,
+    })
     expect(retro.evidence.reports).toHaveLength(2)
     expect(storeForecastEmbedding).toHaveBeenCalledWith('new', [0.1, 0.2])
   })

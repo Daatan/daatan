@@ -140,6 +140,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/leaderboard', lastModified: new Date(),           frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/activity', lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/tags',     lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.6, localized: false },
+    // "Who foresaw X?" hub (daatan#2217); its event pages are noindex and stay out of the sitemap.
+    { route: '/who-foresaw', lastModified: new Date(),           frequency: 'weekly'  as const, priority: 0.6, localized: false },
     // Legal pages render English under /he and /ru and canonical to the EN page until they are
     // translated (legal review, #1934), so no locale entries or hreflang (daatan#2057).
     { route: '/privacy',     lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.3, localized: false },
