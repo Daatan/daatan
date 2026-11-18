@@ -50,7 +50,7 @@ function VoterRow({
 
   return (
     <div className={`p-3 rounded-lg ${isCurrentUser ? 'bg-blue-900/10 border border-blue-800/30' : 'bg-navy-800/40'}`}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         {commitment.user ? (
         <UserLink
           userId={commitment.user.id}
@@ -59,6 +59,7 @@ function VoterRow({
           image={commitment.user.image}
           showAvatar={true}
           avatarSize={28}
+          className="min-w-0"
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="font-medium text-white text-sm truncate">{commitment.user.name}</span>
@@ -281,16 +282,17 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
                   image={commitment.user.image}
                   showAvatar={true}
                   avatarSize={32}
+                  className="min-w-0"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-white">{commitment.user.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-white truncate">{commitment.user.name}</span>
                     {isCurrentUser && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50">
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50 shrink-0">
                         {t('youBadge')}
                       </span>
                     )}
                     {commitment.user.id === authorId && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300/90 border border-amber-700/40 uppercase tracking-wide">
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300/90 border border-amber-700/40 uppercase tracking-wide shrink-0">
                         {t('author')}
                       </span>
                     )}
