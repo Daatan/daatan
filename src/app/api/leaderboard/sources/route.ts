@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const view: SourceLeaderboardView = searchParams.get('view') === 'outlets' ? 'outlets' : 'authors'
-    const sortBy: SourceSortBy = searchParams.get('sortBy') === 'brierScore' ? 'brierScore' : 'skillConservative'
+    const sortParam = searchParams.get('sortBy')
+    const sortBy: SourceSortBy = sortParam === 'brierScore' || sortParam === 'sideRate' ? sortParam : 'skillConservative'
     const tag = searchParams.get('tag')?.slice(0, 80) || null
     const leaderboard = await getCachedSourceLeaderboard(view, sortBy, tag)
     return NextResponse.json(leaderboard)

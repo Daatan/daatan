@@ -1,7 +1,15 @@
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { createLogger } from '@/lib/logger'
 import { getAuthorShadowLeaderboard, type OracleAuthorShadowEntry } from '@/lib/services/oracle'
+import { compareSideRate } from '@/lib/utils/side-rate'
+
+const log = createLogger('source-leaderboard')
 
 export type SourceLeaderboardView = 'authors' | 'outlets'
-export type SourceSortBy = 'skillConservative' | 'brierScore'
+/** `sideRate` (daatan#2231) orders author rows by sideTaken/sideTotal; outlet rows have no such
+ *  counts and keep the default order under it. */
+export type SourceSortBy = 'skillConservative' | 'brierScore' | 'sideRate'
 
 export interface AuthorLeaderboardRow {
   id: string
@@ -14,6 +22,13 @@ export interface AuthorLeaderboardRow {
   /** A newsroom/agency byline ("JPOST EDITORIAL", "Reuters", the outlet's own name), not a
    *  person: listed with a desk badge and left out of the outlet's people count (#1904 item 3). */
   isDesk?: boolean
+  /** "Takes a side" (daatan#2231): of `sideTotal` public forecasts this byline wrote about at this
+   *  outlet (current, non-excluded, COMPLETE pool rows, joint bylines credited to each person;
+   *  the board's tag when set), how many had
+   *  the author's own non-zero `author_lean`. Null for desk bylines and when no pool row matched;
+   *  absent unless the caller asked for them (`getSourceLeaderboard`'s `sideCounts`). */
+  sideTaken?: number | null
+  sideTotal?: number | null
 }
 
 export interface OutletLeaderboardRow {
@@ -264,14 +279,99 @@ export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string
   )
 }
 
-/** skillConservative is higher-is-better; brierScore is lower-is-better. */
-function sortRows<T extends { skillConservative: number; brierScore: number }>(
+/** skillConservative is higher-is-better; brierScore is lower-is-better; sideRate puts rows
+ *  without counts last and falls back to skill among them. */
+function sortRows<T extends { skillConservative: number; brierScore: number; sideTaken?: number | null; sideTotal?: number | null }>(
   rows: T[],
   sortBy: SourceSortBy,
 ): T[] {
   return [...rows].sort((a, b) =>
-    sortBy === 'brierScore' ? a.brierScore - b.brierScore : b.skillConservative - a.skillConservative,
+    sortBy === 'brierScore'
+      ? a.brierScore - b.brierScore
+      : sortBy === 'sideRate'
+        ? compareSideRate(a, b) || b.skillConservative - a.skillConservative
+        : b.skillConservative - a.skillConservative,
   )
+}
+
+interface PoolBylineGroup {
+  author: string | null
+  person_name: string | null
+  outlet: string
+  predictions: string[]
+  leaning: string[] | null
+}
+
+const bylineKey = (outlet: string, author: string) => `${canonicalOutlet(outlet)}\u0000${authorKey(author)}`
+
+/**
+ * Attach "takes a side" counts (daatan#2231) to merged author rows. One aggregate over the
+ * current pool, bounded to the rows' outlets (and their alias hostnames); byline and outlet
+ * identity is then folded here with the same `authorKey`/`canonicalOutlet` the merge uses, so
+ * a forecast seen under two spellings or hostnames counts once. A pool row matches a board row
+ * when `personName ?? author` or `author` names it and `outletName ?? source` is its outlet —
+ * the pair `pushCredibilityFeedback` sends retro as `author_signals`. A joint byline names each
+ * of its people, split by `bylinePeople` exactly as the board splits its own joint rows. Retro
+ * groups bylines through news-indexer's person map, so an unmapped spelling can miss.
+ *
+ * Only public forecasts count: `isPublic`, not DRAFT or PENDING_APPROVAL, and not retro
+ * simulations (a `retro_simulations` row, the test `pushCredibilityFeedback` uses to keep them
+ * out of the ledger). Computed here rather than in retro: retro only sees resolved forecasts, and only
+ * rows that already have a lean.
+ */
+async function attachSideCounts(rows: AuthorLeaderboardRow[], tag?: string): Promise<AuthorLeaderboardRow[]> {
+  const eligible = rows.filter(r => !r.isDesk && !isPlaceholderAuthor(r.author) && r.outletName?.trim())
+  if (eligible.length === 0) return rows.map(r => ({ ...r, sideTaken: null, sideTotal: null }))
+
+  const canonical = new Set(eligible.map(r => canonicalOutlet(r.outletName)))
+  const outlets = [
+    ...canonical,
+    ...Object.keys(OUTLET_ALIASES).filter(variant => canonical.has(OUTLET_ALIASES[variant])),
+  ]
+
+  const groups = await prisma.$queryRaw<PoolBylineGroup[]>(Prisma.sql`
+    SELECT e.author,
+           e.person_name,
+           COALESCE(e.outlet_name, e.source) AS outlet,
+           array_agg(DISTINCT e."predictionId") AS predictions,
+           array_agg(DISTINCT e."predictionId") FILTER (WHERE e.author_lean <> 0) AS leaning
+    FROM evidence_pool_articles e
+    JOIN predictions p ON p.id = e."predictionId"
+    WHERE e.superseded_at IS NULL
+      AND e.excluded = false
+      AND e.status = 'COMPLETE'
+      AND (e.author IS NOT NULL OR e.person_name IS NOT NULL)
+      AND COALESCE(e.outlet_name, e.source) = ANY(${outlets})
+      AND p."isPublic" = true
+      AND p.status NOT IN ('DRAFT', 'PENDING_APPROVAL')
+      AND NOT EXISTS (SELECT 1 FROM retro_simulations r WHERE r.prediction_id = e."predictionId")
+      ${tag ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "_PredictionToTag" pt JOIN tags t ON t.id = pt."B"
+        WHERE pt."A" = e."predictionId" AND t.slug = ${tag}
+      )` : Prisma.empty}
+    GROUP BY 1, 2, 3
+  `)
+
+  const isEligible = new Set(eligible)
+  const tally = new Map<string, { total: Set<string>; taken: Set<string> }>(
+    eligible.map(r => [bylineKey(r.outletName, r.author), { total: new Set(), taken: new Set() }]),
+  )
+  for (const g of groups) {
+    const people = [g.person_name ?? g.author, g.author].flatMap(b => (b ? bylinePeople(b) : []))
+    for (const key of new Set(people.map(name => bylineKey(g.outlet, name)))) {
+      const t = tally.get(key)
+      if (!t) continue
+      for (const id of g.predictions) t.total.add(id)
+      for (const id of g.leaning ?? []) t.taken.add(id)
+    }
+  }
+
+  return rows.map(r => {
+    const t = isEligible.has(r) ? tally.get(bylineKey(r.outletName, r.author)) : undefined
+    return t && t.total.size > 0
+      ? { ...r, sideTaken: t.taken.size, sideTotal: t.total.size }
+      : { ...r, sideTaken: null, sideTotal: null }
+  })
 }
 
 /**
@@ -296,13 +396,15 @@ export async function getSourceLeaderboard(
   sortBy: SourceSortBy = 'skillConservative',
   minPredictions = 0,
   tag?: string,
+  options: { sideCounts?: boolean } = {},
 ): Promise<SourceLeaderboardResult> {
   const data = await getAuthorShadowLeaderboard(undefined, tag)
   const entries = data?.authors ?? []
 
-  const allAuthors = sortRows(mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow))), sortBy)
+  const allAuthors = mergeAuthorRows(expandJointBylines(entries.map(toAuthorRow)))
   const allOutlets = sortRows(aggregateByOutlet(entries), sortBy)
-  const authorRows = allAuthors.filter(r => r.predictions >= minPredictions)
+  const shownAuthors = allAuthors.filter(r => r.predictions >= minPredictions)
+  const authorRows = sortRows(options.sideCounts ? await sideCountsOrNull(shownAuthors, tag) : shownAuthors, sortBy)
   const outletRows = allOutlets.filter(r => r.predictions >= minPredictions)
 
   return {
@@ -313,6 +415,16 @@ export async function getSourceLeaderboard(
     minPredictions,
     hiddenAuthors: allAuthors.length - authorRows.length,
     hiddenOutlets: allOutlets.length - outletRows.length,
+  }
+}
+
+/** The board stays up when the pool query fails; the column just reads empty. */
+async function sideCountsOrNull(rows: AuthorLeaderboardRow[], tag?: string): Promise<AuthorLeaderboardRow[]> {
+  try {
+    return await attachSideCounts(rows, tag)
+  } catch (err) {
+    log.error({ err, tag }, 'event=side_counts_failed')
+    return rows.map(r => ({ ...r, sideTaken: null, sideTotal: null }))
   }
 }
 

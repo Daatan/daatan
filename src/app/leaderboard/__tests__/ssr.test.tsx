@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 
+const nav = vi.hoisted(() => ({ params: new URLSearchParams() }))
 vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/leaderboard',
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => nav.params,
 }))
 
 import LeaderboardClient from '../LeaderboardClient'
@@ -44,6 +45,33 @@ describe('leaderboard server render', () => {
       />,
     )
     expect(html).toContain('href="/sources/Haaretz"')
+    expect(html).not.toContain('sideRate')
+  })
+
+  // #2231: the server render sorts by the URL's `sort`, so `sort=side` needs no server sortBy.
+  it('renders the authors "takes a side" column and sorts by it from the URL', () => {
+    const author = (author: string, sideTaken: number | null, sideTotal: number | null, skillConservative = 0) => ({
+      id: author, author, outletName: 'x.com', skillConservative, brierScore: 0.2, predictions: 9, articles: 9, sideTaken, sideTotal,
+    })
+    const rows = [author('Hedger', 1, 10, 0.9), author('Unknown', null, null, 0.8), author('Sider', 3, 4), author('Sider Big', 6, 8)]
+    const render = (query: string) => {
+      nav.params = new URLSearchParams(query)
+      return renderToString(
+        <SourceLeaderboardClient authorRows={rows} outletRows={[]} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+      )
+    }
+    const order = (html: string) => ['Sider Big', 'Sider', 'Hedger', 'Unknown'].sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+    try {
+      const bySide = render('view=authors&sort=side')
+      expect(bySide).toContain('sideRate')
+      expect(bySide).toContain('6/8')
+      expect(bySide).toContain('—')
+      expect(order(bySide)).toEqual(['Sider Big', 'Sider', 'Hedger', 'Unknown'])
+      expect(order(render('view=authors&sort=side&dir=asc'))).toEqual(['Hedger', 'Sider', 'Sider Big', 'Unknown'])
+      expect(order(render('view=authors'))).toEqual(['Hedger', 'Unknown', 'Sider', 'Sider Big'])
+    } finally {
+      nav.params = new URLSearchParams()
+    }
   })
 })
 

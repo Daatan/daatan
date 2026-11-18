@@ -1210,7 +1210,8 @@
     },
     "sortBy": {
       "skillConservative": "Skill",
-      "brierScore": "Brier score"
+      "brierScore": "Brier score",
+      "sideRate": "Takes a side"
     },
     "author": "Author",
     "outlet": "Outlet",
@@ -1218,6 +1219,8 @@
     "authorsCount": "{count, plural, one {# author} other {# authors}}",
     "skillConservative": "Skill",
     "brierScore": "Brier",
+    "sideRate": "Takes a side",
+    "sideRateHint": "Forecasts where this author's own directional forecast was extracted, out of all the forecasts they wrote about (resolved or not).",
     "predictions": "Predictions",
     "articles": "Articles",
     "emptyTitle": "No scored sources yet",

@@ -11,16 +11,17 @@ import type {
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import DeskBadge from '@/components/sources/DeskBadge'
+import { compareSideRate } from '@/lib/utils/side-rate'
 import { parseView } from './view'
 
 const VIEWS: SourceLeaderboardView[] = ['outlets', 'authors']
 
-type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'predictions'
+type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'side' | 'predictions'
 type SortDir = 'asc' | 'desc'
-const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'predictions']
+const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'side', 'predictions']
 /** First click on a column: text sorts A→Z, Brier lower-is-better, the rest biggest first. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
-  name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', predictions: 'desc',
+  name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', side: 'desc', predictions: 'desc',
 }
 
 /** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
@@ -50,7 +51,10 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
   // `sortBy=brierScore` is the pre-sortable-columns URL; keep old links working.
   const legacyBrier = searchParams.get('sortBy') === 'brierScore'
   const sortParam = searchParams.get('sort') as SortKey | null
-  const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam) ? sortParam : legacyBrier ? 'brier' : 'skill'
+  // "Takes a side" is an authors-only column (#2231); the outlets view keeps its default order.
+  const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam) && !(sortParam === 'side' && view === 'outlets')
+    ? sortParam
+    : legacyBrier ? 'brier' : 'skill'
   const dirParam = searchParams.get('dir')
   const dir: SortDir = dirParam === 'asc' || dirParam === 'desc' ? dirParam : DEFAULT_DIR[sort]
 
@@ -68,6 +72,8 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
         predictions: r.predictions,
+        sideTaken: null,
+        sideTotal: null,
       }))
     : authorRows.map(r => ({
         id: r.id,
@@ -79,6 +85,8 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
         predictions: r.predictions,
+        sideTaken: r.sideTaken ?? null,
+        sideTotal: r.sideTotal ?? null,
       }))
 
   const hiddenCount = view === 'outlets' ? hidden.outlets : hidden.authors
@@ -96,17 +104,21 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
           : sort === 'brier' ? r.brierScore
             : r.predictions
   const sortedRows = [...rows].sort((a, b) => {
+    if (sort === 'side') return compareSideRate(a, b, dir) || a.primary.localeCompare(b.primary)
     const av = sortValue(a)
     const bv = sortValue(b)
     const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number)
     return cmp * sign || a.primary.localeCompare(b.primary)
   })
 
-  const columns: { key: SortKey; label: string; align: 'left' | 'right'; className: string }[] = [
+  const columns: { key: SortKey; label: string; hint?: string; align: 'left' | 'right'; className: string }[] = [
     { key: 'name', label: view === 'outlets' ? t('outlet') : t('author'), align: 'left', className: 'px-2' },
     { key: 'secondary', label: view === 'outlets' ? t('authors') : t('outlet'), align: 'left', className: 'px-2' },
     { key: 'skill', label: t('skillConservative'), align: 'right', className: 'px-2' },
     { key: 'brier', label: t('brierScore'), align: 'right', className: 'px-2' },
+    ...(view === 'authors'
+      ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: 'px-2' }]
+      : []),
     { key: 'predictions', label: t('predictions'), align: 'right', className: 'px-4 sm:px-6' },
   ]
 
@@ -192,6 +204,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                           rel="nofollow"
                           href={boardHref(view, c.key, nextDir, tag)}
                           replace
+                          title={c.hint}
                           className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
                         >
                           {c.label}
@@ -219,6 +232,11 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                     <td className={`px-2 py-3 text-right font-mono font-semibold ${brierTone(row.brierScore)}`}>
                       {row.brierScore.toFixed(3)}
                     </td>
+                    {view === 'authors' && (
+                      <td className="px-2 py-3 text-right font-mono text-gray-300 whitespace-nowrap">
+                        {row.sideTotal ? `${row.sideTaken}/${row.sideTotal}` : '—'}
+                      </td>
+                    )}
                     <td className="px-4 sm:px-6 py-3 text-right text-gray-500">{row.predictions}</td>
                   </tr>
                 ))}
