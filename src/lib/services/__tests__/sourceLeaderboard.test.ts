@@ -6,12 +6,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../oracle', () => ({
   getAuthorShadowLeaderboard: vi.fn(),
 }))
+vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn() } }))
 
+import type { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { getAuthorShadowLeaderboard } from '../oracle'
 import { aggregateByOutlet, authorKey, authorsOfOutlet, bylinePeople, getSourceLeaderboard, getAuthorShadowRowsForOutlet, isDeskByline } from '../sourceLeaderboard'
 import type { OracleAuthorShadowEntry } from '../oracle'
 
 const mockGetAuthorShadowLeaderboard = vi.mocked(getAuthorShadowLeaderboard)
+const mockQueryRaw = vi.mocked(prisma.$queryRaw)
 
 function entry(overrides: Partial<OracleAuthorShadowEntry>): OracleAuthorShadowEntry {
   return {
@@ -432,5 +436,161 @@ describe('desk bylines: newsroom, agency or the outlet itself (#1904 item 3)', (
       'jpost.com',
     )
     expect(listed.map(r => r.author)).toEqual(['JPOST EDITORIAL'])
+  })
+})
+
+describe('"takes a side" counts (#2231)', () => {
+  const group = (o: { author?: string | null; person_name?: string | null; outlet: string; predictions: string[]; leaning?: string[] | null }) => ({
+    author: null, person_name: null, leaning: null, ...o,
+  })
+  const board = (tag?: string) =>
+    getSourceLeaderboard('authors', 'skillConservative', 0, tag, { sideCounts: true })
+  const lastSql = () => mockQueryRaw.mock.calls.at(-1)![0] as unknown as Prisma.Sql
+
+  beforeEach(() => {
+    mockGetAuthorShadowLeaderboard.mockReset()
+    mockQueryRaw.mockReset()
+  })
+
+  it('counts distinct forecasts matched by personName or raw byline at the same outlet', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 1, authors: [entry({ author: 'Jane Roe', outlet_name: 'janeroe.blog', predictions: 5 })] })
+    mockQueryRaw.mockResolvedValue([
+      group({ author: 'ג׳יין רו', person_name: 'Jane Roe', outlet: 'janeroe.blog', predictions: ['p1', 'p2'], leaning: ['p1'] }),
+      group({ author: 'JANE ROE', outlet: 'janeroe.blog', predictions: ['p2', 'p3'] }),
+      group({ author: 'Jane Roe', person_name: 'Someone Else', outlet: 'janeroe.blog', predictions: ['p4'], leaning: ['p4'] }),
+      group({ author: 'Jane Roe', outlet: 'other.com', predictions: ['p9'], leaning: ['p9'] }),
+      group({ author: 'John Doe', outlet: 'janeroe.blog', predictions: ['p8'], leaning: ['p8'] }),
+    ] as never)
+    const { authorRows } = await board()
+    expect(authorRows[0]).toMatchObject({ author: 'Jane Roe', sideTaken: 2, sideTotal: 4 })
+  })
+
+  it('folds alias hostnames into the merged row, and asks only for the board’s outlets', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [
+        entry({ author: 'Lior Ben Ari', outlet_name: 'ynetnews.com', predictions: 3 }),
+        entry({ author: 'ליאור בן ארי', outlet_name: 'ynet.co.il', predictions: 1 }),
+      ],
+    })
+    mockQueryRaw.mockResolvedValue([
+      group({ author: 'Lior Ben Ari', outlet: 'ynetnews.com', predictions: ['p1', 'p2'], leaning: ['p1'] }),
+      group({ author: 'ליאור בן ארי', outlet: 'ynet.co.il', predictions: ['p2', 'p3'], leaning: ['p2'] }),
+    ] as never)
+    const { authorRows } = await board()
+    expect(authorRows).toHaveLength(1)
+    expect(authorRows[0]).toMatchObject({ outletName: 'ynetnews.com', sideTaken: 2, sideTotal: 3 })
+    expect(lastSql().values[0]).toEqual(expect.arrayContaining(['ynet.co.il', 'ynetnews.com']))
+  })
+
+  it('credits a joint pool byline to each person, split the way the board splits its own rows', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 3,
+      authors: [
+        entry({ author: 'Itamar Eichner', outlet_name: 'ynet.co.il', predictions: 4 }),
+        entry({ author: 'Lior Ben Ari', outlet_name: 'ynet.co.il', predictions: 4 }),
+        entry({ author: 'Smith, John', outlet_name: 'ynet.co.il', predictions: 4 }),
+      ],
+    })
+    mockQueryRaw.mockResolvedValue([
+      group({ author: 'Itamar Eichner; Lior Ben Ari; News Agencies', outlet: 'ynet.co.il', predictions: ['p1', 'p2'], leaning: ['p1'] }),
+      group({ author: 'ליאור בן ארי, איתמר אייכנר', outlet: 'ynetnews.com', predictions: ['p2', 'p3'], leaning: ['p3'] }),
+      group({ author: 'Lior Ben Ari', person_name: 'Lior Ben Ari', outlet: 'ynet.co.il', predictions: ['p1', 'p4'] }),
+      group({ author: 'Smith, John', outlet: 'ynet.co.il', predictions: ['p5'], leaning: ['p5'] }),
+    ] as never)
+    const { authorRows } = await board()
+    const by = Object.fromEntries(authorRows.map(r => [r.author, `${r.sideTaken}/${r.sideTotal}`]))
+    // p1 and p2 reach Lior through two groups each and still count once.
+    expect(by).toEqual({ 'Itamar Eichner': '2/3', 'Lior Ben Ari': '2/4', 'Smith, John': '1/1' })
+  })
+
+  it('gives desk bylines and unmatched authors no value', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 3,
+      authors: [
+        entry({ author: 'Reuters', outlet_name: 'reuters.com', predictions: 4 }),
+        entry({ author: 'Nobody Matched', outlet_name: 'x.com', predictions: 4 }),
+        entry({ author: 'Has Rows', outlet_name: 'x.com', predictions: 4 }),
+      ],
+    })
+    mockQueryRaw.mockResolvedValue([
+      group({ author: 'Reuters', outlet: 'reuters.com', predictions: ['p1'], leaning: ['p1'] }),
+      group({ author: 'Has Rows', outlet: 'x.com', predictions: ['p1'] }),
+    ] as never)
+    const { authorRows } = await board()
+    const by = Object.fromEntries(authorRows.map(r => [r.author, [r.sideTaken, r.sideTotal]]))
+    expect(by).toEqual({ Reuters: [null, null], 'Nobody Matched': [null, null], 'Has Rows': [0, 1] })
+    expect(lastSql().values[0]).toEqual(['x.com'])
+  })
+
+  it('restricts to the board’s tag only when one is set', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 1, authors: [entry({ author: 'A One', outlet_name: 'x.com', predictions: 4 })] })
+    mockQueryRaw.mockResolvedValue([] as never)
+    await board('economy')
+    expect(lastSql().sql).toContain('"_PredictionToTag"')
+    expect(lastSql().values).toContain('economy')
+    await board()
+    expect(lastSql().sql).not.toContain('"_PredictionToTag"')
+  })
+
+  it('counts only public forecasts: isPublic, no drafts, none awaiting approval, no retro simulations', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 1, authors: [entry({ author: 'A One', outlet_name: 'x.com', predictions: 4 })] })
+    mockQueryRaw.mockResolvedValue([] as never)
+    await board()
+    const sql = lastSql().sql.replace(/\s+/g, ' ')
+    expect(sql).toContain('p."isPublic" = true')
+    expect(sql).toContain(`p.status NOT IN ('DRAFT', 'PENDING_APPROVAL')`)
+    expect(sql).toContain('NOT EXISTS (SELECT 1 FROM retro_simulations r WHERE r.prediction_id = e."predictionId")')
+  })
+
+  it('is only computed when asked for', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 1, authors: [entry({ author: 'A One', outlet_name: 'x.com', predictions: 4 })] })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative', 0)
+    expect(mockQueryRaw).not.toHaveBeenCalled()
+    expect(authorRows[0].sideTotal).toBeUndefined()
+  })
+
+  it('keeps the board up when the pool query fails', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({ count: 1, authors: [entry({ author: 'A One', outlet_name: 'x.com', predictions: 4 })] })
+    mockQueryRaw.mockRejectedValue(new Error('db down'))
+    const { authorRows } = await board()
+    expect(authorRows.map(r => [r.author, r.sideTaken, r.sideTotal])).toEqual([['A One', null, null]])
+  })
+
+  it('sorts by rate, ties by sample size, rows without a value last; the default sort is unchanged', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 5,
+      authors: [
+        entry({ author: 'Three Of Four', outlet_name: 'x.com', skill_conservative: 0.9 }),
+        entry({ author: 'Six Of Eight', outlet_name: 'x.com', skill_conservative: 0.1 }),
+        entry({ author: 'One Of One', outlet_name: 'x.com', skill_conservative: 0.2 }),
+        entry({ author: 'No Rows', outlet_name: 'x.com', skill_conservative: 0.8 }),
+        entry({ author: 'Zero Of Two', outlet_name: 'x.com', skill_conservative: 0.3 }),
+      ],
+    })
+    const ids = (n: number, p: string) => Array.from({ length: n }, (_, i) => `${p}${i}`)
+    mockQueryRaw.mockResolvedValue([
+      group({ author: 'Three Of Four', outlet: 'x.com', predictions: ids(4, 'a'), leaning: ids(3, 'a') }),
+      group({ author: 'Six Of Eight', outlet: 'x.com', predictions: ids(8, 'b'), leaning: ids(6, 'b') }),
+      group({ author: 'One Of One', outlet: 'x.com', predictions: ids(1, 'c'), leaning: ids(1, 'c') }),
+      group({ author: 'Zero Of Two', outlet: 'x.com', predictions: ids(2, 'd') }),
+    ] as never)
+    const bySide = await getSourceLeaderboard('authors', 'sideRate', 0, undefined, { sideCounts: true })
+    expect(bySide.authorRows.map(r => r.author)).toEqual(['One Of One', 'Six Of Eight', 'Three Of Four', 'Zero Of Two', 'No Rows'])
+    const byDefault = await getSourceLeaderboard('authors', 'skillConservative', 0, undefined, { sideCounts: true })
+    expect(byDefault.authorRows.map(r => r.author)).toEqual(['Three Of Four', 'No Rows', 'Zero Of Two', 'One Of One', 'Six Of Eight'])
+  })
+
+  it('leaves outlet rows in the default order under sideRate', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [
+        entry({ author: 'A', outlet_name: 'weak.com', skill_conservative: -0.2 }),
+        entry({ author: 'B', outlet_name: 'strong.com', skill_conservative: 0.6 }),
+      ],
+    })
+    mockQueryRaw.mockResolvedValue([] as never)
+    const { outletRows } = await getSourceLeaderboard('outlets', 'sideRate', 0, undefined, { sideCounts: true })
+    expect(outletRows.map(r => r.outletName)).toEqual(['strong.com', 'weak.com'])
   })
 })

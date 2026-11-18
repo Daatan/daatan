@@ -1210,7 +1210,8 @@
     },
     "sortBy": {
       "skillConservative": "כישורים",
-      "brierScore": "ציון Brier"
+      "brierScore": "ציון Brier",
+      "sideRate": "נוקט עמדה"
     },
     "author": "מחבר",
     "outlet": "מקור",
@@ -1218,6 +1219,8 @@
     "authorsCount": "{count, plural, one {מחבר אחד} two {# מחברים} many {# מחברים} other {# מחברים}}",
     "skillConservative": "כישורים",
     "brierScore": "Brier",
+    "sideRate": "נוקט עמדה",
+    "sideRateHint": "תחזיות שבהן חולצה התחזית הכיוונית של הכותב עצמו, מתוך כל התחזיות שעליהן כתב (שהוכרעו או לא).",
     "predictions": "תחזיות",
     "articles": "כתבות",
     "emptyTitle": "עדיין אין מקורות מדורגים",

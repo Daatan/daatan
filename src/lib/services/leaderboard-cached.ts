@@ -25,9 +25,11 @@ export const getCachedLeaderboard = unstable_cache(
 // ~10 resolutions a month, 5 left two author rows on the board.
 export const SOURCE_LEADERBOARD_MIN_PREDICTIONS = 4
 
+// The public board is the only caller that pays for the "takes a side" pool query (daatan#2231);
+// the single-row lookups and per-topic boards call getSourceLeaderboard without it.
 export const getCachedSourceLeaderboard = unstable_cache(
   async (view: SourceLeaderboardView, sortBy: SourceSortBy, tag: string | null) =>
-    getSourceLeaderboard(view, sortBy, SOURCE_LEADERBOARD_MIN_PREDICTIONS, tag ?? undefined),
+    getSourceLeaderboard(view, sortBy, SOURCE_LEADERBOARD_MIN_PREDICTIONS, tag ?? undefined, { sideCounts: true }),
   ['leaderboard-sources-api'],
   { revalidate: 300, tags: ['leaderboard-sources'] },
 )
