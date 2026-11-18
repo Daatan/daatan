@@ -147,8 +147,8 @@
     },
     "retro-event-judge": {
       "version": "v2",
-      "hash": "86b9a5f5b0a9d3f3",
-      "chars": 5007,
+      "hash": "d185f14477d88a89",
+      "chars": 5249,
       "schema": "retroEventJudgeSchema",
       "schema_hash": "fefcc8bf78590089",
       "schema_chars": 1201
