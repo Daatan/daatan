@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Activity, Loader2, TrendingUp, CheckCircle2, XCircle, CircleDot, Clock, User } from 'lucide-react'
+import { Activity, Loader2, TrendingUp, CheckCircle2, XCircle, CircleDot, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
@@ -140,11 +140,10 @@ export default function ActivityFeedPage() {
                     name={item.user.name}
                     image={item.user.image}
                     showAvatar={true}
+                    showName={false}
                     avatarSize={32}
                     className="w-10 h-10 rounded-full bg-navy-700 border-2 border-navy-600 flex items-center justify-center group-hover:border-blue-300 transition-colors"
-                  >
-                    {!item.user.image && <User className="w-5 h-5 text-gray-400" />}
-                  </UserLink>
+                  />
                 </div>
 
                 {/* Content */}

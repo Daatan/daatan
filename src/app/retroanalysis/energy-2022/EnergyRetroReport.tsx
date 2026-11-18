@@ -496,8 +496,8 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
       <button type="button" onClick={() => sortBy(k)} className="uppercase">{label}{sortK === k ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>{sub && <span className="block normal-case tracking-normal font-sans text-[11px] font-normal text-gray-500">{sub}</span>}
     </th>
   )
-  const sel = 'bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-sm text-gray-800 min-w-[150px]'
-  const lbl = 'flex flex-col gap-1 font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600'
+  const sel = 'bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-sm text-gray-800 min-w-[150px] max-w-full'
+  const lbl = 'flex flex-col gap-1 min-w-0 max-w-full font-mono text-[11px] font-medium uppercase tracking-wider text-gray-600'
 
   return (
     <>
