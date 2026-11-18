@@ -35,6 +35,7 @@ describe('validateJudgement', () => {
 
   it('skips anything that is not one dated past event', () => {
     expect(validateJudgement({ ...answer, kind: 'trend' }, reports, now)).toMatchObject({ ok: false, reason: 'not_event:trend' })
+    expect(validateJudgement({ ...answer, kind: 'routine' }, reports, now)).toMatchObject({ ok: false, reason: 'not_event:routine', kind: 'routine' })
     expect(validateJudgement({ ...answer, kind: 'whatever' }, reports, now)).toMatchObject({ ok: false, reason: 'judge_bad_kind' })
     expect(validateJudgement({ ...answer, eventIndex: 3 }, reports, now)).toMatchObject({ ok: false, reason: 'judge_bad_index' })
     expect(validateJudgement({ ...answer, claim: 'X will happen soon.' }, reports, now)).toMatchObject({ ok: false, reason: 'judge_no_deadline_token' })

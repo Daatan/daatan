@@ -146,12 +146,12 @@
       "schema_chars": 853
     },
     "retro-event-judge": {
-      "version": "v1",
-      "hash": "68ac9951de51838b",
-      "chars": 3078,
+      "version": "v2",
+      "hash": "86b9a5f5b0a9d3f3",
+      "chars": 5007,
       "schema": "retroEventJudgeSchema",
-      "schema_hash": "a29a9834fe44c0b9",
-      "schema_chars": 1182
+      "schema_hash": "fefcc8bf78590089",
+      "schema_chars": 1201
     },
     "rules-direction": {
       "version": "v1",
