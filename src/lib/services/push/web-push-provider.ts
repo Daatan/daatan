@@ -1,4 +1,4 @@
-import webpush from 'web-push'
+import * as webpush from 'web-push'
 import { createLogger } from '@/lib/logger'
 import { getAppUrl } from '@/lib/branding'
 import { isSelfHosted } from '@/lib/edition'
