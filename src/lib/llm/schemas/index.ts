@@ -268,8 +268,8 @@ export const retroEventJudgeSchema: Schema = {
     kind: {
       type: SchemaType.STRING,
       format: 'enum',
-      enum: ['event', 'trend', 'not_yet', 'mixed', 'other'],
-      description: 'event, trend, not_yet, mixed, or other.',
+      enum: ['event', 'routine', 'trend', 'not_yet', 'mixed', 'other'],
+      description: 'event, routine, trend, not_yet, mixed, or other.',
     },
     reason: {
       type: SchemaType.STRING,
