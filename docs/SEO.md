@@ -94,7 +94,10 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 It returns an empty sitemap unless `APP_ENV=production`, so staging is never submitted. Included pages:
 
 - Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity`, `/tags` — daily;
-  `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`, `/accessibility`, `/contact` — monthly
+  `/who-foresaw` — weekly; `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`,
+  `/accessibility`, `/contact` — monthly. `/who-foresaw` is the "Who foresaw X?" hub
+  (daatan#2217): it is `noindex` while empty, and its event pages are `noindex, follow` and never
+  listed ([RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md#public-pages))
 - `/he` and `/ru` versions of the localized static routes (`localeStaticRoutes`; `eo` is
   deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`). Not the legal
   pages: `/he|ru/{privacy,terms,disclaimer}` render English and canonical to the EN page until

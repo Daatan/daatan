@@ -2242,5 +2242,33 @@
     "brier": "Brier",
     "predictions": "Prognozoj",
     "hint": "Ĉiu temo estas taksata nur laŭ siaj solvitaj prognozoj, do la specimenoj estas malgrandaj — legu la nombrojn singarde."
+  },
+  "whoForesaw": {
+    "meta": {
+      "title": "Kiu antaŭvidis ĝin? Lastatempaj eventoj kaj la fontoj, kiuj antaŭdiris ilin",
+      "description": "Eventoj, kiuj jam okazis, kiuj novaĵfontoj diris semajnon antaŭe, ke ili okazos, kaj kion la Orakulo prognozus el la samaj artikoloj."
+    },
+    "title": "Kiu antaŭvidis ĝin?",
+    "subtitle": "Eventoj, kiuj jam okazis, kaj kiuj fontoj diris anticipe, ke ili okazos.",
+    "method": "Por ĉiu evento kalkuliĝas nur artikoloj publikigitaj almenaŭ semajnon antaŭ ĝi. Fonto antaŭvidis la eventon, se ĝia sinteno estis +0.3 aŭ pli sur skalo de −1 ĝis +1, kaj diris la malon ĉe −0.3 aŭ malpli. La nombro de la Orakulo venas el la samaj artikoloj.",
+    "empty": "Ankoraŭ neniuj eventoj.",
+    "eventTitle": "Kiu antaŭvidis ĝin: {event}",
+    "eventDate": "Evento: {date}",
+    "eventReport": "raporto",
+    "oraculShort": "La Orakulo semajnon antaŭe: {p}%",
+    "oraculLong": "Je {date}, semajnon antaŭe, la Orakulo taksis ĝin je {p}%, el {count} artikoloj publikigitaj antaŭ tiu tago.",
+    "counts": "{called} antaŭvidis · {against} diris la malon · {total} fontoj",
+    "back": "← Ĉiuj eventoj",
+    "question": "La prognozo, al kiu ĝi respondis: {claim}",
+    "weightNote": "La parto apud ĉiu artikolo estas ĝia parto de la pezo de la Orakulo: pli novaj, pli rilataj kaj pli fidindaj artikoloj pezas pli.",
+    "recencyNote": "La Orakulo pezigas pli novajn artikolojn, do la plej lastaj movis ĝian nombron plej multe.",
+    "sections": {
+      "called": "Antaŭvidis ({count})",
+      "against": "Diris la malon ({count})",
+      "neutral": "Sen klara sinteno ({count})"
+    },
+    "stance": "sinteno {value}",
+    "weightShare": "≈{share}% de la pezo",
+    "reports": "Kiel ĝi konfirmiĝis"
   }
 }

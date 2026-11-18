@@ -346,7 +346,7 @@ export default function ApprovalsPage() {
                                         {p.retroSimulation && (
                                             <span
                                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700"
-                                                title={`Retro simulation as of ${p.retroSimulation.asOf.slice(0, 10)}. Approving resolves it as ${p.retroSimulation.outcome === 'correct' ? 'YES' : 'NO'} — it is not published.`}
+                                                title={`Retro simulation as of ${p.retroSimulation.asOf.slice(0, 10)}. Approving resolves it as ${p.retroSimulation.outcome === 'correct' ? 'YES' : 'NO'} and shows the event on the public /who-foresaw pages; the forecast itself stays private.`}
                                             >
                                                 <History className="w-3 h-3" /> Retro · resolves {p.retroSimulation.outcome === 'correct' ? 'YES' : 'NO'}
                                             </span>
