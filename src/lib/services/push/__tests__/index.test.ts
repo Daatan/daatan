@@ -18,11 +18,10 @@ const { sendNotification, setVapidDetails, errorLog, debugLog, mockIsSelfHosted 
   mockIsSelfHosted: vi.fn().mockReturnValue(false),
 }))
 
+// web-push 4 is ESM-only with named exports (no default export).
 vi.mock('web-push', () => ({
-  default: {
-    setVapidDetails,
-    sendNotification,
-  },
+  setVapidDetails,
+  sendNotification,
 }))
 
 vi.mock('@/lib/logger', () => ({
