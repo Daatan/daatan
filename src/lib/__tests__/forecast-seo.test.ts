@@ -9,6 +9,15 @@ import {
 } from '../forecast-seo'
 
 describe('buildForecastDescription', () => {
+  it('does not double the claim\'s own full stop or question mark when appending context', () => {
+    const resolveBy = new Date('2026-12-31T12:00:00Z')
+    const stop = buildForecastDescription('The Houthi movement will lose ground by December 31, 2026.', null, { commitmentCount: 2, resolveByDatetime: resolveBy })
+    expect(stop).not.toContain('..')
+    expect(stop).toContain('2026. 2 forecasters have committed')
+    const question = buildForecastDescription('Will it rain tomorrow?', null, { commitmentCount: 1 })
+    expect(question).toBe('Will it rain tomorrow? 1 forecaster have committed')
+  })
+
   it('uses detailsText when long enough', () => {
     const claim = 'Will it rain tomorrow?'
     const details = 'A detailed analysis of weather patterns suggests rain is likely in the morning.'
@@ -142,7 +151,7 @@ describe('buildForecastDescription with a self-referential summary', () => {
   it('uses the claim path instead of the summary', () => {
     const claim = 'Esperanto Wikipedia will have more than 400,000 articles by December 31, 2026.'
     const result = buildForecastDescription(claim, SELF_REFERENTIAL[0], { commitmentCount: 2 })
-    expect(result).toBe(`${claim}. 2 forecasters have committed`)
+    expect(result).toBe(`${claim} 2 forecasters have committed`)
   })
 })
 

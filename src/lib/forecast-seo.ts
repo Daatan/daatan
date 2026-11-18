@@ -57,7 +57,7 @@ export function buildForecastDescription(
   const trimmedDetails = detailsText?.trim()
   if (trimmedDetails && trimmedDetails.length >= 30 && !isSelfReferentialContext(trimmedDetails)) {
     parts.push(trimmedDetails)
-    return truncate(parts.join('. '), META_DESCRIPTION_MAX)
+    return truncate(joinSentences(parts), META_DESCRIPTION_MAX)
   }
 
   parts.push(claimText)
@@ -73,10 +73,20 @@ export function buildForecastDescription(
   }
 
   if (parts.length > 1) {
-    return truncate(parts.join('. '), META_DESCRIPTION_MAX)
+    return truncate(joinSentences(parts), META_DESCRIPTION_MAX)
   }
 
   return truncate(claimText, META_DESCRIPTION_MAX)
+}
+
+// Claims often end in their own '.', '?' or '!'; a plain join('. ') then printed
+// "…by December 31, 2026.. resolves Dec 31, 2026" (~5% of forecast pages, 2026-11-18).
+function joinSentences(parts: string[]): string {
+  return parts.reduce((acc, part) => {
+    if (!acc) return part
+    const head = acc.replace(/\s+$/, '')
+    return head + (/[.!?…]$/.test(head) ? ' ' : '. ') + part
+  }, '')
 }
 
 function truncate(s: string, max: number): string {
