@@ -32,8 +32,8 @@ export function ResolutionInfo({ prediction, formatDate }: Props) {
               <li key={i}>
                 <a href={link} target="_blank" rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                  {link}
-                  <ExternalLink className="w-3 h-3" />
+                  <span className="min-w-0 break-all">{link}</span>
+                  <ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               </li>
             ))}
