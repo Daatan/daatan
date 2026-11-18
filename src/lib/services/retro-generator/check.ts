@@ -18,10 +18,16 @@ export const NEAR_FORECAST_MIN_SCORE = 0.85
 export const MAX_NEAR_FORECASTS = 5
 const MAX_EXCERPT_CHARS = 400
 /**
- * One call with up to 15 articles. The retro judge, a smaller prompt on the same chain, took
- * 6.3 s median, 11.9 s p90 and 21.4 s at most on Vertex over 140 prod calls (2026-11-16..18).
+ * One call with up to 15 articles, fallback included. On prod (2026-11-18) 23 of 24 Vertex calls
+ * took 12.3 s median, 16.2 s p90 and 23.5 s at most; the 24th timed out at 30 s and the Oracul
+ * fallback answered it in 5 s.
  */
 export const CHECK_TIMEOUT_MS = 35_000
+/**
+ * The Google leg's own limit, below its 30 s default so that the fallback, which now stops at
+ * {@link CHECK_TIMEOUT_MS} too, keeps about twice the 5 s it took (daatan#2229).
+ */
+export const CHECK_GOOGLE_TIMEOUT_MS = 25_000
 
 export interface NearForecast {
   id: string
@@ -133,6 +139,7 @@ export async function checkRetroEvent(input: EventCheckInput): Promise<EventChec
       schema: retroEventCheckSchema,
       temperature: 0,
       signal,
+      googleTimeoutMs: CHECK_GOOGLE_TIMEOUT_MS,
     })
     const checked = validateEventCheck(JSON.parse(result.text) as Record<string, unknown>, input.articles, input.near)
     return checked.ok && result.fallbackProvider ? { ...checked, modelNote: `answered by ${result.fallbackProvider}` } : checked

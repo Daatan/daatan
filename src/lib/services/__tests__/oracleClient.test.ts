@@ -107,6 +107,22 @@ describe('oracleFetch', () => {
 
     vi.unstubAllGlobals()
   })
+
+  it('aborts on the caller signal as well as on its own timeout (daatan#2229)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    vi.stubGlobal('fetch', fetchMock)
+    const caller = new AbortController()
+
+    await oracleFetch({ baseUrl: 'https://oracle.daatan.com', key: 'k' }, '/llm', { method: 'POST', timeoutMs: 60_000, signal: caller.signal })
+
+    const signal = fetchMock.mock.calls[0][1].signal as AbortSignal
+    expect(signal).not.toBe(caller.signal)
+    expect(signal.aborted).toBe(false)
+    caller.abort()
+    expect(signal.aborted).toBe(true)
+
+    vi.unstubAllGlobals()
+  })
 })
 
 describe('logOracleCall', () => {
