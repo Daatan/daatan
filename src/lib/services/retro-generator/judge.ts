@@ -8,7 +8,7 @@ import type { PoolReport } from './types'
 
 const log = createLogger('retro-event-judge')
 
-export const JUDGE_KINDS = ['event', 'trend', 'not_yet', 'mixed', 'other'] as const
+export const JUDGE_KINDS = ['event', 'routine', 'trend', 'not_yet', 'mixed', 'other'] as const
 export type JudgeKind = (typeof JUDGE_KINDS)[number]
 
 /** Reports shown to the judge per cluster: one per article, earliest first. */
