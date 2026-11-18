@@ -36,8 +36,13 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
         '/notifications',
         '/commitments',
         '/create',
-        '/forecasts/new',
-        '/forecasts/express',
+        // `$` anchors these two: forecast slugs share the /forecasts/ prefix, so a
+        // bare '/forecasts/new' also blocked the real forecast
+        // /forecasts/new-knesset-elections-… (listed in the sitemap; only its
+        // /he and /ru twins stayed crawlable). Neither page has subpaths: /new
+        // redirects to /create, /express is the signed-in Express flow.
+        '/forecasts/new$',
+        '/forecasts/express$',
         '/forecasts/*/edit',
         '/retroanalysis',
         // Admin-only internal tool — same category as /admin, /settings, etc.
