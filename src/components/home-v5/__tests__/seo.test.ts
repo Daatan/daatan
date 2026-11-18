@@ -3,17 +3,17 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => (key: string) => key,
 }))
-vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
+vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com', getAppName: () => 'DAATAN' }))
 
 import { homeV5Metadata } from '../meta'
 import { buildSiteJsonLd } from '../seo'
 
 describe('home-v5 metadata', () => {
   it.each([
-    ['en', 'https://daatan.com'],
-    ['he', 'https://daatan.com/he'],
-    ['ru', 'https://daatan.com/ru'],
-  ])('canonicalizes to the site root and has a share image for %s', async (locale, canonical) => {
+    ['en', 'https://daatan.com', 'en_US'],
+    ['he', 'https://daatan.com/he', 'he_IL'],
+    ['ru', 'https://daatan.com/ru', 'ru_RU'],
+  ])('canonicalizes to the site root and has a share image for %s', async (locale, canonical, ogLocale) => {
     const m = await homeV5Metadata(locale)
     expect(m.alternates?.canonical).toBe(canonical)
     expect(m.alternates?.languages).toMatchObject({
@@ -21,7 +21,10 @@ describe('home-v5 metadata', () => {
       he: 'https://daatan.com/he',
       ru: 'https://daatan.com/ru',
     })
-    expect(m.openGraph?.images).toEqual([expect.objectContaining({ url: 'https://daatan.com/opengraph-image' })])
+    expect(m.openGraph?.images).toEqual([
+      expect.objectContaining({ url: 'https://daatan.com/opengraph-image', alt: expect.any(String) }),
+    ])
+    expect(m.openGraph).toMatchObject({ siteName: 'DAATAN', locale: ogLocale })
     expect(m.twitter?.images).toEqual(['https://daatan.com/opengraph-image'])
   })
 })

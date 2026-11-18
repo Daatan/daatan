@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import FeedClient from '@/app/FeedClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
+import { ogLocale } from '@/lib/og-locale'
 import { globalKeywords } from '@/lib/forecast-seo'
 
 
@@ -54,7 +55,7 @@ export async function generateMetadata({
       title: meta.title,
       description: meta.description,
       url: `${appUrl}/${locale}`,
-      locale,
+      locale: ogLocale(locale),
     },
   }
 }

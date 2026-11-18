@@ -3,6 +3,7 @@ import { globalKeywords } from '@/lib/forecast-seo'
 import { NextIntlClientProvider } from 'next-intl'
 import type { Metadata } from 'next'
 import { getAppUrl } from '@/lib/branding'
+import { ogLocale } from '@/lib/og-locale'
 
 /**
  * Locale sub-routes: /he/... and /ru/...
@@ -46,7 +47,7 @@ export async function generateMetadata({
       },
     },
     openGraph: {
-      locale,
+      locale: ogLocale(locale),
     },
   }
 }
