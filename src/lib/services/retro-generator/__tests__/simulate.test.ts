@@ -40,7 +40,7 @@ const article = (url: string, published_at: string, text: string | null = 'body'
   published_at, published_at_source: 'meta', indexed_at: published_at, similarity: 0.7, text,
 })
 const forecast = {
-  mean: 0.2, articles_used: 2, std: 0.1, ci_low: 0, ci_high: 0.4, placeholder: false, question: claimText,
+  mean: 0.2, articles_used: 3, std: 0.1, ci_low: 0, ci_high: 0.4, placeholder: false, question: claimText,
   sources: [{ source_id: 's', source_name: 'x.com', url: 'https://x.com/1', stance: 0.4, certainty: 0.8, credibility_weight: 1, claims: ['c'] }],
 } as OracleForecastResponse
 
@@ -53,6 +53,7 @@ describe('simulateRetroEvent', () => {
     vi.mocked(searchNewsBefore).mockResolvedValue([
       article('https://x.com/1', '2026-10-30T09:00:00Z'),
       article('https://y.com/2', '2026-11-01T09:00:00Z', null),
+      article('https://z.com/3', '2026-11-02T09:00:00Z'),
     ])
     vi.mocked(getOraculForecast).mockResolvedValue({ forecast, logId: 'log-1' })
     vi.mocked(storeForecastEmbedding).mockResolvedValue()
@@ -61,7 +62,7 @@ describe('simulateRetroEvent', () => {
   it('searches strictly before T0 and asks Oracul as of T0 with the same articles, always with a body', async () => {
     const r = await simulateRetroEvent(input)
 
-    expect(r).toMatchObject({ status: 'dry_run', claimText, asOf: '2026-11-03T00:00:00.000Z', probability: 0.6, articlesUsed: 2 })
+    expect(r).toMatchObject({ status: 'dry_run', claimText, asOf: '2026-11-03T00:00:00.000Z', probability: 0.6, articlesUsed: 3 })
     expect(searchNewsBefore).toHaveBeenCalledWith(expect.objectContaining({
       q: evidenceQuery(input.claimTemplate),
       before: new Date('2026-11-03T00:00:00Z'),
@@ -77,7 +78,7 @@ describe('simulateRetroEvent', () => {
       claimDeadline: new Date('2026-11-30T23:59:59.999Z'),
       claimDirection: 'ARRIVAL',
     })
-    expect(opts?.articles?.map((a) => a.text)).toEqual(['body', 'T https://y.com/2\n\nsnip'])
+    expect(opts?.articles?.map((a) => a.text)).toEqual(['body', 'T https://y.com/2\n\nsnip', 'body'])
     expect(meta).toEqual({ source: 'retro-simulation' })
   })
 
@@ -109,10 +110,10 @@ describe('simulateRetroEvent', () => {
     expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'duplicate_retro' })
   })
 
-  it('skips when Oracul abstains or used fewer than two articles', async () => {
+  it('skips when Oracul abstains or used fewer than three articles', async () => {
     vi.mocked(getOraculForecast).mockResolvedValueOnce({ forecast: null, logId: 'l', insufficientData: true, failureClass: 'oracle_abstain' })
     expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'oracle_abstain' })
-    vi.mocked(getOraculForecast).mockResolvedValueOnce({ forecast: { ...forecast, articles_used: 1 }, logId: 'l' })
+    vi.mocked(getOraculForecast).mockResolvedValueOnce({ forecast: { ...forecast, articles_used: 2 }, logId: 'l' })
     expect(await simulateRetroEvent(input)).toMatchObject({ status: 'skipped', reason: 'oracul_thin' })
   })
 
@@ -146,9 +147,9 @@ describe('simulateRetroEvent', () => {
       outcome: 'correct',
       eventUrl: 'https://b.com/2',
       oraculProbability: 0.6,
-      articlesUsed: 2,
+      articlesUsed: 3,
     })
-    expect(retro.evidence.sent.map((a: { url: string }) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2'])
+    expect(retro.evidence.sent.map((a: { url: string }) => a.url)).toEqual(['https://x.com/1', 'https://y.com/2', 'https://z.com/3'])
     expect(retro.evidence.oracul.sources[0]).toMatchObject({ url: 'https://x.com/1', stance: 0.4 })
     expect(retro.evidence.reports).toHaveLength(2)
     expect(storeForecastEmbedding).toHaveBeenCalledWith('new', [0.1, 0.2])

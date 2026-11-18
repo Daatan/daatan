@@ -10,7 +10,7 @@ published, staked, notified or fed into user scoring or the calibration record.
 Issue: [daatan#2217](https://github.com/Daatan/daatan/issues/2217). Decisions (Mark,
 2026-11-16/17): the drafts feed an event-centric "Who foresaw X?" page and a retro-only source
 board (planned, PRs 3–4), never the main leaderboard; the generator runs by hand, weekly; an
-event needs at least two articles published before T0; the Oracul and the page see the same
+event needs at least three articles published before T0 (two until 2026-11-18, see step 4); the Oracul and the page see the same
 article set.
 
 ## Pipeline
@@ -85,7 +85,7 @@ or more than 30 days before the first report (background, not this week's news).
    the evidence window and indexed before the cutoff, with similarity ≥ `minSimilarity` (default
    0.40; the workflow's `min_similarity` input overrides it). It returns the top 15, which is
    the Oracul's article budget. Anything dated at or after T0 is dropped again here. Fewer than
-   2 articles is `thin_evidence`.
+   3 articles is `thin_evidence`.
 
    **The floor**, hand-read on prod on 2026-11-18 (the full claim as the query, top 15 at 0.30):
    - At the first default, 0.55, 6 of 10 events found nothing.
@@ -98,8 +98,11 @@ or more than 30 days before the first report (background, not this week's news).
    It is to be rechecked with the deadline-free query.
 4. **Oracul** answers the claim `as_of` T0 from exactly those articles. Each article always
    carries a body: the archived text, or title + snippet. Without a body the Oracul would fetch
-   today's page, which may hold updates written after T0. If it uses fewer than 2 articles, the
-   result is `oracul_thin`. P = (mean + 1) / 2.
+   today's page, which may hold updates written after T0. If it uses fewer than 3 articles, the
+   result is `oracul_thin`. P = (mean + 1) / 2. The bar was 2 until 2026-11-18 (daatan#2229).
+   Across the three prod runs of 2026-11-17/18, the off-topic chip-rule event passed twice, each
+   time with 2 used, and every on-topic, non-duplicate event used at least 3. The other
+   off-topic event that got through (Megaspeed, 4 and 6 used) still passes.
 5. **Draft** (`mode: apply` only). The draft is a `PENDING_APPROVAL` binary prediction by the
    bot user `retro_sim@daatan.internal`, `isPublic: false`. It gets a `retro_simulations` row with
    `outcome = correct` and an `evidence` JSON:
@@ -129,5 +132,12 @@ indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` a
 - **A looser paraphrase escapes the fold.** "Eisenkot will receive the mandate" scored 0.92–0.94
   against "the President will task Eisenkot", so it stays a separate draft to reject. Its
   reports stay on the rejected row, so the next run counts that cluster as covered.
+- **Similarity measures topic, not the event** (daatan#2229, first apply, 2026-11-18). Off-topic
+  sets score as high as on-topic ones (chip-rule junk 0.404–0.531, on-topic Bab el-Mandeb
+  0.435–0.529). A forecast that already covered the event can sit below the 0.95 dedupe (0.889
+  and 0.903 against "The Knesset Speaker will be changed"), while distinct pairs reach 0.913.
+  Both are rejected at approval until #2229 adds a per-event check.
+- **Runs differ.** Candidates and P are re-drawn every run (the third carrier: 75%, 67% and 81%
+  in three runs), so review the drafts an apply wrote, not the dry run before it.
 - **Negative or trivial events.** For example, "talks will end without a breakthrough". These
   are left to the approval gate.

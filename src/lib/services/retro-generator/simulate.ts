@@ -12,8 +12,15 @@ import type { PoolReport } from './types'
 
 const log = createLogger('retro-simulate')
 
-/** Mark, 2026-11-16 (daatan#2217 Q4): no draft without at least two articles from before T0. */
-export const MIN_PRE_T0_ARTICLES = 2
+/**
+ * The article gate, applied twice: to what the search found before T0, and to what the Oracul
+ * actually used. Mark set two on 2026-11-16 (daatan#2217 Q4) and three on 2026-11-18
+ * (daatan#2229). Across the three prod runs of 2026-11-17/18, the off-topic chip-rule event
+ * passed twice, each time with `articles_used` = 2, and every on-topic, non-duplicate event had
+ * at least 3. A find below three can't reach three used, so the same bar on the search only saves
+ * the Oracul call. The other off-topic event that got through (4 and 6 used) is not caught.
+ */
+export const MIN_PRE_T0_ARTICLES = 3
 /** What Oracul is sent. Its per-article stage runs in parallel, so this bounds cost, not time. */
 export const MAX_EVIDENCE_ARTICLES = 15
 /**
