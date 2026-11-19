@@ -75,6 +75,67 @@ describe('leaderboard server render', () => {
   })
 })
 
+describe('source leaderboard rank and hints', () => {
+  const outlet = (outletName: string, skillConservative: number, brierScore: number) => ({
+    id: outletName, outletName, authorCount: 2, skillConservative, brierScore, predictions: 9, articles: 9,
+  })
+  // Skill order: A > B > C. Brier order (lower first): C < B < A.
+  const rows = [outlet('A.com', 0.9, 0.4), outlet('B.com', 0.5, 0.3), outlet('C.com', 0.1, 0.1)]
+  const render = (query: string) => {
+    nav.params = new URLSearchParams(query)
+    try {
+      return renderToString(
+        <SourceLeaderboardClient authorRows={[]} outletRows={rows} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+      )
+    } finally {
+      nav.params = new URLSearchParams()
+    }
+  }
+  // The 4th-ranked row would print its number; with three rows only medals show, so read the
+  // rank from the row order of the medal colours instead.
+  const medalOrder = (html: string) =>
+    [...html.matchAll(/lucide-medal[^"]*text-(yellow-500|gray-400|amber-600)"/g)].map(m => m[1])
+  const rowOrder = (html: string) =>
+    ['A.com', 'B.com', 'C.com'].sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+
+  it('ranks by Brier from the lowest even when the URL lists the worst first', () => {
+    const html = render('view=outlets&sort=brier&dir=desc')
+    expect(rowOrder(html)).toEqual(['A.com', 'B.com', 'C.com'])
+    // A is the worst Brier → bronze; C is the best → gold, at the bottom.
+    expect(medalOrder(html)).toEqual(['amber-600', 'gray-400', 'yellow-500'])
+  })
+
+  it('keeps tied scores numbered in order when the list is reversed', () => {
+    const tied = [...rows, outlet('D.com', 0.3, 0.2), outlet('E.com', 0.2, 0.2)]
+    nav.params = new URLSearchParams('view=outlets&sort=brier&dir=desc')
+    try {
+      const html = renderToString(
+        <SourceLeaderboardClient authorRows={[]} outletRows={tied} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+      )
+      // Ranks 4 and 5 are the tied D/E pair; worst-first prints 5 before 4.
+      const numbers = [...html.matchAll(/w-6 text-center">(\d+)</g)].map(m => Number(m[1]))
+      expect(numbers).toEqual([5, 4])
+    } finally {
+      nav.params = new URLSearchParams()
+    }
+  })
+
+  it('ranks by Skill when sorted by a column that is not a quality metric', () => {
+    const html = render('view=outlets&sort=name&dir=desc')
+    expect(rowOrder(html)).toEqual(['C.com', 'B.com', 'A.com'])
+    expect(medalOrder(html)).toEqual(['amber-600', 'gray-400', 'yellow-500'])
+  })
+
+  it('explains Skill, Brier and Predictions in column hints and the legend', () => {
+    const html = render('view=outlets')
+    for (const key of ['legend.skillDesc', 'legend.brierDesc', 'legend.predictionsDesc']) {
+      expect(html).toMatch(new RegExp(`role="tooltip"[^>]*>${key}<`))
+      expect(html.split(key).length - 1).toBe(2)
+    }
+    expect(html).toContain('lowerIsBetter')
+  })
+})
+
 // A server page that imports a named export from a 'use client' module gets a client reference,
 // not the value: calling it throws at render, which no unit test or build catches (#2212).
 describe('server/client boundary', () => {

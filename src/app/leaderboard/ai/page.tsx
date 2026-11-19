@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
-import { Bot, ArrowLeft, Trophy } from 'lucide-react'
+import { Bot, ArrowLeft, Hash, TrendingDown, Trophy } from 'lucide-react'
 import { getAiLeaderboard } from '@/lib/services/ai-panel-leaderboard'
 import EmptyState from '@/components/ui/EmptyState'
+import {
+  BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
+  brierTone, valueSize,
+} from '@/components/leaderboard/LeaderboardParts'
 
 
 export const metadata: Metadata = {
@@ -14,20 +18,13 @@ export const metadata: Metadata = {
   robots: { index: false }, // experimental surface; keep it out of search for now
 }
 
-/** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
-function brierTone(brier: number): string {
-  if (brier <= 0.1) return 'text-emerald-400'
-  if (brier <= 0.2) return 'text-lime-400'
-  if (brier < 0.25) return 'text-yellow-400'
-  return 'text-red-400'
-}
-
 export default async function AiLeaderboardPage() {
   const t = await getTranslations('aiLeaderboard')
+  const tl = await getTranslations('leaderboard')
   const lb = await getAiLeaderboard()
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <Link
         href="/leaderboard"
         className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
@@ -52,39 +49,57 @@ export default async function AiLeaderboardPage() {
           description={t('emptyDesc')}
         />
       ) : (
-        <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden">
+        <div className={`${TABLE_CARD} overflow-hidden`}>
           {/* Human baseline: the same crowd, scored on the same commitments. */}
           {lb.humanAvgBrier != null && (
-            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-navy-600 bg-navy-800/50">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-navy-600 bg-navy-800">
               <div className="flex items-center gap-2 text-sm text-gray-300">
                 <Trophy className="w-4 h-4 text-amber-400" />
                 {t('humanBaseline')}
                 <span className="text-gray-500">({t('nScores', { n: lb.humanCount })})</span>
               </div>
-              <span className={`font-mono font-semibold ${brierTone(lb.humanAvgBrier)}`}>
+              <span className={`tabular-nums ${valueSize(false)} ${brierTone(lb.humanAvgBrier)}`}>
                 {lb.humanAvgBrier.toFixed(3)}
               </span>
             </div>
           )}
 
-          <table className="w-full text-sm">
+          <table className="w-full text-left">
             <thead>
-              <tr className="text-left text-gray-500 border-b border-navy-600">
-                <th className="px-4 sm:px-6 py-3 font-medium w-10">#</th>
-                <th className="px-2 py-3 font-medium">{t('model')}</th>
-                <th className="px-2 py-3 font-medium text-right">{t('avgBrier')}</th>
-                <th className="px-4 sm:px-6 py-3 font-medium text-right">{t('scores')}</th>
+              <tr className={HEAD_ROW}>
+                <th className={`px-1 sm:px-4 ${HEAD_CELL} text-gray-500 text-center w-10 sm:w-20`}>
+                  <span className="sm:hidden" aria-hidden="true">#</span>
+                  <span className="sr-only sm:not-sr-only">{tl('rank')}</span>
+                </th>
+                <th className={`px-2 sm:px-4 ${HEAD_CELL} text-gray-500`}>{t('model')}</th>
+                {/* Members arrive best-first by avgBrier, so that column is the active one. */}
+                <th className={`px-2 sm:px-4 ${HEAD_CELL} text-white text-right relative group`}>
+                  <span aria-describedby="ai-hint-brier" className="inline-block">
+                    {t('avgBrier')}
+                    <span aria-hidden="true"> ↑</span>
+                    <LowerIsBetter label={tl('lowerIsBetter')} />
+                  </span>
+                  <ColumnHint id="ai-hint-brier">{t('legend.avgBrierDesc')}</ColumnHint>
+                </th>
+                <th className={`px-2 sm:px-4 ${HEAD_CELL} text-gray-500 text-right relative group`}>
+                  <span aria-describedby="ai-hint-scores" className="inline-block">
+                    {t('scores')}
+                  </span>
+                  <ColumnHint id="ai-hint-scores">{t('legend.scoresDesc')}</ColumnHint>
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={BODY}>
               {lb.members.map((m, i) => (
                 <tr
                   key={`${m.model}:${m.mode}:${m.promptVersion ?? ''}`}
-                  className="border-b border-navy-600/50 last:border-0"
+                  className={`hover:bg-white/5 transition-colors ${i < 3 ? 'bg-amber-400/5' : ''}`}
                 >
-                  <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
-                  <td className="px-2 py-3">
-                    <span className="text-white font-medium">{m.label}</span>
+                  <td className="px-1 sm:px-4 py-3 sm:py-4">
+                    <div className="flex justify-center"><RankBadge rank={i} /></div>
+                  </td>
+                  <td className="px-2 sm:px-4 py-3 sm:py-4">
+                    <span className="font-bold text-white text-sm sm:text-base">{m.label}</span>
                     {m.isOracle && (
                       <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
                         {t('oraculBadge')}
@@ -101,10 +116,10 @@ export default async function AiLeaderboardPage() {
                       </span>
                     )}
                   </td>
-                  <td className={`px-2 py-3 text-right font-mono font-semibold ${brierTone(m.avgBrier)}`}>
+                  <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(true)} ${brierTone(m.avgBrier)}`}>
                     {m.avgBrier.toFixed(3)}
                   </td>
-                  <td className="px-4 sm:px-6 py-3 text-right text-gray-500">{m.count}</td>
+                  <td className="px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums text-sm font-bold text-gray-400">{m.count}</td>
                 </tr>
               ))}
             </tbody>
@@ -112,7 +127,13 @@ export default async function AiLeaderboardPage() {
         </div>
       )}
 
-      <p className="text-xs text-gray-600 mt-4 max-w-2xl">{t('footnote')}</p>
+      <div className={LEGEND_GRID}>
+        <LegendCard icon={<TrendingDown className="w-4 h-4 text-purple-500" />} title={t('avgBrier')}>{t('legend.avgBrierDesc')}</LegendCard>
+        <LegendCard icon={<Trophy className="w-4 h-4 text-amber-400" />} title={t('humanBaseline')}>{t('legend.humanDesc')}</LegendCard>
+        <LegendCard icon={<Hash className="w-4 h-4 text-cyan-400" />} title={t('scores')}>{t('legend.scoresDesc')}</LegendCard>
+      </div>
+
+      <p className="text-xs text-gray-500 mt-4 max-w-2xl">{t('footnote')}</p>
     </div>
   )
 }

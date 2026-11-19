@@ -4,8 +4,9 @@ import { Fragment, useEffect, useState, useCallback, type ReactNode } from 'reac
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Trophy, Loader2, Medal, Target, TrendingDown, Swords, Bot, Newspaper, Users } from 'lucide-react'
+import { Trophy, Loader2, Target, TrendingDown, Swords, Bot, Newspaper, Users } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import { BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD, pillClass } from '@/components/leaderboard/LeaderboardParts'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
 import { FETCH_LIMIT, INITIAL_SORT, LOWER_IS_BETTER, MIN_RANKED_RESOLVED, formatSigned, isLowSample, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
@@ -96,21 +97,12 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
     ? (tags.find(tag => tag.slug === selectedTag)?.name ?? selectedTag)
     : null
 
-  const getRankIcon = (index: number) => {
-    switch (index) {
-      case 0: return <Medal className="w-6 h-6 text-yellow-500" />
-      case 1: return <Medal className="w-6 h-6 text-gray-400" />
-      case 2: return <Medal className="w-6 h-6 text-amber-600" />
-      default: return <span className="text-lg font-bold text-gray-400 w-6 text-center">{index + 1}</span>
-    }
-  }
-
   // The two extra columns only fit from sm up; the active one always shows.
   const isExtra = (key: SortBy) => key === 'peerScore' || key === 'aiScore'
   const cellVisibility = (key: SortBy) => (isExtra(key) && sortBy !== key ? 'hidden sm:table-cell' : '')
 
   const headerClass = (key: SortBy) =>
-    `px-1 sm:px-4 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider text-right w-16 sm:w-24 ${cellVisibility(key)} ${
+    `px-1 sm:px-4 ${HEAD_CELL} text-right w-16 ${key === 'brierScore' ? 'sm:w-28' : 'sm:w-24'} ${cellVisibility(key)} ${
       sortBy === key ? 'text-white' : 'text-gray-500'
     }`
 
@@ -136,7 +128,8 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
     aiScore: 'legend.aiScoreDesc',
   }
 
-  const sortHeader = (sortKey: SortBy, children: ReactNode) => (
+  // The arrow sits on the label; `sub` (topic name, "lower is better") goes on its own line below.
+  const sortHeader = (sortKey: SortBy, label: string, sub?: ReactNode) => (
     <th className={`${headerClass(sortKey)} relative group`} aria-sort={ariaSort(sortKey)}>
       <button
         type="button"
@@ -144,16 +137,11 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
         aria-describedby={`lb-hint-${sortKey}`}
         className="uppercase tracking-wider font-bold text-right hover:text-white transition-colors"
       >
-        {children}
+        {label}
         {sortArrow(sortKey)}
+        {sub}
       </button>
-      <span
-        id={`lb-hint-${sortKey}`}
-        role="tooltip"
-        className="pointer-events-none invisible opacity-0 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100 transition-opacity absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
-      >
-        {t(HINT_KEY[sortKey])}
-      </span>
+      <ColumnHint id={`lb-hint-${sortKey}`}>{t(HINT_KEY[sortKey])}</ColumnHint>
     </th>
   )
 
@@ -213,9 +201,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
           <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{t('filterByTopic')}:</span>
           <button
             onClick={() => handleTagChange(null)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-              !selectedTag ? 'bg-blue-600 text-white' : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
-            }`}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass(!selectedTag)}`}
           >
             {t('allTopics')}
           </button>
@@ -223,9 +209,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
             <button
               key={tag.slug}
               onClick={() => handleTagChange(selectedTag === tag.slug ? null : tag.slug)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                selectedTag === tag.slug ? 'bg-blue-600 text-white' : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
-              }`}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass(selectedTag === tag.slug)}`}
             >
               {tag.name}
             </button>
@@ -249,27 +233,25 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
           action={{ label: t('browseForecasts'), href: '/' }}
         />
       ) : (
-        <div className="bg-navy-700 border border-navy-600 rounded-2xl shadow-sm overflow-hidden">
+        <div className={`${TABLE_CARD} overflow-hidden`}>
           <table className="w-full text-left table-fixed">
             <thead>
-              <tr className="bg-navy-800 border-b border-navy-600">
+              <tr className={HEAD_ROW}>
                 <th className="px-1 sm:px-4 py-4 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider text-center w-10 sm:w-20">
                   {/* "#" on phones: the word does not fit the narrow rank column. */}
                   <span className="sm:hidden" aria-hidden="true">#</span>
                   <span className="sr-only sm:not-sr-only">{t('rank')}</span>
                 </th>
                 <th className="px-2 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">{t('predictor')}</th>
-                {sortHeader('elo', <>
-                  {t('sortBy.elo')}
-                  {selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>}
-                </>)}
+                {sortHeader('elo', t('sortBy.elo'),
+                  selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>)}
                 {sortHeader('accuracy', t('sortBy.accuracy'))}
-                {sortHeader('brierScore', t('sortBy.brierScore'))}
+                {sortHeader('brierScore', t('sortBy.brierScore'), <LowerIsBetter label={t('lowerIsBetter')} />)}
                 {sortHeader('peerScore', t('sortBy.peerScore'))}
                 {sortHeader('aiScore', t('sortBy.aiScore'))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100/10">
+            <tbody className={BODY}>
               {displayed.map((user, row) => { const index = rankById.get(user.id); const lowSample = index === undefined; return (
                 <Fragment key={user.id}>
                 {lowSample && (row === 0 || !isLowSample(displayed[row - 1])) && (
@@ -288,7 +270,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                 >
                   <td className="px-1 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-center">
-                      {lowSample ? <span className="text-gray-600" aria-hidden="true">·</span> : getRankIcon(index)}
+                      {lowSample ? <span className="text-gray-600" aria-hidden="true">·</span> : <RankBadge rank={index} />}
                     </div>
                   </td>
                   <td className="px-2 sm:px-6 py-3 sm:py-4">
@@ -364,42 +346,12 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
       )}
 
       {/* Legend */}
-      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-            <Swords className="w-4 h-4 text-orange-400" />
-            {t('legend.eloTitle')}
-          </h2>
-          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.eloDesc')}</p>
-        </div>
-        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-            <Target className="w-4 h-4 text-green-500" />
-            {t('legend.accuracyTitle')}
-          </h2>
-          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.accuracyDesc')}</p>
-        </div>
-        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-purple-500" />
-            {t('legend.brierTitle')}
-          </h2>
-          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.brierDesc')}</p>
-        </div>
-        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-            <Users className="w-4 h-4 text-cyan-400" />
-            {t('legend.peerScoreTitle')}
-          </h2>
-          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.peerScoreDesc')}</p>
-        </div>
-        <div className="p-4 bg-navy-800 rounded-xl border border-navy-600">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-            <Bot className="w-4 h-4 text-cyan-400" />
-            {t('legend.aiScoreTitle')}
-          </h2>
-          <p className="text-xs text-gray-500 leading-relaxed">{t('legend.aiScoreDesc')}</p>
-        </div>
+      <div className={LEGEND_GRID}>
+        <LegendCard icon={<Swords className="w-4 h-4 text-orange-400" />} title={t('legend.eloTitle')}>{t('legend.eloDesc')}</LegendCard>
+        <LegendCard icon={<Target className="w-4 h-4 text-green-500" />} title={t('legend.accuracyTitle')}>{t('legend.accuracyDesc')}</LegendCard>
+        <LegendCard icon={<TrendingDown className="w-4 h-4 text-purple-500" />} title={t('legend.brierTitle')}>{t('legend.brierDesc')}</LegendCard>
+        <LegendCard icon={<Users className="w-4 h-4 text-cyan-400" />} title={t('legend.peerScoreTitle')}>{t('legend.peerScoreDesc')}</LegendCard>
+        <LegendCard icon={<Bot className="w-4 h-4 text-cyan-400" />} title={t('legend.aiScoreTitle')}>{t('legend.aiScoreDesc')}</LegendCard>
       </div>
       <p className="mt-4 text-center text-xs text-gray-500">
         <Link href="/methodology" className="text-blue-400 hover:text-blue-300 underline">
