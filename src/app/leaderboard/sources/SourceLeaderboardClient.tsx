@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Hash, Newspaper, PenLine, Scale, Swords, TrendingDown } from 'lucide-react'
+import { Hash, Newspaper, PenLine, Scale, Swords, TrendingDown, Zap } from 'lucide-react'
 import type {
   AuthorLeaderboardRow,
   OutletLeaderboardRow,
@@ -16,17 +16,24 @@ import {
   brierTone, pillClass, valueSize,
 } from '@/components/leaderboard/LeaderboardParts'
 import { compareSideRate } from '@/lib/utils/side-rate'
+import { compareBits, formatBits } from '@/lib/utils/bits'
 import { parseView } from './view'
 
 const VIEWS: SourceLeaderboardView[] = ['outlets', 'authors']
 const VIEW_ICON = { outlets: Newspaper, authors: PenLine }
 
-type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'side' | 'predictions'
+type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'side' | 'bits' | 'predictions'
 type SortDir = 'asc' | 'desc'
-const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'side', 'predictions']
+const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'side', 'bits', 'predictions']
 /** First click on a column: text sorts A→Z, Brier lower-is-better, the rest biggest first. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
-  name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', side: 'desc', predictions: 'desc',
+  name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', side: 'desc', bits: 'desc', predictions: 'desc',
+}
+
+/** A long domain (timesofindia.indiatimes.com) may wrap after a dot, never mid-word, so on a
+ *  phone the name column doesn't push Bits off a 360 px screen (#2259). */
+function breakAfterDots(name: string) {
+  return name.split(/(?<=\.)/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]))
 }
 
 function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir, tag: string | null): string {
@@ -68,6 +75,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         secondarySort: r.authorCount,
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
+        bits: r.bits ?? null,
         predictions: r.predictions,
         sideTaken: null,
         sideTotal: null,
@@ -81,6 +89,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         secondarySort: r.outletName.toLowerCase(),
         skillConservative: r.skillConservative,
         brierScore: r.brierScore,
+        bits: r.bits ?? null,
         predictions: r.predictions,
         sideTaken: r.sideTaken ?? null,
         sideTotal: r.sideTotal ?? null,
@@ -114,6 +123,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
     ? (bestFirst ? ranked : [...ranked].reverse())
     : [...rows].sort((a, b) => {
         if (sort === 'side') return compareSideRate(a, b, dir) || a.primary.localeCompare(b.primary)
+        if (sort === 'bits') return compareBits(a, b, dir) || a.primary.localeCompare(b.primary)
         const av = sortValue(a)
         const bv = sortValue(b)
         const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number)
@@ -123,6 +133,9 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
   // On phones the outlet / author count moves under the name (like @username on the user board),
   // unless the board is sorted by it.
   const secondaryVisibility = sort === 'secondary' ? '' : 'hidden sm:table-cell'
+  // "Takes a side" gives way to Bits on phones the same way (#2259): with both, Bits sat past
+  // the right edge of a 360 px screen.
+  const sideVisibility = sort === 'side' ? '' : 'hidden sm:table-cell'
 
   const columns: { key: SortKey; label: string; hint?: string; lowerIsBetter?: boolean; align: 'left' | 'right'; className: string }[] = [
     { key: 'name', label: view === 'outlets' ? t('outlet') : t('author'), align: 'left', className: 'px-2 sm:px-4' },
@@ -130,8 +143,9 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
     { key: 'skill', label: t('skillConservative'), hint: t('legend.skillDesc'), align: 'right', className: 'px-2 sm:px-4' },
     { key: 'brier', label: t('brierScore'), hint: t('legend.brierDesc'), lowerIsBetter: true, align: 'right', className: 'px-2 sm:px-4' },
     ...(view === 'authors'
-      ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: 'px-2 sm:px-4' }]
+      ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: `px-2 sm:px-4 ${sideVisibility}` }]
       : []),
+    { key: 'bits', label: t('bits'), hint: t('legend.bitsDesc'), align: 'right', className: 'px-2 sm:px-4' },
     { key: 'predictions', label: t('predictions'), hint: t('legend.predictionsDesc'), align: 'right', className: 'px-2 sm:px-4' },
   ]
 
@@ -250,7 +264,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                       </td>
                       <td className="px-2 sm:px-4 py-3 sm:py-4 font-bold text-white text-sm sm:text-base">
                         <Link href={row.href} className="hover:underline">
-                          {row.primary}
+                          {breakAfterDots(row.primary)}
                         </Link>
                         {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
                         {secondaryVisibility && (
@@ -266,10 +280,13 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                         {row.brierScore.toFixed(3)}
                       </td>
                       {view === 'authors' && (
-                        <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${valueSize(sort === 'side')} ${sort === 'side' ? 'text-white' : 'text-text-secondary'}`}>
+                        <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${sideVisibility} ${valueSize(sort === 'side')} ${sort === 'side' ? 'text-white' : 'text-text-secondary'}`}>
                           {row.sideTotal ? `${row.sideTaken}/${row.sideTotal}` : '—'}
                         </td>
                       )}
+                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${valueSize(sort === 'bits')} ${sort === 'bits' ? 'text-white' : 'text-text-secondary'}`}>
+                        <span dir="ltr">{formatBits(row.bits)}</span>
+                      </td>
                       <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'predictions')} ${sort === 'predictions' ? 'text-white' : 'text-gray-400'}`}>
                         {row.predictions}
                       </td>
@@ -289,6 +306,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         {view === 'authors' && (
           <LegendCard icon={<Scale className="w-4 h-4 text-green-500" />} title={t('sideRate')}>{t('sideRateHint')}</LegendCard>
         )}
+        <LegendCard icon={<Zap className="w-4 h-4 text-amber-400" />} title={t('bits')}>{t('legend.bitsDesc')}</LegendCard>
         <LegendCard icon={<Hash className="w-4 h-4 text-cyan-400" />} title={t('predictions')}>
           {t('legend.predictionsDesc')}
         </LegendCard>

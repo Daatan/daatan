@@ -75,6 +75,64 @@ describe('leaderboard server render', () => {
   })
 })
 
+// #2259: bits vs a coin flip — signed, isolated LTR, highest first, rows without a value last.
+describe('source leaderboard bits column', () => {
+  const author = (author: string, bits: number | null, skillConservative = 0) => ({
+    id: author, author, outletName: 'x.com', skillConservative, brierScore: 0.2, predictions: 9, articles: 9, bits,
+  })
+  const rows = [author('Cautious', 0.546, 0.9), author('Unscored', null, 0.8), author('Bold', 0.848), author('Wrong', -2.32)]
+  const render = (query: string) => {
+    nav.params = new URLSearchParams(query)
+    try {
+      return renderToString(
+        <SourceLeaderboardClient authorRows={rows} outletRows={[]} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+      )
+    } finally {
+      nav.params = new URLSearchParams()
+    }
+  }
+  const order = (html: string) =>
+    ['Bold', 'Cautious', 'Wrong', 'Unscored'].sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+
+  it('renders signed values with a hint and a legend card', () => {
+    const html = render('view=authors')
+    expect(html).toContain('<span dir="ltr">+0.85</span>')
+    expect(html).toContain('<span dir="ltr">-2.32</span>')
+    expect(html).toContain('<span dir="ltr">—</span>')
+    expect(html).toMatch(/role="tooltip"[^>]*>legend\.bitsDesc</)
+    expect(html.split('legend.bitsDesc').length - 1).toBe(2)
+  })
+
+  it('hides "takes a side" on phones unless the board is sorted by it', () => {
+    const hiddenOnPhones = (html: string) => (html.match(/hidden sm:table-cell/g) ?? []).length
+    // Default view: the outlet column and "takes a side" both drop below sm, in the head and every row.
+    expect(hiddenOnPhones(render('view=authors'))).toBe(2 * (rows.length + 1))
+    expect(hiddenOnPhones(render('view=authors&sort=side'))).toBe(rows.length + 1)
+  })
+
+  it('sorts by bits from the URL, rows without a value last either way', () => {
+    expect(order(render('view=authors&sort=bits'))).toEqual(['Bold', 'Cautious', 'Wrong', 'Unscored'])
+    expect(order(render('view=authors&sort=bits&dir=asc'))).toEqual(['Wrong', 'Cautious', 'Bold', 'Unscored'])
+  })
+
+  it('shows bits on the outlets view too', () => {
+    nav.params = new URLSearchParams('view=outlets')
+    try {
+      const html = renderToString(
+        <SourceLeaderboardClient
+          authorRows={[]}
+          outletRows={[{ id: 'o1', outletName: 'Haaretz', authorCount: 3, skillConservative: 0.1, brierScore: 0.2, bits: 1.4, predictions: 9, articles: 12 }]}
+          hidden={{ authors: 0, outlets: 0, min: 4 }}
+          tags={[]}
+        />,
+      )
+      expect(html).toContain('<span dir="ltr">+1.40</span>')
+    } finally {
+      nav.params = new URLSearchParams()
+    }
+  })
+})
+
 describe('source leaderboard rank and hints', () => {
   const outlet = (outletName: string, skillConservative: number, brierScore: number) => ({
     id: outletName, outletName, authorCount: 2, skillConservative, brierScore, predictions: 9, articles: 9,
@@ -95,8 +153,11 @@ describe('source leaderboard rank and hints', () => {
   // rank from the row order of the medal colours instead.
   const medalOrder = (html: string) =>
     [...html.matchAll(/lucide-medal[^"]*text-(yellow-500|gray-400|amber-600)"/g)].map(m => m[1])
+  // Domains render with a <wbr> after each dot (#2259).
   const rowOrder = (html: string) =>
-    ['A.com', 'B.com', 'C.com'].sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+    ['A.<wbr/>com', 'B.<wbr/>com', 'C.<wbr/>com']
+      .sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+      .map(n => n.replace('<wbr/>', ''))
 
   it('ranks by Brier from the lowest even when the URL lists the worst first', () => {
     const html = render('view=outlets&sort=brier&dir=desc')
