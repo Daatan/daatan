@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import ScrollNav from '../ScrollNav'
+import { retroHref } from '../links'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group, PollSeats, PoolRow, Region, ReportRow, Side } from './types'
 import { lcgSequence } from '@/lib/lcg'
@@ -61,7 +62,7 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
   return (
     <div className="retro-light min-h-screen bg-[#f5f7fa] text-gray-800">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
-        <Link href="/retroanalysis" className="text-xs font-bold tracking-widest uppercase text-gray-500 hover:text-gray-700">{t('back')}</Link>
+        <Link href={retroHref(locale, '/retroanalysis')} className="text-xs font-bold tracking-widest uppercase text-gray-500 hover:text-gray-700">{t('back')}</Link>
 
         <header className="mt-6">
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-mono uppercase tracking-widest text-gray-600">

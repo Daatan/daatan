@@ -33,4 +33,16 @@ describe('sitemap static routes (daatan#2057)', () => {
     expect(list).toContain('https://daatan.com/who-foresaw')
     expect(list.filter((u) => u.includes('/who-foresaw/'))).toEqual([])
   })
+
+  it('lists the retro case studies in en/he/ru with hreflang, but not the eo copies (daatan#2249)', async () => {
+    const entries = await sitemap()
+    const retro = entries.filter((e) => e.url.includes('/retroanalysis'))
+    expect(retro).toHaveLength(12)
+    expect(retro.filter((e) => e.url.includes('/eo/'))).toEqual([])
+    const he = retro.find((e) => e.url === 'https://daatan.com/he/retroanalysis/ukraine-2022')
+    expect(he?.alternates?.languages).toMatchObject({
+      en: 'https://daatan.com/retroanalysis/ukraine-2022',
+      ru: 'https://daatan.com/ru/retroanalysis/ukraine-2022',
+    })
+  })
 })

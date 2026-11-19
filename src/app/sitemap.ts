@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/env'
 import { getAppUrl } from '@/lib/branding'
 import { VISIBLE_TAG_PREDICTION_WHERE } from '@/lib/services/tag'
+import { RETRO_PATHS } from './retroanalysis/links'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
@@ -106,6 +107,8 @@ const BASE_URL = getAppUrl()
 // Locales actively submitted to Google (eo intentionally excluded — low-value traffic)
 const SITEMAP_LOCALES = ['he', 'ru'] as const
 
+const RETRO_LAST_MODIFIED = new Date('2026-11-19')
+
 /** Build hreflang alternates for a path that has he/ru locale versions. */
 function localizedAlternates(path: string) {
   return {
@@ -149,6 +152,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/disclaimer',  lastModified: new Date('2026-06-12'), frequency: 'monthly' as const, priority: 0.3, localized: false },
     { route: '/accessibility', lastModified: new Date('2026-07-06'), frequency: 'monthly' as const, priority: 0.3, localized: false },
     { route: '/contact',     lastModified: new Date('2026-08-08'), frequency: 'monthly' as const, priority: 0.3, localized: false },
+    // Retro case studies, crawlable since robots.txt stopped disallowing them (daatan#2249).
+    ...RETRO_PATHS.map((route) => ({ route, lastModified: RETRO_LAST_MODIFIED, frequency: 'monthly' as const, priority: 0.5, localized: true })),
   ]
 
   const staticRoutes: MetadataRoute.Sitemap = staticRouteDefs.map(({ route, lastModified, frequency, priority, localized }) => ({
@@ -189,6 +194,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
       alternates: { languages: localizedAlternates('/methodology') },
     },
+    ...RETRO_PATHS.map((path) => ({
+      url: `${BASE_URL}/${locale}${path}`,
+      lastModified: RETRO_LAST_MODIFIED,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+      alternates: { languages: localizedAlternates(path) },
+    })),
   ])
 
   const { predictions, translatedPredictionIds, users, tags } = await fetchSitemapData()

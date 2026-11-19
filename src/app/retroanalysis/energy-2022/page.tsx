@@ -1,21 +1,15 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getTranslations } from 'next-intl/server'
 import { isSelfHosted } from '@/lib/edition'
+import { retroMetadata } from '../metadata'
 import EnergyRetroReport from './EnergyRetroReport'
 import rows from './rows.json'
 import pool from './pool.json'
 import prices from './prices.json'
 import type { PoolRow, Prices, ReportRow } from './types'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('retroEnergy.meta')
-  return {
-    title: t('title'),
-    description: t('description'),
-    alternates: { canonical: '/retroanalysis/energy-2022' },
-    openGraph: { url: '/retroanalysis/energy-2022', type: 'article' },
-  }
+export function generateMetadata(): Promise<Metadata> {
+  return retroMetadata('retroEnergy', '/retroanalysis/energy-2022')
 }
 
 export default function Page() {

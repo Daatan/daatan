@@ -98,6 +98,11 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
   `/accessibility`, `/contact` — monthly. `/who-foresaw` is the "Who foresaw X?" hub
   (daatan#2217): it is `noindex` while empty, and its event pages are `noindex, follow` and never
   listed ([RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md#public-pages))
+- The retro case studies (`RETRO_PATHS` in `src/app/retroanalysis/links.ts`: `/retroanalysis`
+  and its three reports) — monthly, in en, he and ru with hreflang. `robots.txt` disallowed the
+  whole section from March to November 2026, so before daatan#2249 Google had crawled none of
+  the case studies. The `/he|ru|eo` copies live under `src/app/[locale]/retroanalysis` and build their
+  metadata with the URL locale (`retroMetadata` in `src/app/retroanalysis/metadata.ts`)
 - `/he` and `/ru` versions of the localized static routes (`localeStaticRoutes`; `eo` is
   deliberately left out of the sitemap, and the `/eo` locale layout is `noindex`). Not the legal
   pages: `/he|ru/{privacy,terms,disclaimer}` render English and canonical to the EN page until
