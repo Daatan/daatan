@@ -796,7 +796,18 @@ non-excluded row with an `author_lean`, opinion-class INCLUDED (that lane
 scores the author's own lean; opinion is the signal). Retro replays it per
 (byline author, outlet) into a shadow author board
 (`GET /leaderboard/author-shadow`) — also shadow-only, nothing feeds back
-into forecasts.
+into forecasts. Each signal also carries the consensus at the article's date
+(daatan#2259 phase 2). This is only for a dated article (`published_date` starts
+`YYYY-MM-DD`):
+- `consensus_snapshot_prob`: the last `context_snapshots` row with
+  `kind = 'evidence'`, not `oracle_settled`, created before the article's
+  UTC day (`external_probability / 100`).
+- `consensus_prior_prob` and `consensus_prior_n`: the mean `(stance + 1) / 2`
+  of the forecast's other non-excluded `COMPLETE` pool rows dated to an
+  earlier day. Opinion rows are included.
+
+Retro records these but does not score them yet. They must ride along at
+ingest, because retro never rewrites a ledger entry.
 
 ### Pipeline alerting — `evidence_health_alerts` (#1478)
 

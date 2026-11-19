@@ -18,6 +18,7 @@ vi.mock('@/lib/prisma', () => {
     },
     contextSnapshot: {
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     prediction: {
       findUnique: vi.fn(),
@@ -94,6 +95,7 @@ const create = vi.mocked(prisma.evidencePoolArticle.create)
 const updateMany = vi.mocked(prisma.evidencePoolArticle.updateMany)
 const count = vi.mocked(prisma.evidencePoolArticle.count)
 const snapshotFindFirst = vi.mocked(prisma.contextSnapshot.findFirst)
+const snapshotFindMany = vi.mocked(prisma.contextSnapshot.findMany)
 const predictionFindUnique = vi.mocked(prisma.prediction.findUnique)
 const mockGetOracleConfig = vi.mocked(getOracleConfig)
 const mockOraculFetch = vi.mocked(oracleFetch)
@@ -965,6 +967,7 @@ describe('pushCredibilityFeedback', () => {
     vi.stubEnv('APP_ENV', 'production')
     mockGetOracleConfig.mockReturnValue({ baseUrl: 'http://oracle', key: 'k' })
     snapshotFindFirst.mockResolvedValue(null as never)
+    snapshotFindMany.mockResolvedValue([] as never)
     predictionFindUnique.mockResolvedValue(null as never)
   })
 
@@ -1046,7 +1049,58 @@ describe('pushCredibilityFeedback', () => {
       author_lean: 0.9,
       author_lean_certainty: 0.8,
       evidence_class: 'opinion',
+      published_date: '2026-07-01',
+      consensus_prior_n: 0,
     })
+  })
+
+  // daatan#2259 phase 2: what was believed when the author wrote, recorded by retro.
+  it('sends the consensus at each author article\'s date', async () => {
+    findMany.mockResolvedValue([
+      poolArticle({ id: 'early-yes', publishedDate: '2026-06-01', stance: 0.6 }),
+      poolArticle({ id: 'early-no', publishedDate: '2026-06-10T08:00:00Z', stance: -0.2, evidenceClass: 'opinion' }),
+      poolArticle({ id: 'early-excluded', publishedDate: '2026-06-05', stance: 1, excluded: true }),
+      poolArticle({ id: 'early-undated', publishedDate: null, stance: 1 }),
+      poolArticle({ id: 'same-day', publishedDate: '2026-06-20', stance: 1 }),
+      poolArticle({ id: 'author', publishedDate: '2026-06-20T15:00:00Z', author: 'Ann', authorLean: 0.8 }),
+      poolArticle({ id: 'undated-author', publishedDate: 'June 2026', author: 'Bob', authorLean: 0.4 }),
+    ] as never)
+    snapshotFindMany.mockResolvedValue([
+      { createdAt: new Date('2026-06-02T00:00:00Z'), externalProbability: 40 },
+      { createdAt: new Date('2026-06-19T23:00:00Z'), externalProbability: 70 },
+      { createdAt: new Date('2026-06-20T01:00:00Z'), externalProbability: 90 },
+    ] as never)
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1, author_signals_recorded: 2 }),
+    } as never)
+
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+
+    expect(snapshotFindMany).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', kind: 'evidence', oracleSettled: false, externalProbability: { not: null } },
+      select: { createdAt: true, externalProbability: true },
+      orderBy: { createdAt: 'asc' },
+    })
+    const body = JSON.parse((mockOraculFetch.mock.calls[0][2] as { body: string }).body)
+    const ann = body.author_signals.find((x: { author: string }) => x.author === 'Ann')
+    // Strictly before the article's day: the 06-20 snapshot and article don't count; the
+    // excluded and undated rows never do. Opinion rows do — the prior is the pool's belief.
+    expect(ann).toMatchObject({ published_date: '2026-06-20', consensus_snapshot_prob: 0.7, consensus_prior_n: 2 })
+    expect(ann.consensus_prior_prob).toBeCloseTo((0.8 + 0.4) / 2)
+    const bob = body.author_signals.find((x: { author: string }) => x.author === 'Bob')
+    expect(bob).not.toHaveProperty('published_date')
+    expect(bob).not.toHaveProperty('consensus_prior_n')
+  })
+
+  it('skips the snapshot read when no row has an author lean', async () => {
+    findMany.mockResolvedValue([poolArticle({ id: 'art-1' })] as never)
+    mockOraculFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ accepted: true, already_ingested: false, sources_recorded: 1, author_signals_recorded: 0 }),
+    } as never)
+    await pushCredibilityFeedback('pred-1', true, resolvedAt)
+    expect(snapshotFindMany).not.toHaveBeenCalled()
   })
 
   it('falls back to the source when the row has no outlet (daatan#1835)', async () => {

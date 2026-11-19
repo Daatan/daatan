@@ -1409,6 +1409,42 @@ export async function retractCredibilityFeedback(predictionId: string): Promise<
   log.info({ predictionId, ...(await res.json()) }, 'event=credibility_feedback_retracted')
 }
 
+/** The article's day (UTC midnight) from a pool row's free-form `publishedDate`, or null. */
+function articleDay(publishedDate: string | null): Date | null {
+  const m = publishedDate?.match(/^(\d{4}-\d{2}-\d{2})/)
+  return m ? new Date(`${m[1]}T00:00:00.000Z`) : null
+}
+
+/**
+ * What was believed when an author wrote (daatan#2259 phase 2), for retro's "bits vs
+ * consensus": daatan's published probability at its last evidence snapshot before the
+ * article's day, and the mean YES-probability of the forecast's earlier pool articles. Retro
+ * records these on `author_signals` but does not score them yet; they ride along at ingest
+ * because retro never rewrites a ledger entry. Empty for an undated article.
+ */
+function consensusAt(
+  row: EvidencePoolArticle,
+  pool: EvidencePoolArticle[],
+  snapshots: { createdAt: Date; externalProbability: number | null }[],
+): Record<string, string | number> {
+  const day = articleDay(row.publishedDate)
+  if (!day) return {}
+  const earlier = pool.filter((o) => {
+    const d = o.id !== row.id && !o.excluded && o.status === 'COMPLETE' && o.stance !== null ? articleDay(o.publishedDate) : null
+    return d !== null && d < day
+  })
+  // Oldest first, so the last one before the day is the belief at the time.
+  const snapshot = snapshots.filter((x) => x.createdAt < day).at(-1)
+  return {
+    published_date: day.toISOString().slice(0, 10),
+    ...(snapshot?.externalProbability != null ? { consensus_snapshot_prob: snapshot.externalProbability / 100 } : {}),
+    ...(earlier.length
+      ? { consensus_prior_prob: earlier.reduce((sum, o) => sum + ((o.stance as number) + 1) / 2, 0) / earlier.length }
+      : {}),
+    consensus_prior_n: earlier.length,
+  }
+}
+
 /**
  * Credibility feedback loop, step 2 (retro docs/ORACLE_VARIABLES.md §9):
  * push one resolved forecast's per-source stances to retro's
@@ -1435,7 +1471,9 @@ export async function retractCredibilityFeedback(predictionId: string): Promise<
  * non-excluded row with an `author_lean`, INCLUDING opinion-class — that
  * lane scores the author's own lean, and opinion is precisely where it
  * lives. Retro replays these per (byline author, outlet) into its shadow
- * author board (`GET /leaderboard/author-shadow`).
+ * author board (`GET /leaderboard/author-shadow`). Each signal also carries the consensus
+ * at the article's date (`consensusAt`, daatan#2259 phase 2), recorded by retro for a later
+ * "bits vs consensus".
  *
  * Carries a third lane when the claim was settlement-pinned:
  * `settlement_snapshot`, the pin as it stood at forecast time, which is the
@@ -1488,6 +1526,13 @@ export async function pushCredibilityFeedback(
     where: { id: predictionId },
     select: { claimArchetype: true, tags: { select: { slug: true } } },
   })
+  const snapshots = authorSignals.length
+    ? await prisma.contextSnapshot.findMany({
+        where: { predictionId, kind: 'evidence', oracleSettled: false, externalProbability: { not: null } },
+        select: { createdAt: true, externalProbability: true },
+        orderBy: { createdAt: 'asc' },
+      })
+    : []
 
   let res: Response
   try {
@@ -1514,6 +1559,7 @@ export async function pushCredibilityFeedback(
           author_lean: a.authorLean,
           author_lean_certainty: a.authorLeanCertainty,
           evidence_class: a.evidenceClass,
+          ...consensusAt(a, pool, snapshots),
         })),
         ...(settlementSnapshot ? { settlement_snapshot: settlementSnapshot } : {}),
         // Same mapper the /pool/aggregate push already uses (line ~820), not a
