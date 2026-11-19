@@ -64,11 +64,13 @@ export function buildForecastDescription(
 
   if (ctx && !ctx.resolution) {
     if (ctx.commitmentCount) {
-      parts.push(`${ctx.commitmentCount} forecaster${ctx.commitmentCount !== 1 ? 's' : ''} have committed`)
+      const n = ctx.commitmentCount
+      parts.push(`${n} ${n === 1 ? 'forecaster has' : 'forecasters have'} committed`)
     }
     if (ctx.resolveByDatetime) {
       const d = new Date(ctx.resolveByDatetime)
-      parts.push(`resolves ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
+      // joinSentences makes every part its own sentence, so each one starts upper-case.
+      parts.push(`Resolves ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
     }
   }
 
