@@ -102,7 +102,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
   const cellVisibility = (key: SortBy) => (isExtra(key) && sortBy !== key ? 'hidden sm:table-cell' : '')
 
   const headerClass = (key: SortBy) =>
-    `px-1 sm:px-4 ${HEAD_CELL} text-right w-16 sm:w-24 ${cellVisibility(key)} ${
+    `px-1 sm:px-4 ${HEAD_CELL} text-right w-16 ${key === 'brierScore' ? 'sm:w-28' : 'sm:w-24'} ${cellVisibility(key)} ${
       sortBy === key ? 'text-white' : 'text-gray-500'
     }`
 
@@ -128,7 +128,8 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
     aiScore: 'legend.aiScoreDesc',
   }
 
-  const sortHeader = (sortKey: SortBy, children: ReactNode) => (
+  // The arrow sits on the label; `sub` (topic name, "lower is better") goes on its own line below.
+  const sortHeader = (sortKey: SortBy, label: string, sub?: ReactNode) => (
     <th className={`${headerClass(sortKey)} relative group`} aria-sort={ariaSort(sortKey)}>
       <button
         type="button"
@@ -136,8 +137,9 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
         aria-describedby={`lb-hint-${sortKey}`}
         className="uppercase tracking-wider font-bold text-right hover:text-white transition-colors"
       >
-        {children}
+        {label}
         {sortArrow(sortKey)}
+        {sub}
       </button>
       <ColumnHint id={`lb-hint-${sortKey}`}>{t(HINT_KEY[sortKey])}</ColumnHint>
     </th>
@@ -241,15 +243,10 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                   <span className="sr-only sm:not-sr-only">{t('rank')}</span>
                 </th>
                 <th className="px-2 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate">{t('predictor')}</th>
-                {sortHeader('elo', <>
-                  {t('sortBy.elo')}
-                  {selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>}
-                </>)}
+                {sortHeader('elo', t('sortBy.elo'),
+                  selectedTagName && <span className="block text-[10px] font-medium normal-case tracking-normal text-blue-300 truncate">{selectedTagName}</span>)}
                 {sortHeader('accuracy', t('sortBy.accuracy'))}
-                {sortHeader('brierScore', <>
-                  {t('sortBy.brierScore')}
-                  <LowerIsBetter label={t('lowerIsBetter')} />
-                </>)}
+                {sortHeader('brierScore', t('sortBy.brierScore'), <LowerIsBetter label={t('lowerIsBetter')} />)}
                 {sortHeader('peerScore', t('sortBy.peerScore'))}
                 {sortHeader('aiScore', t('sortBy.aiScore'))}
               </tr>

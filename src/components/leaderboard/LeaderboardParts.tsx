@@ -36,13 +36,15 @@ export function RankBadge({ rank }: { rank: number }) {
 /**
  * Column hint. The enclosing <th> needs `relative group`. Shown on hover and on keyboard focus
  * inside the header; on touch screens a tap triggers hover, so it appears with the tap.
+ * `hidden`, not `invisible`: an invisible hint still counts toward the scroll size, so a short
+ * table in an overflow-x-auto card (the sources board) would scroll vertically.
  */
 export function ColumnHint({ id, children }: { id: string; children: ReactNode }) {
   return (
     <span
       id={id}
       role="tooltip"
-      className="pointer-events-none invisible opacity-0 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100 transition-opacity absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
+      className="pointer-events-none hidden group-hover:block group-has-[:focus-visible]:block absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
     >
       {children}
     </span>

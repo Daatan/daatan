@@ -198,9 +198,9 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         </>
       ) : (
         <>
-          {/* overflow-x-auto, not overflow-hidden: on a phone the table is wider than the
-              screen (~570 px vs ~360 px) and must scroll sideways; any non-visible overflow
-              still clips to the rounded corners (#2236). */}
+          {/* overflow-x-auto, not overflow-hidden: on a phone the table can be a little wider
+              than the screen (the authors view, long names) and must scroll sideways; any
+              non-visible overflow still clips to the rounded corners (#2236). */}
           <div className={`${TABLE_CARD} overflow-x-auto`}>
             <table className="w-full text-left">
               <thead>
