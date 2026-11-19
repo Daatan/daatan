@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { ArrowDown, ArrowLeft, ArrowUp, Newspaper } from 'lucide-react'
+import { ArrowLeft, Hash, Newspaper, PenLine, Scale, Swords, TrendingDown } from 'lucide-react'
 import type {
   AuthorLeaderboardRow,
   OutletLeaderboardRow,
@@ -11,10 +11,15 @@ import type {
 } from '@/lib/services/sourceLeaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import DeskBadge from '@/components/sources/DeskBadge'
+import {
+  BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
+  brierTone, pillClass, valueSize,
+} from '@/components/leaderboard/LeaderboardParts'
 import { compareSideRate } from '@/lib/utils/side-rate'
 import { parseView } from './view'
 
 const VIEWS: SourceLeaderboardView[] = ['outlets', 'authors']
+const VIEW_ICON = { outlets: Newspaper, authors: PenLine }
 
 type SortKey = 'name' | 'secondary' | 'skill' | 'brier' | 'side' | 'predictions'
 type SortDir = 'asc' | 'desc'
@@ -22,14 +27,6 @@ const SORT_KEYS: SortKey[] = ['name', 'secondary', 'skill', 'brier', 'side', 'pr
 /** First click on a column: text sorts A→Z, Brier lower-is-better, the rest biggest first. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: 'asc', secondary: 'asc', skill: 'desc', brier: 'asc', side: 'desc', predictions: 'desc',
-}
-
-/** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
-function brierTone(brier: number): string {
-  if (brier <= 0.1) return 'text-emerald-400'
-  if (brier <= 0.2) return 'text-lime-400'
-  if (brier < 0.25) return 'text-yellow-400'
-  return 'text-red-400'
 }
 
 function boardHref(view: SourceLeaderboardView, sort: SortKey, dir: SortDir, tag: string | null): string {
@@ -96,34 +93,50 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
     </p>
   )
 
+  // Rank counts from the best, as on the user board: reversing the order doesn't renumber. It
+  // follows Brier when the board is sorted by Brier, and Skill (the default ranking) otherwise.
+  const rankByBrier = sort === 'brier'
+  const ranked = [...rows].sort((a, b) =>
+    (rankByBrier ? a.brierScore - b.brierScore : b.skillConservative - a.skillConservative)
+    || a.primary.localeCompare(b.primary))
+  const rankById = new Map(ranked.map((r, i) => [r.id, i]))
+  const byRank = sort === 'brier' || sort === 'skill'
+  const bestFirst = byRank && dir === DEFAULT_DIR[sort]
+
   const sign = dir === 'asc' ? 1 : -1
   const sortValue = (r: (typeof rows)[number]): string | number =>
     sort === 'name' ? r.primary.toLowerCase()
       : sort === 'secondary' ? r.secondarySort
-        : sort === 'skill' ? r.skillConservative
-          : sort === 'brier' ? r.brierScore
-            : r.predictions
-  const sortedRows = [...rows].sort((a, b) => {
-    if (sort === 'side') return compareSideRate(a, b, dir) || a.primary.localeCompare(b.primary)
-    const av = sortValue(a)
-    const bv = sortValue(b)
-    const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number)
-    return cmp * sign || a.primary.localeCompare(b.primary)
-  })
+        : r.predictions
+  // Sorted by the rank metric, the rows are the ranking itself (reversed for worst-first), so
+  // tied scores keep their numbers in order either way.
+  const sortedRows = byRank
+    ? (bestFirst ? ranked : [...ranked].reverse())
+    : [...rows].sort((a, b) => {
+        if (sort === 'side') return compareSideRate(a, b, dir) || a.primary.localeCompare(b.primary)
+        const av = sortValue(a)
+        const bv = sortValue(b)
+        const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number)
+        return cmp * sign || a.primary.localeCompare(b.primary)
+      })
 
-  const columns: { key: SortKey; label: string; hint?: string; align: 'left' | 'right'; className: string }[] = [
-    { key: 'name', label: view === 'outlets' ? t('outlet') : t('author'), align: 'left', className: 'px-2' },
-    { key: 'secondary', label: view === 'outlets' ? t('authors') : t('outlet'), align: 'left', className: 'px-2' },
-    { key: 'skill', label: t('skillConservative'), align: 'right', className: 'px-2' },
-    { key: 'brier', label: t('brierScore'), align: 'right', className: 'px-2' },
+  // On phones the outlet / author count moves under the name (like @username on the user board),
+  // unless the board is sorted by it.
+  const secondaryVisibility = sort === 'secondary' ? '' : 'hidden sm:table-cell'
+
+  const columns: { key: SortKey; label: string; hint?: string; lowerIsBetter?: boolean; align: 'left' | 'right'; className: string }[] = [
+    { key: 'name', label: view === 'outlets' ? t('outlet') : t('author'), align: 'left', className: 'px-2 sm:px-4' },
+    { key: 'secondary', label: view === 'outlets' ? t('authors') : t('outlet'), align: 'left', className: `px-2 sm:px-4 ${secondaryVisibility}` },
+    { key: 'skill', label: t('skillConservative'), hint: t('legend.skillDesc'), align: 'right', className: 'px-2 sm:px-4' },
+    { key: 'brier', label: t('brierScore'), hint: t('legend.brierDesc'), lowerIsBetter: true, align: 'right', className: 'px-2 sm:px-4' },
     ...(view === 'authors'
-      ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: 'px-2' }]
+      ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: 'px-2 sm:px-4' }]
       : []),
-    { key: 'predictions', label: t('predictions'), align: 'right', className: 'px-4 sm:px-6' },
+    { key: 'predictions', label: t('predictions'), hint: t('legend.predictionsDesc'), align: 'right', className: 'px-2 sm:px-4' },
   ]
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <Link
         href="/leaderboard"
         className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
@@ -138,32 +151,35 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
       </div>
       <p className="text-sm text-gray-500 mb-6 max-w-2xl">{t('explainer')}</p>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {VIEWS.map(v => (
-          <Link
-            key={v}
-            rel="nofollow"
-            href={boardHref(v, sort, dir, tag)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              v === view ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:text-white'
-            }`}
-          >
-            {t(`view.${v}`)}
-          </Link>
-        ))}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+        {VIEWS.map(v => {
+          const Icon = VIEW_ICON[v]
+          return (
+            <Link
+              key={v}
+              rel="nofollow"
+              href={boardHref(v, sort, dir, tag)}
+              aria-current={v === view ? 'page' : undefined}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                v === view ? 'bg-blue-600 text-white shadow-sm' : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              {t(`view.${v}`)}
+            </Link>
+          )
+        })}
       </div>
 
       {tags.length > 0 && (
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
           <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{tl('filterByTopic')}:</span>
           {[{ slug: null, name: tl('allTopics') }, ...tags].map(tg => (
             <Link
               key={tg.slug ?? 'all'}
               rel="nofollow"
               href={boardHref(view, sort, dir, tg.slug)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                (tag ?? null) === tg.slug ? 'bg-cyan-700 text-white' : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
-              }`}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass((tag ?? null) === tg.slug)}`}
             >
               {tg.name}
             </Link>
@@ -185,61 +201,82 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
           {/* overflow-x-auto, not overflow-hidden: on a phone the table is wider than the
               screen (~570 px vs ~360 px) and must scroll sideways; any non-visible overflow
               still clips to the rounded corners (#2236). */}
-          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={`${TABLE_CARD} overflow-x-auto`}>
+            <table className="w-full text-left">
               <thead>
-                <tr className="text-left text-gray-500 border-b border-navy-600">
-                  <th className="px-4 sm:px-6 py-3 font-medium w-10">#</th>
+                <tr className={HEAD_ROW}>
+                  <th className={`px-1 sm:px-4 ${HEAD_CELL} text-gray-500 text-center w-10 sm:w-20`}>
+                    {/* "#" on phones: the word does not fit the narrow rank column. */}
+                    <span className="sm:hidden" aria-hidden="true">#</span>
+                    <span className="sr-only sm:not-sr-only">{tl('rank')}</span>
+                  </th>
                   {columns.map(c => {
                     const active = c.key === sort
                     const nextDir: SortDir = active ? (dir === 'asc' ? 'desc' : 'asc') : DEFAULT_DIR[c.key]
-                    const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
+                    const hintId = c.hint ? `src-hint-${c.key}` : undefined
                     return (
                       <th
                         key={c.key}
                         aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                        className={`${c.className} py-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}
+                        className={`${c.className} ${HEAD_CELL} relative group ${c.align === 'right' ? 'text-right' : 'text-left'} ${
+                          active ? 'text-white' : 'text-gray-500'
+                        }`}
                       >
                         <Link
                           rel="nofollow"
                           href={boardHref(view, c.key, nextDir, tag)}
                           replace
-                          title={c.hint}
-                          className={`inline-flex items-center gap-1 hover:text-white ${active ? 'text-cyan-300' : ''}`}
+                          aria-describedby={hintId}
+                          className="inline-block hover:text-white transition-colors"
                         >
                           {c.label}
-                          {active && <Arrow className="w-3 h-3" aria-hidden="true" />}
+                          {active && <span aria-hidden="true">{dir === 'asc' ? ' ↑' : ' ↓'}</span>}
+                          {c.lowerIsBetter && <LowerIsBetter label={tl('lowerIsBetter')} />}
                         </Link>
+                        {hintId && <ColumnHint id={hintId}>{c.hint}</ColumnHint>}
                       </th>
                     )
                   })}
                 </tr>
               </thead>
-              <tbody>
-                {sortedRows.map((row, i) => (
-                  <tr key={row.id} className="border-b border-navy-600/50 last:border-0">
-                    <td className="px-4 sm:px-6 py-3 text-gray-500">{i + 1}</td>
-                    <td className="px-2 py-3 text-white font-medium">
-                      <Link href={row.href} className="hover:underline hover:text-cyan-300">
-                        {row.primary}
-                      </Link>
-                      {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
-                    </td>
-                    <td className="px-2 py-3 text-gray-400">{row.secondary}</td>
-                    <td className="px-2 py-3 text-right font-mono text-cyan-300">
-                      {row.skillConservative.toFixed(3)}
-                    </td>
-                    <td className={`px-2 py-3 text-right font-mono font-semibold ${brierTone(row.brierScore)}`}>
-                      {row.brierScore.toFixed(3)}
-                    </td>
-                    {view === 'authors' && (
-                      <td className="px-2 py-3 text-right font-mono text-gray-300 whitespace-nowrap">
-                        {row.sideTotal ? `${row.sideTaken}/${row.sideTotal}` : '—'}
+              <tbody className={BODY}>
+                {sortedRows.map(row => {
+                  const rank = rankById.get(row.id) ?? 0
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`hover:bg-white/5 transition-colors ${rank < 3 && bestFirst ? 'bg-amber-400/5' : ''}`}
+                    >
+                      <td className="px-1 sm:px-4 py-3 sm:py-4">
+                        <div className="flex justify-center"><RankBadge rank={rank} /></div>
                       </td>
-                    )}
-                    <td className="px-4 sm:px-6 py-3 text-right text-gray-500">{row.predictions}</td>
-                  </tr>
-                ))}
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 font-bold text-white text-sm sm:text-base">
+                        <Link href={row.href} className="hover:underline">
+                          {row.primary}
+                        </Link>
+                        {row.desk && <DeskBadge label={t('deskBadge')} hint={t('deskBadgeHint')} />}
+                        {secondaryVisibility && (
+                          <span className="sm:hidden block text-xs font-normal text-gray-500">{row.secondary}</span>
+                        )}
+                      </td>
+                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-sm text-gray-400 ${secondaryVisibility}`}>{row.secondary}</td>
+                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'skill')} ${sort === 'skill' ? 'text-white' : 'text-text-secondary'}`}>
+                        {row.skillConservative.toFixed(3)}
+                      </td>
+                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'brier')} ${brierTone(row.brierScore)}`}>
+                        {row.brierScore.toFixed(3)}
+                      </td>
+                      {view === 'authors' && (
+                        <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${valueSize(sort === 'side')} ${sort === 'side' ? 'text-white' : 'text-text-secondary'}`}>
+                          {row.sideTotal ? `${row.sideTaken}/${row.sideTotal}` : '—'}
+                        </td>
+                      )}
+                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'predictions')} ${sort === 'predictions' ? 'text-white' : 'text-gray-400'}`}>
+                        {row.predictions}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -247,7 +284,18 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         </>
       )}
 
-      <p className="text-xs text-gray-600 mt-4 max-w-2xl">{t('footnote')}</p>
+      <div className={LEGEND_GRID}>
+        <LegendCard icon={<Swords className="w-4 h-4 text-orange-400" />} title={t('skillConservative')}>{t('legend.skillDesc')}</LegendCard>
+        <LegendCard icon={<TrendingDown className="w-4 h-4 text-purple-500" />} title={t('sortBy.brierScore')}>{t('legend.brierDesc')}</LegendCard>
+        {view === 'authors' && (
+          <LegendCard icon={<Scale className="w-4 h-4 text-green-500" />} title={t('sideRate')}>{t('sideRateHint')}</LegendCard>
+        )}
+        <LegendCard icon={<Hash className="w-4 h-4 text-cyan-400" />} title={t('predictions')}>
+          {t('legend.predictionsDesc')}
+        </LegendCard>
+      </div>
+
+      <p className="text-xs text-gray-500 mt-4 max-w-2xl">{t('footnote')}</p>
     </div>
   )
 }

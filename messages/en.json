@@ -331,6 +331,7 @@
     "filterByTopic": "Filter by topic",
     "allTopics": "All topics",
     "methodologyLink": "How these are calculated",
+    "lowerIsBetter": "lower is better",
     "soon": "soon",
     "legend": {
       "rsTitle": "Reputation Score (RS)",
@@ -1198,7 +1199,12 @@
     "marketBadge": "market",
     "emptyTitle": "No scores yet",
     "emptyDesc": "AI-panel Brier scores appear once forecasts that were staked on resolve.",
-    "footnote": "Matched-time Brier: each model’s estimate at the instant a user staked, scored against the outcome. Members with fewer than 5 scores are hidden. The Oracul is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet."
+    "footnote": "The Oracul is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet.",
+    "legend": {
+      "avgBrierDesc": "Each model's probability at the moment a user staked, scored against the outcome: (probability − outcome)², averaged. 0 is perfect, 0.25 is a coin flip, 1 is confidently wrong. Lower is better.",
+      "humanDesc": "Human forecasters' Brier on the same commitments — the bar the models have to beat.",
+      "scoresDesc": "How many staked commitments the model was scored on. Models with fewer than 5 are hidden."
+    }
   },
   "sourceLeaderboard": {
     "title": "Source Leaderboard",
@@ -1221,13 +1227,18 @@
     "brierScore": "Brier",
     "sideRate": "Takes a side",
     "sideRateHint": "Forecasts where this author's own directional forecast was extracted, out of all the forecasts they wrote about (resolved or not).",
+    "legend": {
+      "skillDesc": "A head-to-head rating. When sources lean opposite ways on an event, the ones that leaned the right way gain on the ones that leaned wrong once it resolves. It is shown cautiously (mean minus three standard deviations), so a source with few contested calls sits near 0. Higher is better.",
+      "brierDesc": "How close a source's own lean came to what actually happened: (probability − outcome)², averaged over its resolved forecasts. 0 is perfect, 0.25 is a coin flip, 1 is confidently wrong. Lower is better.",
+      "predictionsDesc": "Resolved forecasts where this source's own lean was extracted and scored — the sample behind its Skill and Brier."
+    },
     "predictions": "Predictions",
     "articles": "Articles",
     "emptyTitle": "No scored sources yet",
     "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
     "hiddenAuthors": "{count, plural, one {+ # more author} other {+ # more authors}} with fewer than {min} resolved predictions — not ranked yet.",
     "hiddenOutlets": "{count, plural, one {+ # more outlet} other {+ # more outlets}} with fewer than {min} resolved predictions — not ranked yet.",
-    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. Skill is a conservative rating (discounts low-sample noise); Brier is the raw resolved-outcome accuracy of each source's own directional lean.",
+    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. An outlet's Skill and Brier are its authors' figures, weighted by how many predictions each has.",
     "deskBadge": "Desk",
     "deskBadgeHint": "Newsroom or agency byline, not a named person"
   },

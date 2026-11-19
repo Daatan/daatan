@@ -331,6 +331,7 @@
     "filterByTopic": "Filtri laŭ temo",
     "allTopics": "Ĉiuj temoj",
     "methodologyLink": "Kiel tio estas kalkulata",
+    "lowerIsBetter": "malpli estas pli bone",
     "soon": "baldaŭ",
     "legend": {
       "rsTitle": "Reputaci-Poentaro (RS)",
@@ -1198,7 +1199,12 @@
     "marketBadge": "merkato",
     "emptyTitle": "Ankoraŭ neniuj poentoj",
     "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
-    "footnote": "La homa bazlinio estas la meza Brier de ĉiuj homaj poentoj en la sama periodo — se ĝi egalas la aliajn, la rangigo ankoraŭ ne estas signifa."
+    "footnote": "La Orakolo estas inkluzivita por komparo; “kontrolo” estas intence malforta modelo — se ĝi egalas la aliajn, la rangigo ankoraŭ ne estas signifa.",
+    "legend": {
+      "avgBrierDesc": "La probablo de ĉiu modelo en la momento kiam uzanto vetis, kontraŭ la rezulto: (probablo − rezulto)², averaĝe. 0 estas perfekta, 0,25 estas monero-ĵeto, 1 estas certe malĝusta. Pli malalta estas pli bona.",
+      "humanDesc": "La Brier de homoj ĉe la samaj vetoj — la stango, kiun la modeloj devas superi.",
+      "scoresDesc": "Pri kiom da vetoj de uzantoj la modelo estis poentita. Modeloj kun malpli ol 5 estas kaŝitaj."
+    }
   },
   "sourceLeaderboard": {
     "title": "Rangolisto de Fontoj",
@@ -1221,13 +1227,18 @@
     "brierScore": "Brier",
     "sideRate": "Elektas flankon",
     "sideRateHint": "Prognozoj, en kiuj la propra direkta prognozo de la aŭtoro estis eltirita, el ĉiuj prognozoj pri kiuj la aŭtoro skribis (solvitaj aŭ ne).",
+    "legend": {
+      "skillDesc": "Rangigo fonto kontraŭ fonto. Kiam fontoj emas al malaj flankoj pri la sama evento, post la solvo tiuj, kiuj pravis, gajnas poentojn de tiuj, kiuj eraris. Ĝi estas montrata singarde (meznombro minus tri normaj devioj), do fonto kun malmultaj disputataj kazoj restas ĉirkaŭ 0. Pli alta estas pli bona.",
+      "brierDesc": "Kiom proksima estis la propra emo de la fonto al tio, kio vere okazis: (probablo − rezulto)², averaĝe laŭ solvitaj prognozoj. 0 estas perfekta, 0,25 estas monero-ĵeto, 1 estas certe malĝusta. Pli malalta estas pli bona.",
+      "predictionsDesc": "Solvitaj prognozoj, en kiuj la propra emo de la fonto estis eltirita kaj poentita — la specimeno malantaŭ ĝiaj Lerteco kaj Brier."
+    },
     "predictions": "Prognozoj",
     "articles": "Artikoloj",
     "emptyTitle": "Ankoraŭ neniuj poentitaj fontoj",
     "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
     "hiddenAuthors": "{count, plural, one {+ # plia aŭtoro} other {+ # pliaj aŭtoroj}} kun malpli ol {min} solvitaj prognozoj — ankoraŭ ne rangigitaj.",
     "hiddenOutlets": "{count, plural, one {+ # plia eldonejo} other {+ # pliaj eldonejoj}} kun malpli ol {min} solvitaj prognozoj — ankoraŭ ne rangigitaj.",
-    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. Lerteco estas konservativa takso (rabatas bruon de malgrandaj specimenoj); Brier estas la kruda precizeco de la propra direkta emo de ĉiu fonto, laŭ solvitaj rezultoj.",
+    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. La Lerteco kaj Brier de amaskomunikilo estas la valoroj de ĝiaj aŭtoroj, pezitaj laŭ la nombro de iliaj prognozoj.",
     "deskBadge": "Redakcio",
     "deskBadgeHint": "Subskribo de redakcio aŭ agentejo, ne de nomita persono"
   },
