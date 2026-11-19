@@ -261,7 +261,8 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                       </td>
                       <td className={`px-2 sm:px-4 py-3 sm:py-4 text-sm text-gray-400 ${secondaryVisibility}`}>{row.secondary}</td>
                       <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'skill')} ${sort === 'skill' ? 'text-white' : 'text-text-secondary'}`}>
-                        {row.skillConservative.toFixed(3)}
+                        {/* dir=ltr: in he a leading minus otherwise lands after the digits (#2253) */}
+                        <span dir="ltr">{row.skillConservative.toFixed(3)}</span>
                       </td>
                       <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'brier')} ${brierTone(row.brierScore)}`}>
                         {row.brierScore.toFixed(3)}

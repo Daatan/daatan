@@ -4,28 +4,45 @@
 
 /* ── DAATAN COLOR SYSTEM ─────────────────────────────────── */
 :root {
+  /* Each colour is RGB channels (`--color-X-rgb`) with `--color-X` derived from them, so
+     Tailwind can apply opacity modifiers (`bg-cobalt/10`) via `rgb(var(--color-X-rgb) / <alpha>)`.
+     A bare hex `var()` drops every `/NN` class from the build (#2253). Change the -rgb value. */
   /* Primary: Deep Navy */
-  --color-navy-900: #0B1F33;
-  --color-navy-800: #0E263D;
-  --color-navy-700: #132C45;
-  --color-navy-600: #1C3A5A;
+  --color-navy-900-rgb: 11 31 51; /* #0B1F33 */
+  --color-navy-900:     rgb(var(--color-navy-900-rgb));
+  --color-navy-800-rgb: 14 38 61; /* #0E263D */
+  --color-navy-800:     rgb(var(--color-navy-800-rgb));
+  --color-navy-700-rgb: 19 44 69; /* #132C45 */
+  --color-navy-700:     rgb(var(--color-navy-700-rgb));
+  --color-navy-600-rgb: 28 58 90; /* #1C3A5A */
+  --color-navy-600:     rgb(var(--color-navy-600-rgb));
 
   /* Secondary: Cobalt Blue */
-  --color-cobalt:       #2F6BFF;
-  --color-cobalt-hover: #2459D6;
-  --color-cobalt-light: #5B8CFF;
-  --color-cobalt-soft:  #EAF1FF;
+  --color-cobalt-rgb:       47 107 255; /* #2F6BFF */
+  --color-cobalt:           rgb(var(--color-cobalt-rgb));
+  --color-cobalt-hover-rgb: 36 89 214; /* #2459D6 */
+  --color-cobalt-hover:     rgb(var(--color-cobalt-hover-rgb));
+  --color-cobalt-light-rgb: 91 140 255; /* #5B8CFF */
+  --color-cobalt-light:     rgb(var(--color-cobalt-light-rgb));
+  --color-cobalt-soft-rgb:  234 241 255; /* #EAF1FF */
+  --color-cobalt-soft:      rgb(var(--color-cobalt-soft-rgb));
 
   /* Accent: Analytical Teal */
-  --color-teal:       #2EC4B6;
-  --color-teal-hover: #25A798;
-  --color-teal-soft:  #E6FAF8;
+  --color-teal-rgb:       46 196 182; /* #2EC4B6 */
+  --color-teal:           rgb(var(--color-teal-rgb));
+  --color-teal-hover-rgb: 37 167 152; /* #25A798 */
+  --color-teal-hover:     rgb(var(--color-teal-hover-rgb));
+  --color-teal-soft-rgb:  230 250 248; /* #E6FAF8 */
+  --color-teal-soft:      rgb(var(--color-teal-soft-rgb));
 
   /* Neutrals */
   --color-white:          #FFFFFF;
-  --color-mist:           #E6E9EF;
-  --color-text-secondary: #B2BED0; /* was #A0AEC0 — bumped for contrast */
-  --color-text-subtle:    #9AA5B4; /* was #6B7280 (3.6:1) — now ~6.7:1 on navy-900 */
+  --color-mist-rgb:           230 233 239; /* #E6E9EF */
+  --color-mist:               rgb(var(--color-mist-rgb));
+  --color-text-secondary-rgb: 178 190 208; /* #B2BED0 — was #A0AEC0, bumped for contrast */
+  --color-text-secondary:     rgb(var(--color-text-secondary-rgb));
+  --color-text-subtle-rgb:    154 165 180; /* #9AA5B4 — was #6B7280 (3.6:1), now ~6.7:1 on navy-900 */
+  --color-text-subtle:        rgb(var(--color-text-subtle-rgb));
 
   /* App is unconditionally dark-themed (not tied to prefers-color-scheme) — without this,
      native form controls (select dropdown popups, date pickers, scrollbars) render with the

@@ -136,6 +136,30 @@ describe('source leaderboard rank and hints', () => {
   })
 })
 
+// #2253: in he (RTL) a leading sign is a bidi-neutral character and is drawn after the digits
+// ("1.970-") unless the number is isolated as LTR.
+describe('signed numbers keep their sign in front in RTL', () => {
+  it('isolates Skill on the sources board', () => {
+    const html = renderToString(
+      <SourceLeaderboardClient
+        authorRows={[]}
+        outletRows={[{ id: 'o1', outletName: 'x.com', authorCount: 1, skillConservative: -1.97, brierScore: 0.4, predictions: 9, articles: 9 }]}
+        hidden={{ authors: 0, outlets: 0, min: 4 }}
+        tags={[]}
+      />,
+    )
+    expect(html).toContain('<span dir="ltr">-1.970</span>')
+  })
+
+  it('isolates Peer and AI score on the user board', () => {
+    const html = renderToString(
+      <LeaderboardClient initialUsers={[user({ peerScoreSum: -0.16, aiScoreSum: 0.99 })]} initialTags={[]} initialTag={null} />,
+    )
+    expect(html).toMatch(/<span dir="ltr"[^>]*>-0\.16<\/span>/)
+    expect(html).toMatch(/<span dir="ltr"[^>]*>\+0\.99<\/span>/)
+  })
+})
+
 // A server page that imports a named export from a 'use client' module gets a client reference,
 // not the value: calling it throws at render, which no unit test or build catches (#2212).
 describe('server/client boundary', () => {
