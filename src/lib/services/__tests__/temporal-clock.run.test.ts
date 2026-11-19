@@ -5,6 +5,7 @@ vi.mock('@/lib/prisma', () => ({
     prediction: {
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }))
@@ -55,6 +56,7 @@ import { runRequote, headsUpThreshold } from '@/lib/services/temporal-clock'
 
 const findMany = vi.mocked(prisma.prediction.findMany)
 const update = vi.mocked(prisma.prediction.update)
+const updateMany = vi.mocked(prisma.prediction.updateMany)
 const saveClock = vi.mocked(saveClockSnapshot)
 const getAnchor = vi.mocked(getLatestEvidenceEstimate)
 const classify = vi.mocked(classifyAndStoreTemporal)
@@ -94,6 +96,7 @@ describe('runRequote', () => {
     vi.clearAllMocks()
     findMany.mockResolvedValue([] as never) // base default — the #1185 sweep query in tests that don't queue it
     update.mockResolvedValue({} as never)
+    updateMany.mockResolvedValue({ count: 0 } as never)
     saveClock.mockResolvedValue(undefined)
     classify.mockResolvedValue(null)
     getPin.mockResolvedValue(null)
@@ -558,6 +561,32 @@ describe('runRequote', () => {
   // daatan#1490. Driven through the empty-allowlist path: the glide is irrelevant here
   // and that path runs exactly two findMany queries — the #1185 stuck-PENDING sweep,
   // then this one — so the second mock is unambiguously the settled-drift population.
+  describe('latched forecasts that fell out of Awaiting Resolution', () => {
+    it('puts every undismissed ACTIVE latch back in the queue in one conditional update', async () => {
+      updateMany.mockResolvedValue({ count: 2 } as never)
+      const summary = await runRequote({ archetypes: [], now: NOW })
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { status: 'ACTIVE', settled: true, awaitingAiResolution: false, awaitingDismissedAt: null },
+        data: { awaitingAiResolution: true },
+      })
+      expect(summary.latchedRequeued).toBe(2)
+      expect(summary.errors).toBe(0)
+    })
+
+    it('counts a failed requote as an error without taking the run down', async () => {
+      updateMany.mockRejectedValue(new Error('db down'))
+      const summary = await runRequote({ archetypes: [], now: NOW })
+      expect(summary.latchedRequeued).toBe(0)
+      expect(summary.errors).toBe(1)
+    })
+
+    it('does not run on a dry run', async () => {
+      findMany.mockResolvedValueOnce([])
+      await runRequote({ archetypes: ['DIFFUSE'], now: NOW, dryRun: true })
+      expect(updateMany).not.toHaveBeenCalled()
+    })
+  })
+
   describe('settled forecasts that have drifted off their pin', () => {
     const latched = (overrides: Record<string, unknown> = {}) => ({
       id: 'pred-settled-1',

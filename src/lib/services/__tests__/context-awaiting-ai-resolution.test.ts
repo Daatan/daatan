@@ -200,7 +200,7 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
       ...matchInput(97),
       settled: true,
       oracleSnapshot: {
-        sources: settlingRows.map((settled, i) => ({ source: `outlet-${i}`, settled })),
+        sources: settlingRows.map((settled, i) => ({ sourceName: `outlet-${i}`, settled })),
       },
     })
 
@@ -237,7 +237,7 @@ describe('awaitingAiResolution — symmetric 90/10 flag', () => {
       // settled=false + settling rows: not a pin — 55 stays inside the band.
       await saveNewsIndexerMatch({
         ...matchInput(55),
-        oracleSnapshot: { sources: [{ source: 'a', settled: true }, { source: 'b', settled: true }] },
+        oracleSnapshot: { sources: [{ sourceName: 'a', settled: true }, { sourceName: 'b', settled: true }] },
       })
       expect(updatedData().awaitingAiResolution).toBe(false)
     })

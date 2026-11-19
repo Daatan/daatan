@@ -102,8 +102,8 @@ describe('high-confidence crossing alert', () => {
       settled: true,
       oracleSnapshot: {
         sources: [
-          { source: 'wire-a', settled: true, publishedAt: '2026-10-01T10:00:00Z' },
-          { source: 'wire-b', settled: true, publishedAt: '2026-10-02T10:00:00Z' },
+          { sourceName: 'wire-a', settled: true, publishedAt: '2026-10-01T10:00:00Z' },
+          { sourceName: 'wire-b', settled: true, publishedAt: '2026-10-02T10:00:00Z' },
         ],
       },
     })
@@ -121,7 +121,7 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(97),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
     })
     expect(notifySettledMock).toHaveBeenCalledTimes(1)
   })
@@ -131,7 +131,7 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(3),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
     })
     expect(notifySettledMock).toHaveBeenCalledWith(expect.anything(), 3, expect.objectContaining({ direction: 'NO' }))
   })
@@ -141,7 +141,7 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(97),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
     })
     expect(notifySettledMock).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalled()
@@ -152,7 +152,39 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(97),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'Wire-A ', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'Wire-A ', settled: true }] },
+    })
+    expect(notifySettledMock).not.toHaveBeenCalled()
+  })
+
+  it('names outlets the way the latch bar does: outletName first, then sourceName', async () => {
+    // The shape `EnrichedOracleSource` actually persists. Until this test the fixtures
+    // used a `source` key no pool row carries, so the alert passed here and never fired.
+    mockPrevious(60)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: {
+        sources: [
+          { outletName: 'Reuters', sourceName: 'reuters.com', settled: true },
+          { outletName: 'Reuters', sourceName: 'yahoo.com', settled: true },
+          { outletName: null, sourceName: 'scmp.com', settled: true },
+        ],
+      },
+    })
+    expect(notifySettledMock).toHaveBeenCalledWith(
+      expect.anything(),
+      97,
+      expect.objectContaining({ settling: 3, outlets: ['Reuters', 'scmp.com'] }),
+    )
+  })
+
+  it('a row carrying only an unknown `source` key names no outlet', async () => {
+    mockPrevious(60)
+    await saveNewsIndexerMatch({
+      ...matchInput(97),
+      settled: true,
+      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
     })
     expect(notifySettledMock).not.toHaveBeenCalled()
   })
@@ -162,7 +194,7 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(70),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
     })
     expect(notifySettledMock).not.toHaveBeenCalled()
   })
@@ -174,7 +206,7 @@ describe('high-confidence crossing alert', () => {
     await saveNewsIndexerMatch({
       ...matchInput(97),
       settled: true,
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'color', settled: null }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'color', settled: null }] },
     })
     expect(notify).not.toHaveBeenCalled()
   })
@@ -191,7 +223,7 @@ describe('high-confidence crossing alert', () => {
     mockPrevious(70)
     await saveNewsIndexerMatch({
       ...matchInput(97),
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
     })
     expect(notify).toHaveBeenCalledWith(expect.anything(), 97, 70, false)
   })
@@ -235,7 +267,7 @@ describe('high-confidence crossing alert', () => {
     mockPrevious(null)
     await saveOracleSnapshotOnly({
       predictionId: 'pred-1',
-      oracleSnapshot: { sources: [{ source: 'wire-a', settled: true }, { source: 'wire-b', settled: true }] },
+      oracleSnapshot: { sources: [{ sourceName: 'wire-a', settled: true }, { sourceName: 'wire-b', settled: true }] },
       confidence: 97,
       aiCiLow: 94,
       aiCiHigh: 99,

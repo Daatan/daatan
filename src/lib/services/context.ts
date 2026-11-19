@@ -56,6 +56,15 @@ function settlingSourceCount(oracleSnapshot: unknown): number {
   return sources.filter((s) => (s as { settled?: unknown } | null)?.settled === true).length
 }
 
+/** The outlet a persisted pool row came from: `outletName`, else `sourceName`. The one
+ *  reading of a row's outlet for both the latch bar and the settled alert — they used to
+ *  read different keys, and the alert's (`source`) is not a key the pool rows carry
+ *  (`EnrichedOracleSource`), so it never fired on prod. */
+function poolRowOutlet(row: { outletName?: unknown; sourceName?: unknown }): string | null {
+  const name = typeof row.outletName === 'string' && row.outletName.trim() ? row.outletName : row.sourceName
+  return typeof name === 'string' && name.trim() ? name.trim() : null
+}
+
 /** Distinct outlets among the settling rows. A row with no outlet/source identity is not
  *  counted — fails closed rather than letting anonymous rows each pose as an outlet. */
 function settlingOutletCount(oracleSnapshot: unknown): number {
@@ -65,8 +74,8 @@ function settlingOutletCount(oracleSnapshot: unknown): number {
   for (const raw of sources) {
     const s = raw as { settled?: unknown; outletName?: unknown; sourceName?: unknown } | null
     if (s?.settled !== true) continue
-    const name = typeof s.outletName === 'string' && s.outletName.trim() ? s.outletName : s.sourceName
-    if (typeof name === 'string' && name.trim()) outlets.add(name.trim().toLowerCase())
+    const name = poolRowOutlet(s)
+    if (name) outlets.add(name.toLowerCase())
   }
   return outlets.size
 }
@@ -155,6 +164,11 @@ async function readAwaitingDismissal(predictionId: string): Promise<AwaitingDism
   })
 }
 
+async function readLatched(predictionId: string): Promise<boolean> {
+  const row = await prisma.prediction.findUnique({ where: { id: predictionId }, select: { settled: true } })
+  return row?.settled === true
+}
+
 /** A latched pin is announced only at the extremes the Oracul's pin publishes
  *  (settlement_stance ≈ 97/3) — a latch whose published number sits elsewhere is
  *  not a resolution candidate worth a message (daatan#1845). */
@@ -189,12 +203,13 @@ export function settledAlertFacts(oracleSnapshot: unknown, probability: number):
   let from: Date | null = null
   let to: Date | null = null
   for (const row of sources) {
-    const s = row as { settled?: unknown; source?: unknown; publishedAt?: unknown } | null
+    const s = row as { settled?: unknown; outletName?: unknown; sourceName?: unknown; publishedAt?: unknown } | null
     if (s?.settled !== true) continue
     settling++
-    if (typeof s.source === 'string' && s.source.trim() !== '') {
-      const key = s.source.trim().toLowerCase()
-      if (!outlets.has(key)) outlets.set(key, s.source.trim())
+    const name = poolRowOutlet(s)
+    if (name) {
+      const key = name.toLowerCase()
+      if (!outlets.has(key)) outlets.set(key, name)
     }
     if (typeof s.publishedAt === 'string') {
       const d = new Date(s.publishedAt)
@@ -503,7 +518,12 @@ export async function recordEstimate(input: RecordEstimateInput) {
       : {}
     : input.probability !== null && !glideHeld
       ? await (async () => {
-          const computed = isAwaitingAiResolution(input.probability as number, pinned, backing.backed)
+          // A latched forecast stays a resolution candidate whatever its current number:
+          // the latch is one-way, so only a resolution or a human clear/dismissal may take
+          // it out of the queue. Re-deriving the flag from the bare level dropped it on the
+          // next unpinned write — one latch sat outside the queue for three months that way.
+          const latched = latchWrite || (prev ? prev.settled === true : await readLatched(input.predictionId))
+          const computed = latched || isAwaitingAiResolution(input.probability as number, pinned, backing.backed)
           // Only a write that would put the forecast INTO the queue can be overridden
           // by a standing dismissal, so that is the only time the extra read is paid.
           const dismissal = computed ? await readAwaitingDismissal(input.predictionId) : null

@@ -206,6 +206,10 @@ export interface RequoteSummary {
    *  is false (daatan#1498). Nothing else looks for this state — #1490's sweep
    *  selects on the latch, so it structurally cannot see them. */
   unlatchedPinAlerts: number
+  /** Latched ACTIVE forecasts found outside Awaiting Resolution with no human dismissal,
+   *  and put back. `recordEstimate` now keeps them there; this repairs rows written
+   *  before it did, and any later path that clears the flag without a dismissal. */
+  latchedRequeued: number
   errors: number
   deltas: number[]
 }
@@ -228,6 +232,7 @@ function emptySummary(): RequoteSummary {
     headsUpAlerts: 0,
     settledDriftAlerts: 0,
     unlatchedPinAlerts: 0,
+    latchedRequeued: 0,
     errors: 0,
     deltas: [],
   }
@@ -527,9 +532,11 @@ async function alertPendingPastDeadline(now: Date, summary: RequoteSummary): Pro
  *
  * Re-verification here means the queue a human actually works from: the forecast
  * goes back into Awaiting Resolution (`/api/forecasts?awaitingAiResolution`) and
- * pages once. That flag is otherwise recomputed on every estimate write from the
- * current number alone, so a latched forecast silently drops OUT of the queue as it
- * drifts — which is exactly how these seven became invisible.
+ * pages once. That flag used to be recomputed on every estimate write from the
+ * current number alone, so a latched forecast silently dropped OUT of the queue as it
+ * drifted — which is exactly how these seven became invisible — and the next write
+ * after this sweep dropped it again. `recordEstimate` now holds a latched forecast in
+ * the queue, and `requeueStrandedLatches` repairs rows that lost the flag.
  */
 async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promise<void> {
   // Guarded against the column not being there yet. blue-green-deploy.sh Phase 5 runs
@@ -581,6 +588,28 @@ async function reverifyDriftedSettled(now: Date, summary: RequoteSummary): Promi
       summary.errors++
       log.warn({ predictionId: p.id, err }, 'settled-drift re-verification failed')
     }
+  }
+}
+
+/**
+ * A latched forecast belongs in Awaiting Resolution until a human resolves it, clears
+ * the latch or dismisses it. `recordEstimate` used to re-derive the flag from the bare
+ * number on every write, so a latch whose number moved inside the band dropped out of
+ * the queue on the next requote — and the drift sweep above, having stamped its alert
+ * once, never put it back. This restores the invariant for any row that lost it. A
+ * single conditional UPDATE, so it is idempotent and quiet once the population is clean.
+ */
+async function requeueStrandedLatches(summary: RequoteSummary): Promise<void> {
+  try {
+    const { count } = await prisma.prediction.updateMany({
+      where: { status: 'ACTIVE', settled: true, awaitingAiResolution: false, awaitingDismissedAt: null },
+      data: { awaitingAiResolution: true },
+    })
+    summary.latchedRequeued = count
+    if (count > 0) log.warn({ count }, 'latched forecasts were outside Awaiting Resolution — re-queued')
+  } catch (err) {
+    summary.errors++
+    log.warn({ err }, 'stranded-latch requeue failed')
   }
 }
 
@@ -685,6 +714,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       await reverifyDriftedSettled(now, summary)
       await alertUnlatchedPins(now, summary)
       await alertApproachingDeadline(now, summary)
+      await requeueStrandedLatches(summary)
     }
     return summary
   }
@@ -764,6 +794,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
     await reverifyDriftedSettled(now, summary)
     await alertUnlatchedPins(now, summary)
     await alertApproachingDeadline(now, summary)
+    await requeueStrandedLatches(summary)
   }
 
   const moved = summary.glided + summary.pinned + summary.provisionalPins
@@ -780,6 +811,7 @@ export async function runRequote(opts: RunRequoteOptions): Promise<RequoteSummar
       headsUpAlerts: summary.headsUpAlerts,
       settledDriftAlerts: summary.settledDriftAlerts,
       unlatchedPinAlerts: summary.unlatchedPinAlerts,
+      latchedRequeued: summary.latchedRequeued,
       errors: summary.errors,
       deltaP50: median(summary.deltas),
       deltaMax: summary.deltas.length ? Math.max(...summary.deltas) : 0,

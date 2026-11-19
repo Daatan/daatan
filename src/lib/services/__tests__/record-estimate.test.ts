@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/services/telegram', () => ({
   notifyHighConfidence: vi.fn(),
+  notifySettled: vi.fn(),
 }))
 
 const { logError, logInfo } = vi.hoisted(() => ({ logError: vi.fn(), logInfo: vi.fn() }))
@@ -320,6 +321,39 @@ describe('Awaiting Resolution dismissal (daatan#1659)', () => {
     expect(data.awaitingAiResolution).toBe(true)
     expect(data.awaitingDismissedAt).toBeNull()
     expect(data.awaitingDismissedConfidence).toBeNull()
+  })
+
+  it('a latched forecast stays in the queue when an unpinned write lands inside the band', async () => {
+    // The stranded-latch case: pinned at 97, later evidence publishes 70 with no pin.
+    // The level band alone said "not awaiting" and the latch vanished from the queue.
+    findUnique.mockResolvedValue({ confidence: 97, claimText: 'Claim', slug: 'claim', settled: true } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'news-indexer', probability: 70, ciLow: 60, ciHigh: 80,
+      oracleSnapshot: { mean: 70, sources: [] },
+    })
+    expect(updateData().awaitingAiResolution).toBe(true)
+  })
+
+  it('reads the latch itself for an origin that does not load the previous row', async () => {
+    findUnique.mockResolvedValue({ settled: true } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'clock', probability: 55,
+      oracleSnapshot: { mean: 55, sources: [] },
+    })
+    expect(findUnique).toHaveBeenCalledWith({ where: { id: 'pred-1' }, select: { settled: true } })
+    expect(updateData().awaitingAiResolution).toBe(true)
+  })
+
+  it('a human dismissal still takes a latched forecast out of the queue', async () => {
+    findUnique.mockResolvedValue({
+      confidence: 70, claimText: 'Claim', slug: 'claim', settled: true,
+      awaitingDismissedAt: new Date('2026-11-19T10:00:00.000Z'), awaitingDismissedConfidence: 70,
+    } as never)
+    await recordEstimate({
+      predictionId: 'pred-1', origin: 'news-indexer', probability: 72, ciLow: 60, ciHigh: 80,
+      oracleSnapshot: { mean: 72, sources: [] },
+    })
+    expect(updateData().awaitingAiResolution).toBe(false)
   })
 
   it('recordEstimate does not read the dismissal when the write would not flag anyway', async () => {

@@ -96,7 +96,12 @@ The central table (`Prediction`). Field groups:
   is mostly pre-event articles, so the share alone became unreachable). The
   same bar gates the latch and the alert (`settlementBacking` in
   `context.ts`); an unbacked pin sets the flag false and skips the
-  high-confidence Telegram alert.
+  high-confidence Telegram alert. A **latched** forecast (`settled`) stays
+  flagged on every write whatever its number, until it is resolved, the latch
+  is cleared, or a human dismisses it — before this, the next unpinned write
+  re-derived the flag from the bare level and the latch dropped out of the
+  queue. The requote cron re-flags any ACTIVE, undismissed latch that lost it
+  (`requeueStrandedLatches` in `temporal-clock.ts`).
 - **Settlement latch**: `settled`/`settledAt` — set when the Oracul reports the
   outcome as an accomplished fact (≥2 independent sources). **One-way**: only
   ever set true by the funnel; a later unsettled run does not clear it; human
