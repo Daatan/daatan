@@ -10,34 +10,37 @@ module.exports = {
       colors: {
         // --- DAATAN COLOR SYSTEM ---
         // Single source of truth: edit globals.css :root variables only.
+        // Every entry must be `rgb(var(--color-X-rgb) / <alpha-value>)`. A bare `var(--color-X)`
+        // silently drops all opacity variants (`bg-cobalt/10`, `border-navy-600/50`) from the
+        // build (#2253); src/lib/__tests__/tailwind-colors.test.ts enforces this.
 
         // PRIMARY: Deep Navy
         navy: {
-          900: 'var(--color-navy-900)',
-          800: 'var(--color-navy-800)',
-          700: 'var(--color-navy-700)',
-          600: 'var(--color-navy-600)',
+          900: 'rgb(var(--color-navy-900-rgb) / <alpha-value>)',
+          800: 'rgb(var(--color-navy-800-rgb) / <alpha-value>)',
+          700: 'rgb(var(--color-navy-700-rgb) / <alpha-value>)',
+          600: 'rgb(var(--color-navy-600-rgb) / <alpha-value>)',
         },
 
         // SECONDARY: Cobalt Blue (actions, buttons, focus)
         cobalt: {
-          DEFAULT: 'var(--color-cobalt)',
-          hover:   'var(--color-cobalt-hover)',
-          light:   'var(--color-cobalt-light)',
-          soft:    'var(--color-cobalt-soft)',
+          DEFAULT: 'rgb(var(--color-cobalt-rgb) / <alpha-value>)',
+          hover:   'rgb(var(--color-cobalt-hover-rgb) / <alpha-value>)',
+          light:   'rgb(var(--color-cobalt-light-rgb) / <alpha-value>)',
+          soft:    'rgb(var(--color-cobalt-soft-rgb) / <alpha-value>)',
         },
 
         // ACCENT: Analytical Teal (data, accuracy, results — use sparingly)
         teal: {
-          DEFAULT: 'var(--color-teal)',
-          hover:   'var(--color-teal-hover)',
-          soft:    'var(--color-teal-soft)',
+          DEFAULT: 'rgb(var(--color-teal-rgb) / <alpha-value>)',
+          hover:   'rgb(var(--color-teal-hover-rgb) / <alpha-value>)',
+          soft:    'rgb(var(--color-teal-soft-rgb) / <alpha-value>)',
         },
 
         // NEUTRALS
-        mist:             'var(--color-mist)',
-        'text-secondary': 'var(--color-text-secondary)',
-        'text-subtle':    'var(--color-text-subtle)',
+        mist:             'rgb(var(--color-mist-rgb) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--color-text-secondary-rgb) / <alpha-value>)',
+        'text-subtle':    'rgb(var(--color-text-subtle-rgb) / <alpha-value>)',
 
         // WCAG AA override: Tailwind's default gray-500 (#6B7280) and gray-600 (#4B5563)
         // fail contrast on the dark navy backgrounds used throughout this app.
@@ -57,13 +60,13 @@ module.exports = {
         },
 
         // Legacy alias kept for backward compat
-        primary: 'var(--color-cobalt)',
+        primary: 'rgb(var(--color-cobalt-rgb) / <alpha-value>)',
         sidebar: {
-          bg:     'var(--color-navy-900)',
-          hover:  'var(--color-navy-800)',
-          active: 'var(--color-navy-700)',
-          text:   'var(--color-mist)',
-          muted:  'var(--color-text-secondary)',
+          bg:     'rgb(var(--color-navy-900-rgb) / <alpha-value>)',
+          hover:  'rgb(var(--color-navy-800-rgb) / <alpha-value>)',
+          active: 'rgb(var(--color-navy-700-rgb) / <alpha-value>)',
+          text:   'rgb(var(--color-mist-rgb) / <alpha-value>)',
+          muted:  'rgb(var(--color-text-secondary-rgb) / <alpha-value>)',
         },
       },
       fontFamily: {

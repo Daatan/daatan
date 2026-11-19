@@ -84,7 +84,7 @@ function VoterRow({
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-sm font-bold text-gray-200">{pct}%</span>
           {isResolved && (
-            <span className={`text-xs font-medium ${rsChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <span dir="ltr" className={`text-xs font-medium ${rsChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {rsChange >= 0 ? '+' : ''}{rsChange}
             </span>
           )}
@@ -319,7 +319,7 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
               </div>
               {isResolved && (
                 <div className="mt-1.5 ml-10">
-                  <span className={`text-xs font-medium ${rsChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span dir="ltr" className={`text-xs font-medium ${rsChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {rsChange >= 0 ? '+' : ''}{rsChange} RS
                   </span>
                 </div>

@@ -95,7 +95,7 @@ function ConfidenceInput({
         <span className={`text-sm font-bold ${value > 0 ? 'text-teal' : value < 0 ? 'text-red-400' : 'text-gray-500'}`}>
           {getLabel(value)}
         </span>
-        <span className="text-xs text-gray-500 ml-2">
+        <span dir="ltr" className="text-xs text-gray-500 ml-2">
           ({value > 0 ? '+' : ''}{value})
         </span>
       </div>

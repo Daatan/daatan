@@ -332,10 +332,10 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                     </div>
                   </td>
                   <td className={`px-1 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('peerScore')}`}>
-                    <span className={valueClass('peerScore')}>{formatSigned(user.peerScoreSum)}</span>
+                    <span dir="ltr" className={valueClass('peerScore')}>{formatSigned(user.peerScoreSum)}</span>
                   </td>
                   <td className={`px-1 sm:px-4 py-3 sm:py-4 text-right ${cellVisibility('aiScore')}`}>
-                    <span className={valueClass('aiScore')}>{formatSigned(user.aiScoreSum)}</span>
+                    <span dir="ltr" className={valueClass('aiScore')}>{formatSigned(user.aiScoreSum)}</span>
                   </td>
                 </tr>
                 </Fragment>
