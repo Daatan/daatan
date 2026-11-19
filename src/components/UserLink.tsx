@@ -56,7 +56,7 @@ export function UserLink({
         />
       )}
       {children || (showName && (
-        <span className="font-bold text-white">{displayName}</span>
+        <span className="font-bold text-white"><bdi>{displayName}</bdi></span>
       ))}
     </Link>
   )

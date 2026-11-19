@@ -346,7 +346,7 @@ export default function BotsTable() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-white">{bot.user.name}</span>
-                      <span className="text-xs font-mono text-gray-500">@{bot.user.username}</span>
+                      <bdi className="text-xs font-mono text-gray-500">@{bot.user.username}</bdi>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bot.isActive ? 'bg-green-100 text-teal' : 'bg-navy-700 text-gray-500'}`}>
                         {bot.isActive ? t('botActive') : t('botDisabled')}
                       </span>

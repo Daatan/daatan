@@ -38,6 +38,12 @@ describe('UserLink Component', () => {
     expect(screen.getByText('@jdoe')).toBeInTheDocument()
   })
 
+  // #2255: a leading "@" is bidi-neutral; without isolation it drew as "jdoe@" in Hebrew.
+  it('isolates the shown name so a handle keeps its "@" in front in RTL', () => {
+    render(<UserLink userId="user-123" username="jdoe" />)
+    expect(screen.getByText('@jdoe').tagName).toBe('BDI')
+  })
+
   it('renders Anonymous when both name and username are missing', () => {
     render(<UserLink userId="user-123" />)
     expect(screen.getByText('Anonymous')).toBeInTheDocument()

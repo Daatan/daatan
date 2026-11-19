@@ -297,7 +297,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                           )}
                         </p>
                         {user.username && (
-                          <p className="text-xs text-gray-500 truncate">@{user.username}</p>
+                          <p className="text-xs text-gray-500 truncate"><bdi>@{user.username}</bdi></p>
                         )}
                       </div>
                     </div>

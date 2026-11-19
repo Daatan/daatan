@@ -333,7 +333,7 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
                   <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">
                     {entry.user ? (
                       <a href={`/profile/${entry.user.id}`} className="text-blue-500 hover:underline">
-                        {entry.user.username ? `@${entry.user.username}` : entry.user.name || '—'}
+                        <bdi>{entry.user.username ? `@${entry.user.username}` : entry.user.name || '—'}</bdi>
                       </a>
                     ) : '—'}
                   </td>
