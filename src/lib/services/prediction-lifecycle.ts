@@ -11,6 +11,8 @@ const MAX_EARLY_END_MS = 4 * 3_600_000
  * This keys off resolveByDatetime, not claimDeadline. PENDING closes staking and
  * takes the forecast out of the feeds and the news-indexer, and claimDeadline is
  * parsed from the claim text and can be months away from resolveByDatetime.
+ * The reverse, an extended deadline reopening a PENDING forecast, is in
+ * updateForecast (daatan#2262).
  *
  * Returns the number of predictions transitioned.
  */

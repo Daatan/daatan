@@ -1,7 +1,8 @@
 import crypto from 'crypto'
-import type { OutcomeType } from '@prisma/client'
+import type { OutcomeType, PredictionStatus } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { deadlineEndsAt } from '@/lib/utils/date'
 import { slugify, generateUniqueSlug } from '@/lib/utils/slugify'
 import { tagConnectOrCreate } from '@/lib/services/tag'
 import { hashUrl } from '@/lib/utils/hash'
@@ -830,9 +831,32 @@ const UPDATE_INCLUDE = {
   options: { orderBy: { displayOrder: 'asc' as const } },
 }
 
+/**
+ * daatan#2262: a new Resolve By that hasn't ended reopens a PENDING forecast. Only
+ * transitionExpiredPredictions moves ACTIVE→PENDING, keyed off resolveByDatetime, so an
+ * extended deadline used to leave staking closed and the forecast stuck in Awaiting
+ * Resolution. Same rule as unresolvePrediction. A retro simulation never goes live (#2217).
+ */
+async function reopensOnNewDeadline(
+  id: string,
+  status: PredictionStatus | undefined,
+  resolveByDatetime: string | undefined,
+  now = new Date(),
+): Promise<boolean> {
+  if (status !== 'PENDING' || !resolveByDatetime) return false
+  if (deadlineEndsAt(new Date(resolveByDatetime)) <= now) return false
+  const retro = await prisma.retroSimulation.findUnique({ where: { predictionId: id }, select: { predictionId: true } })
+  return !retro
+}
+
+/** Guarded on PENDING, so a resolution that landed after updateForecast read the status is kept. */
+async function reopenPending(tx: Prisma.TransactionClient, id: string) {
+  await tx.prediction.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'ACTIVE' } })
+}
+
 /** Direct write: the submitted text IS the canonical (English-authored forecasts, or
  *  an admin editing in English). Translations are dropped so display re-translates. */
-async function directUpdateForecast(id: string, data: UpdateForecastData) {
+async function directUpdateForecast(id: string, data: UpdateForecastData, reopen = false) {
   const translatableFieldsChanged =
     data.claimText || data.detailsText !== undefined || data.resolutionRules !== undefined
   if (translatableFieldsChanged) {
@@ -846,6 +870,7 @@ async function directUpdateForecast(id: string, data: UpdateForecastData) {
         data: data.options.map((text, index) => ({ predictionId: id, text, displayOrder: index })),
       })
     }
+    if (reopen) await reopenPending(tx, id)
 
     return tx.prediction.update({
       where: { id },
@@ -887,6 +912,7 @@ async function saveOriginalLanguageEdit(
   lang: string,
   data: UpdateForecastData,
   norm: Awaited<ReturnType<typeof normalizeForecastToEnglish>>,
+  reopen = false,
 ) {
   const seedRows = TRANSLATABLE_FIELDS.flatMap((field) => {
     const original = norm.original[field]
@@ -905,6 +931,7 @@ async function saveOriginalLanguageEdit(
     }
     await tx.predictionTranslation.deleteMany({ where: { predictionId: id } })
     if (seedRows.length) await tx.predictionTranslation.createMany({ data: seedRows, skipDuplicates: true })
+    if (reopen) await reopenPending(tx, id)
     return tx.prediction.update({
       where: { id },
       data: {
@@ -932,9 +959,11 @@ async function saveOriginalLanguageEdit(
 export async function updateForecast(id: string, data: UpdateForecastData) {
   const existing = await prisma.prediction.findUnique({
     where: { id },
-    select: { originalLanguage: true, claimText: true, resolveByDatetime: true },
+    select: { originalLanguage: true, claimText: true, resolveByDatetime: true, status: true },
   })
   if (data.resolveByDatetime) auditResolveByDatetime('update', new Date(data.resolveByDatetime), { predictionId: id })
+  const reopen = await reopensOnNewDeadline(id, existing?.status, data.resolveByDatetime)
+  if (reopen) log.info({ predictionId: id, resolveByDatetime: data.resolveByDatetime }, 'deadline extended: PENDING forecast reopened')
 
   // Either field can change independently in a PATCH — use the effective (post-edit)
   // value for whichever side isn't in this payload, so editing just one side of an
@@ -956,10 +985,10 @@ export async function updateForecast(id: string, data: UpdateForecastData) {
     if (norm.language === null) throw new ForecastTranslationUnavailableError()
     // If the rewrite is actually English (e.g. an admin switched language), store it
     // directly via the normal path; otherwise re-derive + re-seed the original.
-    if (!norm.isEnglish) return saveOriginalLanguageEdit(id, existing.originalLanguage, data, norm)
+    if (!norm.isEnglish) return saveOriginalLanguageEdit(id, existing.originalLanguage, data, norm, reopen)
   }
 
-  return directUpdateForecast(id, data)
+  return directUpdateForecast(id, data, reopen)
 }
 
 /**
