@@ -165,6 +165,26 @@ describe('signed numbers keep their sign in front in RTL', () => {
   })
 })
 
+describe('board switcher (#2257)', () => {
+  const tabs = (html: string) =>
+    [...html.matchAll(/<a [^>]*href="(\/leaderboard[^"]*)"[^>]*>/g)].map(m => [m[1], m[0].includes('aria-current="page"')])
+
+  it('links all three boards and marks the user board current', () => {
+    const html = renderToString(<LeaderboardClient initialUsers={[user({})]} initialTags={[]} initialTag={null} />)
+    expect(html).toContain('aria-label="boards.nav"')
+    expect(tabs(html)).toEqual([['/leaderboard', true], ['/leaderboard/ai', false], ['/leaderboard/sources', false]])
+  })
+
+  it('marks the sources board current and drops the old back link', () => {
+    nav.params = new URLSearchParams()
+    const html = renderToString(
+      <SourceLeaderboardClient authorRows={[]} outletRows={[]} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+    )
+    expect(tabs(html).slice(0, 3)).toEqual([['/leaderboard', false], ['/leaderboard/ai', false], ['/leaderboard/sources', true]])
+    expect(html).not.toContain('backToLeaderboard')
+  })
+})
+
 // A server page that imports a named export from a 'use client' module gets a client reference,
 // not the value: calling it throws at render, which no unit test or build catches (#2212).
 describe('server/client boundary', () => {

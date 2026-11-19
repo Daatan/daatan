@@ -4,9 +4,9 @@ import { Fragment, useEffect, useState, useCallback, type ReactNode } from 'reac
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Trophy, Loader2, Target, TrendingDown, Swords, Bot, Newspaper, Users } from 'lucide-react'
+import { Trophy, Loader2, Target, TrendingDown, Swords, Bot, Users } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
-import { BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD, pillClass } from '@/components/leaderboard/LeaderboardParts'
+import { BODY, BoardTabs, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD, pillClass } from '@/components/leaderboard/LeaderboardParts'
 import { createClientLogger } from '@/lib/client-logger'
 import { useTranslations } from 'next-intl'
 import { FETCH_LIMIT, INITIAL_SORT, LOWER_IS_BETTER, MIN_RANKED_RESOLVED, formatSigned, isLowSample, orderForDisplay, type LeaderboardUser, type SortBy, type SortDir } from './sort'
@@ -150,6 +150,12 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+      <BoardTabs
+        active="users"
+        ariaLabel={t('boards.nav')}
+        labels={{ users: t('boards.users'), ai: t('boards.ai'), sources: t('boards.sources') }}
+      />
+
       {/* Header */}
       <div className="flex flex-col items-center text-center mb-8">
         <div className="p-4 bg-amber-900/20 rounded-2xl mb-4">
@@ -157,22 +163,6 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
         </div>
         <h1 className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight">{t('title')}</h1>
         <p className="text-gray-500 max-w-md">{t('subtitle')}</p>
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          <Link
-            href="/leaderboard/ai"
-            className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300"
-          >
-            <Bot className="w-4 h-4" />
-            {t('aiPanelLink')}
-          </Link>
-          <Link
-            href="/leaderboard/sources"
-            className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300"
-          >
-            <Newspaper className="w-4 h-4" />
-            {t('sourceLeaderboardLink')}
-          </Link>
-        </div>
       </div>
 
       {/* Sort Tabs */}

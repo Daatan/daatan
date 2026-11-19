@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, Hash, Newspaper, PenLine, Scale, Swords, TrendingDown } from 'lucide-react'
+import { Hash, Newspaper, PenLine, Scale, Swords, TrendingDown } from 'lucide-react'
 import type {
   AuthorLeaderboardRow,
   OutletLeaderboardRow,
@@ -12,7 +12,7 @@ import type {
 import EmptyState from '@/components/ui/EmptyState'
 import DeskBadge from '@/components/sources/DeskBadge'
 import {
-  BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
+  BODY, BoardTabs, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
   brierTone, pillClass, valueSize,
 } from '@/components/leaderboard/LeaderboardParts'
 import { compareSideRate } from '@/lib/utils/side-rate'
@@ -137,13 +137,11 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-      <Link
-        href="/leaderboard"
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        {t('backToLeaderboard')}
-      </Link>
+      <BoardTabs
+        active="sources"
+        ariaLabel={tl('boards.nav')}
+        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources') }}
+      />
 
       <div className="flex items-center gap-3 mb-2">
         <Newspaper className="w-7 h-7 text-cyan-400" />
