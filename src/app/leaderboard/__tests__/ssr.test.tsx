@@ -158,6 +158,11 @@ describe('signed numbers keep their sign in front in RTL', () => {
     expect(html).toMatch(/<span dir="ltr"[^>]*>-0\.16<\/span>/)
     expect(html).toMatch(/<span dir="ltr"[^>]*>\+0\.99<\/span>/)
   })
+
+  it('isolates the @username line (#2255)', () => {
+    const html = renderToString(<LeaderboardClient initialUsers={[user({})]} initialTags={[]} initialTag={null} />)
+    expect(html).toContain('<bdi>@<!-- -->ada</bdi>')
+  })
 })
 
 // A server page that imports a named export from a 'use client' module gets a client reference,

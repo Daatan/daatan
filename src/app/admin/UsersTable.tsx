@@ -119,7 +119,7 @@ export default function UsersTable() {
                             <span className="text-xs px-1.5 py-0.5 rounded bg-cobalt/20 text-cobalt-light font-mono">BOT</span>
                           )}
                         </div>
-                        <div className="text-xs text-gray-500 font-mono">@{u.username || 'unknown'}</div>
+                        <div className="text-xs text-gray-500 font-mono"><bdi>@{u.username || 'unknown'}</bdi></div>
                       </Link>
                     </td>
                     <td className="p-3 text-sm text-gray-500">{u.email}</td>

@@ -99,7 +99,7 @@ export async function UserProfileView({
               )}
             </div>
             <p className="text-gray-500 font-medium mb-3">
-              {user.username ? `@${user.username}` : user.email}
+              <bdi>{user.username ? `@${user.username}` : user.email}</bdi>
             </p>
 
             {(user.website || user.twitterHandle) && (
