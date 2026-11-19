@@ -1,8 +1,48 @@
 import type { ReactNode } from 'react'
-import { Medal } from 'lucide-react'
+import Link from 'next/link'
+import { Bot, Medal, Newspaper, Trophy } from 'lucide-react'
 
 // Shared by the user, source and AI-panel leaderboards so the three boards read as one surface.
 // No hooks: the AI board is a server component.
+
+export type Board = 'users' | 'ai' | 'sources'
+
+const BOARDS: { board: Board; href: string; icon: typeof Trophy }[] = [
+  { board: 'users', href: '/leaderboard', icon: Trophy },
+  { board: 'ai', href: '/leaderboard/ai', icon: Bot },
+  { board: 'sources', href: '/leaderboard/sources', icon: Newspaper },
+]
+
+/**
+ * Switcher between the three boards, at the top of each (#2257). Underlined tabs rather than
+ * pills: the sort and view rows below it are pills, and a third pill row read as one more filter.
+ * On phones the three share the width without icons, so the longest locale (ru) fits at 360 px.
+ */
+export function BoardTabs({ active, labels, ariaLabel }: {
+  active: Board
+  labels: Record<Board, string>
+  ariaLabel: string
+}) {
+  return (
+    <nav aria-label={ariaLabel} className="flex border-b border-navy-600 mb-6 overflow-x-auto scrollbar-hide">
+      {BOARDS.map(({ board, href, icon: Icon }) => (
+        <Link
+          key={board}
+          href={href}
+          aria-current={board === active ? 'page' : undefined}
+          className={`-mb-px flex flex-1 sm:flex-none flex-shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-2 sm:px-5 py-3 text-sm sm:text-base font-semibold transition-colors ${
+            board === active
+              ? 'border-cobalt text-white'
+              : 'border-transparent text-gray-400 hover:border-navy-600 hover:text-white'
+          }`}
+        >
+          <Icon className="hidden sm:block w-4 h-4" />
+          {labels[board]}
+        </Link>
+      ))}
+    </nav>
+  )
+}
 
 export const TABLE_CARD = 'bg-navy-700 border border-navy-600 rounded-2xl shadow-sm'
 export const HEAD_ROW = 'bg-navy-800 border-b border-navy-600'

@@ -303,8 +303,12 @@
   "leaderboard": {
     "title": "Leaderboard",
     "subtitle": "Forecasters ranked by ELO rating. Prove your accuracy and climb the ranks.",
-    "aiPanelLink": "AI panel leaderboard",
-    "sourceLeaderboardLink": "Source leaderboard",
+    "boards": {
+      "nav": "Leaderboards",
+      "users": "Forecasters",
+      "ai": "AI models",
+      "sources": "Sources"
+    },
     "rank": "Rank",
     "predictor": "Predictor",
     "correct": "Correct",
@@ -1187,7 +1191,6 @@
   "aiLeaderboard": {
     "title": "AI Panel Leaderboard",
     "experimental": "Experimental",
-    "backToLeaderboard": "Back to leaderboard",
     "explainer": "Each AI model is scored the moment a user stakes, against the outcome — the same matched-time Brier used for humans. Lower is better; 0.25 is a coin flip.",
     "humanBaseline": "Human forecasters (same commitments)",
     "nScores": "{n} scores",
@@ -1208,7 +1211,6 @@
   },
   "sourceLeaderboard": {
     "title": "Source Leaderboard",
-    "backToLeaderboard": "Back to leaderboard",
     "explainer": "Byline authors and outlets scored on their own directional forecasts (author_lean), resolved against outcomes — the same accountability the user leaderboard gives predictors. Lower Brier is better; 0.25 is a coin flip.",
     "view": {
       "authors": "By author",

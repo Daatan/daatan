@@ -1,11 +1,10 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
-import { Bot, ArrowLeft, Hash, TrendingDown, Trophy } from 'lucide-react'
+import { Bot, Hash, TrendingDown, Trophy } from 'lucide-react'
 import { getAiLeaderboard } from '@/lib/services/ai-panel-leaderboard'
 import EmptyState from '@/components/ui/EmptyState'
 import {
-  BODY, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
+  BODY, BoardTabs, ColumnHint, HEAD_CELL, HEAD_ROW, LEGEND_GRID, LegendCard, LowerIsBetter, RankBadge, TABLE_CARD,
   brierTone, valueSize,
 } from '@/components/leaderboard/LeaderboardParts'
 
@@ -25,13 +24,11 @@ export default async function AiLeaderboardPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-      <Link
-        href="/leaderboard"
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        {t('backToLeaderboard')}
-      </Link>
+      <BoardTabs
+        active="ai"
+        ariaLabel={tl('boards.nav')}
+        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources') }}
+      />
 
       <div className="flex items-center gap-3 mb-2">
         <Bot className="w-7 h-7 text-cyan-400" />

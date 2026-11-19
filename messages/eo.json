@@ -303,8 +303,12 @@
   "leaderboard": {
     "title": "Rangolisto",
     "subtitle": "Prognozistoj rangigitaj laŭ ELO-takso. Pruvu vian precizecon kaj grimpu la rangojn.",
-    "aiPanelLink": "Rangolisto de AI",
-    "sourceLeaderboardLink": "Rangolisto de fontoj",
+    "boards": {
+      "nav": "Rangolistoj",
+      "users": "Prognozantoj",
+      "ai": "AI-modeloj",
+      "sources": "Fontoj"
+    },
     "rank": "Rango",
     "predictor": "Prognozanto",
     "correct": "Ĝusta",
@@ -1187,7 +1191,6 @@
   "aiLeaderboard": {
     "title": "Rangolisto de AI",
     "experimental": "Eksperimenta",
-    "backToLeaderboard": "← Reen al la rangolisto",
     "explainer": "Ĉiu AI-modelo estas poentita en la momento kiam uzanto vetas, kontraŭ la rezulto — la sama samtempa Brier uzata por homoj. Malpli estas pli bone; 0,25 estas monero-ĵeto.",
     "humanBaseline": "Homaj prognozistoj (samaj vetoj)",
     "nScores": "{n, plural, one {# poento} other {# poentoj}}",
@@ -1208,7 +1211,6 @@
   },
   "sourceLeaderboard": {
     "title": "Rangolisto de Fontoj",
-    "backToLeaderboard": "← Reen al la rangolisto",
     "explainer": "Aŭtoroj kaj fontoj poentitaj laŭ siaj propraj direktaj prognozoj (author_lean), kontrolitaj kontraŭ la rezulto — la sama respondigo kiun la rangolisto donas al prognozistoj. Malpli alta Brier estas pli bone; 0,25 estas monero-ĵeto.",
     "view": {
       "authors": "Laŭ aŭtoro",
