@@ -501,6 +501,9 @@ latest `main`, because every merge deploys there.
 - **`watchdog.yml` and `cert-expiry.yml`** check staging only while it is running. A staging probe
   is rare, so the deploy's own HTTPS health check is the main signal. Every deploy also runs
   `certbot renew`.
+- **`search-health.yml` checks production.** It used to call staging, so while staging was off
+  every hourly run timed out and failed. The Oracul's search providers are shared, so prod reports
+  the same credits. A manual run can still pick `target: staging`.
 - **No cron or timer of ours runs on the box**, so nothing is lost while it is off.
 - **Releases are unaffected.** A tag waits for that commit's `Deploy to Staging` to succeed, and
   that job wakes the box.

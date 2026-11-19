@@ -1,10 +1,26 @@
 name: Search Health Check
 
+# Calls GET /api/cron/search-health, which polls the Oracul's /search/health and
+# posts one grouped Telegram digest for exhausted or low-credit search providers.
+#
+# Runs against PRODUCTION. Staging is normally off (#2089), so the hourly run
+# used to hit a stopped box: curl timed out, every run failed and the failure
+# mails piled up while nothing was checked. The Oracul and its search providers
+# are shared, so prod sees the same credits. On prod a critical digest (no
+# usable providers) goes to the clean channel; routine low-credit digests stay
+# on noisy (docs/TELEGRAM_NOTIFICATIONS.md).
+
 on:
   schedule:
     # Every hour — checks oracle search provider credits and alerts via Telegram
     - cron: '0 * * * *'
   workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to check
+        type: choice
+        options: [production, staging]
+        default: production
 
 permissions:
   contents: read
@@ -22,13 +38,24 @@ jobs:
 
     steps:
       - name: Trigger search health check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+          # Empty on schedule events — the hourly run checks production.
+          TARGET: ${{ inputs.target || 'production' }}
         run: |
-          URL="${{ secrets.STAGING_URL }}/api/cron/search-health"
+          if [ "$TARGET" = "production" ]; then
+            BASE="https://daatan.com"
+          else
+            BASE="$STAGING_URL"
+          fi
+          if [ -z "$BASE" ]; then echo "❌ No URL configured for $TARGET"; exit 1; fi
 
+          URL="$BASE/api/cron/search-health"
           echo "Polling search health at $URL"
 
           RESPONSE=$(curl -s -w "\n%{http_code}" "$URL" \
-            -H "x-cron-secret: ${{ secrets.BOT_RUNNER_SECRET }}" \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" \
             --max-time 30)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
