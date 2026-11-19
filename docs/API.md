@@ -62,6 +62,8 @@ Get single forecast by id or slug. Public; returns `userCommitment` if authentic
 ### `PATCH /api/forecasts/[id]` — Auth
 Update forecast (author or admin). Core fields editable only on DRAFT; `isPublic` editable on any status.
 
+Moving the `resolveByDatetime` of a `PENDING` forecast to a deadline that has not ended yet puts it back to `ACTIVE` (daatan#2262): staking reopens and it leaves Awaiting Resolution. This is the same rule the unresolve route uses. A retro simulation stays as it is.
+
 **Body** — `patchPredictionSchema` (claimText, detailsText, resolutionRules, resolveByDatetime, isPublic, options)
 
 ---
@@ -967,6 +969,8 @@ throws. Triggered hourly by `.github/workflows/external-market-sync.yml`.
 
 ### `GET /api/cron/transition-expired-predictions`
 Transitions `ACTIVE` predictions past their `resolveByDatetime` to `PENDING`.
+The way back is in `PATCH /api/forecasts/[id]`: extending the deadline of a
+`PENDING` forecast reopens it (daatan#2262).
 Moved off the `GET /api/forecasts` hot read path (#1202) — every feed load
 was paying for this write-scan before doing any read. Doesn't gate commitment
 eligibility (`getCommitmentLockReason` checks `resolveByDatetime` directly),
