@@ -1,20 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getTranslations } from 'next-intl/server'
 import { isSelfHosted } from '@/lib/edition'
+import { retroMetadata } from '../metadata'
 import UkraineRetroReport from './UkraineRetroReport'
 import rows from './rows.json'
 import pool from './pool.json'
 import type { PoolRow, ReportRow } from './types'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('retroUkraine.meta')
-  return {
-    title: t('title'),
-    description: t('description'),
-    alternates: { canonical: '/retroanalysis/ukraine-2022' },
-    openGraph: { url: '/retroanalysis/ukraine-2022', type: 'article' },
-  }
+export function generateMetadata(): Promise<Metadata> {
+  return retroMetadata('retroUkraine', '/retroanalysis/ukraine-2022')
 }
 
 export default function Page() {

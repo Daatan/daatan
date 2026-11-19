@@ -47,7 +47,6 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
         '/forecasts/express$',
         '/forecasts/express?',
         '/forecasts/*/edit',
-        '/retroanalysis',
         // Admin-only internal tool — same category as /admin, /settings, etc.
         // above, just missed when this list was first written.
         '/ibi',

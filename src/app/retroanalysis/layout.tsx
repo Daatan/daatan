@@ -1,14 +1,8 @@
 import type { Metadata } from 'next'
-import { getTranslations } from 'next-intl/server'
+import { retroMetadata } from './metadata'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('retroIndex.meta')
-  return {
-    title: t('title'),
-    description: t('description'),
-    alternates: { canonical: '/retroanalysis' },
-    openGraph: { url: '/retroanalysis', type: 'website' },
-  }
+export function generateMetadata(): Promise<Metadata> {
+  return retroMetadata('retroIndex', '/retroanalysis')
 }
 
 export default function RetroanalysisLayout({ children }: { children: React.ReactNode }) {

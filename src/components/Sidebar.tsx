@@ -72,7 +72,7 @@ const navItems: NavItem[] = [
 ]
 
 // Routes that exist under src/app/[locale]; the rest are served at the root path only.
-const LOCALIZED_NAV_ROUTES = ['/about', '/forecasts', '/home']
+const LOCALIZED_NAV_ROUTES = ['/about', '/forecasts', '/home', '/retroanalysis']
 
 const stripLocale = (pathname: string) => pathname.replace(/^\/(he|ru|eo)(?=\/|$)/, '') || '/'
 

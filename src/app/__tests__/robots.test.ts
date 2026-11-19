@@ -37,4 +37,10 @@ describe('robots.txt disallow rules', () => {
     expect(await blocked('/forecasts/express-train-line-will-open-by-2027')).toBe(false)
     expect(await blocked('/forecasts/some-forecast')).toBe(false)
   })
+
+  it('lets crawlers reach the retro case studies in every language (daatan#2249)', async () => {
+    for (const path of ['/retroanalysis', '/retroanalysis/ukraine-2022', '/he/retroanalysis/israel-2022', '/ru/retroanalysis/energy-2022']) {
+      expect(await blocked(path)).toBe(false)
+    }
+  })
 })
