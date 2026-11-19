@@ -1394,7 +1394,7 @@
   },
   "retroIsrael": {
     "meta": {
-      "title": "Who Saw 64 Seats Coming — Retro Analysis",
+      "title": "Israel 2022 Election: Who Predicted Netanyahu’s 64-Seat Bloc?",
       "description": "1,100 statements from the six months before Israel’s November 2022 Knesset election, each rated for how likely its speaker thought a 61-seat majority for Netanyahu’s bloc was."
     },
     "back": "← Retro Analysis",
@@ -1613,7 +1613,7 @@
   },
   "retroUkraine": {
     "meta": {
-      "title": "Who Saw February 24 Coming — Retro Analysis",
+      "title": "Who Predicted Russia’s Invasion of Ukraine? Retro Analysis",
       "description": "910 statements from the three months before Russia’s full-scale invasion of Ukraine, each rated for how likely its speaker thought the invasion was."
     },
     "back": "← Retro Analysis",
@@ -1835,7 +1835,7 @@
   },
   "retroEnergy": {
     "meta": {
-      "title": "Who Saw $120 Oil and €200 Gas — Retro Analysis",
+      "title": "Who Predicted $120 Oil and €200 Gas in 2022? Retro Analysis",
       "description": "264 rated articles from the six months before the February 2022 invasion, each rated for how likely its speaker thought Brent above $120 and TTF gas above €200/MWh were."
     },
     "back": "← Retro Analysis",
@@ -2066,8 +2066,8 @@
   },
   "retroIndex": {
     "meta": {
-      "title": "Retro Analysis",
-      "description": "Retrospective case studies on DAATAN: who saw a real event coming, rated from what each speaker published at the time."
+      "title": "Who Saw It Coming? Ukraine, Israel and Energy 2022",
+      "description": "Who predicted Russia’s invasion of Ukraine, Israel’s 2022 election and the 2022 oil and gas spike, rated from what each speaker published at the time."
     },
     "nav": {
       "ukraine-2022": "Ukraine 2022",

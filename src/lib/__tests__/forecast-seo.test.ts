@@ -15,7 +15,19 @@ describe('buildForecastDescription', () => {
     expect(stop).not.toContain('..')
     expect(stop).toContain('2026. 2 forecasters have committed')
     const question = buildForecastDescription('Will it rain tomorrow?', null, { commitmentCount: 1 })
-    expect(question).toBe('Will it rain tomorrow? 1 forecaster have committed')
+    expect(question).toBe('Will it rain tomorrow? 1 forecaster has committed')
+  })
+
+  it('starts every appended sentence with a capital letter', () => {
+    const result = buildForecastDescription(
+      "George R.R. Martin will release 'The Winds of Winter' by December 31, 2026.",
+      null,
+      { commitmentCount: 2, resolveByDatetime: new Date('2026-12-31T12:00:00Z') },
+    )
+    expect(result).toBe(
+      "George R.R. Martin will release 'The Winds of Winter' by December 31, 2026. 2 forecasters have committed. Resolves Dec 31, 2026",
+    )
+    expect(result).not.toMatch(/[.!?] [a-z]/)
   })
 
   it('uses detailsText when long enough', () => {
@@ -74,13 +86,13 @@ describe('buildForecastDescription', () => {
       resolveByDatetime: '2026-12-31T00:00:00Z',
     })
     expect(result).toContain('12 forecasters have committed')
-    expect(result).toContain('resolves')
+    expect(result).toContain('Resolves')
     expect(result.length).toBeLessThanOrEqual(158)
   })
 
-  it('uses singular "forecaster" when commitmentCount is 1', () => {
+  it('uses singular "forecaster has" when commitmentCount is 1', () => {
     const result = buildForecastDescription('Will X happen?', null, { commitmentCount: 1 })
-    expect(result).toContain('1 forecaster have committed')
+    expect(result).toContain('1 forecaster has committed')
   })
 
   it('ignores ctx when detailsText is long enough', () => {
