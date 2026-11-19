@@ -657,6 +657,9 @@ export interface OracleAuthorShadowEntry {
   skill_mu: number
   skill_sigma: number
   skill_conservative: number
+  /** Log score vs a coin flip, summed over scored resolutions (daatan#2259, retro#1088). Absent
+   *  on a board scored before retro shipped it, until the next ingest replays the board. */
+  bits?: number
   predictions: number
   articles: number
 }
