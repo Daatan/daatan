@@ -103,6 +103,13 @@ describe('source leaderboard bits column', () => {
     expect(html.split('legend.bitsDesc').length - 1).toBe(2)
   })
 
+  it('hides "takes a side" on phones unless the board is sorted by it', () => {
+    const hiddenOnPhones = (html: string) => (html.match(/hidden sm:table-cell/g) ?? []).length
+    // Default view: the outlet column and "takes a side" both drop below sm, in the head and every row.
+    expect(hiddenOnPhones(render('view=authors'))).toBe(2 * (rows.length + 1))
+    expect(hiddenOnPhones(render('view=authors&sort=side'))).toBe(rows.length + 1)
+  })
+
   it('sorts by bits from the URL, rows without a value last either way', () => {
     expect(order(render('view=authors&sort=bits'))).toEqual(['Bold', 'Cautious', 'Wrong', 'Unscored'])
     expect(order(render('view=authors&sort=bits&dir=asc'))).toEqual(['Wrong', 'Cautious', 'Bold', 'Unscored'])
@@ -146,8 +153,11 @@ describe('source leaderboard rank and hints', () => {
   // rank from the row order of the medal colours instead.
   const medalOrder = (html: string) =>
     [...html.matchAll(/lucide-medal[^"]*text-(yellow-500|gray-400|amber-600)"/g)].map(m => m[1])
+  // Domains render with a <wbr> after each dot (#2259).
   const rowOrder = (html: string) =>
-    ['A.com', 'B.com', 'C.com'].sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+    ['A.<wbr/>com', 'B.<wbr/>com', 'C.<wbr/>com']
+      .sort((a, b) => html.indexOf(`>${a}<`) - html.indexOf(`>${b}<`))
+      .map(n => n.replace('<wbr/>', ''))
 
   it('ranks by Brier from the lowest even when the URL lists the worst first', () => {
     const html = render('view=outlets&sort=brier&dir=desc')
