@@ -3,13 +3,15 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { getAuthorShadowLeaderboard, type OracleAuthorShadowEntry } from '@/lib/services/oracle'
 import { compareSideRate } from '@/lib/utils/side-rate'
+import { compareBits } from '@/lib/utils/bits'
 
 const log = createLogger('source-leaderboard')
 
 export type SourceLeaderboardView = 'authors' | 'outlets'
 /** `sideRate` (daatan#2231) orders author rows by sideTaken/sideTotal; outlet rows have no such
- *  counts and keep the default order under it. */
-export type SourceSortBy = 'skillConservative' | 'brierScore' | 'sideRate'
+ *  counts and keep the default order under it. `bits` (daatan#2259) is higher-is-better, rows
+ *  without a value last. */
+export type SourceSortBy = 'skillConservative' | 'brierScore' | 'sideRate' | 'bits'
 
 export interface AuthorLeaderboardRow {
   id: string
@@ -29,6 +31,9 @@ export interface AuthorLeaderboardRow {
    *  absent unless the caller asked for them (`getSourceLeaderboard`'s `sideCounts`). */
   sideTaken?: number | null
   sideTotal?: number | null
+  /** Bits vs a coin flip (daatan#2259): retro's `log2(P(outcome)/0.5)` summed over the byline's
+   *  scored resolutions. A sum, so merged rows add up. Null until retro's board carries it. */
+  bits?: number | null
 }
 
 export interface OutletLeaderboardRow {
@@ -36,6 +41,8 @@ export interface OutletLeaderboardRow {
   outletName: string
   skillConservative: number
   brierScore: number
+  /** Sum of its bylines' `bits`; null when none carries it. */
+  bits?: number | null
   authorCount: number
   predictions: number
   articles: number
@@ -146,6 +153,7 @@ function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
     outletName: e.outlet_name,
     skillConservative: round3(e.skill_conservative),
     brierScore: round3(e.brier_score),
+    bits: e.bits == null ? null : round3(e.bits),
     predictions: e.predictions,
     articles: e.articles,
     isDesk: isDeskByline(e.author),
@@ -160,6 +168,7 @@ function toAuthorRow(e: OracleAuthorShadowEntry): AuthorLeaderboardRow {
  * Both metrics are weighted by each author's `predictions` count so one prolific author
  * doesn't get diluted by several single-prediction bylines at the same outlet (and vice
  * versa) — same intent as the predictions-count gating already used elsewhere on this board.
+ * `bits` is a sum, not a mean, so it adds up across the outlet's bylines.
  */
 export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLeaderboardRow[] {
   const groups = new Map<string, OracleAuthorShadowEntry[]>()
@@ -189,6 +198,7 @@ export function aggregateByOutlet(entries: OracleAuthorShadowEntry[]): OutletLea
       outletName,
       skillConservative: round3(weighted(e => e.skill_conservative)),
       brierScore: round3(weighted(e => e.brier_score)),
+      bits: sumBits(group.map(e => e.bits)),
       // People, not ledger rows: joint bylines name several, the bylineless bucket none, and one
       // author can have a row per outlet alias or spelling.
       authorCount: new Set(group.flatMap(e => bylinePeople(e.author)).map(authorKey)).size,
@@ -225,7 +235,7 @@ export function bylinePeople(author: string): string[] {
   return parts.filter(p => !NON_PERSON_TOKENS.has(authorKey(p)) && !isDeskPiece(p))
 }
 
-/** Joint-byline rows → one row per named person. Each person gets the row's Brier and
+/** Joint-byline rows → one row per named person. Each person gets the row's Brier, bits and
  *  prediction count in full (credit model chosen for #1904; Brier is a per-prediction mean). */
 function expandJointBylines(rows: AuthorLeaderboardRow[]): AuthorLeaderboardRow[] {
   return rows.flatMap(r => {
@@ -264,6 +274,7 @@ function mergeAuthorRows(rows: AuthorLeaderboardRow[]): AuthorLeaderboardRow[] {
       ...lead,
       skillConservative: round3(weighted(r => r.skillConservative)),
       brierScore: round3(weighted(r => r.brierScore)),
+      bits: sumBits(group.map(r => r.bits)),
       predictions: preds,
       articles: group.reduce((sum, r) => sum + r.articles, 0),
     })
@@ -280,8 +291,8 @@ export function authorsOfOutlet(rows: AuthorLeaderboardRow[], outletName: string
 }
 
 /** skillConservative is higher-is-better; brierScore is lower-is-better; sideRate puts rows
- *  without counts last and falls back to skill among them. */
-function sortRows<T extends { skillConservative: number; brierScore: number; sideTaken?: number | null; sideTotal?: number | null }>(
+ *  without counts last and falls back to skill among them; bits likewise. */
+function sortRows<T extends { skillConservative: number; brierScore: number; sideTaken?: number | null; sideTotal?: number | null; bits?: number | null }>(
   rows: T[],
   sortBy: SourceSortBy,
 ): T[] {
@@ -290,8 +301,16 @@ function sortRows<T extends { skillConservative: number; brierScore: number; sid
       ? a.brierScore - b.brierScore
       : sortBy === 'sideRate'
         ? compareSideRate(a, b) || b.skillConservative - a.skillConservative
-        : b.skillConservative - a.skillConservative,
+        : sortBy === 'bits'
+          ? compareBits(a, b) || b.skillConservative - a.skillConservative
+          : b.skillConservative - a.skillConservative,
   )
+}
+
+/** Null when no row carries bits (a board scored before retro#1088), else the sum of those that do. */
+function sumBits(values: (number | null | undefined)[]): number | null {
+  const present = values.filter((v): v is number => v != null)
+  return present.length ? round3(present.reduce((a, b) => a + b, 0)) : null
 }
 
 interface PoolBylineGroup {

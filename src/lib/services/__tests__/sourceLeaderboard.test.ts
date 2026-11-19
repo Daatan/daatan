@@ -594,3 +594,54 @@ describe('"takes a side" counts (#2231)', () => {
     expect(outletRows.map(r => r.outletName)).toEqual(['strong.com', 'weak.com'])
   })
 })
+
+describe('bits vs a coin flip (#2259)', () => {
+  beforeEach(() => {
+    mockGetAuthorShadowLeaderboard.mockReset()
+  })
+
+  it('maps retro\'s bits, null when the board predates them', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [entry({ author: 'Bold', outlet_name: 'x.com', bits: 1.23456 }), entry({ author: 'Old', outlet_name: 'x.com' })],
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'skillConservative', 0)
+    expect(Object.fromEntries(authorRows.map(r => [r.author, r.bits]))).toEqual({ Bold: 1.235, Old: null })
+  })
+
+  it('sums bits when merging a person\'s rows and across an outlet, skipping rows without them', () => {
+    const merged = authorsOfOutlet(
+      [
+        { id: 's', author: 'Lior Ben Ari', outletName: 'ynet.co.il', skillConservative: 0, brierScore: 0.2, predictions: 1, articles: 1, bits: 0.85 },
+        { id: 'j', author: 'Itamar Eichner; Lior Ben Ari', outletName: 'ynet.co.il', skillConservative: 0, brierScore: 0.2, predictions: 2, articles: 2, bits: -0.5 },
+        { id: 'o', author: 'Lior Ben Ari', outletName: 'ynet.co.il', skillConservative: 0, brierScore: 0.2, predictions: 1, articles: 1, bits: null },
+      ],
+      'ynet.co.il',
+    )
+    const by = Object.fromEntries(merged.map(r => [authorKey(r.author), r.bits]))
+    expect(by['lior ben ari']).toBeCloseTo(0.35)
+    expect(by['itamar eichner']).toBeCloseTo(-0.5)
+
+    const [outlet] = aggregateByOutlet([
+      entry({ author: 'A', outlet_name: 'x.com', bits: 0.85 }),
+      entry({ author: 'B', outlet_name: 'x.com', bits: 0.55 }),
+      entry({ author: 'C', outlet_name: 'x.com' }),
+    ])
+    expect(outlet.bits).toBeCloseTo(1.4)
+    const [none] = aggregateByOutlet([entry({ author: 'A', outlet_name: 'y.com' })])
+    expect(none.bits).toBeNull()
+  })
+
+  it('sorts by bits, highest first, rows without bits last', async () => {
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 3,
+      authors: [
+        entry({ author: 'Cautious', outlet_name: 'x.com', bits: 0.55, skill_conservative: 0.9 }),
+        entry({ author: 'Unscored', outlet_name: 'x.com', skill_conservative: 0.8 }),
+        entry({ author: 'Bold', outlet_name: 'x.com', bits: 0.85, skill_conservative: 0.1 }),
+      ],
+    })
+    const { authorRows } = await getSourceLeaderboard('authors', 'bits', 0)
+    expect(authorRows.map(r => r.author)).toEqual(['Bold', 'Cautious', 'Unscored'])
+  })
+})
