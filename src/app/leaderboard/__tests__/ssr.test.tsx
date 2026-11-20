@@ -64,6 +64,9 @@ describe('leaderboard server render', () => {
     try {
       const bySide = render('view=authors&sort=side')
       expect(bySide).toContain('sideRate')
+      // The rate it sorts by, with the sample size underneath (#2259 follow-up).
+      expect(bySide).toContain('<span dir="ltr">75%</span>')
+      expect(bySide).toContain('<span dir="ltr">10%</span>')
       expect(bySide).toContain('6/8')
       expect(bySide).toContain('—')
       expect(order(bySide)).toEqual(['Sider Big', 'Sider', 'Hedger', 'Unknown'])
@@ -113,6 +116,24 @@ describe('source leaderboard bits column', () => {
   it('sorts by bits from the URL, rows without a value last either way', () => {
     expect(order(render('view=authors&sort=bits'))).toEqual(['Bold', 'Cautious', 'Wrong', 'Unscored'])
     expect(order(render('view=authors&sort=bits&dir=asc'))).toEqual(['Wrong', 'Cautious', 'Bold', 'Unscored'])
+  })
+
+  it('stays off the board, legend and footnote until a row has a value', () => {
+    nav.params = new URLSearchParams('view=authors&sort=bits')
+    try {
+      const unscored = rows.map(r => ({ ...r, bits: null }))
+      const html = renderToString(
+        <SourceLeaderboardClient authorRows={unscored} outletRows={[]} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
+      )
+      expect(html).not.toContain('legend.bitsDesc')
+      expect(html).not.toContain('footnoteBits')
+      expect(html).not.toContain('>bits<')
+      // sort=bits falls back to the default Skill order rather than sorting by an invisible column.
+      expect(order(html)).toEqual(['Cautious', 'Unscored', 'Bold', 'Wrong'])
+    } finally {
+      nav.params = new URLSearchParams()
+    }
+    expect(render('view=authors')).toContain('footnoteBits')
   })
 
   it('shows bits on the outlets view too', () => {
