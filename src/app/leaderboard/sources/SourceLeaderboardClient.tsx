@@ -55,8 +55,12 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
   // `sortBy=brierScore` is the pre-sortable-columns URL; keep old links working.
   const legacyBrier = searchParams.get('sortBy') === 'brierScore'
   const sortParam = searchParams.get('sort') as SortKey | null
+  // "vs coin flip" (#2259) stays off the board until retro has scored a row: retro rescores
+  // only when the next binary forecast resolves, and a column of dashes reads as broken.
+  const hasBits = (view === 'outlets' ? outletRows : authorRows).some(r => r.bits != null)
   // "Takes a side" is an authors-only column (#2231); the outlets view keeps its default order.
-  const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam) && !(sortParam === 'side' && view === 'outlets')
+  const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam)
+    && !(sortParam === 'side' && view === 'outlets') && !(sortParam === 'bits' && !hasBits)
     ? sortParam
     : legacyBrier ? 'brier' : 'skill'
   const dirParam = searchParams.get('dir')
@@ -133,8 +137,8 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
   // On phones the outlet / author count moves under the name (like @username on the user board),
   // unless the board is sorted by it.
   const secondaryVisibility = sort === 'secondary' ? '' : 'hidden sm:table-cell'
-  // "Takes a side" gives way to Bits on phones the same way (#2259): with both, Bits sat past
-  // the right edge of a 360 px screen.
+  // "Takes a side" gives way to "vs coin flip" on phones the same way (#2259): with both, it sat
+  // past the right edge of a 360 px screen.
   const sideVisibility = sort === 'side' ? '' : 'hidden sm:table-cell'
 
   const columns: { key: SortKey; label: string; hint?: string; lowerIsBetter?: boolean; align: 'left' | 'right'; className: string }[] = [
@@ -145,7 +149,9 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
     ...(view === 'authors'
       ? [{ key: 'side' as const, label: t('sideRate'), hint: t('sideRateHint'), align: 'right' as const, className: `px-2 sm:px-4 ${sideVisibility}` }]
       : []),
-    { key: 'bits', label: t('bits'), hint: t('legend.bitsDesc'), align: 'right', className: 'px-2 sm:px-4' },
+    ...(hasBits
+      ? [{ key: 'bits' as const, label: t('bits'), hint: t('legend.bitsDesc'), align: 'right' as const, className: 'px-2 sm:px-4' }]
+      : []),
     { key: 'predictions', label: t('predictions'), hint: t('legend.predictionsDesc'), align: 'right', className: 'px-2 sm:px-4' },
   ]
 
@@ -281,12 +287,20 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
                       </td>
                       {view === 'authors' && (
                         <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${sideVisibility} ${valueSize(sort === 'side')} ${sort === 'side' ? 'text-white' : 'text-text-secondary'}`}>
-                          {row.sideTotal ? `${row.sideTaken}/${row.sideTotal}` : '—'}
+                          {/* The rate is what the column sorts by; X/Y underneath keeps the sample size. */}
+                          {row.sideTotal ? (
+                            <>
+                              <span dir="ltr">{`${Math.round(((row.sideTaken ?? 0) / row.sideTotal) * 100)}%`}</span>
+                              <span dir="ltr" className="block text-[10px] sm:text-xs font-normal text-gray-500">{`${row.sideTaken}/${row.sideTotal}`}</span>
+                            </>
+                          ) : '—'}
                         </td>
                       )}
-                      <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${valueSize(sort === 'bits')} ${sort === 'bits' ? 'text-white' : 'text-text-secondary'}`}>
-                        <span dir="ltr">{formatBits(row.bits)}</span>
-                      </td>
+                      {hasBits && (
+                        <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums whitespace-nowrap ${valueSize(sort === 'bits')} ${sort === 'bits' ? 'text-white' : 'text-text-secondary'}`}>
+                          <span dir="ltr">{formatBits(row.bits)}</span>
+                        </td>
+                      )}
                       <td className={`px-2 sm:px-4 py-3 sm:py-4 text-right tabular-nums ${valueSize(sort === 'predictions')} ${sort === 'predictions' ? 'text-white' : 'text-gray-400'}`}>
                         {row.predictions}
                       </td>
@@ -306,13 +320,15 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
         {view === 'authors' && (
           <LegendCard icon={<Scale className="w-4 h-4 text-green-500" />} title={t('sideRate')}>{t('sideRateHint')}</LegendCard>
         )}
-        <LegendCard icon={<Zap className="w-4 h-4 text-amber-400" />} title={t('bits')}>{t('legend.bitsDesc')}</LegendCard>
+        {hasBits && (
+          <LegendCard icon={<Zap className="w-4 h-4 text-amber-400" />} title={t('bits')}>{t('legend.bitsDesc')}</LegendCard>
+        )}
         <LegendCard icon={<Hash className="w-4 h-4 text-cyan-400" />} title={t('predictions')}>
           {t('legend.predictionsDesc')}
         </LegendCard>
       </div>
 
-      <p className="text-xs text-gray-500 mt-4 max-w-2xl">{t('footnote')}</p>
+      <p className="text-xs text-gray-500 mt-4 max-w-2xl">{t('footnote')}{hasBits && <> {t('footnoteBits')}</>}</p>
     </div>
   )
 }

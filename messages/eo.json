@@ -1220,7 +1220,7 @@
       "skillConservative": "Lerteco",
       "brierScore": "Brier-poento",
       "sideRate": "Elektas flankon",
-      "bits": "Bitoj"
+      "bits": "Kontraŭ monero"
     },
     "author": "Aŭtoro",
     "outlet": "Fonto",
@@ -1230,12 +1230,12 @@
     "brierScore": "Brier",
     "sideRate": "Elektas flankon",
     "sideRateHint": "Prognozoj, en kiuj la propra direkta prognozo de la aŭtoro estis eltirita, el ĉiuj prognozoj pri kiuj la aŭtoro skribis (solvitaj aŭ ne).",
-    "bits": "Bitoj",
+    "bits": "Kontraŭ monero",
     "legend": {
       "skillDesc": "Rangigo fonto kontraŭ fonto. Kiam fontoj emas al malaj flankoj pri la sama evento, post la solvo tiuj, kiuj pravis, gajnas poentojn de tiuj, kiuj eraris. Ĝi estas montrata singarde (meznombro minus tri normaj devioj), do fonto kun malmultaj disputataj kazoj restas ĉirkaŭ 0. Pli alta estas pli bona.",
       "brierDesc": "Kiom proksima estis la propra emo de la fonto al tio, kio vere okazis: (probablo − rezulto)², averaĝe laŭ solvitaj prognozoj. 0 estas perfekta, 0,25 estas monero-ĵeto, 1 estas certe malĝusta. Pli malalta estas pli bona.",
       "predictionsDesc": "Solvitaj prognozoj, en kiuj la propra emo de la fonto estis eltirita kaj poentita — la specimeno malantaŭ ĝiaj Lerteco kaj Brier.",
-      "bitsDesc": "Memfido, kiu pravis. Ĉiu solvita prognozo poentas log₂(la probablo, kiun la fonto donis al tio, kio vere okazis ÷ 0,5), kaj la poentoj sumiĝas: ĝusta prognozo je 90% gajnas +0,85, je 73% +0,55, 50/50 gajnas 0, kaj malĝusta prognozo je 90% kostas 2,32. Pli alta estas pli bona; — signifas ankoraŭ ne poentita."
+      "bitsDesc": "Kiom pli bone ol monerĵeto, kun la memfido: prava prognozo je 90% gajnas +0,85, malprava je 90% perdas 2,32."
     },
     "predictions": "Prognozoj",
     "articles": "Artikoloj",
@@ -1243,7 +1243,8 @@
     "emptyDesc": "Fontaj poentoj aperas kiam solvitaj prognozoj portas author_lean-signalojn el siaj cititaj artikoloj.",
     "hiddenAuthors": "{count, plural, one {+ # plia aŭtoro} other {+ # pliaj aŭtoroj}} kun malpli ol {min} solvitaj prognozoj — ankoraŭ ne rangigitaj.",
     "hiddenOutlets": "{count, plural, one {+ # plia eldonejo} other {+ # pliaj eldonejoj}} kun malpli ol {min} solvitaj prognozoj — ankoraŭ ne rangigitaj.",
-    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. La Lerteco kaj Brier de amaskomunikilo estas la valoroj de ĝiaj aŭtoroj, pezitaj laŭ la nombro de iliaj prognozoj; ĝiaj Bitoj estas ilia sumo.",
+    "footnote": "Ombra poentado: ĉi tiu rekordo estas nur informa kaj ne influas la vivan prognozan takson. La Lerteco kaj Brier de amaskomunikilo estas la valoroj de ĝiaj aŭtoroj, pezitaj laŭ la nombro de iliaj prognozoj.",
+    "footnoteBits": "Ĝia „Kontraŭ monero“ estas ilia sumo.",
     "deskBadge": "Redakcio",
     "deskBadgeHint": "Subskribo de redakcio aŭ agentejo, ne de nomita persono"
   },

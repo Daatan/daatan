@@ -1220,7 +1220,7 @@
       "skillConservative": "Skill",
       "brierScore": "Brier score",
       "sideRate": "Takes a side",
-      "bits": "Bits"
+      "bits": "vs coin flip"
     },
     "author": "Author",
     "outlet": "Outlet",
@@ -1230,12 +1230,12 @@
     "brierScore": "Brier",
     "sideRate": "Takes a side",
     "sideRateHint": "Forecasts where this author's own directional forecast was extracted, out of all the forecasts they wrote about (resolved or not).",
-    "bits": "Bits",
+    "bits": "vs coin flip",
     "legend": {
       "skillDesc": "A head-to-head rating. When sources lean opposite ways on an event, the ones that leaned the right way gain on the ones that leaned wrong once it resolves. It is shown cautiously (mean minus three standard deviations), so a source with few contested calls sits near 0. Higher is better.",
       "brierDesc": "How close a source's own lean came to what actually happened: (probability − outcome)², averaged over its resolved forecasts. 0 is perfect, 0.25 is a coin flip, 1 is confidently wrong. Lower is better.",
       "predictionsDesc": "Resolved forecasts where this source's own lean was extracted and scored — the sample behind its Skill and Brier.",
-      "bitsDesc": "Confidence that paid off. Each resolved forecast scores log₂(the probability the source gave what actually happened ÷ 0.5), and the scores add up: a correct call at 90% earns +0.85, at 73% +0.55, a 50/50 earns 0, and a wrong call at 90% costs −2.32. Higher is better; — means not scored yet."
+      "bitsDesc": "How much better than a coin flip, counting confidence: a right call at 90% earns +0.85, a wrong one at 90% costs −2.32."
     },
     "predictions": "Predictions",
     "articles": "Articles",
@@ -1243,7 +1243,8 @@
     "emptyDesc": "Source scores appear once resolved predictions carry author_lean signals from their cited articles.",
     "hiddenAuthors": "{count, plural, one {+ # more author} other {+ # more authors}} with fewer than {min} resolved predictions — not ranked yet.",
     "hiddenOutlets": "{count, plural, one {+ # more outlet} other {+ # more outlets}} with fewer than {min} resolved predictions — not ranked yet.",
-    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. An outlet's Skill and Brier are its authors' figures, weighted by how many predictions each has; its Bits are their sum.",
+    "footnote": "Shadow scoring: this track record is informational only and does not feed the live forecast estimate. An outlet's Skill and Brier are its authors' figures, weighted by how many predictions each has.",
+    "footnoteBits": "Its “vs coin flip” is their sum.",
     "deskBadge": "Desk",
     "deskBadgeHint": "Newsroom or agency byline, not a named person"
   },
