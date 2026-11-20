@@ -27,7 +27,7 @@ export default async function AiLeaderboardPage() {
       <BoardTabs
         active="ai"
         ariaLabel={tl('boards.nav')}
-        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources') }}
+        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources'), versus: tl('boards.versus') }}
       />
 
       <div className="flex items-center gap-3 mb-2">

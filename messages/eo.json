@@ -307,7 +307,8 @@
       "nav": "Rangolistoj",
       "users": "Prognozantoj",
       "ai": "AI-modeloj",
-      "sources": "Fontoj"
+      "sources": "Fontoj",
+      "versus": "Duelo"
     },
     "rank": "Rango",
     "predictor": "Prognozanto",
@@ -1207,6 +1208,39 @@
       "avgBrierDesc": "La probablo de ĉiu modelo en la momento kiam uzanto vetis, kontraŭ la rezulto: (probablo − rezulto)², averaĝe. 0 estas perfekta, 0,25 estas monero-ĵeto, 1 estas certe malĝusta. Pli malalta estas pli bona.",
       "humanDesc": "La Brier de homoj ĉe la samaj vetoj — la stango, kiun la modeloj devas superi.",
       "scoresDesc": "Pri kiom da vetoj de uzantoj la modelo estis poentita. Modeloj kun malpli ol 5 estas kaŝitaj."
+    }
+  },
+  "versusLeaderboard": {
+    "title": "Homoj, AI kaj fakuloj: kiu pli trafas",
+    "experimental": "Eksperimenta",
+    "explainer": "Ĉiu grupo kiel unu prognozanto, komparata nur sur deciditaj prognozoj, kiujn ĉiuj traktis, por ke neniu venku per pli facilaj demandoj.",
+    "stripTitle": "Sur la samaj {n} prognozoj",
+    "stripDesc": "Deciditaj jes/ne-prognozoj, kiujn traktis ĉiuj subaj grupoj. Meza Brier: malpli = pli bone, 0,25 estas monero.",
+    "who": "Kiu",
+    "group": {
+      "people": "Homoj",
+      "oracul": "Orakulo",
+      "experts": "Fakuloj",
+      "market": "Merkato"
+    },
+    "brier": "Brier",
+    "pairsTitle": "Unu kontraŭ unu",
+    "pairsDesc": "Ĉiu paro sur la prognozoj, kiujn ambaŭ traktis: kiom ofte ĉiu estis pli proksima al la rezulto.",
+    "pair": "Paro",
+    "forecasts": "Prognozoj",
+    "closer": "Pli proksima",
+    "ties": "{n, plural, one {# egalo} other {# egaloj}}",
+    "expertsPending": "Fakuloj aperos, kiam iliaj poentoj alvenos de la Orakulo.",
+    "marketPending": "La merkato aliĝos, kiam ĝi kovros {min} deciditajn prognozojn (nun {n}).",
+    "emptyTitle": "Ankoraŭ ne sufiĉe da deciditaj prognozoj",
+    "emptyDesc": "La listo bezonas almenaŭ {min} deciditajn prognozojn, kiujn du grupoj traktis.",
+    "footnote": "La tempo malsamas: la sinteno de aŭtoro datiĝas de la artikolo, la probabloj de homoj kaj de la Orakulo de la veto. «Homoj» ĉi tie estas la meznombro de la homamaso po prognozo, do ĝi malsamas de la homa cifero en la AI-langeto, kiu averaĝas unuopajn vetojn.",
+    "legend": {
+      "peopleDesc": "Po prognozo, la meznombro de la probabloj de uzantoj ĉe ilia veto. Ĉiu prognozo kalkuliĝas unufoje, do la plej aktivaj ne superpezas la aliajn.",
+      "oraculDesc": "La probablo de la Orakulo en la momento, kiam tiuj uzantoj vetis, averaĝita po prognozo.",
+      "expertsDesc": "Aŭtoroj, kies artikoloj prenis sintenon pri la demando, kiel en la langeto Fontoj: la sinteno de ĉiu aŭtoro kiel probablo, averaĝita inter aŭtoroj.",
+      "marketDesc": "La prezo de la ligita prognoza merkato, kiam la uzantoj vetis.",
+      "brierDesc": "Kvadrata distanco inter la probablo kaj tio, kio okazis: 0 estas perfekta, 0,25 estas monero."
     }
   },
   "sourceLeaderboard": {

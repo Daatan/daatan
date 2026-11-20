@@ -251,10 +251,12 @@ describe('board switcher (#2257)', () => {
   const tabs = (html: string) =>
     [...html.matchAll(/<a [^>]*href="(\/leaderboard[^"]*)"[^>]*>/g)].map(m => [m[1], m[0].includes('aria-current="page"')])
 
-  it('links all three boards and marks the user board current', () => {
+  it('links all four boards and marks the user board current', () => {
     const html = renderToString(<LeaderboardClient initialUsers={[user({})]} initialTags={[]} initialTag={null} />)
     expect(html).toContain('aria-label="boards.nav"')
-    expect(tabs(html)).toEqual([['/leaderboard', true], ['/leaderboard/ai', false], ['/leaderboard/sources', false]])
+    expect(tabs(html)).toEqual([
+      ['/leaderboard', true], ['/leaderboard/ai', false], ['/leaderboard/sources', false], ['/leaderboard/versus', false],
+    ])
   })
 
   it('marks the sources board current and drops the old back link', () => {
@@ -262,7 +264,9 @@ describe('board switcher (#2257)', () => {
     const html = renderToString(
       <SourceLeaderboardClient authorRows={[]} outletRows={[]} hidden={{ authors: 0, outlets: 0, min: 4 }} tags={[]} />,
     )
-    expect(tabs(html).slice(0, 3)).toEqual([['/leaderboard', false], ['/leaderboard/ai', false], ['/leaderboard/sources', true]])
+    expect(tabs(html).slice(0, 4)).toEqual([
+      ['/leaderboard', false], ['/leaderboard/ai', false], ['/leaderboard/sources', true], ['/leaderboard/versus', false],
+    ])
     expect(html).not.toContain('backToLeaderboard')
   })
 })
@@ -273,7 +277,7 @@ describe('server/client boundary', () => {
   it('server pages take only the default export from client modules', async () => {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
-    for (const page of ['page.tsx', 'sources/page.tsx']) {
+    for (const page of ['page.tsx', 'sources/page.tsx', 'versus/page.tsx']) {
       const src = readFileSync(join(__dirname, '..', page), 'utf-8')
       expect(src).not.toMatch(/import\s+\w*\s*,?\s*\{[^}]*\}\s+from\s+'\.\/\w*Client'/)
     }

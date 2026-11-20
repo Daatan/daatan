@@ -160,7 +160,7 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
       <BoardTabs
         active="sources"
         ariaLabel={tl('boards.nav')}
-        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources') }}
+        labels={{ users: tl('boards.users'), ai: tl('boards.ai'), sources: tl('boards.sources'), versus: tl('boards.versus') }}
       />
 
       <div className="flex items-center gap-3 mb-2">

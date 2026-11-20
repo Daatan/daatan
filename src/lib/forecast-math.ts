@@ -1,3 +1,6 @@
+/** A binary commitment's implied P(YES) on 0–1, the `p` its Brier is scored on. */
+export const stakeProbability = (cuCommitted: number): number => (cuCommitted + 100) / 200
+
 /**
  * Community probability for a binary forecast: the mean of committers' stated
  * estimates. Each commit's implied P(YES) is (cuCommitted + 100) / 200 — the
@@ -12,6 +15,6 @@
  */
 export function communityProbability(commits: { cuCommitted: number }[]): number | null {
   if (commits.length === 0) return null
-  const mean = commits.reduce((sum, c) => sum + (c.cuCommitted + 100) / 200, 0) / commits.length
+  const mean = commits.reduce((sum, c) => sum + stakeProbability(c.cuCommitted), 0) / commits.length
   return Math.round(mean * 100)
 }

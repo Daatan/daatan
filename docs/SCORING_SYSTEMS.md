@@ -223,6 +223,27 @@ ELO and Glicko-2 per-tag ratings start all users at default values within each t
 
 ---
 
+## People vs AI vs Experts board (`/leaderboard/versus`, #2266)
+
+The fourth leaderboard tab compares groups, not individuals. Each group is **one forecaster per resolved forecast**, and groups are compared only on forecasts they all called, so nobody wins by facing easier questions. Scope: resolved, public, binary forecasts; retro simulations excluded.
+
+| Group | Probability per forecast |
+|-------|--------------------------|
+| People | Mean of `(cuCommitted + 100) / 200` over the forecast's non-bot scored commitments. Each forecast counts once, so heavy users don't outweigh the rest (Mark, 2026-11-20). |
+| Oracul | Mean `aiProbabilityAtCommit` over those same commitments. |
+| Experts | retro's `experts_prob` from `GET /leaderboard/author-shadow/resolutions` (retro#1094): each byline's mean lean as `(lean + 1) / 2`, averaged over bylines. It is read from retro's ledger, not rebuilt from the pool, which has drifted from what was pushed. Scored against daatan's outcome. |
+| Market | The linked market's price at those commitments, recovered from the `market` rows in `ai_member_scores` (`√Brier` is the distance from the outcome; polarity was applied when scoring). Shown only once it covers ≥ 10 forecasts (`MARKET_MIN`). |
+
+- **Strip:** mean Brier of each group over the forecasts every group called. It needs ≥ 20 such forecasts (`STRIP_MIN`) and three or more groups. Market joins it only if the four-way set still has 20; otherwise it appears in the pairs alone.
+- **Head to head:** for each pair of groups, on the forecasts both called, how often each was closer to the outcome (ties within 1e-9), plus each side's mean Brier. A pair needs ≥ 5 shared forecasts (`PAIR_MIN`).
+- People's Brier here is **not** the human figure on `/leaderboard/ai`. That one averages individual commitments; this one scores the crowd's mean per forecast.
+- Timing differs: a pundit's lean dates from the article, while people's and the Oracul's probabilities date from the stake.
+- If the Oracul call fails or retro has not rescored yet, the board shows People vs Oracul and a note that experts are pending.
+- Cached 5 minutes (`leaderboard` tag). The page is `noindex` while experimental, like the AI board.
+- Code: `src/lib/services/versus-board.ts` (`buildVersusBoard` is pure) and `src/app/leaderboard/versus/page.tsx`.
+
+---
+
 ## Implementation Files
 
 | File | Role |
