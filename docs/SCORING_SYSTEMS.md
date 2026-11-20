@@ -4,7 +4,7 @@
 
 DAATAN computes multiple scoring systems for ranking predictors. Each system measures a different aspect of forecasting skill. Systems are tag-filterable — the leaderboard can rank users within a specific topic using the `?tag=` parameter.
 
-**What the UI shows (since 2026-09-23):** ELO is the headline rating. The leaderboard page offers five sort tabs — ELO, Accuracy, Brier Score (default since 2026-11-15, daatan#2187), Peer Score, AI Score (the last two added 2026-11-09, shown from `sm` up; summed per user, positive = beat the crowd / the AI at commit time) — and every column header sorts too: the first click is best-first, a second click flips to worst-first (client-side reverse of the API's best-first list, unranked users stay last). Users with fewer than 5 resolved forecasts are not ranked: they follow everyone else in a separate block, unnumbered, with a "low sample" badge (daatan#2187); the profile header card is ELO and the profile scores grid is Accuracy + Brier + the calibration chart. Every other system below is still computed and reachable through `GET /api/leaderboard?sortBy=` but is not rendered anywhere user-facing. The `N RS` chips (sidebar, forecast author line, activity feed, profile OG image) were replaced by ELO at the same time.
+**What the UI shows (since 2026-09-23):** ELO is the headline rating. The leaderboard page offers five sort tabs — ELO, Accuracy, Brier Score (default since 2026-11-15, daatan#2187), Peer Score, AI Score (labelled "vs AI" since 2026-11-20; the last two added 2026-11-09, shown from `sm` up; summed per user, positive = beat the crowd / the AI at commit time) — and every column header sorts too: the first click is best-first, a second click flips to worst-first (client-side reverse of the API's best-first list, unranked users stay last). Users with fewer than 5 resolved forecasts are not ranked: they follow everyone else in a separate block, unnumbered, with a "low sample" badge (daatan#2187); the profile header card is ELO and the profile scores grid is Accuracy + Brier + the calibration chart. Every other system below is still computed and reachable through `GET /api/leaderboard?sortBy=` but is not rendered anywhere user-facing. The `N RS` chips (sidebar, forecast author line, activity feed, profile OG image) were replaced by ELO at the same time.
 
 The scoring architecture is defined in `src/lib/services/scoring-systems.ts`. Adding a new scoring system requires only:
 1. Adding its key to `SortBy`
@@ -119,6 +119,8 @@ Stored on `Commitment.peerScore` at resolution.
 ---
 
 ### AI Score
+
+Shown on the leaderboard and in the legend as **"vs AI"** (ru «Против ИИ»; since 2026-11-20).
 
 **Key:** `aiScore` · **Sort:** higher is better · **Tag-filtered:** yes
 
