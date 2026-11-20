@@ -169,7 +169,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `GOOGLE_VERTEX_LOCATION` | ✅ | — | Vertex location; omit to default to `global` |
 | `GOOGLE_VERTEX_CLIENT_EMAIL` | ✅ | — | Vertex service-account email (needs the `Vertex AI User` role) |
 | `GOOGLE_VERTEX_PRIVATE_KEY` | ✅ | — | Vertex service-account private key (PEM; `\n`-escaped newlines are un-escaped at load) |
-| `OPENROUTER_API_KEY` | ✅ | — | LLM provider used by bots. Resolved as admin setting (DB) → SSM `/daatan/<env>/secrets/OPENROUTER_API_KEY` → this env var (`getOpenRouterKey()`) |
+| `OPENROUTER_API_KEY` | ✅ | — | OpenRouter: three of the five AI-panel members (DeepSeek, Grok, the Gemma control), the main chain's last-resort leg, and bots. The panel and main chain resolve it as admin setting (DB) → SSM `/daatan/<env>/secrets/OPENROUTER_API_KEY` → this env var (`getOpenRouterKey()`); bots read only this env var |
 | `SERPER_API_KEY` | ✅ | — | Serper.dev — read only by the `/api/health/search` credit check; web search itself goes through the Oracul |
 | `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping — passed to the container, but no `src/` code reads it |
 | `SERPAPI_API_KEY` | ✅ | — | SerpAPI — read only by the `/api/health/search` credit check |
@@ -201,7 +201,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 
 "optional" = wired through `blue-green-deploy.sh` `ENV_ARGS` + compose and optional in `src/env.ts`; whether a given bundle carries it is not recorded here. Non-secret config passed the same way: `AI_PANEL_GROUNDED_TAG`, `TEMPORAL_CLOCK_DISABLED`, `MAX_BOTS` (default 50). `DATABASE_URL`, `NEXTAUTH_URL`, `APP_ENV`, `GA_MEASUREMENT_ID` and (non-prod) `AUTH_TRUST_HOST` are set per environment by `blue-green-deploy.sh` itself, overriding any bundle value.
 
-The three mandatory `GOOGLE_VERTEX_*` vars are **all-or-nothing**: set all three or none. A partial set registers a Vertex leg that fails every call and burns a retry before the chain falls through to the Developer-API key. See [LLM_ARCHITECTURE.md](LLM_ARCHITECTURE.md).
+The three mandatory `GOOGLE_VERTEX_*` vars are **all-or-nothing**: set all three or none. A partial set behaves like an unset one: `vertexEnv()` returns null, so no Vertex leg is registered at all. On daatan.com, which carries no `GEMINI_API_KEY`, the main chain then starts at the Oracul leg, embeddings are skipped, the panel's Gemini member abstains and Gemini-preference bots go straight to OpenRouter. See [LLM_ARCHITECTURE.md](LLM_ARCHITECTURE.md).
 
 If this table drifts from reality, the canonical cross-check is `scripts/blue-green-deploy.sh` (`ENV_ARGS`) and `docker-compose.{prod,staging}.yml`, which are gated by CI via `scripts/check-env-parity.sh`.
 

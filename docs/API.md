@@ -295,7 +295,7 @@ Find forecasts similar to a given forecast (by ID) or query text, using pgvector
 }
 ```
 
-Returns `{ similar: [] }` when no embedding is available (Gemini API key not configured) or no results pass the similarity threshold.
+Returns `{ similar: [] }` when no embedding is available (neither the Vertex service account, `GOOGLE_VERTEX_*`, nor the self-host `GEMINI_API_KEY` fallback is configured, or the embedding call failed) or no results pass the similarity threshold.
 
 ---
 
@@ -753,7 +753,7 @@ Article search via Oracul's provider fallback chain. Proxies to Oracul `/search`
 **Response** `{ "results": [{ "title", "url", "snippet", "source", "published_date" }] }`
 
 ### `POST /api/ibi/llm` — Admin
-LLM call proxied to the Oracul `/llm` endpoint (AWS Bedrock / Amazon Nova via litellm). `model` is a litellm ID and defaults to the Oracul's configured Bedrock model when omitted.
+LLM call proxied to the Oracul `/llm` endpoint, which hands `model` to litellm. `model` is **required** (a non-empty string; the admin IBI tool defaults it to `google/gemini-2.5-flash`). Which model ids the Oracul accepts is decided on the Oracul side (retro#1082).
 
 **Body** `{ "model": "bedrock/amazon.nova-pro-v1:0", "messages": [{ "role": "user", "content": "..." }], "temperature": 0.1 }`
 

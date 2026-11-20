@@ -145,7 +145,7 @@ The bot always commits YES (`binaryChoice = true`, positive confidence). Confide
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `modelPreference` | string | `google/gemini-2.5-flash-preview:free` | OpenRouter model slug used for all LLM calls (`createBotLLMService` in `src/lib/llm/index.ts`). Stale Gemini slugs are aliased to current ones; a Gemini preference tries direct Gemini first when `GEMINI_API_KEY` is set, and on OpenRouter is replaced by the free non-Google `meta-llama/llama-3.3-70b-instruct:free` (OpenRouter has no free Gemini). |
+| `modelPreference` | string | `google/gemini-2.5-flash-preview:free` | OpenRouter-style model slug that picks the bot's own LLM chain (`createBotLLMService` in `src/lib/llm/index.ts`). Stale Gemini slugs are aliased to current ones. A Gemini preference tries Vertex first (the `GOOGLE_VERTEX_*` service account; `gemini-2.5-flash` for the default slug), then the Developer API when `GEMINI_API_KEY` is set (self-host only), then OpenRouter, where it is replaced by the free non-Google `meta-llama/llama-3.3-70b-instruct:free` (OpenRouter has no free Gemini). Any other slug goes to OpenRouter as-is. The bot's OpenRouter leg reads `OPENROUTER_API_KEY` from the environment only, not the admin setting or SSM. |
 
 ---
 
