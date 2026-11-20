@@ -57,7 +57,7 @@ const OTHER_ROWS = [
     filter: 'Tag-filtered',
   },
   {
-    name: 'AI Score',
+    name: 'vs AI',
     key: 'aiScore',
     what: "How much more accurate a user's probability was than DAATAN's AI estimate at commit time.",
     formula: '(ai_p − outcome)² − (user_p − outcome)²',
