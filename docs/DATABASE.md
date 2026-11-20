@@ -999,8 +999,8 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
   `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel
   `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`) and
   `'market'` (linked market price as of the commit instant); both carry
-  `mode = 'sentinel'`. Feeds only `/leaderboard/ai`; no RS/ELO/Glicko path
-  reads it. Carries the full member identity — `mode` (a grounded-indexer twin
+  `mode = 'sentinel'`. Feeds `/leaderboard/ai`, and its `market` rows feed the
+  Market group on `/leaderboard/versus` (#2266); no RS/ELO/Glicko path reads it. Carries the full member identity — `mode` (a grounded-indexer twin
   shares its sibling's model string; UNIQUE is `(commitmentId, model, mode)`)
   and `promptVersion` (null for the sentinels) — and the leaderboard groups by
   `(model, mode, promptVersion)`: scores produced under different prompt

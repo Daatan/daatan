@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Bot, Medal, Newspaper, Trophy } from 'lucide-react'
+import { Bot, Medal, Newspaper, Swords, Trophy } from 'lucide-react'
 
-// Shared by the user, source and AI-panel leaderboards so the three boards read as one surface.
-// No hooks: the AI board is a server component.
+// Shared by the user, AI-panel, source and versus leaderboards so the boards read as one surface.
+// No hooks: the AI and versus boards are server components.
 
-export type Board = 'users' | 'ai' | 'sources'
+export type Board = 'users' | 'ai' | 'sources' | 'versus'
 
 const BOARDS: { board: Board; href: string; icon: typeof Trophy }[] = [
   { board: 'users', href: '/leaderboard', icon: Trophy },
   { board: 'ai', href: '/leaderboard/ai', icon: Bot },
   { board: 'sources', href: '/leaderboard/sources', icon: Newspaper },
+  { board: 'versus', href: '/leaderboard/versus', icon: Swords },
 ]
 
 /**
- * Switcher between the three boards, at the top of each (#2257). Underlined tabs rather than
- * pills: the sort and view rows below it are pills, and a third pill row read as one more filter.
- * On phones the three share the width without icons, so the longest locale (ru) fits at 360 px.
+ * Switcher between the boards, at the top of each (#2257; the fourth, versus, #2266). Underlined
+ * tabs rather than pills: the sort and view rows below it are pills, and a third pill row read as
+ * one more filter. On phones the tabs share the width without icons, at 12 px, so ru still fits
+ * at 360 px (measured with four tabs, 2026-11-20). Keep labels short: one more word overflows.
  */
 export function BoardTabs({ active, labels, ariaLabel }: {
   active: Board
@@ -30,7 +32,7 @@ export function BoardTabs({ active, labels, ariaLabel }: {
           key={board}
           href={href}
           aria-current={board === active ? 'page' : undefined}
-          className={`-mb-px flex flex-1 sm:flex-none flex-shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-2 sm:px-5 py-3 text-sm sm:text-base font-semibold transition-colors ${
+          className={`-mb-px flex flex-1 sm:flex-none flex-shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-1.5 sm:px-5 py-3 text-xs sm:text-base font-semibold transition-colors ${
             board === active
               ? 'border-cobalt text-white'
               : 'border-transparent text-gray-400 hover:border-navy-600 hover:text-white'

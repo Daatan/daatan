@@ -307,7 +307,8 @@
       "nav": "Leaderboards",
       "users": "Forecasters",
       "ai": "AI models",
-      "sources": "Sources"
+      "sources": "Sources",
+      "versus": "Showdown"
     },
     "rank": "Rank",
     "predictor": "Predictor",
@@ -1207,6 +1208,39 @@
       "avgBrierDesc": "Each model's probability at the moment a user staked, scored against the outcome: (probability − outcome)², averaged. 0 is perfect, 0.25 is a coin flip, 1 is confidently wrong. Lower is better.",
       "humanDesc": "Human forecasters' Brier on the same commitments — the bar the models have to beat.",
       "scoresDesc": "How many staked commitments the model was scored on. Models with fewer than 5 are hidden."
+    }
+  },
+  "versusLeaderboard": {
+    "title": "People, AI and experts: who's closer",
+    "experimental": "Experimental",
+    "explainer": "Each group as one forecaster, compared only on resolved forecasts they all called, so nobody wins by getting easier questions.",
+    "stripTitle": "On the same {n} forecasts",
+    "stripDesc": "Resolved yes/no forecasts that every group below called. Mean Brier: lower is better, 0.25 is a coin flip.",
+    "who": "Who",
+    "group": {
+      "people": "People",
+      "oracul": "Oracul",
+      "experts": "Experts",
+      "market": "Market"
+    },
+    "brier": "Brier",
+    "pairsTitle": "Head to head",
+    "pairsDesc": "Each pair on the forecasts both called: how often each was closer to the outcome.",
+    "pair": "Pair",
+    "forecasts": "Forecasts",
+    "closer": "Closer",
+    "ties": "{n, plural, one {# tie} other {# ties}}",
+    "expertsPending": "Experts will appear once their scores come in from the Oracul.",
+    "marketPending": "Market joins once it covers {min} resolved forecasts (now {n}).",
+    "emptyTitle": "Not enough resolved forecasts yet",
+    "emptyDesc": "The board needs at least {min} resolved forecasts that two groups both called.",
+    "footnote": "Timing differs: a pundit's lean dates from the article, people's and the Oracul's probabilities from the stake. People here is the crowd's mean per forecast, so it differs from the human figure on the AI tab, which averages individual stakes.",
+    "legend": {
+      "peopleDesc": "Per forecast, the mean of users' probabilities when they staked. Each forecast counts once, so heavy users don't outweigh the rest.",
+      "oraculDesc": "The Oracul's probability at the moment those users staked, averaged per forecast.",
+      "expertsDesc": "Pundits whose articles leaned on the question, as on the Sources board: each byline's lean as a probability, averaged over bylines.",
+      "marketDesc": "The linked prediction market's price when the users staked.",
+      "brierDesc": "Squared distance between the probability and what happened: 0 is perfect, 0.25 is a coin flip."
     }
   },
   "sourceLeaderboard": {

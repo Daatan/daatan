@@ -923,6 +923,48 @@ export const getAuthorShadowLeaderboard = async (
   }
 }
 
+export interface OracleExpertResolution {
+  prediction_id: string
+  outcome: boolean
+  /** The experts as one forecaster: each byline's mean lean as (lean + 1) / 2, averaged over bylines. */
+  experts_prob: number
+  bylines: number
+}
+
+export interface OracleExpertResolutionsResponse {
+  resolutions: OracleExpertResolution[]
+  count: number
+}
+
+/**
+ * Per-resolution experts probability from the author lane's ledger (retro#1094), for the
+ * people / AI / experts board (#2266). It has to come from retro: the ledger keeps what each
+ * push stored, and daatan's current pool has drifted from it.
+ *
+ * Returns null if the Oracul is not configured or the request fails. Never throws.
+ */
+export const getExpertResolutions = async (
+  meta: OracleCallMeta = { source: 'leaderboard' },
+): Promise<OracleExpertResolutionsResponse | null> => {
+  const cfg = getOracleConfig()
+  if (!cfg) return null
+
+  const t0 = Date.now()
+  try {
+    const res = await oracleFetch(cfg, '/leaderboard/author-shadow/resolutions', { timeoutMs: HEALTH_TIMEOUT_MS })
+    if (!res.ok) {
+      void logOracleCall({ callType: 'LEADERBOARD', status: 'ERROR', meta, durationMs: Date.now() - t0, httpStatus: res.status })
+      return null
+    }
+    const data = await res.json() as OracleExpertResolutionsResponse
+    void logOracleCall({ callType: 'LEADERBOARD', status: 'OK', meta, durationMs: Date.now() - t0, httpStatus: res.status, resultCount: data.count })
+    return data
+  } catch {
+    void logOracleCall({ callType: 'LEADERBOARD', status: 'ERROR', meta, durationMs: Date.now() - t0 })
+    return null
+  }
+}
+
 /**
  * Check Oracul API health and version compatibility.
  * Returns true if Oracul is reachable and version-compatible.

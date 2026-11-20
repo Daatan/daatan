@@ -153,7 +153,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
       <BoardTabs
         active="users"
         ariaLabel={t('boards.nav')}
-        labels={{ users: t('boards.users'), ai: t('boards.ai'), sources: t('boards.sources') }}
+        labels={{ users: t('boards.users'), ai: t('boards.ai'), sources: t('boards.sources'), versus: t('boards.versus') }}
       />
 
       {/* Header */}
