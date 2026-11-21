@@ -124,4 +124,16 @@ describe('getAiLeaderboard', () => {
     expect(lb.humanAvgBrier).toBeNull()
     expect(commitAgg).not.toHaveBeenCalled()
   })
+
+  it("keeps the Oracul's rows only where the stake was graded against its own estimate (daatan#2271)", async () => {
+    groupBy.mockResolvedValue([] as never)
+
+    await getAiLeaderboard()
+
+    const onlyOracul = {
+      OR: [{ model: { not: 'oracle' } }, { commitment: { aiSourceAtCommit: 'oracle' } }],
+    }
+    expect(groupBy.mock.calls[0]?.[0]?.where).toEqual(onlyOracul)
+    expect(scoreFindMany.mock.calls[0]?.[0]?.where).toEqual(onlyOracul)
+  })
 })

@@ -1,6 +1,8 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { panelSeriesLabel, isControlModel } from '@/lib/llm/panel/roster'
 import { ORACLE_MEMBER, MARKET_MEMBER } from '@/lib/services/ai-panel-score'
+import { ORACUL_SOURCE } from '@/lib/services/ai-source'
 
 export interface MemberLeaderboardRow {
   model: string
@@ -33,6 +35,15 @@ export interface AiLeaderboard {
 }
 
 /**
+ * The Oracul sentinel row is written from `Commitment.aiProbabilityAtCommit`, which is not
+ * always the Oracul's estimate (daatan#2271). Keep its rows only where it was; every other
+ * member is untouched.
+ */
+const ORACUL_ROWS_ONLY_FROM_ORACUL: Prisma.AiMemberScoreWhereInput = {
+  OR: [{ model: { not: ORACLE_MEMBER } }, { commitment: { aiSourceAtCommit: ORACUL_SOURCE } }],
+}
+
+/**
  * How each panel member (and the Oracul) scored on matched-time Brier, vs humans on the
  * same commitments (docs/LASSO.md §7). This is the feature's payoff: do LLMs forecast
  * better than the crowd, the Oracul, or each other?
@@ -50,6 +61,7 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
   // promptVersion and the 'sentinel' mode → one row each.
   const grouped = await prisma.aiMemberScore.groupBy({
     by: ['model', 'mode', 'promptVersion'],
+    where: ORACUL_ROWS_ONLY_FROM_ORACUL,
     _avg: { brierScore: true },
     _count: { brierScore: true },
   })
@@ -93,6 +105,7 @@ export async function getAiLeaderboard(minCount = 5): Promise<AiLeaderboard> {
   // the members were graded on, so "AI vs human" is a fair comparison rather than the
   // panel being measured on a different (easier or harder) set of forecasts.
   const scoredCommitmentIds = await prisma.aiMemberScore.findMany({
+    where: ORACUL_ROWS_ONLY_FROM_ORACUL,
     distinct: ['commitmentId'],
     select: { commitmentId: true },
   })

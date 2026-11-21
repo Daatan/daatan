@@ -323,6 +323,11 @@ The Oracul's needle at commit time is already pinned on the commitment as
 cheap LLMs with no search at all. (Shipped in v1.49.0; the linked market joined as a
 second sentinel member, `'market'`, in v1.51.0.)
 
+**Not every needle is the Oracul's (daatan#2271).** `predictions.confidence` is also written by
+the LLM fallback and can predate any analysis, and a stake with no needle gets a claim-only LLM
+guess afterwards. `Commitment.aiSourceAtCommit` records which; the leaderboard keeps the
+`'oracle'` member's rows only where it is `'oracle'`.
+
 ---
 
 ## 8. UI (shipped in v1.48.0)

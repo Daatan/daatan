@@ -354,7 +354,7 @@
       "peerScoreTitle": "Peer Score",
       "peerScoreDesc": "How much better your probability estimates are than the community consensus at the time you committed. Positive = you beat the crowd.",
       "aiScoreTitle": "vs AI",
-      "aiScoreDesc": "Summed over your forecasts: how much closer you were than the AI when you committed. Above 0 = you beat the AI.",
+      "aiScoreDesc": "Summed over your forecasts: how much closer you were than the Oracul's own estimate when you committed. Stakes where the forecast showed another model's estimate don't count. Above 0 = you beat the AI.",
       "eloTitle": "ELO Rating",
       "eloDesc": "Our main rating. Everyone starts at 1500. When several people forecast the same event, the more accurate ones take points from the less accurate ones once it resolves. Within a topic the rating is kept separately, so it changes when you pick a topic.",
       "glickoTitle": "Glicko-2 Rating",
@@ -1203,7 +1203,7 @@
     "marketBadge": "market",
     "emptyTitle": "No scores yet",
     "emptyDesc": "AI-panel Brier scores appear once forecasts that were staked on resolve.",
-    "footnote": "The Oracul is included for comparison; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet.",
+    "footnote": "The Oracul is included for comparison, on stakes where the forecast showed its own estimate; “control” is a deliberately weak model — if it ties the others, the ranking isn’t meaningful yet.",
     "legend": {
       "avgBrierDesc": "Each model's probability at the moment a user staked, scored against the outcome: (probability − outcome)², averaged. 0 is perfect, 0.25 is a coin flip, 1 is confidently wrong. Lower is better.",
       "humanDesc": "Human forecasters' Brier on the same commitments — the bar the models have to beat.",
@@ -1237,7 +1237,7 @@
     "footnote": "Timing differs: a pundit's lean dates from the article, people's and the Oracul's probabilities from the stake. People here is the crowd's mean per forecast, so it differs from the human figure on the AI tab, which averages individual stakes.",
     "legend": {
       "peopleDesc": "Per forecast, the mean of users' probabilities when they staked. Each forecast counts once, so heavy users don't outweigh the rest.",
-      "oraculDesc": "The Oracul's probability at the moment those users staked, averaged per forecast.",
+      "oraculDesc": "The Oracul's own estimate at the moment those users staked, averaged per forecast. Stakes where the forecast showed another model's estimate don't count.",
       "expertsDesc": "Pundits whose articles leaned on the question, as on the Sources board: each byline's lean as a probability, averaged over bylines.",
       "marketDesc": "The linked prediction market's price when the users staked.",
       "brierDesc": "Squared distance between the probability and what happened: 0 is perfect, 0.25 is a coin flip."

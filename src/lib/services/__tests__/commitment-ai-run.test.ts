@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const tx = {
   commitment: { findMany: vi.fn(), create: vi.fn() },
   aiEstimateRun: { findFirst: vi.fn() },
+  contextSnapshot: { findFirst: vi.fn() },
   prediction: { findUnique: vi.fn(), update: vi.fn() },
 }
 
@@ -61,6 +62,7 @@ beforeEach(() => {
   vi.mocked(prisma.contextSnapshot.findFirst).mockResolvedValue(null)
   commitmentFindUnique.mockResolvedValue(null)
   tx.commitment.findMany.mockResolvedValue([])
+  tx.contextSnapshot.findFirst.mockResolvedValue({ oracleMean: 60 })
   tx.prediction.findUnique.mockResolvedValue({ externalMarketId: null, externalMarketInverted: false })
   tx.commitment.create.mockResolvedValue({
     id: 'c-1',
@@ -121,5 +123,51 @@ describe('Commitment.aiRunIdAtCommit', () => {
     // The Oracul IS one number, so it stays a scalar. The panel is many, so it is a FK.
     expect(data.aiProbabilityAtCommit).toBe(0.6)
     expect(data.aiRunIdAtCommit).toBe('run-current')
+  })
+})
+
+describe('Commitment.aiSourceAtCommit (daatan#2271)', () => {
+  beforeEach(() => {
+    tx.aiEstimateRun.findFirst.mockResolvedValue(null)
+  })
+
+  it("is 'oracle' when the latest snapshot with a probability carries the Oracle payload", async () => {
+    tx.contextSnapshot.findFirst.mockResolvedValue({ oracleMean: 60 })
+
+    await createCommitment('user-1', 'pred-1', { confidence: 70 })
+
+    expect(tx.contextSnapshot.findFirst).toHaveBeenCalledWith({
+      where: { predictionId: 'pred-1', kind: { not: 'clock' }, externalProbability: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { oracleMean: true },
+    })
+    expect(tx.commitment.create.mock.calls[0][0].data).toMatchObject({ aiSourceAtCommit: 'oracle' })
+  })
+
+  it("is 'llm' when that snapshot has a probability but no Oracle payload", async () => {
+    tx.contextSnapshot.findFirst.mockResolvedValue({ oracleMean: null })
+
+    await createCommitment('user-1', 'pred-1', { confidence: 70 })
+
+    expect(tx.commitment.create.mock.calls[0][0].data).toMatchObject({ aiSourceAtCommit: 'llm' })
+  })
+
+  it("is 'unknown' when no snapshot with a probability exists yet", async () => {
+    tx.contextSnapshot.findFirst.mockResolvedValue(null)
+
+    await createCommitment('user-1', 'pred-1', { confidence: 70 })
+
+    expect(tx.commitment.create.mock.calls[0][0].data).toMatchObject({ aiSourceAtCommit: 'unknown' })
+  })
+
+  it('is null, without a lookup, when there is no AI probability to classify', async () => {
+    predictionFindUnique.mockResolvedValue({ ...PREDICTION, confidence: null } as never)
+
+    await createCommitment('user-1', 'pred-1', { confidence: 70 })
+
+    expect(tx.contextSnapshot.findFirst).not.toHaveBeenCalled()
+    const data = tx.commitment.create.mock.calls[0][0].data
+    expect(data.aiProbabilityAtCommit).toBeNull()
+    expect(data.aiSourceAtCommit).toBeNull()
   })
 })

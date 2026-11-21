@@ -1521,6 +1521,13 @@ model Commitment {
   // Competitive scoring fields (snapshotted at commit, computed at resolution)
   communityProbabilityAtCommit Float? @map("community_probability_at_commit")
   aiProbabilityAtCommit        Float? @map("ai_probability_at_commit")
+  // Where aiProbabilityAtCommit came from (daatan#2271), decided by the latest non-clock context
+  // snapshot carrying a probability at or before the stake: 'oracle' (it has the Oracle payload,
+  // i.e. oracleMean is set), 'llm' (a probability without it: the LLM fallback path), 'unknown'
+  // (no such snapshot: the value predates any analysis), 'claim_llm' (the claim-text-only guess
+  // triggerAiProbabilityEstimate backfills after the stake). Everything shown as "Oracul" reads
+  // only 'oracle'. Null exactly when aiProbabilityAtCommit is null.
+  aiSourceAtCommit             String? @map("ai_source_at_commit") @db.VarChar(16)
   peerScore                    Float? @map("peer_score")
   aiScore                      Float? @map("ai_score")
   eloChange                    Int?   @map("elo_change")

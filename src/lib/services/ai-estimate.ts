@@ -3,6 +3,7 @@ import { llmService } from '@/lib/llm'
 import { withRetry } from '@/lib/utils/retry'
 import { createLogger } from '@/lib/logger'
 import { forStage } from '@/lib/llm/stageModels'
+import { CLAIM_LLM_SOURCE } from '@/lib/services/ai-source'
 
 const log = createLogger('ai-estimate')
 
@@ -35,7 +36,8 @@ export async function triggerAiProbabilityEstimate(
 
     await prisma.commitment.update({
       where: { id: commitmentId },
-      data: { aiProbabilityAtCommit: probability },
+      // Tagged so it is never graded as the Oracul's estimate (daatan#2271).
+      data: { aiProbabilityAtCommit: probability, aiSourceAtCommit: CLAIM_LLM_SOURCE },
     })
 
     log.info({ commitmentId, probability }, 'AI probability estimate backfilled')

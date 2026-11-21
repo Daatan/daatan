@@ -135,6 +135,17 @@ describe('loadProfileScores', () => {
     expect(mockEnsureTagRatingsSeeded).not.toHaveBeenCalled()
   })
 
+  it("sums \"vs AI\" only over stakes graded against the Oracul's own estimate (daatan#2271)", async () => {
+    mockAggregate.mockResolvedValue(makeAggregateResult())
+    mockCommitmentFindMany.mockResolvedValue([])
+    mockTagFindMany.mockResolvedValue([])
+
+    await loadProfileScores({ userId: 'u1', selectedTag: null })
+
+    const aiCall = mockAggregate.mock.calls.find((c) => c[0]?._sum?.aiScore)
+    expect(aiCall?.[0].where).toMatchObject({ userId: 'u1', aiScore: { not: null }, aiSourceAtCommit: 'oracle' })
+  })
+
   it('returns null scores when no data', async () => {
     mockAggregate.mockResolvedValue(makeAggregateResult())
     mockCommitmentFindMany.mockResolvedValue([])

@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+vi.mock('@/lib/prisma', () => ({ prisma: { prediction: { findMany: vi.fn() } } }))
 vi.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
 vi.mock('@/lib/services/oracle', () => ({ getExpertResolutions: vi.fn() }))
 
 import {
-  buildVersusBoard, marketProbability, MARKET_MIN, PAIR_MIN, STRIP_MIN, type VersusForecast,
+  buildVersusBoard, getVersusForecasts, marketProbability, MARKET_MIN, PAIR_MIN, STRIP_MIN, type VersusForecast,
 } from '../versus-board'
 import { computeMarketScore } from '../ai-panel-score'
+import { prisma } from '@/lib/prisma'
 
 const f = (id: string, outcome: 0 | 1, people: number | null, oracul: number | null, market: number | null = null): VersusForecast =>
   ({ id, outcome, people, oracul, market })
@@ -100,5 +101,31 @@ describe('marketProbability', () => {
   it('stays in the forecast polarity for an inverted market', () => {
     expect(marketProbability(computeMarketScore(snap, true, at, 1) as number, 1)).toBeCloseTo(0.7)
     expect(marketProbability(computeMarketScore(snap, true, at, 0) as number, 0)).toBeCloseTo(0.7)
+  })
+})
+
+describe('getVersusForecasts', () => {
+  const stake = (cuCommitted: number, aiProbabilityAtCommit: number | null, aiSourceAtCommit: string | null) =>
+    ({ cuCommitted, aiProbabilityAtCommit, aiSourceAtCommit })
+
+  it("averages the Oracul only over stakes graded against its own estimate (daatan#2271)", async () => {
+    vi.mocked(prisma.prediction.findMany).mockResolvedValue([
+      {
+        id: 'mixed', status: 'RESOLVED_CORRECT', aiMemberScores: [],
+        commitments: [stake(60, 0.7, 'oracle'), stake(20, 0.9, 'oracle'), stake(0, 0.1, 'llm'), stake(0, 0.2, 'claim_llm')],
+      },
+      {
+        id: 'no-oracul', status: 'RESOLVED_WRONG', aiMemberScores: [],
+        commitments: [stake(-40, 0.4, 'unknown'), stake(-20, 0.3, 'llm')],
+      },
+    ] as never)
+
+    const rows = await getVersusForecasts()
+
+    expect(rows[0]).toMatchObject({ id: 'mixed', outcome: 1 })
+    expect(rows[0].oracul).toBeCloseTo(0.8)
+    expect(rows[0].people).toBeCloseTo(0.6)
+    expect(rows[1]).toMatchObject({ id: 'no-oracul', outcome: 0, oracul: null })
+    expect(rows[1].people).toBeCloseTo(0.35)
   })
 })
