@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureTagRatingsSeeded } from '@/lib/services/tag-ratings'
 import { withDisplayHeadlines } from '@/lib/services/headline-revisions'
 import type { Prediction } from '@/components/forecasts/ForecastCard'
+import { ORACUL_SOURCE } from '@/lib/services/ai-source'
 
 const DECAY = 0.95
 export const PAGE_SIZE = 20
@@ -137,7 +138,8 @@ export async function loadProfileScores({
       _count: { peerScore: true },
     }),
     prisma.commitment.aggregate({
-      where: { userId, aiScore: { not: null as null }, ...tagFilter },
+      // Only stakes graded against the Oracul's own estimate (daatan#2271), as on the leaderboard.
+      where: { userId, aiScore: { not: null as null }, aiSourceAtCommit: ORACUL_SOURCE, ...tagFilter },
       _sum: { aiScore: true },
       _count: { aiScore: true },
     }),

@@ -3,6 +3,7 @@ import type { Prisma, PredictionOption, PredictionStatus } from '@prisma/client'
 import { notifyNewCommitment } from '@/lib/services/telegram'
 import { createNotification } from '@/lib/services/notification'
 import { triggerAiProbabilityEstimate } from '@/lib/services/ai-estimate'
+import { aiSourceFromSnapshot, type AiSource } from '@/lib/services/ai-source'
 import { createLogger } from '@/lib/logger'
 import type { ServiceResult } from '@/lib/types/service'
 import { marketDisplayProbability } from '@/lib/market-display'
@@ -171,6 +172,19 @@ const writeCommitmentInTx = async (
   const aiProbabilityAtCommit: number | null =
     prediction.confidence != null ? prediction.confidence / 100 : null
 
+  // Which analysis produced that confidence (daatan#2271): only the Oracul's own estimate is
+  // graded as "Oracul" on the boards. Skipped when there is nothing to classify.
+  const aiSourceAtCommit: AiSource | null =
+    aiProbabilityAtCommit == null
+      ? null
+      : aiSourceFromSnapshot(
+          await tx.contextSnapshot.findFirst({
+            where: { predictionId, kind: { not: 'clock' }, externalProbability: { not: null } },
+            orderBy: { createdAt: 'desc' },
+            select: { oracleMean: true },
+          }),
+        )
+
   // Matched-time Brier for the AI panel (docs/LASSO.md §7). A human stakes once
   // while the panel updates daily, so scoring the panel on all its estimates would
   // flatter it enormously — an estimate made the day before resolution is nearly
@@ -234,6 +248,7 @@ const writeCommitmentInTx = async (
       rsSnapshot: user.rs,
       communityProbabilityAtCommit,
       aiProbabilityAtCommit,
+      aiSourceAtCommit,
       aiRunIdAtCommit: latestAiRun?.id ?? null,
       polymarketPrice,
     },
@@ -347,6 +362,7 @@ export async function createCommitment(
       // a number: the UI honestly shows no AI estimate, so grading the user's
       // aiScore against an LLM guess would defeat the abstention. Leaving
       // aiProbabilityAtCommit null makes aiScore simply skipped at resolution.
+      // The guess is tagged 'claim_llm', so nothing labelled Oracul counts it (daatan#2271).
       void triggerAiProbabilityEstimate(commitment.id, prediction.claimText)
     }
   }

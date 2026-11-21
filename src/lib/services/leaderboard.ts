@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { ensureTagRatingsSeeded } from '@/lib/services/tag-ratings'
 import { SCORING_SYSTEMS, type SortBy, type ScoringContext } from '@/lib/services/scoring-systems'
+import { ORACUL_SOURCE } from '@/lib/services/ai-source'
 
 export type { SortBy }
 
@@ -86,7 +87,8 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
     }),
     prisma.commitment.groupBy({
       by: ['userId'],
-      where: { userId: { in: userIds }, aiScore: { not: null }, ...tagFilter },
+      // Only stakes graded against the Oracul's own estimate count as "vs AI" (daatan#2271).
+      where: { userId: { in: userIds }, aiScore: { not: null }, aiSourceAtCommit: ORACUL_SOURCE, ...tagFilter },
       _sum: { aiScore: true },
     }),
     // Net RS change (all resolved, positive + negative) — used for ROI

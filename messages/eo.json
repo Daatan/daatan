@@ -354,7 +354,7 @@
       "peerScoreTitle": "Samula Poentaro",
       "peerScoreDesc": "Kiom viaj probablo-taksoj estas pli bonaj ol la komunuma konsenso je via engaĝiĝo. Pozitiva = vi superis la amason.",
       "aiScoreTitle": "Kontraŭ AI",
-      "aiScoreDesc": "Sumo por viaj prognozoj: kiom pli preciza vi estis ol la AI je via engaĝiĝo. Super 0 = vi venkis la AI-on.",
+      "aiScoreDesc": "Sumo por viaj prognozoj: kiom pli preciza vi estis ol la propra takso de la Orakulo je via engaĝiĝo. Vetoj, kiam la prognozo montris takson de alia modelo, ne kalkuliĝas. Super 0 = vi venkis la AI-on.",
       "eloTitle": "ELO-Takso",
       "eloDesc": "Nia ĉefa takso. Ĉiuj komencas je 1500. Kiam pluraj homoj prognozas la saman eventon, post ĝia solvo la pli precizaj prenas poentojn de la malpli precizaj. Ene de temo la takso estas tenata aparte, do ĝi ŝanĝiĝas kiam vi elektas temon.",
       "glickoTitle": "Glicko-2-Takso",
@@ -1203,7 +1203,7 @@
     "marketBadge": "merkato",
     "emptyTitle": "Ankoraŭ neniuj poentoj",
     "emptyDesc": "AI-panelaj Brier-poentoj aperas kiam prognozoj kun vetoj solviĝas.",
-    "footnote": "La Orakulo estas inkluzivita por komparo; “kontrolo” estas intence malforta modelo — se ĝi egalas la aliajn, la rangigo ankoraŭ ne estas signifa.",
+    "footnote": "La Orakulo estas inkluzivita por komparo, ĉe vetoj, kiam la prognozo montris ĝian propran takson; “kontrolo” estas intence malforta modelo — se ĝi egalas la aliajn, la rangigo ankoraŭ ne estas signifa.",
     "legend": {
       "avgBrierDesc": "La probablo de ĉiu modelo en la momento kiam uzanto vetis, kontraŭ la rezulto: (probablo − rezulto)², averaĝe. 0 estas perfekta, 0,25 estas monero-ĵeto, 1 estas certe malĝusta. Pli malalta estas pli bona.",
       "humanDesc": "La Brier de homoj ĉe la samaj vetoj — la stango, kiun la modeloj devas superi.",
@@ -1237,7 +1237,7 @@
     "footnote": "La tempo malsamas: la sinteno de aŭtoro datiĝas de la artikolo, la probabloj de homoj kaj de la Orakulo de la veto. «Homoj» ĉi tie estas la meznombro de la homamaso po prognozo, do ĝi malsamas de la homa cifero en la AI-langeto, kiu averaĝas unuopajn vetojn.",
     "legend": {
       "peopleDesc": "Po prognozo, la meznombro de la probabloj de uzantoj ĉe ilia veto. Ĉiu prognozo kalkuliĝas unufoje, do la plej aktivaj ne superpezas la aliajn.",
-      "oraculDesc": "La probablo de la Orakulo en la momento, kiam tiuj uzantoj vetis, averaĝita po prognozo.",
+      "oraculDesc": "La propra takso de la Orakulo en la momento, kiam tiuj uzantoj vetis, averaĝita po prognozo. Vetoj, kiam la prognozo montris takson de alia modelo, ne kalkuliĝas.",
       "expertsDesc": "Aŭtoroj, kies artikoloj prenis sintenon pri la demando, kiel en la langeto Fontoj: la sinteno de ĉiu aŭtoro kiel probablo, averaĝita inter aŭtoroj.",
       "marketDesc": "La prezo de la ligita prognoza merkato, kiam la uzantoj vetis.",
       "brierDesc": "Kvadrata distanco inter la probablo kaj tio, kio okazis: 0 estas perfekta, 0,25 estas monero."

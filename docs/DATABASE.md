@@ -997,7 +997,8 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 - `ai_member_scores` — matched-time Brier per (commitment, member), written at
   resolution from the run pinned by `Commitment.aiRunIdAtCommit` (FK,
   `ON DELETE SET NULL` — deleting a run never deletes a commitment). Sentinel
-  `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`) and
+  `model` values: `'oracle'` (scored from `aiProbabilityAtCommit`; `/leaderboard/ai` keeps
+  these rows only where the commitment's `aiSourceAtCommit = 'oracle'`, daatan#2271) and
   `'market'` (linked market price as of the commit instant); both carry
   `mode = 'sentinel'`. Feeds `/leaderboard/ai`, and its `market` rows feed the
   Market group on `/leaderboard/versus` (#2266); no RS/ELO/Glicko path reads it. Carries the full member identity — `mode` (a grounded-indexer twin
@@ -1015,6 +1016,13 @@ score. Canonical doc: [LASSO.md](./LASSO.md).
 `communityProbabilityAtCommit`, `aiProbabilityAtCommit`, `aiRunIdAtCommit` —
 the LASSO run current at stake time, see above) and resolution-time
 results (`rsChange`, `brierScore`, `peerScore`, `aiScore`, `eloChange`).
+`aiSourceAtCommit` (daatan#2271) says where `aiProbabilityAtCommit` came from, by the latest
+non-clock context snapshot with a probability at or before the stake: `oracle` (it carries the
+Oracle payload, so `oracle_mean` is set), `llm` (the LLM fallback), `unknown` (no such snapshot
+yet), `claim_llm` (the claim-text-only guess backfilled after the stake). Null exactly when
+`aiProbabilityAtCommit` is. Backfilled for history by migration `20261121000000`; everything
+labelled Oracul reads only `oracle`. On prod (2026-11-21) only 66 of the 126 scored stakes on
+resolved forecasts were `oracle`.
 `polymarketPrice` / `klDivergence` (daatan#1138, expertise-rating Phase 2): the linked
 market's YES price (0–1, polarity-adjusted for `externalMarketInverted`) snapshotted at
 commit time from `external_market_price_snapshots` — null when unlinked or no snapshot

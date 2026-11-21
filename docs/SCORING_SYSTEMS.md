@@ -130,7 +130,7 @@ Measures how much better your probability estimates are compared to the AI's est
 Positive = you beat the AI.  
 Stored on `Commitment.aiScore` at resolution.
 
-**Leaderboard value:** sum of all AI scores in the selected tag scope.
+**Leaderboard value:** sum of all AI scores in the selected tag scope, over commitments with `aiSourceAtCommit = 'oracle'` only (daatan#2271). `aiScore` is still stored for every commitment that had an AI probability, but a stake graded against the LLM fallback, a pre-analysis value or the claim-only guess no longer counts on the leaderboard or the profile. Same filter on the profile sum.
 
 ---
 
@@ -230,7 +230,7 @@ The fourth leaderboard tab compares groups, not individuals. Each group is **one
 | Group | Probability per forecast |
 |-------|--------------------------|
 | People | Mean of `(cuCommitted + 100) / 200` over the forecast's non-bot scored commitments. Each forecast counts once, so heavy users don't outweigh the rest (Mark, 2026-11-20). |
-| Oracul | Mean `aiProbabilityAtCommit` over those same commitments. |
+| Oracul | Mean `aiProbabilityAtCommit` over those same commitments, only where `aiSourceAtCommit = 'oracle'` (daatan#2271): about half the stakes carry another model's number. |
 | Experts | retro's `experts_prob` from `GET /leaderboard/author-shadow/resolutions` (retro#1094): each byline's mean lean as `(lean + 1) / 2`, averaged over bylines. It is read from retro's ledger, not rebuilt from the pool, which has drifted from what was pushed. Scored against daatan's outcome. |
 | Market | The linked market's price at those commitments, recovered from the `market` rows in `ai_member_scores` (`√Brier` is the distance from the outcome; polarity was applied when scoring). Shown only once it covers ≥ 10 forecasts (`MARKET_MIN`). |
 

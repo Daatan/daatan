@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { stakeProbability } from '@/lib/forecast-math'
 import { getExpertResolutions } from '@/lib/services/oracle'
 import { MARKET_MEMBER, SENTINEL_MODE } from '@/lib/services/ai-panel-score'
+import { ORACUL_SOURCE } from '@/lib/services/ai-source'
 
 // People vs AI vs experts (#2266): each group as ONE forecaster per resolved binary forecast,
 // compared only on forecasts both (or all) of them called, so nobody wins by facing easier ones.
@@ -133,7 +134,8 @@ export function buildVersusBoard(forecasts: VersusForecast[], experts: Map<strin
 /**
  * Resolved public binary forecasts (retro simulations excluded), each group's mean
  * probability per forecast over the non-bot scored commitments: People = the stakes,
- * Oracul = its probability at those stakes, Market = the linked market's price at them.
+ * Oracul = its own estimate at those stakes (stakes graded against an LLM fallback or a
+ * claim-only guess are left out, daatan#2271), Market = the linked market's price at them.
  */
 export async function getVersusForecasts(): Promise<VersusForecast[]> {
   const scored = { brierScore: { not: null }, user: { isBot: false } }
@@ -147,7 +149,10 @@ export async function getVersusForecasts(): Promise<VersusForecast[]> {
     select: {
       id: true,
       status: true,
-      commitments: { where: scored, select: { cuCommitted: true, aiProbabilityAtCommit: true } },
+      commitments: {
+        where: scored,
+        select: { cuCommitted: true, aiProbabilityAtCommit: true, aiSourceAtCommit: true },
+      },
       aiMemberScores: {
         where: { model: MARKET_MEMBER, mode: SENTINEL_MODE, commitment: scored },
         select: { brierScore: true },
@@ -160,7 +165,11 @@ export async function getVersusForecasts(): Promise<VersusForecast[]> {
       id: p.id,
       outcome,
       people: mean(p.commitments.map((c) => stakeProbability(c.cuCommitted))),
-      oracul: mean(p.commitments.flatMap((c) => (c.aiProbabilityAtCommit == null ? [] : [c.aiProbabilityAtCommit]))),
+      oracul: mean(
+        p.commitments.flatMap((c) =>
+          c.aiProbabilityAtCommit == null || c.aiSourceAtCommit !== ORACUL_SOURCE ? [] : [c.aiProbabilityAtCommit],
+        ),
+      ),
       market: mean(p.aiMemberScores.map((s) => marketProbability(s.brierScore, outcome))),
     }
   })

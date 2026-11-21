@@ -59,7 +59,7 @@ const OTHER_ROWS = [
   {
     name: 'vs AI',
     key: 'aiScore',
-    what: "How much more accurate a user's probability was than DAATAN's AI estimate at commit time.",
+    what: "How much more accurate a user's probability was than the Oracul's own estimate at commit time. Commitments where the forecast showed another model's estimate are left out.",
     formula: '(ai_p − outcome)² − (user_p − outcome)²',
     filter: 'Tag-filtered',
   },
