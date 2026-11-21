@@ -1019,7 +1019,9 @@ results (`rsChange`, `brierScore`, `peerScore`, `aiScore`, `eloChange`).
 `aiSourceAtCommit` (daatan#2271) says where `aiProbabilityAtCommit` came from, by the latest
 non-clock context snapshot with a probability at or before the stake: `oracle` (it carries the
 Oracle payload, so `oracle_mean` is set), `llm` (the LLM fallback), `unknown` (no such snapshot
-yet), `claim_llm` (the claim-text-only guess backfilled after the stake). Null exactly when
+yet), `claim_llm` (the claim-text-only guess backfilled after the stake), `oracle_inverted` (the
+Oracul's estimate of the opposite event: the forecast's rules inverted its claim, daatan#2273; set
+only by migration `20261121120000`, on 3 forecasts). Null exactly when
 `aiProbabilityAtCommit` is. Backfilled for history by migration `20261121000000`; everything
 labelled Oracul reads only `oracle`. On prod (2026-11-21) only 66 of the 126 scored stakes on
 resolved forecasts were `oracle`.

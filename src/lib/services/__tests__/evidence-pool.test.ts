@@ -2025,7 +2025,7 @@ describe('retractCredibilityFeedback', () => {
 
   it.each(['staging', 'next', 'development'])('never writes to retro on %s', async (appEnv) => {
     vi.stubEnv('APP_ENV', appEnv)
-    await retractCredibilityFeedback('pred-1')
+    await expect(retractCredibilityFeedback('pred-1')).resolves.toEqual({ status: 'skipped' })
     expect(mockOraculFetch).not.toHaveBeenCalled()
     expect(mockLogger.info).toHaveBeenCalledWith(
       { predictionId: 'pred-1', action: 'retract', appEnv },
@@ -2035,7 +2035,7 @@ describe('retractCredibilityFeedback', () => {
 
   it('does nothing when the Oracul is not configured', async () => {
     mockGetOracleConfig.mockReturnValue(null)
-    await retractCredibilityFeedback('pred-1')
+    await expect(retractCredibilityFeedback('pred-1')).resolves.toEqual({ status: 'skipped' })
     expect(mockOraculFetch).not.toHaveBeenCalled()
   })
 
@@ -2045,7 +2045,10 @@ describe('retractCredibilityFeedback', () => {
       json: async () => ({ feedback_removed: 1, settlement_pins_removed: 0, tags_removed: true }),
     } as never)
 
-    await retractCredibilityFeedback('pred-1')
+    await expect(retractCredibilityFeedback('pred-1')).resolves.toEqual({
+      status: 'ok',
+      retro: { feedback_removed: 1, settlement_pins_removed: 0, tags_removed: true },
+    })
 
     expect(mockOraculFetch).toHaveBeenCalledWith(
       expect.anything(),
@@ -2060,6 +2063,6 @@ describe('retractCredibilityFeedback', () => {
   ])('%s does not throw', async (_name, impl) => {
     mockOraculFetch.mockImplementation(impl as never)
 
-    await expect(retractCredibilityFeedback('pred-1')).resolves.toBeUndefined()
+    await expect(retractCredibilityFeedback('pred-1')).resolves.toEqual({ status: 'failed' })
   })
 })
