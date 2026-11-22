@@ -6,6 +6,7 @@ import {
   CURRENT_VERSION_ONLY,
   hashArticleContent,
   textStalePoolRowWhere,
+  TEXT_EDIT_GRACE_MS,
 } from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
@@ -87,11 +88,14 @@ export function amnestyWhere(): Prisma.EvidencePoolArticleWhereInput {
  * stamp existed has no target rows.
  *
  * Unlike the other scopes the old reading is not "still the best one we have": it
- * answered a different question. So a row whose re-extraction does not finish is put back
- * EXCLUDED, not usable, and a row that cannot be re-read at all (no title, or a
- * search-redirect URL) is excluded without a call — the 2026-11-22 cleanup's convention
- * (daatan#2273). Its `contentHash` stays null, so the next push of the same URL versions
- * it and gets a reading under the current text.
+ * answered a different question. So a row that a working batch did not re-read (the
+ * Oracul left it out, or the claim gate refused it) is put back EXCLUDED, not usable, and a
+ * row that cannot be re-read at all (no title, or a search-redirect URL) is excluded
+ * without a call — the 2026-11-22 cleanup's convention (daatan#2273). Its `contentHash`
+ * stays null, so the next push of the same URL versions it and gets a current reading.
+ * A batch that got no answer at all (Oracul down, thrown) keeps its readings and stops
+ * that forecast, so an outage cannot empty a pool; its rows stay stale for the next run.
+ * Apply is refused until the in-flight grace after the edit has passed (`applyAfter`).
  */
 export const TEXT_EDIT_TARGET = 'text-edit' as const
 
@@ -130,8 +134,12 @@ export interface RemediationForecast {
    *  it targeted, even when every batch reports `ok`. */
   restored: number
   /** `text-edit` scope only: target rows set excluded instead of left on their old
-   *  reading — unfinished re-extractions plus rows that cannot be re-read. */
+   *  reading — unfinished or refused re-extractions plus rows that cannot be re-read. */
   excluded: number
+  /** `text-edit` scope only: apply is refused before this time. A row read inside the
+   *  in-flight grace after the edit still counts as stale ({@link TEXT_EDIT_GRACE_MS}), so a
+   *  re-read done then would never clear. Null on the other scopes. */
+  applyAfter: Date | null
 }
 
 /** Row shape {@link remediatePool} reads for a target row — the parent of any new head. */
@@ -287,9 +295,10 @@ export async function remediatePool(
       failed: 0,
       restored: 0,
       excluded: 0,
+      applyAfter: textEdit && p.textChangedAt ? new Date(p.textChangedAt.getTime() + TEXT_EDIT_GRACE_MS) : null,
     }
     forecasts.push(f)
-    if (!apply || targetRows.length === 0) continue
+    if (!apply || targetRows.length === 0 || (f.applyAfter && f.applyAfter.getTime() > Date.now())) continue
 
     if (unreadable.length > 0) {
       const { count } = await prisma.evidencePoolArticle.updateMany({
@@ -314,27 +323,44 @@ export async function remediatePool(
           : [],
       )
       let threw = false
+      let batchDown = false
       try {
         const r = await refreshOracleSnapshot(p, { articles, origin: 'remediate', reask: true })
         if (r.status === 'ok') f.ok++
         else if (r.status === 'unchanged') f.unchanged++
         else if (r.status === 'insufficient') f.insufficient++
-        else f.noOracul++
+        else {
+          f.noOracul++
+          batchDown = true
+        }
       } catch (err) {
         threw = true
+        batchDown = true
         f.failed++
         log.warn({ predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, err }, 'pool-remediate.batch_failed')
       }
+      // text-edit excludes what a WORKING batch did not re-read; a batch that never got an
+      // answer (Oracul down, thrown) says nothing about its rows, so they keep their reading
+      // and stay stale for the next run — an outage must not empty the pool.
+      const excludeLeftovers = textEdit && !batchDown
       // A batch that threw never reached the claim release, so its heads may still be PENDING.
       const restored = await restoreUnfinishedHeads(chunk, threw ? ['FAILED', 'PENDING'] : ['FAILED'], {
-        asExcluded: textEdit,
+        asExcluded: excludeLeftovers,
       })
-      if (restored > 0 && textEdit) {
-        f.excluded += restored
-        log.warn(
-          { predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, batchRows: chunk.length, excluded: restored },
-          'event=pool_remediate_text_edit_excluded — re-extraction did not finish; old-text readings excluded (daatan#2274)',
-        )
+      if (excludeLeftovers) {
+        // Still current and not excluded = never claimed (a refused claim gate, e.g. the
+        // publish-date gates): with its hash nulled it was not re-read, so its vote is old-text.
+        const { count: unclaimed } = await prisma.evidencePoolArticle.updateMany({
+          where: { id: { in: chunk.map((r) => r.id) }, ...CURRENT_VERSION_ONLY, excluded: false },
+          data: { excluded: true },
+        })
+        f.excluded += restored + unclaimed
+        if (restored + unclaimed > 0) {
+          log.warn(
+            { predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, batchRows: chunk.length, restored, unclaimed },
+            'event=pool_remediate_text_edit_excluded — not re-read under the current text; old readings excluded (daatan#2274)',
+          )
+        }
       } else if (restored > 0) {
         f.restored += restored
         log.warn(
@@ -342,6 +368,7 @@ export async function remediatePool(
           'event=pool_remediate_restored — re-extraction did not finish for these rows; previous readings kept (daatan#2159)',
         )
       }
+      if (textEdit && batchDown) break
     }
 
     f.poolAfter = await prisma.evidencePoolArticle.count({ where: { predictionId: p.id, ...USABLE_POOL_ROW_WHERE } })

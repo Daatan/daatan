@@ -259,7 +259,7 @@ describe('checkEvidenceHealth', () => {
               {
                 predictionId: 'p-edited',
                 ...USABLE_POOL_ROW_WHERE,
-                updatedAt: { lt: new Date(EDITED_AT.getTime() + TEXT_EDIT_GRACE_MS) },
+                addedAt: { lt: new Date(EDITED_AT.getTime() + TEXT_EDIT_GRACE_MS) },
               },
             ],
           },

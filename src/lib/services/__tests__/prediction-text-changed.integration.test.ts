@@ -30,9 +30,9 @@ async function makePrediction() {
 const stampOf = async (id: string) =>
   (await prisma.prediction.findUniqueOrThrow({ where: { id }, select: { textChangedAt: true } })).textChangedAt
 
-async function poolRow(predictionId: string, n: number, updatedAt: Date) {
+async function poolRow(predictionId: string, n: number, addedAt: Date) {
   const url = `https://example.com/tc/${predictionId}/${n}`
-  const r = await prisma.evidencePoolArticle.create({
+  return prisma.evidencePoolArticle.create({
     data: {
       predictionId,
       url,
@@ -45,11 +45,9 @@ async function poolRow(predictionId: string, n: number, updatedAt: Date) {
       certainty: 0.8,
       credibilityWeight: 1,
       relevanceScore: 0.8,
+      addedAt,
     } as Parameters<typeof prisma.evidencePoolArticle.create>[0]['data'],
   })
-  // `@updatedAt` is client-side; the reading time has to be set behind Prisma's back.
-  await prisma.$executeRaw`UPDATE evidence_pool_articles SET updated_at = ${updatedAt} WHERE id = ${r.id}`
-  return r
 }
 
 describe('prediction_text_changed_stamp trigger (daatan#2274)', () => {
@@ -120,5 +118,18 @@ describe('textStalePoolRowWhere (daatan#2274)', () => {
     })
 
     expect(rows.map((r) => r.id)).toEqual([before.id, inFlight.id])
+  })
+
+  it('does not take a write that is not a re-read for a fresh reading', async () => {
+    // A remediation nulls the hash (and a restore or an exclusion toggle writes the row)
+    // without re-reading it; all of these move updated_at, none moves added_at.
+    const p = await makePrediction()
+    await prisma.prediction.update({ where: { id: p.id }, data: { claimText: 'Edited claim' } })
+    const at = (await stampOf(p.id))!
+    const r = await poolRow(p.id, 1, new Date(at.getTime() - 60 * 60 * 1000))
+    await prisma.evidencePoolArticle.update({ where: { id: r.id }, data: { contentHash: null } })
+
+    const n = await prisma.evidencePoolArticle.count({ where: { predictionId: p.id, ...textStalePoolRowWhere(at) } })
+    expect(n).toBe(1)
   })
 })
