@@ -141,6 +141,7 @@ describe('/who-foresaw/sources', () => {
     getForesawSourceBoard.mockRejectedValue(new Error('db down'))
     render(await SourcesPage())
     expect(screen.getByText('board.empty')).toBeInTheDocument()
+    expect(screen.queryByText(/^board\.caveat/)).toBeNull()
   })
 
   it('404s on a self-hosted install', async () => {

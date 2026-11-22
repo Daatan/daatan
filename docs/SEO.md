@@ -96,8 +96,8 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
 - Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity`, `/tags` — daily;
   `/who-foresaw` — weekly; `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`,
   `/accessibility`, `/contact` — monthly. `/who-foresaw` is the "Who foresaw X?" hub
-  (daatan#2217): it is `noindex` while empty, and its event pages are `noindex, follow` and never
-  listed ([RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md#public-pages))
+  (daatan#2217): it is `noindex` while empty, and its event pages and the source board
+  (`/who-foresaw/sources`) are `noindex, follow` and never listed ([RETRO_SIMULATIONS.md](RETRO_SIMULATIONS.md#public-pages))
 - The retro case studies (`RETRO_PATHS` in `src/app/retroanalysis/links.ts`: `/retroanalysis`
   and its three reports) — monthly, in en, he and ru with hreflang. `robots.txt` disallowed the
   whole section from March to November 2026, so before daatan#2249 Google had crawled none of

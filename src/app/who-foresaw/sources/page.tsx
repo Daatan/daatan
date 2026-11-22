@@ -41,11 +41,15 @@ export default async function WhoForesawSourcesPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl">
-      <Link href="/who-foresaw" className="text-sm text-blue-400 hover:underline">{t('back')}</Link>
-      <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-white mb-2">{t('board.title')}</h1>
-      <p className="text-sm text-gray-400 mb-2">{t('board.subtitle')}</p>
-      <p className="text-xs text-gray-500 mb-2">{t('board.method', { min: BOARD_MIN_EVENTS })}</p>
-      <p className="text-xs text-amber-400/80 mb-6 lg:mb-8">{t('board.caveat', { events: board.eventCount })}</p>
+      <div className="mb-6 lg:mb-8 space-y-2">
+        <Link href="/who-foresaw" className="text-sm text-blue-400 hover:underline">{t('back')}</Link>
+        <h1 className="pt-1 text-2xl sm:text-3xl font-bold text-white">{t('board.title')}</h1>
+        <p className="text-sm text-gray-400">{t('board.subtitle')}</p>
+        <p className="text-xs text-gray-500">{t('board.method', { min: BOARD_MIN_EVENTS })}</p>
+        {board.eventCount > 0 && (
+          <p className="text-xs text-amber-400/80">{t('board.caveat', { events: board.eventCount })}</p>
+        )}
+      </div>
 
       {board.rows.length === 0 ? (
         <p className="text-text-secondary">{t('board.empty')}</p>

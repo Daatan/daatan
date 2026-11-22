@@ -2338,7 +2338,7 @@
         "neutral": "sen klara sinteno"
       },
       "empty": "Ankoraŭ neniu fonto skribis pri sufiĉe da eventoj.",
-      "hidden": "+{count, plural, one {# fonto} other {# fontoj}}, kiuj skribis pri malpli ol {min} eventoj."
+      "hidden": "+{count, plural, one {# fonto, kiu skribis} other {# fontoj, kiuj skribis}} pri malpli ol {min} eventoj."
     }
   }
 }

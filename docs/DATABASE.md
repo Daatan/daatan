@@ -1112,7 +1112,8 @@ on the row:
   weight factors), the reports of the event, the judge's templates and the timeline.
 
 An approved row (prediction `RESOLVED_*`) with evidence is shown on the public `/who-foresaw`
-pages (PR 3); `src/lib/services/retro-foresaw.ts` holds that gate.
+pages (PR 3) and counted on the retro-only source board, `/who-foresaw/sources` (PR 4);
+`src/lib/services/retro-foresaw.ts` holds that gate.
 
 Hand-made rows from PR 1 leave them NULL. A retro draft's `predictions.embedding` is stored,
 so the generator's dedupe sees it; similar-forecasts excludes retro rows.
