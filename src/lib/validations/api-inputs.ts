@@ -54,7 +54,7 @@ export const remediateBodySchema = (maxIds: number) =>
   z.object({
     ids: z.array(z.string().min(1)).min(1, 'ids must be a non-empty array of prediction ids').max(maxIds, `at most ${maxIds} ids per call`),
     mode: runMode.optional(),
-    scope: z.enum(['a6', 'usable', 'amnesty']).optional(),
+    scope: z.enum(['a6', 'usable', 'amnesty', 'text-edit']).optional(),
   })
 
 /** POST /api/admin/forecasts/republish. */

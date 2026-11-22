@@ -1075,6 +1075,27 @@ export const USABLE_POOL_ROW_WHERE = {
 } as const satisfies Prisma.EvidencePoolArticleWhereInput
 
 /**
+ * How long after a claim/rules edit a reading still counts as taken under the old text.
+ * An extraction already in flight when the edit lands sent the old text but writes its
+ * row afterwards. Erring this way costs one re-extraction of a row read just after the
+ * edit; erring the other way leaves a vote cast on the wrong question in the pool.
+ */
+export const TEXT_EDIT_GRACE_MS = 10 * 60 * 1000
+
+/**
+ * Usable rows read before the forecast's claim or rules last changed (daatan#2274) —
+ * `textChangedAt` is stamped by a DB trigger on `predictions`, so every writer counts.
+ *
+ * `updatedAt`, not `addedAt`: re-reading a row either rewrites it in place (a FAILED row
+ * re-claimed, which bumps `updatedAt`) or supersedes it with a new row, while edits never
+ * trigger a re-read. The one other write to a usable row is the exclusion toggle, so a row
+ * un-excluded after the edit drops out of this set although its reading is old.
+ */
+export function textStalePoolRowWhere(textChangedAt: Date): Prisma.EvidencePoolArticleWhereInput {
+  return { ...USABLE_POOL_ROW_WHERE, updatedAt: { lt: new Date(textChangedAt.getTime() + TEXT_EDIT_GRACE_MS) } }
+}
+
+/**
  * How many rows of a forecast's pool the aggregate could use right now.
  *
  * Zero means the published confidence — if there is one — has nothing behind it that a

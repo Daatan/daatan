@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
-import { USABLE_POOL_ROW_WHERE } from '@/lib/services/evidence-pool'
+import { USABLE_POOL_ROW_WHERE, textStalePoolRowWhere } from '@/lib/services/evidence-pool'
 import { getOracleBaseUrl } from '@/lib/services/oracleClient'
 
 const log = createLogger('evidence-health')
@@ -206,6 +206,36 @@ async function forecastsWithoutEvidence(): Promise<EvidenceHealthIssue[]> {
 }
 
 /**
+ * ACTIVE forecasts whose pool still holds usable rows read before their claim or rules
+ * last changed (daatan#2274). Those rows were extracted against the old text, and on an
+ * edit that flipped the question they vote the wrong way (daatan#2273: three forecasts'
+ * inverted rules). `textChangedAt` comes from a DB trigger, so a hand-run UPDATE counts.
+ * The condition clears once `remediate` with scope `text-edit` re-reads or excludes them.
+ */
+async function forecastsReadUnderOldText(): Promise<EvidenceHealthIssue[]> {
+  const edited = await prisma.prediction.findMany({
+    where: { status: 'ACTIVE', textChangedAt: { not: null } },
+    select: { id: true, claimText: true, slug: true, textChangedAt: true },
+  })
+  const changedAt = new Map(edited.flatMap((p) => (p.textChangedAt ? [[p.id, p.textChangedAt] as const] : [])))
+  if (changedAt.size === 0) return []
+
+  const stale = await prisma.evidencePoolArticle.groupBy({
+    by: ['predictionId'],
+    where: { OR: [...changedAt].map(([id, at]) => ({ predictionId: id, ...textStalePoolRowWhere(at) })) },
+    _count: { _all: true },
+  })
+  const staleRows = new Map(stale.map((g) => [g.predictionId, g._count._all]))
+  return edited.flatMap((p) => {
+    const n = staleRows.get(p.id) ?? 0
+    const at = changedAt.get(p.id)
+    return n > 0 && at
+      ? [{ kind: 'forecast_text_stale' as const, predictionId: p.id, claimText: p.claimText, slug: p.slug, staleRows: n, textChangedAt: at }]
+      : []
+  })
+}
+
+/**
  * AI-panel 402 burst since the last digest run (daatan#1504, decided on daatan#1491).
  *
  * The sweep records OpenRouter payment failures per UTC day in
@@ -310,6 +340,8 @@ export function alertKey(issue: EvidenceHealthIssue): string {
       return `source-silent:${issue.source.slice(0, MAX_KEY_SOURCE_LEN)}`
     case 'forecast_no_evidence':
       return `forecast-empty:${issue.predictionId}`
+    case 'forecast_text_stale':
+      return `forecast-text-stale:${issue.predictionId}`
     case 'overall_failure_rate':
       return 'overall-failure'
     case 'overall_volume_collapse':
@@ -370,10 +402,11 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
   const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000)
   const baselineFrom = new Date(recentFrom.getTime() - BASELINE_DAYS * 24 * 60 * 60 * 1000)
 
-  const [recent, baseline, emptyForecasts, panelPayment, heartbeatIssues] = await Promise.all([
+  const [recent, baseline, emptyForecasts, textStale, panelPayment, heartbeatIssues] = await Promise.all([
     windowStats(recentFrom, null),
     windowStats(baselineFrom, recentFrom),
     forecastsWithoutEvidence(),
+    forecastsReadUnderOldText(),
     panelPaymentBurst(now),
     batchLoopHeartbeat(now),
   ])
@@ -433,6 +466,7 @@ export async function checkEvidenceHealth(now: Date = new Date()): Promise<Evide
   }
 
   issues.push(...emptyForecasts)
+  issues.push(...textStale)
   issues.push(...panelPayment)
   issues.push(...heartbeatIssues)
 

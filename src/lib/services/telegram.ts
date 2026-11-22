@@ -240,6 +240,15 @@ export type EvidenceHealthIssue =
   | { kind: 'source_failure_rate'; source: string; recentPct: number; baselinePct: number; recentRows: number }
   | { kind: 'source_silent'; source: string; baselineRows: number }
   | { kind: 'forecast_no_evidence'; predictionId: string; claimText: string; slug: string | null }
+  // Usable rows read before the claim/rules last changed (daatan#2274) — they vote on the old question.
+  | {
+      kind: 'forecast_text_stale'
+      predictionId: string
+      claimText: string
+      slug: string | null
+      staleRows: number
+      textChangedAt: Date
+    }
   | { kind: 'overall_failure_rate'; recentPct: number; baselinePct: number }
   | { kind: 'overall_volume_collapse'; recentPerDay: number; baselinePerDay: number }
   // Not a delta: any 402 at all means the shared OpenRouter account is out of
@@ -270,6 +279,13 @@ function evidenceHealthLine(i: EvidenceHealthIssue): string {
     case 'forecast_no_evidence': {
       const url = forecastUrl({ id: i.predictionId, claimText: i.claimText, slug: i.slug })
       return `• no usable evidence: <a href="${url}">${escapeHtml(truncate(i.claimText, 90))}</a>`
+    }
+    case 'forecast_text_stale': {
+      const url = forecastUrl({ id: i.predictionId, claimText: i.claimText, slug: i.slug })
+      return (
+        `• <a href="${url}">${escapeHtml(truncate(i.claimText, 90))}</a>: ${i.staleRows} usable row(s) read before ` +
+        `the claim/rules edit of ${i.textChangedAt.toISOString().slice(0, 10)} — remediate scope <code>text-edit</code>`
+      )
     }
     case 'overall_failure_rate':
       return `• <b>overall failure share</b>: ${i.baselinePct}% → <b>${i.recentPct}%</b>`
