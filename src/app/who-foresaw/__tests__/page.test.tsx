@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-const { listForesawEvents, getForesawEvent, selfHosted, notFound } = vi.hoisted(() => ({
+const { listForesawEvents, getForesawEvent, getForesawSourceBoard, selfHosted, notFound } = vi.hoisted(() => ({
   listForesawEvents: vi.fn(),
   getForesawEvent: vi.fn(),
+  getForesawSourceBoard: vi.fn(),
   selfHosted: { value: false },
   notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }),
 }))
 
-vi.mock('@/lib/services/retro-foresaw', () => ({ listForesawEvents, getForesawEvent }))
+vi.mock('@/lib/services/retro-foresaw', () => ({ listForesawEvents, getForesawEvent, getForesawSourceBoard, BOARD_MIN_EVENTS: 2 }))
 vi.mock('@/lib/edition', () => ({ isSelfHosted: () => selfHosted.value }))
 vi.mock('next/navigation', () => ({ notFound }))
 vi.mock('next/server', () => ({ connection: async () => undefined }))
@@ -20,6 +21,7 @@ vi.mock('next-intl/server', () => ({
 
 import HubPage, { generateMetadata as hubMetadata } from '../page'
 import EventPage, { generateMetadata as eventMetadata } from '../[slug]/page'
+import SourcesPage, { generateMetadata as sourcesMetadata } from '../sources/page'
 
 const summary = {
   slug: 'carrier', eventText: 'A third US carrier arrived', eventDate: '2026-11-16', asOf: '2026-11-09',
@@ -48,6 +50,13 @@ describe('/who-foresaw hub', () => {
     listForesawEvents.mockResolvedValue([summary])
     render(await HubPage())
     expect(screen.getByRole('link', { name: /A third US carrier arrived/ })).toHaveAttribute('href', '/who-foresaw/carrier')
+    expect(screen.getByRole('link', { name: 'board.link' })).toHaveAttribute('href', '/who-foresaw/sources')
+  })
+
+  it('has no source-board link while it has no events', async () => {
+    listForesawEvents.mockResolvedValue([])
+    render(await HubPage())
+    expect(screen.queryByRole('link', { name: 'board.link' })).toBeNull()
   })
 
   it('is indexed and self-canonical when it has events, noindex when empty', async () => {
@@ -96,5 +105,47 @@ describe('/who-foresaw/[slug]', () => {
     getForesawEvent.mockResolvedValue(null)
     await expect(EventPage(params('pending-draft'))).rejects.toThrow('NEXT_NOT_FOUND')
     expect((await eventMetadata(params('pending-draft'))).robots).toEqual({ index: false, follow: false })
+  })
+})
+
+describe('/who-foresaw/sources', () => {
+  const board = {
+    eventCount: 6,
+    hiddenOutlets: 6,
+    rows: [{
+      outlet: 'jpost.com', called: 2, against: 1, total: 6,
+      events: [
+        { slug: 'carrier', eventText: 'A third US carrier arrived', side: 'called' },
+        { slug: 'bab', eventText: 'Houthis took Bab el-Mandeb', side: 'against' },
+      ],
+    }],
+  }
+
+  it('is noindex, follow and self-canonical', async () => {
+    const meta = await sourcesMetadata()
+    expect(meta.robots).toEqual({ index: false, follow: true })
+    expect(meta.alternates?.canonical).toBe('/who-foresaw/sources')
+  })
+
+  it('shows each outlet with its counts and links to its events, and counts the outlets below the floor', async () => {
+    getForesawSourceBoard.mockResolvedValue(board)
+    render(await SourcesPage())
+    expect(screen.getByText('jpost.com')).toBeInTheDocument()
+    expect(screen.getByText(`board.counts:${JSON.stringify({ called: 2, against: 1, total: 6, share: 33 })}`)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Houthis took Bab el-Mandeb' })).toHaveAttribute('href', '/who-foresaw/bab')
+    expect(screen.getByText(`board.hidden:${JSON.stringify({ count: 6, min: 2 })}`)).toBeInTheDocument()
+    expect(screen.getByText(`board.caveat:${JSON.stringify({ events: 6 })}`)).toBeInTheDocument()
+  })
+
+  it('shows the empty state when the lookup fails', async () => {
+    getForesawSourceBoard.mockRejectedValue(new Error('db down'))
+    render(await SourcesPage())
+    expect(screen.getByText('board.empty')).toBeInTheDocument()
+    expect(screen.queryByText(/^board\.caveat/)).toBeNull()
+  })
+
+  it('404s on a self-hosted install', async () => {
+    selfHosted.value = true
+    await expect(SourcesPage()).rejects.toThrow('NEXT_NOT_FOUND')
   })
 })

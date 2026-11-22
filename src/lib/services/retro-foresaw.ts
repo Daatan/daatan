@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { canonicalOutlet } from '@/lib/services/sourceLeaderboard'
 
 /**
  * Read side of the "Who foresaw X?" pages (daatan#2217 PR 3). Retro simulations stay
@@ -189,19 +190,104 @@ const SELECT = {
   prediction: { select: { slug: true, claimText: true } },
 } satisfies Prisma.RetroSimulationSelect
 
-/** Every shown event, newest event first. */
-export async function listForesawEvents(): Promise<ForesawEventSummary[]> {
+async function shownEvents(): Promise<ForesawEvent[]> {
   const rows = await prisma.retroSimulation.findMany({
     where: SHOWN_WHERE,
     select: SELECT,
     orderBy: { eventDate: 'desc' },
   })
-  return rows.flatMap((row) => {
-    const event = toEvent(row)
-    if (!event) return []
-    const { slug, eventText, eventDate, asOf, outcome, oraculProbability, called, against, total } = event
-    return [{ slug, eventText, eventDate, asOf, outcome, oraculProbability, called, against, total }]
+  return rows.flatMap((row) => toEvent(row) ?? [])
+}
+
+/** Every shown event, newest event first. */
+export async function listForesawEvents(): Promise<ForesawEventSummary[]> {
+  return (await shownEvents()).map(({ slug, eventText, eventDate, asOf, outcome, oraculProbability, called, against, total }) => ({
+    slug, eventText, eventDate, asOf, outcome, oraculProbability, called, against, total,
+  }))
+}
+
+/**
+ * The retro source board's sample floor (daatan#2217 PR 4, Mark 2026-11-22): an outlet is ranked
+ * only once it wrote about this many shown events. Below it, "called 1 of 1" reads as a 100%
+ * record; those outlets are counted, not listed. Revisit at ~20 events.
+ */
+export const BOARD_MIN_EVENTS = 2
+
+export interface ForesawSourceEvent {
+  slug: string
+  eventText: string
+  side: ForesawSide
+}
+
+export interface ForesawSourceRow {
+  outlet: string
+  /** Events it called before T0: an article on the outcome's side and none against it. */
+  called: number
+  /** Events it said would not happen: the mirror of `called`. */
+  against: number
+  /** Shown events with at least one of its articles in the Oracul's pre-T0 set. */
+  total: number
+  /** Newest event first. */
+  events: ForesawSourceEvent[]
+}
+
+export interface ForesawSourceBoard {
+  eventCount: number
+  rows: ForesawSourceRow[]
+  /** Outlets below BOARD_MIN_EVENTS. */
+  hiddenOutlets: number
+}
+
+/**
+ * One outlet's verdict on one event from all its articles in the set: it called the event when
+ * at least one article did and none said the opposite, and the mirror for against. Both sides at
+ * once, or neither, is neutral.
+ */
+export function outletSide(sides: ForesawSide[]): ForesawSide {
+  const called = sides.includes('called')
+  const against = sides.includes('against')
+  if (called && !against) return 'called'
+  if (against && !called) return 'against'
+  return 'neutral'
+}
+
+/**
+ * The retro-only source board (daatan#2217 PR 4, Q1/Q7). Built from the same shown events and the
+ * same per-article sides as the event pages, so the two never disagree. No Brier: every shown
+ * outcome is what happened, so accuracy would rank outlets by how often they say "it will".
+ * Sorted by events called, then the called share, then events written about.
+ */
+export async function getForesawSourceBoard(): Promise<ForesawSourceBoard> {
+  const events = await shownEvents()
+  const byOutlet = new Map<string, Map<string, { event: ForesawEvent; sides: ForesawSide[] }>>()
+  for (const event of events) {
+    for (const article of event.articles) {
+      const outlet = canonicalOutlet(article.outlet?.trim() || null)
+      if (!outlet) continue
+      const perEvent = byOutlet.get(outlet) ?? new Map()
+      byOutlet.set(outlet, perEvent)
+      const entry = perEvent.get(event.slug) ?? { event, sides: [] }
+      entry.sides.push(article.side)
+      perEvent.set(event.slug, entry)
+    }
+  }
+
+  const all: ForesawSourceRow[] = [...byOutlet].map(([outlet, perEvent]) => {
+    const list = [...perEvent.values()]
+      .sort((a, b) => b.event.eventDate.localeCompare(a.event.eventDate))
+      .map(({ event, sides }) => ({ slug: event.slug, eventText: event.eventText, side: outletSide(sides) }))
+    return {
+      outlet,
+      called: list.filter((e) => e.side === 'called').length,
+      against: list.filter((e) => e.side === 'against').length,
+      total: list.length,
+      events: list,
+    }
   })
+  const rows = all
+    .filter((r) => r.total >= BOARD_MIN_EVENTS)
+    .sort((a, b) => b.called - a.called || b.called / b.total - a.called / a.total || b.total - a.total || a.outlet.localeCompare(b.outlet))
+  return { eventCount: events.length, rows, hiddenOutlets: all.length - rows.length }
 }
 
 export async function getForesawEvent(slug: string): Promise<ForesawEvent | null> {

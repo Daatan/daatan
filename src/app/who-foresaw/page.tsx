@@ -38,6 +38,11 @@ export default async function WhoForesawPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl">
       <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">{t('title')}</h1>
       <p className="text-sm text-gray-400 mb-2">{t('subtitle')}</p>
+      {events.length > 0 && (
+        <p className="text-sm mb-2">
+          <Link href="/who-foresaw/sources" className="text-blue-400 hover:underline">{t('board.link')}</Link>
+        </p>
+      )}
       <p className="text-xs text-gray-500 mb-6 lg:mb-8">{t('method')}</p>
       {events.length === 0 ? (
         <p className="text-text-secondary">{t('empty')}</p>
