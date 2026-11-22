@@ -3,7 +3,14 @@ import { env } from '@/env'
 import { withAuth } from '@/lib/api-middleware'
 import { handleRouteError } from '@/lib/api-error'
 import { secretsMatch } from '@/lib/cron-auth'
-import { remediatePool, remediableWhere, usablePoolWhere, amnestyWhere } from '@/lib/services/pool-remediate'
+import {
+  remediatePool,
+  remediableWhere,
+  usablePoolWhere,
+  amnestyWhere,
+  TEXT_EDIT_TARGET,
+  type RemediationTarget,
+} from '@/lib/services/pool-remediate'
 import { parseOptionalJsonBody } from '@/lib/api-body'
 import { remediateBodySchema } from '@/lib/validations/api-inputs'
 
@@ -11,7 +18,14 @@ const MAX_IDS_PER_CALL = 10
 
 async function run(request: NextRequest) {
   const { ids, mode, scope } = await parseOptionalJsonBody(request, remediateBodySchema(MAX_IDS_PER_CALL))
-  const target = scope === 'usable' ? usablePoolWhere() : scope === 'amnesty' ? amnestyWhere() : remediableWhere()
+  const target: RemediationTarget =
+    scope === 'usable'
+      ? usablePoolWhere()
+      : scope === 'amnesty'
+        ? amnestyWhere()
+        : scope === 'text-edit'
+          ? TEXT_EDIT_TARGET
+          : remediableWhere()
   return NextResponse.json(await remediatePool(ids, mode === 'apply', target))
 }
 
@@ -33,7 +47,9 @@ const authed = withAuth(async (request: NextRequest) => {
  * over-extraction signature); `usable` targets the whole currently-usable pool for a
  * blanket recompute (retro#626) instead of an A6-only remediation; `amnesty` targets the
  * one-time pre-08-05 `oracle_null_final` re-drive (daatan#1547) — the timeout-retirement
- * regime's terminal stamps, not genuine null verdicts. Each forecast costs one Oracul
+ * regime's terminal stamps, not genuine null verdicts; `text-edit` re-reads the rows read
+ * before the forecast's last claim/rules edit and excludes the ones it cannot (daatan#2274).
+ * Each forecast costs one Oracul
  * analysis per 15 target rows, so this is driven by hand over a reviewed list, not on a
  * schedule — the plan's human-review gate sits in front of it, not inside it.
  *

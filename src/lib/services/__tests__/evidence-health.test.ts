@@ -16,7 +16,7 @@ import {
   PANEL_402_LOOKBACK_HOURS,
   BATCH_HEARTBEAT_STALE_HOURS,
 } from '@/lib/services/evidence-health'
-import { USABLE_POOL_ROW_WHERE, isUsablePoolRow } from '@/lib/services/evidence-pool'
+import { USABLE_POOL_ROW_WHERE, TEXT_EDIT_GRACE_MS, isUsablePoolRow } from '@/lib/services/evidence-pool'
 import type { EvidenceHealthIssue } from '@/lib/services/telegram'
 
 const groupBy = vi.mocked(prisma.evidencePoolArticle.groupBy)
@@ -212,6 +212,76 @@ describe('checkEvidenceHealth', () => {
       excluded: false, status: 'COMPLETE', stance: 0.4,
       certainty: null, credibilityWeight: 1, relevanceScore: 0.6,
     })).toBe(false)
+  })
+
+  describe('pools read under an edited claim or rules (daatan#2274)', () => {
+    const EDITED_AT = new Date('2026-11-22T10:00:00Z')
+
+    /** The coverage query and the stale query share `groupBy`; the stale one carries `OR`. */
+    function stubStale(stale: Record<string, number>) {
+      stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, HEALTHY_BASELINE, ['p-edited', 'p-clean'])
+      const coverage = groupBy.getMockImplementation()!
+      groupBy.mockImplementation((async (args: { where: { OR?: unknown } }) =>
+        args.where.OR
+          ? Object.entries(stale).map(([predictionId, n]) => ({ predictionId, _count: { _all: n } }))
+          : coverage(args as never)) as never)
+    }
+
+    beforeEach(() => {
+      findActive.mockImplementation((async (args: { where: { textChangedAt?: unknown } }) =>
+        args.where.textChangedAt
+          ? [{ id: 'p-edited', claimText: 'Ceasefire holds through March', slug: 'ceasefire', textChangedAt: EDITED_AT }]
+          : [
+              { id: 'p-edited', claimText: 'Ceasefire holds through March', slug: 'ceasefire' },
+              { id: 'p-clean', claimText: 'never edited', slug: 'clean' },
+            ]) as never)
+    })
+
+    it('fires per ACTIVE edited forecast that still holds rows read before the edit', async () => {
+      stubStale({ 'p-edited': 12 })
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired).toContainEqual({
+        kind: 'forecast_text_stale',
+        predictionId: 'p-edited',
+        claimText: 'Ceasefire holds through March',
+        slug: 'ceasefire',
+        staleRows: 12,
+        textChangedAt: EDITED_AT,
+      })
+      // Each forecast against its own edit time, over the same usable-row definition the aggregate reads.
+      expect(groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['predictionId'],
+          where: {
+            OR: [
+              {
+                predictionId: 'p-edited',
+                ...USABLE_POOL_ROW_WHERE,
+                addedAt: { lt: new Date(EDITED_AT.getTime() + TEXT_EDIT_GRACE_MS) },
+              },
+            ],
+          },
+        }),
+      )
+    })
+
+    it('stays silent once the edited forecast has been re-read', async () => {
+      stubStale({})
+
+      const { fired } = await checkEvidenceHealth()
+
+      expect(fired.some((i) => i.kind === 'forecast_text_stale')).toBe(false)
+    })
+  })
+
+  it('does not query the pool for stale rows when no ACTIVE forecast was edited', async () => {
+    stubPool({ 'ynet.co.il': { total: 400, failed: 100 } }, HEALTHY_BASELINE, [])
+
+    await checkEvidenceHealth()
+
+    expect(groupBy.mock.calls.some(([a]) => (a as { where: { OR?: unknown } }).where.OR)).toBe(false)
   })
 
   it('does not re-fire a condition already alerted on, and counts it as suppressed', async () => {
@@ -454,6 +524,17 @@ describe('alertKey', () => {
       [
         { kind: 'forecast_no_evidence', predictionId: 'cml6ukq9u', claimText: 'x', slug: null },
         'forecast-empty:cml6ukq9u',
+      ],
+      [
+        {
+          kind: 'forecast_text_stale',
+          predictionId: 'cmr8cqqai',
+          claimText: 'x',
+          slug: null,
+          staleRows: 3,
+          textChangedAt: new Date(),
+        },
+        'forecast-text-stale:cmr8cqqai',
       ],
       [{ kind: 'overall_failure_rate', recentPct: 60, baselinePct: 40 }, 'overall-failure'],
       [{ kind: 'overall_volume_collapse', recentPerDay: 3, baselinePerDay: 40 }, 'overall-volume'],

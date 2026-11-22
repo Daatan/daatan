@@ -1,7 +1,13 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_MAX_ARTICLES } from '@/lib/services/oracle'
-import { USABLE_POOL_ROW_WHERE, CURRENT_VERSION_ONLY, hashArticleContent } from '@/lib/services/evidence-pool'
+import {
+  USABLE_POOL_ROW_WHERE,
+  CURRENT_VERSION_ONLY,
+  hashArticleContent,
+  textStalePoolRowWhere,
+  TEXT_EDIT_GRACE_MS,
+} from '@/lib/services/evidence-pool'
 import { refreshOracleSnapshot, type SuppliedArticle } from '@/lib/services/oracle-backfill'
 import { createLogger } from '@/lib/logger'
 
@@ -75,9 +81,36 @@ export function amnestyWhere(): Prisma.EvidencePoolArticleWhereInput {
   }
 }
 
+/**
+ * daatan#2274's target: every usable row read before the forecast's claim or rules last
+ * changed ({@link textStalePoolRowWhere}). Not a fixed filter like the others — the
+ * cutoff is each forecast's own `textChangedAt`, and a forecast never edited since the
+ * stamp existed has no target rows.
+ *
+ * Unlike the other scopes the old reading is not "still the best one we have": it
+ * answered a different question. So a row that a working batch did not re-read (the
+ * Oracul left it out, or the claim gate refused it) is put back EXCLUDED, not usable, and a
+ * row that cannot be re-read at all (no title, or a search-redirect URL) is excluded
+ * without a call — the 2026-11-22 cleanup's convention (daatan#2273). Its `contentHash`
+ * stays null, so the next push of the same URL versions it and gets a current reading.
+ * A batch that got no answer at all (Oracul down, thrown) keeps its readings and stops
+ * that forecast, so an outage cannot empty a pool; its rows stay stale for the next run.
+ * Apply is refused until the in-flight grace after the edit has passed (`applyAfter`).
+ */
+export const TEXT_EDIT_TARGET = 'text-edit' as const
+
+export type RemediationTarget = Prisma.EvidencePoolArticleWhereInput | typeof TEXT_EDIT_TARGET
+
+function isReReadable(r: { url: string; title: string | null }): boolean {
+  return r.title !== null && !r.url.includes(NON_ARTICLE_URL_FRAGMENT)
+}
+
 export interface RemediationForecast {
   predictionId: string
   claimText: string
+  /** When the claim or rules last changed — the `text-edit` scope's cutoff. Null = never
+   *  edited since the stamp was added (daatan#2274). */
+  textChangedAt: Date | null
   /** Rows matching {@link remediableWhere} — what this run re-extracts. */
   targetRows: number
   /** Oracul calls: one per DEFAULT_MAX_ARTICLES-row batch. */
@@ -100,6 +133,13 @@ export interface RemediationForecast {
    *  {@link restoreUnfinishedHeads}. Non-zero means the run re-extracted fewer rows than
    *  it targeted, even when every batch reports `ok`. */
   restored: number
+  /** `text-edit` scope only: target rows set excluded instead of left on their old
+   *  reading — unfinished or refused re-extractions plus rows that cannot be re-read. */
+  excluded: number
+  /** `text-edit` scope only: apply is refused before this time. A row read inside the
+   *  in-flight grace after the edit still counts as stale ({@link TEXT_EDIT_GRACE_MS}), so a
+   *  re-read done then would never clear. Null on the other scopes. */
+  applyAfter: Date | null
 }
 
 /** Row shape {@link remediatePool} reads for a target row — the parent of any new head. */
@@ -128,10 +168,15 @@ interface RemediationRow {
  *
  * The delete is guarded on the head still being current and unfinished, so a concurrent
  * claim that already moved the chain on is left untouched. Never throws.
+ *
+ * `asExcluded` is the `text-edit` scope's variant ({@link TEXT_EDIT_TARGET}): the parent
+ * comes back excluded with its `contentHash` left null, because its reading answered the
+ * old text and must not vote again.
  */
 export async function restoreUnfinishedHeads(
   parents: RemediationRow[],
   statuses: Array<'FAILED' | 'PENDING'> = ['FAILED'],
+  { asExcluded = false }: { asExcluded?: boolean } = {},
 ): Promise<number> {
   if (parents.length === 0) return 0
   const parentById = new Map(parents.map((r) => [r.id, r]))
@@ -151,10 +196,12 @@ export async function restoreUnfinishedHeads(
         if (count === 0) return false
         await tx.evidencePoolArticle.update({
           where: { id: parent.id },
-          data: {
-            supersededAt: null,
-            contentHash: parent.title ? hashArticleContent(parent.title, parent.snippet ?? '') : null,
-          },
+          data: asExcluded
+            ? { supersededAt: null, excluded: true }
+            : {
+                supersededAt: null,
+                contentHash: parent.title ? hashArticleContent(parent.title, parent.snippet ?? '') : null,
+              },
         })
         return true
       })
@@ -194,12 +241,16 @@ export interface RemediationResult {
  * supersede-and-insert arm of `claimArticleForExtraction` regardless of the superseded
  * row's `status`/`statusReason` — so a terminal `oracle_null_final` stamp does not need
  * its own carve-out in the claim gate to be re-claimable here.
+ *
+ * {@link TEXT_EDIT_TARGET} re-reads the rows read before the forecast's last claim/rules
+ * edit (daatan#2274), and excludes the ones that cannot be re-read or do not finish.
  */
 export async function remediatePool(
   predictionIds: string[],
   apply: boolean,
-  target: Prisma.EvidencePoolArticleWhereInput = remediableWhere(),
+  target: RemediationTarget = remediableWhere(),
 ): Promise<RemediationResult> {
+  const textEdit = target === TEXT_EDIT_TARGET
   const preds = await prisma.prediction.findMany({
     where: { id: { in: predictionIds } },
     select: {
@@ -211,20 +262,27 @@ export async function remediatePool(
       claimArchetype: true,
       resolutionRules: true,
       confidence: true,
+      textChangedAt: true,
     },
   })
 
   const forecasts: RemediationForecast[] = []
   for (const p of preds) {
-    const rows = await prisma.evidencePoolArticle.findMany({
-      where: { ...target, predictionId: p.id },
-      orderBy: { addedAt: 'asc' },
-      select: { id: true, url: true, title: true, snippet: true, source: true, publishedDate: true },
-    })
+    const where = !textEdit ? target : p.textChangedAt ? textStalePoolRowWhere(p.textChangedAt) : null
+    const targetRows = where
+      ? await prisma.evidencePoolArticle.findMany({
+          where: { ...where, predictionId: p.id },
+          orderBy: { addedAt: 'asc' },
+          select: { id: true, url: true, title: true, snippet: true, source: true, publishedDate: true },
+        })
+      : []
+    const rows = textEdit ? targetRows.filter(isReReadable) : targetRows
+    const unreadable = textEdit ? targetRows.filter((r) => !isReReadable(r)) : []
     const f: RemediationForecast = {
       predictionId: p.id,
       claimText: p.claimText,
-      targetRows: rows.length,
+      textChangedAt: p.textChangedAt,
+      targetRows: targetRows.length,
       batches: Math.ceil(rows.length / DEFAULT_MAX_ARTICLES),
       poolBefore: await prisma.evidencePoolArticle.count({ where: { predictionId: p.id, ...USABLE_POOL_ROW_WHERE } }),
       poolAfter: null,
@@ -236,9 +294,19 @@ export async function remediatePool(
       insufficient: 0,
       failed: 0,
       restored: 0,
+      excluded: 0,
+      applyAfter: textEdit && p.textChangedAt ? new Date(p.textChangedAt.getTime() + TEXT_EDIT_GRACE_MS) : null,
     }
     forecasts.push(f)
-    if (!apply || rows.length === 0) continue
+    if (!apply || targetRows.length === 0 || (f.applyAfter && f.applyAfter.getTime() > Date.now())) continue
+
+    if (unreadable.length > 0) {
+      const { count } = await prisma.evidencePoolArticle.updateMany({
+        where: { id: { in: unreadable.map((r) => r.id) }, ...CURRENT_VERSION_ONLY },
+        data: { excluded: true },
+      })
+      f.excluded += count
+    }
 
     for (let i = 0; i < rows.length; i += DEFAULT_MAX_ARTICLES) {
       const chunk = rows.slice(i, i + DEFAULT_MAX_ARTICLES)
@@ -255,26 +323,52 @@ export async function remediatePool(
           : [],
       )
       let threw = false
+      let batchDown = false
       try {
         const r = await refreshOracleSnapshot(p, { articles, origin: 'remediate', reask: true })
         if (r.status === 'ok') f.ok++
         else if (r.status === 'unchanged') f.unchanged++
         else if (r.status === 'insufficient') f.insufficient++
-        else f.noOracul++
+        else {
+          f.noOracul++
+          batchDown = true
+        }
       } catch (err) {
         threw = true
+        batchDown = true
         f.failed++
         log.warn({ predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, err }, 'pool-remediate.batch_failed')
       }
+      // text-edit excludes what a WORKING batch did not re-read; a batch that never got an
+      // answer (Oracul down, thrown) says nothing about its rows, so they keep their reading
+      // and stay stale for the next run — an outage must not empty the pool.
+      const excludeLeftovers = textEdit && !batchDown
       // A batch that threw never reached the claim release, so its heads may still be PENDING.
-      const restored = await restoreUnfinishedHeads(chunk, threw ? ['FAILED', 'PENDING'] : ['FAILED'])
-      if (restored > 0) {
+      const restored = await restoreUnfinishedHeads(chunk, threw ? ['FAILED', 'PENDING'] : ['FAILED'], {
+        asExcluded: excludeLeftovers,
+      })
+      if (excludeLeftovers) {
+        // Still current and not excluded = never claimed (a refused claim gate, e.g. the
+        // publish-date gates): with its hash nulled it was not re-read, so its vote is old-text.
+        const { count: unclaimed } = await prisma.evidencePoolArticle.updateMany({
+          where: { id: { in: chunk.map((r) => r.id) }, ...CURRENT_VERSION_ONLY, excluded: false },
+          data: { excluded: true },
+        })
+        f.excluded += restored + unclaimed
+        if (restored + unclaimed > 0) {
+          log.warn(
+            { predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, batchRows: chunk.length, restored, unclaimed },
+            'event=pool_remediate_text_edit_excluded — not re-read under the current text; old readings excluded (daatan#2274)',
+          )
+        }
+      } else if (restored > 0) {
         f.restored += restored
         log.warn(
           { predictionId: p.id, batch: i / DEFAULT_MAX_ARTICLES, batchRows: chunk.length, restored },
           'event=pool_remediate_restored — re-extraction did not finish for these rows; previous readings kept (daatan#2159)',
         )
       }
+      if (textEdit && batchDown) break
     }
 
     f.poolAfter = await prisma.evidencePoolArticle.count({ where: { predictionId: p.id, ...USABLE_POOL_ROW_WHERE } })

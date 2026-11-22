@@ -1075,6 +1075,31 @@ export const USABLE_POOL_ROW_WHERE = {
 } as const satisfies Prisma.EvidencePoolArticleWhereInput
 
 /**
+ * How long after a claim/rules edit a row still counts as read under the old text. A run
+ * loads the forecast, then searches, then claims: a claim landing just after the edit can
+ * belong to a run that already holds the old text. Erring this way costs one re-extraction
+ * of a row read just after the edit; erring the other way leaves a vote cast on the wrong
+ * question in the pool.
+ */
+export const TEXT_EDIT_GRACE_MS = 10 * 60 * 1000
+
+/**
+ * Usable rows read before the forecast's claim or rules last changed (daatan#2274) —
+ * `textChangedAt` is stamped by a DB trigger on `predictions`, so every writer counts.
+ *
+ * `addedAt`, not `updatedAt`: a usable reading that replaces an earlier one is a new row
+ * version (supersede-and-insert), so a re-read always moves `addedAt`, while plenty of
+ * writes that are not re-reads move `updatedAt` — a remediation's `contentHash` null, the
+ * restore of an unfinished head, an exclusion toggle. Keyed on `updatedAt` any of those
+ * would make an old-text reading look current. The cost runs the safe way: a row that
+ * FAILED before the edit and was re-claimed in place after it keeps its old `addedAt`
+ * and counts as stale although its reading is new — one extra re-read.
+ */
+export function textStalePoolRowWhere(textChangedAt: Date): Prisma.EvidencePoolArticleWhereInput {
+  return { ...USABLE_POOL_ROW_WHERE, addedAt: { lt: new Date(textChangedAt.getTime() + TEXT_EDIT_GRACE_MS) } }
+}
+
+/**
  * How many rows of a forecast's pool the aggregate could use right now.
  *
  * Zero means the published confidence — if there is one — has nothing behind it that a

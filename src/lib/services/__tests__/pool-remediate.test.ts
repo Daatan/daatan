@@ -26,7 +26,7 @@ vi.mock('@/lib/logger', () => ({
 }))
 
 import { prisma } from '@/lib/prisma'
-import { hashArticleContent } from '@/lib/services/evidence-pool'
+import { hashArticleContent, TEXT_EDIT_GRACE_MS, USABLE_POOL_ROW_WHERE } from '@/lib/services/evidence-pool'
 import {
   remediatePool,
   restoreUnfinishedHeads,
@@ -34,6 +34,7 @@ import {
   usablePoolWhere,
   amnestyWhere,
   AMNESTY_CUTOFF,
+  TEXT_EDIT_TARGET,
   REMEDIATE_MIN_ABS_STANCE,
   REMEDIATE_MIN_CERTAINTY,
 } from '../pool-remediate'
@@ -307,6 +308,15 @@ describe('restoreUnfinishedHeads (daatan#2159)', () => {
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
+  it('restores the parent excluded and hash-less when asked (text-edit scope, daatan#2274)', async () => {
+    mockRows.mockResolvedValueOnce([{ id: 'h1', supersedesId: 'r1' }] as never)
+
+    const n = await restoreUnfinishedHeads([row(1)], ['FAILED'], { asExcluded: true })
+
+    expect(n).toBe(1)
+    expect(mockUpdate).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { supersededAt: null, excluded: true } })
+  })
+
   it('never throws', async () => {
     mockRows.mockRejectedValueOnce(new Error('db down'))
 
@@ -347,5 +357,145 @@ describe('remediatePool restore wiring (daatan#2159)', () => {
     expect(mockRows).toHaveBeenLastCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ status: { in: ['FAILED', 'PENDING'] } }) }),
     )
+  })
+})
+
+describe('remediatePool scope text-edit (daatan#2274)', () => {
+  const EDITED_AT = new Date('2026-11-01T10:00:00Z')
+  const EDITED = { ...PRED, textChangedAt: EDITED_AT }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPredictions.mockResolvedValue([EDITED] as never)
+    mockPrediction.mockResolvedValue({ confidence: 34 } as never)
+    mockCount.mockResolvedValue(20)
+    mockUpdateMany.mockResolvedValue({ count: 1 } as never)
+    mockDeleteMany.mockResolvedValue({ count: 1 } as never)
+    mockUpdate.mockResolvedValue({} as never)
+    mockRefresh.mockResolvedValue({ status: 'ok', sources: 3 })
+  })
+
+  it('targets the usable rows read before the edit, plus the in-flight grace', async () => {
+    mockRows.mockResolvedValueOnce([row(1)] as never)
+
+    const r = await remediatePool(['p1'], false, TEXT_EDIT_TARGET)
+
+    expect(mockRows).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ...USABLE_POOL_ROW_WHERE,
+          addedAt: { lt: new Date(EDITED_AT.getTime() + TEXT_EDIT_GRACE_MS) },
+          predictionId: 'p1',
+        },
+      }),
+    )
+    expect(r.forecasts[0]).toMatchObject({
+      targetRows: 1,
+      batches: 1,
+      textChangedAt: EDITED_AT,
+      excluded: 0,
+      applyAfter: new Date(EDITED_AT.getTime() + TEXT_EDIT_GRACE_MS),
+    })
+    expect(mockRefresh).not.toHaveBeenCalled()
+    expect(mockUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('has nothing to do on a forecast never edited since the stamp existed', async () => {
+    mockPredictions.mockResolvedValue([{ ...PRED, textChangedAt: null }] as never)
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockRows).not.toHaveBeenCalled()
+    expect(r.forecasts[0]).toMatchObject({ targetRows: 0, batches: 0 })
+    expect(mockRefresh).not.toHaveBeenCalled()
+  })
+
+  it('excludes rows it cannot re-read instead of leaving their old-text vote in the pool', async () => {
+    mockRows
+      .mockResolvedValueOnce([
+        row(1),
+        row(2, { url: 'https://www.google.com/goto?url=x' }),
+        row(3, { title: null }),
+      ] as never)
+      .mockResolvedValueOnce([] as never)
+    mockUpdateMany
+      .mockResolvedValueOnce({ count: 2 } as never) // unreadable rows excluded
+      .mockResolvedValueOnce({ count: 1 } as never) // contentHash null
+      .mockResolvedValueOnce({ count: 0 } as never) // leftover sweep
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockUpdateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: { in: ['r2', 'r3'] }, supersededAt: null },
+      data: { excluded: true },
+    })
+    const articles = (mockRefresh.mock.calls[0][1] as { articles: Array<{ url: string }> }).articles
+    expect(articles.map((a) => a.url)).toEqual(['https://a.com/1'])
+    expect(r.forecasts[0]).toMatchObject({ targetRows: 3, batches: 1, excluded: 2, restored: 0 })
+  })
+
+  it('puts an unfinished re-read back EXCLUDED, without its content hash', async () => {
+    mockRows
+      .mockResolvedValueOnce([row(1), row(2)] as never) // target rows
+      .mockResolvedValueOnce([{ id: 'h2', supersedesId: 'r2' }] as never) // unfinished heads
+    mockUpdateMany
+      .mockResolvedValueOnce({ count: 2 } as never) // contentHash null
+      .mockResolvedValueOnce({ count: 0 } as never) // leftover sweep
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockUpdate).toHaveBeenCalledWith({ where: { id: 'r2' }, data: { supersededAt: null, excluded: true } })
+    expect(r.forecasts[0]).toMatchObject({ ok: 1, excluded: 1, restored: 0 })
+  })
+
+  it('excludes rows a working batch never claimed (refused claim gate): nulled hash, not re-read', async () => {
+    mockRows.mockResolvedValueOnce([row(1), row(2)] as never).mockResolvedValueOnce([] as never)
+    mockRefresh.mockResolvedValue({ status: 'unchanged' })
+    mockUpdateMany
+      .mockResolvedValueOnce({ count: 2 } as never) // contentHash null
+      .mockResolvedValueOnce({ count: 2 } as never) // leftover sweep
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockUpdateMany).toHaveBeenLastCalledWith({
+      where: { id: { in: ['r1', 'r2'] }, supersededAt: null, excluded: false },
+      data: { excluded: true },
+    })
+    expect(r.forecasts[0]).toMatchObject({ unchanged: 1, excluded: 2 })
+  })
+
+  it('keeps the readings and stops the forecast when the Oracul is down — an outage must not empty the pool', async () => {
+    const rows = Array.from({ length: 16 }, (_, i) => row(i + 1)) // two batches
+    mockRows
+      .mockResolvedValueOnce(rows as never)
+      .mockResolvedValueOnce([{ id: 'h1', supersedesId: 'r1' }] as never) // transport-FAILED head
+    mockRefresh.mockResolvedValue({ status: 'no-oracle', failureClass: 'timeout' })
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'r1' },
+      data: { supersededAt: null, contentHash: hashArticleContent('Headline 1', 'Body 1') },
+    })
+    // Only the batch's own hash-null write; no exclusion of any kind.
+    expect(mockUpdateMany).toHaveBeenCalledTimes(1)
+    expect(r.forecasts[0]).toMatchObject({ noOracul: 1, restored: 1, excluded: 0 })
+  })
+
+  it('refuses apply inside the in-flight grace after the edit, so its own re-reads cannot stay stale', async () => {
+    const justNow = new Date(Date.now() - 60_000)
+    mockPredictions.mockResolvedValue([{ ...PRED, textChangedAt: justNow }] as never)
+    mockRows.mockResolvedValueOnce([row(1)] as never)
+
+    const r = await remediatePool(['p1'], true, TEXT_EDIT_TARGET)
+
+    expect(mockRefresh).not.toHaveBeenCalled()
+    expect(mockUpdateMany).not.toHaveBeenCalled()
+    expect(r.forecasts[0]).toMatchObject({
+      targetRows: 1,
+      applyAfter: new Date(justNow.getTime() + TEXT_EDIT_GRACE_MS),
+      poolAfter: null,
+    })
   })
 })

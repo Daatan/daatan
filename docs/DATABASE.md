@@ -74,6 +74,13 @@ The central table (`Prediction`). Field groups:
   shows the newest non-revoked revision whose `claimHash` matches the current claim;
   `predictions.headline` is never rewritten. See
   [LLM_ARCHITECTURE.md § Card headline](LLM_ARCHITECTURE.md#card-headline-1814).
+  `text_changed_at` (`textChangedAt`, daatan#2274): when `claimText` or
+  `resolutionRules` last changed. Written **only** by the `prediction_text_changed_stamp`
+  BEFORE UPDATE trigger, so every writer counts — the edit route, the rules backfill,
+  translation re-derivation, the question rephrase and a hand-run `UPDATE` alike. NULL =
+  not edited since the trigger landed (2026-11; no backfill). Evidence-pool rows read
+  before it answered the old text: `textStalePoolRowWhere` in `evidence-pool.ts`, the
+  `forecast-text-stale` health alert, and the remediation scope `text-edit`.
 - **Outcome**: `outcomeType` (BINARY | MULTIPLE_CHOICE | NUMERIC_THRESHOLD),
   `outcomePayload` JSON, `prediction_options` rows for MC/numeric,
   `resolveByDatetime` (the platform deadline).
@@ -814,7 +821,9 @@ ingest, because retro never rewrites a ledger entry.
 One row per condition the evidence pipeline is **currently** failing, keyed by a
 stable string (`source-silent:bbc.co.uk`, `forecast-empty:<predictionId>`,
 `overall-failure`, `batch-heartbeat-stale` / `batch-heartbeat-unreachable` — the
-TruthMachine batch-loop liveness pair, retro#556). `forecast-empty` fires on the shared usable-row definition above, so it
+TruthMachine batch-loop liveness pair, retro#556; `forecast-text-stale:<predictionId>` —
+usable rows read before the claim/rules edit stamped in `predictions.text_changed_at`,
+daatan#2274). `forecast-empty` fires on the shared usable-row definition above, so it
 asks the same question the aggregate does. It is fire/re-arm state, not a log: `checkEvidenceHealth()`
 claims a condition by inserting its key — only the run that wins the insert
 notifies, so overlapping runs can't double-page — and deletes the keys whose

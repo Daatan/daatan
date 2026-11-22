@@ -419,6 +419,12 @@ model Prediction {
   // Resolution rules
   resolutionRules   String?  @db.Text // How to determine outcome
   resolveByDatetime DateTime // Deadline for resolution
+  // When `claimText` or `resolutionRules` last changed after the row was created
+  // (daatan#2274). Set ONLY by the `prediction_text_changed_stamp` DB trigger, so every
+  // writer counts — the edit route, the rules backfill, translation re-derivation and a
+  // hand-run UPDATE alike. Pool rows added before it were read against the old text:
+  // see `textStalePoolWhere` (pool-remediate.ts) and the evidence-health alert.
+  textChangedAt     DateTime? @map("text_changed_at")
 
   // Source tracking (e.g. 'bot' for bot-created predictions)
   source String? @db.VarChar(50)
