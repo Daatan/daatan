@@ -16,8 +16,10 @@ article set, after the event check (step 4) has dropped the off-topic ones.
 
 ## Pipeline
 
-The `Retro Simulations` workflow (`.github/workflows/retro-simulations.yml`, manual dispatch
-only, **dry-run by default**) calls two admin routes with the `x-cron-secret` header:
+The `Retro Simulations` workflow (`.github/workflows/retro-simulations.yml`) runs daily at
+06:41 UTC in **apply** mode on production (`days` 7, `max_clusters` 30, `max_events` 15,
+`min_similarity` 0.40; Mark, 2026-11-22). A manual dispatch is **dry-run by default**. Either
+way it calls two admin routes with the `x-cron-secret` header:
 
 1. `POST /api/admin/retro/candidates` (`findRetroCandidates`). Writes nothing.
 2. `POST /api/admin/retro/simulate` (`simulateRetroEvent`), once per candidate, largest first,
@@ -194,7 +196,14 @@ and generator evidence. Pending and rejected (`VOID`) drafts and every other for
 
 ## Running it
 
-Actions → **Retro Simulations** → `target`, `mode`, `days`, `max_clusters`, `max_events`,
+The daily run needs nothing: when it drafts anything (or a simulate call errors) it posts the
+drafts to the quiet Telegram channel with the `/admin/approvals` link, and a failed scheduled
+run posts there too ([TELEGRAM_NOTIFICATIONS.md](TELEGRAM_NOTIFICATIONS.md)). Nothing is
+remembered between runs: a skipped event is judged again the next day, and can pass on a later
+day (the judge's wording and date vary run to run), so expect the odd repeat-storyline draft to
+reject.
+
+By hand: Actions → **Retro Simulations** → `target`, `mode`, `days`, `max_clusters`, `max_events`,
 `min_similarity`. Run a dry run first; it prints what would be drafted, with P at T0. The job
 log carries each event's whole response (every article sent with its similarity, and the
 Oracul's stance per source) for a hand-read. The workflow judges 30 clusters by default (the route's own
