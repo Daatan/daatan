@@ -130,7 +130,7 @@ Measures how much better your probability estimates are compared to the AI's est
 Positive = you beat the AI.  
 Stored on `Commitment.aiScore` at resolution.
 
-**Leaderboard value:** sum of all AI scores in the selected tag scope, over commitments with `aiSourceAtCommit = 'oracle'` only (daatan#2271). `aiScore` is still stored for every commitment that had an AI probability, but a stake graded against the LLM fallback, a pre-analysis value or the claim-only guess no longer counts on the leaderboard or the profile. Same filter on the profile sum.
+**Leaderboard value:** sum of all AI scores in the selected tag scope, over commitments with `aiSourceAtCommit = 'oracle'` only (daatan#2271). `aiScore` is still stored for every commitment that had an AI probability, but a stake graded against the LLM fallback, a pre-analysis value, the claim-only guess or the Oracul's estimate of an inverted rule (`oracle_inverted`, daatan#2273) no longer counts on the leaderboard or the profile. Same filter on the profile sum.
 
 ---
 

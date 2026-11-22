@@ -1380,16 +1380,20 @@ function retroLedgerWritesAllowed(predictionId: string, action: 'push' | 'retrac
   return false
 }
 
+/** What a retract did: `skipped` = ledger writes are off here (not production, or no Oracul). */
+export type RetractResult = { status: 'ok'; retro: Record<string, unknown> } | { status: 'skipped' | 'failed' }
+
 /**
- * Undo `pushCredibilityFeedback` for a reverted resolution (daatan#2077), via retro's
- * `DELETE /leaderboard/ingest/{id}`. Idempotent there. A failure leaves the old outcome in
- * retro's ledgers and blocks a re-resolution's push as a duplicate, so it logs at error.
+ * Undo `pushCredibilityFeedback` via retro's `DELETE /leaderboard/ingest/{id}`: for a reverted
+ * resolution (daatan#2077), or for readings that scored the wrong event (daatan#2273). Idempotent
+ * there. A failure leaves the old outcome in retro's ledgers and blocks a re-resolution's push as
+ * a duplicate, so it logs at error. Never throws.
  */
-export async function retractCredibilityFeedback(predictionId: string): Promise<void> {
-  if (!retroLedgerWritesAllowed(predictionId, 'retract')) return
+export async function retractCredibilityFeedback(predictionId: string): Promise<RetractResult> {
+  if (!retroLedgerWritesAllowed(predictionId, 'retract')) return { status: 'skipped' }
 
   const cfg = getOracleConfig()
-  if (!cfg) return
+  if (!cfg) return { status: 'skipped' }
 
   let res: Response
   try {
@@ -1400,13 +1404,15 @@ export async function retractCredibilityFeedback(predictionId: string): Promise<
     })
   } catch (err) {
     log.error({ predictionId, err }, 'event=credibility_feedback_retract_failed')
-    return
+    return { status: 'failed' }
   }
   if (!res.ok) {
     log.error({ predictionId, status: res.status }, 'event=credibility_feedback_retract_failed')
-    return
+    return { status: 'failed' }
   }
-  log.info({ predictionId, ...(await res.json()) }, 'event=credibility_feedback_retracted')
+  const retro = ((await res.json().catch(() => ({}))) ?? {}) as Record<string, unknown>
+  log.info({ predictionId, ...retro }, 'event=credibility_feedback_retracted')
+  return { status: 'ok', retro }
 }
 
 /** The article's day (UTC midnight) from a pool row's free-form `publishedDate`, or null. */

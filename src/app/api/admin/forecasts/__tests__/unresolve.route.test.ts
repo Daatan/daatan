@@ -32,7 +32,7 @@ describe('POST /api/admin/forecasts/[id]/unresolve', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     signedInAs('ADMIN')
-    retract.mockResolvedValue(undefined)
+    retract.mockResolvedValue({ status: 'ok', retro: {} })
     unresolve.mockResolvedValue(reverted('wrong'))
   })
 
