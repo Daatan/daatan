@@ -13,8 +13,9 @@ name: Retro Simulations
 #
 # Daily on production in apply mode (Mark, 2026-11-22, daatan#2217). A manual dispatch is still
 # dry-run by default. Draft creation notifies no one, so an apply run on production posts one
-# line to the quiet Telegram channel when it creates drafts or a simulate call errors. A failed
-# scheduled run posts too. Nothing is remembered between runs: an event skipped today is judged
+# line to the quiet Telegram channel when it creates drafts, a simulate call errors, or a
+# dependency skip (embed_failed, search_failed, event_check_failed/incomplete) says something
+# upstream is down. A failed scheduled run posts too. Nothing is remembered between runs: an event skipped today is judged
 # again tomorrow, and drafted events (rejected ones too) are skipped as `duplicate_retro` /
 # `already_forecast`. Auth is the x-cron-secret (BOT_RUNNER_SECRET) header.
 
@@ -109,7 +110,7 @@ jobs:
 
           N=$(jq '.candidates | length' candidates.json)
           [ "$N" -gt "$MAX_EVENTS" ] && N=$MAX_EVENTS
-          CREATED=0; ERRORS=0; : > drafts.txt
+          CREATED=0; ERRORS=0; INFRA=""; : > drafts.txt
           for i in $(seq 0 $((N - 1))); do
             REQ=$(jq -c --argjson i "$i" --arg mode "$MODE" --arg sim "$MIN_SIMILARITY" \
               '.candidates[$i] | {reports, event, claimTemplate, rulesTemplate, mode:$mode}
@@ -126,6 +127,12 @@ jobs:
                else "| \($n) | \(.status // "error") | | | | \(.reason // .error // "?"): \((.claimText // "") | gsub("\\|"; "/"))\((.detail | if type == "object" then .why else null end) // "" | if . == "" then "" else " — " + gsub("\\|"; "/") end) |" end' \
               >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "| $((i + 1)) | error | | | | unparseable response |" >> "$GITHUB_STEP_SUMMARY"
             STATUS=$(echo "$OUT" | jq -r '.status // "error"' 2>/dev/null) || STATUS=error
+            REASON=$(echo "$OUT" | jq -r '.reason // ""' 2>/dev/null) || REASON=""
+            if [ "$STATUS" = "skipped" ] && [[ "$REASON" =~ ^(embed_failed|search_failed|event_check_failed|event_check_incomplete)$ ]]; then
+              # A broken dependency (embeddings, /search/before, the event check) skips rather
+              # than errors; under a cron nobody reads the table, so these go to the ping too.
+              INFRA+="${INFRA:+, }$REASON"
+            fi
             if [ "$STATUS" = "created" ]; then
               CREATED=$((CREATED + 1))
               echo "$OUT" | jq -r '"• \(.claimText[0:140]) (P \((.probability * 100) | round)% at T0 \(.asOf[0:10]))"' >> drafts.txt \
@@ -135,12 +142,12 @@ jobs:
             fi
             sleep 2
           done
-          { echo "simulated=$N"; echo "created=$CREATED"; echo "errors=$ERRORS"; } >> "$GITHUB_OUTPUT"
+          { echo "simulated=$N"; echo "created=$CREATED"; echo "errors=$ERRORS"; echo "infra=$INFRA"; } >> "$GITHUB_OUTPUT"
 
       # The quiet channel: drafts are an action item for Mark, like a new forecast. The chat id
       # falls back to the noisy channel if the clean one is unset (docs/TELEGRAM_NOTIFICATIONS.md).
       - name: Ping Telegram about new drafts
-        if: env.TARGET == 'production' && env.MODE == 'apply' && (steps.run.outputs.created != '0' || steps.run.outputs.errors != '0')
+        if: env.TARGET == 'production' && env.MODE == 'apply' && (steps.run.outputs.created != '0' || steps.run.outputs.errors != '0' || steps.run.outputs.infra != '')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CLEAN_CHAT_ID: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
@@ -148,12 +155,14 @@ jobs:
           CREATED: ${{ steps.run.outputs.created }}
           ERRORS: ${{ steps.run.outputs.errors }}
           SIMULATED: ${{ steps.run.outputs.simulated }}
+          INFRA: ${{ steps.run.outputs.infra }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           CHAT_ID="${CLEAN_CHAT_ID:-$NOISY_CHAT_ID}"
           MSG="🔁 Retro: $CREATED new draft(s) awaiting approval ($SIMULATED simulated"
           [ "$ERRORS" != "0" ] && MSG+=", $ERRORS error(s)"
+          [ -n "$INFRA" ] && MSG+=", infra skips: $INFRA"
           MSG+=")"
           [ -s drafts.txt ] && MSG+=$'\n'"$(cat drafts.txt)"
           MSG+=$'\n'"https://daatan.com/admin/approvals"$'\n'"Run: $RUN_URL"

@@ -196,7 +196,8 @@ and generator evidence. Pending and rejected (`VOID`) drafts and every other for
 
 ## Running it
 
-The daily run needs nothing: when it drafts anything (or a simulate call errors) it posts the
+The daily run needs nothing: when it drafts anything (or a simulate call errors, or a skip says
+embeddings, `/search/before` or the event check failed) it posts the
 drafts to the quiet Telegram channel with the `/admin/approvals` link, and a failed scheduled
 run posts there too ([TELEGRAM_NOTIFICATIONS.md](TELEGRAM_NOTIFICATIONS.md)). Nothing is
 remembered between runs: a skipped event is judged again the next day, and can pass on a later

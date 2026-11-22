@@ -118,7 +118,7 @@ The daily retro generator run (daatan#2217, [RETRO_SIMULATIONS.md](RETRO_SIMULAT
 
 | Event | Emoji | Channel | Message |
 |---|---|---|---|
-| New retro drafts, or a simulate call errored | 🔁 | clean | `Retro: N new draft(s) awaiting approval (M simulated[, K error(s)])` — one line per draft (claim, P at T0, T0), the `/admin/approvals` link, the run link. Silent when nothing was drafted and nothing errored |
+| New retro drafts, a simulate call errored, or a dependency skip | 🔁 | clean | `Retro: N new draft(s) awaiting approval (M simulated[, K error(s)][, infra skips: …])` — one line per draft (claim, P at T0, T0), the `/admin/approvals` link, the run link. Infra skips are `embed_failed`, `search_failed`, `event_check_failed`, `event_check_incomplete` (an `event_check_incomplete` is the cue to reopen daatan#2229). Silent when nothing was drafted, nothing errored and nothing upstream failed |
 | Scheduled run failed | 🚨 | clean | `Retro daily run FAILED` — run link. Drafts made before the failure stay in the queue |
 
 ---
