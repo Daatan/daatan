@@ -2323,6 +2323,22 @@
     },
     "stance": "sinteno {value}",
     "weightShare": "≈{share}% de la pezo",
-    "reports": "Kiel ĝi konfirmiĝis"
+    "reports": "Kiel ĝi konfirmiĝis",
+    "board": {
+      "link": "Kiuj fontoj antaŭvidis ĉi tiujn eventojn? →",
+      "metaTitle": "Kiu antaŭvidis ĝin: la fontoj",
+      "title": "Kiuj fontoj antaŭvidis ĉi tiujn eventojn?",
+      "subtitle": "Novaĵfontoj laŭ kiom da ĉi tiuj eventoj ili antaŭdiris, antaŭ ol ili okazis.",
+      "method": "Fonto antaŭvidis eventon, se almenaŭ unu el ĝiaj artikoloj, publikigita almenaŭ semajnon antaŭ la evento, inklinis al tio, kio okazis (sinteno +0.3 aŭ pli), kaj neniu al la mala flanko; „diris la malon“ en la spegula kazo. Listiĝas nur fontoj, kiuj skribis pri almenaŭ {min} eventoj. Ne estas precizeca poentaro: ĉiuj eventoj ĉi tie okazis, do precizeco nur rekompencus diri „tio okazos“.",
+      "caveat": "Fruaj ciferoj el {events, plural, one {# evento} other {# eventoj}}. Ĉiu evento tenas maksimume 15 artikolojn, do „skribis pri ĝi“ signifas „eniris tiun aron“; la unuaj eventoj estis kreitaj antaŭ ol ekster-temaj artikoloj estis filtritaj; kaj pluraj eventoj apartenas al unu rakonto.",
+      "counts": "antaŭvidis {called} · diris la malon {against} · el {total} ({share}%)",
+      "side": {
+        "called": "antaŭvidis",
+        "against": "diris la malon",
+        "neutral": "sen klara sinteno"
+      },
+      "empty": "Ankoraŭ neniu fonto skribis pri sufiĉe da eventoj.",
+      "hidden": "+{count, plural, one {# fonto} other {# fontoj}}, kiuj skribis pri malpli ol {min} eventoj."
+    }
   }
 }

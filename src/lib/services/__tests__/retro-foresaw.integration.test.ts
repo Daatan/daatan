@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { getForesawEvent, listForesawEvents } from '@/lib/services/retro-foresaw'
+import { getForesawEvent, getForesawSourceBoard, listForesawEvents } from '@/lib/services/retro-foresaw'
 
 let seq = 0
 const unique = () => `${Date.now()}-${++seq}`
@@ -12,7 +12,12 @@ const EVIDENCE = {
   reports: [],
 }
 
-async function makeForecast(authorId: string, status: string, retro: boolean) {
+const evidenceFrom = (outlet: string) => ({
+  ...EVIDENCE,
+  oracul: { ...EVIDENCE.oracul, sources: [{ ...EVIDENCE.oracul.sources[0], url: `https://${outlet}/1`, source: outlet }] },
+})
+
+async function makeForecast(authorId: string, status: string, retro: boolean, outlet = 'a.com') {
   const slug = `foresaw-${unique()}`
   const p = await prisma.prediction.create({
     data: {
@@ -37,7 +42,7 @@ async function makeForecast(authorId: string, status: string, retro: boolean) {
         eventDate: new Date('2026-11-15T00:00:00Z'),
         oraculProbability: 0.7,
         articlesUsed: 1,
-        evidence: EVIDENCE,
+        evidence: evidenceFrom(outlet),
       },
     })
   }
@@ -58,5 +63,22 @@ describe('"Who foresaw X?" visibility gate (daatan#2217 PR 3)', () => {
     const listed = (await listForesawEvents()).map((e) => e.slug)
     expect(listed).toContain(approved)
     for (const slug of [pending, rejected, ordinary]) expect(listed).not.toContain(slug)
+  })
+})
+
+describe('retro source board visibility (daatan#2217 PR 4)', () => {
+  it('counts outlets from approved retro simulations only', async () => {
+    const bot = await prisma.user.create({ data: { email: `b-${unique()}@example.com`, name: 'B', isBot: true } })
+    const shown = `shown-${unique()}.com`
+    const hidden = `hidden-${unique()}.com`
+    await makeForecast(bot.id, 'RESOLVED_CORRECT', true, shown)
+    await makeForecast(bot.id, 'RESOLVED_CORRECT', true, shown)
+    // Two events each, so a leak would clear the floor and be listed.
+    await makeForecast(bot.id, 'PENDING_APPROVAL', true, hidden)
+    await makeForecast(bot.id, 'VOID', true, hidden)
+
+    const outlets = (await getForesawSourceBoard()).rows.map((r) => r.outlet)
+    expect(outlets).toContain(shown)
+    expect(outlets).not.toContain(hidden)
   })
 })

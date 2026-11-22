@@ -10,7 +10,7 @@ published, staked, notified or fed into user scoring or the calibration record.
 
 Issue: [daatan#2217](https://github.com/Daatan/daatan/issues/2217). Decisions (Mark,
 2026-11-16/17): the drafts feed an event-centric "Who foresaw X?" page and a retro-only source
-board (PR 3 shipped the pages; the board is PR 4), never the main leaderboard; the generator runs by hand, weekly; an
+board (PR 3 shipped the pages, PR 4 the board at `/who-foresaw/sources`), never the main leaderboard; the generator runs daily since 2026-11-22 (it was manual and weekly at first); an
 event needs at least three on-topic articles published before T0 (two until 2026-11-18, see step 5); the Oracul and the page see the same
 article set, after the event check (step 4) has dropped the off-topic ones.
 
@@ -192,7 +192,35 @@ and generator evidence. Pending and rejected (`VOID`) drafts and every other for
   The six events approved on 2026-11-18 were generated before the factors were stored, and the
   Oracul's response isn't kept anywhere else (`oracle_call_logs` holds no body), so their pages
   show a note that newer articles count more instead.
-- **Self-hosted installs** 404 on both routes.
+- **Self-hosted installs** 404 on every `/who-foresaw` route.
+
+### Source board
+
+`/who-foresaw/sources` (daatan#2217 PR 4; Mark, Q1/Q7 and 2026-11-22) ranks news sources by the
+shown events they called, kept apart from `/leaderboard/sources`. It is linked from the hub
+while the hub has events, `noindex, follow`, and out of the sitemap. `getForesawSourceBoard()`
+builds it from the same shown events and per-article sides as the event pages, so the two can't
+disagree.
+
+- **Per outlet per event** (`outletSide`): **called** when at least one of its articles in the
+  Oracul's pre-T0 set is on the outcome's side and none is against it; **said the opposite** in
+  the mirror case; otherwise **undecided** (both sides, or only neutral articles). Outlets are
+  keyed with `canonicalOutlet`, the same alias table the main board uses (ynetnews.com is
+  ynet.co.il).
+- **Numbers**: called N · said the opposite K · of M events, and the share N/M. **No Brier**:
+  every shown event happened, so an accuracy score would rank sources by how often they say
+  "it will". Revisit once negative controls exist.
+- **Order**: events called, then the share, then events written about. No ranks or medals.
+- **Floor**: `BOARD_MIN_EVENTS` = 2. Outlets below it are counted in a "+N sources" line, not
+  listed, because one event reads as a 0% or 100% record. Revisit at ~20 events.
+- **Cutoff**: none needed. An earlier default said the board would read the stored cutoff; Q6
+  (2026-11-17) made the evidence pre-T0 by construction, so every counted article predates the
+  event.
+- **What M really is** (shown on the page as a caveat): "wrote about it" means "made the
+  Oracul's set", which keeps at most 15 articles per event (`MAX_EVIDENCE_ARTICLES`; two of
+  the first six events hit it). The first six events predate the event check (#2229), so their
+  sets can hold off-topic articles, which count as "wrote about it, didn't call it". Several
+  events belong to one storyline (government formation), so N is not N independent calls.
 
 ## Running it
 

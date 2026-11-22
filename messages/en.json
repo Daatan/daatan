@@ -2323,6 +2323,22 @@
     },
     "stance": "stance {value}",
     "weightShare": "≈{share}% of the weight",
-    "reports": "How it was confirmed"
+    "reports": "How it was confirmed",
+    "board": {
+      "link": "Which sources called these events? →",
+      "metaTitle": "Who foresaw it: the sources",
+      "title": "Which sources called these events?",
+      "subtitle": "News sources by how many of these events they called before they happened.",
+      "method": "A source called an event when at least one of its articles from a week or more before it leaned toward what happened (stance +0.3 or more) and none leaned the other way; it said the opposite in the mirror case. Only sources that wrote about at least {min} events are listed. There is no accuracy score: every event here happened, so accuracy would only reward saying “it will happen”.",
+      "caveat": "Early numbers from {events, plural, one {# event} other {# events}}. Each event keeps at most 15 articles, so “wrote about it” means “made that set”; the first events were drafted before off-topic articles were filtered out; and several events belong to one storyline.",
+      "counts": "called {called} · said the opposite {against} · of {total} ({share}%)",
+      "side": {
+        "called": "called it",
+        "against": "said the opposite",
+        "neutral": "undecided"
+      },
+      "empty": "No source has written about enough events yet.",
+      "hidden": "+{count, plural, one {# source} other {# sources}} that wrote about fewer than {min} events."
+    }
   }
 }
