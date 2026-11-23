@@ -106,7 +106,7 @@ describe('ForecastCard AI estimate pill', () => {
     vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as any)
   })
 
-  it('renders "AI: X±Y%" when aiCiLow/aiCiHigh are present', () => {
+  it('renders "AI: X% (low–high)" when aiCiLow/aiCiHigh are present', () => {
     const prediction = {
       ...basePrediction,
       confidence: 60,
@@ -114,8 +114,19 @@ describe('ForecastCard AI estimate pill', () => {
       aiCiHigh: 75,
     }
     renderWithIntl(<ForecastCard prediction={prediction} />)
-    // spread = round((75 - 45) / 2) = 15
-    expect(screen.getByText('AI: 60±15%')).toBeInTheDocument()
+    expect(screen.getByText('AI: 60% (45–75)')).toBeInTheDocument()
+  })
+
+  it('shows an off-centre range as it is, never a ± that runs past 100% (#2291)', () => {
+    const prediction = {
+      ...basePrediction,
+      confidence: 97,
+      aiCiLow: 91,
+      aiCiHigh: 99,
+    }
+    renderWithIntl(<ForecastCard prediction={prediction} />)
+    expect(screen.getByText('AI: 97% (91–99)')).toBeInTheDocument()
+    expect(screen.queryByText(/±/)).toBeNull()
   })
 
   it('renders "AI: X%" (no ±) when only confidence is present', () => {

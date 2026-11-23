@@ -19,7 +19,8 @@ vi.mock('@/lib/services/sourceTopicBoards', () => ({
 vi.mock('@/components/sources/TopicBreakdown', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
-vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }))
+vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key, getLocale: async () => 'en' }))
+vi.mock('@/lib/services/forecast', () => ({ getForecastSlugs: async (ids: string[]) => new Map(ids.map((id) => [id, `slug-${id}`])) }))
 
 import OutletPublicPage, { generateMetadata } from '../page'
 
@@ -94,5 +95,19 @@ describe('sources/[name] page', () => {
     const texts = collectText(await OutletPublicPage({ params: Promise.resolve({ name: 'Ynet' }) }))
     expect(texts).toContain('0.078')
     expect(texts).not.toContain('noTrackRecord')
+  })
+
+  it('lists an article that fed two forecasts once, with a numbered link per forecast (#2292)', async () => {
+    const pub = { title: 'Zelenskyy on four-party talks', url: 'https://example.com/a', source: 'example.com', publishedAt: '2026-11-20T10:00:00Z', pushedAt: null, outcome: null }
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail,
+      publications: [{ ...pub, forecastId: 'f1' }, { ...pub, forecastId: 'f2', outcome: 'YES' }],
+    })
+    const texts = collectText(await OutletPublicPage({ params }))
+    expect(texts.filter((x) => x === 'Zelenskyy on four-party talks')).toHaveLength(1)
+    expect(texts).toContain('forecast 1')
+    expect(texts).toContain('forecast 2')
+    expect(texts).toContain('outcomeYes')
+    expect(texts).toContain('/forecasts/slug-f2')
   })
 })

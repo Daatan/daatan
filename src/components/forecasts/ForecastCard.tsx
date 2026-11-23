@@ -476,17 +476,21 @@ export default function ForecastCard({
             })()}
             {prediction.status === 'ACTIVE' && prediction.confidence != null && (() => {
               const hasRange = prediction.aiCiLow != null && prediction.aiCiHigh != null && prediction.aiCiHigh > prediction.aiCiLow
-              const spread = hasRange ? Math.round((prediction.aiCiHigh! - prediction.aiCiLow!) / 2) : 0
+              // The range is rarely centred on the estimate (97 with 91–99), so a ±half-width
+              // printed a range the data doesn't have, past 100% at the top (#2291).
+              const low = hasRange ? Math.round(prediction.aiCiLow!) : 0
+              const high = hasRange ? Math.round(prediction.aiCiHigh!) : 0
               const titleKey = hasRange ? 'aiEstimateWithCiTooltip' : 'aiEstimateTooltip'
               return (
                 <span
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400"
                   title={t(titleKey, {
                     probability: prediction.confidence,
-                    spread,
+                    low,
+                    high,
                   })}
                 >
-                  AI: {hasRange ? `${prediction.confidence}±${spread}%` : `${prediction.confidence}%`}
+                  AI: {hasRange ? `${prediction.confidence}% (${low}–${high})` : `${prediction.confidence}%`}
                 </span>
               )
             })()}

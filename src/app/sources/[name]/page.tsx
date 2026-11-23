@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
 import { getForecastSlugs } from '@/lib/services/forecast'
+import { groupPublications } from '@/lib/utils/group-publications'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
@@ -51,9 +52,11 @@ export default async function OutletPublicPage({ params }: Props) {
     getTopicBoards(),
   ])
   if (!detail) notFound()
+  const publications = groupPublications(detail.publications)
   const forecastSlugs = await getForecastSlugs(
-    detail.publications.flatMap((p) => (p.forecastId ? [p.forecastId] : [])),
+    publications.flatMap((p) => p.forecasts.map((f) => f.forecastId)),
   )
+  const locale = await getLocale()
 
   // The leaderboard keys outlets by domain, forecast pages link by display name ("Ynet"), so
   // match on every domain news-indexer knows for this outlet, not just the name in the URL (#1891).
@@ -195,40 +198,55 @@ export default async function OutletPublicPage({ params }: Props) {
         </div>
       )}
 
-      {detail.publications.length > 0 && (
+      {/* A list, not a table (#2292): under auto table layout a long title ran over the
+          forecast column, and one article that fed two forecasts printed as two rows. */}
+      {publications.length > 0 && (
         <>
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-            {t('publications')} ({detail.publications.length})
+            {t('publications')} ({publications.length})
           </h3>
-          <div className="overflow-x-auto rounded-lg border border-navy-600">
-            <table className="w-full text-sm">
-              <tbody>
-                {detail.publications.map((p, i) => (
-                  <tr key={i} className="border-t border-navy-700 first:border-t-0">
-                    <td className="px-3 py-2 max-w-[26rem]">
-                      {isUrl(p.url) ? (
-                        <a href={p.url} target="_blank" rel="noopener noreferrer"
-                           className="inline-flex items-center gap-1 text-blue-500 hover:underline truncate">
-                          <span className="truncate">{p.title || p.url}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      ) : (
-                        <span className="text-white">{p.title || '—'}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {p.forecastId ? (
-                        <Link href={`/forecasts/${forecastSlugs.get(p.forecastId) ?? p.forecastId}`} className="text-blue-500 hover:underline">
-                          {t('forecast')}
+          <ul className="rounded-lg border border-navy-600 divide-y divide-navy-700">
+            {publications.map((p, i) => (
+              <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 break-words">
+                {isUrl(p.url) ? (
+                  <a href={p.url} target="_blank" rel="noopener noreferrer"
+                     className="text-sm text-blue-400 hover:underline">
+                    {p.title || p.url}
+                    <ExternalLink className="inline w-3 h-3 ms-1 align-baseline" />
+                  </a>
+                ) : (
+                  <span className="text-sm text-white">{p.title || '—'}</span>
+                )}
+                {(p.publishedAt || p.forecasts.length > 0) && (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                    {p.publishedAt && (
+                      <time dateTime={p.publishedAt}>
+                        {new Date(p.publishedAt).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' })}
+                      </time>
+                    )}
+                    {p.forecasts.map((f, j) => (
+                      <span key={f.forecastId} className="inline-flex items-center gap-1.5">
+                        <Link
+                          href={`/forecasts/${forecastSlugs.get(f.forecastId) ?? f.forecastId}`}
+                          className="text-cyan-400 hover:underline"
+                        >
+                          {p.forecasts.length > 1 ? `${t('forecast')} ${j + 1}` : t('forecast')}
                         </Link>
-                      ) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">{p.outcome || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        {f.outcome && (
+                          <span className="px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-300">
+                            {f.outcome === 'YES' ? t('outcomeYes')
+                              : f.outcome === 'NO' ? t('outcomeNo')
+                              : f.outcome === 'ANNULLED' ? t('outcomeAnnulled')
+                              : f.outcome}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </div>

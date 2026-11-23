@@ -19,6 +19,11 @@ const BOARDS: { board: Board; href: string; icon: typeof Trophy }[] = [
  * tabs rather than pills: the sort and view rows below it are pills, and a third pill row read as
  * one more filter. On phones the tabs share the width without icons, at 12 px, so ru still fits
  * at 360 px (measured with four tabs, 2026-11-20). Keep labels short: one more word overflows.
+ *
+ * Sticky under the phone top bar (h-16) and at the top on desktop, so switching boards doesn't
+ * mean scrolling back up (#2293). The negative margins cancel the boards' shared
+ * `p-4 sm:p-6 lg:p-8` so the background spans the padding and rows don't show beside it — the
+ * same treatment as the feed's filter bar.
  */
 export function BoardTabs({ active, labels, ariaLabel }: {
   active: Board
@@ -26,7 +31,10 @@ export function BoardTabs({ active, labels, ariaLabel }: {
   ariaLabel: string
 }) {
   return (
-    <nav aria-label={ariaLabel} className="flex border-b border-navy-600 mb-6 overflow-x-auto scrollbar-hide">
+    <nav
+      aria-label={ariaLabel}
+      className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 bg-navy-900/90 backdrop-blur-sm flex border-b border-navy-600 mb-6 overflow-x-auto scrollbar-hide"
+    >
       {BOARDS.map(({ board, href, icon: Icon }) => (
         <Link
           key={board}
