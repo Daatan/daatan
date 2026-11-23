@@ -297,9 +297,9 @@ describe('ContextTimeline', () => {
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    // Spread shown as ±halfWidth (ciHigh=76, ciLow=52 → (76-52)/2 = 12)
+    // The range itself, not a ±half-width around the estimate (#2291)
     await waitFor(() => {
-      expect(screen.getByText(/± 12%/)).toBeInTheDocument()
+      expect(screen.getByText('52–76%')).toBeInTheDocument()
     })
 
     // Articles-used suffix appended to reasoning
@@ -429,7 +429,7 @@ describe('ContextTimeline', () => {
       expect(screen.getByText('55%')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('oracle-sources')).toBeNull()
-    expect(screen.queryByText(/±/)).toBeNull()
+    expect(screen.queryByText(/\d–\d+%/)).toBeNull()
   })
 
   it('pluralizes previous updates correctly', async () => {
