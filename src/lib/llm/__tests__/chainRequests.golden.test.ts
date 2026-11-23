@@ -110,19 +110,20 @@ function sha(val: unknown): string {
 
 const PROMPT = 'PROMPT-UNDER-TEST'
 
+const LEG_OF_HOST: Record<string, string> = {
+  'generativelanguage.googleapis.com': 'gemini',
+  'openrouter.ai': 'openrouter',
+  'ollama.test': 'ollama',
+}
+
 function failingFetch() {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const raw = typeof init?.body === 'string' ? JSON.parse(init.body) : null
-    const leg = url.includes('aiplatform.googleapis.com')
+    const host = new URL(url).hostname
+    const leg = /^([a-z0-9-]+-)?aiplatform\.googleapis\.com$/.test(host)
       ? 'vertex'
-      : url.includes('generativelanguage.googleapis.com')
-        ? 'gemini'
-        : url.includes('openrouter.ai')
-          ? 'openrouter'
-          : url.includes('ollama.test')
-            ? 'ollama'
-            : 'other'
+      : (LEG_OF_HOST[host] ?? 'other')
     capture({ leg, url: url.split('?')[0], body: raw ? scrub(raw) : null })
     return new Response(JSON.stringify({ error: { code: 500, message: 'down (test)' } }), {
       status: 500,
