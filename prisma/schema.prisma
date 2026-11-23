@@ -451,8 +451,12 @@ model Prediction {
   awaitingAiResolution Boolean @default(false) @map("awaiting_ai_resolution")
 
   // Temporal-model metadata (retro/docs/TEMPORAL_MODEL_PLAN.md #3.4). NULL
-  // classifierVersion = never classified (pre-existing forecast awaiting
-  // backfill, or classification failed — fail-open, no glide until retried).
+  // classifierVersion = queued for the requote self-heal pass: never classified
+  // (classification failed, or a pre-existing forecast awaiting backfill), or its
+  // claimText / resolveByDatetime changed since the last classification — the
+  // prediction_reclassify_on_claim_edit trigger clears it. In the edit case the
+  // previous direction/deadline/archetype stay in place (and keep gliding) until
+  // the reclassification lands.
   claimDeadline     DateTime?       @map("claim_deadline") // parsed from claim TEXT, not resolveByDatetime — they diverge
   claimDirection    ClaimDirection? @map("claim_direction")
   claimArchetype    ClaimArchetype? @map("claim_archetype")

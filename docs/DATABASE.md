@@ -137,7 +137,11 @@ The central table (`Prediction`). Field groups:
   `resolveByDatetime`; the two diverging triggers the divergence rule),
   `claimDirection` (ARRIVAL/SURVIVAL/NONE), `claimArchetype` (only DIFFUSE is
   priced), `tauLeadDays`, `classifierVersion/At/Output`. NULL
-  `classifierVersion` = not yet classified (no glide). The divergence check
+  `classifierVersion` = queued for the requote cron's self-heal pass (ACTIVE
+  rows only, 5 a run): either never classified (no glide), or re-queued by the
+  `prediction_reclassify_on_claim_edit` trigger because `claimText` or
+  `resolveByDatetime` changed — then the previous direction/deadline/archetype
+  stay in place, and keep gliding, until the reclassification lands. The divergence check
   itself (`isDeadlineDivergent`, `src/lib/utils/deadline-divergence.ts`,
   daatan#1234) is a pure function shared by the temporal clock's glide-horizon
   selection and a non-blocking warning banner on the forecast edit form — the
