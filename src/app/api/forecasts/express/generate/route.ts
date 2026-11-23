@@ -86,6 +86,8 @@ export const POST = withAuth(async (request, user) => {
           dateBasis: result.dateBasis,
           isDefaultHorizonDate: result.isDefaultHorizonDate,
           groundedDate: result.groundedDate,
+          // The draft's own Google Search (daatan#2290): query count, or null for a leg without search.
+          draftSearch: result.draftSearch,
           rulesDirection: result.rulesDirection,
           rulesStrength: result.rulesStrength,
           definedness: result.definedness,

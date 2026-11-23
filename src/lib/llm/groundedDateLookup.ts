@@ -59,7 +59,7 @@ A user is creating a forecast. Their input and the drafted claim are inside the 
 
 Find the date by which the forecast's outcome will be known. That is one of:
 - an officially scheduled real-world event that decides it (an election, a central-bank meeting, a court date, a summit, a fixture) — the next occurrence after the current date;
-- a legal or statutory deadline that bounds when it must be decided, when the outcome hangs on a process rather than one event — e.g. for whether or how a government is formed after an election, the last date the law allows for forming it before new elections are triggered (count from the dates the law and current reporting give; use the outer limit, including allowed extensions);
+- a legal or statutory deadline that bounds when it must be decided, when the outcome hangs on a process rather than one event — e.g. for whether or how a government is formed after an election, the last date the law allows for forming it before new elections are triggered (count from the dates the law and current reporting give; use the outer limit: when the process runs in stages — a mandate that passes to another candidate if the first one fails, extensions, a final period before new elections — the end of the last stage, never the deadline of the current or first stage);
 - the scheduled end of a season, tournament, term or reporting period the forecast is about (e.g. the last day of a league's regular season).
 Answer with ONLY a JSON object, no prose:
 {"event": "<the deciding event or deadline, in English>", "date": "YYYY-MM-DD" or null, "source_url": "<url or empty>"}

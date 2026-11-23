@@ -63,16 +63,6 @@
     }
   },
   {
-    "stage": "express_draft",
-    "file": "lib/llm/expressPrediction.ts",
-    "model": null,
-    "params": {
-      "schema": "expr: expressPredictionSchema",
-      "temperature": 0.2,
-      "thinkingBudget": 512
-    }
-  },
-  {
     "stage": "express_topic",
     "file": "lib/llm/expressPrediction.ts",
     "model": null,

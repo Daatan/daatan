@@ -67,6 +67,12 @@ describe('withModelQuirks — per chain leg', () => {
     expect(withModelQuirks(leg('xai.grok-4.7'), req)).toBe(req)
   })
 
+  it('drops googleSearch on gemini-2.5-flash, which answers 400 to search with a schema (daatan#2290)', () => {
+    const req = { prompt: 'p', searchPrompt: 's', temperature: 0.2, googleSearch: true }
+    expect(withModelQuirks(leg('gemini-2.5-flash'), req)).toEqual({ prompt: 'p', searchPrompt: 's', temperature: 0.2 })
+    expect(withModelQuirks(leg('gemini-3.5-flash-lite'), req)).toBe(req)
+  })
+
   it('leaves a provider without modelFor alone', () => {
     const req = { prompt: 'p', temperature: 0 }
     expect(withModelQuirks({ name: 'double', generateContent: async () => ({ text: '' }) }, req)).toBe(req)

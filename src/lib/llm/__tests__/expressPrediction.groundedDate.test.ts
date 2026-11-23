@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('../../services/moderation', () => ({ checkContent: vi.fn(async () => ({ isOffensive: false, reason: '' })) }))
 vi.mock('../../utils/scraper', () => ({ fetchUrlContent: vi.fn() }))
 vi.mock('../../services/oracleSearch', () => ({ oracleSearch: vi.fn(async () => []) }))
-vi.mock('../index', () => ({ llmService: { generateContent: vi.fn() } }))
+vi.mock('../index', () => ({ llmService: { generateContent: vi.fn(), primarySearches: vi.fn(() => false) } }))
 vi.mock('../searchQuery', () => ({ buildSearchQuery: vi.fn(async (t: string) => t) }))
 vi.mock('../bedrock-prompts', () => ({
   getPromptTemplate: vi.fn(async () => 'TEMPLATE'),
@@ -233,5 +233,82 @@ describe('generateExpressPrediction — grounded event-date lookup (#1706)', () 
 
     expect(lookupGroundedEventDate).toHaveBeenCalledTimes(1)
     expect(lookupGroundedEventDate).toHaveBeenCalledWith('https://example.com/fed-watch', BASE.claimText, expect.any(Date))
+  })
+})
+
+// daatan#2290: the draft searches itself on the primary leg. The lookup is then only for a
+// draft from a leg without search, and never started early.
+describe('generateExpressPrediction — draft with Google Search (daatan#2290)', () => {
+  /** Queue drafts as `[draft, queries]`; queries undefined = a leg without search answered. */
+  function mockSearchDrafts(...drafts: Array<[Record<string, unknown>, number | undefined]>) {
+    const queue = [...drafts]
+    vi.mocked(llmService.generateContent).mockImplementation((async ({ schema }: { schema?: unknown }) => {
+      if (!schema) return { text: 'topic' }
+      const next = queue.shift()
+      if (next === undefined) throw new Error('unexpected extra draft call')
+      const [draft, queries] = next
+      return { text: JSON.stringify(draft), ...(queries === undefined ? {} : { search: { queries } }) }
+    }) as never)
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(oracleSearch).mockResolvedValue([ARTICLE] as never)
+    vi.mocked(llmService.primarySearches).mockReturnValue(true)
+  })
+  afterEach(() => {
+    vi.mocked(llmService.primarySearches).mockReturnValue(false)
+  })
+
+  it('a searched draft keeps its "assumed" date: no lookup, no re-draft', async () => {
+    mockSearchDrafts([BASE, 3])
+
+    const result = await generateExpressPrediction('The Fed cuts rates at its next meeting')
+
+    expect(lookupGroundedEventDate).not.toHaveBeenCalled()
+    expect(draftPrompts()).toHaveLength(1)
+    expect(result.groundedDate).toEqual({ fired: false })
+    expect(result.draftSearch).toEqual({ queries: 3 })
+  })
+
+  it('sends the search note only in searchPrompt, ahead of the articles', async () => {
+    mockSearchDrafts([REDRAFT, 1])
+
+    await generateExpressPrediction('The Fed cuts rates at its next meeting')
+
+    const req = vi.mocked(llmService.generateContent).mock.calls
+      .map(([r]) => r as { prompt: string; searchPrompt?: string; schema?: unknown; googleSearch?: boolean })
+      .find((r) => r.schema)!
+    expect(req.prompt).not.toContain('[Web search available]')
+    expect(req.searchPrompt).toContain('[Web search available]')
+    expect(req.searchPrompt!.indexOf('[Web search available]')).toBeLessThan(req.searchPrompt!.indexOf('[Article 1]'))
+  })
+
+  it('a fallback draft without search still gets the lookup, after the draft and on the drafted claim', async () => {
+    mockSearchDrafts([BASE, undefined], [REDRAFT, 2])
+    vi.mocked(lookupGroundedEventDate).mockResolvedValue(FOUND)
+
+    const result = await generateExpressPrediction('The Fed cuts rates at its next meeting')
+
+    expect(lookupGroundedEventDate).toHaveBeenCalledTimes(1)
+    expect(lookupGroundedEventDate).toHaveBeenCalledWith('The Fed cuts rates at its next meeting', BASE.claimText, expect.any(Date))
+    expect(result.groundedDate).toEqual({ fired: true, ...FOUND, adopted: true })
+    // The re-draft's own search, which is what produced the returned draft.
+    expect(result.draftSearch).toEqual({ queries: 2 })
+  })
+
+  it('does not flag the year of a date the draft found by search', async () => {
+    const searched = {
+      ...BASE,
+      claimText: 'A Democrat will win the next US presidential election.',
+      resolveByDatetime: '2028-11-07T23:59:59Z',
+      dateBasis: 'from_sources',
+    }
+    mockSearchDrafts([searched, 2])
+    expect((await generateExpressPrediction('A Democrat wins the next US presidential election')).ungroundedYears).toEqual([])
+
+    // Same draft, no search behind it: the year came from the model's memory.
+    mockSearchDrafts([searched, 0])
+    expect((await generateExpressPrediction('A Democrat wins the next US presidential election')).ungroundedYears).toEqual(['2028'])
   })
 })

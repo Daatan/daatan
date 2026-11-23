@@ -5,6 +5,7 @@ describe('forStage / stageModel read the model registry (daatan#2287)', () => {
   it('fills model, params and timeout from the stage entry', () => {
     expect(forStage('moderation')).toEqual({ stage: 'moderation', temperature: 0 })
     expect(forStage('express_draft')).toEqual({ stage: 'express_draft', temperature: 0.2, thinkingBudget: 512 })
+    expect(forStage('search_query')).toEqual({ stage: 'search_query', temperature: 0, thinkingBudget: 0 })
     expect(forStage('research_verdict')).toEqual({
       stage: 'research_verdict',
       model: 'gemini-2.5-pro',

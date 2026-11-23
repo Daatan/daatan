@@ -84,14 +84,14 @@
     }
   },
   "expressPredictionSchema": {
-    "sha256": "5cfec4f1255aef42",
+    "sha256": "bf6fdd2ba8803489",
     "schema": {
       "description": "Structured prediction generated from user's casual input",
       "type": "object",
       "properties": {
         "claimText": {
           "type": "string",
-          "description": "Clear, testable prediction statement"
+          "description": "Clear, testable prediction statement, in English (translate a non-English input)"
         },
         "resolveByDatetime": {
           "type": "string",

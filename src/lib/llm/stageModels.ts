@@ -84,6 +84,7 @@ export interface StageRequest {
   model?: string
   temperature?: number
   thinkingBudget?: number
+  googleSearch?: boolean
   googleTimeoutMs?: number
   forceParams?: ModelParam[]
 }
@@ -99,12 +100,13 @@ export function forStage(stage: LlmStage): StageRequest {
     throw new Error(`model registry: stage ${stage} has a ${entry.primary.provider} primary, which needs the per-stage leg adapter (daatan#2287)`)
   }
   const model = envStageModel(stage) ?? entry.primary?.model
-  const { temperature, reasoningBudget } = entry.params
+  const { temperature, reasoningBudget, googleSearch } = entry.params
   return {
     stage,
     ...(model ? { model } : {}),
     ...(temperature !== undefined ? { temperature } : {}),
     ...(reasoningBudget !== undefined ? { thinkingBudget: reasoningBudget } : {}),
+    ...(googleSearch ? { googleSearch } : {}),
     ...(entry.timeoutMs !== undefined ? { googleTimeoutMs: entry.timeoutMs } : {}),
     ...(entry.force?.length ? { forceParams: entry.force } : {}),
   }

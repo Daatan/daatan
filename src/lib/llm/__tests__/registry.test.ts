@@ -25,6 +25,7 @@ const paramsSchema = z
     temperature: z.number().min(0).max(2).optional(),
     reasoningBudget: z.number().int().min(0).optional(),
     maxTokens: z.number().int().positive().optional(),
+    googleSearch: z.boolean().optional(),
   })
   .strict()
 
@@ -66,6 +67,15 @@ describe('model registry (daatan#2287)', () => {
   it("a stage's own primary is a Google model until per-stage legs exist", () => {
     const off = stages.filter(([, e]) => e.primary && e.primary.provider !== 'google').map(([s]) => s)
     expect(off, 'a per-stage primary on another provider needs the per-stage leg adapter first').toEqual([])
+  })
+
+  it("a stage's own primary takes every param the stage sets", () => {
+    // A quirk may drop a param on a fallback or on the chain model (the rollback path), but
+    // a stage that names its own model chose it for those params (daatan#2290).
+    for (const [stage, entry] of stages) {
+      if (!entry.primary) continue
+      expect(applyQuirks(entry.primary.model, entry.params, entry.force), `stage ${stage} on ${entry.primary.model}`).toEqual(entry.params)
+    }
   })
 
   it('the chain has one leg per provider, Google first', () => {
@@ -115,7 +125,7 @@ describe('model registry (daatan#2287)', () => {
   })
 
   it('staged call sites leave model, params and timeout to the registry', () => {
-    const owned = new Set(['model', 'temperature', 'thinkingBudget', 'googleTimeoutMs', 'forceParams'])
+    const owned = new Set(['model', 'temperature', 'thinkingBudget', 'googleSearch', 'googleTimeoutMs', 'forceParams'])
     const offenders = scanSource()
       .calls.filter((c) => c.stage !== '(unstaged)')
       .flatMap((c) => [

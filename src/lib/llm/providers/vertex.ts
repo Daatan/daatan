@@ -38,7 +38,10 @@ export interface VertexConfig extends VertexEnv {
 }
 
 interface VertexResponse {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> }
+    groundingMetadata?: { webSearchQueries?: string[] }
+  }>
   usageMetadata?: {
     promptTokenCount?: number
     candidatesTokenCount?: number
@@ -81,6 +84,7 @@ export function vertexAccessToken(env: VertexEnv): Promise<string> {
 
 export class VertexProvider implements LLMProvider {
   name = 'Vertex'
+  supportsGoogleSearch = true
 
   modelFor(request: LLMRequest): string {
     return request.model ?? this.config.modelName
@@ -107,6 +111,9 @@ export class VertexProvider implements LLMProvider {
     if (request.signal?.aborted) controller.abort()
     else request.signal?.addEventListener('abort', onCallerAbort)
 
+    // daatan#2290: by the time a request gets here its model's quirks have run, so
+    // `googleSearch` is only still set where the model takes it.
+    const search = request.googleSearch === true
     try {
       const token = await vertexAccessToken(this.config)
       // fetch rejects on an already-aborted signal, so an abort landing during the
@@ -118,7 +125,8 @@ export class VertexProvider implements LLMProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+          contents: [{ role: 'user', parts: [{ text: search ? (request.searchPrompt ?? request.prompt) : request.prompt }] }],
+          ...(search ? { tools: [{ googleSearch: {} }] } : {}),
           generationConfig: {
             responseMimeType: request.schema ? 'application/json' : 'text/plain',
             ...(request.schema ? { responseSchema: request.schema } : {}),
@@ -137,7 +145,12 @@ export class VertexProvider implements LLMProvider {
       }
 
       const data = (await res.json()) as VertexResponse
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+      const candidate = data.candidates?.[0]
+      const parts = candidate?.content?.parts
+      // A grounded answer can arrive split across parts.
+      const text = search && parts?.some((p) => p.text !== undefined)
+        ? parts.map((p) => p.text ?? '').join('')
+        : parts?.[0]?.text
       // Throw rather than return '': the service treats a provider error as
       // "fall through to the next leg", and an empty string would instead be
       // handed to a JSON.parse downstream as if it were a real answer.
@@ -145,6 +158,7 @@ export class VertexProvider implements LLMProvider {
 
       return {
         text,
+        ...(search ? { search: { queries: candidate?.groundingMetadata?.webSearchQueries?.length ?? 0 } } : {}),
         usage: data.usageMetadata
           ? {
               promptTokens: data.usageMetadata.promptTokenCount ?? 0,

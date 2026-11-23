@@ -13,15 +13,22 @@ export function withModelQuirks(provider: LLMProvider, request: LLMRequest): LLM
   const params: ModelParams = {
     ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     ...(request.thinkingBudget !== undefined ? { reasoningBudget: request.thinkingBudget } : {}),
+    ...(request.googleSearch ? { googleSearch: true } : {}),
   }
   const out = applyQuirks(model, params, request.forceParams)
   if (out === params) return request
   if (out.maxTokens !== undefined) {
     throw new Error(`model registry: a quirk of ${model} sets maxTokens, which the main chain does not send yet`)
   }
-  const legRequest: LLMRequest = { ...request, temperature: out.temperature, thinkingBudget: out.reasoningBudget }
+  const legRequest: LLMRequest = {
+    ...request,
+    temperature: out.temperature,
+    thinkingBudget: out.reasoningBudget,
+    googleSearch: out.googleSearch,
+  }
   if (out.temperature === undefined) delete legRequest.temperature
   if (out.reasoningBudget === undefined) delete legRequest.thinkingBudget
+  if (out.googleSearch === undefined) delete legRequest.googleSearch
   return legRequest
 }
 
@@ -35,6 +42,17 @@ export class ResilientLLMService {
   /** Number of providers in the chain — callers size their overall deadline from it. */
   get legCount(): number {
     return this.providers.length
+  }
+
+  /**
+   * Whether the first leg would send `request` with Google Search (daatan#2290): the request
+   * asks for it, the leg has the tool, and its model's quirks keep it. False when the stage
+   * doesn't set it (express_draft today), its model can't search, or there is no Vertex leg.
+   */
+  primarySearches(request: LLMRequest): boolean {
+    const first = this.providers[0]
+    if (!request.googleSearch || !first?.supportsGoogleSearch) return false
+    return withModelQuirks(first, request).googleSearch === true
   }
 
   async generateContent(request: LLMRequest): Promise<LLMResponse> {
@@ -56,7 +74,7 @@ export class ResilientLLMService {
         const legRequest = withModelQuirks(provider, request)
         const response = await provider.generateContent(legSignal === request.signal ? legRequest : { ...legRequest, signal: legSignal })
         log.info(
-          { provider: provider.name, stage, durationMs: Date.now() - t0, tokens: response.usage?.totalTokens },
+          { provider: provider.name, stage, durationMs: Date.now() - t0, tokens: response.usage?.totalTokens, searches: response.search?.queries },
           'llm: success',
         )
         if (i > 0) {

@@ -12,6 +12,7 @@ vi.mock('../bedrock-prompts', () => ({
 vi.mock('../../services/translation', () => ({ localizeForecastForAuthor: vi.fn(async () => null) }))
 
 import { generateExpressPrediction } from '../expressPrediction'
+import { forStage } from '../stageModels'
 import { llmService } from '../index'
 import { oracleSearch } from '../../services/oracleSearch'
 
@@ -63,7 +64,7 @@ describe('generateExpressPrediction — tag normalisation (#1787)', () => {
     expect(result.tags).toHaveLength(5)
   })
 
-  it('caps the draft call\'s thinking at 512 tokens on both paths (#1890)', async () => {
+  it('sends the registry\'s express_draft request, with a search prompt, on both paths (#1890, daatan#2290)', async () => {
     mockPrediction(['Economy'])
     await generateExpressPrediction('some input', undefined, true)
     vi.mocked(oracleSearch).mockResolvedValue([
@@ -72,7 +73,10 @@ describe('generateExpressPrediction — tag normalisation (#1787)', () => {
     await generateExpressPrediction('Middle East event')
     const drafts = vi.mocked(llmService.generateContent).mock.calls.map(([req]) => req).filter((r) => r.stage === 'express_draft')
     expect(drafts.length).toBeGreaterThanOrEqual(2)
-    for (const r of drafts) expect(r.thinkingBudget).toBe(512)
+    for (const r of drafts) {
+      expect(r).toMatchObject(forStage('express_draft'))
+      expect(r.searchPrompt).toEqual(expect.any(String))
+    }
   })
 
   it('tolerates a missing tags field', async () => {
