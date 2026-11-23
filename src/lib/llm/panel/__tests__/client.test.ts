@@ -1,10 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
 const bedrockSend = vi.fn()
+/** The region of the client each `send` went out on, in call order. */
+const bedrockSendRegions: string[] = []
 vi.mock('@aws-sdk/client-bedrock-runtime', () => ({
   // Classes, not vi.fn(() => ...): the client constructs these with `new`.
   BedrockRuntimeClient: class {
-    send = bedrockSend
+    constructor(private readonly config: { region: string }) {}
+    send = (...args: unknown[]) => {
+      bedrockSendRegions.push(this.config.region)
+      return bedrockSend(...args)
+    }
   },
   ConverseCommand: class {
     constructor(public input: unknown) {}
@@ -61,6 +67,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockReset()
   bedrockSend.mockReset()
+  bedrockSendRegions.length = 0
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -209,6 +216,30 @@ describe('bedrock route', () => {
     await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({
       probability: 50,
     })
+  })
+
+  // daatan#2283: DeepSeek V3.2 and Gemma 3 4B have no eu-central-1 deployment.
+  it('calls each member in its own region, and in the app region by default', async () => {
+    bedrockSend.mockResolvedValue(converse('{"probability": 50}'))
+
+    await callPanelMember(BEDROCK_MEMBER, 'p', '')
+    await callPanelMember({ ...BEDROCK_MEMBER, model: 'deepseek.v3.2', region: 'us-east-1' }, 'p', '')
+    await callPanelMember(BEDROCK_MEMBER, 'p', '')
+
+    const appRegion = process.env.AWS_REGION || 'eu-central-1'
+    expect(bedrockSendRegions).toEqual([appRegion, 'us-east-1', appRegion])
+  })
+
+  // A model that emits a reasoning block puts it before the answer.
+  it('reads the first text block, not content[0]', async () => {
+    bedrockSend.mockResolvedValue({
+      output: {
+        message: {
+          content: [{ reasoningContent: { reasoningText: { text: 'thinking' } } }, { text: '{"probability": 61}' }],
+        },
+      },
+    })
+    await expect(callPanelMember(BEDROCK_MEMBER, 'p', '')).resolves.toMatchObject({ probability: 61 })
   })
 
   // Bedrock's Converse has no `response_format`, so the model may wrap its object.

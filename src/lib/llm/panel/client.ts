@@ -10,12 +10,19 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const TIMEOUT_MS = 30_000
 const REGION = process.env.AWS_REGION || 'eu-central-1'
 
-/** Lazily constructed so importing this module never needs AWS credentials — unit
- *  tests and the OpenRouter-only path must not pay for an SDK client. */
-let bedrockClient: BedrockRuntimeClient | null = null
-function getBedrockClient(): BedrockRuntimeClient {
-  bedrockClient ??= new BedrockRuntimeClient({ region: REGION })
-  return bedrockClient
+/** Lazily constructed, one per region, so importing this module never needs AWS
+ *  credentials — unit tests and the OpenRouter-only path must not pay for an SDK client.
+ *  Per region because not every panel model is served everywhere: Qwen runs in the
+ *  app's own region, while DeepSeek V3.2 and Gemma 3 4B have no eu-central-1
+ *  deployment and run in us-east-1 (daatan#2283). */
+const bedrockClients = new Map<string, BedrockRuntimeClient>()
+function getBedrockClient(region: string): BedrockRuntimeClient {
+  let client = bedrockClients.get(region)
+  if (!client) {
+    client = new BedrockRuntimeClient({ region })
+    bedrockClients.set(region, client)
+  }
+  return client
 }
 
 /**
@@ -161,19 +168,22 @@ async function callBedrockMember(member: PanelMember, prompt: string): Promise<P
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   try {
-    const response = await getBedrockClient().send(
+    const response = await getBedrockClient(member.region ?? REGION).send(
       new ConverseCommand({
         modelId: member.model,
         messages: [{ role: 'user', content: [{ text: prompt }] }],
-        // Same ceiling and determinism as the OpenRouter path. Bedrock has no
-        // `reasoning: {enabled:false}` switch, but this member is the non-reasoning one,
-        // so there is nothing to disable — and maxTokens still bounds a surprise.
+        // Same ceiling and determinism as the OpenRouter path. Converse has no
+        // `reasoning: {enabled:false}` switch, so every Bedrock member must be a model
+        // that does not think by default (Qwen 2507-instruct, DeepSeek V3.2, Gemma 3) —
+        // and maxTokens still bounds a surprise.
         inferenceConfig: { maxTokens: MAX_TOKENS, temperature: 0 },
       }),
       { abortSignal: controller.signal },
     )
 
-    const text = response.output?.message?.content?.[0]?.text
+    // The first TEXT block, not `content[0]`: a model that emits a reasoning block
+    // puts it first, and reading [0] would turn a valid answer into "empty response".
+    const text = response.output?.message?.content?.find((block) => typeof block.text === 'string')?.text
     if (typeof text !== 'string' || text.trim() === '') {
       throw new Error(`Empty response from ${member.model}`)
     }

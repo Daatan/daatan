@@ -43,6 +43,14 @@ export interface PanelMember {
   mode: PanelMode
   route: PanelRoute
   /**
+   * AWS region for a `route: 'bedrock'` member; defaults to the app's own region
+   * (`AWS_REGION`, eu-central-1). Ignored for other routes. Needed because Bedrock does
+   * not serve every model everywhere — DeepSeek V3.2 and Gemma 3 4B have no
+   * eu-central-1 deployment (daatan#2283). terraform/bedrock_invoke.tf grants each
+   * member in exactly this region.
+   */
+  region?: string
+  /**
    * OpenRouter provider tags to pin, most-preferred first, with fallbacks off.
    * Ignored for `route: 'bedrock'` (AWS serves one implementation).
    *
@@ -73,6 +81,11 @@ export interface PanelMember {
  */
 export const VERTEX_PANEL_MODEL = 'google/gemini-3.5-flash-lite'
 
+/** The second Bedrock region: models with no eu-central-1 deployment run here. Extraction
+ *  and settlement verification already run in us-east-1 (retro#548), so this adds no new
+ *  data-residency exposure. */
+export const BEDROCK_US_REGION = 'us-east-1'
+
 export const PANEL_MEMBERS: readonly PanelMember[] = [
   // Non-reasoning, and the most decorrelated lineage available (non-Western corpus
   // and RLHF). Doubles as the deterministic baseline: no hidden thinking tokens.
@@ -95,13 +108,19 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
   // member abstained 100% of the time (confirmed on staging 2026-07-11, all 56 rows
   // null). Reasoning models are incompatible with this panel by design — temperature 0,
   // no hidden thinking, one cheap integer, a deterministic step-function chart. DeepSeek
-  // is a strong independent lineage (distinct from Alibaba/Google/xAI) and answers in
-  // ~7 tokens with reasoning off. Verified against the live API before landing.
+  // is a strong independent lineage (distinct from Alibaba/Google/xAI).
+  //
+  // Was `deepseek/deepseek-chat` (DeepSeek V3, Dec 2024) on OpenRouter until daatan#2283:
+  // that route is paid from a personal balance, and its 402s silenced this member from
+  // 2026-11-17. Bedrock serves no V3, so this is also a model upgrade — a new member, a
+  // fresh Brier series. us-east-1 because Bedrock has no eu-central-1 deployment of it.
+  // Verified 2026-11-23 (real prompt, temperature 0, 64 tokens): 6/6 answered with a
+  // bare `{"probability": N}` in a single text block, 7 output tokens, no reasoning.
   {
-    model: 'deepseek/deepseek-chat',
+    model: 'deepseek.v3.2',
     mode: 'ungrounded',
-    route: 'openrouter',
-    providerOrder: ['deepinfra/fp4'],
+    route: 'bedrock',
+    region: BEDROCK_US_REGION,
   },
 
   // Direct Vertex (daatan#1513), not proxied through OpenRouter, authenticated with
@@ -121,17 +140,26 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     route: 'vertex',
   },
 
+  // The last OpenRouter member. Bedrock serves only Grok 4.6/4.7, which this panel
+  // excludes by design: measured 2026-11-23 (daatan#2283), Grok 4.7 rejects
+  // `temperature`, always reasons, and on two of three real claims spent the whole
+  // budget on reasoning at both 64 and 1,024 tokens, with or without `low` effort.
   { model: 'x-ai/grok-4.3', mode: 'ungrounded', route: 'openrouter', providerOrder: ['xai'] },
 
   // Was openai/gpt-5-nano (same reasoning-mandatory 400 as gpt-5-mini). The control is
   // deliberately WEAK — if it ties the strong members on Brier, the instrument is not
   // measuring anything. A 4B open-weights model is a cleaner control than a mini
-  // frontier model ever was. Verified: ~8 tokens, reasoning off.
+  // frontier model ever was.
+  //
+  // Same weights as the `google/gemma-3-4b-it` it replaces on OpenRouter (daatan#2283),
+  // but a new id on a new route, so a new series — see `model` above. Verified
+  // 2026-11-23: 6/6 answered, always inside a ```json fence (13 output tokens), which
+  // `extractJsonObject` unwraps.
   {
-    model: 'google/gemma-3-4b-it',
+    model: 'google.gemma-3-4b-it',
     mode: 'ungrounded',
-    route: 'openrouter',
-    providerOrder: ['deepinfra/bf16'],
+    route: 'bedrock',
+    region: BEDROCK_US_REGION,
     control: true,
   },
 ] as const
@@ -141,11 +169,10 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
  * as their ungrounded counterpart, differing ONLY in mode — so the grounded-vs-ungrounded
  * Brier delta per model isolates the value of the injected articles.
  *
- * Free-or-almost-free by policy: Qwen rides Bedrock (AWS credits), Gemini Flash-Lite rides
- * Vertex (also AWS/GCP credits, daatan#1513), and DeepSeek is the cheapest remaining
- * OpenRouter member. Grok is deliberately absent (it alone is ~80% of panel token
- * cost) and the control stays ungrounded — a grounded control would no longer
- * falsify the same instrument.
+ * Free-or-almost-free by policy: Qwen and DeepSeek ride Bedrock (AWS credits), Gemini
+ * Flash-Lite rides Vertex (GCP credits, daatan#1513). Grok is deliberately absent (it
+ * alone was ~80% of panel token cost) and the control stays ungrounded — a grounded
+ * control would no longer falsify the same instrument.
  *
  * These members join a forecast's roster only when grounding is configured AND the
  * forecast carries the scope tag — see `runPanelSweep`.
@@ -157,10 +184,10 @@ export const GROUNDED_PANEL_MEMBERS: readonly PanelMember[] = [
     route: 'bedrock',
   },
   {
-    model: 'deepseek/deepseek-chat',
+    model: 'deepseek.v3.2',
     mode: 'grounded-indexer',
-    route: 'openrouter',
-    providerOrder: ['deepinfra/fp4'],
+    route: 'bedrock',
+    region: BEDROCK_US_REGION,
   },
   {
     model: VERTEX_PANEL_MODEL,
@@ -187,22 +214,36 @@ export function rosterSignature(members: readonly PanelMember[] = PANEL_MEMBERS)
  * Falls back to the raw slug so a new member is never unlabelled.
  */
 export function panelMemberLabel(model: string): string {
-  if (model.startsWith('qwen')) return 'Qwen'
-  if (model.startsWith('deepseek')) return 'DeepSeek'
-  if (model.startsWith('google/gemini')) return 'Gemini'
-  if (model.startsWith('google/gemma')) return 'Gemma'
-  if (model.startsWith('x-ai/grok')) return 'Grok'
-  if (model.startsWith('openai/')) return 'GPT'
+  // Bedrock ids use `vendor.model` (and a `global.`/`us.` prefix for an inference
+  // profile) where OpenRouter slugs use `vendor/model`; retired rows carry either form.
+  const id = model.replace(/^(global|us|eu|apac)\./, '').replace('.', '/')
+  if (id.startsWith('qwen')) return 'Qwen'
+  if (id.startsWith('deepseek')) return 'DeepSeek'
+  if (id.startsWith('google/gemini')) return 'Gemini'
+  if (id.startsWith('google/gemma')) return 'Gemma'
+  if (id.startsWith('x-ai/grok') || id.startsWith('xai/grok')) return 'Grok'
+  if (id.startsWith('openai/')) return 'GPT'
   return model
 }
 
 /**
- * Whether a model id is the roster's deliberately-weak control member. The single
- * source of truth is the roster's `control` flag — callers must not re-derive this
- * from model-name prefixes, or swapping the control model silently mislabels it.
+ * Controls that have left the roster. Their historical rows are still a control's
+ * series — the leaderboard must keep saying so, or a retired control that ties the
+ * strong members reads as a strong member. Append here whenever `control` moves.
+ */
+const RETIRED_CONTROL_MODELS: readonly string[] = [
+  'openai/gpt-5-nano',
+  'google/gemma-3-4b-it', // → google.gemma-3-4b-it on Bedrock (daatan#2283)
+]
+
+/**
+ * Whether a model id is (or was) the roster's deliberately-weak control member. The
+ * source of truth is the roster's `control` flag plus `RETIRED_CONTROL_MODELS` —
+ * callers must not re-derive this from model-name prefixes, or swapping the control
+ * model silently mislabels it.
  */
 export function isControlModel(model: string, members: readonly PanelMember[] = PANEL_MEMBERS): boolean {
-  return members.some((m) => m.control === true && m.model === model)
+  return members.some((m) => m.control === true && m.model === model) || RETIRED_CONTROL_MODELS.includes(model)
 }
 
 /**

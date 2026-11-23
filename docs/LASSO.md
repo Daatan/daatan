@@ -154,15 +154,15 @@ say which is better. This comparison is free.
 
 ## 5. Roster
 
-`src/lib/llm/panel/roster.ts`. Three on OpenRouter, one on Bedrock, one on Vertex.
+`src/lib/llm/panel/roster.ts`. Three on Bedrock, one on Vertex, one on OpenRouter (daatan#2283).
 
 | Member | Route | Lineage | Role |
 |---|---|---|---|
 | `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | Alibaba | deterministic baseline, outage-proof |
-| `deepseek/deepseek-chat` | openrouter (`deepinfra/fp4`) | DeepSeek | |
+| `deepseek.v3.2` | **bedrock** (us-east-1) | DeepSeek | was `deepseek/deepseek-chat` (V3) on OpenRouter until daatan#2283 |
 | `google/gemini-3.5-flash-lite` | **vertex** | Google | direct, no OpenRouter markup (daatan#1513); was `google/gemini-2.5-flash` until daatan#1763 |
-| `x-ai/grok-4.3` | openrouter (`xai`) | xAI | |
-| `google/gemma-3-4b-it` | openrouter (`deepinfra/bf16`) | Google (4B) | **control** |
+| `x-ai/grok-4.3` | openrouter (`xai`) | xAI | Bedrock has only Grok 4.6/4.7, which cannot turn reasoning off |
+| `google.gemma-3-4b-it` | **bedrock** (us-east-1) | Google (4B) | **control**; same weights as the OpenRouter `google/gemma-3-4b-it` it replaced (daatan#2283) |
 
 > **No OpenAI member.** The gpt-5 lineup on OpenRouter is *reasoning-mandatory* —
 > `reasoning: {enabled: false}` returns `HTTP 400 "Reasoning is mandatory for this
@@ -188,6 +188,24 @@ say which is better. This comparison is free.
 > price-identical to 2.5 Flash), with `thinkingBudget: 0` sent explicitly. A new member:
 > its Brier series starts fresh and the roster signature change forces a new sweep. The
 > main chain's own model choice is a separate decision (per-stage, `LLM_STAGE_MODELS`).
+
+**daatan#2283 (2026-11-23).** The OpenRouter account ran dry on 2026-11-17 (HTTP 402), and
+from 11-18 every DeepSeek, Grok and Gemma call failed: the panel ran on two members, Qwen and
+Gemini. OpenRouter is paid from a personal balance, while Bedrock runs on the AWS credits, so
+DeepSeek and Gemma moved to Bedrock. Both have no eu-central-1 deployment and run in us-east-1
+(`PanelMember.region`). Their ids changed, so both start fresh Brier series. DeepSeek is also
+a model upgrade (V3 → V3.2); Gemma keeps its weights. Grok stays on OpenRouter for now:
+Bedrock serves only Grok 4.6/4.7, whose reasoning can be set to `low` at the least but never
+off, and this panel excludes reasoning models (see above).
+
+The smoke run on 2026-11-23 used the real prompt, 3 claims × 2 repeats per variant:
+- `deepseek.v3.2` answered 6/6 with a bare `{"probability": N}`, in 7 output tokens and no
+  reasoning block;
+- `google.gemma-3-4b-it` answered 6/6, inside a ```json fence (13 tokens), which the parser
+  unwraps;
+- `global.xai.grok-4.7` rejects `temperature`. On the Brent and Netanyahu claims it spent the
+  whole budget on reasoning, at 64 and at 1,024 tokens, with or without `low` effort. It
+  answered only the deliberately vague claim, with `null`.
 
 The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
 one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in

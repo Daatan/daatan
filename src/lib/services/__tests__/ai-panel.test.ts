@@ -402,7 +402,10 @@ describe('runPanelSweep', () => {
     expect(summary.written).toBe(1)
 
     const called = callMember.mock.calls.map(([m]) => m.route)
-    expect(called.sort()).toEqual(['bedrock', 'vertex'])
+    const authenticated = PANEL_MEMBERS.filter((m) => m.route !== 'openrouter').map((m) => m.route)
+    expect(called.sort()).toEqual(authenticated.sort())
+    expect(called).toContain('bedrock')
+    expect(called).toContain('vertex')
     expect(called).not.toContain('openrouter')
   })
 
@@ -467,15 +470,19 @@ describe('runPanelSweep', () => {
 
     // Reported as an incident even though the sweep produced data.
     expect(summary.unauthorized).toBe(true)
-    // The Bedrock member carried all ten forecasts.
+    // The Bedrock members carried all ten forecasts.
     expect(summary.written).toBe(10)
 
+    const openRouterMembers = PANEL_MEMBERS.filter((m) => m.route === 'openrouter').length
+    const bedrockMembers = PANEL_MEMBERS.filter((m) => m.route === 'bedrock').length
     const openRouterCalls = callMember.mock.calls.filter(([m]) => m.route === 'openrouter')
     const bedrockCalls = callMember.mock.calls.filter(([m]) => m.route === 'bedrock')
-    // Latched: at most the calls already in flight (4 forecasts × 3 workers), not
-    // 4 members × 10 forecasts = 40.
-    expect(openRouterCalls.length).toBeLessThanOrEqual(12)
-    expect(bedrockCalls.length).toBe(10)
+    // Latched: at most the calls already in flight (4 forecasts at a time), not
+    // every OpenRouter member × 10 forecasts.
+    expect(openRouterMembers).toBeGreaterThan(0)
+    expect(openRouterCalls.length).toBeLessThanOrEqual(4 * openRouterMembers)
+    expect(openRouterCalls.length).toBeLessThan(10 * openRouterMembers)
+    expect(bedrockCalls.length).toBe(10 * bedrockMembers)
   })
 
   it('writes nothing when every route is unauthenticated', async () => {

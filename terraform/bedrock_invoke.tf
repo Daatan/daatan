@@ -37,9 +37,12 @@
 #   non-streaming (one integer, `max_tokens: 64`), so streaming is withheld.
 #
 # MODEL ARN SHAPE
-#   Foundation-model ARNs carry no account id.
-#   Verified `inferenceTypesSupported = ["ON_DEMAND"]` for this model in eu-central-1,
-#   so it is invocable directly and needs no inference-profile ARN.
+#   Foundation-model ARNs carry no account id, but they DO carry the region, and a model
+#   is granted only in the region the roster calls it in (`PanelMember.region`, default
+#   eu-central-1). Since daatan#2283 DeepSeek V3.2 and Gemma 3 4B run in us-east-1:
+#   neither has an eu-central-1 deployment. All three were verified
+#   `inferenceTypesSupported = ["ON_DEMAND"]` in their region (2026-11-23), so they are
+#   invocable directly and need no inference-profile ARN.
 #
 # RUNBOOK (never a blanket apply)
 #   Staging first:
@@ -52,10 +55,13 @@
 #     terraform apply -target=aws_iam_role_policy.bedrock_invoke_panel
 
 locals {
-  # Bedrock model ids invocable by the AI panel. Keep in sync with the `route: 'bedrock'`
-  # entries in src/lib/llm/panel/roster.ts.
-  panel_bedrock_model_ids = [
-    "qwen.qwen3-235b-a22b-2507-v1:0",
+  # Bedrock models invocable by the AI panel, each in the region the roster calls it in.
+  # Keep in sync with the `route: 'bedrock'` entries (and their `region`) in
+  # src/lib/llm/panel/roster.ts.
+  panel_bedrock_models = [
+    { region = var.aws_region, model = "qwen.qwen3-235b-a22b-2507-v1:0" },
+    { region = "us-east-1", model = "deepseek.v3.2" },
+    { region = "us-east-1", model = "google.gemma-3-4b-it" },
   ]
 }
 
@@ -76,8 +82,8 @@ resource "aws_iam_role_policy" "bedrock_invoke_panel" {
         Effect = "Allow"
         Action = ["bedrock:InvokeModel"]
         Resource = [
-          for model_id in local.panel_bedrock_model_ids :
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/${model_id}"
+          for m in local.panel_bedrock_models :
+          "arn:aws:bedrock:${m.region}::foundation-model/${m.model}"
         ]
       }
     ]
