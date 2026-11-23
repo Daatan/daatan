@@ -110,4 +110,19 @@ describe('sources/[name] page', () => {
     expect(texts).toContain('outcomeYes')
     expect(texts).toContain('/forecasts/slug-f2')
   })
+
+  it('lets a Hebrew title set its own direction on an English page (#2292)', async () => {
+    const url = 'https://ynet.co.il/a'
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail,
+      publications: [{ title: 'הדמוקרטים: "מוכר את הביטחון"', url, source: 'ynet.co.il', publishedAt: null, pushedAt: null, outcome: null, forecastId: 'f1' }],
+    })
+    const findProps = (node: unknown): Record<string, unknown> | undefined => {
+      if (Array.isArray(node)) return node.map(findProps).find(Boolean)
+      if (!node || typeof node !== 'object' || !('props' in node)) return undefined
+      const props = (node as { props: Record<string, unknown> }).props
+      return props.href === url ? props : Object.values(props).map(findProps).find(Boolean)
+    }
+    expect(findProps(await OutletPublicPage({ params }))?.dir).toBe('auto')
+  })
 })
