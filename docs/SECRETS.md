@@ -169,7 +169,7 @@ Full, currently-active list. Vars marked "GitHub secret" are **also** needed at 
 | `GOOGLE_VERTEX_LOCATION` | ✅ | — | Vertex location; omit to default to `global` |
 | `GOOGLE_VERTEX_CLIENT_EMAIL` | ✅ | — | Vertex service-account email (needs the `Vertex AI User` role) |
 | `GOOGLE_VERTEX_PRIVATE_KEY` | ✅ | — | Vertex service-account private key (PEM; `\n`-escaped newlines are un-escaped at load) |
-| `OPENROUTER_API_KEY` | ✅ | — | OpenRouter: three of the five AI-panel members (DeepSeek, Grok, the Gemma control), the main chain's last-resort leg, and bots. The panel and main chain resolve it as admin setting (DB) → SSM `/daatan/<env>/secrets/OPENROUTER_API_KEY` → this env var (`getOpenRouterKey()`); bots read only this env var |
+| `OPENROUTER_API_KEY` | ✅ | — | OpenRouter: one of the five AI-panel members (Grok; DeepSeek and the Gemma control moved to Bedrock in daatan#2283), the main chain's last-resort leg, and bots. The panel and main chain resolve it as admin setting (DB) → SSM `/daatan/<env>/secrets/OPENROUTER_API_KEY` → this env var (`getOpenRouterKey()`); bots read only this env var |
 | `SERPER_API_KEY` | ✅ | — | Serper.dev — read only by the `/api/health/search` credit check; web search itself goes through the Oracul |
 | `NIMBLEWAY_API_KEY` | ✅ | — | Nimble web scraping — passed to the container, but no `src/` code reads it |
 | `SERPAPI_API_KEY` | ✅ | — | SerpAPI — read only by the `/api/health/search` credit check |
