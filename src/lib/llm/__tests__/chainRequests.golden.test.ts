@@ -6,14 +6,18 @@
  * generation params, message roles. Prompt text is replaced by `<prompt>`; structured
  * schemas are recorded once by value (`schemas` golden) and per call by hash.
  *
- * Covers: every stage (params taken from the call-site golden), the prod and the
- * self-host chain shapes, bot chains, every AI-panel member, the grounded-date lookup.
- * The model-registry refactor must leave all of it byte-identical.
+ * Each stage's request is built from what its call site passes, read LIVE from source
+ * (`goldens/callSites.ts`), and goes through the real service — so once params move into
+ * the model registry, the registry is what fills them in here. Timeouts are recorded too:
+ * every `setTimeout` / `AbortSignal.timeout` of ≥ 1 s armed before a leg's request.
+ *
+ * Covers: every stage on the prod chain shape, the self-host shape, bot chains (prod
+ * and self-host env), every AI-panel member, the grounded-date lookup. The
+ * model-registry refactor must leave all of it byte-identical.
  */
 import { createHash } from 'crypto'
-import { readFileSync } from 'fs'
-import path from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { literalValue, scanSource } from './goldens/callSites'
 import { expectGolden } from './goldens/golden'
 
 const ENV_KEYS = [
@@ -49,14 +53,20 @@ interface Captured {
   url: string
   body: unknown
   region?: string
+  /** Timeouts (ms) armed since the previous captured request — this leg's deadlines. */
+  timers?: number[]
 }
 const captured: Captured[] = []
+const pendingTimers: number[] = []
+function capture(entry: Omit<Captured, 'timers'>) {
+  captured.push({ ...entry, timers: pendingTimers.splice(0) })
+}
 
 vi.mock('@/lib/services/oracleClient', async (orig) => ({
   ...(await orig<typeof import('@/lib/services/oracleClient')>()),
   getOracleConfig: () => ({ baseUrl: 'https://oracle.test', key: 'oracle-test-key' }),
   oracleFetch: vi.fn(async (_cfg: unknown, p: string, init: { body: string; timeoutMs?: number }) => {
-    captured.push({ leg: 'oracle', url: p, body: { ...scrub(JSON.parse(init.body)) as object, timeoutMs: init.timeoutMs } })
+    capture({ leg: 'oracle', url: p, body: { ...(scrub(JSON.parse(init.body)) as object), timeoutMs: init.timeoutMs } })
     return { ok: false, status: 503, text: async () => 'down', json: async () => ({}) }
   }),
 }))
@@ -65,7 +75,7 @@ vi.mock('@aws-sdk/client-bedrock-runtime', () => ({
   BedrockRuntimeClient: class {
     constructor(private readonly config: { region: string }) {}
     send = async (cmd: { input: Record<string, unknown> }) => {
-      captured.push({ leg: 'bedrock', url: 'converse', region: this.config.region, body: scrub(cmd.input) })
+      capture({ leg: 'bedrock', url: 'converse', region: this.config.region, body: scrub(cmd.input) })
       throw new Error('bedrock down (test)')
     }
   },
@@ -113,7 +123,7 @@ function failingFetch() {
           : url.includes('ollama.test')
             ? 'ollama'
             : 'other'
-    captured.push({ leg, url: url.split('?')[0], body: raw ? scrub(raw) : null })
+    capture({ leg, url: url.split('?')[0], body: raw ? scrub(raw) : null })
     return new Response(JSON.stringify({ error: { code: 500, message: 'down (test)' } }), {
       status: 500,
       headers: { 'content-type': 'application/json' },
@@ -156,26 +166,22 @@ async function loadSchemas(): Promise<Record<string, unknown>> {
   return out
 }
 
-interface CallSite {
-  stage: string
-  file: string
-  fallback: string | null
-  params: Record<string, string>
-}
-
-/** `'EXPRESS_DRAFT_THINKING_BUDGET = 512'` → 512; `'0.2'` → 0.2. */
-function literal(text: string): unknown {
-  const value = text.includes(' = ') ? text.split(' = ').pop()! : text
-  if (/^[\d_.]+$/.test(value)) return Number(value.replace(/_/g, ''))
-  if (/^'.*'$/.test(value)) return value.slice(1, -1)
-  return undefined
-}
-
+const realSetTimeout = globalThis.setTimeout
+const realSignalTimeout = AbortSignal.timeout.bind(AbortSignal)
 let fetchMock: ReturnType<typeof failingFetch>
 beforeEach(() => {
   captured.length = 0
+  pendingTimers.length = 0
   fetchMock = failingFetch()
   vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('setTimeout', ((fn: () => void, ms?: number, ...args: unknown[]) => {
+    if ((ms ?? 0) >= 1000) pendingTimers.push(ms!)
+    return realSetTimeout(fn, ms, ...args)
+  }) as typeof setTimeout)
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+    if (ms >= 1000) pendingTimers.push(ms)
+    return realSignalTimeout(ms)
+  })
 })
 afterAll(() => {
   vi.unstubAllGlobals()
@@ -196,27 +202,28 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
 
   it('every staged call site, prod chain shape (Vertex → Oracul → OpenRouter)', async () => {
     const schemas = await loadSchemas()
-    const sites = JSON.parse(
-      readFileSync(path.resolve(process.cwd(), 'src/lib/llm/__tests__/goldens/stage-call-sites.json'), 'utf8'),
-    ) as CallSite[]
     const llm = await loadLlm({ ...VERTEX_ENV }, false)
     const { forStage } = await import('@/lib/llm/stageModels')
     const out: Record<string, unknown>[] = []
-    for (const site of sites) {
+    for (const site of scanSource().calls) {
       if (site.stage === '(unstaged)') continue
       captured.length = 0
-      const p = site.params
-      const fallback = site.fallback ? (literal(site.fallback) as string) : undefined
-      const request = {
-        ...forStage(site.stage as never, fallback),
+      pendingTimers.length = 0
+      // Exactly what the call site passes: literal params and its schema. Runtime
+      // expressions (e.g. primaryOnly: source === 'research') take their default.
+      const request: Record<string, unknown> = {
+        ...forStage(site.stage as never, site.fallback ? (literalValue(site.fallback) as string) : undefined),
         prompt: PROMPT,
-        ...(p.temperature !== undefined ? { temperature: literal(p.temperature) as number } : {}),
-        ...(p.thinkingBudget !== undefined ? { thinkingBudget: literal(p.thinkingBudget) as number } : {}),
-        ...(p.googleTimeoutMs !== undefined ? { googleTimeoutMs: literal(p.googleTimeoutMs) as number } : {}),
-        ...(p.schema !== undefined ? { schema: schemas[p.schema] as never } : {}),
       }
-      if (p.schema !== undefined) expect(schemas[p.schema], `schema ${p.schema} not found`).toBeDefined()
-      await expect(llm.llmService.generateContent(request)).rejects.toThrow()
+      for (const [key, text] of Object.entries(site.params)) {
+        if (key === 'schema') {
+          expect(schemas[text], `schema ${text} not found`).toBeDefined()
+          request.schema = schemas[text]
+        } else if (literalValue(text) !== undefined) {
+          request[key] = literalValue(text)
+        }
+      }
+      await expect(llm.llmService.generateContent(request as never)).rejects.toThrow()
       out.push({ stage: site.stage, file: site.file, legs: [...captured] })
     }
     expectGolden('chain-prod-stages', out)
@@ -255,14 +262,18 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
       ['thinking', { prompt: PROMPT, temperature: 0.2, thinkingBudget: 512 }],
     ] as const) {
       captured.length = 0
+      pendingTimers.length = 0
       await expect(llm.llmService.generateContent(request as never)).rejects.toThrow()
       out.push({ case: name, legs: [...captured] })
     }
     expectGolden('chain-selfhost', out)
   })
 
-  it('bot chains by model preference', async () => {
-    const llm = await loadLlm({ ...VERTEX_ENV, OPENROUTER_API_KEY: 'or-bot-key', GEMINI_API_KEY: 'gemini-test-key' }, false)
+  it.each([
+    ['prod', { ...VERTEX_ENV, OPENROUTER_API_KEY: 'or-bot-key' }],
+    ['with-gemini-key', { ...VERTEX_ENV, OPENROUTER_API_KEY: 'or-bot-key', GEMINI_API_KEY: 'gemini-test-key' }],
+  ] as const)('bot chains by model preference (%s env)', async (envName, env) => {
+    const llm = await loadLlm(env, false)
     const out: Record<string, unknown>[] = []
     for (const pref of [
       'google/gemini-2.5-flash',
@@ -271,13 +282,14 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
       'meta-llama/llama-3.3-70b-instruct:free',
     ]) {
       captured.length = 0
+      pendingTimers.length = 0
       const svc = llm.createBotLLMService(pref)
       await expect(
-        svc.generateContent({ prompt: PROMPT, temperature: 0.7, schema: { type: 'object' } as never, legTimeoutMs: 1000 }),
+        svc.generateContent({ prompt: PROMPT, temperature: 0.7, schema: { type: 'object' } as never, legTimeoutMs: 45_000 }),
       ).rejects.toThrow()
       out.push({ preference: pref, legs: [...captured] })
     }
-    expectGolden('chain-bots', out)
+    expectGolden(`chain-bots-${envName}`, out)
   })
 
   it('every AI-panel member (Bedrock / Vertex / OpenRouter routes)', async () => {
@@ -294,6 +306,7 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
     const out: Record<string, unknown>[] = []
     for (const m of members) {
       captured.length = 0
+      pendingTimers.length = 0
       await callPanelMember(m as never, PROMPT, 'or-panel-key').catch(() => undefined)
       out.push({ member: { model: m.model, mode: m.mode, route: m.route, region: 'region' in m ? m.region : undefined }, requests: [...captured] })
     }

@@ -21,7 +21,10 @@
               ]
             }
           ]
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -36,7 +39,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -50,7 +54,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "ollama",
@@ -62,7 +69,10 @@
           "options": {
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -89,7 +99,10 @@
               ]
             }
           ]
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -108,7 +121,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -126,7 +140,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "ollama",
@@ -139,7 +156,10 @@
           "options": {
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -164,7 +184,10 @@
               ]
             }
           ]
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -179,7 +202,8 @@
           ],
           "temperature": 0.1,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -193,7 +217,10 @@
             }
           ],
           "temperature": 0.7
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "ollama",
@@ -203,7 +230,10 @@
           "prompt": "<prompt>",
           "stream": false,
           "options": {}
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -232,7 +262,10 @@
               ]
             }
           ]
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -247,7 +280,8 @@
           ],
           "temperature": 0.2,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -261,7 +295,10 @@
             }
           ],
           "temperature": 0.2
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "ollama",
@@ -273,7 +310,10 @@
           "options": {
             "temperature": 0.2
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   }

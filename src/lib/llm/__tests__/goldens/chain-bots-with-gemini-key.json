@@ -1,0 +1,264 @@
+[
+  {
+    "preference": "google/gemini-2.5-flash",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.7
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "preference": "google/gemini-2.0-flash-exp:free",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.0-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.7
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      },
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:a2c799262a3ce3c1",
+            "temperature": 0.7
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "preference": "openai/gpt-5-mini",
+    "legs": [
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "openai/gpt-5-mini",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.7
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "preference": "meta-llama/llama-3.3-70b-instruct:free",
+    "legs": [
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.7
+        },
+        "timers": [
+          45000,
+          30000
+        ]
+      }
+    ]
+  }
+]

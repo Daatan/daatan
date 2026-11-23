@@ -21,29 +21,11 @@
             "responseSchema": "sha256:a2c799262a3ce3c1",
             "temperature": 0.7
           }
-        }
-      },
-      {
-        "leg": "gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        "body": {
-          "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": "sha256:a2c799262a3ce3c1",
-            "temperature": 0.7
-          },
-          "safetySettings": [],
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {
-                  "text": "<prompt>"
-                }
-              ]
-            }
-          ]
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       },
       {
         "leg": "openrouter",
@@ -61,29 +43,11 @@
             }
           ],
           "temperature": 0.7
-        }
-      },
-      {
-        "leg": "gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        "body": {
-          "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": "sha256:a2c799262a3ce3c1",
-            "temperature": 0.7
-          },
-          "safetySettings": [],
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {
-                  "text": "<prompt>"
-                }
-              ]
-            }
-          ]
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       }
     ]
   },
@@ -109,29 +73,11 @@
             "responseSchema": "sha256:a2c799262a3ce3c1",
             "temperature": 0.7
           }
-        }
-      },
-      {
-        "leg": "gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        "body": {
-          "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": "sha256:a2c799262a3ce3c1",
-            "temperature": 0.7
-          },
-          "safetySettings": [],
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {
-                  "text": "<prompt>"
-                }
-              ]
-            }
-          ]
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       },
       {
         "leg": "openrouter",
@@ -149,29 +95,11 @@
             }
           ],
           "temperature": 0.7
-        }
-      },
-      {
-        "leg": "gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        "body": {
-          "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": "sha256:a2c799262a3ce3c1",
-            "temperature": 0.7
-          },
-          "safetySettings": [],
-          "contents": [
-            {
-              "role": "user",
-              "parts": [
-                {
-                  "text": "<prompt>"
-                }
-              ]
-            }
-          ]
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       }
     ]
   },
@@ -194,7 +122,11 @@
             }
           ],
           "temperature": 0.7
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       }
     ]
   },
@@ -217,7 +149,11 @@
             }
           ],
           "temperature": 0.7
-        }
+        },
+        "timers": [
+          45000,
+          30000
+        ]
       }
     ]
   }

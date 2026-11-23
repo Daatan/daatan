@@ -21,6 +21,9 @@
       "generationConfig": {
         "temperature": 0
       }
-    }
+    },
+    "timers": [
+      15000
+    ]
   }
 ]

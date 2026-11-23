@@ -26,7 +26,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -58,7 +61,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -92,7 +98,10 @@
             "responseMimeType": "application/json",
             "responseSchema": "sha256:06b0e3faa31aa0df"
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -124,7 +133,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -156,7 +168,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -187,7 +202,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -219,7 +237,10 @@
             "maxTokens": 64,
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -253,7 +274,10 @@
             "responseMimeType": "application/json",
             "responseSchema": "sha256:06b0e3faa31aa0df"
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -288,7 +312,10 @@
             "order": [],
             "allow_fallbacks": false
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   }

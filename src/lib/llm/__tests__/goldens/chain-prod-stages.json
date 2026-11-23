@@ -21,7 +21,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -36,7 +39,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -50,7 +54,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -77,7 +84,10 @@
             "responseSchema": "sha256:27be7d5cc54e059a",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -96,7 +106,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -114,7 +125,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -141,7 +155,10 @@
             "responseSchema": "sha256:ced428afb74eff8d",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -160,7 +177,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -178,7 +196,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -204,7 +225,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -219,7 +243,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -233,7 +258,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -263,7 +291,10 @@
               "thinkingBudget": 512
             }
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -282,7 +313,8 @@
           ],
           "temperature": 0.2,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -300,7 +332,10 @@
             }
           ],
           "temperature": 0.2
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -330,7 +365,10 @@
               "thinkingBudget": 512
             }
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -349,7 +387,8 @@
           ],
           "temperature": 0.2,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -367,7 +406,10 @@
             }
           ],
           "temperature": 0.2
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -393,7 +435,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -408,7 +453,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -422,7 +468,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -449,7 +498,10 @@
             "responseSchema": "sha256:23d6ee05b2166419",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -468,7 +520,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -486,7 +539,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -512,7 +568,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -527,7 +586,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -541,7 +601,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -568,7 +631,10 @@
             "responseSchema": "sha256:301354de80dc237e",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -587,7 +653,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -605,7 +672,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -632,7 +702,10 @@
             "responseSchema": "sha256:35dba167662ff278",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -651,7 +724,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -669,7 +743,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -696,7 +773,10 @@
             "responseSchema": "sha256:d1a892d64983fc25",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -715,7 +795,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -733,7 +814,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -760,7 +844,10 @@
             "responseSchema": "sha256:bfe4d75fe81d70fb",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -779,7 +866,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -797,7 +885,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -824,7 +915,10 @@
             "responseSchema": "sha256:b93236f952e555cd",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          75000
+        ]
       },
       {
         "leg": "oracle",
@@ -843,7 +937,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -861,7 +956,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -888,7 +986,10 @@
             "responseSchema": "sha256:cdb8d186146bce62",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          25000
+        ]
       },
       {
         "leg": "oracle",
@@ -907,7 +1008,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -925,7 +1027,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -952,7 +1057,10 @@
             "responseSchema": "sha256:fefcc8bf78590089",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -971,7 +1079,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -989,7 +1098,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1016,7 +1128,10 @@
             "responseSchema": "sha256:69f218a19e93fc3a",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1035,7 +1150,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1053,7 +1169,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1080,7 +1199,10 @@
             "responseSchema": "sha256:61c9938bf39f33b0",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1099,7 +1221,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1117,7 +1240,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1146,7 +1272,10 @@
               "thinkingBudget": 0
             }
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1161,7 +1290,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1175,7 +1305,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1202,7 +1335,10 @@
             "responseSchema": "sha256:c0354bcae6754eb2",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1221,7 +1357,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1239,7 +1376,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1266,7 +1406,10 @@
             "responseSchema": "sha256:828ef7790960178e",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1285,7 +1428,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1303,7 +1447,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1329,7 +1476,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1344,7 +1494,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1358,7 +1509,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   },
@@ -1384,7 +1538,10 @@
             "responseMimeType": "text/plain",
             "temperature": 0
           }
-        }
+        },
+        "timers": [
+          30000
+        ]
       },
       {
         "leg": "oracle",
@@ -1399,7 +1556,8 @@
           ],
           "temperature": 0,
           "timeoutMs": 60000
-        }
+        },
+        "timers": []
       },
       {
         "leg": "openrouter",
@@ -1413,7 +1571,10 @@
             }
           ],
           "temperature": 0
-        }
+        },
+        "timers": [
+          30000
+        ]
       }
     ]
   }

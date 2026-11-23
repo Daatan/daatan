@@ -17,6 +17,9 @@
         "responseMimeType": "text/plain",
         "temperature": 0
       }
-    }
+    },
+    "timers": [
+      30000
+    ]
   }
 ]

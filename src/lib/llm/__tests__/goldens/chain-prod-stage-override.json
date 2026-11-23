@@ -17,7 +17,10 @@
         "responseMimeType": "text/plain",
         "temperature": 0
       }
-    }
+    },
+    "timers": [
+      30000
+    ]
   },
   {
     "leg": "oracle",
@@ -32,7 +35,8 @@
       ],
       "temperature": 0,
       "timeoutMs": 60000
-    }
+    },
+    "timers": []
   },
   {
     "leg": "openrouter",
@@ -46,6 +50,9 @@
         }
       ],
       "temperature": 0
-    }
+    },
+    "timers": [
+      30000
+    ]
   }
 ]
