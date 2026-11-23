@@ -48,12 +48,13 @@ describe('panelMemberLabel', () => {
     ['google/gemini-3.5-flash-lite', 'Gemini'],
     ['x-ai/grok-4.3', 'Grok'],
     ['global.xai.grok-4.7', 'Grok'],
+    ['mistral.mistral-large-3-675b-instruct', 'Mistral'],
     ['openai/gpt-5-mini', 'GPT'],
   ])('%s → %s', (model, label) => {
     expect(panelMemberLabel(model)).toBe(label)
   })
 
   it('falls back to the raw id, so a new member is never unlabelled', () => {
-    expect(panelMemberLabel('mistral.large-3')).toBe('mistral.large-3')
+    expect(panelMemberLabel('nvidia.nemotron-super-3-120b')).toBe('nvidia.nemotron-super-3-120b')
   })
 })

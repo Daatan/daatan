@@ -548,7 +548,7 @@ export async function runPanelSweep(opts?: {
     log.warn('No OpenRouter key and no Bedrock/Vertex member — AI panel is dormant')
     return { considered: 0, written: 0, completedPartial: 0, skipped: 0, failed: 0, dryRun: 0, dormant: true }
   }
-  if (!apiKey) {
+  if (!apiKey && PANEL_MEMBERS.some((m) => m.route === 'openrouter')) {
     log.warn('No OpenRouter key configured — running Bedrock/Vertex members only')
   }
 

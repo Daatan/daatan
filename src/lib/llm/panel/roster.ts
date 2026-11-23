@@ -140,11 +140,20 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     route: 'vertex',
   },
 
-  // The last OpenRouter member. Bedrock serves only Grok 4.6/4.7, which this panel
-  // excludes by design: measured 2026-11-23 (daatan#2283), Grok 4.7 rejects
-  // `temperature`, always reasons, and on two of three real claims spent the whole
-  // budget on reasoning at both 64 and 1,024 tokens, with or without `low` effort.
-  { model: 'x-ai/grok-4.3', mode: 'ungrounded', route: 'openrouter', providerOrder: ['xai'] },
+  // Replaced `x-ai/grok-4.3`, the last OpenRouter member (daatan#2283): that route is
+  // paid from a personal balance, and Bedrock serves only Grok 4.6/4.7, which this panel
+  // excludes by design — measured 2026-11-23, Grok 4.7 rejects `temperature`, always
+  // reasons, and on two of three real claims spent the whole budget on reasoning at both
+  // 64 and 1,024 tokens, with or without `low` effort. Mistral keeps a fifth independent
+  // lineage (European, distinct from Alibaba/DeepSeek/Google). Verified 2026-11-23 (real
+  // prompt, temperature 0, 64 tokens): 6/6 answered inside a ```json fence, 11–16 output
+  // tokens, no reasoning, and `null` on the deliberately vague claim.
+  {
+    model: 'mistral.mistral-large-3-675b-instruct',
+    mode: 'ungrounded',
+    route: 'bedrock',
+    region: BEDROCK_US_REGION,
+  },
 
   // Was openai/gpt-5-nano (same reasoning-mandatory 400 as gpt-5-mini). The control is
   // deliberately WEAK — if it ties the strong members on Brier, the instrument is not
@@ -210,7 +219,7 @@ export function rosterSignature(members: readonly PanelMember[] = PANEL_MEMBERS)
 
 /**
  * Short human label for a member on the chart legend. Keyed by prefix so a version
- * bump (grok-4.3 → grok-4.4, or the Bedrock qwen id) keeps its label without an edit.
+ * bump (deepseek V3 → V3.2, or the Bedrock qwen id) keeps its label without an edit.
  * Falls back to the raw slug so a new member is never unlabelled.
  */
 export function panelMemberLabel(model: string): string {
@@ -222,6 +231,7 @@ export function panelMemberLabel(model: string): string {
   if (id.startsWith('google/gemini')) return 'Gemini'
   if (id.startsWith('google/gemma')) return 'Gemma'
   if (id.startsWith('x-ai/grok') || id.startsWith('xai/grok')) return 'Grok'
+  if (id.startsWith('mistral')) return 'Mistral'
   if (id.startsWith('openai/')) return 'GPT'
   return model
 }
