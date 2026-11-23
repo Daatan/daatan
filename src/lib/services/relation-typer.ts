@@ -174,7 +174,7 @@ export async function typePair(pair: CandidatePair): Promise<TyperVerdict | null
       bDirection: pair.bDirection ?? 'unknown',
     })
     const res = await withTimeout(
-      llmService.generateContent({ ...forStage('relation_typer'), prompt, schema: relationTyperSchema, temperature: 0 }),
+      llmService.generateContent({ ...forStage('relation_typer'), prompt, schema: relationTyperSchema }),
       TYPE_TIMEOUT_MS,
     )
     return verdictSchema.parse(JSON.parse(res.text))

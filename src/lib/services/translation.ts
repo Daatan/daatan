@@ -95,7 +95,6 @@ export async function callGeminiTranslate(
   const response = await llmService.generateContent({
     ...forStage('translation'),
     prompt,
-    temperature: 0,
   })
   return response.text.trim()
 }
@@ -239,7 +238,7 @@ async function detectAndTranslateToEnglish(
     .filter(Boolean)
     .join('\n')
 
-  const res = await llmService.generateContent({ ...forStage('translation_detect'), prompt, temperature: 0 })
+  const res = await llmService.generateContent({ ...forStage('translation_detect'), prompt })
   const match = res.text.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No JSON object in detect-translate response')
   const parsed = JSON.parse(match[0]) as Record<string, unknown>

@@ -105,7 +105,7 @@ export async function generateHeadline(claimText: string): Promise<string | null
     const base = HEADLINE_PROMPT.replace('{claim}', () => claim)
     const prompt = hint ? base.replace(/Headline:$/, () => hint) : base
     const generation = llmService
-      .generateContent({ ...forStage('headline'), prompt, temperature: 0 })
+      .generateContent({ ...forStage('headline'), prompt })
       .then((res) => clean(res.text))
     const ms = hint ? HEADLINE_RETRY_TIMEOUT_MS : HEADLINE_TIMEOUT_MS
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))

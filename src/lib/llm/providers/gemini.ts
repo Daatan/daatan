@@ -8,6 +8,10 @@ const GEMINI_TIMEOUT_MS = 30_000
 
 export class GeminiProvider implements LLMProvider {
   name = 'Gemini'
+
+  modelFor(request: LLMRequest): string {
+    return request.model ?? this.modelName
+  }
   private genAI: GoogleGenerativeAI
   private modelName: string
 

@@ -101,7 +101,6 @@ export async function judgeCluster(clusterReports: PoolReport[], now: Date = new
       ...forStage('retro_event_judge'),
       prompt: await buildJudgePrompt(reports, now),
       schema: retroEventJudgeSchema,
-      temperature: 0,
     })
     const judged = validateJudgement(JSON.parse(result.text) as Record<string, unknown>, reports, now)
     return judged.ok && result.fallbackProvider ? { ...judged, modelNote: `answered by ${result.fallbackProvider}` } : judged

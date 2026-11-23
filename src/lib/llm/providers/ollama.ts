@@ -10,6 +10,10 @@ const OLLAMA_TIMEOUT_MS = 30_000
 
 export class OllamaProvider implements LLMProvider {
   name = 'Ollama'
+
+  modelFor(): string {
+    return this.modelName
+  }
   private baseUrl: string
   private modelName: string
 

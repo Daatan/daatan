@@ -62,7 +62,6 @@ export async function checkContent(
       ...forStage('moderation'),
       prompt,
       schema: moderationSchema,
-      temperature: 0, // High consistency for moderation
     })
 
     const parsed = moderationResultSchema.parse(JSON.parse(result.text))

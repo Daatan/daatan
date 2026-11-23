@@ -1,3 +1,4 @@
+import type { ModelParam } from './registry'
 import type { LlmStage } from './stageModels'
 import { Schema } from '@google/generative-ai'
 
@@ -29,6 +30,8 @@ export interface LLMRequest {
   /** Gemini `thinkingConfig.thinkingBudget` in tokens (0 = off). Unset keeps the
    *  model's default dynamic thinking. Vertex and Gemini legs only. */
   thinkingBudget?: number
+  /** Params sent even where the leg's model quirk says otherwise (registry `force`). */
+  forceParams?: ModelParam[]
 }
 
 export interface LLMResponse {
@@ -44,6 +47,9 @@ export interface LLMResponse {
 
 export interface LLMProvider {
   name: string
+  /** The model this leg would call for `request`; its registry quirks apply to the request.
+   *  Every real provider has it — only test doubles leave it out. */
+  modelFor?(request: LLMRequest): string
   generateContent(request: LLMRequest): Promise<LLMResponse>
 }
 

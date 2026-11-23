@@ -13,6 +13,10 @@ const ORACLE_TIMEOUT_MS = 60_000
  */
 export class OracleProvider implements LLMProvider {
   name = 'Oracul'
+
+  modelFor(): string {
+    return this.modelName
+  }
   private cfg: OracleConfig
   private modelName: string
 

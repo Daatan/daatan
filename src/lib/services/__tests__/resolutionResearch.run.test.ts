@@ -11,7 +11,6 @@ vi.mock('@/lib/llm/bedrock-prompts', () => ({
   fillPrompt: vi.fn().mockReturnValue('prompt'),
 }))
 vi.mock('@/lib/llm/schemas', () => ({ queryGenerationSchema: {}, researchSchema: {} }))
-vi.mock('@/lib/llm/stageModels', () => ({ forStage: vi.fn().mockReturnValue({}) }))
 
 import { oracleSearch } from '@/lib/services/oracleSearch'
 import { searchArticlesMultilingual } from '@/lib/utils/multilingualSearch'

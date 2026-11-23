@@ -30,7 +30,7 @@ async function main() {
     const { rulesDirectionSchema } = await import('../src/lib/llm/schemas')
     const { stageModel } = await import('../src/lib/llm/stageModels')
 
-    const model = process.env.RULES_MODEL || stageModel('rules_direction', 'gemini-2.5-flash')
+    const model = process.env.RULES_MODEL || stageModel('rules_direction')
     const project = process.env.GOOGLE_VERTEX_PROJECT_ID || 'daatan'
     const token = process.env.VERTEX_ACCESS_TOKEN || execSync('gcloud auth print-access-token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
     const url = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`

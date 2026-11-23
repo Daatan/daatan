@@ -3,6 +3,7 @@ import { env } from '@/env'
 import { isSelfHosted } from '@/lib/edition'
 import { createLogger } from '@/lib/logger'
 import { getAwsSecret } from '@/lib/aws/secrets'
+import { SELF_HOST_OPENROUTER_DEFAULT } from '@/lib/llm/registry'
 
 const log = createLogger('settings')
 
@@ -136,6 +137,6 @@ export function getOpenRouterModel(): string {
   return (
     getCachedSetting(SETTING_KEYS.openrouterModel) ||
     env.OPENROUTER_MODEL ||
-    'openai/gpt-5-mini'
+    SELF_HOST_OPENROUTER_DEFAULT
   )
 }

@@ -209,7 +209,7 @@ async function main() {
             return { ...full, properties, required: (full.required ?? []).filter((k) => k !== 'conditions') }
         })()
         : full
-    const model = process.env.RESEARCH_MODEL || stageModel('research_verdict', 'gemini-2.5-pro')
+    const model = process.env.RESEARCH_MODEL || stageModel('research_verdict')
     console.log(`resolution-research: ${model}, template ${templateFile ?? 'current'}, pool ${POOL}, schema ${SCHEMA}, guard ${GUARD ? 'on' : 'off'}, ${RUNS} runs per case\n`)
 
     const prompts = cases.map((c) => {
@@ -260,7 +260,7 @@ async function main() {
     if (process.env.QUERIES !== '0') {
         const queryFile = process.env.QUERY_TEMPLATE_FILE
         const queryTemplate = queryFile ? readFileSync(queryFile, 'utf8') : PROMPTS['research-query-generation']
-        const queryModel = stageModel('research_queries', 'gemini-2.5-flash')
+        const queryModel = stageModel('research_queries')
         const queryCases = [
             { name: 'Texas', claim: fx.claimText, rules: fx.resolutionRules, created: fx.created, deadline: fx.deadline },
             { name: 'Georgia', claim: GA_CLAIM, rules: GA_RULES, ...GA_DATES },

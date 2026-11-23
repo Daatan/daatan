@@ -17,7 +17,6 @@ async function generateRules(claimText: string, detailsText: string | null, outc
       typeLabel: outcomeType === 'BINARY' ? 'Yes/No (BINARY)' : 'Multiple choice (MULTIPLE_CHOICE)',
     }),
     schema: rulesSchema,
-    temperature: 0,
   })
 
   const parsed = JSON.parse(response.text) as { resolutionRules: string }

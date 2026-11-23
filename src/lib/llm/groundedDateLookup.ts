@@ -1,6 +1,8 @@
 import { createLogger } from '@/lib/logger'
-import { vertexEnv, vertexEndpoint, vertexAccessToken } from './providers/vertex'
+import { vertexEnv, vertexEndpoint, vertexAccessToken, VERTEX_TIMEOUT_MS } from './providers/vertex'
 import { stageModel } from '@/lib/llm/stageModels'
+import { applyQuirks } from './quirks'
+import { STAGES } from './registry'
 
 const log = createLogger('grounded-date-lookup')
 
@@ -27,16 +29,10 @@ const log = createLogger('grounded-date-lookup')
  * prose and parsed here.
  */
 
-const LOOKUP_MODEL = 'gemini-2.5-flash'
-/**
- * Measured 4.4–10.4 s (2026-09-18); p50 4.4 s / p90 8.4 s on 28 calls (2026-11-02, #1890).
- * Past this the draft goes out with the "assumed" warning instead — the slow tail is search
- * round-trips, not thinking (a thinkingBudget cap cost accuracy for ~0.3 s), so it's cut here.
- * Raised from 10 s (daatan#2199): every `unavailable` in prod 2026-10-16..11-15 (4/4) was this
- * timeout, not a Vertex error — Hebrew government-formation claims, which need more searching.
- * The lookup starts beside the first draft, so the author waits only for the part past it.
- */
-const LOOKUP_TIMEOUT_MS = 15_000
+/** Model, temperature and timeout: the `grounded_date` registry entry (registry.ts). Past the
+ *  timeout the draft goes out with the "assumed" warning instead. The lookup starts beside the
+ *  first draft, so the author waits only for the part past it. */
+const LOOKUP = STAGES.grounded_date
 /** A "scheduled event" further out than this is a misread, not a calendar fact. */
 const MAX_YEARS_AHEAD = 10
 const MAX_EVENT_CHARS = 160
@@ -102,18 +98,20 @@ export async function lookupGroundedEventDate(
   const started = Date.now()
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), LOOKUP.timeoutMs ?? VERTEX_TIMEOUT_MS)
   const onCallerAbort = () => controller.abort()
   signal?.addEventListener('abort', onCallerAbort, { once: true })
   try {
     const token = await vertexAccessToken(env)
-    const res = await fetch(vertexEndpoint(env, stageModel('grounded_date', LOOKUP_MODEL), 'generateContent'), {
+    const model = stageModel('grounded_date')
+    const { temperature } = applyQuirks(model, LOOKUP.params, LOOKUP.force)
+    const res = await fetch(vertexEndpoint(env, model, 'generateContent'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: buildPrompt(userInput, claimText, now.toISOString().split('T')[0]) }] }],
         tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0 },
+        generationConfig: temperature !== undefined ? { temperature } : {},
       }),
       signal: controller.signal,
     })

@@ -5,13 +5,16 @@
  * call site passes today. The goldens never feed a stored file back into the code.
  *
  * `effectiveStageParams()` and `effectiveModelRoles()` say what each stage / role ends
- * up with. Today that is the call-site literals and the module constants. The
- * model-registry refactor changes ONLY these two functions (to merge the registry);
- * the golden JSON files must stay byte-identical.
+ * up with: the model registry (`registry.ts`) merged with whatever a call site still
+ * passes itself. They were written against the pre-registry code first (#2288); moving
+ * values into the registry changed only these two functions, and the golden JSON files
+ * stayed byte-identical.
  */
 import { readdirSync, readFileSync, statSync } from 'fs'
 import path from 'path'
 import ts from 'typescript'
+import { chainModel, EVIDENCE_SECOND_OPINION, PANEL_MEMBERS } from '../../registry'
+import { forStage, stageModel, type LlmStage } from '../../stageModels'
 
 const SRC = path.resolve(process.cwd(), 'src')
 const SKIP_PROPS = new Set(['prompt', 'signal'])
@@ -157,34 +160,51 @@ function paramValue(text: string): unknown {
   return v === undefined ? `expr: ${text}` : v
 }
 
-/** SEAM — the params each call site's request ends up with, by stage. */
+/**
+ * SEAM — the params each call site's request ends up with, by stage: what `forStage(stage)`
+ * contributes from the model registry, then the call site's own literals on top (the
+ * spread order at every call site).
+ */
 export function effectiveStageParams(): { stage: string; file: string; model: string | null; params: Record<string, unknown> }[] {
-  return scanSource().calls.map((c) => ({
-    stage: c.stage,
-    file: c.file,
-    model: c.fallback ? (paramValue(c.fallback) as string) : null,
-    params: Object.fromEntries(Object.entries(c.params).map(([k, v]) => [k, paramValue(v)])),
-  }))
+  return scanSource().calls.map((c) => {
+    const fromRegistry: Record<string, unknown> = c.stage === '(unstaged)' ? {} : { ...forStage(c.stage as LlmStage) }
+    const model = fromRegistry.model as string | undefined
+    delete fromRegistry.stage
+    delete fromRegistry.model
+    const fromSite = Object.fromEntries(Object.entries(c.params).map(([k, v]) => [k, paramValue(v)]))
+    return {
+      stage: c.stage,
+      file: c.file,
+      model: model ?? (c.fallback ? (paramValue(c.fallback) as string) : null),
+      params: Object.fromEntries(Object.entries({ ...fromRegistry, ...fromSite }).sort(([x], [y]) => x.localeCompare(y))),
+    }
+  })
 }
 
-/** Which role each hard-coded model constant serves. A new constant must be added here. */
+/** Model constants outside the registry, and the role each serves. Embeddings are out of
+ *  the registry's scope (a model change means re-embedding). A new constant must be added. */
 export const ROLE_OF_CONSTANT: Record<string, string> = {
-  GEMINI_MODEL: 'chain.google',
-  ORACLE_FALLBACK_MODEL: 'chain.oracle',
-  OPENROUTER_FREE_FALLBACK_MODEL: 'chain.openrouter',
-  LOOKUP_MODEL: 'grounded_date',
-  RESEARCH_VERDICT_MODEL: 'research_verdict',
-  DEFAULT_EXPENSIVE_MODEL: 'evidence_second_opinion',
-  VERTEX_PANEL_MODEL: 'panel.vertex',
   EMBEDDING_MODEL: 'embedding',
 }
 
-/** SEAM — the model each role uses, by role. */
+const REGISTRY_FILE = 'lib/llm/registry.ts'
+
+/** SEAM — the model each role uses, by role: the registry, plus the constants above. */
 export function effectiveModelRoles(): Record<string, string> {
-  const out: Record<string, string> = {}
+  const vertexMember = PANEL_MEMBERS.find((m) => m.route === 'vertex')
+  const out: Record<string, string> = {
+    'chain.google': chainModel('google'),
+    'chain.oracle': chainModel('oracle'),
+    'chain.openrouter': chainModel('openrouter'),
+    grounded_date: stageModel('grounded_date'),
+    research_verdict: stageModel('research_verdict'),
+    evidence_second_opinion: EVIDENCE_SECOND_OPINION.model,
+    ...(vertexMember ? { 'panel.vertex': vertexMember.model } : {}),
+  }
   for (const c of scanSource().constants) {
+    if (c.file === REGISTRY_FILE) continue
     const role = ROLE_OF_CONSTANT[c.name]
-    if (!role) throw new Error(`model constant ${c.name} (${c.file}) has no role in ROLE_OF_CONSTANT`)
+    if (!role) throw new Error(`model constant ${c.name} (${c.file}) is outside the registry — move it into registry.ts`)
     out[role] = c.value
   }
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)))

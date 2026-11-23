@@ -22,7 +22,6 @@ export async function triggerAiProbabilityEstimate(
         const response = await llmService.generateContent({
           ...forStage('ai_estimate'),
           prompt: `You are a calibrated forecasting assistant. Given the following prediction claim, estimate the probability (0–100) that it will resolve as TRUE/correct. Reply with ONLY a single integer between 0 and 100, nothing else.\n\nClaim: ${claimText}`,
-          temperature: 0,
         })
         const text = response.text.trim()
         const value = parseInt(text, 10)

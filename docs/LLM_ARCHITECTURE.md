@@ -46,47 +46,71 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 A single provider failing is **logged but not paged** — a later leg may still succeed, and a fallback that rescues the call is silent. Telegram is paged (via `notifyLlmError`) **only when the whole chain fails**, with the attempted provider chain (e.g. `Gemini → Oracul → OpenRouter`) and the last error. See `docs/TELEGRAM_NOTIFICATIONS.md`.
 
-### Model per stage (#1800)
+### The model registry (#1800, #2287)
 
-Every `llmService.generateContent` call names its stage (`forStage('<stage>')`,
-`src/lib/llm/stageModels.ts`, the list is `LLM_STAGES`). One env var moves any stage
-independently of the rest:
+Every model the app calls, on which provider and with which params, is one entry in
+**`src/lib/llm/registry.ts`** — the same shape as retro's and news-indexer's `models.yaml`
+(umbrella Daatan/platform#60). Changing a model, a chain leg or a param is an edit there,
+and `__tests__/registry.test.ts` checks it in CI. What it holds:
 
-```
-LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flash"
-```
+- **`CHAIN`** — the shared chain's legs in order (Google → Oracul → OpenRouter → Ollama) and
+  each leg's model. `buildProviders()` walks it; each leg still registers only when configured.
+  The bots' fallbacks reuse these models.
+- **`STAGES`** — one entry per `LLM_STAGES` member: its own primary model (a Google model for
+  now), `params` (`temperature`, `reasoningBudget`), `timeoutMs` for the primary leg, `force`,
+  and optional `eval` / `evalResult` (CI fails when `evalResult.model` is no longer the stage's
+  model: re-run the eval after a swap). Call sites spread `forStage('<stage>')` and pass only
+  the prompt, the schema and runtime arguments (`primaryOnly`, `signal`); a static test
+  refuses a staged call site that sets a registry-owned param itself.
+- **`MODEL_QUIRKS`** — what a model can't take as is, per neutral param: `ignore` (dropped),
+  `reject` (CI fails on any role that would send it), `rename` (sent as another param) or
+  `hook` (a named function in `quirks.ts`), each with a required `note`. A role overrides
+  `ignore`/`rename`/`hook` with `force: [param]`. Ids are matched after `normalizeModelId`
+  (`bedrock/`, `vertex_ai/`, `google/` and `us.`/`eu.`/`apac.`/`global.` removed). Every chain
+  leg (`ResilientLLMService`, per the leg's `modelFor`) and every panel member applies them.
+- **`EVIDENCE_SECOND_OPINION`**, and the AI panel: `PANEL_MEMBERS` / `GROUNDED_PANEL_MEMBERS`
+  (rules in [LASSO.md](LASSO.md) §5: a new model is a new member and a new Brier series) and
+  `PANEL_PARAMS` (temperature 0, reasoning off, 64 tokens).
 
-- Unset/empty = every stage on its built-in model (the chain's `GEMINI_MODEL`;
-  `research_verdict` → `gemini-2.5-pro`; `grounded_date` → `gemini-2.5-flash`).
-- Values are **Google model ids** — they reach the Vertex/Gemini legs only. The non-Google
-  fallback legs (Oracul Nova Pro, OpenRouter, Ollama) keep their pinned models.
-- Prod: set it in Secrets Manager `daatan-env-prod`, then redeploy — `blue-green-deploy.sh`
-  and both compose files pass it (and `EVIDENCE_SECOND_OPINION_MODEL`, which before #1800
-  never reached the container at all); empty = default.
-- **Thinking budget.** A request may set `thinkingBudget` (tokens, `0` = off), sent as Gemini
-  `thinkingConfig` by the Vertex and Gemini legs only; unset keeps the model's dynamic thinking.
-  Two stages set it (#1890). `search_query` sends 0 (`SEARCH_QUERY_THINKING_BUDGET`): dynamic
-  thinking spent ~630 tokens on a 3–8 word answer, and 7 of 26 prod calls hit the 5 s query timeout.
-  In an A/B on 41 real claims, 0 took p50 3.07 → 0.65 s with the same entities.
-  `express_draft` sends 512. Default thinking spent ~1,300 tokens and was the
-  slowest creation stage (p90 16 s → 5 s at 512 on `scripts/bench-express-draft.ts`). 0 copied
-  non-English inputs verbatim instead of translating them. If `LLM_STAGE_MODELS` moves
-  `express_draft` to a model without a token-count thinking budget, re-check this first.
+Per-stage notes worth keeping in mind:
+
+- **Thinking budget.** `reasoningBudget` (tokens, `0` = off) is sent as Gemini `thinkingConfig`
+  by the Vertex and Gemini legs only; unset keeps the model's dynamic thinking. `search_query`
+  sends 0: dynamic thinking spent ~630 tokens on a 3–8 word answer, and 7 of 26 prod calls hit
+  the 5 s query timeout; in an A/B on 41 real claims, 0 took p50 3.07 → 0.65 s with the same
+  entities. `express_draft` sends 512 (#1890): default thinking spent ~1,300 tokens and was the
+  slowest creation stage (p90 16 s → 5 s on `scripts/bench-express-draft.ts`), and 0 copied
+  non-English inputs verbatim instead of translating them. Moving `express_draft` to a model
+  without a token-count thinking budget means re-checking this first.
+- **`research_verdict` (#2096).** `gemini-2.5-pro`, 75 s on the Google legs instead of 30 s. A
+  resolver's manual research uses the first leg only (`primaryOnly`), so a failure is an error
+  to retry, not a verdict from another vendor's model. The born-true check may still fall
+  back, and its Telegram alert then names the fallback model.
+- **`retro_event_check` (daatan#2229).** The opposite: 25 s on the Google legs, so that the
+  Oracul fallback has 10 s left of the check's 35 s.
 - When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
   with the `stage` — the stage ran on another vendor's model. Not paged.
-- **`research_verdict` (#2096).** The Vertex and Gemini legs get 75 s instead of 30 s
-  (`googleTimeoutMs`). A resolver's manual research uses the first leg only (`primaryOnly`), so
-  a failure is an error to retry, not a verdict from another vendor's model. The born-true
-  check may still fall back, and its Telegram alert then names the fallback model.
-- **`retro_event_check` (daatan#2229).** The opposite: the Google legs get 25 s instead of 30 s,
-  so that the Oracul fallback has 10 s left of the check's 35 s.
+- At startup the app logs one `model_config` line per chain leg and stage (`role`, `model`,
+  `source`: `registry` or `env`).
 
-Not covered, by design: embeddings (`embedding.ts`, `gemini-embedding-2` @ 768 dims — a change
-means re-embedding every row), the LLM panel roster (a model change starts a new Brier series)
-and bots (`Bot.modelPreference`, per bot in the DB).
+**Env overrides, on their way out.** `LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,…"`
+(a stage's Google model) and `EVIDENCE_SECOND_OPINION_MODEL` still win over the registry. Both
+are empty in the prod container (2026-11-23); they go once the registry's `model_config` lines
+have been checked on the server and the staging bundle has been checked for them. That also removes the self-host edition's only per-stage
+override: self-hosters change `registry.ts` like everyone else.
+
+**Deliberately outside the registry** (runtime choices): each bot's `Bot.modelPreference`
+(DB, admin-editable) and the calls that run on it (bot runner, admin bot-config generation);
+the self-host OpenRouter model (admin setting → `OPENROUTER_MODEL` →
+`SELF_HOST_OPENROUTER_DEFAULT`), which replaces the chain's OpenRouter leg there; the Ibi
+tool's model menu (the user picks per request); `primaryOnly` (depends on the caller); and embeddings
+(`embedding.ts`, `gemini-embedding-2` @ 768 dims — a change means re-embedding every row).
 
 ## Code Structure
 
+*   **`src/lib/llm/registry.ts`**: the model registry — chain, stages, quirks, panel (see above).
+*   **`src/lib/llm/quirks.ts`**: `applyQuirks()` and the `QUIRK_HOOKS` a `hook` quirk names.
+*   **`src/lib/llm/stageModels.ts`**: `LLM_STAGES`, `forStage()`, `stageModel()`.
 *   **`src/lib/llm/types.ts`**: Interfaces for `LLMProvider`, `LLMRequest`, `LLMResponse`.
 *   **`src/lib/llm/providers/`**: Implementations for specific services.
     *   `vertex.ts`: REST client for Gemini on Vertex AI (primary leg; also exports `vertexEnv()` / `vertexEndpoint()` / `vertexAccessToken()` for the panel and the grounded-date lookup).
@@ -97,7 +121,7 @@ and bots (`Bot.modelPreference`, per bot in the DB).
 *   **`src/lib/llm/service.ts`**: `ResilientLLMService` class that handles the retry/fallback logic.
 *   **`src/lib/llm/bedrock-prompts.ts`**: the `PROMPTS` record and `getPromptTemplate()` / `fillPrompt()`. (Name kept from when it fetched from Bedrock; ~26 `getPromptTemplate` call sites.)
 *   **`src/lib/llm/index.ts`**: Instantiates and exports `llmService` and `createBotLLMService`.
-*   **`src/lib/llm/panel/`**: the AI panel (LASSO) — `roster.ts` (members), `client.ts` (per-route calls), `context.ts` (grounded-indexer snippets).
+*   **`src/lib/llm/panel/`**: the AI panel (LASSO) — `roster.ts` (member type and helpers; the members are in `registry.ts`), `client.ts` (per-route calls), `context.ts` (grounded-indexer snippets).
 *   **`src/lib/llm/groundedDateLookup.ts`**: the web-grounded scheduled-event date lookup used by express prediction (#1706).
 
 ## Prompts
@@ -169,11 +193,12 @@ Instead of importing `GoogleGenerativeAI` directly, use the service:
 
 ```typescript
 import { llmService } from '@/lib/llm'
+import { forStage } from '@/lib/llm/stageModels'
 
 const response = await llmService.generateContent({
+  ...forStage('moderation'), // model, params and timeout from registry.ts
   prompt: "Your prompt here",
   schema: optionalJsonSchema, // Gemini supports this natively; Ollama uses JSON mode
-  temperature: 0.7
 })
 
 console.log(response.text)
@@ -190,8 +215,10 @@ const response = await botLlm.generateContent({ prompt: "..." })
 
 ## Adding a New Provider
 
-1.  Create a class in `src/lib/llm/providers/` implementing `LLMProvider`.
-2.  Add it to the initialization list in `src/lib/llm/index.ts`.
+1.  Create a class in `src/lib/llm/providers/` implementing `LLMProvider`, including
+    `modelFor()` so its model's registry quirks apply.
+2.  Add the provider to `ChainProvider` and a leg to `CHAIN` in `registry.ts`, and its
+    branch to `buildProviders()` in `src/lib/llm/index.ts`.
 
 ## Oracul API Integration
 

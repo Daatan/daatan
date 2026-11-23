@@ -65,7 +65,6 @@ export async function suggestTags(claim: string, details?: string) {
       ...forStage('tags'),
       prompt,
       schema: suggestTagsSchema,
-      temperature: 0,
     })
 
     try {
@@ -90,7 +89,6 @@ export async function extractPrediction(text: string) {
       ...forStage('prediction_extract'),
       prompt,
       schema: predictionSchema,
-      temperature: 0,
     })
 
     try {
