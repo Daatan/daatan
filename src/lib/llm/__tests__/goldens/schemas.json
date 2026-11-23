@@ -1,0 +1,686 @@
+{
+  "botConfigGenerationSchema": {
+    "sha256": "88b8c9bcb2eb5919",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "personaPrompt": {
+          "type": "string"
+        },
+        "forecastPrompt": {
+          "type": "string"
+        },
+        "votePrompt": {
+          "type": "string"
+        },
+        "newsSources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "personaPrompt",
+        "forecastPrompt",
+        "votePrompt",
+        "newsSources"
+      ]
+    }
+  },
+  "claimDefinednessSchema": {
+    "sha256": "ced428afb74eff8d",
+    "schema": {
+      "description": "Whether the claim has a deciding term with two common readings, or rules that conflict with it",
+      "type": "object",
+      "properties": {
+        "splitOutcome": {
+          "type": "string",
+          "description": "An ordinary outcome on which the two readings settle differently, or the conflict in one sentence. Empty string when there is no fault."
+        },
+        "splitChance": {
+          "type": "integer",
+          "description": "0-100: how likely the split outcome is to happen. 0 when there is no fault."
+        },
+        "readerShare": {
+          "type": "integer",
+          "description": "0-100: share of ordinary readers who would take the reading the rules do not use (100 for a literal rules conflict). 0 when there is no fault."
+        },
+        "fault": {
+          "type": "string",
+          "format": "enum",
+          "enum": [
+            "none",
+            "two_readings",
+            "rules_conflict"
+          ],
+          "description": "two_readings, rules_conflict, or none."
+        },
+        "term": {
+          "type": "string",
+          "description": "The deciding word or phrase, quoted from the claim (or the conflicting part of the rules). Empty when fault is none."
+        },
+        "question": {
+          "type": "string",
+          "description": "One short question asking the author which they mean. Empty when fault is none."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Two or three corrected one-sentence versions of the claim, each fixing one reading. Empty when fault is none."
+        }
+      },
+      "required": [
+        "splitOutcome",
+        "splitChance",
+        "readerShare",
+        "fault",
+        "term",
+        "question",
+        "options"
+      ]
+    }
+  },
+  "expressPredictionSchema": {
+    "sha256": "5cfec4f1255aef42",
+    "schema": {
+      "description": "Structured prediction generated from user's casual input",
+      "type": "object",
+      "properties": {
+        "claimText": {
+          "type": "string",
+          "description": "Clear, testable prediction statement"
+        },
+        "resolveByDatetime": {
+          "type": "string",
+          "description": "ISO 8601 datetime when prediction should be resolved"
+        },
+        "detailsText": {
+          "type": "string",
+          "description": "2-3 sentence neutral summary of the current situation. Base it on the articles ONLY when they are actually about this claim's topic. If the articles are not relevant to the claim, briefly frame the claim itself instead — never state that the articles lack information."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of relevant tags (1-3)"
+        },
+        "resolutionRules": {
+          "type": "string",
+          "description": "Specific criteria for resolution"
+        },
+        "outcomeType": {
+          "type": "string",
+          "description": "BINARY for yes/no predictions, MULTIPLE_CHOICE when multiple distinct outcomes are possible (e.g. 'who will win', 'which team')"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "For MULTIPLE_CHOICE only: 2-10 distinct outcome options. Empty array for BINARY."
+        },
+        "probabilitySuggestion": {
+          "type": "number",
+          "nullable": true,
+          "description": "Suggested probability (0-100) that the claim resolves YES, or null unless the provided articles or a linked market price actually bear on the outcome. Do not return 50 as a placeholder for 'no information' — return null instead."
+        },
+        "probabilityReasoning": {
+          "type": "string",
+          "description": "One sentence explanation for the probability suggestion, or for why no estimate can be given yet"
+        },
+        "relevantArticleIndices": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "1-based indices of the [Article N] entries above that are genuinely about this claim's topic. Empty array if none of the articles are relevant."
+        },
+        "dateBasis": {
+          "type": "string",
+          "description": "How resolveByDatetime was determined: \"explicit_in_claim\" if the user's own input states the date, \"from_sources\" if a provided article states it, or \"assumed\" if neither does (including the rule 3/3a default fallback)."
+        }
+      },
+      "required": [
+        "claimText",
+        "resolveByDatetime",
+        "detailsText",
+        "tags",
+        "resolutionRules",
+        "outcomeType",
+        "options",
+        "probabilitySuggestion",
+        "probabilityReasoning",
+        "relevantArticleIndices",
+        "dateBasis"
+      ]
+    }
+  },
+  "forecastBatchSchema": {
+    "sha256": "c8ae135bd1bd47b7",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "claimText": {
+          "type": "string"
+        },
+        "detailsText": {
+          "type": "string"
+        },
+        "outcomeType": {
+          "type": "string"
+        },
+        "resolveByDatetime": {
+          "type": "string"
+        },
+        "resolutionRules": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skip": {
+          "type": "boolean",
+          "description": "Set to true if the topic does not match the required tags"
+        }
+      },
+      "required": [
+        "claimText",
+        "outcomeType",
+        "resolveByDatetime",
+        "resolutionRules"
+      ]
+    }
+  },
+  "guessChancesSchema": {
+    "sha256": "23d6ee05b2166419",
+    "schema": {
+      "description": "Suggested probability and reasoning for a forecast",
+      "type": "object",
+      "properties": {
+        "probability": {
+          "type": "number",
+          "nullable": true,
+          "description": "Suggested probability (0 to 100), or null if the forecast is too vague or underspecified to estimate"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Brief explanation for the suggested probability, or for why one cannot be given"
+        }
+      },
+      "required": [
+        "probability",
+        "reasoning"
+      ]
+    }
+  },
+  "moderationSchema": {
+    "sha256": "301354de80dc237e",
+    "schema": {
+      "description": "Result of content moderation check",
+      "type": "object",
+      "properties": {
+        "isOffensive": {
+          "type": "boolean",
+          "description": "Whether the content violates safety policies"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Brief explanation of the violation if isOffensive is true"
+        }
+      },
+      "required": [
+        "isOffensive",
+        "reason"
+      ]
+    }
+  },
+  "predictionSchema": {
+    "sha256": "35dba167662ff278",
+    "schema": {
+      "description": "Structured prediction data extracted from text or URL",
+      "type": "object",
+      "properties": {
+        "claim": {
+          "type": "string",
+          "description": "The core prediction or claim made by the person"
+        },
+        "author": {
+          "type": "string",
+          "description": "The name of the person who made the prediction"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "description": "The source URL where the prediction was found"
+        },
+        "resolutionDate": {
+          "type": "string",
+          "description": "The date when the prediction can be verified (ISO 8601 format)"
+        },
+        "outcomeOptions": {
+          "type": "array",
+          "description": "The possible outcomes for the prediction (e.g., ['Yes', 'No'])",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "claim",
+        "author",
+        "resolutionDate",
+        "outcomeOptions"
+      ]
+    }
+  },
+  "queryGenerationSchema": {
+    "sha256": "bfe4d75fe81d70fb",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "2-3 short, factual web search queries (3-7 words each) to find news about the forecast outcome"
+        }
+      },
+      "required": [
+        "queries"
+      ]
+    }
+  },
+  "relationTyperSchema": {
+    "sha256": "d1a892d64983fc25",
+    "schema": {
+      "description": "Logical relation between two forecast questions",
+      "type": "object",
+      "properties": {
+        "relation": {
+          "type": "string",
+          "description": "alias | nested | threshold | complement | exclusive | implies | independent"
+        },
+        "direction": {
+          "type": "string",
+          "description": "a_to_b | b_to_a | null",
+          "nullable": true
+        },
+        "a_span": {
+          "type": "string"
+        },
+        "b_span": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "description": "0..1"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "relation",
+        "a_span",
+        "b_span",
+        "confidence",
+        "notes"
+      ]
+    }
+  },
+  "researchSchema": {
+    "sha256": "b93236f952e555cd",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "format": "enum",
+          "enum": [
+            "correct",
+            "wrong",
+            "void",
+            "unresolvable"
+          ],
+          "description": "The suggested resolution outcome"
+        },
+        "correctOptionId": {
+          "type": "string",
+          "description": "The ID of the correct option if the prediction is MULTIPLE_CHOICE and outcome is 'correct'"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Brief explanation of why this outcome was chosen based on the evidence"
+        },
+        "evidenceLinks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of URLs found that support the resolution"
+        },
+        "premature": {
+          "type": "boolean",
+          "description": "True when the deadline has not passed yet and the claim is neither already confirmed nor already impossible — it is too early to resolve. outcome must then be 'unresolvable'."
+        },
+        "conditions": {
+          "type": "array",
+          "description": "Each separate condition the resolution rules require (one entry for a single-condition claim). outcome may be 'correct' only when every status is 'met'.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "string",
+                "description": "One condition, in your own words"
+              },
+              "evidence": {
+                "type": "string",
+                "description": "The specific fact that decides it, with its source and date; empty when unconfirmed"
+              },
+              "status": {
+                "type": "string",
+                "format": "enum",
+                "enum": [
+                  "met",
+                  "failed",
+                  "unconfirmed"
+                ],
+                "description": "'met' only when a source states it (a count or threshold needs the number)"
+              }
+            },
+            "required": [
+              "condition",
+              "status"
+            ]
+          }
+        }
+      },
+      "required": [
+        "outcome",
+        "reasoning",
+        "evidenceLinks",
+        "conditions"
+      ]
+    }
+  },
+  "retroEventCheckSchema": {
+    "sha256": "cdb8d186146bce62",
+    "schema": {
+      "description": "Per-article verdicts on a retro simulation's evidence, and whether an existing forecast already covers the event",
+      "type": "object",
+      "properties": {
+        "articles": {
+          "type": "array",
+          "description": "One entry per article, in the order given.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "n": {
+                "type": "integer",
+                "description": "The article number."
+              },
+              "onTopic": {
+                "type": "boolean",
+                "description": "About the matter the question's outcome turns on."
+              },
+              "reportsEvent": {
+                "type": "boolean",
+                "description": "Already says that what the question asks about has happened."
+              }
+            },
+            "required": [
+              "n",
+              "onTopic",
+              "reportsEvent"
+            ]
+          }
+        },
+        "sameEventAs": {
+          "type": "integer",
+          "description": "Number of the existing forecast this event settles; 0 for none."
+        },
+        "reason": {
+          "type": "string",
+          "description": "One short sentence on the most important thing found."
+        }
+      },
+      "required": [
+        "articles",
+        "sameEventAs",
+        "reason"
+      ]
+    }
+  },
+  "retroEventJudgeSchema": {
+    "sha256": "fefcc8bf78590089",
+    "schema": {
+      "description": "Whether grouped news reports describe one discrete past event, and the forecast question it settles",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "format": "enum",
+          "enum": [
+            "event",
+            "routine",
+            "trend",
+            "not_yet",
+            "mixed",
+            "other"
+          ],
+          "description": "event, routine, trend, not_yet, mixed, or other."
+        },
+        "reason": {
+          "type": "string",
+          "description": "One short sentence on why this kind."
+        },
+        "eventSummary": {
+          "type": "string",
+          "description": "One past-tense sentence: who did what. Empty unless kind is event."
+        },
+        "eventDate": {
+          "type": "string",
+          "description": "The day the event happened, YYYY-MM-DD. Empty when it cannot be told, or unless kind is event."
+        },
+        "eventIndex": {
+          "type": "integer",
+          "description": "Number of the report that most directly confirms the event happened; 0 unless kind is event."
+        },
+        "claim": {
+          "type": "string",
+          "description": "Future-tense declarative forecast the event makes true, ending with \"by {DEADLINE}\". Empty unless kind is event."
+        },
+        "resolutionRules": {
+          "type": "string",
+          "description": "Two or three sentences: what counts as YES by {DEADLINE}, and NO otherwise. Empty unless kind is event."
+        }
+      },
+      "required": [
+        "kind",
+        "reason",
+        "eventSummary",
+        "eventDate",
+        "eventIndex",
+        "claim",
+        "resolutionRules"
+      ]
+    }
+  },
+  "rulesDirectionSchema": {
+    "sha256": "69f218a19e93fc3a",
+    "schema": {
+      "description": "Whether the resolution rules resolve YES when the claim is true",
+      "type": "object",
+      "properties": {
+        "yesCondition": {
+          "type": "string",
+          "description": "The event that makes the rules resolve YES, in one short sentence."
+        },
+        "direction": {
+          "type": "string",
+          "format": "enum",
+          "enum": [
+            "consistent",
+            "inverted",
+            "unclear"
+          ],
+          "description": "consistent: rules YES means the claim is true. inverted: rules YES means the claim is false. unclear: the rules never say what resolves YES."
+        },
+        "fixedRules": {
+          "type": "string",
+          "description": "Only when inverted: the rules rewritten so YES means the claim is true, everything else kept. Otherwise an empty string."
+        }
+      },
+      "required": [
+        "yesCondition",
+        "direction",
+        "fixedRules"
+      ]
+    }
+  },
+  "rulesSchema": {
+    "sha256": "27be7d5cc54e059a",
+    "schema": {
+      "description": "Resolution rules for a prediction",
+      "type": "object",
+      "properties": {
+        "resolutionRules": {
+          "type": "string",
+          "description": "Clear, specific criteria for how this prediction resolves. 1-3 sentences."
+        }
+      },
+      "required": [
+        "resolutionRules"
+      ]
+    }
+  },
+  "rulesStrengthSchema": {
+    "sha256": "61c9938bf39f33b0",
+    "schema": {
+      "description": "Whether the resolution rules resolve YES on an easier event than the claim states",
+      "type": "object",
+      "properties": {
+        "yesTrigger": {
+          "type": "string",
+          "description": "The weakest event that makes the rules resolve YES, in one short sentence."
+        },
+        "weaker": {
+          "type": "boolean",
+          "description": "True when that trigger is easier to meet than the event the claim states."
+        },
+        "kind": {
+          "type": "string",
+          "format": "enum",
+          "enum": [
+            "none",
+            "announcement",
+            "intent",
+            "partial",
+            "scope",
+            "or_weak",
+            "other"
+          ],
+          "description": "Which kind of weakening, or none when weaker is false."
+        },
+        "fixedRules": {
+          "type": "string",
+          "description": "Only when weaker: the rules rewritten to resolve YES only on the claim's own event, everything else kept. Otherwise an empty string."
+        }
+      },
+      "required": [
+        "yesTrigger",
+        "weaker",
+        "kind",
+        "fixedRules"
+      ]
+    }
+  },
+  "suggestTagsSchema": {
+    "sha256": "c0354bcae6754eb2",
+    "schema": {
+      "description": "Suggested tags for a prediction",
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of 1-3 relevant tags"
+        }
+      },
+      "required": [
+        "tags"
+      ]
+    }
+  },
+  "temporalClassifierSchema": {
+    "sha256": "828ef7790960178e",
+    "schema": {
+      "description": "Temporal classification of a forecast claim",
+      "type": "object",
+      "properties": {
+        "claim_deadline": {
+          "type": "string",
+          "description": "ISO date (YYYY-MM-DD) the claim text implies, or null if none",
+          "nullable": true
+        },
+        "direction": {
+          "type": "string",
+          "description": "arrival | survival | none"
+        },
+        "archetype": {
+          "type": "string",
+          "description": "diffuse | scheduled | threshold | none"
+        },
+        "tau_lead_days": {
+          "type": "number",
+          "description": "Mandatory lead-time days before the deadline, 0 if none"
+        },
+        "confidence": {
+          "type": "number",
+          "description": "0..1 confidence in the classification"
+        },
+        "notes": {
+          "type": "string",
+          "description": "One sentence for a human auditor"
+        }
+      },
+      "required": [
+        "direction",
+        "archetype",
+        "tau_lead_days",
+        "confidence",
+        "notes"
+      ]
+    }
+  },
+  "voteDecisionSchema": {
+    "sha256": "760c1ac2e80b7285",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "shouldVote": {
+          "type": "boolean"
+        },
+        "binaryChoice": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "shouldVote",
+        "binaryChoice"
+      ]
+    }
+  }
+}

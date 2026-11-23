@@ -1,0 +1,227 @@
+[
+  {
+    "stage": "(unstaged)",
+    "file": "app/api/admin/bots/route.ts",
+    "fallback": null,
+    "params": {
+      "schema": "botConfigGenerationSchema",
+      "temperature": "0.7"
+    }
+  },
+  {
+    "stage": "(unstaged)",
+    "file": "lib/services/bots/shared.ts",
+    "fallback": null,
+    "params": {
+      "legTimeoutMs": "timeoutMs",
+      "schema": "schema",
+      "temperature": "temperature"
+    }
+  },
+  {
+    "stage": "ai_estimate",
+    "file": "lib/services/ai-estimate.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "backfill_rules",
+    "file": "app/api/admin/forecasts/backfill-rules/route.ts",
+    "fallback": null,
+    "params": {
+      "schema": "rulesSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "claim_definedness",
+    "file": "lib/llm/claimDefinedness.ts",
+    "fallback": null,
+    "params": {
+      "schema": "claimDefinednessSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "context_summary",
+    "file": "app/api/forecasts/[id]/context/route.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "express_draft",
+    "file": "lib/llm/expressPrediction.ts",
+    "fallback": null,
+    "params": {
+      "schema": "expressPredictionSchema",
+      "temperature": "0.2",
+      "thinkingBudget": "EXPRESS_DRAFT_THINKING_BUDGET = 512"
+    }
+  },
+  {
+    "stage": "express_draft",
+    "file": "lib/llm/expressPrediction.ts",
+    "fallback": null,
+    "params": {
+      "schema": "expressPredictionSchema",
+      "temperature": "0.2",
+      "thinkingBudget": "EXPRESS_DRAFT_THINKING_BUDGET = 512"
+    }
+  },
+  {
+    "stage": "express_topic",
+    "file": "lib/llm/expressPrediction.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "guess_chances",
+    "file": "lib/llm/expressPrediction.ts",
+    "fallback": null,
+    "params": {
+      "schema": "guessChancesSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "headline",
+    "file": "lib/llm/headline.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "moderation",
+    "file": "lib/services/moderation.ts",
+    "fallback": null,
+    "params": {
+      "schema": "moderationSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "prediction_extract",
+    "file": "lib/llm/gemini.ts",
+    "fallback": null,
+    "params": {
+      "schema": "predictionSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "relation_typer",
+    "file": "lib/services/relation-typer.ts",
+    "fallback": null,
+    "params": {
+      "schema": "relationTyperSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "research_queries",
+    "file": "lib/services/resolutionResearch.ts",
+    "fallback": null,
+    "params": {
+      "schema": "queryGenerationSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "research_verdict",
+    "file": "lib/services/resolutionResearch.ts",
+    "fallback": "RESEARCH_VERDICT_MODEL = 'gemini-2.5-pro'",
+    "params": {
+      "googleTimeoutMs": "RESEARCH_VERDICT_TIMEOUT_MS = 75_000",
+      "primaryOnly": "source === 'research'",
+      "schema": "researchSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "retro_event_check",
+    "file": "lib/services/retro-generator/check.ts",
+    "fallback": null,
+    "params": {
+      "googleTimeoutMs": "CHECK_GOOGLE_TIMEOUT_MS = 25_000",
+      "schema": "retroEventCheckSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "retro_event_judge",
+    "file": "lib/services/retro-generator/judge.ts",
+    "fallback": null,
+    "params": {
+      "schema": "retroEventJudgeSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "rules_direction",
+    "file": "lib/llm/rulesDirection.ts",
+    "fallback": null,
+    "params": {
+      "schema": "rulesDirectionSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "rules_strength",
+    "file": "lib/llm/rulesStrength.ts",
+    "fallback": null,
+    "params": {
+      "schema": "rulesStrengthSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "search_query",
+    "file": "lib/llm/searchQuery.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0",
+      "thinkingBudget": "SEARCH_QUERY_THINKING_BUDGET = 0"
+    }
+  },
+  {
+    "stage": "tags",
+    "file": "lib/llm/gemini.ts",
+    "fallback": null,
+    "params": {
+      "schema": "suggestTagsSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "temporal_classifier",
+    "file": "lib/services/temporal-classifier.ts",
+    "fallback": null,
+    "params": {
+      "schema": "temporalClassifierSchema",
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "translation",
+    "file": "lib/services/translation.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  },
+  {
+    "stage": "translation_detect",
+    "file": "lib/services/translation.ts",
+    "fallback": null,
+    "params": {
+      "temperature": "0"
+    }
+  }
+]

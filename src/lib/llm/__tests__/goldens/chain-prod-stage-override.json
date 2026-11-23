@@ -1,0 +1,51 @@
+[
+  {
+    "leg": "vertex",
+    "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash-lite:generateContent",
+    "body": {
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "<prompt>"
+            }
+          ]
+        }
+      ],
+      "generationConfig": {
+        "responseMimeType": "text/plain",
+        "temperature": 0
+      }
+    }
+  },
+  {
+    "leg": "oracle",
+    "url": "/llm",
+    "body": {
+      "model": "bedrock/amazon.nova-pro-v1:0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "<prompt>"
+        }
+      ],
+      "temperature": 0,
+      "timeoutMs": 60000
+    }
+  },
+  {
+    "leg": "openrouter",
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "body": {
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "messages": [
+        {
+          "role": "user",
+          "content": "<prompt>"
+        }
+      ],
+      "temperature": 0
+    }
+  }
+]
