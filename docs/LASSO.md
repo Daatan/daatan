@@ -198,6 +198,15 @@ a model upgrade (V3 → V3.2); Gemma keeps its weights. Grok stays on OpenRouter
 Bedrock serves only Grok 4.6/4.7, whose reasoning can be set to `low` at the least but never
 off, and this panel excludes reasoning models (see above).
 
+The smoke run on 2026-11-23 used the real prompt, 3 claims × 2 repeats per variant:
+- `deepseek.v3.2` answered 6/6 with a bare `{"probability": N}`, in 7 output tokens and no
+  reasoning block;
+- `google.gemma-3-4b-it` answered 6/6, inside a ```json fence (13 tokens), which the parser
+  unwraps;
+- `global.xai.grok-4.7` rejects `temperature`. On the Brent and Netanyahu claims it spent the
+  whole budget on reasoning, at 64 and at 1,024 tokens, with or without `low` effort. It
+  answered only the deliberately vague claim, with `null`.
+
 The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
 one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in
 the panel's first real sweep returned 401 and nothing was produced. A member on the

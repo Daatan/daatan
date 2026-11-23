@@ -114,6 +114,8 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
   // that route is paid from a personal balance, and its 402s silenced this member from
   // 2026-11-17. Bedrock serves no V3, so this is also a model upgrade — a new member, a
   // fresh Brier series. us-east-1 because Bedrock has no eu-central-1 deployment of it.
+  // Verified 2026-11-23 (real prompt, temperature 0, 64 tokens): 6/6 answered with a
+  // bare `{"probability": N}` in a single text block, 7 output tokens, no reasoning.
   {
     model: 'deepseek.v3.2',
     mode: 'ungrounded',
@@ -138,9 +140,10 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
     route: 'vertex',
   },
 
-  // The last OpenRouter member. Bedrock serves only Grok 4.6/4.7, and neither can turn
-  // reasoning off (lowest effort is `low`), which this panel excludes by design — the
-  // move waits on a measured smoke run (daatan#2283).
+  // The last OpenRouter member. Bedrock serves only Grok 4.6/4.7, which this panel
+  // excludes by design: measured 2026-11-23 (daatan#2283), Grok 4.7 rejects
+  // `temperature`, always reasons, and on two of three real claims spent the whole
+  // budget on reasoning at both 64 and 1,024 tokens, with or without `low` effort.
   { model: 'x-ai/grok-4.3', mode: 'ungrounded', route: 'openrouter', providerOrder: ['xai'] },
 
   // Was openai/gpt-5-nano (same reasoning-mandatory 400 as gpt-5-mini). The control is
@@ -149,7 +152,9 @@ export const PANEL_MEMBERS: readonly PanelMember[] = [
   // frontier model ever was.
   //
   // Same weights as the `google/gemma-3-4b-it` it replaces on OpenRouter (daatan#2283),
-  // but a new id on a new route, so a new series — see `model` above.
+  // but a new id on a new route, so a new series — see `model` above. Verified
+  // 2026-11-23: 6/6 answered, always inside a ```json fence (13 output tokens), which
+  // `extractJsonObject` unwraps.
   {
     model: 'google.gemma-3-4b-it',
     mode: 'ungrounded',
