@@ -62,6 +62,7 @@ locals {
     { region = var.aws_region, model = "qwen.qwen3-235b-a22b-2507-v1:0" },
     { region = "us-east-1", model = "deepseek.v3.2" },
     { region = "us-east-1", model = "google.gemma-3-4b-it" },
+    { region = "us-east-1", model = "mistral.mistral-large-3-675b-instruct" },
   ]
 }
 

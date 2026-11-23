@@ -154,14 +154,14 @@ say which is better. This comparison is free.
 
 ## 5. Roster
 
-`src/lib/llm/panel/roster.ts`. Three on Bedrock, one on Vertex, one on OpenRouter (daatan#2283).
+`src/lib/llm/panel/roster.ts`. Four on Bedrock, one on Vertex, none on OpenRouter (daatan#2283).
 
 | Member | Route | Lineage | Role |
 |---|---|---|---|
 | `qwen.qwen3-235b-a22b-2507-v1:0` | **bedrock** | Alibaba | deterministic baseline, outage-proof |
 | `deepseek.v3.2` | **bedrock** (us-east-1) | DeepSeek | was `deepseek/deepseek-chat` (V3) on OpenRouter until daatan#2283 |
 | `google/gemini-3.5-flash-lite` | **vertex** | Google | direct, no OpenRouter markup (daatan#1513); was `google/gemini-2.5-flash` until daatan#1763 |
-| `x-ai/grok-4.3` | openrouter (`xai`) | xAI | Bedrock has only Grok 4.6/4.7, which cannot turn reasoning off |
+| `mistral.mistral-large-3-675b-instruct` | **bedrock** (us-east-1) | Mistral | replaced `x-ai/grok-4.3` on OpenRouter (daatan#2283): Bedrock's Grok 4.6/4.7 cannot stop reasoning |
 | `google.gemma-3-4b-it` | **bedrock** (us-east-1) | Google (4B) | **control**; same weights as the OpenRouter `google/gemma-3-4b-it` it replaced (daatan#2283) |
 
 > **No OpenAI member.** The gpt-5 lineup on OpenRouter is *reasoning-mandatory* —
@@ -206,6 +206,13 @@ The smoke run on 2026-11-23 used the real prompt, 3 claims × 2 repeats per vari
 - `global.xai.grok-4.7` rejects `temperature`. On the Brent and Netanyahu claims it spent the
   whole budget on reasoning, at 64 and at 1,024 tokens, with or without `low` effort. It
   answered only the deliberately vague claim, with `null`.
+
+So Grok left the panel, and Mistral Large 3 on Bedrock took its slot. It is another
+non-thinking, independent lineage, and it runs on credits. Its smoke run used the same setup
+(64 tokens, temperature 0). It answered 6/6 inside a ```json fence (11–16 tokens), returned
+`null` on the vague claim, and produced no reasoning. With that, no panel member depends on
+OpenRouter any more. The sweep still supports the route (key latch, skip-not-fail without a
+key), and the tests keep it covered with a synthetic member.
 
 The Bedrock member is not about the $0.23/mo it saves. Every member used to depend on
 one third-party credential, and on 2026-07-10 that credential was dead: all 285 calls in

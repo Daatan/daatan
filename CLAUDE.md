@@ -40,7 +40,7 @@ Detailed architecture and feature docs: see [`docs/`](./docs/).
 
 - Schema: [`prisma/schema.prisma`](./prisma/schema.prisma) + [`docs/DATABASE.md`](./docs/DATABASE.md) (table map, probability scales, cross-cutting gotchas)
 - Auth flow: [`src/auth.ts`](./src/auth.ts)
-- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — main chain Gemini (Vertex, then Developer API) → Oracul (Bedrock/Nova) → OpenRouter → Ollama (each leg registers only when configured); OpenRouter also serves one of the five AI-panel members (Grok; three run on Bedrock, one on Vertex) and the bots. See [`docs/LLM_ARCHITECTURE.md`](./docs/LLM_ARCHITECTURE.md)
+- LLM providers: [`src/lib/llm/`](./src/lib/llm/) — main chain Gemini (Vertex, then Developer API) → Oracul (Bedrock/Nova) → OpenRouter → Ollama (each leg registers only when configured); OpenRouter also serves the bots (the five AI-panel members run four on Bedrock, one on Vertex since daatan#2283). See [`docs/LLM_ARCHITECTURE.md`](./docs/LLM_ARCHITECTURE.md)
 - Scoring systems: [`src/lib/services/scoring-systems.ts`](./src/lib/services/scoring-systems.ts) and [`docs/SCORING_SYSTEMS.md`](./docs/SCORING_SYSTEMS.md)
 - Bot system: [`src/lib/services/bots/`](./src/lib/services/bots/) and [`docs/bots.md`](./docs/bots.md), [`docs/BOT_APPROVAL_WORKFLOW.md`](./docs/BOT_APPROVAL_WORKFLOW.md)
 - Embeddings + similar-forecasts: [`docs/EMBEDDINGS.md`](./docs/EMBEDDINGS.md)

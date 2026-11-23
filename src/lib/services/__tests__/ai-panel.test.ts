@@ -31,6 +31,21 @@ vi.mock('@/lib/llm/panel/client', async (importOriginal) => ({
 // The 402 recorder writes through Prisma; here only the hook-up matters (daatan#1504).
 vi.mock('@/lib/services/panel-failures', () => ({ recordPanelPaymentFailure: vi.fn() }))
 
+// The live roster has no OpenRouter member since daatan#2283, but the sweep's OpenRouter
+// mechanics (key latch, partial runs, skip-not-fail without a key) stay — the route is
+// still supported. A synthetic OpenRouter member keeps them exercised; it is never called
+// for real (callPanelMember is mocked above).
+vi.mock('@/lib/llm/panel/roster', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/llm/panel/roster')>()
+  return {
+    ...actual,
+    PANEL_MEMBERS: [
+      ...actual.PANEL_MEMBERS,
+      { model: 'test/openrouter-member', mode: 'ungrounded', route: 'openrouter' },
+    ],
+  }
+})
+
 // Retrieval is network; the pure helpers (fingerprint, articles block) stay real so
 // hashes and prompts in these tests match production byte-for-byte.
 vi.mock('@/lib/llm/panel/context', async (importOriginal) => ({
