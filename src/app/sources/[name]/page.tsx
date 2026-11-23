@@ -199,7 +199,9 @@ export default async function OutletPublicPage({ params }: Props) {
       )}
 
       {/* A list, not a table (#2292): under auto table layout a long title ran over the
-          forecast column, and one article that fed two forecasts printed as two rows. */}
+          forecast column, and one article that fed two forecasts printed as two rows.
+          dir="auto": most titles are Hebrew, and on an English page their quotes and
+          trailing punctuation otherwise jump to the wrong end. */}
       {publications.length > 0 && (
         <>
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
@@ -209,13 +211,13 @@ export default async function OutletPublicPage({ params }: Props) {
             {publications.map((p, i) => (
               <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 break-words">
                 {isUrl(p.url) ? (
-                  <a href={p.url} target="_blank" rel="noopener noreferrer"
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" dir="auto"
                      className="text-sm text-blue-400 hover:underline">
                     {p.title || p.url}
                     <ExternalLink className="inline w-3 h-3 ms-1 align-baseline" />
                   </a>
                 ) : (
-                  <span className="text-sm text-white">{p.title || '—'}</span>
+                  <span dir="auto" className="text-sm text-white">{p.title || '—'}</span>
                 )}
                 {(p.publishedAt || p.forecasts.length > 0) && (
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
