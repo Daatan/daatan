@@ -1256,7 +1256,7 @@
     "sortBy": {
       "skillConservative": "כישורים",
       "brierScore": "ציון Brier",
-      "sideRate": "נוקט עמדה",
+      "sideRate": "ביטחון המקור",
       "bits": "מול מטבע"
     },
     "author": "מחבר",
@@ -1265,7 +1265,7 @@
     "authorsCount": "{count, plural, one {מחבר אחד} two {# מחברים} many {# מחברים} other {# מחברים}}",
     "skillConservative": "כישורים",
     "brierScore": "Brier",
-    "sideRate": "נוקט עמדה",
+    "sideRate": "ביטחון המקור",
     "sideRateHint": "תחזיות שבהן חולצה התחזית הכיוונית של הכותב עצמו, מתוך כל התחזיות שעליהן כתב (שהוכרעו או לא).",
     "bits": "מול מטבע",
     "legend": {

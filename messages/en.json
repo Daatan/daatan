@@ -1256,7 +1256,7 @@
     "sortBy": {
       "skillConservative": "Skill",
       "brierScore": "Brier score",
-      "sideRate": "Takes a side",
+      "sideRate": "Source confidence",
       "bits": "vs coin flip"
     },
     "author": "Author",
@@ -1265,7 +1265,7 @@
     "authorsCount": "{count, plural, one {# author} other {# authors}}",
     "skillConservative": "Skill",
     "brierScore": "Brier",
-    "sideRate": "Takes a side",
+    "sideRate": "Source confidence",
     "sideRateHint": "Forecasts where this author's own directional forecast was extracted, out of all the forecasts they wrote about (resolved or not).",
     "bits": "vs coin flip",
     "legend": {

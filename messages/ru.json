@@ -1256,7 +1256,7 @@
     "sortBy": {
       "skillConservative": "Навык",
       "brierScore": "Оценка Brier",
-      "sideRate": "Занимает сторону",
+      "sideRate": "Уверенность источника",
       "bits": "Против монетки"
     },
     "author": "Автор",
@@ -1265,7 +1265,7 @@
     "authorsCount": "{count, plural, one {# автор} few {# автора} many {# авторов} other {# авторов}}",
     "skillConservative": "Навык",
     "brierScore": "Brier",
-    "sideRate": "Занимает сторону",
+    "sideRate": "Уверенность источника",
     "sideRateHint": "Прогнозы, в которых извлечён собственный направленный прогноз автора, из всех прогнозов, о которых он писал (разрешённых или нет).",
     "bits": "Против монетки",
     "legend": {
