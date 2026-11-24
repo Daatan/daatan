@@ -17,6 +17,7 @@ import {
 // and this chart agree.
 import { communityProbability } from '@/lib/forecast-math'
 import { marketNotIdenticalHint } from '@/lib/market-display'
+import { ArticleDotsView, ExpandChartButton, type AiLinePoint } from '@/components/forecasts/ArticleDotsView'
 
 type ChartSnapshot = {
   createdAt: string
@@ -76,6 +77,9 @@ type Props = {
   panelSeries?: ChartPanelMember[]
   /** The viewer opted into the AI panel in Settings. Off by default. */
   showAiPanel?: boolean
+  /** Enables the expanded "every article" view (daatan#2300), which fetches its dots by this id.
+   *  Omitted → the chart has no expanded view. */
+  forecastId?: string
 }
 
 const OPTION_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4']
@@ -115,6 +119,9 @@ const fmtHour = (ts: number) =>
   new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric' })
 
 const DAY_MS = 86_400_000
+/** A plain click on the plot opens the expanded view, but only once this long has passed
+ *  without a second click — a double-click keeps meaning "reset zoom". */
+export const EXPAND_CLICK_DELAY_MS = 300
 type RangeKey = '24h' | '7d' | 'all'
 const RANGES: { key: RangeKey; label: string; span: number }[] = [
   { key: '24h', label: '24h', span: DAY_MS },
@@ -203,6 +210,7 @@ export default function ProbabilityChart({
   marketNote,
   panelSeries = [],
   showAiPanel = false,
+  forecastId,
 }: Props) {
   // `picked` is the user's explicit range choice; null → use the data-driven default.
   // `brush` tracks manual brush dragging, so presets and fine control coexist.
@@ -219,6 +227,22 @@ export default function ProbabilityChart({
   // moving or tapping back inside re-arms normal hover behavior.
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [tooltipDismissed, setTooltipDismissed] = useState(false)
+
+  // The expanded "every article" view (daatan#2300). Opened by the header button or a plain
+  // click on the plot; focus returns to the button when it closes.
+  const [expanded, setExpanded] = useState(false)
+  const expandRef = useRef<HTMLButtonElement | null>(null)
+  const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelPendingExpand = () => {
+    if (expandTimer.current) clearTimeout(expandTimer.current)
+    expandTimer.current = null
+  }
+  useEffect(() => {
+    const timer = expandTimer
+    return () => {
+      if (timer.current) clearTimeout(timer.current)
+    }
+  }, [])
   useEffect(() => {
     const handleOutside = (e: Event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
@@ -248,6 +272,9 @@ export default function ProbabilityChart({
   const shouldRender =
     outcomeType !== 'NUMERIC_THRESHOLD' &&
     !(commitments.length < 3 && !showMarket && !showAiHistory && !hasPanelData)
+  // A dot's height is the article's P(YES), so the view only exists on binary claims, and only
+  // once there is an Oracul line to draw it over.
+  const canExpand = forecastId != null && outcomeType === 'BINARY' && aiPointCount > 0
 
   // Members are drawn only when the viewer opted in AND at least one has a point.
   const panelMembers = showAiPanel ? panelSeries.filter(m => m.points.length > 0) : []
@@ -386,17 +413,34 @@ export default function ProbabilityChart({
     if (dragStart != null && dragEnd != null && dragStart !== dragEnd) {
       const window = tsWindowToIndices(data.map(d => d.ts as number), dragStart, dragEnd)
       if (window) setBrush(window)
+    } else if (dragStart != null && canExpand) {
+      // A press and release on the same point is a click: open the expanded view, unless a
+      // second click turns it into the double-click that resets zoom.
+      cancelPendingExpand()
+      expandTimer.current = setTimeout(() => {
+        expandTimer.current = null
+        setExpanded(true)
+      }, EXPAND_CLICK_DELAY_MS)
     }
     setDragStart(null); setDragEnd(null)
   }
-  const resetZoom = () => { setBrush(null); setPicked(null); setDragStart(null); setDragEnd(null) }
+  const resetZoom = () => { cancelPendingExpand(); setBrush(null); setPicked(null); setDragStart(null); setDragEnd(null) }
+  const closeExpanded = () => { setExpanded(false); expandRef.current?.focus() }
+  const aiLine: AiLinePoint[] = canExpand
+    ? snapshots
+        .filter(s => s.externalProbability != null)
+        .map(s => ({ t: new Date(s.createdAt).getTime(), p: s.externalProbability as number }))
+    : []
 
   return (
     <div ref={wrapperRef} className="mb-8 bg-navy-700 border border-navy-600 rounded-xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-          Probability over time
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+            Probability over time
+          </h3>
+          {canExpand && <ExpandChartButton ref={expandRef} onClick={() => setExpanded(true)} />}
+        </div>
         {showPresets && (
           <div className="flex items-center gap-1">
             {RANGES.map(r => (
@@ -589,6 +633,9 @@ export default function ProbabilityChart({
             </button>
           )}
         </div>
+      )}
+      {expanded && canExpand && forecastId && (
+        <ArticleDotsView forecastId={forecastId} aiLine={aiLine} onClose={closeExpanded} />
       )}
     </div>
   )
