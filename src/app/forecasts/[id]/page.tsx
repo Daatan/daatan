@@ -21,6 +21,7 @@ import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 import { JsonLd } from '@/components/JsonLd'
 import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getAppName, getAppUrl } from '@/lib/branding'
+import { authorJsonLd } from '@/lib/author-json-ld'
 import { ogLocale } from '@/lib/og-locale'
 
 async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
@@ -328,16 +329,8 @@ export default async function ForecastDetailPage({ params }: Props) {
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     datePublished: prediction.publishedAt,
     dateModified: prediction.updatedAt,
-    author: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
-    creator: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
+    author: authorJsonLd(prediction.author, appUrl),
+    creator: authorJsonLd(prediction.author, appUrl),
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
@@ -372,16 +365,8 @@ export default async function ForecastDetailPage({ params }: Props) {
     // Without an online attendance mode Google assumes a physical event and
     // rejects VirtualLocation ("Invalid object type for field location").
     eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
-    organizer: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
-    performer: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
+    organizer: authorJsonLd(prediction.author, appUrl),
+    performer: authorJsonLd(prediction.author, appUrl),
     location: {
       '@type': 'VirtualLocation',
       name: 'DAATAN',
@@ -428,16 +413,8 @@ export default async function ForecastDetailPage({ params }: Props) {
           itemReviewed: {
             '@type': 'Claim',
             name: prediction.claimText,
-            author: {
-              '@type': 'Person',
-              name: prediction.author.name || prediction.author.username,
-              url: `${appUrl}/profile/${prediction.author.username}`,
-            },
-            creator: {
-              '@type': 'Person',
-              name: prediction.author.name || prediction.author.username,
-              url: `${appUrl}/profile/${prediction.author.username}`,
-            },
+            author: authorJsonLd(prediction.author, appUrl),
+            creator: authorJsonLd(prediction.author, appUrl),
           },
         }
       : null

@@ -47,7 +47,7 @@ locale-prefixed route `src/app/[locale]/forecasts/[id]/page.tsx` mirrors all fiv
 it previously emitted only Article + BreadcrumbList, fixed in #1295 so translated pages carry
 the same structured-data strength as the English canonical):
 
-1. **Article** (`schema.org/Article`) — `headline`, `description`, `datePublished`, `dateModified`, `author` + `creator` (both the forecast author as Person), `publisher` (DAATAN Organization).
+1. **Article** (`schema.org/Article`) — `headline`, `description`, `datePublished`, `dateModified`, `author` + `creator` (both the forecast author as Person), `publisher` (DAATAN Organization). A forecast published as Daatan (#2301) has the DAATAN Organization in every author slot on the page instead of a Person; `authorJsonLd()` in `src/lib/author-json-ld.ts` builds all of them, and `/profile/daatan` describes itself as an Organization too.
 2. **BreadcrumbList** — Home → Forecasts → [claim text]
 3. **Event** (`schema.org/Event`, public forecasts only) — maps the forecast to a predictive event:
    - `name`: forecast claim text

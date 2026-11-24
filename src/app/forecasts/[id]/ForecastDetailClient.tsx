@@ -51,6 +51,7 @@ import { communityProbability } from '@/lib/forecast-math'
 import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate, isDeadlineToday } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
+import { isDaatanAccount } from '@/lib/daatan-account'
 
 const log = createClientLogger('ForecastDetail')
 
@@ -993,8 +994,12 @@ export default function ForecastDetailClient({
               )}
             </span>
           </UserLink>
-          <span className="text-gray-600 shrink-0">·</span>
-          <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
+          {!isDaatanAccount(prediction.author) && (
+            <>
+              <span className="text-gray-600 shrink-0">·</span>
+              <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
+            </>
+          )}
         </div>
       )}
       {realCreator && (
