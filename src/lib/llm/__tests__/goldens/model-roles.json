@@ -1,6 +1,6 @@
 {
   "chain.google": "gemini-2.5-flash",
-  "chain.openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+  "chain.openrouter": "meta-llama/llama-3.3-70b-instruct",
   "chain.oracle": "bedrock/amazon.nova-pro-v1:0",
   "embedding": "gemini-embedding-2",
   "evidence_second_opinion": "bedrock/us.anthropic.claude-sonnet-5-5",

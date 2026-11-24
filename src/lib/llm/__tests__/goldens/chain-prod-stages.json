@@ -46,7 +46,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -113,7 +113,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -184,7 +184,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -250,7 +250,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -320,7 +320,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -386,7 +386,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -453,7 +453,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -519,7 +519,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -586,7 +586,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -657,7 +657,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -728,7 +728,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -799,7 +799,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -870,7 +870,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -941,7 +941,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1012,7 +1012,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1083,7 +1083,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1154,7 +1154,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1223,7 +1223,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -1290,7 +1290,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1361,7 +1361,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "system",
@@ -1427,7 +1427,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",
@@ -1489,7 +1489,7 @@
         "leg": "openrouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "body": {
-          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "model": "meta-llama/llama-3.3-70b-instruct",
           "messages": [
             {
               "role": "user",

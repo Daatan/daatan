@@ -110,8 +110,11 @@ export const CHAIN: readonly ChainLeg[] = [
   },
   {
     provider: 'openrouter',
-    model: 'meta-llama/llama-3.3-70b-instruct:free',
-    note: 'SaaS last-resort backstop, and the bots\' fallback too. Must not be a Google model: it would die in the same outage. Self-host replaces it with the admin-chosen model. This id no longer exists on OpenRouter (daatan#2282).',
+    // Paid id: the `:free` tier of this model was withdrawn and its old id is no longer
+    // served (daatan#2282). At this leg's volume (0 calls in the 30 days to 2026-11-20)
+    // the cost is negligible; it shares the OpenRouter key and its balance with Jev.
+    model: 'meta-llama/llama-3.3-70b-instruct',
+    note: 'SaaS last-resort backstop, and the bots\' fallback too. Must not be a Google model: it would die in the same outage. Self-host replaces it with the admin-chosen model.',
   },
   {
     provider: 'ollama',

@@ -281,7 +281,7 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
       'google/gemini-2.5-flash',
       'google/gemini-2.0-flash-exp:free',
       'openai/gpt-5-mini',
-      'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.3-70b-instruct',
     ]) {
       captured.length = 0
       pendingTimers.length = 0
