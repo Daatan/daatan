@@ -206,6 +206,35 @@ describe('ContextTimeline', () => {
     expect(screen.getByText('Older update')).toBeInTheDocument()
   })
 
+  it("links a previous update's source chip to the source page, and its icon to the article (#2298)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        currentContext: 'Latest',
+        contextUpdatedAt: '2026-02-20T10:00:00Z',
+        snapshots: [
+          { id: 's2', summary: 'Latest', sources: [], createdAt: '2026-02-20T10:00:00Z' },
+          {
+            id: 's1',
+            summary: 'Older update',
+            sources: [
+              { title: 'a', url: 'https://www.theverge.com/a' },
+              { title: 'b', url: 'https://www.theverge.com/b' },
+            ],
+            createdAt: '2026-02-19T10:00:00Z',
+          },
+        ],
+      }),
+    })
+
+    renderWithIntl(<ContextTimeline predictionId="p1" canAnalyze={false} commitmentsOpen={false} />)
+    await waitFor(() => expect(screen.getByText('1 previous update')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('1 previous update'))
+
+    expect(screen.getByRole('link', { name: 'theverge.com (2)' })).toHaveAttribute('href', '/sources/theverge.com')
+    expect(screen.getByRole('link', { name: 'https://www.theverge.com/a' })).toHaveAttribute('target', '_blank')
+  })
+
   it('calls POST and updates state when update-context is clicked', async () => {
     // First call: GET on mount
     mockFetch.mockResolvedValueOnce({
@@ -356,8 +385,10 @@ describe('ContextTimeline', () => {
     })
     const note = screen.getByTestId('settled-pin-note')
     expect(note).toHaveTextContent(enMessages.context.settledNote)
-    expect(note).toHaveTextContent('RFE/RL')
+    expect(note).toHaveTextContent('Reported as decided by: RFE/RL')
     expect(note).not.toHaveTextContent('Reuters')
+    // Linked by host, not by the display name (#2298).
+    expect(screen.getByRole('link', { name: 'RFE/RL' })).toHaveAttribute('href', '/sources/rferl.org')
   })
 
   it('daatan#1718: hides the settled-pin note (but keeps the badge) while the forecast is still open to commitments', async () => {

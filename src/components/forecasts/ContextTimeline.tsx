@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import Link from 'next/link'
 import { FileText, RefreshCw, Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
@@ -9,6 +10,8 @@ import { toError } from '@/lib/utils/error'
 import { formatDisplayDateTime } from '@/lib/utils/date'
 import { truncateAtSentence } from '@/lib/utils/truncate-text'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
+import { SourceLinks, settlingSources } from '@/components/forecasts/SourceLinks'
+import { sourcePagePath } from '@/lib/utils/source-page'
 
 const log = createClientLogger('ContextTimeline')
 
@@ -150,18 +153,6 @@ const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
   }
 }
 
-/** Display name for a settling source — its name, else the URL host (sans www). */
-export function settlingSourceNames(oracle: { sources?: OracleSnapshotSource[] } | null | undefined): string[] {
-  const settlers = (oracle?.sources ?? []).filter((s) => s.settled === true)
-  return settlers.map((s) => {
-    if (s.sourceName) return s.sourceName
-    try {
-      return new URL(s.url).hostname.replace(/^www\./, '')
-    } catch {
-      return s.url
-    }
-  })
-}
 
 export default function ContextTimeline({
   predictionId,
@@ -485,11 +476,13 @@ export default function ContextTimeline({
                       while the forecast is still open to commitments is the
                       free-points tell this issue describes. */}
                   {oracle?.settled && !commitmentsOpen && (() => {
-                    const names = settlingSourceNames(oracle)
+                    const settlers = settlingSources(oracle)
                     return (
                       <p className="text-xs text-amber-300/90 mt-1 leading-relaxed" data-testid="settled-pin-note">
                         {t('settledNote')}
-                        {names.length > 0 && ` ${t('settledNoteSources', { names: names.join(', ') })}`}
+                        {settlers.length > 0 && (
+                          <> {t.rich('settledNoteSources', { names: () => <SourceLinks sources={settlers} /> })}</>
+                        )}
                       </p>
                     )
                   })()}
@@ -540,18 +533,32 @@ export default function ContextTimeline({
                     if (grouped.length === 0) return null
                     return (
                       <div className="mt-1 flex flex-wrap gap-2">
-                        {grouped.map((g, i) => (
-                          <a
-                            key={i}
-                            href={g.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-0.5 text-xs text-blue-500 hover:text-cobalt-light hover:underline"
-                          >
-                            {g.source}{g.count > 1 ? ` (${g.count})` : ''}
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        ))}
+                        {grouped.map((g, i) => {
+                          // The name opens the source's page (#2298); the icon keeps opening the article.
+                          const label = `${g.source}${g.count > 1 ? ` (${g.count})` : ''}`
+                          const page = sourcePagePath(null, g.url)
+                          return (
+                            <span key={i} className="inline-flex items-center gap-0.5 text-xs text-blue-500">
+                              {page ? (
+                                <Link href={page} className="hover:text-cobalt-light hover:underline">
+                                  {label}
+                                </Link>
+                              ) : (
+                                label
+                              )}
+                              <a
+                                href={g.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={g.url}
+                                aria-label={g.url}
+                                className="hover:text-cobalt-light"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </span>
+                          )
+                        })}
                       </div>
                     )
                   })()}
