@@ -1256,7 +1256,7 @@
     "sortBy": {
       "skillConservative": "Lerteco",
       "brierScore": "Brier-poento",
-      "sideRate": "Elektas flankon",
+      "sideRate": "Certeco de la fonto",
       "bits": "Kontraŭ monero"
     },
     "author": "Aŭtoro",
@@ -1265,7 +1265,7 @@
     "authorsCount": "{count, plural, one {# aŭtoro} other {# aŭtoroj}}",
     "skillConservative": "Lerteco",
     "brierScore": "Brier",
-    "sideRate": "Elektas flankon",
+    "sideRate": "Certeco de la fonto",
     "sideRateHint": "Prognozoj, en kiuj la propra direkta prognozo de la aŭtoro estis eltirita, el ĉiuj prognozoj pri kiuj la aŭtoro skribis (solvitaj aŭ ne).",
     "bits": "Kontraŭ monero",
     "legend": {
