@@ -15,6 +15,7 @@ import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import { communityProbability } from '@/lib/forecast-math'
 import { forecastFaqJsonLd, latestProbabilityUpdateISO, type ForecastSeoCopy } from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import { getRealCreator } from '@/lib/services/daatan-author'
 import ForecastDetailClient from './ForecastDetailClient'
 import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 import { JsonLd } from '@/components/JsonLd'
@@ -285,6 +286,8 @@ export default async function ForecastDetailPage({ params }: Props) {
     ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { showAiPanel: true } }))
         ?.showAiPanel ?? false
     : false
+  // Who really created a forecast published as Daatan (#2301): admins only, never in props otherwise.
+  const realCreator = session?.user?.role === 'ADMIN' ? await getRealCreator(prediction.id) : null
 
   const [
     initialComments,
@@ -480,6 +483,7 @@ export default async function ForecastDetailPage({ params }: Props) {
         lastUpdatedISO={lastUpdatedISO}
         aiPanelSeries={panelSeries}
         showAiPanel={showAiPanel}
+        realCreator={realCreator}
         usableEvidenceCount={usableEvidenceCount}
       />
       {prediction.isPublic && <RelatedForecasts predictionId={prediction.id} linkLocale="en" />}

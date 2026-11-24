@@ -398,6 +398,22 @@ describe('loadProfileTab', () => {
     expect(result.resolvedItems).toHaveLength(0)
   })
 
+  it("lists only published forecasts on someone else's profile, own drafts on your own (#2301)", async () => {
+    mockCount.mockResolvedValue(0)
+    mockPredictionFindMany.mockResolvedValue([])
+
+    await loadProfileTab({ userId: 'u1', isPublic: true, selectedTag: null, tab: 'created', page: 1 })
+    expect(mockPredictionFindMany.mock.calls[0][0].where).toMatchObject({
+      authorId: 'u1',
+      isPublic: true,
+      status: { notIn: ['DRAFT', 'PENDING_APPROVAL'] },
+    })
+
+    mockPredictionFindMany.mockClear()
+    await loadProfileTab({ userId: 'u1', isPublic: false, selectedTag: null, tab: 'created', page: 1 })
+    expect(mockPredictionFindMany.mock.calls[0][0].where).not.toHaveProperty('status')
+  })
+
   it('returns participated items on participated tab', async () => {
     mockCount.mockResolvedValue(5)
     const fakeCommitment = {

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { DAATAN_USERNAME } from '@/lib/daatan-account'
 import { ensureTagRatingsSeeded } from '@/lib/services/tag-ratings'
 import { SCORING_SYSTEMS, type SortBy, type ScoringContext } from '@/lib/services/scoring-systems'
 import { ORACUL_SOURCE } from '@/lib/services/ai-source'
@@ -9,6 +10,14 @@ export type { SortBy }
 // Metaculus-style exponential decay: weight = 0.95^(days/30).
 // A prediction resolved 30 days ago counts as 95% of one resolved today.
 const DECAY = 0.95
+
+// The Daatan account (#2301) authors forecasts but never commits, so it is not a forecaster and
+// would only sit mid-table at the default RS. `username: { not }` alone would also drop the
+// users with no username (SQL NULL), hence the OR.
+const forecasterWhere: Prisma.UserWhereInput = {
+  isPublic: true,
+  OR: [{ username: null }, { username: { not: DAATAN_USERNAME } }],
+}
 
 export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: string) => {
   // Resolve tag slug → id and seed per-tag ratings lazily if not yet populated
@@ -20,7 +29,7 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
   }
 
   const users = await prisma.user.findMany({
-    where: { isPublic: true },
+    where: forecasterWhere,
     select: {
       id: true,
       name: true,
@@ -266,7 +275,7 @@ export const getLeaderboard = async (limit: number, sortBy: SortBy, tagSlug?: st
 
 export const getTopReputation = async (limit: number) => {
   return prisma.user.findMany({
-    where: { isPublic: true },
+    where: forecasterWhere,
     select: {
       id: true,
       name: true,

@@ -80,6 +80,8 @@ model User {
   predictions         Prediction[] // Predictions authored by user
   commitments         Commitment[] // User's commitments
   resolvedPredictions Prediction[] @relation("ResolvedBy")
+  // Forecasts this user created under the Daatan account (#2301); admin-only.
+  createdAsDaatan PredictionCreator[]
 
   // Bot rejection tracking
   rejectedBotTopics BotRejectedTopic[]
@@ -600,6 +602,8 @@ model Prediction {
   resolutionSnapshots     ResolutionSnapshot[]
   outcomeCutoffs          PredictionOutcomeCutoff[]
   retroSimulation         RetroSimulation?
+  // Set only when an admin published this forecast as Daatan (#2301).
+  realCreator PredictionCreator?
 
   @@index([status])
   @@index([authorId])
@@ -610,6 +614,20 @@ model Prediction {
   @@index([status, isPublic, createdAt])
   @@index([status, isPublic, updatedAt])
   @@map("predictions")
+}
+
+/// The account that actually created a forecast an admin published as Daatan (#2301). Admin-only.
+/// Its own table rather than a predictions column so that no `include` of a Prediction (several
+/// public reads spread the whole row into an API response or page props) can leak it.
+model PredictionCreator {
+  predictionId String     @id
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([userId])
+  @@map("prediction_creators")
 }
 
 // ============================================

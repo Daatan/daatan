@@ -228,7 +228,10 @@
     "seoAnswerResolvedYes": "כן, זה התממש.",
     "seoAnswerResolvedWrong": "לא, זה לא קרה.",
     "seoAnswerNoEstimate": "אין עדיין הערכה זמינה.",
-    "seoUpdatedOn": "עודכן"
+    "seoUpdatedOn": "עודכן",
+    "publishAsDaatan": "פרסום בשם Daatan",
+    "publishAsDaatanHint": "Daatan יוצג כמחבר. החשבון שלך נשמר כיוצר, וזה גלוי למנהלים בלבד.",
+    "createdByAdminOnly": "נוצר על ידי <name></name> · גלוי למנהלים בלבד"
   },
   "Forecasts": {
     "title": "עריכת תחזית",

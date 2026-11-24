@@ -76,6 +76,7 @@ export default function ForecastDetailClient({
   aiPanelSeries = [],
   showAiPanel = false,
   usableEvidenceCount = null,
+  realCreator = null,
 }: {
   initialData?: Prediction
   isLocalized?: boolean
@@ -101,6 +102,8 @@ export default function ForecastDetailClient({
    *  number has no inspectable evidence behind it; null means the caller didn't compute
    *  it, in which case the page says nothing — silence is the fail-open direction here. */
   usableEvidenceCount?: number | null
+  /** Admins only: who created a forecast published as Daatan (#2301). Never sent to anyone else. */
+  realCreator?: { id: string; name: string | null; username: string | null } | null
 }) {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -993,6 +996,17 @@ export default function ForecastDetailClient({
           <span className="text-gray-600 shrink-0">·</span>
           <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
         </div>
+      )}
+      {realCreator && (
+        <p className="mt-2 text-xs text-gray-500" data-testid="real-creator">
+          {t.rich('createdByAdminOnly', {
+            name: () => (
+              <UserLink userId={realCreator.id} username={realCreator.username} name={realCreator.name} className="text-gray-300 hover:text-white">
+                {realCreator.name || realCreator.username}
+              </UserLink>
+            ),
+          })}
+        </p>
       )}
 
       {/* Comments Section — inline on mobile/tablet; in the right column on desktop */}

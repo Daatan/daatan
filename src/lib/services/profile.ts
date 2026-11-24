@@ -313,7 +313,11 @@ export async function loadProfileTab({
   tab: ProfileTab
   page: number
 }): Promise<ProfileTabResult> {
-  const publicFilter = isPublic ? { isPublic: true as const } : {}
+  // A public profile lists only published forecasts: a draft is flagged isPublic by default but
+  // its page 404s for everyone but its author and admins (forecast-visibility.ts), #2301.
+  const publicFilter = isPublic
+    ? { isPublic: true as const, status: { notIn: ['DRAFT' as const, 'PENDING_APPROVAL' as const] } }
+    : {}
   const predTagFilter = selectedTag ? { tags: { some: { slug: selectedTag } } } : {}
   const skip = (Math.max(1, page) - 1) * PAGE_SIZE
 

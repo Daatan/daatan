@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { isReservedUsername } from '@/lib/daatan-account'
 
 export interface UpdateProfileData {
   name?: string | null
@@ -10,6 +11,9 @@ export interface UpdateProfileData {
 
 export const updateProfile = async (userId: string, data: UpdateProfileData) => {
   if (data.username) {
+    if (isReservedUsername(data.username)) {
+      return { ok: false as const, error: 'Username already taken', status: 400 }
+    }
     const existing = await prisma.user.findUnique({ where: { username: data.username } })
     if (existing && existing.id !== userId) {
       return { ok: false as const, error: 'Username already taken', status: 400 }

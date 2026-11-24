@@ -77,6 +77,9 @@ export const createPredictionSchema = z.object({
 
   // External market link, set when the forecast was imported from a PM/Kalshi URL
   externalMarketId: z.string().cuid().optional(),
+
+  // Admin only: publish under the Daatan account, the caller recorded as real creator (#2301)
+  asDaatan: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   const payload = data.outcomePayload as Record<string, unknown> | undefined
 

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma, PredictionOption, PredictionStatus } from '@prisma/client'
 import { notifyNewCommitment } from '@/lib/services/telegram'
-import { createNotification } from '@/lib/services/notification'
+import { notifyForecastOwner } from '@/lib/services/daatan-author'
 import { triggerAiProbabilityEstimate } from '@/lib/services/ai-estimate'
 import { aiSourceFromSnapshot, type AiSource } from '@/lib/services/ai-source'
 import { createLogger } from '@/lib/logger'
@@ -282,8 +282,7 @@ export const emitCreateCommitmentSideEffects = (
 
   notifyNewCommitment(prediction, committer, data.confidence, choiceLabel)
 
-  createNotification({
-    userId: prediction.authorId,
+  notifyForecastOwner(prediction, {
     type: 'NEW_COMMITMENT',
     title: 'New commitment on your forecast',
     message: `${committer.name || committer.username || 'Someone'} committed with ${data.confidence > 0 ? '+' : ''}${data.confidence} confidence (${choiceLabel}) on "${prediction.claimText.substring(0, 80)}"`,

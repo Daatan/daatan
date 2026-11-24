@@ -6,6 +6,7 @@ import { slugify } from '@/lib/utils/slugify'
 import { createLogger } from '@/lib/logger'
 import { notifyNewUserRegistered } from '@/lib/services/telegram'
 import { findUserByEmail, findUsernameCollisions, registerUser } from '@/lib/services/user'
+import { isReservedUsername } from '@/lib/daatan-account'
 import { checkRateLimit, rateLimitResponse, clientIp } from '@/lib/rate-limit'
 import { env } from '@/env'
 import { isEmailDomainAllowed, isOpenSignupEnabled, parseAllowedDomains } from '@/lib/auth/access'
@@ -56,13 +57,13 @@ export async function POST(req: NextRequest) {
     let slug = baseSlug
     let counter = 1
 
-    while (existingUsernames.includes(username)) {
+    while (existingUsernames.includes(username) || isReservedUsername(username)) {
       username = `${baseUsername}${counter}`
       counter++
     }
 
     counter = 1
-    while (existingSlugs.includes(slug)) {
+    while (existingSlugs.includes(slug) || isReservedUsername(slug)) {
       slug = `${baseSlug}-${counter}`
       counter++
     }

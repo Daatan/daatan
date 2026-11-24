@@ -7,9 +7,11 @@ import { useCapabilities } from '@/components/CapabilitiesProvider'
 
 interface CreateForecastClientProps {
   userId: string
+  /** Shows the admin-only "publish as Daatan" option (#2301); the API enforces it too. */
+  isAdmin?: boolean
 }
 
-export default function CreateForecastClient({ userId }: CreateForecastClientProps) {
+export default function CreateForecastClient({ userId, isAdmin = false }: CreateForecastClientProps) {
   const searchParams = useSearchParams()
   const { ai } = useCapabilities()
   const fromExpress = searchParams.get('from') === 'express'
@@ -19,7 +21,7 @@ export default function CreateForecastClient({ userId }: CreateForecastClientPro
   if (!ai) {
     return (
       <div className="max-w-4xl mx-auto">
-        <ForecastWizard isExpressFlow={false} />
+        <ForecastWizard isExpressFlow={false} isAdmin={isAdmin} />
       </div>
     )
   }
@@ -28,7 +30,7 @@ export default function CreateForecastClient({ userId }: CreateForecastClientPro
   if (fromExpress) {
     return (
       <div className="max-w-4xl mx-auto">
-        <ForecastWizard isExpressFlow={true} />
+        <ForecastWizard isExpressFlow={true} isAdmin={isAdmin} />
       </div>
     )
   }
@@ -36,7 +38,7 @@ export default function CreateForecastClient({ userId }: CreateForecastClientPro
   // daatan#2067: Express is the only create mode when AI is on (Manual removed).
   return (
     <div className="max-w-4xl mx-auto">
-      <ExpressForecastClient userId={userId} />
+      <ExpressForecastClient userId={userId} isAdmin={isAdmin} />
     </div>
   )
 }

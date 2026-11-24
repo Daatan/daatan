@@ -26,6 +26,7 @@ import {
   type ForecastSeoLocale,
 } from '@/lib/forecast-seo-schema'
 import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import { getRealCreator } from '@/lib/services/daatan-author'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
 import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 
@@ -273,6 +274,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { showAiPanel: true } }))
         ?.showAiPanel ?? false
     : false
+  // Who really created a forecast published as Daatan (#2301): admins only, never in props otherwise.
+  const realCreator = session?.user?.role === 'ADMIN' ? await getRealCreator(prediction.id) : null
 
   const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory, panelSeries] = await Promise.all([
     getInitialComments(prediction.id),
@@ -478,6 +481,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           lastUpdatedISO={lastUpdatedISO}
           aiPanelSeries={panelSeries}
           showAiPanel={showAiPanel}
+          realCreator={realCreator}
         />
       </Suspense>
       {prediction.isPublic && <RelatedForecasts predictionId={prediction.id} linkLocale={locale} uiLocale={locale} />}

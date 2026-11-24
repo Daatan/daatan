@@ -52,6 +52,8 @@ export type PredictionFormData = {
   // Step 4: Publish
   cuCommitted?: number
   isPublic: boolean
+  /** Admin only: publish under the Daatan account (#2301). */
+  asDaatan?: boolean
 
   // Set when the forecast was imported from a Polymarket/Kalshi URL (links the market on create)
   externalMarketId?: string
@@ -67,11 +69,12 @@ const STEPS = [
 interface ForecastWizardProps {
   isExpressFlow?: boolean
   initialClaim?: string
+  isAdmin?: boolean
 }
 
 const DRAFT_KEY = 'daatan:forecast-draft'
 
-export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: ForecastWizardProps) => {
+export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '', isAdmin = false }: ForecastWizardProps) => {
   const router = useRouter()
   const t = useTranslations('wizard')
   const { externalMarkets } = useCapabilities()
@@ -268,6 +271,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
           resolutionRules: formData.resolutionRules,
           resolveByDatetime: localEndOfDay(formData.resolveByDatetime).toISOString(),
           isPublic: formData.isPublic,
+          asDaatan: isAdmin && formData.asDaatan ? true : undefined,
           source: (!formData.newsAnchorId && !formData.newsAnchorUrl) ? 'manual' : undefined,
           externalMarketId: formData.externalMarketId || undefined,
         }),
@@ -332,7 +336,7 @@ export const ForecastWizard = ({ isExpressFlow = false, initialClaim = '' }: For
       case 3:
         return <StepOutcome formData={formData} updateFormData={updateFormData} />
       case 4:
-        return <StepPublish formData={formData} updateFormData={updateFormData} />
+        return <StepPublish formData={formData} updateFormData={updateFormData} isAdmin={isAdmin} />
       default:
         return null
     }

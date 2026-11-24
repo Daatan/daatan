@@ -27,7 +27,7 @@ List predictions. Public; optional session for user-context fields.
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
 | `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE`. `PENDING` ("Awaiting Resolution") also matches still-`ACTIVE` forecasts where `awaitingAiResolution` is true (organic AI estimate >=90% or <=10%; a settlement pin instead needs >=2 settling votes in its snapshot — see `context.ts`, daatan#1248; a latched (`settled`) forecast stays in until it is resolved, its latch cleared, or it is dismissed) — status itself doesn't change, so staking stays open until the real deadline |
-| `authorId` | cuid | — | Filter by author |
+| `authorId` | cuid | — | Filter by author. Another user's `DRAFT`/`PENDING_APPROVAL` forecasts are left out unless you are an admin (daatan#2301) |
 | `tags` | string | — | Comma-separated tag names |
 | `q` | string | — | Free-text search over `claimText`, its translations (`prediction_translations`, `fieldName='claimText'` — so a Hebrew/Russian/Esperanto query finds forecasts whose canonical claim is English, daatan#1804) and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169). With no explicit `sortBy`, results are ordered by relevance (whole word in the claim > in a translation > tag > word prefix > substring > trigram; newest first within a tier), and a query of ≤3 characters keeps only whole-word and tag matches, so `AI` no longer returns every claim containing "ai" (daatan#1878) |
 | `page` | number | 1 | |
@@ -49,6 +49,8 @@ Create a new prediction (status = DRAFT).
 `tags` is normalised before validation (`normalizeForecastTags`, `src/lib/forecast-tags.ts`). Entries are trimmed. Empty, non-string and over-50-character entries are dropped, duplicates (by slug) are removed, and the list is cut to `MAX_FORECAST_TAGS` (5). A body with too many tags is therefore accepted with the first 5 kept instead of failing with `400` (daatan#1787).
 
 **Response** `201` — created prediction with author, newsAnchor, options
+
+**`asDaatan: true` (admin only, daatan#2301)** — publish under the Daatan account (`username: daatan`, created on first use by `getOrCreateDaatanUser()`, `src/lib/services/daatan-author.ts`). Daatan becomes `authorId`; the caller is recorded in `prediction_creators`, which no public read selects. `403` for a non-admin. `POST /api/forecasts/[id]/publish` lets any admin publish such a draft, and the author notifications (`NEW_COMMITMENT`, `COMMENT_ON_FORECAST`) go to the recorded creator instead of the Daatan account. The forecast page shows admins a "Created by" line. The username `daatan` is reserved: signup skips it and the profile form refuses it (`isReservedUsername`, `src/lib/daatan-account.ts`), and the account is left off the leaderboards.
 
 **Side effect (daatan#1747):** `createForecast()` schedules a fire-and-forget born-true check (`scheduleBornTrueCheck()`, `src/lib/services/bornTrueCheck.ts`) after persisting — off this response path, so it never adds latency here. It re-runs the same research leg `POST /api/forecasts/[id]/research` uses (see below) and, when the verdict comes back decisive (`correct`/`wrong`) this soon after creation, posts a Telegram review row rather than blocking or mutating the forecast — see `docs/TELEGRAM_NOTIFICATIONS.md`.
 

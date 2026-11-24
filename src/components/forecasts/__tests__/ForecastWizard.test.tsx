@@ -35,7 +35,7 @@ vi.mock('next-intl', async () => {
 })
 
 /** Render the wizard with step 4 active and controllable formData via sessionStorage. */
-async function renderAtStep4(overrides: Record<string, unknown> = {}) {
+async function renderAtStep4(overrides: Record<string, unknown> = {}, { isAdmin = false } = {}) {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const draft = {
@@ -51,7 +51,7 @@ async function renderAtStep4(overrides: Record<string, unknown> = {}) {
     currentStep: 4,
   }
   sessionStorage.setItem('daatan:forecast-draft', JSON.stringify(draft))
-  await act(async () => { render(<ForecastWizard isExpressFlow={false} />) })
+  await act(async () => { render(<ForecastWizard isExpressFlow={false} isAdmin={isAdmin} />) })
 }
 
 describe('ForecastWizard', () => {
@@ -252,6 +252,39 @@ describe('ForecastWizard', () => {
         const body = JSON.parse((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string)
         expect(body.resolutionRules).toBeDefined()
         expect(body.claimText).toBeDefined()
+      })
+    })
+
+    describe('publish as Daatan (#2301)', () => {
+      const okResponses = () => {
+        vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'pred-1', slug: 's' }) } as Response)
+        vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response)
+      }
+      const publishAndReadBody = async () => {
+        const publishBtn = screen.getAllByRole('button', { name: /publish/i }).at(-1)!
+        await act(async () => { fireEvent.click(publishBtn) })
+        await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled())
+        return JSON.parse((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string)
+      }
+
+      it('is not offered to a non-admin', async () => {
+        await renderAtStep4()
+        expect(screen.queryByRole('checkbox', { name: /publish as daatan/i })).toBeNull()
+      })
+
+      it('is offered to an admin, unchecked, and sends nothing until checked', async () => {
+        okResponses()
+        await renderAtStep4({}, { isAdmin: true })
+        const box = screen.getByRole('checkbox', { name: /publish as daatan/i }) as HTMLInputElement
+        expect(box.checked).toBe(false)
+        expect((await publishAndReadBody()).asDaatan).toBeUndefined()
+      })
+
+      it('sends asDaatan when the admin checks it', async () => {
+        okResponses()
+        await renderAtStep4({}, { isAdmin: true })
+        await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: /publish as daatan/i })) })
+        expect((await publishAndReadBody()).asDaatan).toBe(true)
       })
     })
 

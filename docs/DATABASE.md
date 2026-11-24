@@ -61,6 +61,12 @@ code-verified per-environment cutoff timestamps, not just this prose).
 
 The central table (`Prediction`). Field groups:
 
+- **Author**: `authorId`. A forecast an admin published as Daatan (daatan#2301) has the
+  Daatan account (`username: daatan`, `isBot`, no `BotConfig`) as author, and the admin in
+  `prediction_creators` (`predictionId` PK, `userId`, `createdAt`). That is a table rather
+  than a column so no `include` of a prediction, spread into a public response or page
+  props, can carry it: only admin reads select it.
+
 - **Content**: `claimText` (canonical English, ≤500), `detailsText`,
   `resolutionRules`, `slug` (+ `prediction_slug_aliases` for 308 redirects
   after re-slugs), `originalLanguage` (non-English originals preserved in
