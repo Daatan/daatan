@@ -114,7 +114,7 @@ const isPlaceholderAuthor = (name: string) => name.trim().toLowerCase() === NO_B
  * outlet's name can't be derived from its domain. Add a normalised byline when an authors board
  * shows an outlet as a person.
  */
-const INSTITUTIONAL_BYLINES = new Set(['الجزيرة نت', 'חדשות סרוגים'])
+const INSTITUTIONAL_BYLINES = new Set(['الجزيرة نت', 'חדשות סרוגים', 'כיכר השבת'])
 
 /** Wire services and newsroom credits that byline a piece on their own. */
 const DESK_BYLINES = new Set([
