@@ -14,8 +14,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/forecasts/Speedometer', () => ({ default: () => null }))
 vi.mock('@/components/comments/CommentThread', () => ({ default: () => null }))
 vi.mock('@/components/forecasts/ConfidenceSlider', () => ({ default: () => null }))
-// Keep the real settlingSourceNames export — ForecastDetailClient imports it
-// from this module; only the component itself is stubbed out.
+// Keep the module's real exports (types, helpers); only the component itself is stubbed out.
 vi.mock('@/components/forecasts/ContextTimeline', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/components/forecasts/ContextTimeline')>()),
   default: () => null,
@@ -122,6 +121,9 @@ describe('ForecastDetailClient — Oracul settlement-pin indicator (#1250, narro
     expect(notice).toHaveTextContent('RFE/RL')
     expect(notice).toHaveTextContent('pravda.com.ua')
     expect(notice).not.toHaveTextContent('Reuters')
+    // Each settling source links to its /sources page by host (#2298).
+    expect(screen.getByRole('link', { name: 'RFE/RL' })).toHaveAttribute('href', '/sources/rferl.org')
+    expect(screen.getByRole('link', { name: 'pravda.com.ua' })).toHaveAttribute('href', '/sources/pravda.com.ua')
   })
 
   it('renders the pin notice once the forecast has moved off ACTIVE (e.g. resolved) even with a future resolveByDatetime — #1250 behavior restored', async () => {

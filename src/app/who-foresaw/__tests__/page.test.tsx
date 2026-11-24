@@ -130,7 +130,7 @@ describe('/who-foresaw/sources', () => {
   it('shows each outlet with its counts and links to its events, and counts the outlets below the floor', async () => {
     getForesawSourceBoard.mockResolvedValue(board)
     render(await SourcesPage())
-    expect(screen.getByText('jpost.com')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'jpost.com' })).toHaveAttribute('href', '/sources/jpost.com')
     expect(screen.getByText(`board.counts:${JSON.stringify({ called: 2, against: 1, total: 6, share: 33 })}`)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Houthis took Bab el-Mandeb' })).toHaveAttribute('href', '/who-foresaw/bab')
     expect(screen.getByText(`board.hidden:${JSON.stringify({ count: 6, min: 2 })}`)).toBeInTheDocument()

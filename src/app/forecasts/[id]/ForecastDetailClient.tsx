@@ -30,7 +30,8 @@ import { ModeratorResolutionSection } from './ModeratorResolutionSection'
 import CommentThread, { type Comment } from '@/components/comments/CommentThread'
 import ConfidenceSlider from '@/components/forecasts/ConfidenceSlider'
 import Speedometer from '@/components/forecasts/Speedometer'
-import ContextTimeline, { settlingSourceNames, type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import ContextTimeline, { type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import { SourceLinks, settlingSources } from '@/components/forecasts/SourceLinks'
 import { RoleBadge } from '@/components/RoleBadge'
 import { UserLink } from '@/components/UserLink'
 import { ForecastInfoPanel } from './_forecast/ForecastInfoPanel'
@@ -562,7 +563,7 @@ export default function ForecastDetailClient({
           // aiEstimate overrides the server-prefetched latest snapshot.
           const latestOracul = initialContextSnapshots?.[0]?.oracleSnapshot ?? null
           const aiSettled = !aiAbstained && (aiEstimate ? !!aiEstimate.settled : !!latestOracul?.settled)
-          const settlerNames = aiSettled ? settlingSourceNames(latestOracul) : []
+          const settlers = aiSettled ? settlingSources(latestOracul) : []
           // daatan#1718 — gates the settled-pin banner below
           const commitmentsOpen = prediction.status === 'ACTIVE' && !commitmentsLocked
 
@@ -627,9 +628,9 @@ export default function ForecastDetailClient({
                     <Gavel className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                     <p>
                       {t('settledPinNotice')}
-                      {settlerNames.length > 0 && (
+                      {settlers.length > 0 && (
                         <span className="block mt-0.5 text-amber-200/80">
-                          {t('settledPinSources', { names: settlerNames.join(', ') })}
+                          {t.rich('settledPinSources', { names: () => <SourceLinks sources={settlers} /> })}
                         </span>
                       )}
                     </p>

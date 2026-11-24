@@ -58,7 +58,13 @@ export default async function WhoForesawSourcesPage() {
           {board.rows.map((row) => (
             <li key={row.outlet} className="rounded-lg border border-navy-600 bg-navy-700 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p dir="auto" className="text-white font-medium break-all">{row.outlet}</p>
+                <Link
+                  href={`/sources/${encodeURIComponent(row.outlet)}`}
+                  dir="auto"
+                  className="text-white font-medium break-all hover:underline"
+                >
+                  {row.outlet}
+                </Link>
                 <p className="text-sm text-gray-300">
                   {t('board.counts', { called: row.called, against: row.against, total: row.total, share: percent(row.called / row.total) })}
                 </p>
