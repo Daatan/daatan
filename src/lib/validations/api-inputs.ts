@@ -87,6 +87,9 @@ export const retroCandidatesBodySchema = z.object({
   maxClusters: z.number().int().min(1).max(80).optional(),
 })
 
+/** `POST /api/admin/topic-suggestions` (daatan#2308): the same knobs as the retro candidates step. */
+export const topicSuggestionsBodySchema = retroCandidatesBodySchema
+
 const retroPoolReportSchema = z.object({
   url: z.string().min(1).max(2000),
   source: z.string().max(200).nullable(),

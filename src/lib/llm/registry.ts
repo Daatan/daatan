@@ -207,6 +207,12 @@ export const STAGES: Readonly<Record<LlmStage, StageEntry>> = {
     note:
       "The Google leg's own limit, below its 30 s default, so the fallback (which also stops at CHECK_TIMEOUT_MS, 35 s) keeps about twice the 5 s it took (daatan#2229).",
   },
+  topic_suggest: {
+    params: { temperature: 0 },
+    timeoutMs: 60_000,
+    note:
+      'One call a run over every multi-source cluster of the week plus the open forecasts they touch (daatan#2308), so the input is large (~15k tokens) and the answer long. 60 s on Vertex; the service caps the whole run at 100 s (RUN_BUDGET_MS), so an Oracul fallback after a Vertex timeout is cut short before the 118 s curl limit of the workflow.',
+  },
 }
 
 // ─── One-off roles ──────────────────────────────────────────────────────────────────────

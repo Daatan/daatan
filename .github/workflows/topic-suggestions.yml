@@ -1,0 +1,84 @@
+name: Topic Suggestions
+
+# Forward questions from this week's topics (daatan#2308), stage 1: show, write nothing.
+#
+# POST /api/admin/topic-suggestions clusters the evidence pool's reported facts like the retro
+# candidates step, keeps the clusters at least two outlets reported, and asks the model once
+# over all of them: fold the clusters into stories, and for each story write the questions about
+# what happens next that no open forecast already asks. The answer goes to this run's summary
+# and to the `topic-suggestions` artifact for an admin to read. Nothing is drafted, nothing is
+# posted. Dispatch only, until the suggestions have been read. Auth is the x-cron-secret
+# (BOT_RUNNER_SECRET) header.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      days:
+        description: Evidence-pool window, days
+        default: '7'
+      max_clusters:
+        description: Multi-source clusters to send (largest first)
+        default: '40'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  suggest:
+    name: suggestions on ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET: ${{ inputs.target }}
+      DAYS: ${{ inputs.days }}
+      MAX_CLUSTERS: ${{ inputs.max_clusters }}
+    steps:
+      - name: Ask for this week's forward questions
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          BOT_RUNNER_SECRET: ${{ secrets.BOT_RUNNER_SECRET }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET" =~ ^(staging|production)$ ]] || { echo "::error::bad target"; exit 1; }
+          [[ "$DAYS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::days must be an integer"; exit 1; }
+          [[ "$MAX_CLUSTERS" =~ ^[0-9]{1,2}$ ]] || { echo "::error::max_clusters must be an integer"; exit 1; }
+          if [ "$TARGET" = "production" ]; then BASE="https://daatan.com"; else BASE="$STAGING_URL"; fi
+          [ -n "$BASE" ] || { echo "::error::No URL configured for $TARGET"; exit 1; }
+
+          BODY=$(jq -nc --argjson d "$DAYS" --argjson m "$MAX_CLUSTERS" '{days:$d, maxClusters:$m}')
+          HTTP=$(curl -s -o suggestions.json -w '%{http_code}' --max-time 118 -X POST \
+            -H "x-cron-secret: $BOT_RUNNER_SECRET" -H 'Content-Type: application/json' \
+            -d "$BODY" "$BASE/api/admin/topic-suggestions")
+          [ "$HTTP" = "200" ] || { echo "::error::topic-suggestions HTTP $HTTP"; head -c 500 suggestions.json; exit 1; }
+
+          {
+            echo "## Topic suggestions on $TARGET (writes nothing)"
+            jq -r '"Pool claims \(.claims) → reports \(.reports) → clusters \(.clusters) → multi-source \(.multiSource) → sent \(.sent), with \(.openForecasts) open forecasts → **\(.stories | length) stories, \(.suggestions | length) suggestions**\(if .modelNote then " (" + .modelNote + ")" else "" end). Timings ms: \(.timingsMs | tostring)"' suggestions.json
+            echo
+            echo "### Stories"
+            jq -r '.stories[] | "- \(.title) — \(.sources) outlets, groups \(.groups | map(tostring) | join(", "))"' suggestions.json
+            echo
+            echo "### Suggestions"
+            jq -r '.suggestions | to_entries[] | "\(.key + 1). **\(.value.claimText)** — \(.value.story), \(.value.sources) outlets\n   - Rules: \(.value.resolutionRules)\n   - Why: \(.value.reason)\(if .value.nearest then "\n   - Closest forecast (\(.value.nearest.score)): \(.value.nearest.claimText)" else "" end)\n   - Read: \(.value.urls[0:3] | join(" · "))"' suggestions.json
+            echo
+            echo "### Not suggested"
+            jq -r '.skipped[] | "- \(.reason) · \(.story)\(if .claim then " — " + .claim else "" end)\(if .detail then " (" + .detail + ")" else "" end)"' suggestions.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the full answer
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: topic-suggestions
+          path: suggestions.json
+          if-no-files-found: ignore
+          retention-days: 30

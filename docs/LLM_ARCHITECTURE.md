@@ -107,6 +107,9 @@ Per-stage notes worth keeping in mind:
   back, and its Telegram alert then names the fallback model.
 - **`retro_event_check` (daatan#2229).** The opposite: 25 s on the Google legs, so that the
   Oracul fallback has 10 s left of the check's 35 s.
+- **`topic_suggest` (daatan#2308).** One large call a run (the week's multi-source clusters and
+  the open forecasts they touch), so 60 s on Vertex. The service also passes a signal that ends
+  the call 100 s into the run, before the workflow's 118 s curl limit, whichever leg is serving.
 - When a later provider rescues a call, `llm: served by fallback provider` is logged at WARN
   with the `stage` — the stage ran on another vendor's model. Not paged.
 - At startup the app logs one `model_config` line per chain leg and stage (`role`, `model`,

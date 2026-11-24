@@ -328,3 +328,46 @@ export const retroEventCheckSchema: Schema = {
   },
   required: ['articles', 'sameEventAs', 'reason'],
 }
+
+/**
+ * Forward questions on this week's stories (daatan#2308): the topic run's clusters folded
+ * into stories, each with 0–3 open questions or a pointer to the forecast that already asks one.
+ */
+export const topicSuggestSchema: Schema = {
+  description: "This week's stories from clustered news reports, with the open forecast questions each one raises",
+  type: SchemaType.OBJECT,
+  properties: {
+    stories: {
+      type: SchemaType.ARRAY,
+      description: 'One entry per story.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          title: { type: SchemaType.STRING, description: 'A short name for the story, a few words.' },
+          groups: {
+            type: SchemaType.ARRAY,
+            description: 'The numbers of the report groups that belong to this story.',
+            items: { type: SchemaType.INTEGER },
+          },
+          questions: {
+            type: SchemaType.ARRAY,
+            description: 'Zero to three open questions about what happens next in this story.',
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                claim: { type: SchemaType.STRING, description: 'Future-tense declarative forecast ending with "by {DEADLINE}". Empty when coveredBy is set.' },
+                deadline: { type: SchemaType.STRING, description: 'YYYY-MM-DD by which the outcome will be known. Empty when coveredBy is set.' },
+                resolutionRules: { type: SchemaType.STRING, description: 'Two or three sentences on what counts as YES by {DEADLINE}. Empty when coveredBy is set.' },
+                coveredBy: { type: SchemaType.INTEGER, description: 'Number of the open forecast that already asks this question; 0 for none.' },
+                reason: { type: SchemaType.STRING, description: 'One short sentence on why this is open and worth asking.' },
+              },
+              required: ['claim', 'deadline', 'resolutionRules', 'coveredBy', 'reason'],
+            },
+          },
+        },
+        required: ['title', 'groups', 'questions'],
+      },
+    },
+  },
+  required: ['stories'],
+}
