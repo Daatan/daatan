@@ -51,7 +51,7 @@ const globalFetch = global.fetch
 afterEach(() => { global.fetch = globalFetch })
 
 const daatanForecast = makePrediction({
-  author: { id: 'daatan-user', name: 'Daatan', username: 'daatan', image: '/logo-icon-192.png', rs: 100, role: 'USER' },
+  author: { id: 'daatan-user', name: 'Daatan', username: 'daatan', image: '/logo-icon-192.png', rs: 100, role: 'USER', eloRating: 1500 },
 })
 
 const renderWith = async (props: Record<string, unknown> = {}) => {
@@ -78,5 +78,10 @@ describe('ForecastDetailClient — real creator of a Daatan forecast (daatan#230
     await renderWith()
     expect(screen.queryByTestId('real-creator')).toBeNull()
     expect(screen.getAllByText('Daatan').length).toBeGreaterThan(0)
+  })
+
+  it('shows no ELO on the author line of a Daatan forecast', async () => {
+    await renderWith()
+    expect(screen.queryByText(/ELO\s*1500/)).toBeNull()
   })
 })

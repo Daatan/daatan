@@ -17,6 +17,7 @@ import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
 import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
 import { getContributingSources } from '@/lib/services/forecast-sources'
 import { getAppName, getAppUrl } from '@/lib/branding'
+import { authorJsonLd } from '@/lib/author-json-ld'
 import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { communityProbability } from '@/lib/forecast-math'
 import {
@@ -319,16 +320,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     image: `${appUrl}/forecasts/${slug}/opengraph-image`,
     datePublished: prediction.publishedAt,
     dateModified: prediction.updatedAt,
-    author: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
-    creator: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
+    author: authorJsonLd(prediction.author, appUrl),
+    creator: authorJsonLd(prediction.author, appUrl),
     publisher: {
       '@type': 'Organization',
       name: 'DAATAN',
@@ -363,16 +356,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
       ? 'https://schema.org/EventCancelled'
       : 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
-    organizer: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
-    performer: {
-      '@type': 'Person',
-      name: prediction.author.name || prediction.author.username,
-      url: `${appUrl}/profile/${prediction.author.username}`,
-    },
+    organizer: authorJsonLd(prediction.author, appUrl),
+    performer: authorJsonLd(prediction.author, appUrl),
     location: {
       '@type': 'VirtualLocation',
       name: 'DAATAN',
@@ -419,16 +404,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
           itemReviewed: {
             '@type': 'Claim',
             name: localizedPrediction.claimText,
-            author: {
-              '@type': 'Person',
-              name: prediction.author.name || prediction.author.username,
-              url: `${appUrl}/profile/${prediction.author.username}`,
-            },
-            creator: {
-              '@type': 'Person',
-              name: prediction.author.name || prediction.author.username,
-              url: `${appUrl}/profile/${prediction.author.username}`,
-            },
+            author: authorJsonLd(prediction.author, appUrl),
+            creator: authorJsonLd(prediction.author, appUrl),
           },
         }
       : null

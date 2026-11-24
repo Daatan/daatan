@@ -8,6 +8,7 @@ import { loadProfileScores, loadProfileTab } from '@/lib/services/profile'
 import type { ProfileTab } from '@/lib/services/profile'
 import { JsonLd } from '@/components/JsonLd'
 import { getAppUrl } from '@/lib/branding'
+import { isDaatanAccount } from '@/lib/daatan-account'
 
 
 const VALID_TABS: ProfileTab[] = ['created', 'participated', 'resolved']
@@ -162,7 +163,7 @@ async function loadPublicProfile({ id, selectedTag, tab, page }: { id: string; s
     const url = profileUrl(user)
     const personJsonLd = {
       '@context': 'https://schema.org',
-      '@type': 'Person',
+      '@type': isDaatanAccount(user) ? 'Organization' : 'Person',
       name: user.name,
       ...(user.username && { identifier: `@${user.username}` }),
       url,

@@ -9,3 +9,8 @@ export const DAATAN_USERNAME = 'daatan'
 export function isReservedUsername(name: string): boolean {
   return name.toLowerCase() === DAATAN_USERNAME
 }
+
+/** The Daatan account itself: the name is reserved, so only the system user can hold it. */
+export function isDaatanAccount(user: { username?: string | null }): boolean {
+  return user.username === DAATAN_USERNAME
+}

@@ -6,6 +6,7 @@ import { UserLink } from '@/components/UserLink'
 import { RoleBadge } from '@/components/RoleBadge'
 import { formatDisplayDate, formatDisplayDateTime } from '@/lib/utils/date'
 import type { Prediction } from './types'
+import { isDaatanAccount } from '@/lib/daatan-account'
 
 interface Props {
   prediction: Prediction
@@ -69,7 +70,9 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
                   <RoleBadge role={prediction.author.role} size="sm" />
                 )}
               </span>
-              <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
+              {!isDaatanAccount(prediction.author) && (
+                <span className="text-xs text-gray-500 shrink-0">{t('eloShort')} {Number.isFinite(prediction.author.eloRating) ? Math.round(prediction.author.eloRating) : '—'}</span>
+              )}
             </UserLink>
           </div>
         )}

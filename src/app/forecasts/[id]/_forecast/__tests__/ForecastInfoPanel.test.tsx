@@ -75,3 +75,19 @@ describe('ForecastInfoPanel — Tags box', () => {
     expect(screen.getByText('Politics').closest('a')).toHaveAttribute('href', '/tags/politics')
   })
 })
+
+describe('ForecastInfoPanel — author ELO (daatan#2301)', () => {
+  it('shows the author ELO for an ordinary author', () => {
+    wrap({ ...basePrediction, author: { ...basePrediction.author, eloRating: 1612 } } as unknown as Prediction)
+    expect(screen.getByText(/ELO\s*1612/)).toBeInTheDocument()
+  })
+
+  it('hides it for the Daatan account, which never commits', () => {
+    wrap({
+      ...basePrediction,
+      author: { id: 'daatan-user', name: 'Daatan', username: 'daatan', image: null, rs: 100, role: 'USER', eloRating: 1500 },
+    } as unknown as Prediction)
+    expect(screen.getByText('Daatan')).toBeInTheDocument()
+    expect(screen.queryByText(/ELO\s*1500/)).toBeNull()
+  })
+})
