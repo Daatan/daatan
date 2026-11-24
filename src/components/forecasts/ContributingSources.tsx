@@ -6,6 +6,7 @@ import { Newspaper, ExternalLink, ChevronDown, Gavel } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { canonicalKey } from '@/lib/utils/canonical-url'
+import { sourcePagePath } from '@/lib/utils/source-page'
 import { Avatar } from '@/components/Avatar'
 
 type Side = 'yes' | 'no' | 'neutral'
@@ -92,9 +93,10 @@ function signalStrength(s: ContributingSource): number {
 type OutletGroup = {
   domain: string
   name: string
-  /** Resolved outlet identity (news-indexer outlet.name), for linking to /sources/[name].
-   *  Null when no article in the group resolved one — the card falls back to plain text. */
-  outletName: string | null
+  /** The outlet's /sources/[name] page: its resolved news-indexer outlet name when an article
+   *  in the group carries one, else the lead article's host (#2298). The Oracul's own
+   *  web-search finds never resolve a name, and they still have a page under their domain. */
+  href: string | null
   /** Sorted by signal strength, most decisive first; the first entry (not an outlet-wide average) drives side/pct. */
   articles: ContributingSource[]
   side: Side
@@ -183,7 +185,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     return {
       domain,
       name: articles.find(a => a.source)?.source || domain,
-      outletName: articles.find(a => a.outletName)?.outletName ?? null,
+      href: sourcePagePath(articles.find((a) => a.outletName)?.outletName, lead.url),
       articles: sorted,
       side,
       pct,
@@ -292,13 +294,13 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     )
   }
 
-  // Outlet name: a link to its /sources/[name] profile when resolved, else plain text.
+  // Outlet name: a link to its /sources/[name] profile (see OutletGroup.href).
   // Never nested inside the row's own article-opening <a>/<summary> (invalid HTML / would
   // steal the details-toggle click) — always a sibling with its own stopPropagation.
   const OutletName = ({ g, className }: { g: OutletGroup; className: string }) =>
-    g.outletName ? (
+    g.href ? (
       <Link
-        href={`/sources/${encodeURIComponent(g.outletName)}`}
+        href={g.href}
         onClick={(e) => e.stopPropagation()}
         className={`${className} hover:underline w-fit`}
       >

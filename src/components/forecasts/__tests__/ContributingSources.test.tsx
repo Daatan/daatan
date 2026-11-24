@@ -227,12 +227,13 @@ describe('ContributingSources', () => {
     expect(link).toHaveAttribute('href', '/sources/reuters')
   })
 
-  it('renders the outlet name as plain text (no link) when outletName is unresolved', () => {
+  it('links an unresolved outlet to the /sources page of its article host (#2298)', () => {
     renderWithIntl(
-      <ContributingSources sources={[src({ source: 'Reuters', outletName: null, stance: 0.5 })]} />,
+      <ContributingSources
+        sources={[src({ url: 'https://www.tomshardware.com/tech/x', source: 'tomshardware.com', outletName: null, stance: -0.2 })]}
+      />,
     )
-    const name = screen.getByText('Reuters')
-    expect(name.closest('a')).toBeNull()
+    expect(screen.getByText('tomshardware.com').closest('a')).toHaveAttribute('href', '/sources/tomshardware.com')
   })
 
   it('links a multi-article outlet card name to its /sources/[name] profile when resolved', () => {
