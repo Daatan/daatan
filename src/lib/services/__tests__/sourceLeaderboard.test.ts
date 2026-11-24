@@ -407,10 +407,10 @@ describe('rows hidden by the sample-size floor (#2179)', () => {
 
 describe('desk bylines: newsroom, agency or the outlet itself (#1904 item 3)', () => {
   it('recognises agencies, newsroom credits and an outlet named in another script', () => {
-    for (const b of ['Reuters', 'News Agencies', 'JPOST EDITORIAL', 'Times of Israel Staff', 'מערכת וואלה', 'الجزيرة نت', 'חדשות סרוגים']) {
+    for (const b of ['Reuters', 'News Agencies', 'JPOST EDITORIAL', 'Times of Israel Staff', 'מערכת וואלה', 'الجزيرة نت', 'חדשות סרוגים', 'כיכר השבת']) {
       expect(isDeskByline(b), b).toBe(true)
     }
-    for (const b of ['Itamar Eichner', 'ליאור בן ארי', 'Guy Bechor', 'Smith, John', 'Itamar Eichner; News Agencies']) {
+    for (const b of ['Itamar Eichner', 'ליאור בן ארי', 'Guy Bechor', 'Smith, John', 'Itamar Eichner; News Agencies', 'כיכר השבת; יוני גבאי']) {
       expect(isDeskByline(b), b).toBe(false)
     }
   })
@@ -425,6 +425,27 @@ describe('desk bylines: newsroom, agency or the outlet itself (#1904 item 3)', (
     const { authorRows, outletRows } = await getSourceLeaderboard('authors')
     expect(authorRows.map(r => [r.author, r.isDesk])).toEqual([['الجزيرة نت', true], ['Real Person', false]])
     expect(outletRows[0]).toMatchObject({ outletName: 'aljazeera.net', predictions: 6, authorCount: 1 })
+  })
+
+  // #2317: kikar.co.il bylines most pieces "כיכר השבת; <journalist>". The outlet's name is not a
+  // person, so the joint rows credit only the journalist and the outlet keeps its solo record.
+  it('drops the outlet from a joint "outlet; journalist" byline and keeps only its solo record', async () => {
+    expect(bylinePeople('כיכר השבת; יוני גבאי')).toEqual(['יוני גבאי'])
+    mockGetAuthorShadowLeaderboard.mockResolvedValue({
+      count: 2,
+      authors: [
+        entry({ author: 'כיכר השבת', outlet_name: 'kikar.co.il', predictions: 3 }),
+        entry({ author: 'כיכר השבת; יוני גבאי', outlet_name: 'kikar.co.il', predictions: 5 }),
+      ],
+    })
+    const all = await getSourceLeaderboard('authors')
+    expect(all.authorRows.map(r => [r.author, r.predictions, r.isDesk])).toEqual(
+      expect.arrayContaining([['כיכר השבת', 3, true], ['יוני גבאי', 5, false]]),
+    )
+    expect(all.authorRows).toHaveLength(2)
+    const floored = await getSourceLeaderboard('authors', 'skillConservative', 4)
+    expect(floored.authorRows.map(r => r.author)).toEqual(['יוני גבאי'])
+    expect(floored.hiddenAuthors).toBe(1)
   })
 
   it('is listed on its outlet page even when it is the only byline', () => {
