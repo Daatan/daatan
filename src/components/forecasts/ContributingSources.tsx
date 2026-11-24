@@ -8,20 +8,11 @@ import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { canonicalKey } from '@/lib/utils/canonical-url'
 import { sourcePagePath } from '@/lib/utils/source-page'
 import { Avatar } from '@/components/Avatar'
-
-type Side = 'yes' | 'no' | 'neutral'
+import { getSide, stanceProbYes, type Side } from '@/lib/source-vote'
 
 /** Outlet cards shown per column before "Show all" (#2169). Columns are sorted by
  *  article count, so the cut keeps the outlets that carry most of the pool. */
 export const OUTLETS_PER_COLUMN = 5
-
-/** Stance → side: same thresholds as the Oracul-snapshot source chips. */
-function getSide(stance: number | null): Side {
-  if (stance == null) return 'neutral'
-  if (stance > 0.15) return 'yes'
-  if (stance < -0.15) return 'no'
-  return 'neutral'
-}
 
 const dotColor: Record<Side, string> = {
   yes: 'bg-emerald-500',
@@ -74,8 +65,7 @@ function fmtDate(iso: string | null): string | null {
  * shown — filtered out as gate-rejected) reads as 0.5.
  */
 function articleProbYes(s: ContributingSource): number {
-  if (s.stance == null) return 0.5
-  return Math.min(1, Math.max(0, (1 + s.stance) / 2))
+  return stanceProbYes(s.stance)
 }
 
 /**

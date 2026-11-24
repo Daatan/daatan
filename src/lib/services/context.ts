@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { notifyHighConfidence, notifySettled } from '@/lib/services/telegram'
 import { EVIDENCE_ANCHOR_PTS } from '@/lib/services/oracle-snapshot'
+import type { ArticleDotRow } from '@/lib/article-dots'
 
 const log = createLogger('context-service')
 
@@ -1236,6 +1237,36 @@ export async function getEvidenceEstimateSeries(predictionId: string): Promise<E
 export async function getForecastVisibility(idOrSlug: string) {
   return prisma.prediction.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, isPublic: true, authorId: true },
+    select: { id: true, isPublic: true, authorId: true, status: true },
   })
+}
+
+/**
+ * Every `oracleSnapshot.sources[]` entry of a forecast's non-clock snapshots, flattened to the
+ * seven keys the expanded chart's article dots read (daatan#2300), oldest snapshot first and in
+ * pool order within one. Projected in SQL so the multi-megabyte blobs (per-claim shadow layer,
+ * provenance) never leave Postgres; `sourcesSummary` would be lighter still but carries neither
+ * certainty nor title. A non-array `sources` and non-numeric stance/certainty read as empty/null
+ * instead of failing the whole query on one malformed row. See `buildArticleDots`.
+ */
+export async function getArticleDotRows(predictionId: string): Promise<ArticleDotRow[]> {
+  return prisma.$queryRaw<ArticleDotRow[]>(Prisma.sql`
+    SELECT cs."createdAt" AS "snapshotAt",
+           src.elem->>'url' AS "url",
+           CASE WHEN jsonb_typeof(src.elem->'stance') = 'number' THEN (src.elem->>'stance')::float8 END AS "stance",
+           CASE WHEN jsonb_typeof(src.elem->'certainty') = 'number' THEN (src.elem->>'certainty')::float8 END AS "certainty",
+           src.elem->>'title' AS "title",
+           src.elem->>'sourceName' AS "sourceName",
+           src.elem->>'outletName' AS "outletName"
+    FROM context_snapshots cs
+    CROSS JOIN LATERAL jsonb_array_elements(
+      CASE WHEN jsonb_typeof(cs.oracle_snapshot->'sources') = 'array'
+           THEN cs.oracle_snapshot->'sources'
+           ELSE '[]'::jsonb END
+    ) WITH ORDINALITY AS src(elem, ord)
+    WHERE cs."predictionId" = ${predictionId}
+      AND cs.kind <> 'clock'
+      AND jsonb_typeof(src.elem) = 'object'
+    ORDER BY cs."createdAt" ASC, cs.id ASC, src.ord ASC
+  `)
 }

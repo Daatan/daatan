@@ -931,6 +931,7 @@ export default function ForecastDetailClient({
           Market prices are polarity-adjusted here (inverted links plot 100 − price)
           and the legend says so, so the line always matches the claim's direction. */}
       <ProbabilityChart
+        forecastId={prediction.id}
         commitments={prediction.commitments}
         snapshots={initialProbabilityHistory ?? initialContextSnapshots ?? []}
         outcomeType={prediction.outcomeType}

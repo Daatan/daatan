@@ -231,6 +231,33 @@ Only `kind = 'evidence'` snapshots are returned — clock-tick rows (and any fut
 
 ---
 
+### `GET /api/forecasts/[id]/article-dots`
+One dot per article the Oracul read for a forecast, for the expanded "Probability over time" chart (daatan#2300). `[id]` is the forecast id or slug. The forecast page fetches it only when a reader opens that view. Same visibility as the forecast page (`isForecastViewableByVisitor`): a private, `DRAFT` or `PENDING_APPROVAL` forecast is a 404 unless the caller is its author, an admin or an approver, and the snapshot query never runs for anyone else.
+
+Built from every non-clock snapshot's `oracleSnapshot.sources[]`. Postgres projects seven keys per source, so the heavy per-claim blobs never reach the app (`getArticleDotRows` in `src/lib/services/context.ts`). Articles are deduped by `canonicalKey`, so `www.` and tracking-param variants count as one (`buildArticleDots` in `src/lib/article-dots.ts`):
+
+- `firstSeenAt` is the first snapshot that lists the article.
+- `probYes`, `certainty` and `side` come from the latest snapshot that lists it.
+- An article whose latest reading has no stance (gate-rejected) is left out.
+- `side` uses the sources panel's thresholds (`getSide` in `src/lib/source-vote.ts`).
+
+**Response** — `{ predictionId, dots: ArticleDot[] }`, oldest first:
+
+```jsonc
+{
+  "url": "https://…",
+  "title": "Headline",              // newest non-null title, or null
+  "outlet": "Reuters",              // the Oracul's sourceName, or null (the UI falls back to the host)
+  "outletPath": "/sources/Reuters", // sourcePagePath(outletName, url), or null
+  "firstSeenAt": "ISO-8601",        // x
+  "probYes": 0.65,                  // y: (1 + stance) / 2, 0–1, the same number as the sources badge
+  "certainty": 0.8,                 // dot size, 0–1, or null
+  "side": "yes"                     // 'yes' | 'no' | 'neutral'
+}
+```
+
+---
+
 ### `POST /api/forecasts/[id]/context` — Auth
 Refresh the AI context for a forecast: fetches web articles for the claim, asks an LLM to summarise them, computes an "AI %" probability, and appends a new snapshot to the context timeline. Author-only and rate-limited to once per 24h per forecast.
 
