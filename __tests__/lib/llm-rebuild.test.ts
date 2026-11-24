@@ -96,12 +96,12 @@ describe('buildProviders / rebuildLlmService', () => {
     expect(find('openrouter')?.model).toBe('openai/gpt-5-mini')
   })
 
-  it('registers OpenRouter on SaaS too, using the free non-Google backstop model', async () => {
+  it('registers OpenRouter on SaaS too, using the non-Google backstop model', async () => {
     mockEnv.DAATAN_EDITION = 'saas'
     orKey = 'sk-or-key'
     await load()
     expect(kinds()).toContain('openrouter')
-    expect(find('openrouter')?.model).toBe('meta-llama/llama-3.3-70b-instruct:free')
+    expect(find('openrouter')?.model).toBe('meta-llama/llama-3.3-70b-instruct')
   })
 
   it('does NOT register OpenRouter when no key is present', async () => {

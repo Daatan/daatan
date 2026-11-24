@@ -28,12 +28,12 @@ What probability (0-100) does this article assign to this forecast happening?
 Return valid JSON only, no other text:
 { "probability": 55, "reasoning": "one sentence explanation" }`
 
+// OpenRouter ids. The `:free` Gemini/DeepSeek ids and `anthropic/claude-3-5-haiku` were
+// dropped: OpenRouter no longer serves them (checked 2026-11-24, daatan#2282). Any other
+// model goes through Custom.
 const MODELS = [
   { label: 'Gemini 2.5 Flash', value: 'google/gemini-2.5-flash' },
-  { label: 'Gemini 2.5 Flash (free)', value: 'google/gemini-2.5-flash:free' },
-  { label: 'DeepSeek R1 (free)', value: 'deepseek/deepseek-r1:free' },
-  { label: 'Llama 3.3 70B (free)', value: 'meta-llama/llama-3.3-70b-instruct:free' },
-  { label: 'Claude 3.5 Haiku', value: 'anthropic/claude-3-5-haiku' },
+  { label: 'Llama 3.3 70B', value: 'meta-llama/llama-3.3-70b-instruct' },
   { label: 'Custom', value: '__custom__' },
 ]
 

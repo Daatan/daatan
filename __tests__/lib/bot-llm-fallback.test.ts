@@ -24,21 +24,21 @@ describe('createBotLLMService — OpenRouter fallback model', () => {
 
   afterEach(() => vi.unstubAllEnvs())
 
-  it('uses a free non-Google model on the OpenRouter leg for a Gemini-preference bot', async () => {
+  it('uses the non-Google backstop model on the OpenRouter leg for a Gemini-preference bot', async () => {
     const { createBotLLMService } = await import('@/lib/llm')
     createBotLLMService('google/gemini-2.5-flash-preview:free')
 
     expect(openRouterCtor).toHaveBeenCalledWith(
-      expect.objectContaining({ modelName: 'meta-llama/llama-3.3-70b-instruct:free' }),
+      expect.objectContaining({ modelName: 'meta-llama/llama-3.3-70b-instruct' }),
     )
   })
 
   it('passes a non-Gemini OpenRouter preference through unchanged', async () => {
     const { createBotLLMService } = await import('@/lib/llm')
-    createBotLLMService('meta-llama/llama-3.3-70b-instruct:free')
+    createBotLLMService('meta-llama/llama-3.3-70b-instruct')
 
     expect(openRouterCtor).toHaveBeenCalledWith(
-      expect.objectContaining({ modelName: 'meta-llama/llama-3.3-70b-instruct:free' }),
+      expect.objectContaining({ modelName: 'meta-llama/llama-3.3-70b-instruct' }),
     )
   })
 })

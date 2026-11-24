@@ -60,6 +60,6 @@ describe('createBotLLMService (#1879)', () => {
     process.env.GOOGLE_VERTEX_PROJECT_ID = 'p'
     process.env.GOOGLE_VERTEX_CLIENT_EMAIL = 'sa@p.iam.gserviceaccount.com'
     process.env.GOOGLE_VERTEX_PRIVATE_KEY = 'key'
-    expect(providersOf(createBotLLMService('meta-llama/llama-3.3-70b-instruct:free'))).toHaveLength(0)
+    expect(providersOf(createBotLLMService('meta-llama/llama-3.3-70b-instruct'))).toHaveLength(0)
   })
 })

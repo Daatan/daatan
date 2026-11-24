@@ -26,7 +26,7 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 4.  **Fallback 2**: **OpenRouter**
     *   Registered whenever a key is configured (admin setting → SSM `OPENROUTER_API_KEY` → env, `getOpenRouterKey()`), for **both** editions.
-    *   **SaaS**: added only as a last-resort backstop, so it uses the free **non-Google** model `meta-llama/llama-3.3-70b-instruct:free` (an OpenRouter *Gemini* model would still hit Google's backend and die in the same outage).
+    *   **SaaS**: added only as a last-resort backstop, so it uses the **non-Google** model `meta-llama/llama-3.3-70b-instruct` (an OpenRouter *Gemini* model would still hit Google's backend and die in the same outage). It is the paid id: the `:free` one was withdrawn (daatan#2282). It shares the OpenRouter key, and its balance, with the Oracul's Jev gate, so it fails whenever that balance runs out.
     *   **Self-host**: runs as a primary user-facing provider on the admin-chosen `getOpenRouterModel()`.
 
 5.  **Fallback 3**: **Ollama** (hosting `qwen2.5:7b`)
