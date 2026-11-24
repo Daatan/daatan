@@ -104,6 +104,43 @@ describe('VertexProvider', () => {
     expect('thinkingConfig' in cfgs[2]).toBe(false)
   })
 
+  describe('Google Search (daatan#2290)', () => {
+    it('attaches the tool and sends searchPrompt only when googleSearch is set', async () => {
+      const provider = new VertexProvider(CONFIG)
+      await provider.generateContent({ prompt: 'plain', searchPrompt: 'with search note', googleSearch: true })
+      await provider.generateContent({ prompt: 'plain', searchPrompt: 'with search note' })
+      const [searched, plain] = fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string))
+      expect(searched.tools).toEqual([{ googleSearch: {} }])
+      expect(searched.contents[0].parts[0].text).toBe('with search note')
+      expect('tools' in plain).toBe(false)
+      expect(plain.contents[0].parts[0].text).toBe('plain')
+    })
+
+    it('falls back to prompt when no searchPrompt is given', async () => {
+      await new VertexProvider(CONFIG).generateContent({ prompt: 'plain', googleSearch: true })
+      expect(lastCall().body.contents[0].parts[0].text).toBe('plain')
+    })
+
+    it('joins a grounded answer split across parts and reports the query count', async () => {
+      fetchMock.mockResolvedValue(okResponse({
+        candidates: [{
+          content: { parts: [{ text: '{"answer":' }, { text: '42}' }] },
+          groundingMetadata: { webSearchQueries: ['a', 'b'] },
+        }],
+      }))
+      const res = await new VertexProvider(CONFIG).generateContent({ prompt: 'q', googleSearch: true })
+      expect(res.text).toBe('{"answer":42}')
+      expect(res.search).toEqual({ queries: 2 })
+    })
+
+    it('reports zero queries when the model searched nothing, and no search at all without the tool', async () => {
+      const searched = await new VertexProvider(CONFIG).generateContent({ prompt: 'q', googleSearch: true })
+      const plain = await new VertexProvider(CONFIG).generateContent({ prompt: 'q' })
+      expect(searched.search).toEqual({ queries: 0 })
+      expect(plain.search).toBeUndefined()
+    })
+  })
+
   it('returns the candidate text and maps usage', async () => {
     const res = await new VertexProvider(CONFIG).generateContent({ prompt: 'q' })
     expect(res.text).toBe('{"answer":42}')

@@ -27,7 +27,7 @@ import type { LlmStage } from './stageModels'
 // ─── Params and model quirks ────────────────────────────────────────────────────────────
 
 /** A provider-neutral call param. Each adapter maps it to its own wire name. */
-export type ModelParam = 'temperature' | 'reasoningBudget' | 'maxTokens'
+export type ModelParam = 'temperature' | 'reasoningBudget' | 'maxTokens' | 'googleSearch'
 
 export interface ModelParams {
   temperature?: number
@@ -35,6 +35,9 @@ export interface ModelParams {
   reasoningBudget?: number
   /** Output token cap. */
   maxTokens?: number
+  /** Ground the call with Google Search (daatan#2290). Only the Vertex leg has the tool;
+   *  every other leg ignores it and sends the plain prompt. */
+  googleSearch?: boolean
 }
 
 /**
@@ -60,6 +63,12 @@ export type QuirkRule<Hook extends string = QuirkHookName> =
  * removed, so one entry covers every route to the same model.
  */
 export const MODEL_QUIRKS: Readonly<Record<string, Partial<Record<ModelParam, QuirkRule>>>> = {
+  'gemini-2.5-flash': {
+    googleSearch: {
+      rule: 'ignore',
+      note: 'Google Search together with a responseSchema answers HTTP 400 on 2.5 (probed 2026-11-23, daatan#2290); 3.5-flash, 3.5-flash-lite and 3.6–3.8-flash take both. Every chain stage that searches sends a schema, so on 2.5 the call runs without search. The grounded-date lookup searches on 2.5 without a schema, outside the chain.',
+    },
+  },
   'xai.grok-4.7': {
     temperature: {
       rule: 'ignore',
@@ -132,7 +141,7 @@ export interface StageEntry {
    */
   primary?: { provider: ChainProvider; model: string }
   /** `maxTokens` is not wired on the main chain yet. */
-  params: Pick<ModelParams, 'temperature' | 'reasoningBudget'>
+  params: Pick<ModelParams, 'temperature' | 'reasoningBudget' | 'googleSearch'>
   /** Params sent even where a model quirk says otherwise. */
   force?: ModelParam[]
   /** The primary leg's timeout in ms; unset = the provider default (Google legs: 30 s). */
@@ -149,9 +158,9 @@ export const STAGES: Readonly<Record<LlmStage, StageEntry>> = {
   express_draft: {
     params: { temperature: 0.2, reasoningBudget: 512 },
     note:
-      "Thinking capped for the draft (#1890 option B). Default (dynamic) thinking spent ~1,300 tokens and made the draft the slowest creation stage: bench on 16 polarity cases x 3, p50 7.5 s / p90 16.4 s / max 26.6 s. At 512: p50 4.6 s / p90 5.4 s / max 6.0 s, no polarity flips, every claim in English. 0 is faster still but copied 9 of 48 non-English inputs verbatim instead of translating them.",
-    eval: 'scripts/bench-express-draft.ts, scripts/check-express-polarity.ts',
-    evalResult: { model: 'gemini-2.5-flash', ref: 'daatan#1890 option B (bench above)' },
+      "Thinking capped for the draft (#1890 option B). Default (dynamic) thinking spent ~1,300 tokens and made the draft the slowest creation stage: bench on 16 polarity cases x 3, p50 7.5 s / p90 16.4 s / max 26.6 s. At 512: p50 4.6 s / p90 5.4 s / max 6.0 s, no polarity flips, every claim in English. 0 is faster still but copied 9 of 48 non-English inputs verbatim instead of translating them. A searching draft (daatan#2290: `gemini-3.5-flash-lite` with `googleSearch`, one call, no lookup) is wired but off: in confirm runs 2 and 3 (scripts/eval-express-grounded.ts, its `search` arm vs this entry, 55 date drafts each) it was 4-5x faster (p90 ~3.5 s vs 15 s) with as many dates in range (44 vs 40, 44 vs 44) but more confidently wrong ones (3 vs 0, 5 vs 4), nearly all a government-formation deadline taken from the first mandate. To switch: `primary` Flash-Lite, `googleSearch: true`, drop `reasoningBudget` (512 made Flash-Lite skip search), re-run that eval, `UPDATE_GOLDENS=1`.",
+    eval: 'scripts/eval-express-grounded.ts, scripts/check-express-polarity.ts',
+    evalResult: { model: 'gemini-2.5-flash', ref: 'daatan#2290 confirm run 3, rollback arm' },
   },
   express_topic: { params: { temperature: 0 } },
   guess_chances: { params: { temperature: 0 } },

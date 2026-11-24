@@ -32,12 +32,20 @@ export interface LLMRequest {
   thinkingBudget?: number
   /** Params sent even where the leg's model quirk says otherwise (registry `force`). */
   forceParams?: ModelParam[]
+  /** Ground the call with Google Search (daatan#2290). Honored by the Vertex leg only, and
+   *  dropped there for a model whose quirk says it can't search with this request. */
+  googleSearch?: boolean
+  /** The prompt to send instead of `prompt` when the leg does attach Google Search — e.g.
+   *  with a note that it may search. Legs without search never see it. */
+  searchPrompt?: string
 }
 
 export interface LLMResponse {
   text: string
   /** Set when a later leg answered, so the model is not the one the stage asked for. */
   fallbackProvider?: string
+  /** Set only when the answering leg sent Google Search: how many queries the model ran. */
+  search?: { queries: number }
   usage?: {
     promptTokens: number
     completionTokens: number
@@ -50,6 +58,8 @@ export interface LLMProvider {
   /** The model this leg would call for `request`; its registry quirks apply to the request.
    *  Every real provider has it — only test doubles leave it out. */
   modelFor?(request: LLMRequest): string
+  /** Whether this leg attaches Google Search when a request asks for it (Vertex only). */
+  supportsGoogleSearch?: boolean
   generateContent(request: LLMRequest): Promise<LLMResponse>
 }
 

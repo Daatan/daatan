@@ -153,4 +153,27 @@ describe('ResilientLLMService', () => {
       expect(new ResilientLLMService([ok('a', '1'), ok('b', '2'), ok('c', '3')]).legCount).toBe(3)
     })
   })
+
+  describe('primarySearches (daatan#2290)', () => {
+    const leg = (model: string, supportsGoogleSearch: boolean): LLMProvider => ({
+      name: 'leg',
+      supportsGoogleSearch,
+      modelFor: (r) => r.model ?? model,
+      generateContent: vi.fn(async () => ({ text: '' })),
+    })
+
+    it('is true only when the request asks, the first leg has the tool and its model keeps it', () => {
+      const svc = new ResilientLLMService([leg('gemini-2.5-flash', true), ok('Oracul', '')])
+      expect(svc.primarySearches({ prompt: 'p', googleSearch: true, model: 'gemini-3.5-flash-lite' })).toBe(true)
+      expect(svc.primarySearches({ prompt: 'p', model: 'gemini-3.5-flash-lite' })).toBe(false)
+      // The rollback path: the chain's own model drops search by quirk.
+      expect(svc.primarySearches({ prompt: 'p', googleSearch: true })).toBe(false)
+    })
+
+    it('is false when the first leg has no search tool (no Vertex)', () => {
+      const svc = new ResilientLLMService([leg('gemini-3.5-flash-lite', false)])
+      expect(svc.primarySearches({ prompt: 'p', googleSearch: true })).toBe(false)
+      expect(new ResilientLLMService([]).primarySearches({ prompt: 'p', googleSearch: true })).toBe(false)
+    })
+  })
 })

@@ -17,7 +17,7 @@ import { chainModel, EVIDENCE_SECOND_OPINION, PANEL_MEMBERS } from '../../regist
 import { forStage, stageModel, type LlmStage } from '../../stageModels'
 
 const SRC = path.resolve(process.cwd(), 'src')
-const SKIP_PROPS = new Set(['prompt', 'signal'])
+const SKIP_PROPS = new Set(['prompt', 'searchPrompt', 'signal'])
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

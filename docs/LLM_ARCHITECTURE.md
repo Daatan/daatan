@@ -40,7 +40,7 @@ The main `llmService` tries providers in this order; each leg is **registered on
 
 **The AI panel (LASSO)** does not use this chain either: `src/lib/llm/panel/client.ts` calls each roster member (`src/lib/llm/panel/roster.ts`) on its own route — `openrouter`, `bedrock`, or `vertex` (the Gemini member moved from an OpenRouter `google-vertex` pin to direct Vertex in #1513, and from `gemini-2.5-flash` to `gemini-3.5-flash-lite` in #1763 — a non-thinking model is required because Vertex counts thought tokens against the panel's 64-token cap, so the main chain's model choice does not apply to it). See [LASSO.md](LASSO.md).
 
-**The express grounded-date lookup** (`src/lib/llm/groundedDateLookup.ts`, #1706) is also deliberately outside the chain: it needs Gemini's `googleSearch` tool, which no fallback leg has, so it calls Vertex directly and is skipped when Vertex isn't configured. See [Express prediction date grounding](#express-prediction-date-grounding-1086) below.
+**The express grounded-date lookup** (`src/lib/llm/groundedDateLookup.ts`, #1706) is also deliberately outside the chain: it needs Gemini's `googleSearch` tool on `gemini-2.5-flash` without a schema, so it calls Vertex directly and is skipped when Vertex isn't configured. Since daatan#2290 the express draft can search by itself (the `googleSearch` stage param, below; off for now); a draft that searched never gets the lookup. See [Express prediction date grounding](#express-prediction-date-grounding-1086) below.
 
 ### Failure notifications
 
@@ -57,7 +57,7 @@ and `__tests__/registry.test.ts` checks it in CI. What it holds:
   each leg's model. `buildProviders()` walks it; each leg still registers only when configured.
   The bots' fallbacks reuse these models.
 - **`STAGES`** — one entry per `LLM_STAGES` member: its own primary model (a Google model for
-  now), `params` (`temperature`, `reasoningBudget`), `timeoutMs` for the primary leg, `force`,
+  now), `params` (`temperature`, `reasoningBudget`, `googleSearch`), `timeoutMs` for the primary leg, `force`,
   and optional `eval` / `evalResult` (CI fails when `evalResult.model` is no longer the stage's
   model: re-run the eval after a swap). Call sites spread `forStage('<stage>')` and pass only
   the prompt, the schema and runtime arguments (`primaryOnly`, `signal`); a static test
@@ -78,10 +78,29 @@ Per-stage notes worth keeping in mind:
   by the Vertex and Gemini legs only; unset keeps the model's dynamic thinking. `search_query`
   sends 0: dynamic thinking spent ~630 tokens on a 3–8 word answer, and 7 of 26 prod calls hit
   the 5 s query timeout; in an A/B on 41 real claims, 0 took p50 3.07 → 0.65 s with the same
-  entities. `express_draft` sends 512 (#1890): default thinking spent ~1,300 tokens and was the
-  slowest creation stage (p90 16 s → 5 s on `scripts/bench-express-draft.ts`), and 0 copied
-  non-English inputs verbatim instead of translating them. Moving `express_draft` to a model
-  without a token-count thinking budget means re-checking this first.
+  entities. `express_draft` sends 512 on `gemini-2.5-flash` (#1890): default thinking spent
+  ~1,300 tokens and was the slowest creation stage (p90 16 s → 5 s on
+  `scripts/bench-express-draft.ts`), and 0 copied non-English inputs verbatim instead of
+  translating them. A searching draft on `gemini-3.5-flash-lite` (daatan#2290) must drop it:
+  Flash-Lite spends no thought tokens either way, but with a 512 budget it searched far less
+  (no query in 14 of 15 government-formation drafts, against 0 of 15 without) and found fewer
+  deciding dates.
+- **Google Search (`googleSearch`, daatan#2290).** A stage param like the others. Only the
+  Vertex leg has the tool (`supportsGoogleSearch`): it attaches `tools: [{googleSearch: {}}]`,
+  sends the request's `searchPrompt` instead of `prompt` (the call site's variant that says it
+  may search), joins a grounded answer split across parts, and reports `search.queries` (the
+  model's `webSearchQueries`). Every other leg ignores it and sends the plain `prompt`. The
+  `gemini-2.5-flash` quirk drops it: 2.5 answers HTTP 400 to search together with a
+  `responseSchema`, while 3.5-flash, 3.5-flash-lite and 3.6–3.8-flash take both — but return
+  empty `groundingChunks` with a schema, so there are no source URLs.
+  `llmService.primarySearches(request)` says whether the first leg would search.
+  No stage sets it yet. It was built for `express_draft` and is off there (see
+  [The draft's own search](#express-prediction-date-grounding-1086)). Switching it on is one
+  registry entry: set `primary` to `gemini-3.5-flash-lite`, add `googleSearch: true` to
+  `params` and drop `reasoningBudget`. Then re-run `scripts/eval-express-grounded.ts` (its
+  `search` arm against `current`), point `evalResult` at that run and `UPDATE_GOLDENS=1`.
+  `LLM_STAGE_MODELS=express_draft=gemini-3.5-flash-lite` swaps only the model. It keeps the
+  512 budget and adds no search, so it is not that configuration.
 - **`research_verdict` (#2096).** `gemini-2.5-pro`, 75 s on the Google legs instead of 30 s. A
   resolver's manual research uses the first leg only (`primaryOnly`), so a failure is an error
   to retry, not a verdict from another vendor's model. The born-true check may still fall
@@ -152,12 +171,14 @@ in-code fallback. Prompt text that reached production lived in a console git cou
 The model must not invent dates for scheduled events (elections, rulings, statutory deadlines) — it does not reliably know when future events happen. Two layers enforce this:
 
 1. **Prompt rule 3b** in `express-prediction`: a specific event date may appear in the claim or resolution date only when the user's input or the retrieved articles state it; otherwise the claim omits the event date and the deterministic defaults apply (end of current year — end of next year once fewer than 90 days remain, `getDefaultHorizon` (#2199) — or +5 years for relative-timing claims).
-2. **`findUngroundedYears()`** (`src/lib/llm/expressPrediction.ts`): after generation, any future year in the claim or resolution date that appears nowhere in the user input or article text — and isn't one of the two defaults — is returned as `ungroundedYears` on the result. The Express review screen renders these as an "Unverified date" warning; editing the claim or the date clears it.
+2. **`findUngroundedYears()`** (`src/lib/llm/expressPrediction.ts`): after generation, any future year in the claim or resolution date that appears nowhere in the user input or article text — and isn't one of the two defaults — is returned as `ungroundedYears` on the result. The Express review screen renders these as an "Unverified date" warning; editing the claim or the date clears it. A draft that ran a Google Search query and reports its date `from_sources` is not checked (daatan#2290): search returns no source text to check against, and its dates (an election in the claim, the inauguration as the resolution date) are sourced.
 3. **`findClaimTextDeadlineMismatch()`** (`src/lib/utils/extractDatesFromText.ts`, #1706 proposal 5): the same deterministic regex cross-check `POST /api/forecasts` runs to hard-block a claim-text/deadline mismatch at creation (#1404) runs here too and is returned as `claimDeadlineMismatch` — an ISO date, or `null` when the claim has no explicit date phrase or it agrees with `resolveByDatetime`. The review screen renders it as a warning before the author ever reaches the creation endpoint that would reject it.
 
 `dateBasis` (#1706 proposal 1) is a fourth, softer signal in the same family: a self-reported `"explicit_in_claim" | "from_sources" | "assumed"` flag on the schema, surfaced as an "Assumed resolution date" warning when the model couldn't ground the date in anything at all — narrower than `ungroundedYears` (which only fires on an invented year) and orthogonal to `claimDeadlineMismatch` (which only fires when the claim's own text disagrees with the stored deadline).
 
-**Grounded date lookup** (#1706 option 2, `draftWithGroundedDate` in `expressPrediction.ts`): when the first draft reports `dateBasis: "assumed"`, `lookupGroundedEventDate()` (`src/lib/llm/groundedDateLookup.ts`) makes one separate Vertex `gemini-2.5-flash` call with the `googleSearch` tool (15 s budget; 10 s until #2199, when every prod `unavailable` in a month was that timeout). The lookup is started beside the first draft on the author's input (except for a bare URL, which waits for the drafted claim) and aborted if the draft doesn't need it, so its latency mostly overlaps the draft — at the price of one grounded call per non-URL draft (#1890). Timings: `stageTimings.lookupMs` (the lookup's own duration), `lookupWaitMs` (the part the author waited for after the draft), `redraftMs`; all inside `draftMs` to find the date by which the forecast's outcome is known: an officially scheduled event, a legal/statutory deadline (e.g. the outer limit for forming a government after an election, #2199), or the scheduled end of a season or term. If it finds one, the date is prepended to the articles text as a reference and the forecast is drafted again, so rule 3b can use it like any sourced date. The outcome is returned as `groundedDate` (`{ fired: false }`, `{ fired: true, status: 'no_date' }`, `{ fired: true, status: 'unavailable', reason: 'no_vertex' | 'timeout' | 'error' | 'cancelled' }` (`reason` since #2199), or `status: 'found'` with `event`/`date`/`sourceUrl`/`adopted`), recorded in the `ForecastCreationAttempt` details by `POST /api/forecasts/express/generate` (together with the AI's own `resolveByDatetime`, before any author edit, since #2199), and shown on the review screen as a notice when the re-draft adopted the date. No Vertex, a failed call or no date found all keep the first draft and its "assumed" warning.
+**The draft's own search** (daatan#2290, built but off): with `express_draft` on `gemini-3.5-flash-lite` and the `googleSearch` stage param, one call drafts the forecast and looks up its deciding date. On the leg that searches, `[Web search available]` (`EXPRESS_SEARCH_BLOCK`) is put in front of the articles, telling the model to search for the deciding date, deadline or season end and to report such a date as `from_sources`. A draft that searched and still says `assumed` keeps its warning: no lookup, no re-draft. It stays off because it failed the gate in `scripts/eval-express-grounded.ts` (2026-11-23, against the 2.5 draft + lookup below, 55 date drafts per arm and run). It was 4–5× faster (p90 ~3.5 s vs 15 s) with as many dates in range (44 vs 40, 44 vs 44), but it had more confidently wrong ones (3 vs 0, 5 vs 4). Nearly all of them were the first designated MK's mandate deadline taken as the deadline for forming a government. The attempt's `details.draftSearch` records the query count; it is `null` for a leg without search, which while search is off is every draft.
+
+**Grounded date lookup** (#1706 option 2, `draftWithGroundedDate` in `expressPrediction.ts`): only for a draft from a leg without search, which while the draft's own search is off is every draft. When that draft reports `dateBasis: "assumed"`, `lookupGroundedEventDate()` (`src/lib/llm/groundedDateLookup.ts`) makes one separate Vertex `gemini-2.5-flash` call with the `googleSearch` tool (15 s budget; 10 s until #2199, when every prod `unavailable` in a month was that timeout). When the stage's primary leg does not search, the lookup is started beside the first draft on the author's input (except for a bare URL, which waits for the drafted claim) and aborted if the draft doesn't need it, so its latency mostly overlaps the draft — at the price of one grounded call per non-URL draft (#1890). When the primary searches, the lookup waits for a fallback draft to need it. It is a Vertex call too, so it helps only when the searching model failed while Vertex stayed up; otherwise it adds up to 15 s to a fallback draft. Timings: `stageTimings.lookupMs` (the lookup's own duration), `lookupWaitMs` (the part the author waited for after the draft), `redraftMs`; all inside `draftMs` to find the date by which the forecast's outcome is known: an officially scheduled event, a legal/statutory deadline (e.g. the outer limit for forming a government after an election, #2199), or the scheduled end of a season or term. If it finds one, the date is prepended to the articles text as a reference and the forecast is drafted again, so rule 3b can use it like any sourced date. The outcome is returned as `groundedDate` (`{ fired: false }`, `{ fired: true, status: 'no_date' }`, `{ fired: true, status: 'unavailable', reason: 'no_vertex' | 'timeout' | 'error' | 'cancelled' }` (`reason` since #2199), or `status: 'found'` with `event`/`date`/`sourceUrl`/`adopted`), recorded in the `ForecastCreationAttempt` details by `POST /api/forecasts/express/generate` (together with the AI's own `resolveByDatetime`, before any author edit, since #2199), and shown on the review screen as a notice when the re-draft adopted the date. No Vertex, a failed call or no date found all keep the first draft and its "assumed" warning.
 
 ### Card headline (#1814)
 

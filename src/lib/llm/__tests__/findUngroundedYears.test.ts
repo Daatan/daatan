@@ -125,4 +125,12 @@ describe('getDefaultHorizon', () => {
     // ...but the same year is still suspect while the default is this year
     expect(findUngroundedYears('X by December 31, 2027', '2027-12-31T23:59:59Z', '', new Date('2026-06-01T00:00:00Z'))).toEqual(['2027'])
   })
+
+  it('flags nothing when the draft found its dates by search (daatan#2290)', () => {
+    const now = new Date('2026-11-23T00:00:00Z')
+    // Election date in the claim, inauguration as the resolution date: both from search.
+    const claim = 'A Democrat wins the US presidential election held on November 7, 2028'
+    expect(findUngroundedYears(claim, '2029-01-20T23:59:59Z', '', now)).toEqual(['2028', '2029'])
+    expect(findUngroundedYears(claim, '2029-01-20T23:59:59Z', '', now, { datesFromSearch: true })).toEqual([])
+  })
 })

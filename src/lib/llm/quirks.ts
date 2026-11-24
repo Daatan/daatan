@@ -42,7 +42,8 @@ export function applyQuirks(
       delete next[param]
       out = next
     } else if (rule.rule === 'rename') {
-      next[rule.to] = params[param]
+      // Params differ in type (googleSearch is a flag): a rename between them is the table's error.
+      ;(next as Record<ModelParam, unknown>)[rule.to] = params[param]
       delete next[param]
       out = next
     } else {
