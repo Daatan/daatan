@@ -232,21 +232,28 @@ Only `kind = 'evidence'` snapshots are returned — clock-tick rows (and any fut
 ---
 
 ### `GET /api/forecasts/[id]/article-dots`
-One dot per article the Oracul read for a forecast, for the expanded "Probability over time" chart (daatan#2300). `[id]` is the forecast id or slug. The forecast page fetches it only when a reader opens that view. Same visibility as the forecast page (`isForecastViewableByVisitor`): a private, `DRAFT` or `PENDING_APPROVAL` forecast is a 404 unless the caller is its author, an admin or an approver, and the snapshot query never runs for anyone else.
+One dot per article in the Oracul's current pool for a forecast, for the expanded "Probability over time" chart (daatan#2300). `[id]` is the forecast id or slug. The forecast page fetches it only when a reader opens that view. Same visibility as the forecast page (`isForecastViewableByVisitor`): a private, `DRAFT` or `PENDING_APPROVAL` forecast is a 404 unless the caller is its author, an admin or an approver, and the snapshot query never runs for anyone else.
 
-Built from every non-clock snapshot's `oracleSnapshot.sources[]`. Postgres projects seven keys per source, so the heavy per-claim blobs never reach the app (`getArticleDotRows` in `src/lib/services/context.ts`). Articles are deduped by `canonicalKey`, so `www.` and tracking-param variants count as one (`buildArticleDots` in `src/lib/article-dots.ts`):
+One query (`getArticleDotRows` in `src/lib/services/context.ts`) reads two cheap things, never every snapshot's pool (that cost 52.5 s and 1.2M rows on the biggest prod forecast):
 
-- `firstSeenAt` is the first snapshot that lists the article.
-- `probYes`, `certainty` and `side` come from the latest snapshot that lists it.
-- An article whose latest reading has no stance (gate-rejected) is left out.
+- **The readings** are the latest non-clock snapshot's `oracleSnapshot.sources[]` — the pool the sources panel shows. Only voting entries (a numeric `stance`) count; an article that has left the pool gets no dot.
+- **The first-seen time** of each URL is the earliest evidence snapshot that lists it, read off the `sources_delta` chain (each URL's first appearance is an `upsert`); a snapshot whose delta is missing or not based on its predecessor is read from its own `sources_summary`.
+- At most `MAX_ARTICLE_DOTS` (2000) rows, the most certain first; `poolSize` is the count before that cap.
+
+Prod, 2026-11-24, `EXPLAIN ANALYZE` on the three forecasts with the most snapshots: 128–174 ms, 1,282–1,646 rows.
+
+The app then dedupes by `canonicalKey`, so `www.` and tracking-param variants in the pool count as one (`buildArticleDots` in `src/lib/article-dots.ts`):
+
+- `firstSeenAt` is the earliest first sighting of any of the article's URLs.
+- `probYes`, `certainty` and `side` come from its current reading (the later pool entry when two URLs merge).
 - `side` uses the sources panel's thresholds (`getSide` in `src/lib/source-vote.ts`).
 
-**Response** — `{ predictionId, dots: ArticleDot[] }`, oldest first:
+**Response** — `{ predictionId, dots: ArticleDot[], poolSize, truncated }`, dots oldest first. `truncated` is `poolSize > ` the rows returned; the view then says how many it shows of how many.
 
 ```jsonc
 {
   "url": "https://…",
-  "title": "Headline",              // newest non-null title, or null
+  "title": "Headline",              // last non-null title, or null
   "outlet": "Reuters",              // the Oracul's sourceName, or null (the UI falls back to the host)
   "outletPath": "/sources/Reuters", // sourcePagePath(outletName, url), or null
   "firstSeenAt": "ISO-8601",        // x

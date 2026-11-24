@@ -6,7 +6,7 @@ import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
 import { getArticleDotRows, getForecastVisibility } from '@/lib/services/context'
 
 /**
- * GET /api/forecasts/[id]/article-dots — one dot per article the Oracul read for this forecast,
+ * GET /api/forecasts/[id]/article-dots — one dot per article in the Oracul's current pool for this forecast,
  * for the expanded "Probability over time" chart (daatan#2300). Fetched when that view opens,
  * never with the page. Same visibility rule as the forecast page (`isForecastViewableByVisitor`):
  * a private, draft or pending forecast is a 404 unless the caller is its author, an admin or an
@@ -31,8 +31,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    const dots = buildArticleDots(await getArticleDotRows(forecast.id))
-    return NextResponse.json({ predictionId: forecast.id, dots })
+    const rows = await getArticleDotRows(forecast.id)
+    const poolSize = rows[0]?.poolSize ?? 0
+    return NextResponse.json({
+      predictionId: forecast.id,
+      dots: buildArticleDots(rows),
+      poolSize,
+      truncated: poolSize > rows.length,
+    })
   } catch (error) {
     return handleRouteError(error, 'Failed to fetch article dots')
   }

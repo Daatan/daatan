@@ -59,13 +59,14 @@ export function ExpandChartButton({ onClick, ref }: { onClick: () => void; ref?:
   )
 }
 
-type Load = { state: 'loading' } | { state: 'error' } | { state: 'ready'; dots: ArticleDot[] }
+type DotsBody = { dots: ArticleDot[]; poolSize: number; truncated: boolean }
+type Load = { state: 'loading' } | { state: 'error' } | ({ state: 'ready' } & DotsBody)
 type PlacedDot = ArticleDot & { t: number }
 
 /**
  * The expanded "Probability over time" view (daatan#2300): the Oracul's line with every article
- * it read as a dot — x when first read, y the article's own vote (1 + stance) / 2, size its
- * certainty, colour its side. A modal over the page on wide screens, a full-screen sheet on
+ * in its current pool as a dot — x when first read, y the article's own vote (1 + stance) / 2,
+ * size its certainty, colour its side. A modal over the page on wide screens, a full-screen sheet on
  * phones. Its series is fetched on open (`GET /api/forecasts/[id]/article-dots`).
  */
 export function ArticleDotsView({
@@ -88,7 +89,7 @@ export function ArticleDotsView({
     const ctrl = new AbortController()
     fetch(`/api/forecasts/${encodeURIComponent(forecastId)}/article-dots`, { signal: ctrl.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((body: { dots: ArticleDot[] }) => setLoad({ state: 'ready', dots: body.dots }))
+      .then(({ dots, poolSize, truncated }: DotsBody) => setLoad({ state: 'ready', dots, poolSize, truncated }))
       .catch(() => {
         if (!ctrl.signal.aborted) setLoad({ state: 'error' })
       })
@@ -228,6 +229,11 @@ export function ArticleDotsView({
         </h2>
         {load.state === 'ready' && dots.length > 0 && (
           <p className="text-xs text-gray-500 mt-0.5">{t('subtitle', { count: dots.length })}</p>
+        )}
+        {load.state === 'ready' && load.truncated && (
+          <p data-testid="article-dots-truncated" className="text-xs text-amber-400/80 mt-0.5">
+            {t('truncated', { shown: dots.length, total: load.poolSize })}
+          </p>
         )}
       </div>
       <button

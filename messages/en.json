@@ -2359,13 +2359,14 @@
     "chartLabel": "Chart: the Oracul estimate over time, with each article it read as a dot",
     "legendLine": "Oracul estimate",
     "legendSize": "Bigger dot = more certain",
-    "caption": "Each dot is one article, placed when the Oracul first read it, at the chance its stance implies. The line is not an average of the dots: the Oracul pools them, weighting each by its certainty and its outlet's credibility, and starts from a base rate — so dots far from the line are normal.",
+    "caption": "Each dot is one article, placed when the Oracul first read it, at the chance its stance implies. The line is not an average of the dots: the Oracul pools them, weighting each by its certainty and its outlet's credibility, and starts from a base rate — so dots far from the line are normal. Only articles still in the Oracul's pool appear, at their current reading.",
     "zoomHint": "Drag across the chart to zoom · double-click to reset",
     "presetDays": "{days, plural, one {# day} other {# days}}",
     "rangeAll": "All",
     "firstRead": "First read {date}",
     "untitled": "Untitled article",
     "vote": "{vote} · {pct}%",
-    "dotLabel": "{title} — {outlet}: {vote}"
+    "dotLabel": "{title} — {outlet}: {vote}",
+    "truncated": "Showing the {shown} most certain of {total} articles."
   }
 }

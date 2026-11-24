@@ -13,6 +13,7 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 import { GET } from '../route'
+import { MAX_ARTICLE_DOTS } from '@/lib/article-dots'
 
 const call = (id: string) =>
   GET(new NextRequest(`http://localhost/api/forecasts/${id}/article-dots`), { params: Promise.resolve({ id }) })
@@ -21,8 +22,9 @@ const forecast = (over: Record<string, unknown> = {}) => ({
   id: 'p1', isPublic: true, authorId: 'author', status: 'ACTIVE', ...over,
 })
 
-const sourceRow = (url: string, stance: number | null, at: string) => ({
-  snapshotAt: new Date(at), url, stance, certainty: 0.5, title: `T ${url}`, sourceName: 'Src', outletName: null,
+const sourceRow = (url: string, stance: number | null, firstSeen: string, poolSize = 3) => ({
+  readAt: new Date('2026-11-03T00:00:00Z'), firstSeenAt: new Date(firstSeen), url, stance, certainty: 0.5,
+  title: `T ${url}`, sourceName: 'Src', outletName: null, poolSize,
 })
 
 describe('GET /api/forecasts/[id]/article-dots', () => {
@@ -67,22 +69,25 @@ describe('GET /api/forecasts/[id]/article-dots', () => {
 
   it('serves a public forecast without touching the session, keyed by the resolved id', async () => {
     findFirst.mockResolvedValue(forecast())
+    // Three of a five-article pool came back: the query's cap cut two.
     queryRaw.mockResolvedValue([
-      sourceRow('https://a.com/1', 0.4, '2026-11-01T00:00:00Z'),
-      sourceRow('https://www.a.com/1', -0.4, '2026-11-02T00:00:00Z'),
-      sourceRow('https://b.com/2', null, '2026-11-02T00:00:00Z'),
+      sourceRow('https://a.com/1', 0.4, '2026-11-01T00:00:00Z', 5),
+      sourceRow('https://www.a.com/1', -0.4, '2026-11-02T00:00:00Z', 5),
+      sourceRow('https://b.com/2', null, '2026-11-02T00:00:00Z', 5),
     ])
     const res = await call('my-slug')
     expect(res.status).toBe(200)
     expect(authMock).not.toHaveBeenCalled()
     expect(findFirst.mock.calls[0][0].where).toEqual({ OR: [{ id: 'my-slug' }, { slug: 'my-slug' }] })
 
-    // The projection is bound to the resolved id, never to the slug from the URL.
+    // The query is bound to the resolved id, never to the slug from the URL, and capped.
     const sql = queryRaw.mock.calls[0][0] as { values: unknown[] }
-    expect(sql.values).toEqual(['p1'])
+    expect(sql.values).toEqual(['p1', 'p1', MAX_ARTICLE_DOTS])
 
     const body = await res.json()
     expect(body.predictionId).toBe('p1')
+    expect(body.poolSize).toBe(5)
+    expect(body.truncated).toBe(true)
     expect(body.dots).toEqual([
       {
         url: 'https://www.a.com/1',
@@ -95,5 +100,11 @@ describe('GET /api/forecasts/[id]/article-dots', () => {
         side: 'no',
       },
     ])
+  })
+
+  it('an empty pool is an empty series, not a truncated one', async () => {
+    findFirst.mockResolvedValue(forecast())
+    const body = await (await call('p1')).json()
+    expect(body).toEqual({ predictionId: 'p1', dots: [], poolSize: 0, truncated: false })
   })
 })

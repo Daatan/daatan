@@ -78,7 +78,7 @@ const fetchMock = vi.fn()
 beforeEach(() => {
   lineChartProps = {}
   fetchMock.mockReset()
-  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ predictionId: 'p1', dots: DOTS }) })
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ predictionId: 'p1', dots: DOTS, poolSize: 2, truncated: false }) })
   vi.stubGlobal('fetch', fetchMock)
 })
 
@@ -126,10 +126,18 @@ describe('expanded "every article" chart (daatan#2300)', () => {
     const noDot = within(dialog).getByRole('link', { name: /Untitled article — other\.example: Won't happen · 25%/ })
     expect(noDot.querySelector('circle')).toHaveAttribute('r', String(dotRadius(null)))
     expect(within(dialog).getByText('2 articles read by the Oracul')).toBeInTheDocument()
+    expect(within(dialog).queryByTestId('article-dots-truncated')).toBeNull()
+  })
+
+  it('says how many articles the cap left out when the pool was bigger than the response', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ predictionId: 'p1', dots: DOTS, poolSize: 2500, truncated: true }) })
+    renderChart()
+    fireEvent.click(expandButton())
+    expect(await screen.findByTestId('article-dots-truncated')).toHaveTextContent('Showing the 2 most certain of 2500 articles.')
   })
 
   it('shows the caption while loading and when no article has a stance yet', async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ predictionId: 'p1', dots: [] }) })
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ predictionId: 'p1', dots: [], poolSize: 0, truncated: false }) })
     renderChart()
     fireEvent.click(expandButton())
     expect(screen.getByTestId('article-dots-caption')).toBeInTheDocument()

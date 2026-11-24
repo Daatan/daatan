@@ -2359,13 +2359,14 @@
     "chartLabel": "Grafikaĵo: la takso de la Orakulo laŭ la tempo, kun ĉiu artikolo kiun ĝi legis kiel punkto",
     "legendLine": "Takso de la Orakulo",
     "legendSize": "Pli granda punkto = pli certa",
-    "caption": "Ĉiu punkto estas unu artikolo, metita kiam la Orakulo unue legis ĝin, ĉe la probablo kiun ĝia sinteno implicas. La linio ne estas mezumo de la punktoj: la Orakulo kunigas ilin, pezante ĉiun laŭ ĝia certeco kaj la kredindeco de ĝia eldonejo, kaj komencas de baza ofteco — do punktoj malproksime de la linio estas normalaj.",
+    "caption": "Ĉiu punkto estas unu artikolo, metita kiam la Orakulo unue legis ĝin, ĉe la probablo kiun ĝia sinteno implicas. La linio ne estas mezumo de la punktoj: la Orakulo kunigas ilin, pezante ĉiun laŭ ĝia certeco kaj la kredindeco de ĝia eldonejo, kaj komencas de baza ofteco — do punktoj malproksime de la linio estas normalaj. Montriĝas nur artikoloj ankoraŭ en la provizo de la Orakulo, laŭ ilia nuna legado.",
     "zoomHint": "Trenu trans la grafikaĵo por zomi · duobla klako por restarigi",
     "presetDays": "{days, plural, one {# tago} other {# tagoj}}",
     "rangeAll": "Ĉio",
     "firstRead": "Unue legita {date}",
     "untitled": "Artikolo sen titolo",
     "vote": "{vote} · {pct}%",
-    "dotLabel": "{title} — {outlet}: {vote}"
+    "dotLabel": "{title} — {outlet}: {vote}",
+    "truncated": "Montriĝas la {shown} plej certaj el {total} artikoloj."
   }
 }

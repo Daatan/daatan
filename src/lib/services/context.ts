@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { notifyHighConfidence, notifySettled } from '@/lib/services/telegram'
 import { EVIDENCE_ANCHOR_PTS } from '@/lib/services/oracle-snapshot'
-import type { ArticleDotRow } from '@/lib/article-dots'
+import { MAX_ARTICLE_DOTS, type ArticleDotRow } from '@/lib/article-dots'
 
 const log = createLogger('context-service')
 
@@ -1242,31 +1242,92 @@ export async function getForecastVisibility(idOrSlug: string) {
 }
 
 /**
- * Every `oracleSnapshot.sources[]` entry of a forecast's non-clock snapshots, flattened to the
- * seven keys the expanded chart's article dots read (daatan#2300), oldest snapshot first and in
- * pool order within one. Projected in SQL so the multi-megabyte blobs (per-claim shadow layer,
- * provenance) never leave Postgres; `sourcesSummary` would be lighter still but carries neither
- * certainty nor title. A non-array `sources` and non-numeric stance/certainty read as empty/null
- * instead of failing the whole query on one malformed row. See `buildArticleDots`.
+ * The expanded chart's article dots (daatan#2300), read without re-reading every snapshot's pool:
+ * flattening `oracleSnapshot.sources[]` across all snapshots cost 52.5 s and 1.2M rows on the
+ * biggest prod forecast (1,631 snapshots, ~2 MB of TOAST each). Two cheap reads instead:
+ *
+ * - The readings (y, size, side, title, outlet) are the latest non-clock snapshot's pool — the
+ *   one blob the sources panel reads too (`getLatestOracleSnapshot`).
+ * - The first-seen time per URL is the `sources_delta` chain (daatan#2158): a URL's first
+ *   appearance is an `upsert` of the snapshot that first lists it, so `min("createdAt")` over the
+ *   upserts is exact. A row whose delta is missing or not based on its predecessor (the reader
+ *   rule in migration 20261112000000) is read from its own `sources_summary` instead.
+ *
+ * The two meet in one GROUP BY rather than a join: the planner estimates one row per jsonb set
+ * function, picked a nested loop and spent ~0.5 s re-scanning the aggregate. Only voting entries
+ * (numeric stance) are kept, then the `limit` most certain; `poolSize` is the count before the
+ * cap. Rows come back in pool order. A non-array `sources` reads as an empty pool rather than
+ * failing the query. See `buildArticleDots`.
  */
-export async function getArticleDotRows(predictionId: string): Promise<ArticleDotRow[]> {
+export async function getArticleDotRows(predictionId: string, limit = MAX_ARTICLE_DOTS): Promise<ArticleDotRow[]> {
   return prisma.$queryRaw<ArticleDotRow[]>(Prisma.sql`
-    SELECT cs."createdAt" AS "snapshotAt",
-           src.elem->>'url' AS "url",
-           CASE WHEN jsonb_typeof(src.elem->'stance') = 'number' THEN (src.elem->>'stance')::float8 END AS "stance",
-           CASE WHEN jsonb_typeof(src.elem->'certainty') = 'number' THEN (src.elem->>'certainty')::float8 END AS "certainty",
-           src.elem->>'title' AS "title",
-           src.elem->>'sourceName' AS "sourceName",
-           src.elem->>'outletName' AS "outletName"
-    FROM context_snapshots cs
-    CROSS JOIN LATERAL jsonb_array_elements(
-      CASE WHEN jsonb_typeof(cs.oracle_snapshot->'sources') = 'array'
-           THEN cs.oracle_snapshot->'sources'
-           ELSE '[]'::jsonb END
-    ) WITH ORDINALITY AS src(elem, ord)
-    WHERE cs."predictionId" = ${predictionId}
-      AND cs.kind <> 'clock'
-      AND jsonb_typeof(src.elem) = 'object'
-    ORDER BY cs."createdAt" ASC, cs.id ASC, src.ord ASC
+    WITH latest AS MATERIALIZED (
+      SELECT cs."createdAt", cs.oracle_snapshot -> 'sources' AS sources
+      FROM context_snapshots cs
+      WHERE cs.id = (
+        SELECT l.id FROM context_snapshots l
+        WHERE l."predictionId" = ${predictionId} AND l.kind <> 'clock' AND l.oracle_snapshot IS NOT NULL
+        ORDER BY l."createdAt" DESC, l.id DESC
+        LIMIT 1)
+    ),
+    cur AS (
+      SELECT src.elem ->> 'url' AS url, src.ord, src.elem
+      FROM latest l
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(l.sources) = 'array' THEN l.sources ELSE '[]'::jsonb END
+      ) WITH ORDINALITY AS src(elem, ord)
+      WHERE jsonb_typeof(src.elem) = 'object'
+        AND jsonb_typeof(src.elem -> 'url') = 'string'
+        AND jsonb_typeof(src.elem -> 'stance') = 'number'
+    ),
+    chain AS (
+      SELECT cs.id, cs."createdAt",
+             cs.sources_delta IS NOT NULL
+               AND (cs.sources_delta ->> 'base') IS NOT DISTINCT FROM lag(cs.id) OVER (ORDER BY cs."createdAt", cs.id) AS delta_ok
+      FROM context_snapshots cs
+      WHERE cs."predictionId" = ${predictionId} AND cs.kind = 'evidence' AND cs.oracle_snapshot IS NOT NULL
+    ),
+    history AS (
+      SELECT r.elem ->> 'url' AS url, c."createdAt" AS seen_at
+      FROM chain c
+      JOIN context_snapshots cs ON cs.id = c.id
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN c.delta_ok AND jsonb_typeof(cs.sources_delta -> 'upsert') = 'array' THEN cs.sources_delta -> 'upsert'
+             WHEN jsonb_typeof(cs.sources_summary) = 'array' THEN cs.sources_summary
+             ELSE '[]'::jsonb END
+      ) AS r(elem)
+      WHERE jsonb_typeof(r.elem -> 'url') = 'string'
+    ),
+    merged AS (
+      SELECT u.url,
+             min(u.seen_at) AS first_seen,
+             max(u.ord) AS ord,
+             (array_agg(u.elem ORDER BY u.ord DESC) FILTER (WHERE u.ord IS NOT NULL))[1] AS elem
+      FROM (
+        SELECT h.url, NULL::bigint AS ord, NULL::jsonb AS elem, h.seen_at FROM history h
+        UNION ALL
+        SELECT c.url, c.ord, c.elem, NULL FROM cur c
+      ) u
+      GROUP BY u.url
+      HAVING count(u.ord) > 0
+    ),
+    ranked AS (
+      SELECT m.url, m.first_seen, m.ord, m.elem, count(*) OVER () AS pool_size
+      FROM merged m
+      ORDER BY CASE WHEN jsonb_typeof(m.elem -> 'certainty') = 'number' THEN (m.elem ->> 'certainty')::float8 END DESC NULLS LAST,
+               m.ord
+      LIMIT ${limit}::int
+    )
+    SELECT (SELECT l."createdAt" FROM latest l) AS "readAt",
+           r.first_seen AS "firstSeenAt",
+           r.url AS "url",
+           (r.elem ->> 'stance')::float8 AS "stance",
+           CASE WHEN jsonb_typeof(r.elem -> 'certainty') = 'number' THEN (r.elem ->> 'certainty')::float8 END AS "certainty",
+           r.elem ->> 'title' AS "title",
+           r.elem ->> 'sourceName' AS "sourceName",
+           r.elem ->> 'outletName' AS "outletName",
+           r.pool_size::int AS "poolSize"
+    FROM ranked r
+    ORDER BY r.ord
   `)
 }
