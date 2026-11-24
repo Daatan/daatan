@@ -31,6 +31,7 @@ export const LLM_STAGES = [
   'claim_definedness',
   'retro_event_judge',
   'retro_event_check',
+  'topic_suggest',
 ] as const
 
 export type LlmStage = (typeof LLM_STAGES)[number]

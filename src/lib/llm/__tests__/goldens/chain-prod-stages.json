@@ -1381,6 +1381,77 @@
     ]
   },
   {
+    "stage": "topic_suggest",
+    "file": "lib/services/topic-suggestions/suggest.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:cc26041087d0917f",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          60000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
     "stage": "translation",
     "file": "lib/services/translation.ts",
     "legs": [

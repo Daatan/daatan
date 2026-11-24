@@ -199,6 +199,16 @@
     }
   },
   {
+    "stage": "topic_suggest",
+    "file": "lib/services/topic-suggestions/suggest.ts",
+    "model": null,
+    "params": {
+      "googleTimeoutMs": 60000,
+      "schema": "expr: topicSuggestSchema",
+      "temperature": 0
+    }
+  },
+  {
     "stage": "translation",
     "file": "lib/services/translation.ts",
     "model": null,

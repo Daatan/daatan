@@ -239,6 +239,33 @@ Oracul's stance per source) for a hand-read. The workflow judges 30 clusters by 
 default is 40): 40 took 70–89 s on prod, against the 118 s limit on the candidates call. The simulate step needs the news
 indexer's `/search/before` (news-indexer#542) and the app's `NEWS_INDEXER_URL` and API key.
 
+## Forward questions (daatan#2308)
+
+The candidates step finds what the news is talking about and looks back ("X happened"). The
+same input also yields questions that look forward ("will X happen next?"). `POST
+/api/admin/topic-suggestions` (`findTopicSuggestions`, the `topic-suggest` prompt) reuses
+`loadPoolReports` and `clusterReports`. It keeps the clusters from at least two outlets and
+sends them all to the model in one call, together with the open forecasts their articles are
+matched to. Then:
+
+- **Fold.** The model folds the clusters into stories. Average linkage under-merges a big story
+  (the coalition was 17 of the 47 multi-source clusters in the week to 2026-11-24), and only a
+  reader of every cluster can tell that they are one story.
+- **Ask.** It writes zero to three questions per story. Each must be open, decided by one
+  reported outcome, uncertain, and not already asked: `coveredBy` names the open forecast that
+  asks it.
+- **Check.** `validateSuggestions` checks the deadline (7 days to 5 years) and the `{DEADLINE}`
+  token, and caps the run at 3 per story and 12 in total. An embedding backstop drops a claim
+  at 0.95 or more to any forecast and shows the closest one from 0.85 up.
+
+Stage 1 writes nothing. The dispatch-only `Topic Suggestions` workflow puts the answer in its
+run summary and a `topic-suggestions` artifact, for an admin to read. The hand-read of one week
+(issue comment, 2026-11-24) found about 11 stories and 6–7 good new questions. Every story
+already had a forecast, by construction: the pool only holds articles matched to forecasts, so
+this source asks the next step inside stories Daatan already follows. It never surfaces a story
+Daatan has no forecast on. Drafting the suggestions into the approval queue under the Daatan
+account is a later step, once the suggestions have been read.
+
 ## Known limits
 
 - **The event day is the judge's reading.** If it puts the event later than it really

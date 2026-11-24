@@ -662,6 +662,79 @@
       ]
     }
   },
+  "topicSuggestSchema": {
+    "sha256": "cc26041087d0917f",
+    "schema": {
+      "description": "This week's stories from clustered news reports, with the open forecast questions each one raises",
+      "type": "object",
+      "properties": {
+        "stories": {
+          "type": "array",
+          "description": "One entry per story.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "A short name for the story, a few words."
+              },
+              "groups": {
+                "type": "array",
+                "description": "The numbers of the report groups that belong to this story.",
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "questions": {
+                "type": "array",
+                "description": "Zero to three open questions about what happens next in this story.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "claim": {
+                      "type": "string",
+                      "description": "Future-tense declarative forecast ending with \"by {DEADLINE}\". Empty when coveredBy is set."
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "description": "YYYY-MM-DD by which the outcome will be known. Empty when coveredBy is set."
+                    },
+                    "resolutionRules": {
+                      "type": "string",
+                      "description": "Two or three sentences on what counts as YES by {DEADLINE}. Empty when coveredBy is set."
+                    },
+                    "coveredBy": {
+                      "type": "integer",
+                      "description": "Number of the open forecast that already asks this question; 0 for none."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "One short sentence on why this is open and worth asking."
+                    }
+                  },
+                  "required": [
+                    "claim",
+                    "deadline",
+                    "resolutionRules",
+                    "coveredBy",
+                    "reason"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "title",
+              "groups",
+              "questions"
+            ]
+          }
+        }
+      },
+      "required": [
+        "stories"
+      ]
+    }
+  },
   "voteDecisionSchema": {
     "sha256": "760c1ac2e80b7285",
     "schema": {
