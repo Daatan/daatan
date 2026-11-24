@@ -1,0 +1,10 @@
+{
+  "chain.google": "gemini-2.5-flash",
+  "chain.openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+  "chain.oracle": "bedrock/amazon.nova-pro-v1:0",
+  "embedding": "gemini-embedding-2",
+  "evidence_second_opinion": "bedrock/us.anthropic.claude-sonnet-5-5",
+  "grounded_date": "gemini-2.5-flash",
+  "panel.vertex": "google/gemini-3.5-flash-lite",
+  "research_verdict": "gemini-2.5-pro"
+}

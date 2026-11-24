@@ -1,0 +1,322 @@
+[
+  {
+    "member": {
+      "model": "qwen.qwen3-235b-a22b-2507-v1:0",
+      "mode": "ungrounded",
+      "route": "bedrock"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "eu-central-1",
+        "body": {
+          "modelId": "qwen.qwen3-235b-a22b-2507-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "deepseek.v3.2",
+      "mode": "ungrounded",
+      "route": "bedrock",
+      "region": "us-east-1"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "us-east-1",
+        "body": {
+          "modelId": "deepseek.v3.2",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "google/gemini-3.5-flash-lite",
+      "mode": "ungrounded",
+      "route": "vertex"
+    },
+    "requests": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.5-flash-lite:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0,
+            "maxOutputTokens": 64,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            },
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:06b0e3faa31aa0df"
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "mistral.mistral-large-3-675b-instruct",
+      "mode": "ungrounded",
+      "route": "bedrock",
+      "region": "us-east-1"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "us-east-1",
+        "body": {
+          "modelId": "mistral.mistral-large-3-675b-instruct",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "google.gemma-3-4b-it",
+      "mode": "ungrounded",
+      "route": "bedrock",
+      "region": "us-east-1"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "us-east-1",
+        "body": {
+          "modelId": "google.gemma-3-4b-it",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "qwen.qwen3-235b-a22b-2507-v1:0",
+      "mode": "grounded-indexer",
+      "route": "bedrock"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "eu-central-1",
+        "body": {
+          "modelId": "qwen.qwen3-235b-a22b-2507-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "deepseek.v3.2",
+      "mode": "grounded-indexer",
+      "route": "bedrock",
+      "region": "us-east-1"
+    },
+    "requests": [
+      {
+        "leg": "bedrock",
+        "url": "converse",
+        "region": "us-east-1",
+        "body": {
+          "modelId": "deepseek.v3.2",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "inferenceConfig": {
+            "maxTokens": 64,
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "google/gemini-3.5-flash-lite",
+      "mode": "grounded-indexer",
+      "route": "vertex"
+    },
+    "requests": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.5-flash-lite:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "temperature": 0,
+            "maxOutputTokens": 64,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            },
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:06b0e3faa31aa0df"
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "member": {
+      "model": "test/openrouter-member",
+      "mode": "ungrounded",
+      "route": "openrouter"
+    },
+    "requests": [
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "test/openrouter-member",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "max_tokens": 64,
+          "response_format": {
+            "type": "json_schema",
+            "json_schema": "sha256:30b63478561a6aba"
+          },
+          "reasoning": {
+            "enabled": false
+          },
+          "provider": {
+            "order": [],
+            "allow_fallbacks": false
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,1581 @@
+[
+  {
+    "stage": "ai_estimate",
+    "file": "lib/services/ai-estimate.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "backfill_rules",
+    "file": "app/api/admin/forecasts/backfill-rules/route.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:27be7d5cc54e059a",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "claim_definedness",
+    "file": "lib/llm/claimDefinedness.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:ced428afb74eff8d",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "context_summary",
+    "file": "app/api/forecasts/[id]/context/route.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "express_draft",
+    "file": "lib/llm/expressPrediction.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:5cfec4f1255aef42",
+            "temperature": 0.2,
+            "thinkingConfig": {
+              "thinkingBudget": 512
+            }
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "express_draft",
+    "file": "lib/llm/expressPrediction.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:5cfec4f1255aef42",
+            "temperature": 0.2,
+            "thinkingConfig": {
+              "thinkingBudget": 512
+            }
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "express_topic",
+    "file": "lib/llm/expressPrediction.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "guess_chances",
+    "file": "lib/llm/expressPrediction.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:23d6ee05b2166419",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "headline",
+    "file": "lib/llm/headline.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "moderation",
+    "file": "lib/services/moderation.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:301354de80dc237e",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "prediction_extract",
+    "file": "lib/llm/gemini.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:35dba167662ff278",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "relation_typer",
+    "file": "lib/services/relation-typer.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:d1a892d64983fc25",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "research_queries",
+    "file": "lib/services/resolutionResearch.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:bfe4d75fe81d70fb",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "research_verdict",
+    "file": "lib/services/resolutionResearch.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-pro:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:b93236f952e555cd",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          75000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "retro_event_check",
+    "file": "lib/services/retro-generator/check.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:cdb8d186146bce62",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          25000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "retro_event_judge",
+    "file": "lib/services/retro-generator/judge.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:fefcc8bf78590089",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "rules_direction",
+    "file": "lib/llm/rulesDirection.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:69f218a19e93fc3a",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "rules_strength",
+    "file": "lib/llm/rulesStrength.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:61c9938bf39f33b0",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "search_query",
+    "file": "lib/llm/searchQuery.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "tags",
+    "file": "lib/llm/gemini.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:c0354bcae6754eb2",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "temporal_classifier",
+    "file": "lib/services/temporal-classifier.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:828ef7790960178e",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "translation",
+    "file": "lib/services/translation.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "stage": "translation_detect",
+    "file": "lib/services/translation.ts",
+    "legs": [
+      {
+        "leg": "vertex",
+        "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "meta-llama/llama-3.3-70b-instruct:free",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  }
+]

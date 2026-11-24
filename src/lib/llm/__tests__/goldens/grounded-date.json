@@ -1,0 +1,29 @@
+[
+  {
+    "leg": "vertex",
+    "url": "https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-2.5-flash:generateContent",
+    "body": {
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "<prompt>"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "googleSearch": {}
+        }
+      ],
+      "generationConfig": {
+        "temperature": 0
+      }
+    },
+    "timers": [
+      15000
+    ]
+  }
+]

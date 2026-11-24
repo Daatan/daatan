@@ -1,0 +1,320 @@
+[
+  {
+    "case": "text",
+    "legs": [
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "admin/chosen-model",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "ollama",
+        "url": "http://ollama.test:11434/api/generate",
+        "body": {
+          "model": "qwen2.5:7b",
+          "prompt": "<prompt>",
+          "stream": false,
+          "options": {
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "case": "schema",
+    "legs": [
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": "sha256:59c23259e0885dbc",
+            "temperature": 0
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "admin/chosen-model",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You must respond with valid JSON only. No markdown, no explanation — only the JSON object."
+            },
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "ollama",
+        "url": "http://ollama.test:11434/api/generate",
+        "body": {
+          "model": "qwen2.5:7b",
+          "prompt": "<prompt>",
+          "format": "json",
+          "stream": false,
+          "options": {
+            "temperature": 0
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "case": "no-temperature",
+    "legs": [
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "text/plain"
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.1,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "admin/chosen-model",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.7
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "ollama",
+        "url": "http://ollama.test:11434/api/generate",
+        "body": {
+          "model": "qwen2.5:7b",
+          "prompt": "<prompt>",
+          "stream": false,
+          "options": {}
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  },
+  {
+    "case": "thinking",
+    "legs": [
+      {
+        "leg": "gemini",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "body": {
+          "generationConfig": {
+            "responseMimeType": "text/plain",
+            "temperature": 0.2,
+            "thinkingConfig": {
+              "thinkingBudget": 512
+            }
+          },
+          "safetySettings": [],
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "<prompt>"
+                }
+              ]
+            }
+          ]
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "oracle",
+        "url": "/llm",
+        "body": {
+          "model": "bedrock/amazon.nova-pro-v1:0",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2,
+          "timeoutMs": 60000
+        },
+        "timers": []
+      },
+      {
+        "leg": "openrouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "body": {
+          "model": "admin/chosen-model",
+          "messages": [
+            {
+              "role": "user",
+              "content": "<prompt>"
+            }
+          ],
+          "temperature": 0.2
+        },
+        "timers": [
+          30000
+        ]
+      },
+      {
+        "leg": "ollama",
+        "url": "http://ollama.test:11434/api/generate",
+        "body": {
+          "model": "qwen2.5:7b",
+          "prompt": "<prompt>",
+          "stream": false,
+          "options": {
+            "temperature": 0.2
+          }
+        },
+        "timers": [
+          30000
+        ]
+      }
+    ]
+  }
+]
