@@ -50,9 +50,12 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     keywords: globalKeywords('en'),
     icons: {
+      // favicon.svg is cropped to the mark for tab sizes (daatan#2310); logo-icon.png's
+      // wide margins drew it at half the size of other sites' icons. The ico is labelled
+      // 32x32, not `any`, so browsers that support SVG favicons pick the SVG.
       icon: [
-        { url: '/favicon.ico', sizes: 'any' },
-        { url: '/logo-icon.png', type: 'image/png', sizes: '512x512' },
+        { url: '/favicon.ico', sizes: '32x32' },
+        { url: '/favicon.svg', type: 'image/svg+xml' },
       ],
       apple: '/apple-touch-icon.png',
     },
