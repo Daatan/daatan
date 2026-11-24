@@ -251,11 +251,18 @@ matched to. Then:
 - **Fold.** The model folds the clusters into stories. Average linkage under-merges a big story
   (the coalition was 17 of the 47 multi-source clusters in the week to 2026-11-24), and only a
   reader of every cluster can tell that they are one story.
-- **Ask.** It writes zero to three questions per story. Each must be open, decided by one
+- **Ask.** It writes up to three new questions per story, preferring fewer: most stories have
+  one or two, and a market or sports story rarely has any. Each must be open, decided by one
   reported outcome, uncertain, and not already asked: `coveredBy` names the open forecast that
-  asks it.
+  asks it, and a covered question does not use up one of the three. Daatan usually already asks
+  a story's headline question, so prompt v2 sends the model to the steps the story is waiting
+  on: a mandate extension, a coalition agreement, charges, a vote. A step's default deadline is
+  the end of the month about 90 days out (`stepDeadline`); the year-end horizon is for questions
+  about how the whole story ends.
 - **Check.** `validateSuggestions` checks the deadline (7 days to 5 years) and the `{DEADLINE}`
-  token, and caps the run at 3 per story and 12 in total. An embedding backstop drops a claim
+  token, skips non-event wording (`cease`, `remain`, `continue`, `expire`, `will not`,
+  `consecutive`: such a claim comes true by default, cannot be confirmed or is a statistic), and
+  caps the run at 3 per story and 12 in total. An embedding backstop drops a claim
   at 0.95 or more to any forecast and shows the closest one from 0.85 up.
 
 Stage 1 writes nothing. The dispatch-only `Topic Suggestions` workflow puts the answer in its
@@ -265,6 +272,16 @@ already had a forecast, by construction: the pool only holds articles matched to
 this source asks the next step inside stories Daatan already follows. It never surfaces a story
 Daatan has no forecast on. Drafting the suggestions into the approval queue under the Daatan
 account is a later step, once the suggestions have been read.
+
+The first production run of prompt v1 (2026-11-24) found 9 stories but wrote only 2 questions,
+both close to existing forecasts: the model asked each story's headline question, found it
+covered and stopped. `scripts/replay-topic-suggest.ts` replays a frozen week (a fixture built
+from a read-only export, kept out of the repo) through the app's own prompt rendering and
+`validateSuggestions`, three runs each. On the week to 2026-11-24, v1 gave 2 questions in every
+run. v2 gave the same 5 in all three: three steps in the coalition story (an extension request
+for the mandate, Likud dropping Ben Gvir, a government within the first 28 days), Huang's
+reappointment and charges in the Megaspeed case. Drafts without "prefer fewer" gave up to 12, but filled them with streaks, price swings and
+"another strike".
 
 ## Known limits
 
