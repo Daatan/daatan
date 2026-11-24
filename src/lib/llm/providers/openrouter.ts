@@ -8,6 +8,10 @@ const OPENROUTER_TIMEOUT_MS = 30_000
 
 export class OpenRouterProvider implements LLMProvider {
   name = 'OpenRouter'
+
+  modelFor(): string {
+    return this.modelName
+  }
   private apiKey: string
   private modelName: string
   private baseUrl: string

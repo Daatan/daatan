@@ -20,8 +20,8 @@ process.env.SKIP_ENV_VALIDATION = '1'
 async function main() {
   const { HEADLINE_PROMPT, polarityMatches, polarityRetryHint } = await import('../src/lib/llm/headline')
   const { stageModel } = await import('../src/lib/llm/stageModels')
-  const model = process.env.HEADLINE_MODEL || stageModel('headline', 'gemini-2.5-flash')
-  const tModel = process.env.TRANSLATE_MODEL || stageModel('translation', 'gemini-2.5-flash')
+  const model = process.env.HEADLINE_MODEL || stageModel('headline')
+  const tModel = process.env.TRANSLATE_MODEL || stageModel('translation')
   const token = process.env.VERTEX_ACCESS_TOKEN || execSync('gcloud auth print-access-token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   const cases: { claim: string; old?: string }[] = JSON.parse(readFileSync(process.env.CLAIMS_FILE || 'claims.json', 'utf8'))
 

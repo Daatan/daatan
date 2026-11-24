@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../index', () => ({ llmService: { generateContent: vi.fn() } }))
 
 import { llmService } from '../index'
-import { buildSearchQuery, SEARCH_QUERY_THINKING_BUDGET } from '../searchQuery'
+import { STAGES } from '../registry'
+import { buildSearchQuery } from '../searchQuery'
 
 describe('buildSearchQuery', () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe('buildSearchQuery', () => {
     vi.mocked(llmService.generateContent).mockResolvedValue({ text: 'Real Madrid Champions League' } as never)
     const q = await buildSearchQuery('Real Madrid will win the 2027 Champions League')
     expect(q).toBe('Real Madrid Champions League')
-    expect(SEARCH_QUERY_THINKING_BUDGET).toBe(0)
+    expect(STAGES.search_query.params.reasoningBudget).toBe(0)
     expect(llmService.generateContent).toHaveBeenCalledWith(
       expect.objectContaining({ stage: 'search_query', thinkingBudget: 0, temperature: 0 }),
     )

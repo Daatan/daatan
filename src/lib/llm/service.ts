@@ -1,8 +1,29 @@
 import { LLMProvider, LLMRequest, LLMResponse } from './types'
+import { applyQuirks } from './quirks'
+import type { ModelParams } from './registry'
 import { createLogger } from '@/lib/logger'
 import { notifyLlmError } from '@/lib/services/telegram'
 
 const log = createLogger('llm-service')
+
+/** `request` as `provider`'s model should receive it — its registry quirks applied. */
+export function withModelQuirks(provider: LLMProvider, request: LLMRequest): LLMRequest {
+  const model = provider.modelFor?.(request)
+  if (!model) return request
+  const params: ModelParams = {
+    ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+    ...(request.thinkingBudget !== undefined ? { reasoningBudget: request.thinkingBudget } : {}),
+  }
+  const out = applyQuirks(model, params, request.forceParams)
+  if (out === params) return request
+  if (out.maxTokens !== undefined) {
+    throw new Error(`model registry: a quirk of ${model} sets maxTokens, which the main chain does not send yet`)
+  }
+  const legRequest: LLMRequest = { ...request, temperature: out.temperature, thinkingBudget: out.reasoningBudget }
+  if (out.temperature === undefined) delete legRequest.temperature
+  if (out.reasoningBudget === undefined) delete legRequest.thinkingBudget
+  return legRequest
+}
 
 export class ResilientLLMService {
   private providers: LLMProvider[]
@@ -32,7 +53,8 @@ export class ResilientLLMService {
         : request.signal
       try {
         log.info({ provider: provider.name, stage }, 'llm: start')
-        const response = await provider.generateContent(legSignal === request.signal ? request : { ...request, signal: legSignal })
+        const legRequest = withModelQuirks(provider, request)
+        const response = await provider.generateContent(legSignal === request.signal ? legRequest : { ...legRequest, signal: legSignal })
         log.info(
           { provider: provider.name, stage, durationMs: Date.now() - t0, tokens: response.usage?.totalTokens },
           'llm: success',

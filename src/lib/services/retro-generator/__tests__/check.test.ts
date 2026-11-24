@@ -7,7 +7,8 @@ vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn() } }))
 import { llmService } from '@/lib/llm'
 import { retroEventCheckSchema } from '@/lib/llm/schemas'
 import type { NewsBeforeArticle } from '@/lib/services/news-indexer'
-import { buildEventCheckPrompt, checkRetroEvent, CHECK_GOOGLE_TIMEOUT_MS, CHECK_TIMEOUT_MS, validateEventCheck, type EventCheckInput, type NearForecast } from '../check'
+import { STAGES } from '@/lib/llm/registry'
+import { buildEventCheckPrompt, checkRetroEvent, CHECK_TIMEOUT_MS, validateEventCheck, type EventCheckInput, type NearForecast } from '../check'
 
 const article = (url: string, title: string, snippet: string | null = 'snip', text: string | null = 'body'): NewsBeforeArticle => ({
   title, url, snippet, source: 'x.com', language: 'en', published_date: '2026-11-01',
@@ -116,8 +117,8 @@ describe('checkRetroEvent', () => {
     vi.mocked(llmService.generateContent).mockResolvedValue({ text: JSON.stringify(answer) })
     await checkRetroEvent(input)
     const req = vi.mocked(llmService.generateContent).mock.calls[0][0]
-    expect(req.googleTimeoutMs).toBe(CHECK_GOOGLE_TIMEOUT_MS)
-    expect(CHECK_TIMEOUT_MS - CHECK_GOOGLE_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000)
+    expect(req.googleTimeoutMs).toBe(STAGES.retro_event_check.timeoutMs)
+    expect(CHECK_TIMEOUT_MS - STAGES.retro_event_check.timeoutMs!).toBeGreaterThanOrEqual(10_000)
   })
 
   it('notes a fallback model', async () => {

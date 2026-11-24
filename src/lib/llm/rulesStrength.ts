@@ -38,7 +38,6 @@ export async function checkRulesStrength(claimText: string, resolutionRules: str
       ...forStage('rules_strength'),
       prompt: fillPrompt(template, { claimText, resolutionRules }),
       schema: rulesStrengthSchema,
-      temperature: 0,
     })
     const parsed = JSON.parse(result.text) as { yesTrigger?: string; weaker?: boolean; kind?: string; fixedRules?: string }
     const weaker = parsed.weaker === true

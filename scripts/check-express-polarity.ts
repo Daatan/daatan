@@ -61,7 +61,7 @@ async function main() {
     const { expressPredictionSchema } = await import('../src/lib/llm/expressPrediction')
     const { stageModel } = await import('../src/lib/llm/stageModels')
 
-    const model = process.env.EXPRESS_MODEL || stageModel('express_draft', 'gemini-2.5-flash')
+    const model = process.env.EXPRESS_MODEL || stageModel('express_draft')
     const judgeModel = process.env.JUDGE_MODEL || 'gemini-2.5-flash'
     const project = process.env.GOOGLE_VERTEX_PROJECT_ID || 'daatan'
     const token = process.env.VERTEX_ACCESS_TOKEN || execSync('gcloud auth print-access-token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()

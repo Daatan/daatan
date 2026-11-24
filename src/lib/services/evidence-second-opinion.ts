@@ -4,6 +4,7 @@ import { createLogger } from '@/lib/logger'
 import { env } from '@/env'
 import { getOraculForecast, type OracleFailureClass } from '@/lib/services/oracle'
 import type { EvidenceSecondOpinionIssue } from '@/lib/services/telegram'
+import { EVIDENCE_SECOND_OPINION } from '@/lib/llm/registry'
 
 const log = createLogger('evidence-second-opinion')
 
@@ -55,10 +56,9 @@ export const MAX_REEXTRACTIONS_PER_RUN = 10
  *  is expected, not itself evidence of a bug. */
 export const SOURCE_DRIFT_TRIGGER_PP = 25
 
-const DEFAULT_EXPENSIVE_MODEL = 'bedrock/us.anthropic.claude-sonnet-5-5'
-
+/** The registry's model; the env override goes once the registry is verified (daatan#2287). */
 function expensiveModel(): string {
-  return env.EVIDENCE_SECOND_OPINION_MODEL || DEFAULT_EXPENSIVE_MODEL
+  return env.EVIDENCE_SECOND_OPINION_MODEL || EVIDENCE_SECOND_OPINION.model
 }
 
 function stancePct(stance: number): number {

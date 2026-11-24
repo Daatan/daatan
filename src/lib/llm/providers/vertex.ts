@@ -19,7 +19,7 @@ import { googleAccessToken } from '@/lib/services/google-auth'
  * real differences are the endpoint and Bearer auth instead of `?key=`.
  */
 
-const VERTEX_TIMEOUT_MS = 30_000
+export const VERTEX_TIMEOUT_MS = 30_000
 
 /** Vertex is authorised by ordinary GCP scope, not a per-API scope. */
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
@@ -81,6 +81,10 @@ export function vertexAccessToken(env: VertexEnv): Promise<string> {
 
 export class VertexProvider implements LLMProvider {
   name = 'Vertex'
+
+  modelFor(request: LLMRequest): string {
+    return request.model ?? this.config.modelName
+  }
   private config: VertexConfig
 
   constructor(config: VertexConfig) {

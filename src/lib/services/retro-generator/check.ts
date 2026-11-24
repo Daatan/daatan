@@ -23,11 +23,6 @@ const MAX_EXCERPT_CHARS = 400
  * fallback answered it in 5 s.
  */
 export const CHECK_TIMEOUT_MS = 35_000
-/**
- * The Google leg's own limit, below its 30 s default so that the fallback, which now stops at
- * {@link CHECK_TIMEOUT_MS} too, keeps about twice the 5 s it took (daatan#2229).
- */
-export const CHECK_GOOGLE_TIMEOUT_MS = 25_000
 
 export interface NearForecast {
   id: string
@@ -137,9 +132,7 @@ export async function checkRetroEvent(input: EventCheckInput): Promise<EventChec
       ...forStage('retro_event_check'),
       prompt: await buildEventCheckPrompt(input),
       schema: retroEventCheckSchema,
-      temperature: 0,
       signal,
-      googleTimeoutMs: CHECK_GOOGLE_TIMEOUT_MS,
     })
     const checked = validateEventCheck(JSON.parse(result.text) as Record<string, unknown>, input.articles, input.near)
     return checked.ok && result.fallbackProvider ? { ...checked, modelNote: `answered by ${result.fallbackProvider}` } : checked

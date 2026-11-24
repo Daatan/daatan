@@ -9,89 +9,86 @@ import { createLogger } from '@/lib/logger'
 import { isSelfHosted } from '@/lib/edition'
 import { getOpenRouterKey, getOpenRouterModel } from '@/lib/services/settings'
 import { getOracleConfig } from '@/lib/services/oracleClient'
+import { CHAIN, chainModel, EVIDENCE_SECOND_OPINION } from './registry'
+import { LLM_STAGES, stageModel, stageModelSource } from './stageModels'
 
 const log = createLogger('llm')
 
 // Configuration
 const geminiApiKey = process.env.GEMINI_API_KEY || ''
 
-/** One model name for both Google legs — they must not silently diverge. */
-const GEMINI_MODEL = 'gemini-2.5-flash'
-
-// The Oracul fallback leg runs on AWS Bedrock / Amazon Nova (a different vendor
-// from Google), so it can serve precisely when Gemini/Google is unavailable. We
-// pin an explicit model rather than inherit the Oracul's pipeline default.
-const ORACLE_FALLBACK_MODEL = 'bedrock/amazon.nova-pro-v1:0'
-
-// OpenRouter no longer offers a free Gemini model (the :free Gemini slugs now
-// 404). Both the SaaS main-chain fallback and the Gemini-preference bot leg use
-// this free NON-Google model — it's only reached when direct Gemini is down, so
-// it must not route back to Google, and it can actually serve during a Google outage.
-const OPENROUTER_FREE_FALLBACK_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
-
-// Build the main service's provider list in priority order:
-//   Gemini → Oracul (Bedrock/Nova) → OpenRouter → Ollama
-// Each leg registers only when it's configured, so a call is never Gemini-only in
-// practice. The OpenRouter/Oracul keys are read at build time from admin settings
-// (DB) → env, so re-running this after the settings cache warms (or after the admin
-// saves a key) picks it up without a restart — see rebuildLlmService().
+// The main service's legs, in the registry's chain order (registry.ts `CHAIN`). Each leg
+// registers only when it's configured, so a call is never single-vendor in practice. The
+// OpenRouter/Oracul keys are read at build time from admin settings (DB) → env, so
+// re-running this after the settings cache warms (or after the admin saves a key) picks
+// it up without a restart — see rebuildLlmService().
 function buildProviders(): LLMProvider[] {
   const providers: LLMProvider[] = []
-
-  // Primary: Gemini via Vertex (#1472), when its service account is provisioned.
-  // Same model, same schemas — only the billing surface differs, and Vertex has no
-  // prepaid balance that can hit zero. Registered AHEAD of the Developer-API leg
-  // rather than replacing it: if Vertex is misconfigured or its quota is exhausted,
-  // the key-based leg below is right behind it and the chain still serves. Daatan's
-  // own SaaS containers no longer carry GEMINI_API_KEY (#1472), so in production
-  // that leg does not register at all and the chain falls through to Oracul/Bedrock
-  // — a different vendor, which is the more useful fallback anyway. The leg stays in
-  // the code for the self-host edition, where a Developer API key is the easy path.
-  const vertex = vertexEnv()
-  if (vertex) {
-    providers.push(new VertexProvider({ ...vertex, modelName: GEMINI_MODEL }))
+  for (const leg of CHAIN) {
+    if (leg.provider === 'google') {
+      // Gemini via Vertex (#1472), when its service account is provisioned, AHEAD of the
+      // Developer-API leg rather than replacing it: if Vertex is misconfigured or out of
+      // quota, the key-based leg is right behind it. Daatan's own SaaS containers carry no
+      // GEMINI_API_KEY (#1472), so in production that leg does not register and the chain
+      // falls through to the next vendor. It stays for the self-host edition, where a
+      // Developer API key is the easy path.
+      const vertex = vertexEnv()
+      if (vertex) providers.push(new VertexProvider({ ...vertex, modelName: leg.model }))
+      if (geminiApiKey) {
+        providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: leg.model }))
+      } else if (!vertex) {
+        log.warn(
+          'Neither GOOGLE_VERTEX_* nor GEMINI_API_KEY is set; both Google legs will be ' +
+          'disabled. Only fallback providers will be used.',
+        )
+      }
+    } else if (leg.provider === 'oracle') {
+      // The Oracul's /llm — a no-op on self-host installs that don't reach Daatan's Oracul.
+      const oracleConfig = getOracleConfig()
+      if (oracleConfig) providers.push(new OracleProvider(oracleConfig, leg.model))
+    } else if (leg.provider === 'openrouter') {
+      // Both editions, whenever a key is configured (admin setting → env). Self-host runs
+      // it as a user-facing provider on the admin-chosen model (a documented runtime
+      // choice); SaaS only as the last-resort backstop on the registry's model.
+      const openrouterApiKey = getOpenRouterKey()
+      if (openrouterApiKey) {
+        const openrouterModel = isSelfHosted() ? getOpenRouterModel() : leg.model
+        providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: openrouterModel }))
+      }
+    } else {
+      // Skipping the localhost:11434 default avoids a dead provider slot (and its false
+      // "provider failed" pages) on hosts that don't run Ollama, e.g. prod.
+      const ollamaBaseUrl = process.env.OLLAMA_BASE_URL
+      if (ollamaBaseUrl) providers.push(new OllamaProvider({ baseUrl: ollamaBaseUrl, modelName: leg.model }))
+    }
   }
-
-  // Direct Gemini (Developer API, key-based). In CI/test we often have no key, so
-  // skip it and rely on the fallbacks below.
-  if (geminiApiKey) {
-    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: GEMINI_MODEL }))
-  } else if (!vertex) {
-    log.warn(
-      'Neither GOOGLE_VERTEX_* nor GEMINI_API_KEY is set; both Google legs will be ' +
-      'disabled. Only fallback providers will be used.',
-    )
-  }
-
-  // Fallback 1: the Oracul's /llm (AWS Bedrock / Amazon Nova) — a different vendor
-  // from Google, so it survives a Gemini/Google outage. Registered whenever the
-  // Oracul is configured (ORACLE_URL + ORACLE_API_KEY); a no-op otherwise, e.g. on
-  // self-host installs that don't reach Daatan's Oracul.
-  const oracleConfig = getOracleConfig()
-  if (oracleConfig) {
-    providers.push(new OracleProvider(oracleConfig, ORACLE_FALLBACK_MODEL))
-  }
-
-  // Fallback 2: OpenRouter. Registered whenever a key is configured (admin setting
-  // → env), for BOTH editions. Self-host runs it as a primary user-facing provider
-  // on the admin-chosen model; SaaS adds it only as a last-resort backstop, so it
-  // defaults to the free NON-Google model (an OpenRouter *Gemini* model would still
-  // hit Google's backend and die in the same outage).
-  const openrouterApiKey = getOpenRouterKey()
-  if (openrouterApiKey) {
-    const openrouterModel = isSelfHosted() ? getOpenRouterModel() : OPENROUTER_FREE_FALLBACK_MODEL
-    providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: openrouterModel }))
-  }
-
-  // Fallback 3: local Ollama — only when explicitly configured. Skipping the
-  // localhost:11434 default avoids a dead provider slot (and its false "provider
-  // failed" pages) on hosts that don't run Ollama, e.g. prod.
-  const ollamaBaseUrl = process.env.OLLAMA_BASE_URL
-  if (ollamaBaseUrl) {
-    providers.push(new OllamaProvider({ baseUrl: ollamaBaseUrl, modelName: 'qwen2.5:7b' }))
-  }
-
+  logModelConfigOnce()
   return providers
+}
+
+let modelConfigLogged = false
+
+/** One `model_config` line per role at startup, so the server shows which values are live
+ *  and where each came from (daatan#2287) — the check before env overrides are removed. */
+function logModelConfigOnce(): void {
+  if (modelConfigLogged) return
+  modelConfigLogged = true
+  for (const leg of CHAIN) {
+    log.info({ event: 'model_config', role: `chain.${leg.provider}`, model: leg.model, source: 'registry' }, 'model_config')
+  }
+  for (const stage of LLM_STAGES) {
+    log.info({ event: 'model_config', role: `stage.${stage}`, model: stageModel(stage), source: stageModelSource(stage) }, 'model_config')
+  }
+  const secondOpinionEnv = process.env.EVIDENCE_SECOND_OPINION_MODEL
+  log.info(
+    {
+      event: 'model_config',
+      role: 'evidence_second_opinion',
+      model: secondOpinionEnv || EVIDENCE_SECOND_OPINION.model,
+      source: secondOpinionEnv ? 'env' : 'registry',
+    },
+    'model_config',
+  )
 }
 
 // Main service with fallback strategy; tries providers in registration order.
@@ -120,7 +117,9 @@ const OPENROUTER_MODEL_ALIASES: Record<string, string> = {
 
 /**
  * Creates an LLM service backed by OpenRouter for a specific model.
- * Used by the bot runner where each bot may have a different model preference.
+ * Used by the bot runner where each bot may have a different model preference — a
+ * documented runtime choice (DB, admin-editable), not a registry entry. Its fallbacks
+ * are the registry's chain models.
  */
 export function createBotLLMService(modelName: string): ResilientLLMService {
   const openrouterApiKey = process.env.OPENROUTER_API_KEY || ''
@@ -145,7 +144,7 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
 
     // Remap legacy direct-API model names to the current stable ID
     if (directModelName === 'gemini-2.0-flash-exp' || directModelName === 'gemini-2.5-flash-preview' || directModelName === 'gemini-1.5-flash' || directModelName === 'gemini-1.5-pro') {
-      directModelName = 'gemini-2.5-flash'
+      directModelName = chainModel('google')
     }
 
     // Vertex first (#1879): prod containers carry no GEMINI_API_KEY (#1472), so
@@ -161,19 +160,19 @@ export function createBotLLMService(modelName: string): ResilientLLMService {
   }
 
   if (openrouterApiKey) {
-    // No free Gemini exists on OpenRouter; substitute a free non-Google model so
-    // this fallback leg works when Gemini/Google is the thing that's unavailable.
+    // A Gemini preference gets the chain's non-Google OpenRouter model here, so this
+    // fallback leg works when Gemini/Google is the thing that's unavailable.
     const openrouterModel = isGemini
-      ? OPENROUTER_FREE_FALLBACK_MODEL
+      ? chainModel('openrouter')
       : resolvedModelName
     log.info({ modelName: openrouterModel }, 'Adding OpenRouter provider for bot')
     providers.push(new OpenRouterProvider({ apiKey: openrouterApiKey, modelName: openrouterModel }))
   }
 
-  // Final fallback: direct stable Gemini if we have a key and requested model was Gemini
+  // Final fallback: the chain's stable Gemini model if we have a key and the requested model was Gemini
   if (resolvedModelName.toLowerCase().includes('gemini') && geminiApiKey) {
-    log.info('Adding stable gemini-2.5-flash as final fallback')
-    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: 'gemini-2.5-flash' }))
+    log.info({ modelName: chainModel('google') }, 'Adding the chain Gemini model as final fallback')
+    providers.push(new GeminiProvider({ apiKey: geminiApiKey, modelName: chainModel('google') }))
   }
 
   if (providers.length === 0) {

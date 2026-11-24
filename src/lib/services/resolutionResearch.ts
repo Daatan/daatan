@@ -19,15 +19,7 @@ const PRIMARY_RESULTS_CAP = 10
 // evidence the #1511 leg was built to find.
 const PRE_CREATION_RESULTS_CAP = 5
 const TOTAL_RESULTS_CAP = 20
-// The verdict call runs on the strongest Gemini tier: resolution research is
-// low-volume (rate-limited per user) and is exactly the multi-source
-// rules-reasoning task where the pro tier beats flash. Query generation stays
-// on the chain default. Non-Google fallback legs ignore the override.
-const RESEARCH_VERDICT_MODEL = 'gemini-2.5-pro'
-
-// #2096: the 30 s default cut Pro off in 3 of 15 prod verdicts, and its slowest success took
-// 27.5 s. nginx allows 120 s for /api/, and this has to leave room for the search before it.
-const RESEARCH_VERDICT_TIMEOUT_MS = 75_000
+// The verdict's model and timeout (gemini-2.5-pro, 75 s) are its registry entry: registry.ts.
 
 // The Oracul leg has no native schema mode, so a verdict can arrive without a field.
 const verdictSchema = z.object({
@@ -302,7 +294,6 @@ export async function runResolutionResearch(
         ...forStage('research_queries'),
         prompt,
         schema: queryGenerationSchema,
-        temperature: 0,
       })
       const { queries } = JSON.parse(qRes.text) as { queries: string[] }
       // Each targeted query runs twice: once over the whole window up to the
@@ -390,9 +381,7 @@ export async function runResolutionResearch(
   const response = await llmService.generateContent({
     prompt,
     schema: researchSchema,
-    temperature: 0,
-    ...forStage('research_verdict', RESEARCH_VERDICT_MODEL),
-    googleTimeoutMs: RESEARCH_VERDICT_TIMEOUT_MS,
+    ...forStage('research_verdict'),
     // #2096: a resolver can retry, and acts on this verdict at once. The born-true check
     // only asks a human to look, so a fallback verdict still beats no alert there.
     primaryOnly: source === 'research',

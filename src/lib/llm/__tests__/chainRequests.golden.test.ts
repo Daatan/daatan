@@ -213,7 +213,7 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
       // Exactly what the call site passes: literal params and its schema. Runtime
       // expressions (e.g. primaryOnly: source === 'research') take their default.
       const request: Record<string, unknown> = {
-        ...forStage(site.stage as never, site.fallback ? (literalValue(site.fallback) as string) : undefined),
+        ...forStage(site.stage as never),
         prompt: PROMPT,
       }
       for (const [key, text] of Object.entries(site.params)) {
@@ -232,10 +232,11 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
 
   it('research_verdict primaryOnly sends the Vertex leg only', async () => {
     const llm = await loadLlm({ ...VERTEX_ENV }, false)
-    const { forStage } = await import('@/lib/llm/stageModels')
+    // Explicit rather than forStage: this pins what primaryOnly cuts, not the stage's params.
     await expect(
       llm.llmService.generateContent({
-        ...forStage('research_verdict', 'gemini-2.5-pro'),
+        stage: 'research_verdict',
+        model: 'gemini-2.5-pro',
         prompt: PROMPT,
         temperature: 0,
         primaryOnly: true,
@@ -248,7 +249,7 @@ describe('LLM request goldens — outgoing requests (daatan#2287)', () => {
     const llm = await loadLlm({ ...VERTEX_ENV, LLM_STAGE_MODELS: 'moderation=gemini-2.5-flash-lite' }, false)
     const { forStage } = await import('@/lib/llm/stageModels')
     await expect(
-      llm.llmService.generateContent({ ...forStage('moderation'), prompt: PROMPT, temperature: 0 }),
+      llm.llmService.generateContent({ ...forStage('moderation'), prompt: PROMPT }),
     ).rejects.toThrow()
     expectGolden('chain-prod-stage-override', captured)
   })

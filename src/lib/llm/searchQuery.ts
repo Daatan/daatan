@@ -22,9 +22,6 @@ const log = createLogger('search-query')
  */
 const QUERY_TIMEOUT_MS = 5_000
 
-/** Thinking tokens for the query extraction; 0 = off (daatan#1890). */
-export const SEARCH_QUERY_THINKING_BUDGET = 0
-
 /**
  * Strip a leading emoji prefix (e.g. the "🤖 " on bot forecasts) and take the
  * segment before a title separator. Mirrors the cleanup the context route used
@@ -68,8 +65,6 @@ export async function buildSearchQuery(claim: string): Promise<string> {
     const res = await llmService.generateContent({
       ...forStage('search_query'),
       prompt,
-      temperature: 0,
-      thinkingBudget: SEARCH_QUERY_THINKING_BUDGET,
     })
     return res.text.trim().replace(/^["']+|["']+$/g, '').replace(/\s+/g, ' ').trim()
   })()

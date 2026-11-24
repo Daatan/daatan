@@ -21,15 +21,6 @@ import { checkRulesStrength, type RulesStrengthOutcome } from './rulesStrength'
 import { checkClaimDefinedness, type ClaimDefinednessOutcome } from './claimDefinedness'
 import { forStage } from '@/lib/llm/stageModels'
 
-/**
- * Cap on gemini-2.5-flash's thinking for the draft (#1890 option B). Default (dynamic)
- * thinking spent ~1,300 tokens and made the draft the slowest creation stage: bench on
- * 16 polarity cases x 3, p50 7.5 s / p90 16.4 s / max 26.6 s. At 512: p50 4.6 s / p90
- * 5.4 s / max 6.0 s, no polarity flips, every claim in English. 0 is faster still but
- * copied 9 of 48 non-English inputs verbatim instead of translating them.
- * Bench: scripts/bench-express-draft.ts.
- */
-const EXPRESS_DRAFT_THINKING_BUDGET = 512
 
 const log = createLogger('express-prediction')
 
@@ -500,7 +491,6 @@ export async function generateExpressPrediction(
     const draft = async (text: string): Promise<ParsedPrediction> => {
       const result = await llmService.generateContent({
         ...forStage('express_draft'),
-      thinkingBudget: EXPRESS_DRAFT_THINKING_BUDGET,
         prompt: fillPrompt(template, {
           userInput,
           articlesText: text,
@@ -513,7 +503,6 @@ export async function generateExpressPrediction(
           STANDARD_TAGS: STANDARD_TAGS.join(', '),
         }),
         schema: expressPredictionSchema,
-        temperature: 0.2,
       })
       const parsed: ParsedPrediction = JSON.parse(result.text)
       parsed.claimText = humanizeISODates(parsed.claimText)
@@ -682,7 +671,6 @@ export async function generateExpressPrediction(
         const extractResult = await llmService.generateContent({
           ...forStage('express_topic'),
           prompt,
-          temperature: 0,
         })
         topic = extractResult.text.trim().replace(/^["']|["']$/g, '')
       } catch (error) {
@@ -803,7 +791,6 @@ URL: ${article.url}
   const draft = async (text: string): Promise<ParsedPrediction> => {
     const result = await llmService.generateContent({
       ...forStage('express_draft'),
-      thinkingBudget: EXPRESS_DRAFT_THINKING_BUDGET,
       prompt: fillPrompt(template, {
         userInput,
         articlesText: text,
@@ -815,8 +802,7 @@ URL: ${article.url}
         currentDate: now.toISOString().split('T')[0],
         STANDARD_TAGS: STANDARD_TAGS.join(', '),
       }),
-      schema: expressPredictionSchema,
-      temperature: 0.2, // Slightly creative but structured
+      schema: expressPredictionSchema, // Slightly creative but structured
     })
     const parsed: ParsedPrediction = JSON.parse(result.text)
     // Post-process: replace any ISO timestamps that leaked into claimText
@@ -1009,7 +995,6 @@ Snippet: ${article.snippet}
       ...forStage('guess_chances'),
       prompt,
       schema: guessChancesSchema,
-      temperature: 0,
     })
     const parsed = JSON.parse(result.text) as { probability: number | null; reasoning: string }
     return { ...parsed, probability: clampGuessedProbability(parsed.probability) }

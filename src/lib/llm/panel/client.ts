@@ -2,12 +2,14 @@ import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-r
 import { createLogger } from '@/lib/logger'
 import { getAppUrl } from '@/lib/branding'
 import { vertexEndpoint, vertexAccessToken, vertexEnv } from '../providers/vertex'
+import { applyQuirks } from '../quirks'
+import { PANEL_PARAMS, PANEL_TIMEOUT_MS, type ModelParams } from '../registry'
 import type { PanelMember } from './roster'
 
 const log = createLogger('ai-panel-client')
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const TIMEOUT_MS = 30_000
+const TIMEOUT_MS = PANEL_TIMEOUT_MS
 const REGION = process.env.AWS_REGION || 'eu-central-1'
 
 /** Lazily constructed, one per region, so importing this module never needs AWS
@@ -26,13 +28,15 @@ function getBedrockClient(region: string): BedrockRuntimeClient {
 }
 
 /**
- * Hard ceiling on output tokens. The answer is one integer; anything larger means a
- * model ignored `reasoning: { enabled: false }` and started thinking out loud on our
- * bill (Gemini prices internal reasoning at the output rate). Capping bounds the
- * blast radius — the call fails and the member abstains, rather than quietly
- * costing 9× (docs/LASSO.md §5).
+ * The panel's params (registry `PANEL_PARAMS`: temperature 0, reasoning off, a 64-token
+ * cap) as this member's model should receive them. The cap is a hard ceiling: the answer
+ * is one integer, so anything larger means a model ignored the reasoning switch and
+ * started thinking out loud on our bill — the call fails and the member abstains rather
+ * than quietly costing 9× (docs/LASSO.md §5).
  */
-const MAX_TOKENS = 64
+function memberParams(member: PanelMember): ModelParams {
+  return applyQuirks(member.model, PANEL_PARAMS)
+}
 
 /** Native structured output. All four members support `structured_outputs`, so the
  *  schema is enforced by the provider rather than steered by a system message the
@@ -159,6 +163,30 @@ export async function callPanelMember(
  * the member abstains and the other four are unaffected. That is the correct
  * degradation, and it means this code can ship before the Terraform lands.
  */
+function bedrockInferenceConfig(p: ModelParams): { maxTokens?: number; temperature?: number } {
+  return {
+    ...(p.maxTokens !== undefined ? { maxTokens: p.maxTokens } : {}),
+    ...(p.temperature !== undefined ? { temperature: p.temperature } : {}),
+  }
+}
+
+function vertexGenerationParams(p: ModelParams): Record<string, unknown> {
+  return {
+    ...(p.temperature !== undefined ? { temperature: p.temperature } : {}),
+    ...(p.maxTokens !== undefined ? { maxOutputTokens: p.maxTokens } : {}),
+    ...(p.reasoningBudget !== undefined ? { thinkingConfig: { thinkingBudget: p.reasoningBudget } } : {}),
+  }
+}
+
+function openRouterParams(p: ModelParams): Record<string, unknown> {
+  return {
+    ...(p.temperature !== undefined ? { temperature: p.temperature } : {}),
+    ...(p.maxTokens !== undefined ? { max_tokens: p.maxTokens } : {}),
+    ...(p.reasoningBudget === 0 ? { reasoning: { enabled: false } } : {}),
+    ...(p.reasoningBudget ? { reasoning: { max_tokens: p.reasoningBudget } } : {}),
+  }
+}
+
 async function callBedrockMember(member: PanelMember, prompt: string): Promise<PanelCallResult> {
   const startedAt = Date.now()
   // Same 30s bound as the OpenRouter path. The SDK's default handler has no request
@@ -176,7 +204,8 @@ async function callBedrockMember(member: PanelMember, prompt: string): Promise<P
         // `reasoning: {enabled:false}` switch, so every Bedrock member must be a model
         // that does not think by default (Qwen 2507-instruct, DeepSeek V3.2, Gemma 3) —
         // and maxTokens still bounds a surprise.
-        inferenceConfig: { maxTokens: MAX_TOKENS, temperature: 0 },
+        // reasoningBudget has no Converse field, so it is not sent.
+        inferenceConfig: bedrockInferenceConfig(memberParams(member)),
       }),
       { abortSignal: controller.signal },
     )
@@ -246,15 +275,13 @@ async function callVertexMember(member: PanelMember, prompt: string): Promise<Pa
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0,
-          maxOutputTokens: MAX_TOKENS,
+          ...vertexGenerationParams(memberParams(member)),
           // The panel is no-hidden-thinking by construction (docs/LASSO.md §5), and on
           // Vertex thought tokens count against maxOutputTokens: a thinking model spends
           // the whole 64-token cap thinking and returns no text (finishReason MAX_TOKENS).
           // Measured 2026-10-03 (daatan#1763): gemini-2.5-flash honours budget 0;
           // gemini-3.x *Flash* ignores it and rejects thinkingLevel MINIMAL (HTTP 400),
-          // so it can't sit on this panel — hence the Flash-Lite member in roster.ts.
-          thinkingConfig: { thinkingBudget: 0 },
+          // so it can't sit on this panel — hence the Flash-Lite member in the registry.
           responseMimeType: 'application/json',
           responseSchema: VERTEX_RESPONSE_SCHEMA,
         },
@@ -308,13 +335,12 @@ async function callOpenRouterMember(
         // Determinism: with a date-gated prompt, temperature 0 means an unchanged
         // input yields an unchanged number, so the chart's step-function carry-forward
         // is exactly right rather than an approximation of resampling noise.
-        temperature: 0,
-        max_tokens: MAX_TOKENS,
+        // Hidden chain-of-thought (reasoningBudget 0 → `reasoning: {enabled: false}`)
+        // bills at the output rate, can't explain why a member's line moved (it isn't
+        // stored), and breaks determinism at temp 0. A 250-token base-rate question is
+        // not a reasoning task.
+        ...openRouterParams(memberParams(member)),
         response_format: RESPONSE_FORMAT,
-        // Hidden chain-of-thought bills at the output rate, can't explain why a
-        // member's line moved (it isn't stored), and breaks determinism at temp 0.
-        // A 250-token base-rate question is not a reasoning task.
-        reasoning: { enabled: false },
         provider: { order: member.providerOrder ?? [], allow_fallbacks: false },
       }),
     })

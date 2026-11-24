@@ -162,7 +162,7 @@ async function main() {
     const researchFile = process.env.RESEARCH_TEMPLATE_FILE
     const expressFile = process.env.EXPRESS_TEMPLATE_FILE
     const researchTemplate = researchFile ? readFileSync(researchFile, 'utf8') : PROMPTS['resolution-research']
-    const researchModel = process.env.RESEARCH_MODEL || stageModel('research_verdict', 'gemini-2.5-pro')
+    const researchModel = process.env.RESEARCH_MODEL || stageModel('research_verdict')
     if (!expressFile) console.log(`resolution-research: ${researchModel}${researchFile ? `, template ${researchFile}` : ''}, ${RUNS} runs per case\n`)
     const researchRuns = expressFile ? [] : await Promise.all(RESEARCH_CASES.map((c) => Promise.all(Array.from({ length: RUNS }, () => call(researchModel, fillPrompt(researchTemplate, {
         claimText: c.claim,
@@ -187,7 +187,7 @@ async function main() {
     })
 
     if (!researchFile) {
-        const expressModel = stageModel('express_draft', 'gemini-2.5-flash')
+        const expressModel = stageModel('express_draft')
         const today = '2026-11-02'
         const expressTemplate = expressFile ? readFileSync(expressFile, 'utf8') : PROMPTS['express-prediction']
         console.log(`\nexpress-prediction: ${expressModel}${expressFile ? `, template ${expressFile}` : ''}, ${RUNS} runs per case\n`)

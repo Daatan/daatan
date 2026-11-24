@@ -89,7 +89,6 @@ export async function checkClaimDefinedness(
       ...forStage('claim_definedness'),
       prompt: fillPrompt(template, { claimText, resolutionRules, language }),
       schema: claimDefinednessSchema,
-      temperature: 0,
     })
     const parsed = JSON.parse(result.text) as Partial<Omit<ClaimDefinednessOutcome, 'verdict'>>
     const fault: ClaimDefinednessOutcome['fault'] = DEFINEDNESS_FAULTS.find((f) => f === parsed.fault) ?? 'none'

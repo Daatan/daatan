@@ -26,7 +26,7 @@ async function main() {
     const { moderationSchema } = await import('../src/lib/services/moderation')
     const { stageModel } = await import('../src/lib/llm/stageModels')
 
-    const model = process.env.MODERATION_MODEL || stageModel('moderation', 'gemini-2.5-flash')
+    const model = process.env.MODERATION_MODEL || stageModel('moderation')
     const project = process.env.GOOGLE_VERTEX_PROJECT_ID || 'daatan'
     const token = process.env.VERTEX_ACCESS_TOKEN || execSync('gcloud auth print-access-token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
     const url = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`

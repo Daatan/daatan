@@ -29,7 +29,6 @@ async function judge(claimText: string, resolutionRules: string): Promise<Verdic
     ...forStage('rules_direction'),
     prompt: fillPrompt(template, { claimText, resolutionRules }),
     schema: rulesDirectionSchema,
-    temperature: 0,
   })
   const parsed = JSON.parse(result.text) as Partial<Verdict>
   const direction = parsed.direction === 'inverted' || parsed.direction === 'unclear' ? parsed.direction : 'consistent'

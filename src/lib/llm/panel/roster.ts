@@ -4,7 +4,11 @@
  * Deliberately data, not code: `AiEstimate.model` and `.mode` are stored as plain
  * strings, so adding or dropping a member is one entry here and no migration.
  * Per-member Brier is what decides who stays — don't agonize over the roster.
+ *
+ * The roster data itself lives in `../registry.ts` (daatan#2287); this file keeps the
+ * member type and the helpers.
  */
+import { GROUNDED_PANEL_MEMBERS, PANEL_MEMBERS } from '../registry'
 
 /**
  * Ungrounded = claim + dates + rules, no article text, no web search.
@@ -71,139 +75,8 @@ export interface PanelMember {
   control?: boolean
 }
 
-/**
- * The Vertex Gemini member's model, shared by the ungrounded member and its grounded
- * twin. Deliberately NOT a main-chain model constant: the main chain can use a thinking
- * model, the panel can't. Verified 2026-10-03 (daatan#1763): Flash-Lite answers inside
- * the 64-token cap with zero thought tokens; gemini-3.8-flash spends the whole cap
- * thinking and returns nothing. Price-identical to the gemini-2.5-flash it replaces
- * ($0.30 / $2.50 per 1M on Vertex global).
- */
-export const VERTEX_PANEL_MODEL = 'google/gemini-3.5-flash-lite'
-
-/** The second Bedrock region: models with no eu-central-1 deployment run here. Extraction
- *  and settlement verification already run in us-east-1 (retro#548), so this adds no new
- *  data-residency exposure. */
-export const BEDROCK_US_REGION = 'us-east-1'
-
-export const PANEL_MEMBERS: readonly PanelMember[] = [
-  // Non-reasoning, and the most decorrelated lineage available (non-Western corpus
-  // and RLHF). Doubles as the deterministic baseline: no hidden thinking tokens.
-  //
-  // Routed via Bedrock, not OpenRouter: identical weights, billed to AWS credits, and
-  // — the actual reason — it keeps the panel producing estimates when OpenRouter is
-  // down or its key is stale. Note the model ID differs from the OpenRouter slug, so
-  // Brier treats this as a distinct member from any historical `qwen/...` rows.
-  // Requires terraform/bedrock_invoke.tf to be applied; without it the member fails
-  // AccessDenied and abstains, which is the correct degradation.
-  {
-    model: 'qwen.qwen3-235b-a22b-2507-v1:0',
-    mode: 'ungrounded',
-    route: 'bedrock',
-  },
-
-  // Was openai/gpt-5-mini. OpenAI's entire gpt-5 lineup on OpenRouter is reasoning-
-  // MANDATORY: `reasoning: {enabled: false}` returns HTTP 400 "Reasoning is mandatory
-  // for this endpoint and cannot be disabled", so every call 401-style failed and the
-  // member abstained 100% of the time (confirmed on staging 2026-07-11, all 56 rows
-  // null). Reasoning models are incompatible with this panel by design — temperature 0,
-  // no hidden thinking, one cheap integer, a deterministic step-function chart. DeepSeek
-  // is a strong independent lineage (distinct from Alibaba/Google/xAI).
-  //
-  // Was `deepseek/deepseek-chat` (DeepSeek V3, Dec 2024) on OpenRouter until daatan#2283:
-  // that route is paid from a personal balance, and its 402s silenced this member from
-  // 2026-11-17. Bedrock serves no V3, so this is also a model upgrade — a new member, a
-  // fresh Brier series. us-east-1 because Bedrock has no eu-central-1 deployment of it.
-  // Verified 2026-11-23 (real prompt, temperature 0, 64 tokens): 6/6 answered with a
-  // bare `{"probability": N}` in a single text block, 7 output tokens, no reasoning.
-  {
-    model: 'deepseek.v3.2',
-    mode: 'ungrounded',
-    route: 'bedrock',
-    region: BEDROCK_US_REGION,
-  },
-
-  // Direct Vertex (daatan#1513), not proxied through OpenRouter, authenticated with
-  // the app's own service account. The id keeps the `google/` OpenRouter-style prefix
-  // (client.ts strips it for the endpoint). This is NOT a stack-wide residency
-  // guarantee — extraction and settlement verification (the calls that actually
-  // carry article/claim text) run on Bedrock in us-east-1 (retro#548).
-  //
-  // Was google/gemini-2.5-flash until daatan#1763 (Vertex stops serving 2.5 on
-  // 2027-03-31). Flash-LITE, not Flash, on purpose: Gemini 3.x Flash cannot turn its
-  // thinking off (budget 0 ignored, MINIMAL rejected), and the panel is
-  // no-hidden-thinking by construction — see VERTEX_PANEL_MODEL. A new member: its
-  // Brier series starts fresh, and the roster signature change forces a new sweep.
-  {
-    model: VERTEX_PANEL_MODEL,
-    mode: 'ungrounded',
-    route: 'vertex',
-  },
-
-  // Replaced `x-ai/grok-4.3`, the last OpenRouter member (daatan#2283): that route is
-  // paid from a personal balance, and Bedrock serves only Grok 4.6/4.7, which this panel
-  // excludes by design — measured 2026-11-23, Grok 4.7 rejects `temperature`, always
-  // reasons, and on two of three real claims spent the whole budget on reasoning at both
-  // 64 and 1,024 tokens, with or without `low` effort. Mistral keeps a fifth independent
-  // lineage (European, distinct from Alibaba/DeepSeek/Google). Verified 2026-11-23 (real
-  // prompt, temperature 0, 64 tokens): 6/6 answered inside a ```json fence, 11–16 output
-  // tokens, no reasoning, and `null` on the deliberately vague claim.
-  {
-    model: 'mistral.mistral-large-3-675b-instruct',
-    mode: 'ungrounded',
-    route: 'bedrock',
-    region: BEDROCK_US_REGION,
-  },
-
-  // Was openai/gpt-5-nano (same reasoning-mandatory 400 as gpt-5-mini). The control is
-  // deliberately WEAK — if it ties the strong members on Brier, the instrument is not
-  // measuring anything. A 4B open-weights model is a cleaner control than a mini
-  // frontier model ever was.
-  //
-  // Same weights as the `google/gemma-3-4b-it` it replaces on OpenRouter (daatan#2283),
-  // but a new id on a new route, so a new series — see `model` above. Verified
-  // 2026-11-23: 6/6 answered, always inside a ```json fence (13 output tokens), which
-  // `extractJsonObject` unwraps.
-  {
-    model: 'google.gemma-3-4b-it',
-    mode: 'ungrounded',
-    route: 'bedrock',
-    region: BEDROCK_US_REGION,
-    control: true,
-  },
-] as const
-
-/**
- * The grounded-indexer twins (docs/LASSO.md §9a): the same model + route + provider pin
- * as their ungrounded counterpart, differing ONLY in mode — so the grounded-vs-ungrounded
- * Brier delta per model isolates the value of the injected articles.
- *
- * Free-or-almost-free by policy: Qwen and DeepSeek ride Bedrock (AWS credits), Gemini
- * Flash-Lite rides Vertex (GCP credits, daatan#1513). Grok is deliberately absent (it
- * alone was ~80% of panel token cost) and the control stays ungrounded — a grounded
- * control would no longer falsify the same instrument.
- *
- * These members join a forecast's roster only when grounding is configured AND the
- * forecast carries the scope tag — see `runPanelSweep`.
- */
-export const GROUNDED_PANEL_MEMBERS: readonly PanelMember[] = [
-  {
-    model: 'qwen.qwen3-235b-a22b-2507-v1:0',
-    mode: 'grounded-indexer',
-    route: 'bedrock',
-  },
-  {
-    model: 'deepseek.v3.2',
-    mode: 'grounded-indexer',
-    route: 'bedrock',
-    region: BEDROCK_US_REGION,
-  },
-  {
-    model: VERTEX_PANEL_MODEL,
-    mode: 'grounded-indexer',
-    route: 'vertex',
-  },
-] as const
+// The roster itself lives in the model registry (daatan#2287): one file for every model.
+export { BEDROCK_US_REGION, GROUNDED_PANEL_MEMBERS, PANEL_MEMBERS, VERTEX_PANEL_MODEL } from '../registry'
 
 /**
  * Stable fingerprint of the roster, folded into the run's input hash. Adding or

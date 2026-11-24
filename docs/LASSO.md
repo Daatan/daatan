@@ -154,7 +154,7 @@ say which is better. This comparison is free.
 
 ## 5. Roster
 
-`src/lib/llm/panel/roster.ts`. Four on Bedrock, one on Vertex, none on OpenRouter (daatan#2283).
+`src/lib/llm/registry.ts` (`PANEL_MEMBERS`, daatan#2287). Four on Bedrock, one on Vertex, none on OpenRouter (daatan#2283).
 
 | Member | Route | Lineage | Role |
 |---|---|---|---|

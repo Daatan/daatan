@@ -118,7 +118,7 @@ export async function classifyClaim(input: {
     })
 
     const response = await withTimeout(
-      llmService.generateContent({ ...forStage('temporal_classifier'), prompt, schema: temporalClassifierSchema, temperature: 0 }),
+      llmService.generateContent({ ...forStage('temporal_classifier'), prompt, schema: temporalClassifierSchema }),
       CLASSIFY_TIMEOUT_MS,
     )
 

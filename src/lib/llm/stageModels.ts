@@ -1,4 +1,5 @@
 import { createLogger } from '@/lib/logger'
+import { chainModel, STAGES, type ModelParam } from './registry'
 
 const log = createLogger('llm-stage-models')
 
@@ -37,7 +38,8 @@ export type LlmStage = (typeof LLM_STAGES)[number]
 /**
  * `LLM_STAGE_MODELS="moderation=gemini-2.5-flash-lite,guess_chances=gemini-3.8-flash"`.
  * One env var rather than one per stage, so prod whitelists it once (compose +
- * blue-green ENV_ARGS). Unset or empty = every stage keeps its built-in model.
+ * blue-green ENV_ARGS). Unset or empty = every stage keeps its registry model. Goes away
+ * once the registry has been verified on the server (daatan#2287).
  * The value is a Google model id: it reaches the Vertex/Gemini legs only — the
  * non-Google fallback legs keep their pinned models (see LLMRequest.model).
  */
@@ -58,17 +60,52 @@ export function parseStageModels(raw: string | undefined): Partial<Record<LlmSta
 
 let cached: { raw: string | undefined; map: Partial<Record<LlmStage, string>> } | null = null
 
-/** The configured model for `stage`, else `fallback` (undefined = the chain default). */
-export function stageModel(stage: LlmStage, fallback: string): string
-export function stageModel(stage: LlmStage, fallback?: string): string | undefined
-export function stageModel(stage: LlmStage, fallback?: string): string | undefined {
+function envStageModel(stage: LlmStage): string | undefined {
   const raw = process.env.LLM_STAGE_MODELS
   if (!cached || cached.raw !== raw) cached = { raw, map: parseStageModels(raw) }
-  return cached.map[stage] ?? fallback
+  return cached.map[stage]
 }
 
-/** Spread into an `llmService.generateContent` request: tags the stage, applies its model. */
-export function forStage(stage: LlmStage, fallback?: string): { stage: LlmStage; model?: string } {
-  const model = stageModel(stage, fallback)
-  return model ? { stage, model } : { stage }
+/** Where a stage's model comes from — logged once at startup as `model_config`. */
+export function stageModelSource(stage: LlmStage): 'env' | 'registry' {
+  return envStageModel(stage) ? 'env' : 'registry'
+}
+
+/**
+ * The stage's primary model: `LLM_STAGE_MODELS`, else its registry `primary`, else the
+ * chain's Google model.
+ */
+export function stageModel(stage: LlmStage): string {
+  return envStageModel(stage) ?? STAGES[stage].primary?.model ?? chainModel('google')
+}
+
+export interface StageRequest {
+  stage: LlmStage
+  model?: string
+  temperature?: number
+  thinkingBudget?: number
+  googleTimeoutMs?: number
+  forceParams?: ModelParam[]
+}
+
+/**
+ * Spread into an `llmService.generateContent` request: tags the stage and applies its
+ * registry entry (model, params, timeout). Call sites pass only the prompt, schema and
+ * runtime arguments — the params live in `registry.ts` (daatan#2287).
+ */
+export function forStage(stage: LlmStage): StageRequest {
+  const entry = STAGES[stage]
+  if (entry.primary && entry.primary.provider !== 'google') {
+    throw new Error(`model registry: stage ${stage} has a ${entry.primary.provider} primary, which needs the per-stage leg adapter (daatan#2287)`)
+  }
+  const model = envStageModel(stage) ?? entry.primary?.model
+  const { temperature, reasoningBudget } = entry.params
+  return {
+    stage,
+    ...(model ? { model } : {}),
+    ...(temperature !== undefined ? { temperature } : {}),
+    ...(reasoningBudget !== undefined ? { thinkingBudget: reasoningBudget } : {}),
+    ...(entry.timeoutMs !== undefined ? { googleTimeoutMs: entry.timeoutMs } : {}),
+    ...(entry.force?.length ? { forceParams: entry.force } : {}),
+  }
 }
