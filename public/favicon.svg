@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 14 36 36" fill="none">
+  <!--
+    Browser-tab favicon (daatan#2310). Same radar mark as logo-icon.svg, but:
+    - the viewBox is cropped to the mark (logo-icon.svg's ring spans only half its 64-unit
+      canvas, so a tab rendered it at about half the size of other sites' icons);
+    - strokes are heavier, since tabs draw this at 16-32 px, where 0.9-unit spokes vanish.
+    favicon.ico is rendered from this file (16/32/48). Keep logo-icon.svg for in-page use.
+  -->
+  <defs>
+    <linearGradient id="favBaseGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#2563EB"/>
+      <stop offset="100%" style="stop-color:#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="favAccentGrad" gradientUnits="userSpaceOnUse" x1="16" y1="48" x2="48" y2="16">
+      <stop offset="0%" style="stop-color:#38BDF8"/>
+      <stop offset="100%" style="stop-color:#7DD3FC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer ring: full circle minus the sweep-arc gap -->
+  <path d="M 44.43 21.93 A 16 16 0 1 1 28.13 16.48"
+        stroke="url(#favBaseGrad)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+
+  <!-- Sweep-arc highlight, outer edge flush with the ring's (14.8 + 2.5 = 16 + 1.3) -->
+  <path d="M 30.97 17.24 A 14.8 14.8 0 0 1 43.50 22.68"
+        stroke="url(#favAccentGrad)" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+  <!-- Middle ring -->
+  <circle cx="32" cy="32" r="10" stroke="url(#favBaseGrad)" stroke-width="1.6" fill="none"/>
+
+  <!-- Crosshair spokes -->
+  <line x1="32" y1="16" x2="32" y2="48" stroke="url(#favBaseGrad)" stroke-width="1.4"/>
+  <line x1="16" y1="32" x2="48" y2="32" stroke="url(#favBaseGrad)" stroke-width="1.4"/>
+
+  <!-- Needle -->
+  <line x1="32" y1="32" x2="43.15" y2="21.96" stroke="url(#favAccentGrad)" stroke-width="2.8" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="32" cy="32" r="4.5" fill="url(#favBaseGrad)"/>
+</svg>
