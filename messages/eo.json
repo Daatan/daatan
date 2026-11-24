@@ -228,7 +228,10 @@
     "seoAnswerResolvedYes": "Jes, tio efektiviĝis.",
     "seoAnswerResolvedWrong": "Ne, tio ne okazis.",
     "seoAnswerNoEstimate": "Ankoraŭ ne haveblas takso.",
-    "seoUpdatedOn": "Ĝisdatigita"
+    "seoUpdatedOn": "Ĝisdatigita",
+    "publishAsDaatan": "Publikigi kiel Daatan",
+    "publishAsDaatanHint": "Daatan aperas kiel aŭtoro. Vi estas registrita kiel kreinto, videbla nur por administrantoj.",
+    "createdByAdminOnly": "Kreita de <name></name> · videbla nur por administrantoj"
   },
   "Forecasts": {
     "title": "Redakti Prognozon",

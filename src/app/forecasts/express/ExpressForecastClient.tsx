@@ -15,11 +15,14 @@ import { toLocalDatetimeInput, formatDisplayDate } from '@/lib/utils/date'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
 import { MAX_FORECAST_TAGS, normalizeForecastTags } from '@/lib/forecast-tags'
 import type { DateBasis, GroundedDateOutcome } from '@/lib/llm/expressPrediction'
+import { PublishAsDaatanToggle } from '@/components/forecasts/PublishAsDaatanToggle'
 
 const log = createClientLogger('ExpressForecast')
 
 interface ExpressForecastClientProps {
   userId: string
+  /** Shows the admin-only "publish as Daatan" option (#2301); the API enforces it too. */
+  isAdmin?: boolean
   initialInput?: string
   onInputChange?: (val: string) => void
 }
@@ -115,6 +118,7 @@ export function localizedValidationError(
 
 export default function ExpressForecastClient({
   userId,
+  isAdmin = false,
   initialInput = '',
   onInputChange
 }: ExpressForecastClientProps) {
@@ -183,6 +187,7 @@ export default function ExpressForecastClient({
   const [isRechecking, setIsRechecking] = useState(false)
   const [isGuessing, setIsGuessing] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
+  const [asDaatan, setAsDaatan] = useState(false)
   const [editForm, setEditForm] = useState<GeneratedPrediction | null>(null)
   const [newTag, setNewTag] = useState('')
 
@@ -532,6 +537,7 @@ export default function ExpressForecastClient({
           source: (finalData.newsAnchor || finalData.externalMarketId) ? undefined : 'manual',
           externalMarketId: finalData.externalMarketId || undefined,
           isPublic,
+          asDaatan: isAdmin && asDaatan ? true : undefined,
           // A legitimate 0% suggestion is falsy but valid — only null/undefined
           // (no suggestion, or the model abstained per #1657) means "no estimate".
           confidence: finalData.probabilitySuggestion ?? undefined,
@@ -1325,6 +1331,7 @@ export default function ExpressForecastClient({
                 {isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
             )}
+            {!isEditing && isAdmin && <PublishAsDaatanToggle checked={asDaatan} onChange={setAsDaatan} />}
 
             {!isEditing && generated?.probabilitySuggestion == null && (
               <p className="text-xs text-amber-500 -mt-2">{t('noAiEstimateWarning')}</p>

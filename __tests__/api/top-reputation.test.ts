@@ -44,7 +44,7 @@ describe('Leaderboard API', () => {
     const data = await response.json()
 
     expect(prisma.user.findMany).toHaveBeenCalledWith({
-      where: { isPublic: true },
+      where: { isPublic: true, OR: [{ username: null }, { username: { not: 'daatan' } }] },
       select: expect.any(Object),
       orderBy: { rs: 'desc' },
       take: 10,

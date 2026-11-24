@@ -4,6 +4,7 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { withAuth } from '@/lib/api-middleware'
 import { notifyNewComment } from '@/lib/services/telegram'
 import { createNotification } from '@/lib/services/notification'
+import { notifyForecastOwner } from '@/lib/services/daatan-author'
 import { checkContent } from '@/lib/services/moderation'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import {
@@ -79,8 +80,7 @@ export const POST = withAuth(async (request, user) => {
 
   notifyNewComment(prediction, comment.author, data.text)
 
-  createNotification({
-    userId: prediction.authorId,
+  notifyForecastOwner(prediction, {
     type: 'COMMENT_ON_FORECAST',
     title: 'New comment on your forecast',
     message: `${comment.author.name || comment.author.username || 'Someone'} commented on "${prediction.claimText.substring(0, 80)}"`,

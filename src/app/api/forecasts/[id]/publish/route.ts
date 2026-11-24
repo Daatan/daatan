@@ -4,6 +4,7 @@ import { apiError, handleRouteError } from '@/lib/api-error'
 import { getForecastById, publishForecast } from '@/lib/services/forecast'
 import { notifyForecastPublished } from '@/lib/services/telegram'
 import { MIN_RESOLUTION_RULES_LENGTH } from '@/lib/resolution-rules'
+import { getRealCreatorId } from '@/lib/services/daatan-author'
 
 
 // POST /api/forecasts/[id]/publish - Publish a forecast (DRAFT → ACTIVE)
@@ -15,7 +16,10 @@ export const POST = withAuth(async (_request, user, { params }) => {
       return apiError('Prediction not found', 404)
     }
 
-    if (prediction.authorId !== user.id) {
+    // A forecast published as Daatan (#2301) has no human author to publish it: any admin may.
+    const mayPublish =
+      prediction.authorId === user.id || (user.role === 'ADMIN' && (await getRealCreatorId(prediction.id)) !== null)
+    if (!mayPublish) {
       return apiError('Forbidden', 403)
     }
 

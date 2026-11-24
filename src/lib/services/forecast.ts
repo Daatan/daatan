@@ -282,6 +282,8 @@ export async function verifyUserExists(userId: string) {
 
 export interface CreateForecastInput {
   authorId: string
+  /** The admin who created it when `authorId` is the Daatan account (#2301); admin-only. */
+  realCreatorId?: string
   claimText: string
   detailsText?: string
   outcomeType: string
@@ -361,6 +363,7 @@ export async function createForecast(input: CreateForecastInput) {
           moderationCheckFailed: input.moderationCheckFailed ?? false,
           shareToken,
           tags: tagEntries.length ? { connectOrCreate: tagEntries } : undefined,
+          realCreator: input.realCreatorId ? { create: { userId: input.realCreatorId } } : undefined,
         },
         select: { id: true },
       })

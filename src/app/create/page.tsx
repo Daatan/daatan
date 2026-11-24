@@ -16,5 +16,5 @@ export default async function CreatePage() {
     redirect('/auth/signin?callbackUrl=/create')
   }
 
-  return <CreateForecastClient userId={session.user.id} />
+  return <CreateForecastClient userId={session.user.id} isAdmin={session.user.role === 'ADMIN'} />
 }

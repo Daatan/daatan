@@ -228,7 +228,10 @@
     "seoAnswerResolvedYes": "Yes, this came true.",
     "seoAnswerResolvedWrong": "No, this did not happen.",
     "seoAnswerNoEstimate": "No estimate is available yet.",
-    "seoUpdatedOn": "Updated"
+    "seoUpdatedOn": "Updated",
+    "publishAsDaatan": "Publish as Daatan",
+    "publishAsDaatanHint": "Daatan is shown as the author. You are recorded as the creator, visible to admins only.",
+    "createdByAdminOnly": "Created by <name></name> · visible to admins only"
   },
   "Forecasts": {
     "title": "Edit Forecast",

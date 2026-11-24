@@ -11,13 +11,15 @@ import {
 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { PredictionFormData } from '../ForecastWizard'
+import { PublishAsDaatanToggle } from '../PublishAsDaatanToggle'
 
 type Props = {
   formData: PredictionFormData
   updateFormData: (updates: Partial<PredictionFormData>) => void
+  isAdmin?: boolean
 }
 
-export const StepPublish = ({ formData, updateFormData }: Props) => {
+export const StepPublish = ({ formData, updateFormData, isAdmin = false }: Props) => {
   const t = useTranslations('wizard')
   const locale = useLocale()
 
@@ -166,6 +168,13 @@ export const StepPublish = ({ formData, updateFormData }: Props) => {
           </button>
         </div>
       </div>
+
+      {isAdmin && (
+        <PublishAsDaatanToggle
+          checked={formData.asDaatan ?? false}
+          onChange={(asDaatan) => updateFormData({ asDaatan })}
+        />
+      )}
 
       {/* Publish Checklist */}
       <div className="p-4 bg-teal/10 border border-green-200 rounded-lg">

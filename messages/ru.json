@@ -228,7 +228,10 @@
     "seoAnswerResolvedYes": "Да, это сбылось.",
     "seoAnswerResolvedWrong": "Нет, этого не произошло.",
     "seoAnswerNoEstimate": "Оценка пока недоступна.",
-    "seoUpdatedOn": "Обновлено"
+    "seoUpdatedOn": "Обновлено",
+    "publishAsDaatan": "Опубликовать от имени Daatan",
+    "publishAsDaatanHint": "Автором будет показан Daatan. Что создали вы, видно только админам.",
+    "createdByAdminOnly": "Создал(а) <name></name> · видно только админам"
   },
   "Forecasts": {
     "title": "Редактировать прогноз",

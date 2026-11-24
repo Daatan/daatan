@@ -15,6 +15,7 @@ import { toError } from '@/lib/utils/error'
 import { withRetry } from '@/lib/utils/retry'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
 import { formatDisplayDate } from '@/lib/utils/date'
+import { getOrCreateDaatanUser } from '@/lib/services/daatan-author'
 
 const log = createLogger('api-forecasts')
 
@@ -115,7 +116,11 @@ export async function GET(request: NextRequest) {
     if (query.authorId) {
       const isOwnProfile = session?.user?.id === query.authorId
       const isAdmin = session?.user?.role === 'ADMIN'
-      if (!isOwnProfile && !isAdmin) where.isPublic = true
+      if (!isOwnProfile && !isAdmin) {
+        where.isPublic = true
+        // Someone else's drafts are not public even when flagged isPublic (#2301).
+        if (!query.status && !resolvedOnly) where.status = { notIn: ['DRAFT', 'PENDING_APPROVAL'] }
+      }
     } else {
       where.isPublic = true
     }
@@ -203,6 +208,9 @@ export const POST = withAuth(async (request, user) => {
 
   const body = await request.json()
   const data = createPredictionSchema.parse(body)
+  if (data.asDaatan && user.role !== 'ADMIN') {
+    return apiError('Only admins can publish as Daatan', 403)
+  }
 
   const userExists = await verifyUserExists(user.id)
   if (!userExists) {
@@ -255,8 +263,10 @@ export const POST = withAuth(async (request, user) => {
   }
 
   try {
+    // As Daatan (#2301): Daatan is the public author, the admin is kept as the real creator.
     const prediction = await createForecast({
-      authorId: user.id,
+      authorId: data.asDaatan ? (await getOrCreateDaatanUser()).id : user.id,
+      realCreatorId: data.asDaatan ? user.id : undefined,
       claimText: data.claimText,
       detailsText: data.detailsText,
       outcomeType: data.outcomeType,

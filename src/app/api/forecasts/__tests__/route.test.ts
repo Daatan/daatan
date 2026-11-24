@@ -33,6 +33,13 @@ vi.mock('@/lib/services/translation', () => ({
     TRANSLATABLE_FIELDS: ['claimText', 'detailsText', 'resolutionRules'],
 }))
 
+const { mockGetOrCreateDaatanUser } = vi.hoisted(() => ({
+    mockGetOrCreateDaatanUser: vi.fn().mockResolvedValue({ id: 'daatan-user' }),
+}))
+vi.mock('@/lib/services/daatan-author', () => ({
+    getOrCreateDaatanUser: mockGetOrCreateDaatanUser,
+}))
+
 vi.mock('@/lib/services/fuzzy-search', () => ({
     findFuzzyMatches: vi.fn().mockResolvedValue({ predictionIds: [], tagNames: [] }),
 }))
@@ -108,6 +115,25 @@ describe('/api/forecasts', () => {
             expect(response.status).toBe(200)
             expect(data.predictions).toHaveLength(2)
             expect(data.predictions[0].claimText).toBe('Forecast 1')
+        })
+
+        it("hides someone else's drafts from an author listing, not your own (#2301)", async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            mockAuth.mockResolvedValue(null)
+            await GET(new NextRequest('http://localhost/api/forecasts?authorId=clxauthor0000000000000000'))
+            expect(vi.mocked(prisma.prediction.findMany).mock.calls[0][0]!.where).toMatchObject({
+                authorId: 'clxauthor0000000000000000',
+                isPublic: true,
+                status: { notIn: ['DRAFT', 'PENDING_APPROVAL'] },
+            })
+
+            vi.mocked(prisma.prediction.findMany).mockClear()
+            mockAuth.mockResolvedValue({ user: { id: 'clxauthor0000000000000000', role: 'USER' } } as any)
+            await GET(new NextRequest('http://localhost/api/forecasts?authorId=clxauthor0000000000000000'))
+            expect(vi.mocked(prisma.prediction.findMany).mock.calls[0][0]!.where).not.toHaveProperty('status')
         })
 
         it('passes tag filter to prisma where clause', async () => {
@@ -365,6 +391,67 @@ describe('/api/forecasts', () => {
             expect(response.status).toBe(201)
             expect(data.id).toBe('new-1')
             expect(prisma.prediction.create).toHaveBeenCalled()
+        })
+
+        describe('asDaatan (#2301)', () => {
+            const body = {
+                claimText: 'Daatan Forecast',
+                resolveByDatetime: '2099-12-31T23:59:59Z',
+                outcomeType: 'BINARY',
+                resolutionRules: 'Resolves YES if the event occurs as described.',
+                asDaatan: true,
+            }
+            const post = () => POST(new NextRequest('http://localhost/api/forecasts', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            }), { params: {} } as any)
+
+            it('refuses a non-admin', async () => {
+                const { prisma } = await import('@/lib/prisma')
+                mockAuth.mockResolvedValue({ user: { id: 'user1', email: 'u@example.com', role: 'USER' } } as any)
+
+                const response = await post()
+
+                expect(response.status).toBe(403)
+                expect(prisma.prediction.create).not.toHaveBeenCalled()
+                expect(mockGetOrCreateDaatanUser).not.toHaveBeenCalled()
+            })
+
+            it('authors an admin forecast as Daatan and records the admin as real creator', async () => {
+                const { prisma } = await import('@/lib/prisma')
+                mockAuth.mockResolvedValue({ user: { id: 'admin1', email: 'a@example.com', role: 'ADMIN' } } as any)
+                vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'admin1', rs: 100 } as any)
+                vi.mocked(prisma.prediction.create).mockResolvedValue({ id: 'new-d', status: 'DRAFT' } as any)
+                vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ id: 'new-d', status: 'DRAFT' } as any)
+                vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+
+                const response = await post()
+
+                expect(response.status).toBe(201)
+                const data = vi.mocked(prisma.prediction.create).mock.calls[0][0].data as Record<string, unknown>
+                expect(data.authorId).toBe('daatan-user')
+                expect(data.realCreator).toEqual({ create: { userId: 'admin1' } })
+            })
+
+            it('leaves an ordinary admin forecast authored by the admin', async () => {
+                const { prisma } = await import('@/lib/prisma')
+                mockAuth.mockResolvedValue({ user: { id: 'admin1', email: 'a@example.com', role: 'ADMIN' } } as any)
+                vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'admin1', rs: 100 } as any)
+                vi.mocked(prisma.prediction.create).mockResolvedValue({ id: 'new-a', status: 'DRAFT' } as any)
+                vi.mocked(prisma.prediction.findUnique).mockResolvedValue({ id: 'new-a', status: 'DRAFT' } as any)
+                vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+
+                const response = await POST(new NextRequest('http://localhost/api/forecasts', {
+                    method: 'POST',
+                    body: JSON.stringify({ ...body, asDaatan: false }),
+                }), { params: {} } as any)
+
+                expect(response.status).toBe(201)
+                const data = vi.mocked(prisma.prediction.create).mock.calls[0][0].data as Record<string, unknown>
+                expect(data.authorId).toBe('admin1')
+                expect(data.realCreator).toBeUndefined()
+                expect(mockGetOrCreateDaatanUser).not.toHaveBeenCalled()
+            })
         })
 
         it('runs moderation and English normalization in parallel, normalizing once (#2195)', async () => {

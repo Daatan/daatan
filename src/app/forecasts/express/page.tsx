@@ -16,5 +16,5 @@ export default async function ExpressForecastPage() {
     redirect('/auth/signin?callbackUrl=/forecasts/express')
   }
 
-  return <ExpressForecastClient userId={session.user.id} />
+  return <ExpressForecastClient userId={session.user.id} isAdmin={session.user.role === 'ADMIN'} />
 }
