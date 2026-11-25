@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
 import { localizedText, telegramHref } from '@/lib/utils/outlet-identity'
+import { outletLogo } from '@/lib/utils/outlet-logos'
 import { getOutletForecastRows, getPublicForecastLinks } from '@/lib/services/outlet-forecasts'
 import { groupPublications } from '@/lib/utils/group-publications'
 import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
@@ -101,6 +103,7 @@ export default async function OutletPublicPage({ params }: Props) {
   // and this list always describe the same rows.
   const scoredAuthors = track ? authorsOfOutlet(authorRows, track.outletName) : []
   const topics = outletTopicRecords(topicBoards, keys)
+  const logo = outletLogo(keys)
 
   const shownName = localizedText(detail.displayName, locale) ?? detail.name
   const description = localizedText(detail.description, locale)
@@ -131,6 +134,7 @@ export default async function OutletPublicPage({ params }: Props) {
       '@type': 'Organization',
       name: shownName,
       ...(site ? { url: site } : {}),
+      ...(logo ? { logo: `${getAppUrl()}${logo.src}` } : {}),
       ...(sameAs.length > 0 ? { sameAs } : {}),
     },
   }
@@ -147,13 +151,20 @@ export default async function OutletPublicPage({ params }: Props) {
       </Link>
 
       <header className="pb-8 border-b border-navy-700">
-        <div className="flex items-center gap-4">
-          <span
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-navy-600 text-lg font-black text-gray-300"
-            aria-hidden="true"
-          >
-            {shownName.trim().charAt(0).toUpperCase()}
-          </span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          {logo ? (
+            // A light plate: most wordmarks are dark ink on transparent and vanish on navy.
+            <span className="inline-flex shrink-0 items-center rounded-md bg-white px-3 py-2">
+              <Image src={logo.src} alt="" width={logo.width} height={logo.height} />
+            </span>
+          ) : (
+            <span
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-navy-600 text-lg font-black text-gray-300"
+              aria-hidden="true"
+            >
+              {shownName.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
           <h1 dir="auto" className="text-2xl sm:text-3xl font-bold text-white">{shownName}</h1>
         </div>
 

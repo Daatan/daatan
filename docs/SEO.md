@@ -64,8 +64,8 @@ the same structured-data strength as the English canonical):
 ### Source pages (`/sources/[name]`, daatan#2339)
 
 A source page emits one `WebPage` whose `about` is an `Organization`: name, the outlet's site
-(its first news-indexer domain) and `sameAs` links to its Wikipedia article and Telegram
-channel. It is identity only: the Brier grade and the board rank are not encoded as a rating.
+(its first news-indexer domain), its bundled `logo` when it has one ([OUTLET_LOGOS.md](./OUTLET_LOGOS.md))
+and `sameAs` links to its Wikipedia article and Telegram channel. It is identity only: the Brier grade and the board rank are not encoded as a rating.
 The type stays `Organization`, not `NewsMediaOrganization`, because the board also carries
 personal sites and think tanks.
 
@@ -129,7 +129,7 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
   the tag page itself (`VISIBLE_TAG_PREDICTION_WHERE` in `src/lib/services/tag.ts`, daatan#2028),
   so no sitemap entry lands on an empty tag page.
 - Source pages (`/sources/[name]`) for every outlet on the public sources board, i.e. at least
-  `SOURCE_LEADERBOARD_MIN_PREDICTIONS` scored forecasts (`getBoardOutletNames()` in
+  `SOURCE_LEADERBOARD_MIN_PREDICTIONS` scored forecasts (`getBoardOutlets()` in
   `src/lib/services/leaderboard-cached.ts`, daatan#2337) — weekly. The same check decides the
   page's `robots`: on the board it is indexed, below the threshold it is `noindex` as a thin page.
   When the Oracul is unreachable the board reads as empty, so this fails closed: source pages
