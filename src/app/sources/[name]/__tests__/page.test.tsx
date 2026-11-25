@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const {
   mockGetPublicOutletDetail, mockGetSourceLeaderboard, mockNotFound, mockForecastRows, mockForecastLinks, mockLocale,
+  mockBoardOutlets,
 } = vi.hoisted(() => ({
   mockGetPublicOutletDetail: vi.fn(),
   mockGetSourceLeaderboard: vi.fn(),
@@ -9,6 +10,7 @@ const {
   mockForecastRows: vi.fn(),
   mockForecastLinks: vi.fn(),
   mockLocale: { value: 'en' },
+  mockBoardOutlets: vi.fn(),
 }))
 
 vi.mock('@/lib/services/outlets', () => ({ getPublicOutletDetail: mockGetPublicOutletDetail }))
@@ -21,7 +23,10 @@ vi.mock('@/lib/services/sourceLeaderboard', () => ({
   canonicalOutlet: (n: string) => n,
   authorsOfOutlet: () => [],
 }))
-vi.mock('@/lib/services/leaderboard-cached', () => ({ SOURCE_LEADERBOARD_MIN_PREDICTIONS: 4 }))
+vi.mock('@/lib/services/leaderboard-cached', () => ({
+  SOURCE_LEADERBOARD_MIN_PREDICTIONS: 4,
+  getBoardOutletNames: mockBoardOutlets,
+}))
 vi.mock('@/lib/services/sourceTopicBoards', () => ({
   getTopicBoards: async () => [],
   outletTopicRecords: () => [],
@@ -82,6 +87,7 @@ describe('sources/[name] page', () => {
     mockGetSourceLeaderboard.mockResolvedValue({ view: 'outlets', sortBy: 'skillConservative', authorRows: [], outletRows: [] })
     mockForecastRows.mockResolvedValue([])
     mockForecastLinks.mockResolvedValue(new Map())
+    mockBoardOutlets.mockResolvedValue([])
   })
 
   const params = Promise.resolve({ name: 'maariv' })
@@ -98,6 +104,28 @@ describe('sources/[name] page', () => {
     expect(metadata.alternates).toEqual({ canonical: 'https://daatan.com/sources/maariv' })
   })
 
+  it('generateMetadata indexes an outlet on the public board, without a second brand (daatan#2337)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
+    mockBoardOutlets.mockResolvedValue(['ynetnews.com', 'maariv'])
+    const metadata = await generateMetadata({ params })
+    expect(metadata.robots).toEqual({ index: true })
+    expect(metadata.title).toBe('maariv — source profile')
+  })
+
+  it('generateMetadata finds the board row through a domain, as the page body does (#1891)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynet', domains: ['ynet.co.il'] })
+    mockBoardOutlets.mockResolvedValue(['ynet.co.il'])
+    const metadata = await generateMetadata({ params: Promise.resolve({ name: 'Ynet' }) })
+    expect(metadata.robots).toEqual({ index: true })
+  })
+
+  it('generateMetadata keeps an outlet below the board threshold out of search (daatan#2337)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
+    mockBoardOutlets.mockResolvedValue(['ynetnews.com'])
+    const metadata = await generateMetadata({ params })
+    expect(metadata.robots).toEqual({ index: false })
+  })
+
   it('titles and describes the page in the reader’s language, falling back to English', async () => {
     mockLocale.value = 'he'
     mockGetPublicOutletDetail.mockResolvedValue({
@@ -106,7 +134,7 @@ describe('sources/[name] page', () => {
       description: { en: 'Israeli daily.' },
     })
     const metadata = await generateMetadata({ params })
-    expect(metadata.title).toBe('מעריב — source profile | Daatan')
+    expect(metadata.title).toBe('מעריב — source profile')
     expect(metadata.description).toBe('Israeli daily.')
   })
 

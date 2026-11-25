@@ -32,14 +32,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const row = await findRow(decodedAuthor, decodedOutlet)
   if (!row) return { title: 'Author Not Found', robots: { index: false, follow: false } }
 
-  const title = `${row.author} (${row.outletName}) — author profile | Daatan`
+  const title = `${row.author} (${row.outletName}) — author profile`
   const description = `Track record for ${row.author} at ${row.outletName} on Daatan.`
   const url = `${getAppUrl()}/authors/${encodeURIComponent(row.author)}/${encodeURIComponent(row.outletName)}`
   return {
     title,
     description,
-    // Parallel to /leaderboard/sources's own experimental/noindex status until the
-    // shadow-scoring feature graduates out of experimental.
+    // One byline at one outlet is a thin page; outlet pages on the board are the indexed
+    // level (daatan#2337).
     robots: { index: false },
     alternates: { canonical: url },
     openGraph: { title, description, url, type: 'website' },
