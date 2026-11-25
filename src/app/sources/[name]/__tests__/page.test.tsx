@@ -20,7 +20,7 @@ vi.mock('@/lib/services/outlet-forecasts', () => ({
 }))
 vi.mock('@/lib/services/sourceLeaderboard', () => ({
   getSourceLeaderboard: mockGetSourceLeaderboard,
-  canonicalOutlet: (n: string) => n,
+  canonicalOutlet: (n: string) => (n === 'ynetnews.com' ? 'ynet.co.il' : n),
   authorsOfOutlet: () => [],
 }))
 vi.mock('@/lib/services/leaderboard-cached', () => ({
@@ -278,9 +278,34 @@ describe('sources/[name] page', () => {
         '@type': 'Organization',
         name: 'Ynet',
         url: 'https://ynet.co.il',
+        logo: 'https://daatan.com/outlet-logos/ynet.co.il.png',
         sameAs: ['https://en.wikipedia.org/wiki/Ynet', 'https://t.me/ynetalerts'],
       },
     })
+  })
+
+  it('shows the bundled logo on a light plate in place of the letter avatar (daatan#2341)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynet', domains: ['ynet.co.il'] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynet' }) })
+    const img = findProps(tree, p => p.src === '/outlet-logos/ynet.co.il.png')
+    expect(img).toMatchObject({ alt: '', width: 93, height: 40 })
+    expect(collectText(tree)).not.toContain('Y')
+  })
+
+  it('finds the logo through an alias domain', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynetnews', domains: ['ynetnews.com'] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynetnews' }) })
+    expect(findProps(tree, p => p.src === '/outlet-logos/ynet.co.il.png')).toBeDefined()
+  })
+
+  it('keeps the letter avatar and no JSON-LD logo when the outlet has no logo', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, domains: ['maariv.co.il'] })
+    const tree = await OutletPublicPage({ params })
+    expect(findProps(tree, p => typeof p.src === 'string' && p.src.startsWith('/outlet-logos/'))).toBeUndefined()
+    expect(collectText(tree)).toContain('M')
+    const data = findProps(tree, p => typeof p.data === 'object' && p.data !== null && '@type' in p.data)?.data as
+      { about: Record<string, unknown> }
+    expect(data.about).not.toHaveProperty('logo')
   })
 
   it('links a Telegram channel stored as a full URL without prefixing it again', async () => {
