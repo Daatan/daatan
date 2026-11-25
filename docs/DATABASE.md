@@ -177,7 +177,9 @@ The central table (`Prediction`). Field groups:
   market asks the opposite question — UI plots `100 − price`).
   `polymarketPrice` (0–1, daatan#1138) is reserved for a denormalized current
   market price; no writer populates it yet — the per-commit value lives on
-  `Commitment.polymarketPrice` (below).
+  `Commitment.polymarketPrice` (below). The forecast page's market number
+  (daatan#2323) reads the newest `external_market_price_snapshots` row instead,
+  polarity-adjusted, greyed as stale after 48 h (`latestMarketReading`).
 - **Moderation flag**: `moderationCheckFailed` (daatan#1318, also on `comments`) —
   true when the AI moderation check threw instead of returning a verdict; the
   content is published but flagged for manual review.

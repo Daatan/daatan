@@ -43,12 +43,13 @@ import { ContributingSources } from '@/components/forecasts/ContributingSources'
 import type { ContributingSource } from '@/lib/services/forecast-sources'
 import { ExternalMarketLinkAdmin } from './_forecast/ExternalMarketLinkAdmin'
 import { MarketDeadlineNote } from './_forecast/MarketDeadlineNote'
+import { EstimateLegend, type AiLegendState } from './_forecast/EstimateLegend'
 import { AwaitingResolutionAdmin } from './_forecast/AwaitingResolutionAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { RevertResolutionAdmin } from './_forecast/RevertResolutionAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
-import { marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
+import { latestMarketReading, marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate, isDeadlineToday } from '@/lib/utils/date'
 import type { Prediction } from './_forecast/types'
 import { isDaatanAccount } from '@/lib/daatan-account'
@@ -431,7 +432,8 @@ export default function ForecastDetailClient({
 
             {/* Confidence/Probability - Moved to top (desktop only; redundant with the gauge on mobile) */}
             {prediction.status === 'ACTIVE' && prediction.outcomeType === 'BINARY' && (() => {
-              const prob = communityProbability(prediction.commitments) ?? 50
+              const prob = communityProbability(prediction.commitments)
+              if (prob == null) return null
               return (
                 <div
                   className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-700 text-teal text-sm font-medium border border-teal/20"
@@ -553,7 +555,8 @@ export default function ForecastDetailClient({
       {/* Probability Display (Interactive Gauge) */}
       <div className="mb-12">
         {prediction.outcomeType === 'BINARY' && (() => {
-          const marketProb = communityProbability(prediction.commitments) ?? 50
+          // null until someone commits: no made-up 50% (daatan#2323)
+          const communityProb = communityProbability(prediction.commitments)
           // The AI needle/band read the prediction's funnel-maintained cache
           // (confidence/aiCiLow/aiCiHigh — includes the daily glide requote);
           // `aiEstimate` overrides only after an in-page analyze run produces a
@@ -570,6 +573,22 @@ export default function ForecastDetailClient({
           const settlers = aiSettled ? settlingSources(latestOracul) : []
           // daatan#1718 — gates the settled-pin banner below
           const commitmentsOpen = prediction.status === 'ACTIVE' && !commitmentsLocked
+          const aiLegend: AiLegendState = aiAbstained
+            ? { kind: 'abstained' }
+            : aiVal != null ? { kind: 'value', value: aiVal } : { kind: 'none' }
+          const linkedMarket = prediction.externalMarket
+          const marketReading = linkedMarket
+            ? latestMarketReading(linkedMarket.snapshots, prediction.externalMarketInverted ?? false, nowMs)
+            : null
+          const legendMarket = linkedMarket && marketReading
+            ? {
+                provider: linkedMarket.provider === 'KALSHI' ? 'Kalshi' : 'Polymarket',
+                reading: marketReading,
+                question: linkedMarket.question,
+                inverted: prediction.externalMarketInverted ?? false,
+                resolved: linkedMarket.resolved,
+              }
+            : null
 
           return (
             <div className="flex flex-col items-center">
@@ -578,7 +597,7 @@ export default function ForecastDetailClient({
                 <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
                 <Speedometer
-                  percentage={marketProb}
+                  percentage={communityProb}
                   userPercentage={userConfidence}
                   centerLabel={t('legendYou')}
                   aiPercentage={aiAbstained ? undefined : (aiEstimate?.probability ?? prediction.confidence ?? undefined)}
@@ -590,33 +609,12 @@ export default function ForecastDetailClient({
                     : undefined}
                 />
 
-                {/* Legend */}
-                <div className="flex justify-center gap-6 mt-6 xl:mt-10 text-[10px] font-bold uppercase tracking-widest border-t border-navy-600 pt-4 xl:pt-8 w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-1 bg-[#A0AEC0] rounded-full" />
-                    <span className="text-gray-400">{t('legendCommunity')} {marketProb}%</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-1.5 bg-[#3B82F6] rounded-full" />
-                    <span className="text-blue-400">{t('legendYou')} {userConfidence}%</span>
-                  </div>
-                  {aiAbstained ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
-                      <span className="text-amber-400/70">{t('legendAI')} · {t('aiInsufficientEvidence')}</span>
-                    </div>
-                  ) : aiVal != null ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-1 bg-[#FBBF24] rounded-full" />
-                      <span className="text-amber-400">{t('legendAI')} {aiVal}%</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2" data-testid="ai-no-sources-yet">
-                      <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
-                      <span className="text-amber-400/70">{t('legendAI')} · {t('aiNoSourcesYet')}</span>
-                    </div>
-                  )}
-                </div>
+                <EstimateLegend
+                  community={communityProb}
+                  you={userConfidence}
+                  ai={aiLegend}
+                  market={legendMarket}
+                />
 
                 {/* Settlement-pin indicator (#1250, narrowed by #1718): the AI number
                     above is a pin, not a pooled average — say so, and name the
@@ -942,10 +940,12 @@ export default function ForecastDetailClient({
         }))}
         marketLabel={marketLineName(
           prediction.externalMarket?.provider === 'KALSHI' ? 'Kalshi' : 'Polymarket',
-          prediction.externalMarketInverted ?? false,
+          prediction.externalMarketInverted ? t('marketInvertedWord') : null,
           trackedOutcomeLabel(prediction.externalMarket?.outcomes),
         )}
-        marketQuestion={prediction.externalMarket?.question}
+        marketHint={prediction.externalMarket
+          ? `${t('marketAsks', { question: prediction.externalMarket.question })} ${t('marketNotIdentical')}`
+          : undefined}
         marketUrl={prediction.externalMarket?.url}
         marketNote={
           <MarketDeadlineNote

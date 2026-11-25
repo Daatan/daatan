@@ -85,7 +85,7 @@ describe('ProbabilityChart gating', () => {
           { createdAt: '2026-06-01', probability: 60 },
           { createdAt: '2026-06-02', probability: 65 },
         ]}
-        marketQuestion="Will X happen by June 30?"
+        marketHint="The market asks: “Will X happen by June 30?”. It is a related market, not the same question."
         marketUrl="https://polymarket.com/event/x"
       />,
     )

@@ -22,28 +22,47 @@ export function trackedOutcomeLabel(outcomes: unknown): string | null {
   return labels[0] ?? null
 }
 
-/** Chart legend / series name for the Market line, e.g. "Polymarket, inverted". */
+/**
+ * Chart legend / series name for the Market line, e.g. "Polymarket, inverted".
+ * `invertedWord` is the reader's word for "inverted", or null for a plain link.
+ */
 export function marketLineName(
   providerLabel: string,
-  inverted: boolean,
+  invertedWord: string | null,
   outcomeLabel: string | null,
 ): string {
-  const qualifier = inverted ? `${providerLabel}, inverted` : providerLabel
+  const qualifier = invertedWord ? `${providerLabel}, ${invertedWord}` : providerLabel
   return outcomeLabel ? `"${outcomeLabel}" (${qualifier})` : qualifier
 }
 
-/**
- * daatan#2069: a linked market is almost never the exact same question as the
- * forecast — said on hover over the market's legend entry and under the chart.
- */
-export function marketNotIdenticalHint(question: string | undefined): string {
-  const asks = question ? `The market asks: “${question}”. ` : ''
-  return `${asks}It is a related market, not the same question as this forecast — its wording, deadline or resolution rules may differ, so its price is shown for comparison only.`
+/** daatan#2323: a market price older than this is shown greyed and marked stale. */
+export const MARKET_STALE_HOURS = 48
+
+export interface MarketReading {
+  /** Polarity-adjusted, 0–100. */
+  probability: number
+  /** ISO time of the snapshot. */
+  at: string
+  stale: boolean
 }
 
-/** One-line explanation of an inverted link, used as a hover hint. */
-export const INVERTED_HINT =
-  'This market asks the opposite question, so its price is shown as 100 − market price to match this forecast’s claim.'
+/**
+ * The market's latest price as the forecast page shows it (daatan#2323): the last
+ * snapshot (callers pass them oldest first), polarity-adjusted, aged against `nowMs`.
+ */
+export function latestMarketReading(
+  snapshots: ReadonlyArray<{ createdAt: string; probability: number }>,
+  inverted: boolean,
+  nowMs: number,
+): MarketReading | null {
+  const last = snapshots.at(-1)
+  if (!last) return null
+  return {
+    probability: marketDisplayProbability(last.probability, inverted),
+    at: last.createdAt,
+    stale: nowMs - new Date(last.createdAt).getTime() > MARKET_STALE_HOURS * 3_600_000,
+  }
+}
 
 /**
  * daatan#2141: a linked market whose resolution date sits within this many days of

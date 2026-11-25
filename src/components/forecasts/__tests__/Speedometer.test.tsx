@@ -18,6 +18,14 @@ describe('Speedometer component', () => {
     expect(screen.getByText('75%')).toBeInTheDocument()
   })
 
+  it('draws no community tick before anyone has committed (daatan#2323)', () => {
+    const { container, rerender } = render(<Speedometer percentage={null} userPercentage={60} />)
+    expect(container.querySelector('[data-testid="community-tick"]')).toBeNull()
+    expect(screen.getByText('60%')).toBeInTheDocument()
+    rerender(<Speedometer percentage={40} userPercentage={60} />)
+    expect(container.querySelector('[data-testid="community-tick"]')).not.toBeNull()
+  })
+
   it('displays the label below the SVG', () => {
     render(<Speedometer percentage={50} label="Will Happen" color="green" />)
     expect(screen.getByText('Will Happen')).toBeInTheDocument()
