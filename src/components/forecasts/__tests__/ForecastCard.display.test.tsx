@@ -239,4 +239,10 @@ describe('ForecastCard in Hebrew (daatan#2333)', () => {
     expect(document.body.textContent).toContain(new Date('2027-03-19T12:00:00.000Z').toLocaleDateString('he', { month: 'short', day: 'numeric', year: 'numeric' }))
     expect(document.body.textContent).not.toMatch(/Mar 19, 2027/)
   })
+
+  it('links the Hebrew forecast page, so crawlers reach translated pages through links (daatan#2336)', () => {
+    const prediction = { ...basePrediction, slug: 'will-x-happen' }
+    render(<NextIntlClientProvider locale="he" messages={heMessages}><ForecastCard prediction={prediction} /></NextIntlClientProvider>)
+    expect(screen.getByRole('link', { name: basePrediction.claimText })).toHaveAttribute('href', '/he/forecasts/will-x-happen')
+  })
 })

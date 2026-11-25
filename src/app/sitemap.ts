@@ -6,6 +6,7 @@ import { env } from '@/env'
 import { getAppUrl } from '@/lib/branding'
 import { VISIBLE_TAG_PREDICTION_WHERE } from '@/lib/services/tag'
 import { RETRO_PATHS } from './retroanalysis/links'
+import { getBoardOutletNames } from '@/lib/services/leaderboard-cached'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
@@ -141,6 +142,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { route: '/about',    lastModified: new Date('2026-03-26'), frequency: 'monthly' as const, priority: 0.8, localized: true  },
     { route: '/methodology', lastModified: new Date('2026-07-05'), frequency: 'monthly' as const, priority: 0.6, localized: true  },
     { route: '/leaderboard', lastModified: new Date(),           frequency: 'daily'   as const, priority: 0.8, localized: false },
+    { route: '/leaderboard/sources', lastModified: new Date(),   frequency: 'daily'   as const, priority: 0.7, localized: false },
     { route: '/activity', lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.8, localized: false },
     { route: '/tags',     lastModified: new Date(),              frequency: 'daily'   as const, priority: 0.6, localized: false },
     // "Who foresaw X?" hub (daatan#2217); its event pages are noindex and stay out of the sitemap.
@@ -203,7 +205,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ])
 
-  const { predictions, translatedPredictionIds, users, tags } = await fetchSitemapData()
+  const [{ predictions, translatedPredictionIds, users, tags }, boardOutlets] = await Promise.all([
+    fetchSitemapData(),
+    getBoardOutletNames(),
+  ])
 
   const translatedSet = new Set(
     translatedPredictionIds.map((t) => `${t.predictionId}:${t.language}`),
@@ -273,6 +278,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }))
 
+  // 7. Source pages on the public board, the only ones indexed (daatan#2337). Same URL as their
+  // canonical and the board's links; no locale variants (one route, language by cookie).
+  const sourceRoutes: MetadataRoute.Sitemap = boardOutlets.map((name) => ({
+    url: `${BASE_URL}/sources/${encodeURIComponent(name)}`,
+    changeFrequency: 'weekly' as const,
+    priority: 0.5,
+  }))
+
   return [
     ...staticRoutes,
     ...localeStaticRoutes,
@@ -280,5 +293,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...localeForecastRoutes,
     ...profileRoutes,
     ...tagRoutes,
+    ...sourceRoutes,
   ]
 }

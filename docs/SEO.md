@@ -93,7 +93,7 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 `src/app/sitemap.ts` — dynamically generates the sitemap from live DB data (queries cached 1h).
 It returns an empty sitemap unless `APP_ENV=production`, so staging is never submitted. Included pages:
 
-- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity`, `/tags` — daily;
+- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/leaderboard/sources`, `/activity`, `/tags` — daily;
   `/who-foresaw` — weekly; `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`,
   `/accessibility`, `/contact` — monthly. `/who-foresaw` is the "Who foresaw X?" hub
   (daatan#2217): it is `noindex` while empty, and its event pages and the source board
@@ -115,6 +115,13 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
 - Tags with at least one public **ACTIVE** forecast (`/tags/[slug]`) — daily. Same filter as
   the tag page itself (`VISIBLE_TAG_PREDICTION_WHERE` in `src/lib/services/tag.ts`, daatan#2028),
   so no sitemap entry lands on an empty tag page.
+- Source pages (`/sources/[name]`) for every outlet on the public sources board, i.e. at least
+  `SOURCE_LEADERBOARD_MIN_PREDICTIONS` scored forecasts (`getBoardOutletNames()` in
+  `src/lib/services/leaderboard-cached.ts`, daatan#2337) — weekly. The same check decides the
+  page's `robots`: on the board it is indexed, below the threshold it is `noindex` as a thin page.
+  When the Oracul is unreachable the board reads as empty, so this fails closed: source pages
+  are `noindex` and left out of the sitemap, as they then show no track record either. Author pages
+  (`/authors/[author]/[outlet]`) stay `noindex` and unlisted: one byline at one outlet is thin.
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 
@@ -176,6 +183,13 @@ through the sitemap. `src/lib/services/crawl-links.ts` (every reader wrapped in
 
 Links use the same visibility filter as `/forecasts` and `/tags/<slug>`, so each lands on a
 page that shows the target.
+
+Forecast cards link the forecast page in the reader's language: `forecastHref()`
+(`src/lib/forecast-href.ts`) gives `/he/forecasts/<slug>` on a Hebrew page and the root path in
+English. Until daatan#2336 every card linked the English page, so `/he/forecasts` and
+`/ru/forecasts` had no link to a translated forecast. Google reached those pages mostly through
+the sitemap and hreflang, and in November 2026 left 115 of them "Discovered – currently not
+indexed".
 
 `/leaderboard` and `/leaderboard/sources` are server-rendered too (daatan#2212). Before, they were
 client pages that fetched `/api/leaderboard*` after hydration. `robots.txt` disallows `/api/`, so

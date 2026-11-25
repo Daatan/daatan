@@ -10,7 +10,7 @@ import { groupPublications } from '@/lib/utils/group-publications'
 import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
 import { brierGrade } from '@/lib/utils/brier-grade'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
-import { SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
+import { getBoardOutletNames, SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import OutletForecastTable from '@/components/sources/OutletForecastTable'
@@ -40,18 +40,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const detail = await getPublicOutletDetail(decodeURIComponent(name))
   if (!detail) return { title: 'Source Not Found', robots: { index: false, follow: false } }
 
-  const locale = await getLocale()
+  const [locale, boardOutlets] = await Promise.all([getLocale(), getBoardOutletNames()])
+  // Same row lookup as the page body (#1891), so the page is indexed exactly when it shows a
+  // track record.
+  const keys = new Set([detail.name, ...detail.domains].map(canonicalOutlet))
+  const onBoard = boardOutlets.some((n) => keys.has(n))
   const shown = localizedText(detail.displayName, locale) ?? detail.name
-  const title = `${shown} — source profile | Daatan`
+  // Bare title: the root layout's `%s | DAATAN` template adds the brand.
+  const title = `${shown} — source profile`
   const description =
     localizedText(detail.description, locale) ?? `Track record, publications, and identity info for ${shown} on Daatan.`
   const url = `${getAppUrl()}/sources/${encodeURIComponent(detail.name)}`
   return {
     title,
     description,
-    // Parallel to /leaderboard/sources's own experimental/noindex status until the
-    // shadow-scoring feature graduates out of experimental.
-    robots: { index: false },
+    // Indexed once the outlet is on the public board, as that board is (#1588); below its
+    // threshold the page is too thin to submit (daatan#2337).
+    robots: { index: onBoard },
     alternates: { canonical: url },
     openGraph: { title, description, url, type: 'website' },
   }

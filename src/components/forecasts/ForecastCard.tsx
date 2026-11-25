@@ -35,6 +35,7 @@ import {
   PenLine,
 } from 'lucide-react'
 import { UserLink } from '@/components/UserLink'
+import { forecastHref } from '@/lib/forecast-href'
 import Speedometer from './Speedometer'
 import { useTopicLabel } from '@/components/feed/useTopicLabel'
 
@@ -327,7 +328,7 @@ export default function ForecastCard({
   }
 
   const badge = getStatusBadge(prediction.status)
-  const forecastUrl = `/forecasts/${prediction.slug || prediction.id}`
+  const forecastUrl = forecastHref(prediction.slug || prediction.id, locale)
   const showMenu = !canApprove && (canAdminister || canResolve)
   // The claim as shown, so a screen reader reads the same language as the page (daatan#2333).
   const shownClaim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
