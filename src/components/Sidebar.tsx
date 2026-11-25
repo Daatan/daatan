@@ -295,7 +295,7 @@ const Sidebar = () => {
           <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} alt="" />
           <div className="min-w-0">
             <span className="block text-lg font-bold text-white leading-tight">{appName}</span>
-            <p className="mt-0.5 text-[11px] font-semibold uppercase leading-snug tracking-[0.18em] text-text-secondary">{t('tagline')}</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase leading-snug tracking-[0.05em] text-text-secondary">{t('tagline')}</p>
             <span className="text-[11px] text-text-subtle font-mono">v{VERSION}</span>
           </div>
         </Link>
