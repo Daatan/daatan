@@ -15,15 +15,29 @@ vi.mock('@/i18n/routing', () => ({
   })
 }))
 
+const intl = vi.hoisted(() => ({ locale: 'en' }))
+
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => {
     if (key === 'signIn') return 'Sign In'
     return key
   },
-  useLocale: () => 'en'
+  useLocale: () => intl.locale
 }))
 
 describe('Sidebar Component', () => {
+  it('opens the elections app in the reader\'s language (daatan#2332)', () => {
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as any)
+    const hrefs = () => [...document.querySelectorAll('a[href^="https://elections.daatan.com"]')].map((a) => a.getAttribute('href'))
+    for (const [locale, href] of [['en', 'https://elections.daatan.com/?lang=en'], ['ru', 'https://elections.daatan.com/?lang=ru'], ['he', 'https://elections.daatan.com']]) {
+      intl.locale = locale
+      const { unmount } = render(<Sidebar />)
+      expect(new Set(hrefs())).toEqual(new Set([href]))
+      unmount()
+    }
+    intl.locale = 'en'
+  })
+
   it('renders sign in button when unauthenticated', () => {
     vi.mocked(useSession).mockReturnValue({
       data: null,

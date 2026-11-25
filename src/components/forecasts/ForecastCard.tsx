@@ -256,7 +256,8 @@ export default function ForecastCard({
 
   const formatDate = (date: string | Date) => {
     if (!isMounted) return ''
-    return new Date(date).toLocaleDateString('en-US', {
+    // In the reader's language (daatan#2333): a Hebrew page showed "MAR 19, 2027".
+    return new Date(date).toLocaleDateString(locale, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -328,6 +329,8 @@ export default function ForecastCard({
   const badge = getStatusBadge(prediction.status)
   const forecastUrl = `/forecasts/${prediction.slug || prediction.id}`
   const showMenu = !canApprove && (canAdminister || canResolve)
+  // The claim as shown, so a screen reader reads the same language as the page (daatan#2333).
+  const shownClaim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
 
   return (
     <div className="group relative block p-4 sm:p-5 bg-navy-700 border border-navy-600 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
@@ -336,7 +339,7 @@ export default function ForecastCard({
           offers "open in new tab". Interactive children sit above it via z-[2]. */}
       <Link
         href={forecastUrl}
-        aria-label={prediction.claimText}
+        aria-label={shownClaim}
         className="absolute inset-0 z-[1]"
       />
 
@@ -534,7 +537,7 @@ export default function ForecastCard({
           {/* Claim Text. With a headline (#1814) the headline is the title and the
               full claim sits under it; without one, the claim is the title as before. */}
           {(() => {
-            const claim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
+            const claim = shownClaim
             const headline = prediction.headline
               ? (showTranslated && translatedHeadline ? translatedHeadline : prediction.headline)
               : null

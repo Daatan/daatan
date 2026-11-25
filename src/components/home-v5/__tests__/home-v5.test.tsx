@@ -24,13 +24,19 @@ describe('home-v5 links', () => {
   it('points Sources at the source leaderboard and Elections at the elections app', () => {
     const links = buildLinks('en')
     expect(links.sources).toBe('/leaderboard/sources')
-    expect(links.elections).toBe('https://elections.daatan.com')
+    expect(links.elections).toBe('https://elections.daatan.com/?lang=en')
+  })
+
+  it('opens the elections app in the viewer\'s language; Hebrew is its default, Esperanto falls back to English (#2332)', () => {
+    expect(buildLinks('he').elections).toBe('https://elections.daatan.com')
+    expect(buildLinks('ru').elections).toBe('https://elections.daatan.com/?lang=ru')
+    expect(buildLinks('eo').elections).toBe('https://elections.daatan.com/?lang=en')
   })
 
   it('has no placeholder hrefs', () => {
     for (const locale of ['en', 'he', 'ru', 'eo'] as const) {
       for (const href of Object.values(buildLinks(locale))) {
-        expect(href).toMatch(/^(\/|https:\/\/elections\.daatan\.com$)/)
+        expect(href).toMatch(/^(\/|https:\/\/elections\.daatan\.com(\/\?lang=(en|ru))?$)/)
         expect(href).not.toBe('#')
       }
     }

@@ -32,7 +32,9 @@
     "contact": "Kontaktu Nin",
     "retroanalysis": "Retroanalizo",
     "admin": "Administranto",
-    "tagline": "EARNED TRUST"
+    "tagline": "EARNED TRUST",
+    "openMenu": "Malfermi menuon",
+    "closeMenu": "Fermi menuon"
   },
   "feed": {
     "title": "Prognozoj",
@@ -88,6 +90,10 @@
       "deadline": "Ordigi laŭ solvo-limdato",
       "cu": "Ordigi laŭ la sumo de vetitaj kredindec-unuoj",
       "updated": "Ordigi laŭ la lasta ĝisdatigo-dato"
+    },
+    "sortOrder": {
+      "asc": "Kreskanta",
+      "desc": "Malkreskanta"
     }
   },
   "forecast": {
@@ -2442,5 +2448,16 @@
       "space": "Kosmo",
       "israeli-elections-2026": "Israelaj elektoj 2026"
     }
+  },
+  "cookieConsent": {
+    "label": "Konsento pri kuketoj",
+    "notice": "Ni uzas kuketojn de Google Analytics por kompreni kiel la aplikaĵo estas uzata kaj plibonigi ĝin. Vi povas rifuzi iam ajn.",
+    "prompt": "Ni uzas analizajn kuketojn por kompreni kiel la aplikaĵo estas uzata kaj plibonigi ĝin.",
+    "noTracking": "Neniuj reklamoj. Neniu spurado inter retejoj.",
+    "privacy": "Privateca Politiko",
+    "optOut": "Rifuzi",
+    "decline": "Malakcepti",
+    "ok": "Bone",
+    "accept": "Akcepti"
   }
 }
