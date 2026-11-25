@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Home, Loader2, TrendingUp, Plus, Filter, Tag, X, ArrowUpRight, ArrowDownUp } from 'lucide-react'
+import { Home, Loader2, TrendingUp, Plus, Filter, ArrowUpRight, ArrowDownUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 import { useSession } from 'next-auth/react'
@@ -13,6 +13,9 @@ import { ForecastCardSkeleton } from '@/components/forecasts/ForecastCardSkeleto
 import EmptyState from '@/components/ui/EmptyState'
 import { useCapabilities } from '@/components/CapabilitiesProvider'
 import { createClientLogger } from '@/lib/client-logger'
+import { TopicFilter } from '@/components/feed/TopicFilter'
+import { useRememberedTopics } from '@/components/feed/useRememberedTopics'
+import type { TopicCounts } from '@/lib/topics'
 
 const log = createClientLogger('FeedClient')
 
@@ -21,50 +24,16 @@ type SortBy = 'newest' | 'deadline' | 'cu' | 'updated'
 
 const VALID_STATUSES: FilterStatus[] = ['ACTIVE', 'PENDING', 'RESOLVED', 'CLOSING_SOON', 'NEEDS_REVIEW', 'ALL']
 
-import { STANDARD_TAGS } from '@/lib/constants'
-
-// Remembered tag filter (daatan#2203): guests keep it in localStorage, signed-in users on
-// their account (/api/user/preferences). Written only on an explicit toggle/clear — never
-// from a ?tags= URL, so opening a shared link doesn't overwrite someone's saved topics.
-const FEED_TAGS_STORAGE_KEY = 'daatan_feed_tags'
-
-function knownTags(tags: unknown): string[] {
-  if (!Array.isArray(tags)) return []
-  return tags.filter((t): t is string => typeof t === 'string' && (STANDARD_TAGS as readonly string[]).includes(t))
-}
-
-function readGuestTags(): string[] {
-  try {
-    return knownTags(JSON.parse(localStorage.getItem(FEED_TAGS_STORAGE_KEY) ?? '[]'))
-  } catch {
-    return []
-  }
-}
-
-function saveRememberedTags(tags: string[], signedIn: boolean) {
-  if (signedIn) {
-    fetch('/api/user/preferences', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedTags: tags }),
-    }).catch((err) => log.warn({ err }, 'Failed to save feed tags'))
-    return
-  }
-  try {
-    localStorage.setItem(FEED_TAGS_STORAGE_KEY, JSON.stringify(tags))
-  } catch {
-    // Storage unavailable (private mode, blocked site data) — the filter just isn't remembered.
-  }
-}
-
 interface FeedClientProps {
   initialPredictions?: Prediction[]
+  /** Open forecasts per topic slug, for ordering the topic chips (daatan#2330). */
+  topicCounts?: TopicCounts
 }
 
-export default function FeedClient({ initialPredictions }: FeedClientProps) {
+export default function FeedClient({ initialPredictions, topicCounts = {} }: FeedClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session, status: sessionStatus } = useSession()
+  const { data: session } = useSession()
   const { selfHosted } = useCapabilities()
   // "Needs Review" is the bot-forecast approval queue; bots (and the
   // PENDING_APPROVAL status) don't exist on self-host, so hide the filter there.
@@ -74,7 +43,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
 
   // Initialize state from URL search params
   const initialStatus = searchParams.get('status') as FilterStatus | null
-  const initialTags = searchParams.get('tags')?.split(',').filter(Boolean) || []
+  const urlTags = searchParams.get('tags')?.split(',').filter(Boolean) ?? null
   const initialSort = (searchParams.get('sortBy') as SortBy | null) || 'newest'
   const initialSortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc' | null) || (initialSort === 'deadline' ? 'asc' : 'desc')
 
@@ -85,7 +54,7 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
   const ssrConsumed = useRef(
     !!(initialPredictions?.length) &&
     (!initialStatus || initialStatus === 'ACTIVE') &&
-    initialTags.length === 0 &&
+    !urlTags?.length &&
     initialSort === 'newest' &&
     initialSortOrder === 'desc'
   )
@@ -93,34 +62,9 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
   const [filter, setFilter] = useState<FilterStatus>(
     initialStatus && VALID_STATUSES.includes(initialStatus) ? initialStatus : 'ACTIVE'
   )
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags)
+  const [selectedTags, chooseTopics] = useRememberedTopics(urlTags)
   const [sortBy, setSortBy] = useState<SortBy>(initialSort)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialSortOrder)
-  const [tagsVisible, setTagsVisible] = useState(selectedTags.length > 0)
-
-  // Restore the remembered tags once, after mount and once the session is known, unless the
-  // URL already names tags. A toggle made while the account fetch is in flight wins.
-  const urlHasTags = searchParams.get('tags') != null
-  const restoreStarted = useRef(false)
-  const userChangedTags = useRef(false)
-  useEffect(() => {
-    if (restoreStarted.current || urlHasTags || sessionStatus === 'loading') return
-    restoreStarted.current = true
-    const apply = (tags: string[]) => {
-      if (userChangedTags.current || tags.length === 0) return
-      setSelectedTags(tags)
-      setTagsVisible(true)
-    }
-    if (sessionStatus === 'authenticated') {
-      fetch('/api/user/preferences', { credentials: 'include' })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => apply(knownTags(data?.feedTags)))
-        .catch((err) => log.warn({ err }, 'Failed to load feed tags'))
-    } else {
-      // Browser-only: localStorage is unreadable during SSR, hence an effect.
-      apply(readGuestTags())
-    }
-  }, [urlHasTags, sessionStatus])
 
   // Sync state to URL search params
   const syncToUrl = useCallback((status: FilterStatus, tags: string[], sort: SortBy, order: 'asc' | 'desc') => {
@@ -156,21 +100,9 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
     syncToUrl(filter, selectedTags, sortBy, newOrder)
   }
 
-  const handleToggleTag = (tag: string) => {
-    const newTags = selectedTags.includes(tag)
-      ? selectedTags.filter(t => t !== tag)
-      : [...selectedTags, tag]
-    userChangedTags.current = true
-    setSelectedTags(newTags)
-    syncToUrl(filter, newTags, sortBy, sortOrder)
-    saveRememberedTags(newTags, sessionStatus === 'authenticated')
-  }
-
-  const handleClearTags = () => {
-    userChangedTags.current = true
-    setSelectedTags([])
-    syncToUrl(filter, [], sortBy, sortOrder)
-    saveRememberedTags([], sessionStatus === 'authenticated')
+  const handleTopics = (tags: string[]) => {
+    chooseTopics(tags)
+    syncToUrl(filter, tags, sortBy, sortOrder)
   }
 
   useEffect(() => {
@@ -363,66 +295,10 @@ export default function FeedClient({ initialPredictions }: FeedClientProps) {
               </>
             )}
 
-            {/* Tags toggle */}
-            <div className="w-px h-5 bg-navy-600 mx-1 flex-shrink-0" />
-            <button
-              onClick={() => setTagsVisible(v => !v)}
-              title={t('filterHints.tags')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                tagsVisible
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
-              }`}
-            >
-              <Tag className="w-3.5 h-3.5" />
-              {t('tags')}
-              {selectedTags.length > 0 && (
-                <span className="ml-0.5 bg-white/20 text-xs rounded-full px-1.5 py-0.5 leading-none">
-                  {selectedTags.length}
-                </span>
-              )}
-            </button>
           </div>
         </div>
 
-        {/* Tag Multi-Select Filter */}
-        {tagsVisible && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {selectedTags.length > 0 && (
-                <button
-                  onClick={handleClearTags}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
-                  aria-label="Clear all selected tags"
-                >
-                  <X className="w-3 h-3" />
-                  Clear all
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {STANDARD_TAGS.map((tag) => {
-                const isSelected = selectedTags.includes(tag)
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => handleToggleTag(tag)}
-                    aria-pressed={isSelected}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-150 flex items-center gap-1.5 ${isSelected
-                      ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-600'
-                      : 'bg-navy-700 text-gray-400 hover:bg-navy-600 hover:text-mist'
-                      }`}
-                  >
-                    {tag}
-                    {isSelected && (
-                      <X className="w-3 h-3 ml-0.5 opacity-70 hover:opacity-100" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        <TopicFilter selected={selectedTags} counts={topicCounts} onChange={handleTopics} />
       </div>
 
       {/* Feed Content */}

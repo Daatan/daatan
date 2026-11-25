@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { locales } from '@/i18n/config'
+import { STANDARD_TAGS } from '@/lib/constants'
 import { NOTIFICATION_TYPE_DEFAULTS } from '@/lib/services/notification'
 import type { NotificationType } from '@prisma/client'
 
@@ -28,8 +29,8 @@ export const suggestTagsBodySchema = z.object({
 
 const runMode = z.enum(['dry-run', 'apply'])
 
-/** PATCH /api/user/preferences. */
-export const FEED_TAGS_MAX = 20
+/** PATCH /api/user/preferences. Room for every topic (daatan#2330: there are 21). */
+export const FEED_TAGS_MAX = STANDARD_TAGS.length
 
 export const userPreferencesSchema = z
   .object({

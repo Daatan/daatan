@@ -28,7 +28,7 @@ List predictions. Public; optional session for user-context fields.
 |-------|------|---------|-------|
 | `status` | enum | — | `DRAFT`, `ACTIVE`, `PENDING`, `PENDING_APPROVAL`, `RESOLVED_*`, `VOID`, `UNRESOLVABLE`. `PENDING` ("Awaiting Resolution") also matches still-`ACTIVE` forecasts where `awaitingAiResolution` is true (organic AI estimate >=90% or <=10%; a settlement pin instead needs >=2 settling votes in its snapshot — see `context.ts`, daatan#1248; a latched (`settled`) forecast stays in until it is resolved, its latch cleared, or it is dismissed) — status itself doesn't change, so staking stays open until the real deadline |
 | `authorId` | cuid | — | Filter by author. Another user's `DRAFT`/`PENDING_APPROVAL` forecasts are left out unless you are an admin (daatan#2301) |
-| `tags` | string | — | Comma-separated tag names |
+| `tags` | string | — | Comma-separated tag names; a forecast matches if it has any of them. Matched by slug, so case and spacing don't matter (`Politics` finds a tag stored as `politics`, daatan#2330) |
 | `q` | string | — | Free-text search over `claimText`, its translations (`prediction_translations`, `fieldName='claimText'` — so a Hebrew/Russian/Esperanto query finds forecasts whose canonical claim is English, daatan#1804) and tag names — substring match plus `pg_trgm` similarity (threshold 0.3) for typo tolerance, e.g. "Netanyau" matches "Netanyahu" (daatan#1169). With no explicit `sortBy`, results are ordered by relevance (whole word in the claim > in a translation > tag > word prefix > substring > trigram; newest first within a tier), and a query of ≤3 characters keeps only whole-word and tag matches, so `AI` no longer returns every claim containing "ai" (daatan#1878) |
 | `page` | number | 1 | |
 | `limit` | number | 20 | max 100 |
@@ -470,8 +470,9 @@ Set preferred display language.
 Display preferences. GET returns `{ showAiPanel, feedTags }`.
 
 - `showAiPanel` (boolean) is the LASSO chart opt-in, [LASSO.md](./LASSO.md) §8.
-- `feedTags` (string[], ≤ 20 tags, each 1–50 chars) is the remembered home-feed tag filter
-  (daatan#2203). It is deduped on write, and `[]` clears it.
+- `feedTags` (string[], at most one per standard topic, each 1–50 chars) is the remembered topic
+  filter (daatan#2203), shared by `/` and `/forecasts` since daatan#2330. It is deduped on write, and
+  `[]` clears it.
 
 PATCH accepts either field or both, and writes only the fields that were sent. It returns 400 on an
 empty body or a bad value. Nothing here can touch scoring, roles, or profile identity.
