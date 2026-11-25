@@ -112,7 +112,7 @@ describe('ForecastDetailClient — linked market number (daatan#2323)', () => {
   it('hands the chart a translated "related, not the same question" hint and inverted label', async () => {
     await renderPage({ externalMarketInverted: true }, ruMessages, 'ru')
     const props = chartProps.mock.calls.at(-1)?.[0] as { marketHint: string; marketLabel: string }
-    expect(props.marketHint).toBe(`Вопрос рынка: «Will X happen?». ${ruMessages.forecast.marketNotIdentical}`)
+    expect(props.marketHint).toBe(`Вопрос рынка: «\u2068Will X happen?\u2069». ${ruMessages.forecast.marketNotIdentical}`)
     expect(props.marketLabel).toBe(`Polymarket, ${ruMessages.forecast.marketInvertedWord}`)
   })
 })

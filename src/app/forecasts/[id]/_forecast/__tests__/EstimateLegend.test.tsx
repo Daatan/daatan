@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import enMessages from '../../../../../../messages/en.json'
 import ruMessages from '../../../../../../messages/ru.json'
+import heMessages from '../../../../../../messages/he.json'
 import { EstimateLegend, type LegendMarket } from '../EstimateLegend'
 
 const f = enMessages.forecast
@@ -45,8 +46,8 @@ describe('EstimateLegend (daatan#2323)', () => {
     expect(explainer).toHaveTextContent(f.numbersYou)
     expect(explainer).toHaveTextContent(f.numbersAiTitle)
     expect(explainer).toHaveTextContent(/not the same/)
-    expect(explainer).toHaveTextContent('“Will X happen by June 30?”')
-    expect(explainer).toHaveTextContent(/Price as of Nov 25, 2026/)
+    expect(explainer).toHaveTextContent('“\u2068Will X happen by June 30?\u2069”')
+    expect(explainer).toHaveTextContent(/Price as of \u2068Nov 25, 2026/)
     // Same text on hover for desktop.
     expect(screen.getByTestId('legend-market').getAttribute('title')).toMatch(/not the same/)
   })
@@ -82,6 +83,14 @@ describe('EstimateLegend (daatan#2323)', () => {
   it('translates the hints', () => {
     renderLegend({ market: market() }, ruMessages, 'ru')
     expect(screen.getByTestId('numbers-explainer')).toHaveTextContent(ruMessages.forecast.numbersExplainer)
-    expect(screen.getByTestId('numbers-explainer')).toHaveTextContent('Вопрос рынка: «Will X happen by June 30?».')
+    expect(screen.getByTestId('numbers-explainer')).toHaveTextContent('Вопрос рынка: «\u2068Will X happen by June 30?\u2069».')
+  })
+
+  it('isolates the English market question and the date so a Hebrew page does not reorder them (daatan#2327)', () => {
+    renderLegend({ market: market() }, heMessages, 'he')
+    const hint = screen.getByTestId('legend-market').getAttribute('title') ?? ''
+    expect(hint).toContain('\u2068Will X happen by June 30?\u2069')
+    expect(hint).toMatch(/\u2068Nov 25, 2026[^\u2069]*\u2069/)
+    expect(screen.getByTestId('numbers-explainer').textContent).toContain('\u2068Will X happen by June 30?\u2069')
   })
 })
