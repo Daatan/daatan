@@ -49,7 +49,7 @@ describe('marketLineName', () => {
   })
 
   it('names the tracked outcome for non-Yes/No markets', () => {
-    expect(marketLineName('Polymarket', null, 'Knicks')).toBe('"Knicks" (Polymarket)')
+    expect(marketLineName('Polymarket', null, 'Knicks')).toBe('"\u2068Knicks\u2069" (Polymarket)')
   })
 })
 

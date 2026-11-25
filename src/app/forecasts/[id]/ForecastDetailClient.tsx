@@ -51,6 +51,7 @@ import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
 import { communityProbability } from '@/lib/forecast-math'
 import { latestMarketReading, marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate, isDeadlineToday } from '@/lib/utils/date'
+import { bidiIsolate } from '@/lib/utils/bidi'
 import type { Prediction } from './_forecast/types'
 import { isDaatanAccount } from '@/lib/daatan-account'
 
@@ -944,7 +945,7 @@ export default function ForecastDetailClient({
           trackedOutcomeLabel(prediction.externalMarket?.outcomes),
         )}
         marketHint={prediction.externalMarket
-          ? `${t('marketAsks', { question: prediction.externalMarket.question })} ${t('marketNotIdentical')}`
+          ? `${t('marketAsks', { question: bidiIsolate(prediction.externalMarket.question) })} ${t('marketNotIdentical')}`
           : undefined}
         marketUrl={prediction.externalMarket?.url}
         marketNote={

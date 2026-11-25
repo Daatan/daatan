@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { MARKET_STALE_HOURS, type MarketReading } from '@/lib/market-display'
+import { bidiIsolate } from '@/lib/utils/bidi'
 import { formatDisplayDateTime } from '@/lib/utils/date'
 
 export type AiLegendState =
@@ -37,11 +38,11 @@ export function EstimateLegend({ community, you, ai, market }: Props) {
   const marketHint = market
     ? [
         t('numbersMarket', { provider: market.provider }),
-        t('marketAsks', { question: market.question }),
+        t('marketAsks', { question: bidiIsolate(market.question) }),
         market.inverted ? t('numbersMarketInverted') : null,
         market.resolved
           ? t('numbersMarketClosed')
-          : t('numbersMarketAt', { at: formatDisplayDateTime(market.reading.at) }),
+          : t('numbersMarketAt', { at: bidiIsolate(formatDisplayDateTime(market.reading.at)) }),
         !market.resolved && market.reading.stale ? t('numbersMarketStale', { hours: MARKET_STALE_HOURS }) : null,
       ].filter(Boolean).join(' ')
     : null

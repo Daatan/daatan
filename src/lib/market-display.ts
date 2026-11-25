@@ -5,6 +5,8 @@
  * can never disagree.
  */
 
+import { bidiIsolate } from '@/lib/utils/bidi'
+
 /** The probability to show for a raw market price, honoring the inverted flag. */
 export function marketDisplayProbability(raw: number, inverted: boolean): number {
   return inverted ? 100 - raw : raw
@@ -25,6 +27,8 @@ export function trackedOutcomeLabel(outcomes: unknown): string | null {
 /**
  * Chart legend / series name for the Market line, e.g. "Polymarket, inverted".
  * `invertedWord` is the reader's word for "inverted", or null for a plain link.
+ * The outcome label is the provider's own (usually English) text, so it is
+ * direction-isolated for RTL pages (daatan#2327).
  */
 export function marketLineName(
   providerLabel: string,
@@ -32,7 +36,7 @@ export function marketLineName(
   outcomeLabel: string | null,
 ): string {
   const qualifier = invertedWord ? `${providerLabel}, ${invertedWord}` : providerLabel
-  return outcomeLabel ? `"${outcomeLabel}" (${qualifier})` : qualifier
+  return outcomeLabel ? `"${bidiIsolate(outcomeLabel)}" (${qualifier})` : qualifier
 }
 
 /** daatan#2323: a market price older than this is shown greyed and marked stale. */
