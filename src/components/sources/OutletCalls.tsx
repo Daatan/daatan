@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { MIN_CALL_ARTICLES, type OutletCall } from '@/lib/utils/outlet-forecasts'
