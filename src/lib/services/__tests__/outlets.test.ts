@@ -26,6 +26,8 @@ describe('getPublicOutletDetail', () => {
 
   const samplePayload = {
     name: 'maariv',
+    displayName: { en: 'Maariv', he: 'מעריב' },
+    description: { en: 'Israeli daily.' },
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Maariv',
     telegramChannel: 'maariv_news',
     links: [{ label: 'Homepage', url: 'https://maariv.co.il' }],
@@ -43,6 +45,8 @@ describe('getPublicOutletDetail', () => {
     expect(data).not.toBeNull()
     expect(data).not.toHaveProperty('notes')
     expect(data?.name).toBe('maariv')
+    expect(data?.displayName).toEqual(samplePayload.displayName)
+    expect(data?.description).toEqual(samplePayload.description)
     expect(data?.wikipediaUrl).toBe(samplePayload.wikipediaUrl)
     expect(data?.impact).toEqual(samplePayload.impact)
     expect(data?.publications).toEqual(samplePayload.publications)
@@ -78,5 +82,8 @@ describe('getPublicOutletDetail', () => {
     expect(data?.publications).toEqual([])
     expect(data?.linkedPeople).toEqual([])
     expect(data?.sourceConfig).toBeNull()
+    // news-indexer before #557 sends neither identity field.
+    expect(data?.displayName).toEqual({})
+    expect(data?.description).toEqual({})
   })
 })

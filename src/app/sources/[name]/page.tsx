@@ -4,11 +4,18 @@ import { notFound } from 'next/navigation'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
-import { getForecastSlugs } from '@/lib/services/forecast'
+import { localizedText, telegramHref } from '@/lib/utils/outlet-identity'
+import { getOutletForecastRows, getPublicForecastLinks } from '@/lib/services/outlet-forecasts'
 import { groupPublications } from '@/lib/utils/group-publications'
+import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
+import { brierGrade } from '@/lib/utils/brier-grade'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
+import { SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
+import OutletForecastTable from '@/components/sources/OutletForecastTable'
+import { ShowMoreList, ShowMoreTable } from '@/components/sources/ShowMore'
+import { brierTone } from '@/components/leaderboard/LeaderboardParts'
 import { getAppUrl } from '@/lib/branding'
 import DeskBadge from '@/components/sources/DeskBadge'
 
@@ -19,6 +26,10 @@ interface Props {
 
 /** Below this many resolved predictions a skill/Brier number is mostly noise. */
 const LOW_SAMPLE = 30
+const INITIAL_PUBLICATIONS = 10
+const INITIAL_AUTHORS = 10
+
+const OUTCOME_LABEL: Record<string, string> = { YES: 'outcomeYes', NO: 'outcomeNo', ANNULLED: 'outcomeAnnulled' }
 
 function isUrl(s: string | null | undefined): s is string {
   return !!s && /^https?:\/\//.test(s)
@@ -29,8 +40,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const detail = await getPublicOutletDetail(decodeURIComponent(name))
   if (!detail) return { title: 'Source Not Found', robots: { index: false, follow: false } }
 
-  const title = `${detail.name} — source profile | Daatan`
-  const description = `Track record, publications, and identity info for ${detail.name} on Daatan.`
+  const locale = await getLocale()
+  const shown = localizedText(detail.displayName, locale) ?? detail.name
+  const title = `${shown} — source profile | Daatan`
+  const description =
+    localizedText(detail.description, locale) ?? `Track record, publications, and identity info for ${shown} on Daatan.`
   const url = `${getAppUrl()}/sources/${encodeURIComponent(detail.name)}`
   return {
     title,
@@ -46,220 +60,239 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function OutletPublicPage({ params }: Props) {
   const { name } = await params
 
-  const [detail, { outletRows, authorRows }, topicBoards] = await Promise.all([
+  const [detail, { outletRows, authorRows }, topicBoards, locale] = await Promise.all([
     getPublicOutletDetail(decodeURIComponent(name)),
     getSourceLeaderboard('outlets', 'skillConservative'),
     getTopicBoards(),
+    getLocale(),
   ])
   if (!detail) notFound()
   const publications = groupPublications(detail.publications)
-  const forecastSlugs = await getForecastSlugs(
-    publications.flatMap((p) => p.forecasts.map((f) => f.forecastId)),
-  )
-  const locale = await getLocale()
+  const [forecastRows, forecastLinks] = await Promise.all([
+    getOutletForecastRows(detail.name, detail.domains, locale),
+    getPublicForecastLinks(publications.flatMap((p) => p.forecasts.map((f) => f.forecastId)), locale),
+  ])
 
   // The leaderboard keys outlets by domain, forecast pages link by display name ("Ynet"), so
   // match on every domain news-indexer knows for this outlet, not just the name in the URL (#1891).
   const keys = new Set([detail.name, ...detail.domains].map(canonicalOutlet))
   const track = outletRows.find(r => keys.has(r.outletName))
+  // Rank as the public board shows it: same order, same sample-size floor.
+  const ranked = outletRows.filter(r => r.predictions >= SOURCE_LEADERBOARD_MIN_PREDICTIONS)
+  const rank = track ? ranked.findIndex(r => r.outletName === track.outletName) : -1
   // The scored authors behind the track record. Same key as `track`, so the numbers above
   // and this list always describe the same rows.
   const scoredAuthors = track ? authorsOfOutlet(authorRows, track.outletName) : []
   const topics = outletTopicRecords(topicBoards, keys)
-  const noImpact =
-    detail.impact.forecastsAffected === 0 && detail.impact.matches === 0 && detail.impact.last30dMatches === 0
+
+  const shownName = localizedText(detail.displayName, locale) ?? detail.name
+  const description = localizedText(detail.description, locale)
+  const articleTotal = forecastRows.reduce((n, r) => n + r.articles, 0)
+  const lastArticle = forecastRows.reduce<string | null>((d, r) => (!d || r.lastArticle > d ? r.lastArticle : d), null)
+  const date = (iso: string) =>
+    new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' })
+
   const t = await getTranslations('outletPage')
   const tBoard = await getTranslations('sourceLeaderboard')
 
+  const links = [
+    ...(detail.wikipediaUrl ? [{ label: t('wikipedia'), url: detail.wikipediaUrl }] : []),
+    ...(detail.telegramChannel ? [{ label: t('telegram'), url: telegramHref(detail.telegramChannel) }] : []),
+    ...detail.links,
+  ]
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <Link
         href="/leaderboard/sources"
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4"
+        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-6"
       >
         <Newspaper className="w-4 h-4" />
         {t('backToLeaderboard')}
       </Link>
 
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">{detail.name}</h1>
-      {detail.sourceConfig && (
-        <p className="text-sm text-gray-400 mb-4">
-          {detail.sourceConfig.type} · {detail.sourceConfig.language || '—'}
-        </p>
-      )}
-
-      {(detail.wikipediaUrl || detail.telegramChannel || detail.links.length > 0) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-2 mb-6 text-sm">
-          {detail.wikipediaUrl && (
-            <a href={detail.wikipediaUrl} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-1 text-blue-400 hover:underline">
-              {t('wikipedia')} <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
-          {detail.telegramChannel && (
-            <a href={`https://t.me/${detail.telegramChannel}`} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-1 text-blue-400 hover:underline">
-              {t('telegram')} <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
-          {detail.links.map((l, i) => (
-            <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-1 text-blue-400 hover:underline">
-              {l.label} <ExternalLink className="w-3 h-3" />
-            </a>
-          ))}
+      <header className="pb-8 border-b border-navy-700">
+        <div className="flex items-center gap-4">
+          <span
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-navy-600 text-lg font-black text-gray-300"
+            aria-hidden="true"
+          >
+            {shownName.trim().charAt(0).toUpperCase()}
+          </span>
+          <h1 dir="auto" className="text-2xl sm:text-3xl font-bold text-white">{shownName}</h1>
         </div>
-      )}
 
-      <div className="p-4 rounded-xl bg-navy-700 border border-navy-600 mb-8">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">{t('trackRecord')}</h2>
-        {track ? (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Stat label={t('skill')} value={track.skillConservative.toFixed(3)} />
-              <Stat label={t('brier')} value={track.brierScore.toFixed(3)} />
-              <Stat label={t('authors')} value={String(track.authorCount)} />
-              <Stat label={t('predictions')} value={String(track.predictions)} />
-            </div>
-            <p className="text-xs text-gray-500 mt-3">
-              {t('brierHint')}
-              {track.predictions < LOW_SAMPLE && (
-                <span className="text-amber-400"> · {t('lowSample', { count: track.predictions })}</span>
-              )}
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-gray-500">{t('noTrackRecord')}</p>
-        )}
-      </div>
+        {description && <p dir="auto" className="mt-4 max-w-2xl text-gray-300 leading-relaxed">{description}</p>}
 
-      {noImpact ? (
-        <p className="text-sm text-gray-500 mb-8">{t('noImpact')}</p>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          <Stat label={t('forecastsAffected')} hint={t('impactHint')} value={String(detail.impact.forecastsAffected)} big />
-          <Stat label={t('matches')} hint={t('impactHint')} value={String(detail.impact.matches)} big />
-          <Stat label={t('last30dMatches')} hint={t('impactHint')} value={String(detail.impact.last30dMatches)} big highlight />
-        </div>
-      )}
-
-      <TopicBreakdown records={topics} view="outlets" />
-
-      {scoredAuthors.length > 0 && (
-        <>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-            {t('scoredAuthors')} ({scoredAuthors.length})
-          </h3>
-          <div className="overflow-x-auto rounded-lg border border-navy-600 mb-8">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b border-navy-600">
-                  <th className="px-3 py-2 font-medium">{t('author')}</th>
-                  <th className="px-3 py-2 font-medium text-right">{t('skill')}</th>
-                  <th className="px-3 py-2 font-medium text-right">{t('brier')}</th>
-                  <th className="px-3 py-2 font-medium text-right">{t('predictions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scoredAuthors.map(a => (
-                  <tr key={a.id} className="border-t border-navy-700 first:border-t-0">
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/authors/${encodeURIComponent(a.author)}/${encodeURIComponent(a.outletName)}`}
-                        className="text-white hover:underline hover:text-cyan-300"
-                      >
-                        {a.author}
-                      </Link>
-                      {a.isDesk && <DeskBadge label={tBoard('deskBadge')} hint={tBoard('deskBadgeHint')} />}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-cyan-300">{a.skillConservative.toFixed(3)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-300">{a.brierScore.toFixed(3)}</td>
-                    <td className="px-3 py-2 text-right text-gray-500">{a.predictions}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {links.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {links.map((l, i) => (
+              <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 rounded-full border border-navy-600 px-3 py-1 text-xs text-gray-300 hover:border-gray-500 hover:text-white">
+                {l.label} <ExternalLink className="w-3 h-3" />
+              </a>
+            ))}
           </div>
-        </>
-      )}
+        )}
 
-      {(detail.linkedPeople.length > 0 || scoredAuthors.length === 0) && (
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('linkedPeople')}</h3>
-      )}
-      {detail.linkedPeople.length === 0 ? (
-        scoredAuthors.length === 0 && <p className="text-sm text-gray-500 mb-8">{t('noLinkedPeople')}</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5 mb-8">
-          {detail.linkedPeople.map(p => (
-            <span key={p.id} className="inline-flex items-center px-3 py-1 text-xs text-gray-300 bg-navy-900 border border-navy-600 rounded-full">
-              {p.canonicalName}
-            </span>
-          ))}
-        </div>
-      )}
+        <p className="mt-5 max-w-2xl text-sm text-gray-400 leading-relaxed">{t('lead', { name: shownName })}</p>
+
+        <dl className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-5">
+          <Stat
+            label={t('trackRecord')}
+            value={track ? t(`grade.${brierGrade(track.brierScore)}`) : '—'}
+            tone={track ? brierTone(track.brierScore) : undefined}
+            note={track ? t('gradeNote', { brier: track.brierScore.toFixed(2), count: track.predictions }) : t('noTrackRecord')}
+            warn={track && track.predictions < LOW_SAMPLE ? t('lowSample') : undefined}
+          />
+          {rank >= 0 && (
+            <Stat
+              label={t('rankLabel')}
+              value={t('rankValue', { rank: rank + 1, total: ranked.length })}
+              href="/leaderboard/sources?view=outlets"
+            />
+          )}
+          <Stat label={t('forecastsCovered')} value={String(forecastRows.length)} />
+          <Stat label={t('articlesCited')} value={String(articleTotal)} />
+          {lastArticle && <Stat label={t('lastArticle')} value={date(lastArticle)} />}
+        </dl>
+        {track && <p className="mt-4 text-xs text-gray-500">{t('trackRecordHint')}</p>}
+      </header>
+
+      <section className="pt-8">
+        <h2 className="text-lg font-bold text-white">
+          {t('forecastsTitle')} <span className="text-gray-500 font-normal">({forecastRows.length})</span>
+        </h2>
+        <p className="mt-1 mb-4 text-xs text-gray-500 max-w-2xl">{t('forecastsHint')}</p>
+        {forecastRows.length > 0 ? (
+          <OutletForecastTable rows={sortOutletForecasts(forecastRows)} />
+        ) : (
+          <p className="text-sm text-gray-500">{t('noForecasts')}</p>
+        )}
+      </section>
 
       {/* A list, not a table (#2292): under auto table layout a long title ran over the
           forecast column, and one article that fed two forecasts printed as two rows.
           dir="auto": most titles are Hebrew, and on an English page their quotes and
           trailing punctuation otherwise jump to the wrong end. */}
       {publications.length > 0 && (
-        <>
+        <section className="pt-10">
+          <h2 className="text-lg font-bold text-white mb-3">
+            {t('publications')} <span className="text-gray-500 font-normal">({publications.length})</span>
+          </h2>
+          <ShowMoreList
+            initial={INITIAL_PUBLICATIONS}
+            moreLabel={t('showMore')}
+            className="rounded-lg border border-navy-600 divide-y divide-navy-700"
+            items={publications.map((p, i) => {
+              const fed = p.forecasts.flatMap((f) => {
+                const link = forecastLinks.get(f.forecastId)
+                return link ? [{ ...f, ...link }] : []
+              })
+              return (
+                <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 break-words">
+                  {isUrl(p.url) ? (
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" dir="auto"
+                       className="text-sm text-blue-400 hover:underline">
+                      {p.title || p.url}
+                      <ExternalLink className="inline w-3 h-3 ms-1 align-baseline" />
+                    </a>
+                  ) : (
+                    <span dir="auto" className="text-sm text-white">{p.title || '—'}</span>
+                  )}
+                  {p.publishedAt && (
+                    <time dateTime={p.publishedAt} className="block mt-1 text-xs text-gray-500">{date(p.publishedAt)}</time>
+                  )}
+                  {fed.map((f) => (
+                    <div key={f.forecastId} className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <Link href={f.href} dir="auto" className="text-cyan-400 hover:underline">{f.title}</Link>
+                      {f.outcome && (
+                        <span className="px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-300">
+                          {OUTCOME_LABEL[f.outcome] ? t(OUTCOME_LABEL[f.outcome]) : f.outcome}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </li>
+              )
+            })}
+          />
+        </section>
+      )}
+
+      <section className="pt-10">
+        <TopicBreakdown records={topics} view="outlets" />
+      </section>
+
+      {scoredAuthors.length > 0 && (
+        <section className="pt-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-            {t('publications')} ({publications.length})
+            {t('scoredAuthors')} ({scoredAuthors.length})
           </h3>
-          <ul className="rounded-lg border border-navy-600 divide-y divide-navy-700">
-            {publications.map((p, i) => (
-              <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 break-words">
-                {isUrl(p.url) ? (
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" dir="auto"
-                     className="text-sm text-blue-400 hover:underline">
-                    {p.title || p.url}
-                    <ExternalLink className="inline w-3 h-3 ms-1 align-baseline" />
-                  </a>
-                ) : (
-                  <span dir="auto" className="text-sm text-white">{p.title || '—'}</span>
-                )}
-                {(p.publishedAt || p.forecasts.length > 0) && (
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                    {p.publishedAt && (
-                      <time dateTime={p.publishedAt}>
-                        {new Date(p.publishedAt).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' })}
-                      </time>
-                    )}
-                    {p.forecasts.map((f, j) => (
-                      <span key={f.forecastId} className="inline-flex items-center gap-1.5">
-                        <Link
-                          href={`/forecasts/${forecastSlugs.get(f.forecastId) ?? f.forecastId}`}
-                          className="text-cyan-400 hover:underline"
-                        >
-                          {p.forecasts.length > 1 ? `${t('forecast')} ${j + 1}` : t('forecast')}
-                        </Link>
-                        {f.outcome && (
-                          <span className="px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-300">
-                            {f.outcome === 'YES' ? t('outcomeYes')
-                              : f.outcome === 'NO' ? t('outcomeNo')
-                              : f.outcome === 'ANNULLED' ? t('outcomeAnnulled')
-                              : f.outcome}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </li>
+          <ShowMoreTable
+            initial={INITIAL_AUTHORS}
+            moreLabel={t('showAllAuthors', { count: scoredAuthors.length })}
+            className="overflow-x-auto rounded-lg border border-navy-600"
+            head={
+              <tr className="text-start text-gray-500 border-b border-navy-600">
+                <th className="px-3 py-2 font-medium text-start">{t('author')}</th>
+                <th className="px-3 py-2 font-medium text-end">{t('skill')}</th>
+                <th className="px-3 py-2 font-medium text-end">{t('brier')}</th>
+                <th className="px-3 py-2 font-medium text-end">{t('predictions')}</th>
+              </tr>
+            }
+            rows={scoredAuthors.map(a => (
+              <tr key={a.id} className="border-t border-navy-700 first:border-t-0">
+                <td className="px-3 py-2">
+                  <Link
+                    href={`/authors/${encodeURIComponent(a.author)}/${encodeURIComponent(a.outletName)}`}
+                    className="text-white hover:underline hover:text-cyan-300"
+                  >
+                    {a.author}
+                  </Link>
+                  {a.isDesk && <DeskBadge label={tBoard('deskBadge')} hint={tBoard('deskBadgeHint')} />}
+                </td>
+                <td className="px-3 py-2 text-end font-mono text-cyan-300">{a.skillConservative.toFixed(3)}</td>
+                <td className="px-3 py-2 text-end font-mono text-gray-300">{a.brierScore.toFixed(3)}</td>
+                <td className="px-3 py-2 text-end text-gray-500">{a.predictions}</td>
+              </tr>
             ))}
-          </ul>
-        </>
+          />
+        </section>
+      )}
+
+      {detail.linkedPeople.length > 0 && (
+        <section className="pt-8">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('linkedPeople')}</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {detail.linkedPeople.map(p => (
+              <span key={p.id} className="inline-flex items-center px-3 py-1 text-xs text-gray-300 bg-navy-900 border border-navy-600 rounded-full">
+                {p.canonicalName}
+              </span>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   )
 }
 
-function Stat({ label, value, big, highlight, hint }: { label: string; value: string; big?: boolean; highlight?: boolean; hint?: string }) {
+function Stat({ label, value, note, warn, tone, href }: {
+  label: string
+  value: string
+  note?: string
+  warn?: string
+  tone?: string
+  href?: string
+}) {
   return (
-    <div title={hint} className="p-3 rounded-lg bg-navy-800 border border-navy-600">
-      <div className={`font-bold ${highlight ? 'text-emerald-400' : 'text-white'} ${big ? 'text-2xl' : 'text-lg'}`}>{value}</div>
-      <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
+    <div>
+      <dt className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">{label}</dt>
+      <dd className={`text-xl font-black ${tone ?? 'text-white'}`}>
+        {href ? <Link href={href} className="underline decoration-navy-600 underline-offset-4 hover:text-cyan-300">{value}</Link> : value}
+      </dd>
+      {note && <dd className="mt-0.5 text-xs text-gray-500">{note}</dd>}
+      {warn && <dd className="mt-0.5 text-xs text-amber-400">{warn}</dd>}
     </div>
   )
 }
