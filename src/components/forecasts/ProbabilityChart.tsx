@@ -16,7 +16,6 @@ import {
 // Canonical community-probability lives in @/lib/forecast-math so the feed card
 // and this chart agree.
 import { communityProbability } from '@/lib/forecast-math'
-import { marketNotIdenticalHint } from '@/lib/market-display'
 import { ArticleDotsView, ExpandChartButton, type AiLinePoint } from '@/components/forecasts/ArticleDotsView'
 
 type ChartSnapshot = {
@@ -68,8 +67,9 @@ type Props = {
   marketSnapshots?: ChartMarketPoint[]
   /** Legend name for the market line, e.g. "Polymarket, inverted". */
   marketLabel?: string
-  /** The linked market's own question + URL — shown in the "not identical" hint. */
-  marketQuestion?: string
+  /** daatan#2069: the reader-language "related, not the same question" hint, with the
+   *  market's own question — on hover over the market legend entry and under the chart. */
+  marketHint?: string
   marketUrl?: string
   /** Extra note under the market hint, e.g. the deadline-mismatch line (daatan#2141). */
   marketNote?: ReactNode
@@ -205,7 +205,7 @@ export default function ProbabilityChart({
   options,
   marketSnapshots = [],
   marketLabel = 'Polymarket',
-  marketQuestion,
+  marketHint,
   marketUrl,
   marketNote,
   panelSeries = [],
@@ -504,7 +504,7 @@ export default function ProbabilityChart({
             formatter={(value: string) =>
               showMarket && value === marketLabel ? (
                 <span
-                  title={marketNotIdenticalHint(marketQuestion)}
+                  title={marketHint}
                   className="cursor-help underline decoration-dotted underline-offset-2"
                   data-testid="market-legend"
                 >
@@ -620,7 +620,7 @@ export default function ProbabilityChart({
             </a>
           ) : marketLabel}
           {': '}
-          {marketNotIdenticalHint(marketQuestion)}
+          {marketHint}
         </p>
       )}
       {showMarket && marketNote}

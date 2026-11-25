@@ -78,10 +78,10 @@ describe('Speedometer — probability calculation', () => {
     })
   })
 
-  it('shows 50% when there are no commitments', async () => {
+  it('passes no community value when there are no commitments, not a made-up 50% (daatan#2323)', async () => {
     await renderPrediction([])
     expect(speedometerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ percentage: 50 }),
+      expect.objectContaining({ percentage: null }),
       undefined // React 19 calls function components with props only
     )
   })
