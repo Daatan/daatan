@@ -52,7 +52,6 @@
       "mostStaked": "Most Staked",
       "updated": "Last Updated"
     },
-    "tags": "Tags",
     "openForecasts": "Open Forecasts",
     "closingSoon": "Closing Soon",
     "awaitingResolution": "Awaiting Resolution",
@@ -82,8 +81,7 @@
       "awaitingResolution": "Show forecasts past their deadline, waiting to be resolved",
       "resolved": "Show forecasts that have already been resolved",
       "all": "Show all forecasts regardless of status",
-      "needsReview": "Show forecasts awaiting moderator approval",
-      "tags": "Filter forecasts by tags"
+      "needsReview": "Show forecasts awaiting moderator approval"
     },
     "sortHints": {
       "newest": "Sort by creation date, newest first",
@@ -2416,5 +2414,33 @@
     "vote": "{vote} · {pct}%",
     "dotLabel": "{title} — {outlet}: {vote}",
     "truncated": "Showing the {shown} most certain of {total} articles."
+  },
+  "topics": {
+    "filterLabel": "Topics",
+    "selectedCount": "{count, plural, one {# topic} other {# topics}}",
+    "clear": "clear",
+    "names": {
+      "politics": "Politics",
+      "geopolitics": "Geopolitics",
+      "economy": "Economy",
+      "technology": "Technology",
+      "ai": "AI",
+      "crypto": "Crypto",
+      "sports": "Sports",
+      "entertainment": "Entertainment",
+      "science": "Science",
+      "climate": "Climate",
+      "health": "Health",
+      "business": "Business",
+      "conflict": "Conflict",
+      "elections": "Elections",
+      "us-politics": "US Politics",
+      "europe": "Europe",
+      "middle-east": "Middle East",
+      "asia": "Asia",
+      "energy": "Energy",
+      "space": "Space",
+      "israeli-elections-2026": "Israeli Elections 2026"
+    }
   }
 }

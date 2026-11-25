@@ -5,6 +5,7 @@ import FeedClient from './FeedClient'
 import { JsonLd } from '@/components/JsonLd'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
+import { getOpenTopicCounts } from '@/lib/services/topic-counts'
 
 
 export async function generateMetadata({
@@ -73,7 +74,10 @@ export default async function FeedPage({
   // Only SSR the default view (no filter params) — this is what crawlers hit.
   // Custom-filter URLs are less SEO-critical and the client handles them.
   const hasCustomParams = params.status || params.tags || params.sortBy
-  const initialPredictions = hasCustomParams ? [] : await getInitialFeed()
+  const [initialPredictions, topicCounts] = await Promise.all([
+    hasCustomParams ? [] : getInitialFeed(),
+    getOpenTopicCounts(),
+  ])
 
   const websiteJsonLd = {
     '@context': 'https://schema.org',
@@ -88,7 +92,7 @@ export default async function FeedPage({
     <>
       <JsonLd data={websiteJsonLd} />
       <Suspense fallback={<FeedLoading />}>
-        <FeedClient initialPredictions={initialPredictions} />
+        <FeedClient initialPredictions={initialPredictions} topicCounts={topicCounts} />
       </Suspense>
     </>
   )

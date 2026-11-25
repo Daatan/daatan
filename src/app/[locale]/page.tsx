@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import FeedClient from '@/app/FeedClient'
 import { listForecasts, enrichPredictions } from '@/lib/services/forecast'
 import { getAppUrl } from '@/lib/branding'
+import { getOpenTopicCounts } from '@/lib/services/topic-counts'
 import { ogLocale } from '@/lib/og-locale'
 import { globalKeywords } from '@/lib/forecast-seo'
 
@@ -69,6 +70,7 @@ function FeedLoading() {
 }
 
 export default async function LocaleHomePage() {
+  const topicCountsPromise = getOpenTopicCounts()
   const { predictions } = await listForecasts({
     where: { status: 'ACTIVE', isPublic: true },
     orderBy: { createdAt: 'desc' },
@@ -86,7 +88,7 @@ export default async function LocaleHomePage() {
 
   return (
     <Suspense fallback={<FeedLoading />}>
-      <FeedClient initialPredictions={initialPredictions} />
+      <FeedClient initialPredictions={initialPredictions} topicCounts={await topicCountsPromise} />
     </Suspense>
   )
 }

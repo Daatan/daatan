@@ -52,7 +52,6 @@
       "mostStaked": "Plej vetitaj",
       "updated": "Laste Ĝisdatigita"
     },
-    "tags": "Etikedoj",
     "openForecasts": "Malfermitaj Prognozoj",
     "closingSoon": "Baldaŭ Fermiĝos",
     "awaitingResolution": "Atendas solvon",
@@ -82,8 +81,7 @@
       "awaitingResolution": "Montri prognozojn post sia limdato, atendantajn solvon",
       "resolved": "Montri jam solvitajn prognozojn",
       "all": "Montri ĉiujn prognozojn sendepende de stato",
-      "needsReview": "Montri prognozojn atendantajn aprobon de moderiganto",
-      "tags": "Filtri prognozojn laŭ etikedoj"
+      "needsReview": "Montri prognozojn atendantajn aprobon de moderiganto"
     },
     "sortHints": {
       "newest": "Ordigi laŭ kreodato, plej novaj unue",
@@ -2416,5 +2414,33 @@
     "vote": "{vote} · {pct}%",
     "dotLabel": "{title} — {outlet}: {vote}",
     "truncated": "Montriĝas la {shown} plej certaj el {total} artikoloj."
+  },
+  "topics": {
+    "filterLabel": "Temoj",
+    "selectedCount": "{count, plural, one {# temo} other {# temoj}}",
+    "clear": "forigi",
+    "names": {
+      "politics": "Politiko",
+      "geopolitics": "Geopolitiko",
+      "economy": "Ekonomio",
+      "technology": "Teknologio",
+      "ai": "AI",
+      "crypto": "Kriptovalutoj",
+      "sports": "Sporto",
+      "entertainment": "Distro",
+      "science": "Scienco",
+      "climate": "Klimato",
+      "health": "Sano",
+      "business": "Komerco",
+      "conflict": "Konfliktoj",
+      "elections": "Elektoj",
+      "us-politics": "Usona politiko",
+      "europe": "Eŭropo",
+      "middle-east": "Proksima Oriento",
+      "asia": "Azio",
+      "energy": "Energio",
+      "space": "Kosmo",
+      "israeli-elections-2026": "Israelaj elektoj 2026"
+    }
   }
 }

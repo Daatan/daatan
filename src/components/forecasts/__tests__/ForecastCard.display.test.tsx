@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import ForecastCard, { Prediction } from '../ForecastCard'
 import messages from '../../../../messages/en.json'
+import ruMessages from '../../../../messages/ru.json'
 
 const renderWithIntl = (ui: React.ReactElement) =>
   render(<NextIntlClientProvider locale="en" messages={messages}>{ui}</NextIntlClientProvider>)
@@ -208,5 +209,19 @@ describe('ForecastCard navigation link', () => {
       renderWithIntl(<ForecastCard prediction={{ ...basePrediction, status: 'PENDING', resolveByDatetime: deadline }} />)
       expect(screen.queryByText('Expires today')).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('ForecastCard topic chips (daatan#2330)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as never)
+  })
+
+  it('translates standard topics in any spelling and leaves other tags as stored', () => {
+    const prediction = { ...basePrediction, tags: [{ name: 'politics', slug: 'politics' }, { name: 'Israel', slug: 'israel' }] }
+    render(<NextIntlClientProvider locale="ru" messages={ruMessages}><ForecastCard prediction={prediction} /></NextIntlClientProvider>)
+    expect(screen.getByRole('link', { name: 'Политика' })).toHaveAttribute('href', '/tags/politics')
+    expect(screen.getByRole('link', { name: 'Israel' })).toBeInTheDocument()
   })
 })

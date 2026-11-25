@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { UserLink } from '@/components/UserLink'
 import Speedometer from './Speedometer'
+import { useTopicLabel } from '@/components/feed/useTopicLabel'
 
 export type Prediction = {
   id: string
@@ -100,6 +101,7 @@ export default function ForecastCard({
   const { data: session } = useSession()
   const router = useRouter()
   const t = useTranslations('forecast')
+  const topicLabel = useTopicLabel()
   const tt = useTranslations('translate')
   const locale = useLocale()
   const nowMs = useNowMs()
@@ -501,10 +503,10 @@ export default function ForecastCard({
                     key={tag.name}
                     href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
                     prefetch={false}
-                    title={t('filterByTagTooltip', { tag: tag.name })}
+                    title={t('filterByTagTooltip', { tag: topicLabel(tag.name) })}
                     className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs lg:text-sm font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
-                    {tag.name}
+                    {topicLabel(tag.name)}
                   </Link>
                 ))}
               </>

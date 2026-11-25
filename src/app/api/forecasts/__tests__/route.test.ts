@@ -155,9 +155,20 @@ describe('/api/forecasts', () => {
             const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as any
             expect(findManyCall.where.tags).toEqual({
                 some: {
-                    name: { in: ['AI', 'Crypto'] },
+                    slug: { in: ['ai', 'crypto'] },
                 },
             })
+        })
+
+        it('matches a topic by slug, so "Politics" also finds a tag stored as "politics" (daatan#2330)', async () => {
+            const { prisma } = await import('@/lib/prisma')
+            vi.mocked(prisma.prediction.findMany).mockResolvedValue([])
+            vi.mocked(prisma.prediction.count).mockResolvedValue(0)
+
+            await GET(new NextRequest('http://localhost/api/forecasts?tags=Politics,US%20Politics'))
+
+            const findManyCall = vi.mocked(prisma.prediction.findMany).mock.calls[0][0] as { where: { tags: unknown } }
+            expect(findManyCall.where.tags).toEqual({ some: { slug: { in: ['politics', 'us-politics'] } } })
         })
 
         it('returns forecasts without tag filter when no tags param', async () => {

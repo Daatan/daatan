@@ -52,7 +52,6 @@
       "mostStaked": "הכי פופולרי",
       "updated": "עודכן לאחרונה"
     },
-    "tags": "תגיות",
     "openForecasts": "תחזיות פתוחות",
     "closingSoon": "נסגר בקרוב",
     "awaitingResolution": "ממתין להכרעה",
@@ -82,8 +81,7 @@
       "awaitingResolution": "הצג תחזיות שמועדן חלף וממתינות להכרעה",
       "resolved": "הצג תחזיות שכבר הוכרעו",
       "all": "הצג את כל התחזיות ללא קשר לסטטוס",
-      "needsReview": "הצג תחזיות הממתינות לאישור מנחה",
-      "tags": "סינון תחזיות לפי תגיות"
+      "needsReview": "הצג תחזיות הממתינות לאישור מנחה"
     },
     "sortHints": {
       "newest": "מיון לפי תאריך יצירה, החדשות תחילה",
@@ -2416,5 +2414,33 @@
     "vote": "{vote} · {pct}%",
     "dotLabel": "{title} — {outlet}: {vote}",
     "truncated": "מוצגות {shown} הכתבות בעלות הוודאות הגבוהה ביותר מתוך {total}."
+  },
+  "topics": {
+    "filterLabel": "נושאים",
+    "selectedCount": "{count, plural, one {נושא אחד} other {# נושאים}}",
+    "clear": "ניקוי",
+    "names": {
+      "politics": "פוליטיקה",
+      "geopolitics": "גאופוליטיקה",
+      "economy": "כלכלה",
+      "technology": "טכנולוגיה",
+      "ai": "בינה מלאכותית",
+      "crypto": "קריפטו",
+      "sports": "ספורט",
+      "entertainment": "בידור",
+      "science": "מדע",
+      "climate": "אקלים",
+      "health": "בריאות",
+      "business": "עסקים",
+      "conflict": "סכסוכים",
+      "elections": "בחירות",
+      "us-politics": "פוליטיקה בארה\"ב",
+      "europe": "אירופה",
+      "middle-east": "המזרח התיכון",
+      "asia": "אסיה",
+      "energy": "אנרגיה",
+      "space": "חלל",
+      "israeli-elections-2026": "בחירות 2026 בישראל"
+    }
   }
 }
