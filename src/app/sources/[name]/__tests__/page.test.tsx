@@ -25,7 +25,7 @@ vi.mock('@/lib/services/sourceLeaderboard', () => ({
 }))
 vi.mock('@/lib/services/leaderboard-cached', () => ({
   SOURCE_LEADERBOARD_MIN_PREDICTIONS: 4,
-  getBoardOutletNames: mockBoardOutlets,
+  getBoardOutlets: mockBoardOutlets,
 }))
 vi.mock('@/lib/services/sourceTopicBoards', () => ({
   getTopicBoards: async () => [],
@@ -106,22 +106,37 @@ describe('sources/[name] page', () => {
 
   it('generateMetadata indexes an outlet on the public board, without a second brand (daatan#2337)', async () => {
     mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
-    mockBoardOutlets.mockResolvedValue(['ynetnews.com', 'maariv'])
+    mockBoardOutlets.mockResolvedValue([outletRow('ynetnews.com', 0.2, 30), outletRow('maariv', 0.281, 21)])
     const metadata = await generateMetadata({ params })
     expect(metadata.robots).toEqual({ index: true })
     expect(metadata.title).toBe('maariv — source profile')
   })
 
+  it('generateMetadata leads the snippet with the board numbers, then the outlet description (daatan#2339)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, description: { en: 'Israeli daily.' } })
+    mockBoardOutlets.mockResolvedValue([outletRow('ynetnews.com', 0.2, 30), outletRow('maariv', 0.281, 21)])
+    const metadata = await generateMetadata({ params })
+    expect(metadata.description).toBe(
+      'metaBoard {"name":"maariv","brier":"0.28","count":21,"rank":2,"total":2} Israeli daily.',
+    )
+  })
+
+  it('generateMetadata keeps the generic snippet for an outlet off the board', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
+    const metadata = await generateMetadata({ params })
+    expect(metadata.description).toBe('Track record, publications, and identity info for maariv on Daatan.')
+  })
+
   it('generateMetadata finds the board row through a domain, as the page body does (#1891)', async () => {
     mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynet', domains: ['ynet.co.il'] })
-    mockBoardOutlets.mockResolvedValue(['ynet.co.il'])
+    mockBoardOutlets.mockResolvedValue([outletRow('ynet.co.il', 0.15, 40)])
     const metadata = await generateMetadata({ params: Promise.resolve({ name: 'Ynet' }) })
     expect(metadata.robots).toEqual({ index: true })
   })
 
   it('generateMetadata keeps an outlet below the board threshold out of search (daatan#2337)', async () => {
     mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
-    mockBoardOutlets.mockResolvedValue(['ynetnews.com'])
+    mockBoardOutlets.mockResolvedValue([outletRow('ynetnews.com', 0.2, 30)])
     const metadata = await generateMetadata({ params })
     expect(metadata.robots).toEqual({ index: false })
   })
@@ -232,6 +247,40 @@ describe('sources/[name] page', () => {
       publications: [{ title: 'הדמוקרטים: "מוכר את הביטחון"', url, source: 'ynet.co.il', publishedAt: null, pushedAt: null, outcome: null, forecastId: 'f1' }],
     })
     expect(findProps(await OutletPublicPage({ params }), p => p.href === url)?.dir).toBe('auto')
+  })
+
+  it('says the rank is head-to-head, apart from the Brier grade (daatan#2339)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'kikar.co.il', domains: ['kikar.co.il'] })
+    mockGetSourceLeaderboard.mockResolvedValue({
+      view: 'outlets', sortBy: 'skillConservative', authorRows: [],
+      outletRows: [outletRow('a.com', 0.2, 40), outletRow('kikar.co.il', 0.28, 21)],
+    })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'kikar.co.il' }) })
+    const rank = findProps(tree, p => p.label === 'rankLabel')
+    expect(rank?.value).toBe('rankValue {"rank":2,"total":2}')
+    expect(rank?.note).toBe('rankNote')
+    expect(findProps(tree, p => p.label === 'trackRecord')?.value).toBe('grade.poor')
+  })
+
+  it('describes the outlet in identity-only JSON-LD (daatan#2339)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail, name: 'Ynet', displayName: { en: 'Ynet' }, domains: ['ynet.co.il'],
+      wikipediaUrl: 'https://en.wikipedia.org/wiki/Ynet', telegramChannel: 'ynetalerts',
+    })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynet' }) })
+    const data = findProps(tree, p => typeof p.data === 'object' && p.data !== null && '@type' in p.data)?.data
+    expect(data).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      url: 'https://daatan.com/sources/Ynet',
+      name: 'Ynet — source profile',
+      about: {
+        '@type': 'Organization',
+        name: 'Ynet',
+        url: 'https://ynet.co.il',
+        sameAs: ['https://en.wikipedia.org/wiki/Ynet', 'https://t.me/ynetalerts'],
+      },
+    })
   })
 
   it('links a Telegram channel stored as a full URL without prefixing it again', async () => {

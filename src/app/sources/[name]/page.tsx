@@ -10,7 +10,7 @@ import { groupPublications } from '@/lib/utils/group-publications'
 import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
 import { brierGrade } from '@/lib/utils/brier-grade'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
-import { getBoardOutletNames, SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
+import { getBoardOutlets, SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import OutletForecastTable from '@/components/sources/OutletForecastTable'
@@ -18,6 +18,7 @@ import { ShowMoreList, ShowMoreTable } from '@/components/sources/ShowMore'
 import { brierTone } from '@/components/leaderboard/LeaderboardParts'
 import { getAppUrl } from '@/lib/branding'
 import DeskBadge from '@/components/sources/DeskBadge'
+import { JsonLd } from '@/components/JsonLd'
 
 
 interface Props {
@@ -40,23 +41,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const detail = await getPublicOutletDetail(decodeURIComponent(name))
   if (!detail) return { title: 'Source Not Found', robots: { index: false, follow: false } }
 
-  const [locale, boardOutlets] = await Promise.all([getLocale(), getBoardOutletNames()])
+  const [locale, board, t] = await Promise.all([getLocale(), getBoardOutlets(), getTranslations('outletPage')])
   // Same row lookup as the page body (#1891), so the page is indexed exactly when it shows a
   // track record.
   const keys = new Set([detail.name, ...detail.domains].map(canonicalOutlet))
-  const onBoard = boardOutlets.some((n) => keys.has(n))
+  const place = board.findIndex((r) => keys.has(r.outletName))
   const shown = localizedText(detail.displayName, locale) ?? detail.name
   // Bare title: the root layout's `%s | DAATAN` template adds the brand.
   const title = `${shown} — source profile`
+  // The board's own numbers lead the snippet (daatan#2339); off the board the page is noindex.
+  const stats = place >= 0
+    ? t('metaBoard', {
+        name: shown,
+        brier: board[place].brierScore.toFixed(2),
+        count: board[place].predictions,
+        rank: place + 1,
+        total: board.length,
+      })
+    : null
   const description =
-    localizedText(detail.description, locale) ?? `Track record, publications, and identity info for ${shown} on Daatan.`
+    [stats, localizedText(detail.description, locale)].filter(Boolean).join(' ') ||
+    `Track record, publications, and identity info for ${shown} on Daatan.`
   const url = `${getAppUrl()}/sources/${encodeURIComponent(detail.name)}`
   return {
     title,
     description,
     // Indexed once the outlet is on the public board, as that board is (#1588); below its
     // threshold the page is too thin to submit (daatan#2337).
-    robots: { index: onBoard },
+    robots: { index: place >= 0 },
     alternates: { canonical: url },
     openGraph: { title, description, url, type: 'website' },
   }
@@ -106,8 +118,26 @@ export default async function OutletPublicPage({ params }: Props) {
     ...detail.links,
   ]
 
+  // Identity only (daatan#2339): who the outlet is and where it lives, not its grade.
+  const site = detail.domains[0] ? `https://${detail.domains[0]}` : null
+  const sameAs = [detail.wikipediaUrl, detail.telegramChannel ? telegramHref(detail.telegramChannel) : null]
+    .filter((u): u is string => !!u)
+  const pageJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: `${getAppUrl()}/sources/${encodeURIComponent(detail.name)}`,
+    name: `${shownName} — source profile`,
+    about: {
+      '@type': 'Organization',
+      name: shownName,
+      ...(site ? { url: site } : {}),
+      ...(sameAs.length > 0 ? { sameAs } : {}),
+    },
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+      <JsonLd data={pageJsonLd} />
       <Link
         href="/leaderboard/sources"
         className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-6"
@@ -154,6 +184,7 @@ export default async function OutletPublicPage({ params }: Props) {
             <Stat
               label={t('rankLabel')}
               value={t('rankValue', { rank: rank + 1, total: ranked.length })}
+              note={t('rankNote')}
               href="/leaderboard/sources?view=outlets"
             />
           )}
