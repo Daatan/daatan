@@ -32,7 +32,9 @@
     "contact": "Contact Us",
     "retroanalysis": "Retro Analysis",
     "admin": "Admin",
-    "tagline": "EARNED TRUST"
+    "tagline": "EARNED TRUST",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "feed": {
     "title": "Forecasts",
@@ -88,6 +90,10 @@
       "deadline": "Sort by resolution deadline",
       "cu": "Sort by total credibility units staked",
       "updated": "Sort by when the forecast was last updated"
+    },
+    "sortOrder": {
+      "asc": "Ascending",
+      "desc": "Descending"
     }
   },
   "forecast": {
@@ -2442,5 +2448,16 @@
       "space": "Space",
       "israeli-elections-2026": "Israeli Elections 2026"
     }
+  },
+  "cookieConsent": {
+    "label": "Cookie consent",
+    "notice": "We use Google Analytics cookies to understand how the app is used and improve it. You can opt out at any time.",
+    "prompt": "We use analytics cookies to understand how the app is used and improve it.",
+    "noTracking": "No ads. No cross-site tracking.",
+    "privacy": "Privacy Policy",
+    "optOut": "Opt out",
+    "decline": "Decline",
+    "ok": "OK",
+    "accept": "Accept"
   }
 }

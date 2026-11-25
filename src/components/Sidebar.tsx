@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 
 import { useTranslations, useLocale } from 'next-intl'
+import { ELECTIONS_URL, electionsUrl } from '@/lib/elections-url'
 
 type NavItem = {
   href: string
@@ -48,10 +49,6 @@ type NavItem = {
   // Extra paths (locale prefix stripped) on which this item is shown as current.
   alsoActiveOn?: string[]
 }
-
-// Separate Next.js app, not part of white-label branding — SaaS-only, hidden
-// on self-host below alongside the other SaaS-only routes.
-const ELECTIONS_URL = 'https://elections.daatan.com'
 
 const navItems: NavItem[] = [
   // Opening /forecasts also marks the feed as seen, so the site root shows the feed from then on
@@ -170,7 +167,9 @@ const Sidebar = () => {
 
   const navLinks = filteredNavItems.map(item => ({
     ...item,
-    href: currentLocale !== 'en' && LOCALIZED_NAV_ROUTES.includes(item.href) ? `/${currentLocale}${item.href}` : item.href,
+    href: item.href === ELECTIONS_URL
+      ? electionsUrl(currentLocale)
+      : currentLocale !== 'en' && LOCALIZED_NAV_ROUTES.includes(item.href) ? `/${currentLocale}${item.href}` : item.href,
     label: t(item.labelKey)
   }))
 
@@ -254,7 +253,7 @@ const Sidebar = () => {
             onClick={handleToggleMenu}
             onKeyDown={handleKeyDown}
             className="p-2 rounded-lg hover:bg-navy-800 transition-colors"
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
             aria-expanded={isMobileMenuOpen}
             tabIndex={0}
           >

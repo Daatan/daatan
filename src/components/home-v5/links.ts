@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config'
+import { electionsUrl } from '@/lib/elections-url'
 
 // Routes that exist under src/app/[locale]; everything else is served at the
 // root path only, so a /he/methodology-style link to them would 404.
@@ -17,8 +18,8 @@ export function buildLinks(locale: Locale) {
     home: p('/'),
     forecasts: p('/forecasts'),
     sources: '/leaderboard/sources',
-    // Separate app, same URL as the sidebar's Elections item (daatan /elections 301s there, #2011).
-    elections: 'https://elections.daatan.com',
+    // Separate app, same URL as the sidebar's Elections item, in the viewer's language (#2332).
+    elections: electionsUrl(locale),
     profile: '/profile',
     retro: p('/retroanalysis'),
     howItWorks: p('/methodology'),

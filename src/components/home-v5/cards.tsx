@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CalendarDays, CircleX, CircleCheck } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
+import { getTopicLabel } from '@/lib/topic-label'
 
 export interface ForecastCardData {
   tags: string[]
@@ -30,6 +31,7 @@ const CARD = 'mt-9 flex flex-1 flex-col rounded-[14px] border border-[var(--hv5-
 
 export async function ForecastCard({ locale, data }: { locale: string; data: ForecastCardData }) {
   const t = await getTranslations({ locale, namespace: 'HomeV5.card' })
+  const topicLabel = await getTopicLabel(locale)
   const pct = Math.max(0, Math.min(100, Math.round(data.confidence)))
   const C = 2 * Math.PI * 24
   return (
@@ -37,7 +39,7 @@ export async function ForecastCard({ locale, data }: { locale: string; data: For
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ul className="m-0 flex list-none gap-2 p-0">
           {data.tags.map((tag) => (
-            <li key={tag} className="rounded-full border border-[#2c4f7c] px-3 py-[3px] text-sm leading-[1.4] text-[var(--hv5-accent-2)]">{tag}</li>
+            <li key={tag} className="rounded-full border border-[#2c4f7c] px-3 py-[3px] text-sm leading-[1.4] text-[var(--hv5-accent-2)]">{topicLabel(tag)}</li>
           ))}
         </ul>
         <span className="flex items-center gap-2 text-sm text-[var(--hv5-muted)]">
@@ -89,6 +91,7 @@ function initials(name: string): string {
 
 export async function SourceCard({ locale, data }: { locale: string; data: SourceCardData }) {
   const t = await getTranslations({ locale, namespace: 'HomeV5.card' })
+  const topicLabel = await getTopicLabel(locale)
   const correct = data.record.filter(Boolean).length
   const ok = data.verdict === 'correct'
   return (
@@ -122,7 +125,7 @@ export async function SourceCard({ locale, data }: { locale: string; data: Sourc
       <div className="mt-auto pt-[22px]">
         <div className="border-t border-[var(--hv5-line-2)] pt-[18px]">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm leading-[1.4] text-[var(--hv5-muted)]">{t('recordIn', { tag: data.tag })}</span>
+            <span className="text-sm leading-[1.4] text-[var(--hv5-muted)]">{t('recordIn', { tag: topicLabel(data.tag) })}</span>
             <span className="text-base font-semibold text-[var(--hv5-ink)]">{t('recordCount', { correct, total: data.record.length })}</span>
           </div>
           <div aria-hidden="true" className="mt-3.5 flex flex-wrap items-center gap-[9px]">

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { getRecentForecastLinks, getVisibleTagLinks, type ForecastLink, type TagLink } from '@/lib/services/crawl-links'
 import { createLogger } from '@/lib/logger'
+import { getTopicLabel } from '@/lib/topic-label'
 import { CONTAINER } from './ui'
 import type { HomeLinks } from './links'
 
@@ -43,6 +44,7 @@ export default async function LatestForecasts({
 }) {
   if (forecasts.length === 0 && tags.length === 0) return null
   const t = await getTranslations({ locale, namespace: 'HomeV5.latest' })
+  const topicLabel = await getTopicLabel(locale)
   return (
     <section aria-labelledby="hv5-latest" className="bg-[var(--hv5-bg)] pt-16 md:pt-[120px]">
       <div className={CONTAINER}>
@@ -65,7 +67,7 @@ export default async function LatestForecasts({
               {tags.map((tag) => (
                 <li key={tag.slug}>
                   <Link href={`/tags/${tag.slug}`} className="block rounded-full border border-[#2c4f7c] px-3 py-[3px] text-sm leading-[1.4] text-[var(--hv5-accent-2)] no-underline hover:bg-white/5">
-                    {tag.name}
+                    {topicLabel(tag.name)}
                   </Link>
                 </li>
               ))}

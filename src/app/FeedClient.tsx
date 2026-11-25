@@ -267,11 +267,11 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
                 <button
                   onClick={handleToggleSortOrder}
                   className="p-1.5 rounded-lg bg-navy-700 hover:bg-navy-600 text-gray-400 hover:text-white transition-all group relative"
-                  title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                  title={sortOrder === 'asc' ? t('sortOrder.asc') : t('sortOrder.desc')}
                 >
                   <ArrowDownUp className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
                   <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                    {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                    {sortOrder === 'asc' ? t('sortOrder.asc') : t('sortOrder.desc')}
                   </span>
                 </button>
                 {([

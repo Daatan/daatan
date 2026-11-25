@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { consentNotRequired } from '@/lib/consent-region'
 
@@ -71,6 +72,7 @@ type Mode = 'banner' | 'notice'
  * - The footer "Cookie settings" link always opens the full banner.
  */
 export default function CookieConsent() {
+  const t = useTranslations('cookieConsent')
   const [mode, setMode] = useState<Mode | null>(null)
   const declineRef = useRef<HTMLButtonElement & HTMLAnchorElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
@@ -148,18 +150,16 @@ export default function CookieConsent() {
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape-to-dismiss listener on the region, catching bubbled keydowns from its content; the region itself isn't made interactive
     <div
       role="region"
-      aria-label="Cookie consent"
+      aria-label={t('label')}
       aria-describedby="cookie-consent-description"
       onKeyDown={(e) => { if (e.key === 'Escape') (isNotice ? handleNoticeOk : handleDecline)() }}
       className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-navy-700 border-t border-navy-600 shadow-lg"
     >
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <p id="cookie-consent-description" className="flex-1 text-sm text-gray-200">
-          {isNotice
-            ? 'We use Google Analytics cookies to understand how the app is used and improve it. You can opt out at any time.'
-            : 'We use analytics cookies to understand how the app is used and improve it.'}{' '}
-          No ads. No cross-site tracking.{' '}
-          <Link href="/privacy" className="underline hover:text-white">Privacy Policy</Link>.
+          {isNotice ? t('notice') : t('prompt')}{' '}
+          {t('noTracking')}{' '}
+          <Link href="/privacy" className="underline hover:text-white">{t('privacy')}</Link>.
         </p>
         <div className="flex gap-2 shrink-0">
           <Button
@@ -168,13 +168,13 @@ export default function CookieConsent() {
             variant="outline"
             size="sm"
           >
-            {isNotice ? 'Opt out' : 'Decline'}
+            {isNotice ? t('optOut') : t('decline')}
           </Button>
           <Button
             onClick={isNotice ? handleNoticeOk : handleAccept}
             size="sm"
           >
-            {isNotice ? 'OK' : 'Accept'}
+            {isNotice ? t('ok') : t('accept')}
           </Button>
         </div>
       </div>

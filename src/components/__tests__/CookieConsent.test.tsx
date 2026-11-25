@@ -2,6 +2,13 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import CookieConsent, { COOKIE_SETTINGS_EVENT } from '../CookieConsent'
+import { NextIntlClientProvider } from 'next-intl'
+import messages from '../../../messages/en.json'
+import heMessages from '../../../messages/he.json'
+
+const Intl = ({ children }: { children: React.ReactNode }) => (
+  <NextIntlClientProvider locale="en" messages={messages}>{children}</NextIntlClientProvider>
+)
 
 function setRegion(notRequired: boolean | undefined) {
   if (notRequired === undefined) delete window.__daatanConsentNotRequired
@@ -21,32 +28,32 @@ describe('CookieConsent', () => {
   it('does not render when consent was already decided', async () => {
     localStorage.setItem('daatan_analytics_consent', 'granted')
     setRegion(false)
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     await act(async () => {})
     expect(screen.queryByText('Accept')).not.toBeInTheDocument()
     expect(screen.queryByText('OK')).not.toBeInTheDocument()
   })
 
   it('shows the opt-in banner when there is no region check (GA off / script missing)', async () => {
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Accept')).toBeInTheDocument()
   })
 
   it('shows the opt-in banner when the region requires consent', async () => {
     setRegion(false)
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Accept')).toBeInTheDocument()
     expect(window.gtag).not.toHaveBeenCalledWith('consent', 'update', expect.objectContaining({ analytics_storage: 'granted' }))
   })
 
   it('shows the opt-in banner when the region check failed', async () => {
     window.__daatanConsentNotRequired = Promise.reject(new Error('blocked')).catch(() => false)
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Accept')).toBeInTheDocument()
   })
 
   it('moves focus onto the Decline button when the banner appears', async () => {
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Decline')).toHaveFocus()
   })
 
@@ -56,7 +63,7 @@ describe('CookieConsent', () => {
     document.body.appendChild(trigger)
     trigger.focus()
 
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Decline')).toHaveFocus()
 
     fireEvent.click(screen.getByText('Accept'))
@@ -67,20 +74,20 @@ describe('CookieConsent', () => {
   })
 
   it('dismisses on Escape, same as Decline', async () => {
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     fireEvent.keyDown(await screen.findByRole('region', { name: 'Cookie consent' }), { key: 'Escape' })
     expect(screen.queryByText('Accept')).not.toBeInTheDocument()
     expect(localStorage.getItem('daatan_analytics_consent')).toBe('denied')
   })
 
   it('has no automatically detectable a11y violations', async () => {
-    const { container } = render(<CookieConsent />)
+    const { container } = render(<CookieConsent />, { wrapper: Intl })
     await screen.findByText('Accept')
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('links to the Privacy Policy', async () => {
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
   })
 })
@@ -97,7 +104,7 @@ describe('CookieConsent outside opt-in regions', () => {
   })
 
   it('shows a notice instead of the banner, without storing a consent choice', async () => {
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     expect(await screen.findByText('Opt out')).toBeInTheDocument()
     expect(screen.queryByText('Accept')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('OK'))
@@ -108,7 +115,7 @@ describe('CookieConsent outside opt-in regions', () => {
 
   it('does not show the notice again once acknowledged', async () => {
     localStorage.setItem('daatan_analytics_notice_seen', '1')
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     await act(async () => {})
     expect(screen.queryByText('Opt out')).not.toBeInTheDocument()
     expect(screen.queryByText('Accept')).not.toBeInTheDocument()
@@ -116,7 +123,7 @@ describe('CookieConsent outside opt-in regions', () => {
 
   it('Opt out stores denied, revokes consent and deletes GA cookies', async () => {
     document.cookie = '_ga=GA1.1.123; path=/'
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     fireEvent.click(await screen.findByText('Opt out'))
     expect(localStorage.getItem('daatan_analytics_consent')).toBe('denied')
     expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.objectContaining({ analytics_storage: 'denied' }))
@@ -125,7 +132,7 @@ describe('CookieConsent outside opt-in regions', () => {
 
   it('a stored denial wins over the region', async () => {
     localStorage.setItem('daatan_analytics_consent', 'denied')
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     await act(async () => {})
     expect(screen.queryByText('Opt out')).not.toBeInTheDocument()
     expect(window.gtag).toHaveBeenCalledWith('consent', 'update', expect.objectContaining({ analytics_storage: 'denied' }))
@@ -137,7 +144,7 @@ describe('CookieConsent re-open from footer', () => {
 
   it('shows the banner again after a choice and revokes consent on Decline', async () => {
     localStorage.setItem('daatan_analytics_consent', 'granted')
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     await act(async () => {})
     expect(screen.queryByText('Decline')).not.toBeInTheDocument()
 
@@ -149,10 +156,32 @@ describe('CookieConsent re-open from footer', () => {
   it('opens the full banner (not the notice) outside opt-in regions too', async () => {
     setRegion(true)
     localStorage.setItem('daatan_analytics_notice_seen', '1')
-    render(<CookieConsent />)
+    render(<CookieConsent />, { wrapper: Intl })
     await act(async () => {})
     act(() => { window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT)) })
     expect(screen.getByText('Accept')).toBeInTheDocument()
     expect(screen.getByText('Decline')).toBeInTheDocument()
+  })
+})
+
+describe('CookieConsent in Hebrew (daatan#2333)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setRegion(undefined)
+    window.gtag = vi.fn()
+  })
+  afterEach(() => {
+    delete window.gtag
+  })
+
+  it('speaks the page language, including the region label and the buttons', async () => {
+    render(<NextIntlClientProvider locale="he" messages={heMessages}><CookieConsent /></NextIntlClientProvider>)
+    const region = await screen.findByRole('region', { name: heMessages.cookieConsent.label })
+    expect(region).toHaveTextContent(heMessages.cookieConsent.prompt)
+    expect(region).toHaveTextContent(heMessages.cookieConsent.noTracking)
+    expect(screen.getByRole('button', { name: heMessages.cookieConsent.decline })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: heMessages.cookieConsent.accept })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: heMessages.cookieConsent.privacy })).toHaveAttribute('href', '/privacy')
+    expect(region.textContent).not.toMatch(/[A-Za-z]{4,}/)
   })
 })
