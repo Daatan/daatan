@@ -7,13 +7,14 @@ import { getPublicOutletDetail } from '@/lib/services/outlets'
 import { localizedText, telegramHref } from '@/lib/utils/outlet-identity'
 import { getOutletForecastRows, getPublicForecastLinks } from '@/lib/services/outlet-forecasts'
 import { groupPublications } from '@/lib/utils/group-publications'
-import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
+import { pickCalls, sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
 import { brierGrade } from '@/lib/utils/brier-grade'
 import { authorsOfOutlet, canonicalOutlet, getSourceLeaderboard } from '@/lib/services/sourceLeaderboard'
 import { getBoardOutlets, SOURCE_LEADERBOARD_MIN_PREDICTIONS } from '@/lib/services/leaderboard-cached'
 import { getTopicBoards, outletTopicRecords } from '@/lib/services/sourceTopicBoards'
 import TopicBreakdown from '@/components/sources/TopicBreakdown'
 import OutletForecastTable from '@/components/sources/OutletForecastTable'
+import OutletCalls from '@/components/sources/OutletCalls'
 import { ShowMoreList, ShowMoreTable } from '@/components/sources/ShowMore'
 import { brierTone } from '@/components/leaderboard/LeaderboardParts'
 import { getAppUrl } from '@/lib/branding'
@@ -104,6 +105,7 @@ export default async function OutletPublicPage({ params }: Props) {
 
   const shownName = localizedText(detail.displayName, locale) ?? detail.name
   const description = localizedText(detail.description, locale)
+  const calls = pickCalls(forecastRows)
   const articleTotal = forecastRows.reduce((n, r) => n + r.articles, 0)
   const lastArticle = forecastRows.reduce<string | null>((d, r) => (!d || r.lastArticle > d ? r.lastArticle : d), null)
   const date = (iso: string) =>
@@ -194,6 +196,8 @@ export default async function OutletPublicPage({ params }: Props) {
         </dl>
         {track && <p className="mt-4 text-xs text-gray-500">{t('trackRecordHint')}</p>}
       </header>
+
+      {(calls.heldUp.length > 0 || calls.missed.length > 0) && <OutletCalls {...calls} />}
 
       <section className="pt-8">
         <h2 className="text-lg font-bold text-white">

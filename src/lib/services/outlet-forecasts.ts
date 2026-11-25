@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { createLogger } from '@/lib/logger'
 import { CURRENT_VERSION_ONLY } from '@/lib/services/evidence-pool'
+import { approvedCutoffs, isScorableReading } from '@/lib/services/outcome-cutoff'
 import { stanceToPercent } from '@/lib/services/oracle-snapshot'
 import { getCachedClaimTranslations } from '@/lib/services/translation'
 import { articleDay, forecastState, runningTrend, type OutletForecastRow } from '@/lib/utils/outlet-forecasts'
@@ -8,6 +9,18 @@ import { articleDay, forecastState, runningTrend, type OutletForecastRow } from 
 const log = createLogger('outlet-forecasts')
 
 const HIDDEN_STATUSES = ['DRAFT', 'PENDING_APPROVAL'] as const
+const RESOLVED_STATUSES: ReadonlySet<string> = new Set(['RESOLVED_CORRECT', 'RESOLVED_WRONG'])
+
+/** Mean lean of the articles that may count as calls before `cutoff`: published before it, by
+ *  the scoring rule's own date handling, and not reporting the outcome as settled fact. */
+function leanBefore(
+  list: { stance: number; publishedDate: string | null; settled: boolean | null }[],
+  cutoff: Date | undefined,
+): { lean: number; articles: number } | null {
+  const before = list.filter((a) => isScorableReading(a, cutoff))
+  if (before.length === 0) return null
+  return { lean: stanceToPercent(before.reduce((n, a) => n + a.stance, 0) / before.length), articles: before.length }
+}
 
 export interface PublicForecastLink {
   href: string
@@ -58,18 +71,26 @@ export async function getOutletForecastRows(name: string, domains: string[], loc
         OR: [{ source: { in: domains } }, { outletName: name }],
         prediction: { isPublic: true, status: { notIn: [...HIDDEN_STATUSES] } },
       },
-      select: { predictionId: true, stance: true, publishedDate: true, addedAt: true },
+      select: { predictionId: true, stance: true, publishedDate: true, settled: true, addedAt: true },
     })
 
-    const byForecast = new Map<string, { stance: number; day: string; addedAt: Date }[]>()
+    type Article = { stance: number; day: string; addedAt: Date; publishedDate: string | null; settled: boolean | null }
+    const byForecast = new Map<string, Article[]>()
     for (const a of articles) {
       if (a.stance === null) continue
       const list = byForecast.get(a.predictionId) ?? []
-      list.push({ stance: a.stance, day: articleDay(a.publishedDate, a.addedAt), addedAt: a.addedAt })
+      list.push({
+        stance: a.stance, day: articleDay(a.publishedDate, a.addedAt), addedAt: a.addedAt,
+        publishedDate: a.publishedDate, settled: a.settled,
+      })
       byForecast.set(a.predictionId, list)
     }
 
     const links = await getPublicForecastLinks([...byForecast.keys()], locale)
+    // The outcome instant is the approved outcome cutoff (daatan#2144) and nothing else: a
+    // forecast without one, or ruled `insufficient`, shows no pre-outcome lean (daatan#2340).
+    const resolved = [...links].filter(([, l]) => RESOLVED_STATUSES.has(l.status)).map(([id]) => id)
+    const outcomeAt = await approvedCutoffs(resolved)
     return [...byForecast].flatMap(([forecastId, list]) => {
       const link = links.get(forecastId)
       if (!link) return []
@@ -84,6 +105,7 @@ export async function getOutletForecastRows(name: string, domains: string[], loc
         lean: trend[trend.length - 1],
         trend,
         lastArticle: list[list.length - 1].day,
+        beforeOutcome: leanBefore(list, outcomeAt.get(forecastId)),
       }]
     })
   } catch (err) {

@@ -20,6 +20,9 @@ export interface OutletForecastRow {
   trend: number[]
   /** Date of the outlet's newest article on this forecast, `YYYY-MM-DD`. */
   lastArticle: string
+  /** On a resolved forecast with an outcome instant: the lean of only the articles published
+   *  before it (daatan#2340). Null when none were, or the forecast has no such instant. */
+  beforeOutcome?: { lean: number; articles: number } | null
 }
 
 export const TREND_POINTS = 24
@@ -105,4 +108,47 @@ export function sortOutletForecasts(
     }
   }
   return [...rows].sort((a, b) => compare(a, b) || byNewest(a, b))
+}
+
+/**
+ * A resolved forecast this outlet's coverage took a side on before the outcome was known
+ * (daatan#2340). It reads the articles' lean, not a score: the board scores the writers.
+ */
+export interface OutletCall {
+  forecastId: string
+  href: string
+  title: string
+  state: 'cameTrue' | 'didNotHappen'
+  /** Mean lean, 1–99, of the outlet's articles published before the outcome. */
+  lean: number
+  articles: number
+}
+
+/** Fewer articles than this before the outcome is one writer's take, not the outlet's. */
+export const MIN_CALL_ARTICLES = 3
+/** A lean closer to 50% than this (a 60/40 split) took no side. */
+export const MIN_CALL_DISTANCE = 10
+
+/**
+ * Resolved forecasts where the pre-outcome lean took a side, split by whether that side held
+ * up: leaning above 50% on one that came true, or below on one that didn't, is the right way
+ * (the board's own hit rule). Each list puts the firmest lean first, then the most articles.
+ */
+export function pickCalls(rows: OutletForecastRow[]): { heldUp: OutletCall[]; missed: OutletCall[] } {
+  const heldUp: OutletCall[] = []
+  const missed: OutletCall[] = []
+  for (const r of rows) {
+    const before = r.beforeOutcome
+    if (!before || (r.state !== 'cameTrue' && r.state !== 'didNotHappen')) continue
+    if (before.articles < MIN_CALL_ARTICLES || Math.abs(before.lean - 50) < MIN_CALL_DISTANCE) continue
+    const call: OutletCall = {
+      forecastId: r.forecastId, href: r.href, title: r.title, state: r.state,
+      lean: before.lean, articles: before.articles,
+    }
+    const leanedYes = before.lean > 50
+    ;(leanedYes === (r.state === 'cameTrue') ? heldUp : missed).push(call)
+  }
+  const firmest = (a: OutletCall, b: OutletCall) =>
+    Math.abs(b.lean - 50) - Math.abs(a.lean - 50) || b.articles - a.articles || a.title.localeCompare(b.title)
+  return { heldUp: heldUp.sort(firmest), missed: missed.sort(firmest) }
 }

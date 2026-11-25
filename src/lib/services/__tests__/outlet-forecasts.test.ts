@@ -4,6 +4,7 @@ const { mockPrisma, mockTranslations } = vi.hoisted(() => ({
   mockPrisma: {
     evidencePoolArticle: { findMany: vi.fn() },
     prediction: { findMany: vi.fn() },
+    predictionOutcomeCutoff: { findMany: vi.fn() },
   },
   mockTranslations: vi.fn(),
 }))
@@ -18,6 +19,7 @@ describe('outlet-forecasts (#2320)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockTranslations.mockResolvedValue(new Map())
+    mockPrisma.predictionOutcomeCutoff.findMany.mockResolvedValue([])
   })
 
   it('links only public, approved forecasts, preferring a cached translation of the title', async () => {
@@ -72,6 +74,52 @@ describe('outlet-forecasts (#2320)', () => {
     })
     expect(rows[0].trend).toEqual([99, 75, 50])
     expect(rows[0].lean).toBe(50)
+  })
+
+  describe('lean before the outcome (#2340)', () => {
+    const cutoffAt = at('2026-11-10T12:00:00Z')
+    const article = (stance: number, publishedDate: string | null, settled: boolean | null = null) =>
+      ({ predictionId: 'f1', stance, publishedDate, settled, addedAt: at('2026-11-01T00:00:00Z') })
+
+    beforeEach(() => {
+      mockPrisma.prediction.findMany.mockResolvedValue([
+        { id: 'f1', slug: 's1', claimText: 'Claim', status: 'RESOLVED_CORRECT' },
+        { id: 'f2', slug: 's2', claimText: 'Open one', status: 'ACTIVE' },
+      ])
+    })
+
+    it('averages only articles published before the approved cutoff that do not report the outcome', async () => {
+      mockPrisma.evidencePoolArticle.findMany.mockResolvedValue([
+        article(1.0, '2026-11-01T08:00:00Z'),
+        article(0.0, '2026-11-09'), // its whole day, in any zone, ends before the cutoff
+        article(-1.0, '2026-11-10T13:00:00Z'), // after the cutoff
+        article(-1.0, '2026-11-02T08:00:00Z', true), // reports the outcome as settled fact
+        article(-1.0, null), // undated never counts
+        article(-1.0, '2026-11-10'), // the cutoff's own day
+        { predictionId: 'f2', stance: 0.5, publishedDate: '2026-11-01', settled: null, addedAt: at('2026-11-01T00:00:00Z') },
+      ])
+      mockPrisma.predictionOutcomeCutoff.findMany.mockResolvedValue([
+        { predictionId: 'f1', status: 'approved', cutoffAt },
+      ])
+
+      const rows = await getOutletForecastRows('Ynet', ['ynet.co.il'], 'en')
+
+      expect(mockPrisma.predictionOutcomeCutoff.findMany.mock.calls[0][0].where).toEqual({ predictionId: { in: ['f1'] } })
+      const f1 = rows.find((r) => r.forecastId === 'f1')
+      expect(f1?.beforeOutcome).toEqual({ lean: 75, articles: 2 })
+      expect(f1?.articles).toBe(6)
+      expect(rows.find((r) => r.forecastId === 'f2')?.beforeOutcome).toBeNull()
+    })
+
+    it('shows none without an approved cutoff, including one later ruled insufficient', async () => {
+      mockPrisma.evidencePoolArticle.findMany.mockResolvedValue([article(1.0, '2026-11-01T08:00:00Z')])
+      mockPrisma.predictionOutcomeCutoff.findMany.mockResolvedValue([
+        { predictionId: 'f1', status: 'approved', cutoffAt },
+        { predictionId: 'f1', status: 'insufficient', cutoffAt: null },
+      ])
+      const rows = await getOutletForecastRows('Ynet', ['ynet.co.il'], 'en')
+      expect(rows[0].beforeOutcome).toBeNull()
+    })
   })
 
   it('fails open to no rows', async () => {

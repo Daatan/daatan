@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  articleDay, forecastState, runningTrend, sortOutletForecasts, TREND_POINTS, type OutletForecastRow,
+  articleDay, forecastState, pickCalls, runningTrend, sortOutletForecasts, TREND_POINTS, type OutletForecastRow,
 } from '../outlet-forecasts'
 import { brierGrade } from '../brier-grade'
 import { brierTone } from '@/components/leaderboard/LeaderboardParts'
@@ -75,6 +75,50 @@ describe('sortOutletForecasts', () => {
     const before = ids(rows)
     sortOutletForecasts(rows, 'lean')
     expect(ids(rows)).toEqual(before)
+  })
+})
+
+describe('pickCalls (#2340)', () => {
+  const resolved = (id: string, state: OutletForecastRow['state'], lean: number, articles = 4) =>
+    row({ forecastId: id, title: id, state, beforeOutcome: { lean, articles } })
+
+  it('splits by whether the pre-outcome lean pointed at what happened', () => {
+    const { heldUp, missed } = pickCalls([
+      resolved('yes-high', 'cameTrue', 80),
+      resolved('no-low', 'didNotHappen', 25),
+      resolved('yes-low', 'cameTrue', 30),
+      resolved('no-high', 'didNotHappen', 70),
+    ])
+    expect(heldUp.map((c) => c.forecastId)).toEqual(['yes-high', 'no-low'])
+    expect(missed.map((c) => c.forecastId)).toEqual(['no-high', 'yes-low'])
+    expect(heldUp[1]).toEqual({ forecastId: 'no-low', href: '/forecasts/f', title: 'no-low', state: 'didNotHappen', lean: 25, articles: 4 })
+  })
+
+  it('uses the pre-outcome lean, not the overall one', () => {
+    const r = { ...resolved('f', 'cameTrue', 30), lean: 90 }
+    expect(pickCalls([r]).missed).toHaveLength(1)
+  })
+
+  it('skips a near-even lean, too few articles, open or annulled forecasts, and no pre-outcome reading', () => {
+    const { heldUp, missed } = pickCalls([
+      resolved('even', 'cameTrue', 59),
+      resolved('thin', 'cameTrue', 90, 2),
+      resolved('open', 'open', 90),
+      resolved('annulled', 'annulled', 90),
+      row({ forecastId: 'none', state: 'cameTrue', beforeOutcome: null }),
+      row({ forecastId: 'unset', state: 'cameTrue' }),
+    ])
+    expect([...heldUp, ...missed]).toEqual([])
+    expect(pickCalls([resolved('edge', 'cameTrue', 60, 3)]).heldUp).toHaveLength(1)
+  })
+
+  it('puts the firmest lean first, then the most articles', () => {
+    const { heldUp } = pickCalls([
+      resolved('a', 'cameTrue', 70, 3),
+      resolved('b', 'didNotHappen', 10, 3),
+      resolved('c', 'cameTrue', 70, 9),
+    ])
+    expect(heldUp.map((c) => c.forecastId)).toEqual(['b', 'c', 'a'])
   })
 })
 

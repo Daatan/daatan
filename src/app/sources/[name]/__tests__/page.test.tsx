@@ -216,6 +216,20 @@ describe('sources/[name] page', () => {
     expect(rows.map(r => r.forecastId)).toEqual(['b', 'a'])
   })
 
+  it('shows calls before the outcome only when there are some (#2340)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
+    const base = { href: '/forecasts/a', title: 'A', articles: 5, lean: 70, trend: [70], lastArticle: '2026-11-20' }
+    mockForecastRows.mockResolvedValue([{ ...base, forecastId: 'a', state: 'cameTrue', beforeOutcome: null }])
+    expect(findProps(await OutletPublicPage({ params }), p => Array.isArray(p.heldUp))).toBeUndefined()
+
+    mockForecastRows.mockResolvedValue([
+      { ...base, forecastId: 'a', state: 'cameTrue', beforeOutcome: { lean: 20, articles: 4 } },
+    ])
+    const calls = findProps(await OutletPublicPage({ params }), p => Array.isArray(p.heldUp))
+    expect(calls?.heldUp).toEqual([])
+    expect((calls?.missed as { forecastId: string }[]).map(c => c.forecastId)).toEqual(['a'])
+  })
+
   it('lists an article that fed two forecasts once, linking each by its public title (#2292)', async () => {
     const pub = { title: 'Zelenskyy on four-party talks', url: 'https://example.com/a', source: 'example.com', publishedAt: '2026-11-20T10:00:00Z', pushedAt: null, outcome: null }
     mockGetPublicOutletDetail.mockResolvedValue({
