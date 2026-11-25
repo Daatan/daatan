@@ -61,6 +61,19 @@ the same structured-data strength as the English canonical):
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
 5. **FAQPage** (`schema.org/FAQPage`, public forecasts only, #1295) — one `Question`/`Answer` pair wrapping the claim in question form ("What are the chances that …?", past-tense "Did this come true: …?" once resolved), pure builders in `src/lib/forecast-seo-schema.ts`. `dateModified` is valid here because FAQPage subtypes CreativeWork. Google restricted FAQ rich results to authoritative government/health sites in Aug 2023, so this earns no Search carousel on daatan.com — it's aimed at AI-search/LLM extraction (ChatGPT, Perplexity, AI Overviews), not a Google rich result. (A visible on-page question/answer line mirroring it was removed in #1635; the JSON-LD is built server-side and unaffected.)
 
+### Source pages (`/sources/[name]`, daatan#2339)
+
+A source page emits one `WebPage` whose `about` is an `Organization`: name, the outlet's site
+(its first news-indexer domain) and `sameAs` links to its Wikipedia article and Telegram
+channel. It is identity only: the Brier grade and the board rank are not encoded as a rating.
+The type stays `Organization`, not `NewsMediaOrganization`, because the board also carries
+personal sites and think tanks.
+
+Its meta description leads with the board's own numbers for an outlet on the board (Brier,
+resolved predictions, head-to-head rank, read from the same cached board as `robots`), followed
+by the news-indexer description when there is one. Off the board the page is `noindex` and keeps
+the generic sentence.
+
 ### Freshness: `dateModified` vs. `updatedAt`
 
 `Prediction.updatedAt` is a Prisma `@updatedAt` column — it bumps on *any* row write (a

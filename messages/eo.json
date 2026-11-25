@@ -1312,7 +1312,7 @@
     "backToLeaderboard": "Reen al la rangolisto de fontoj",
     "wikipedia": "Vikipedio",
     "telegram": "Telegram-kanalo",
-    "trackRecord": "Spurhistorio",
+    "trackRecord": "Precizeco",
     "skill": "Lerteco",
     "brier": "Brier",
     "predictions": "Prognozoj",
@@ -1333,8 +1333,9 @@
       "poor": "Malforta"
     },
     "gradeNote": "Brier {brier} · {count, plural, one {# solvita prognozo} other {# solvitaj prognozoj}}",
-    "trackRecordHint": "La spurhistorio poentas la verkistojn de ĉi tiu fonto laŭ solvitaj prognozoj, el la rangolisto de fontoj. Pli malalta Brier estas pli bona; ĉiam respondi 50/50 donas 0,25.",
-    "rankLabel": "Rango inter fontoj",
+    "trackRecordHint": "Precizeco estas la Brier-poentaro de la verkistoj de ĉi tiu fonto ĉe solvitaj prognozoj: pli malalta estas pli bona, kaj ĉiam respondi 50/50 donas 0,25. La rango estas rekta komparo: ĝi kalkulas nur prognozojn, kie fontoj kliniĝis al kontraŭaj direktoj, kaj tiuj, kiuj kliniĝis ĝuste, supreniras. Fonto povas venki en tiuj komparoj kaj tamen ricevi malaltan precizecon, se ĝi maltrafis prognozojn, kiujn ankaŭ la aliaj fontoj maltrafis.",
+    "rankLabel": "Rango en rektaj komparoj",
+    "rankNote": "Kontraŭ aliaj fontoj ĉe la samaj prognozoj",
     "rankValue": "{rank} el {total}",
     "forecastsCovered": "Kovritaj prognozoj",
     "articlesCited": "Cititaj artikoloj",
@@ -1363,7 +1364,8 @@
     "articleCount": "{count, plural, one {# artikolo} other {# artikoloj}}",
     "showAllForecasts": "Montri ĉiujn ({count})",
     "showAllAuthors": "Montri ĉiujn ({count})",
-    "showMore": "Montri pli"
+    "showMore": "Montri pli",
+    "metaBoard": "{name} ĉe Daatan: Brier {brier} el {count, plural, one {# solvita prognozo} other {# solvitaj prognozoj}}, {rank}-a loko el {total} fontoj en rektaj komparoj."
   },
   "authorPage": {
     "backToLeaderboard": "Reen al la rangolisto de fontoj",

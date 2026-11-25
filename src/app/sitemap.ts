@@ -6,7 +6,7 @@ import { env } from '@/env'
 import { getAppUrl } from '@/lib/branding'
 import { VISIBLE_TAG_PREDICTION_WHERE } from '@/lib/services/tag'
 import { RETRO_PATHS } from './retroanalysis/links'
-import { getBoardOutletNames } from '@/lib/services/leaderboard-cached'
+import { getBoardOutlets } from '@/lib/services/leaderboard-cached'
 
 // Don't prerender at build time — DATABASE_URL is a placeholder during the
 // Docker image build and Prisma can't reach it. Regenerate on demand instead.
@@ -207,7 +207,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const [{ predictions, translatedPredictionIds, users, tags }, boardOutlets] = await Promise.all([
     fetchSitemapData(),
-    getBoardOutletNames(),
+    getBoardOutlets(),
   ])
 
   const translatedSet = new Set(
@@ -280,8 +280,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // 7. Source pages on the public board, the only ones indexed (daatan#2337). Same URL as their
   // canonical and the board's links; no locale variants (one route, language by cookie).
-  const sourceRoutes: MetadataRoute.Sitemap = boardOutlets.map((name) => ({
-    url: `${BASE_URL}/sources/${encodeURIComponent(name)}`,
+  const sourceRoutes: MetadataRoute.Sitemap = boardOutlets.map((r) => ({
+    url: `${BASE_URL}/sources/${encodeURIComponent(r.outletName)}`,
     changeFrequency: 'weekly' as const,
     priority: 0.5,
   }))

@@ -10,7 +10,7 @@ vi.mock('@/lib/prisma', () => {
 })
 
 const { mockBoardOutlets } = vi.hoisted(() => ({ mockBoardOutlets: vi.fn() }))
-vi.mock('@/lib/services/leaderboard-cached', () => ({ getBoardOutletNames: mockBoardOutlets }))
+vi.mock('@/lib/services/leaderboard-cached', () => ({ getBoardOutlets: mockBoardOutlets }))
 
 import sitemap from '../sitemap'
 
@@ -60,7 +60,7 @@ describe('sitemap source pages (daatan#2337)', () => {
   })
 
   it('lists the sources board and each source page on it, at its canonical URL', async () => {
-    mockBoardOutlets.mockResolvedValue(['ynetnews.com', 'Ben Caspit'])
+    mockBoardOutlets.mockResolvedValue([{ outletName: 'ynetnews.com' }, { outletName: 'Ben Caspit' }])
     const list = await urls()
     expect(list).toContain('https://daatan.com/leaderboard/sources')
     expect(list).toEqual(expect.arrayContaining([

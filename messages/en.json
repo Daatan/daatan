@@ -1312,7 +1312,7 @@
     "backToLeaderboard": "Back to source leaderboard",
     "wikipedia": "Wikipedia",
     "telegram": "Telegram channel",
-    "trackRecord": "Track record",
+    "trackRecord": "Accuracy",
     "skill": "Skill",
     "brier": "Brier",
     "predictions": "Predictions",
@@ -1333,8 +1333,9 @@
       "poor": "Poor"
     },
     "gradeNote": "Brier {brier} · {count, plural, one {# resolved prediction} other {# resolved predictions}}",
-    "trackRecordHint": "Track record scores this outlet's writers on resolved forecasts, from the source leaderboard. Lower Brier is better; always answering 50/50 scores 0.25.",
-    "rankLabel": "Rank among outlets",
+    "trackRecordHint": "Accuracy is the Brier score of this outlet's writers on resolved forecasts: lower is better, and always answering 50/50 scores 0.25. The rank is head-to-head: it counts only forecasts where sources leaned opposite ways, and the ones that leaned the right way move up. An outlet can win those contests and still grade poorly if it missed forecasts that the other sources missed too.",
+    "rankLabel": "Head-to-head rank",
+    "rankNote": "Against other sources on the same forecasts",
     "rankValue": "{rank} of {total}",
     "forecastsCovered": "Forecasts covered",
     "articlesCited": "Articles cited",
@@ -1363,7 +1364,8 @@
     "articleCount": "{count, plural, one {# article} other {# articles}}",
     "showAllForecasts": "Show all ({count})",
     "showAllAuthors": "Show all ({count})",
-    "showMore": "Show more"
+    "showMore": "Show more",
+    "metaBoard": "{name} on Daatan: Brier {brier} over {count, plural, one {# resolved prediction} other {# resolved predictions}}, ranked {rank} of {total} outlets head-to-head."
   },
   "authorPage": {
     "backToLeaderboard": "Back to source leaderboard",

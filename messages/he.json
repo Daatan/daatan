@@ -1312,7 +1312,7 @@
     "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
     "wikipedia": "ויקיפדיה",
     "telegram": "ערוץ טלגרם",
-    "trackRecord": "רקורד",
+    "trackRecord": "דיוק",
     "skill": "כישורים",
     "brier": "Brier",
     "predictions": "תחזיות",
@@ -1333,8 +1333,9 @@
       "poor": "חלש"
     },
     "gradeNote": "Brier {brier} · {count, plural, one {תחזית אחת שהוכרעה} other {# תחזיות שהוכרעו}}",
-    "trackRecordHint": "הרקורד מדרג את כותבי המקור לפי תחזיות שהוכרעו, מתוך טבלת דירוג המקורות. ציון Brier נמוך יותר הוא טוב יותר; תשובה קבועה של 50/50 מקבלת 0.25.",
-    "rankLabel": "דירוג בין המקורות",
+    "trackRecordHint": "הדיוק הוא ציון Brier של כותבי המקור בתחזיות שהוכרעו: נמוך יותר הוא טוב יותר, ותשובה קבועה של 50/50 מקבלת 0.25. הדירוג הוא בהשוואה ישירה: נספרות רק תחזיות שבהן המקורות נטו לכיוונים מנוגדים, ומי שנטה לכיוון הנכון עולה. מקור יכול לנצח בהשוואות האלה ועדיין לקבל ציון דיוק נמוך, אם טעה בתחזיות שבהן טעו גם המקורות האחרים.",
+    "rankLabel": "דירוג בהשוואה ישירה",
+    "rankNote": "מול מקורות אחרים באותן תחזיות",
     "rankValue": "{rank} מתוך {total}",
     "forecastsCovered": "תחזיות שסוקרו",
     "articlesCited": "כתבות שצוטטו",
@@ -1363,7 +1364,8 @@
     "articleCount": "{count, plural, one {כתבה אחת} other {# כתבות}}",
     "showAllForecasts": "הצג הכול ({count})",
     "showAllAuthors": "הצג הכול ({count})",
-    "showMore": "הצג עוד"
+    "showMore": "הצג עוד",
+    "metaBoard": "{name} ב-Daatan: ציון Brier {brier} על פני {count, plural, one {תחזית אחת שהוכרעה} other {# תחזיות שהוכרעו}}, מקום {rank} מתוך {total} מקורות בהשוואה ישירה."
   },
   "authorPage": {
     "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
