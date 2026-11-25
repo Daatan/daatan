@@ -1,31 +1,48 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockGetPublicOutletDetail, mockGetSourceLeaderboard, mockNotFound } = vi.hoisted(() => ({
+const {
+  mockGetPublicOutletDetail, mockGetSourceLeaderboard, mockNotFound, mockForecastRows, mockForecastLinks, mockLocale,
+} = vi.hoisted(() => ({
   mockGetPublicOutletDetail: vi.fn(),
   mockGetSourceLeaderboard: vi.fn(),
   mockNotFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }),
+  mockForecastRows: vi.fn(),
+  mockForecastLinks: vi.fn(),
+  mockLocale: { value: 'en' },
 }))
 
 vi.mock('@/lib/services/outlets', () => ({ getPublicOutletDetail: mockGetPublicOutletDetail }))
+vi.mock('@/lib/services/outlet-forecasts', () => ({
+  getOutletForecastRows: mockForecastRows,
+  getPublicForecastLinks: mockForecastLinks,
+}))
 vi.mock('@/lib/services/sourceLeaderboard', () => ({
   getSourceLeaderboard: mockGetSourceLeaderboard,
   canonicalOutlet: (n: string) => n,
   authorsOfOutlet: () => [],
 }))
+vi.mock('@/lib/services/leaderboard-cached', () => ({ SOURCE_LEADERBOARD_MIN_PREDICTIONS: 4 }))
 vi.mock('@/lib/services/sourceTopicBoards', () => ({
   getTopicBoards: async () => [],
   outletTopicRecords: () => [],
 }))
 vi.mock('@/components/sources/TopicBreakdown', () => ({ default: () => null }))
+vi.mock('@/components/sources/OutletForecastTable', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({ notFound: mockNotFound }))
 vi.mock('@/lib/branding', () => ({ getAppUrl: () => 'https://daatan.com' }))
-vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key, getLocale: async () => 'en' }))
-vi.mock('@/lib/services/forecast', () => ({ getForecastSlugs: async (ids: string[]) => new Map(ids.map((id) => [id, `slug-${id}`])) }))
+// key → key, or `key {json}` when the call passes values, so a test can see both.
+vi.mock('next-intl/server', () => ({
+  getTranslations: async () => (key: string, values?: Record<string, unknown>) =>
+    values ? `${key} ${JSON.stringify(values)}` : key,
+  getLocale: async () => mockLocale.value,
+}))
 
 import OutletPublicPage, { generateMetadata } from '../page'
 
 const sampleDetail = {
   name: 'maariv',
+  displayName: {},
+  description: {},
   wikipediaUrl: null,
   telegramChannel: null,
   links: [],
@@ -35,6 +52,10 @@ const sampleDetail = {
   publications: [],
   linkedPeople: [],
 }
+
+const outletRow = (outletName: string, brierScore: number, predictions: number) => ({
+  id: outletName, outletName, skillConservative: 0.05, brierScore, authorCount: 3, predictions, articles: 40,
+})
 
 /** Every string/number in a React element tree (props, not component internals). */
 function collectText(node: unknown, out: string[] = []): string[] {
@@ -46,10 +67,21 @@ function collectText(node: unknown, out: string[] = []): string[] {
   return out
 }
 
+/** Props of the first element in the tree that satisfies `match`. */
+function findProps(node: unknown, match: (p: Record<string, unknown>) => boolean): Record<string, unknown> | undefined {
+  if (Array.isArray(node)) return node.map(n => findProps(n, match)).find(Boolean)
+  if (!node || typeof node !== 'object' || !('props' in node)) return undefined
+  const props = (node as { props: Record<string, unknown> }).props
+  return match(props) ? props : Object.values(props).map(v => findProps(v, match)).find(Boolean)
+}
+
 describe('sources/[name] page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockLocale.value = 'en'
     mockGetSourceLeaderboard.mockResolvedValue({ view: 'outlets', sortBy: 'skillConservative', authorRows: [], outletRows: [] })
+    mockForecastRows.mockResolvedValue([])
+    mockForecastLinks.mockResolvedValue(new Map())
   })
 
   const params = Promise.resolve({ name: 'maariv' })
@@ -66,6 +98,18 @@ describe('sources/[name] page', () => {
     expect(metadata.alternates).toEqual({ canonical: 'https://daatan.com/sources/maariv' })
   })
 
+  it('titles and describes the page in the reader’s language, falling back to English', async () => {
+    mockLocale.value = 'he'
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail,
+      displayName: { en: 'Maariv', he: 'מעריב' },
+      description: { en: 'Israeli daily.' },
+    })
+    const metadata = await generateMetadata({ params })
+    expect(metadata.title).toBe('מעריב — source profile | Daatan')
+    expect(metadata.description).toBe('Israeli daily.')
+  })
+
   it('calls notFound() for an unknown outlet', async () => {
     mockGetPublicOutletDetail.mockResolvedValue(null)
     await expect(OutletPublicPage({ params })).rejects.toThrow('NEXT_NOT_FOUND')
@@ -74,8 +118,11 @@ describe('sources/[name] page', () => {
 
   it('renders when the outlet exists, even with no track record yet', async () => {
     mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
-    await expect(OutletPublicPage({ params })).resolves.toBeTruthy()
+    const texts = collectText(await OutletPublicPage({ params }))
     expect(mockNotFound).not.toHaveBeenCalled()
+    expect(texts).toContain('maariv')
+    expect(texts).toContain('noTrackRecord')
+    expect(texts).toContain('noForecasts')
   })
 
   it('decodes a URL-encoded outlet name before looking it up', async () => {
@@ -84,31 +131,70 @@ describe('sources/[name] page', () => {
     expect(mockGetPublicOutletDetail).toHaveBeenCalledWith('some/outlet')
   })
 
-  it('finds the track record through a domain when the URL carries the display name (#1891)', async () => {
+  it('shows the display name and description when news-indexer has them', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail, displayName: { en: 'Maariv' }, description: { en: 'Israeli daily.' },
+    })
+    const texts = collectText(await OutletPublicPage({ params }))
+    expect(texts).toContain('Maariv')
+    expect(texts).toContain('Israeli daily.')
+  })
+
+  it('grades the track record in words, found through a domain when the URL carries the name (#1891)', async () => {
     mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynet', domains: ['ynet.co.il'] })
     mockGetSourceLeaderboard.mockResolvedValue({
       view: 'outlets',
       sortBy: 'skillConservative',
       authorRows: [],
-      outletRows: [{ id: 'ynet.co.il', outletName: 'ynet.co.il', skillConservative: 0.078, brierScore: 0.433, authorCount: 25, predictions: 29, articles: 40 }],
+      outletRows: [outletRow('jpost.com', 0.15, 40), outletRow('tiny.com', 0.1, 2), outletRow('ynet.co.il', 0.433, 29)],
     })
     const texts = collectText(await OutletPublicPage({ params: Promise.resolve({ name: 'Ynet' }) }))
-    expect(texts).toContain('0.078')
+    expect(texts).toContain('grade.poor')
+    expect(texts).toContain('gradeNote {"brier":"0.43","count":29}')
+    expect(texts).toContain('lowSample')
+    // Ranked as the board shows it: tiny.com sits under the 4-prediction floor.
+    expect(texts).toContain('rankValue {"rank":2,"total":2}')
     expect(texts).not.toContain('noTrackRecord')
   })
 
-  it('lists an article that fed two forecasts once, with a numbered link per forecast (#2292)', async () => {
+  it('sums the forecast table into the header stats', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue(sampleDetail)
+    mockForecastRows.mockResolvedValue([
+      { forecastId: 'a', href: '/forecasts/a', title: 'A', state: 'cameTrue', articles: 3, lean: 70, trend: [70], lastArticle: '2026-11-20' },
+      { forecastId: 'b', href: '/forecasts/b', title: 'B', state: 'open', articles: 2, lean: 40, trend: [40], lastArticle: '2026-11-02' },
+    ])
+    const tree = await OutletPublicPage({ params })
+    const stat = (label: string) => findProps(tree, p => p.label === label)?.value
+    expect(stat('forecastsCovered')).toBe('2')
+    expect(stat('articlesCited')).toBe('5')
+    expect(stat('lastArticle')).toMatch(/Nov 20, 2026/)
+    // Open forecasts first by default.
+    const rows = findProps(tree, p => Array.isArray(p.rows))?.rows as { forecastId: string }[]
+    expect(rows.map(r => r.forecastId)).toEqual(['b', 'a'])
+  })
+
+  it('lists an article that fed two forecasts once, linking each by its public title (#2292)', async () => {
     const pub = { title: 'Zelenskyy on four-party talks', url: 'https://example.com/a', source: 'example.com', publishedAt: '2026-11-20T10:00:00Z', pushedAt: null, outcome: null }
     mockGetPublicOutletDetail.mockResolvedValue({
       ...sampleDetail,
-      publications: [{ ...pub, forecastId: 'f1' }, { ...pub, forecastId: 'f2', outcome: 'YES' }],
+      publications: [
+        { ...pub, forecastId: 'f1' },
+        { ...pub, forecastId: 'f2', outcome: 'YES' },
+        { ...pub, forecastId: 'private' },
+      ],
     })
+    mockForecastLinks.mockResolvedValue(new Map([
+      ['f1', { href: '/forecasts/slug-f1', title: 'Talks happen by March', status: 'ACTIVE' }],
+      ['f2', { href: '/forecasts/slug-f2', title: 'Ceasefire holds', status: 'RESOLVED_CORRECT' }],
+    ]))
     const texts = collectText(await OutletPublicPage({ params }))
+    expect(mockForecastLinks).toHaveBeenCalledWith(['f1', 'f2', 'private'], 'en')
     expect(texts.filter((x) => x === 'Zelenskyy on four-party talks')).toHaveLength(1)
-    expect(texts).toContain('forecast 1')
-    expect(texts).toContain('forecast 2')
+    expect(texts).toContain('Talks happen by March')
+    expect(texts).toContain('Ceasefire holds')
     expect(texts).toContain('outcomeYes')
     expect(texts).toContain('/forecasts/slug-f2')
+    expect(texts.some((x) => x.includes('private'))).toBe(false)
   })
 
   it('lets a Hebrew title set its own direction on an English page (#2292)', async () => {
@@ -117,12 +203,13 @@ describe('sources/[name] page', () => {
       ...sampleDetail,
       publications: [{ title: 'הדמוקרטים: "מוכר את הביטחון"', url, source: 'ynet.co.il', publishedAt: null, pushedAt: null, outcome: null, forecastId: 'f1' }],
     })
-    const findProps = (node: unknown): Record<string, unknown> | undefined => {
-      if (Array.isArray(node)) return node.map(findProps).find(Boolean)
-      if (!node || typeof node !== 'object' || !('props' in node)) return undefined
-      const props = (node as { props: Record<string, unknown> }).props
-      return props.href === url ? props : Object.values(props).map(findProps).find(Boolean)
-    }
-    expect(findProps(await OutletPublicPage({ params }))?.dir).toBe('auto')
+    expect(findProps(await OutletPublicPage({ params }), p => p.href === url)?.dir).toBe('auto')
+  })
+
+  it('links a Telegram channel stored as a full URL without prefixing it again', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, telegramChannel: 'https://t.me/ynetnewslatest' })
+    const texts = collectText(await OutletPublicPage({ params }))
+    expect(texts).toContain('https://t.me/ynetnewslatest')
+    expect(texts.some((x) => x.includes('t.me/https'))).toBe(false)
   })
 })

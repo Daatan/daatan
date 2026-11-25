@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
 import { Loader2, ExternalLink, ChevronLeft, Plus, X, Search } from 'lucide-react'
+import { IDENTITY_LANGS, type LocalizedText } from '@/lib/utils/outlet-identity'
 
 type LinkItem = { label: string; url: string }
 
@@ -47,6 +48,8 @@ type AuthorScoringRow = {
 
 type OutletDetail = {
   name: string
+  displayName?: LocalizedText
+  description?: LocalizedText
   wikipediaUrl: string | null
   telegramChannel: string | null
   links: LinkItem[]
@@ -74,6 +77,8 @@ export default function OutletDetailPanel({ name }: Props) {
   const [authorScoring, setAuthorScoring] = useState<AuthorScoringRow[] | null>(null)
 
   // Edit-form state, seeded from the loaded detail.
+  const [displayName, setDisplayName] = useState<LocalizedText>({})
+  const [description, setDescription] = useState<LocalizedText>({})
   const [wikipediaUrl, setWikipediaUrl] = useState('')
   const [telegramChannel, setTelegramChannel] = useState('')
   const [notes, setNotes] = useState('')
@@ -98,6 +103,8 @@ export default function OutletDetailPanel({ name }: Props) {
         }
         const detail: OutletDetail = await res.json()
         setData(detail)
+        setDisplayName(detail.displayName ?? {})
+        setDescription(detail.description ?? {})
         setWikipediaUrl(detail.wikipediaUrl ?? '')
         setTelegramChannel(detail.telegramChannel ?? '')
         setNotes(detail.notes ?? '')
@@ -128,6 +135,9 @@ export default function OutletDetailPanel({ name }: Props) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Whole maps: news-indexer replaces each one and drops blank languages.
+          display_name: displayName,
+          description,
           wikipedia_url: wikipediaUrl,
           telegram_channel: telegramChannel,
           notes,
@@ -215,6 +225,48 @@ export default function OutletDetailPanel({ name }: Props) {
 
       {/* Enrichment edit form */}
       <div className="p-4 rounded-xl bg-navy-700 border border-navy-600 mb-8 space-y-4">
+        <fieldset>
+          <legend className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
+            {t('sourcesDetailDisplayName')}
+          </legend>
+          <p className="text-xs text-gray-500 mb-2">{t('sourcesDetailIdentityHint')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {IDENTITY_LANGS.map((lang) => (
+              <label key={lang} className="flex items-center gap-2">
+                <span className="w-6 text-xs font-mono text-gray-500 uppercase">{lang}</span>
+                <input
+                  value={displayName[lang] ?? ''}
+                  onChange={(e) => setDisplayName((prev) => ({ ...prev, [lang]: e.target.value }))}
+                  maxLength={120}
+                  dir="auto"
+                  className="flex-1 px-3 py-1.5 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
+            {t('sourcesDetailDescription')}
+          </legend>
+          <div className="space-y-2">
+            {IDENTITY_LANGS.map((lang) => (
+              <label key={lang} className="flex items-start gap-2">
+                <span className="w-6 pt-2 text-xs font-mono text-gray-500 uppercase">{lang}</span>
+                <textarea
+                  value={description[lang] ?? ''}
+                  onChange={(e) => setDescription((prev) => ({ ...prev, [lang]: e.target.value }))}
+                  maxLength={600}
+                  rows={2}
+                  dir="auto"
+                  className="flex-1 px-3 py-2 text-sm bg-navy-800 border border-navy-600 rounded-lg text-white placeholder-gray-500"
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">
             {t('sourcesDetailWikipedia')}

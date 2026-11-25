@@ -1,4 +1,5 @@
 import { env } from '@/env'
+import type { LocalizedText } from '@/lib/utils/outlet-identity'
 
 export interface PublicOutletLink {
   label: string
@@ -37,6 +38,9 @@ export interface PublicOutletLinkedPerson {
 
 export interface PublicOutletDetail {
   name: string
+  /** {} until set in news-indexer's outlet table; see `localizedText`. */
+  displayName: LocalizedText
+  description: LocalizedText
   wikipediaUrl: string | null
   telegramChannel: string | null
   links: PublicOutletLink[]
@@ -70,6 +74,8 @@ export async function getPublicOutletDetail(name: string): Promise<PublicOutletD
     const data = await res.json()
     return {
       name: data.name,
+      displayName: data.displayName ?? {},
+      description: data.description ?? {},
       wikipediaUrl: data.wikipediaUrl ?? null,
       telegramChannel: data.telegramChannel ?? null,
       links: data.links ?? [],
