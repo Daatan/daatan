@@ -203,12 +203,14 @@ Prediction {
 ### Feed Filtering
 The feed (`src/app/FeedClient.tsx`) supports status filters, tag filters and sorting, all persisted in URL query params:
 1. **Status** — Open, Closing Soon, Awaiting Resolution, Resolved, All, plus Needs Review (bot-forecast approval queue; admins/approvers only, not on self-host)
-2. **Tags** — multi-select clickable tag chips (e.g. `?tags=AI,Crypto`)
+2. **Tags** — multi-select topic chips (e.g. `?tags=AI,Crypto`), always visible on both feeds, `/` and `/forecasts` (`src/app/forecasts/PredictionsClient.tsx`), through the shared `TopicFilter` (`src/components/feed/`, #2330)
    - Tags filter uses OR logic: predictions matching *any* selected tag are shown
+   - Order (`orderTopics` in `src/lib/topics.ts`): the picked topics first, then the rest by open forecasts, most first; a topic with no open forecasts is hidden unless picked
+   - Topic names are translated (`topics.names` in `messages/*.json`, keyed by slug); other tags show as stored. `GET /api/forecasts?tags=` matches by slug, so case and spacing don't matter
    - Standard tags (`STANDARD_TAGS` in `src/lib/constants.ts`): Politics, Geopolitics, Economy, Technology, AI, Crypto, Sports, Entertainment, Science, Climate, Health, Business, Conflict, Elections, US Politics, Europe, Middle East, Asia, Energy, Space, Israeli Elections 2026
 3. **Sort** — Newest, By Deadline, Most Staked (`cu`), Last Updated (`?sortBy=`, `?sortOrder=`)
 
-Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so filters survive page refresh and can be shared via link. The tag selection is also remembered across visits (#2209): on the account (`users.feed_tags`, `PATCH /api/user/preferences`) for signed-in users, in `localStorage` for guests. It is applied only when the URL names no tags, and written only on an explicit toggle/clear, so opening a shared `?tags=` link never overwrites the saved topics.
+Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so filters survive page refresh and can be shared via link. The tag selection is also remembered across visits (#2209), as one selection shared by both feeds since #2330 (`useRememberedTopics`): on the account (`users.feed_tags`, `PATCH /api/user/preferences`) for signed-in users, in `localStorage` for guests. It is applied only when the URL names no tags, and written only on an explicit toggle/clear, so opening a shared `?tags=` link never overwrites the saved topics.
 
 ### Prediction Statuses
 
@@ -230,6 +232,8 @@ Filter state is persisted in the URL (e.g. `?status=RESOLVED&tags=AI,Crypto`) so
 Resolution starts when:
 1. `resolve_by_datetime` arrives (the `transition-expired-predictions` cron, every 15 min, moves `active` → `pending`). A date-only deadline (stored as 23:59 UTC) ends at **midnight in Israel** at the end of that date, 2–3 h before the stamp; any other stamp is an exact time (`deadlineEndsAt` in `src/lib/utils/date.ts`, daatan#2030), **OR**
 2. An earlier authoritative source enables resolution
+
+Nothing else moves `active` → `pending`, so an edit that moves a `pending` forecast's deadline to one that has not ended puts it back to `active` (daatan#2262): staking reopens and it leaves Awaiting Resolution. A retro simulation stays as it is.
 
 ---
 

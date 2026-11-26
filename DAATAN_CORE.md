@@ -32,7 +32,7 @@ If any check fails → out of scope.
 - **Database:** PostgreSQL 16 (Prisma 7.x ORM)
 - **Authentication:** Auth.js v5 / NextAuth (Google OAuth + email/password; OIDC for self-host)
 - **Testing:** Vitest, Playwright (E2E)
-- **AI Integration:** Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also serves three of the five AI-panel members and the bots; prompts live in git (`src/lib/llm/bedrock-prompts.ts`, `prompts/`); calibrated estimates from the TruthMachine Oracul (`oracle.daatan.com`)
+- **AI Integration:** Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also serves the bots, while the five AI-panel members run four on Bedrock and one on Vertex (daatan#2283); prompts live in git (`src/lib/llm/bedrock-prompts.ts`, `prompts/`); calibrated estimates from the TruthMachine Oracul (`oracle.daatan.com`)
 - **Notifications:** Resend (email), web-push (browser push), Telegram
 - **i18n:** next-intl
 - **Infrastructure:** Docker, Nginx, AWS EC2, S3 (avatars)

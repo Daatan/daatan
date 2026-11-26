@@ -174,8 +174,9 @@ say which is better. This comparison is free.
 > frontier model. Every member verified against the live API (`finish=stop`, ~7–8
 > completion tokens) before landing. Revisit if OpenAI ships a non-reasoning tier.
 >
-> **Grok honors `reasoning: {enabled: false}`** (5–6 tokens observed), so the
-> `max_tokens: 64` cap never trips on it — the concern that drove that cap is resolved.
+> **Grok 4.3 on OpenRouter honoured `reasoning: {enabled: false}`** (5–6 tokens observed)
+> while it was a member. Bedrock's Grok 4.6/4.7 cannot turn reasoning off, which is why
+> Grok left the panel in daatan#2283 (below).
 >
 > **Vertex Gemini 3 *Flash* is reasoning-mandatory too** (daatan#1763, measured
 > 2026-10-03). On Vertex, thought tokens count against `maxOutputTokens`, so a thinking
@@ -228,7 +229,7 @@ see `roster.ts`), but immune to an OpenRouter-wide 401/402
 the way the Bedrock member is.
 
 The **control member** is a falsification check: if a deliberately weak model scores
-the same Brier as Grok, the instrument is not measuring anything and a flat
+the same Brier as the strong members, the instrument is not measuring anything and a flat
 leaderboard is uninterpretable. ~$0.20/mo.
 
 `AiEstimate.model` and `.mode` are plain `String`, never enums — adding a member is one
@@ -275,16 +276,19 @@ Of the five, only `qwen3-235b-a22b-2507` exists on Bedrock
 *open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models; xAI and
 DeepSeek's own hosted checkpoint are absent entirely. Substituting open-weights cousins
 under the same member label would poison the per-member comparison, so DeepSeek, Grok,
-and Gemma stay on OpenRouter — Gemini, whose flagship API *is* a first-party Google
-surface, moved to Vertex instead (daatan#1513).
+and Gemma stayed on OpenRouter — Gemini, whose flagship API *is* a first-party Google
+surface, moved to Vertex instead (daatan#1513). That changed in daatan#2283: DeepSeek V3.2,
+Gemma 3 4B and Mistral Large 3 (in Grok's place) now run on Bedrock in us-east-1, each as a
+new member with a fresh Brier series (see the daatan#2283 note above).
 
 Running Qwen on Bedrock and Gemini on Vertex saves little directly. The reason to do it
 is that **every member used to depend on one third-party credential** — and on
 2026-07-10 that credential was dead, so all 285 calls in the first real sweep returned
 401 and the panel produced nothing. A Bedrock or Vertex member runs on the account's own
 credentials and keeps the panel producing data through an OpenRouter outage or a bad
-key. Qwen is also the only non-reasoning member, so it carries none of the hidden-token
-cost risk.
+key. Bedrock Converse has no generic reasoning switch, so every Bedrock member must be a
+model that doesn't reason (`registry.ts`, `PANEL_PARAMS`); none of them carries the
+hidden-token cost risk.
 
 `terraform/bedrock_invoke.tf` grants the app role `bedrock:InvokeModel`, scoped to the
 model ids the roster names; the Vertex leg reuses the same GCP service account as the
@@ -436,8 +440,9 @@ forecasts get three extra members (`mode: 'grounded-indexer'` in
 `GROUNDED_PANEL_MEMBERS`): the same Qwen/DeepSeek/Gemini-Flash-Lite models, same routes and
 provider pins as their ungrounded siblings, differing only in mode and prompt — so the
 per-model grounded-vs-ungrounded Brier delta isolates exactly what the injected
-articles are worth. Grok is deliberately absent (it alone is ~80% of panel token cost)
-and the control stays ungrounded (a grounded control would falsify a different
+articles are worth. Grok was deliberately left out (it alone was ~80% of panel token cost),
+and Mistral Large 3, which took its slot in daatan#2283, has no grounded twin either;
+the control stays ungrounded (a grounded control would falsify a different
 instrument). Costs tokens only: Qwen rides Bedrock credits, retrieval is our own
 pgvector index — roughly **$3–5/mo at the elections scope**, vs ~$60–150/mo for vendor
 search at the same cadence.
@@ -519,9 +524,9 @@ Open, roughly in order of value:
   (`20260715…_ai_panel`, `…_user_show_ai_panel`, `…_ai_member_score`). They are
   checksummed and immutable — editing an applied migration triggers Prisma drift — so the
   historical reference stays. This doc is the live source of truth.
-- **Grok honors `reasoning: {enabled: false}`** — confirmed on the first real sweep (5–6
-  completion tokens, not ~800), so the `max_tokens: 64` cap never trips on it. The
-  question that drove that cap is closed.
+- **Grok 4.3 honoured `reasoning: {enabled: false}`** while it was a member (OpenRouter,
+  until daatan#2283) — confirmed on the first real sweep (5–6 completion tokens, not ~800).
+  The 64-token cap stays as the guard for any member that ignores its off switch.
 - **OpenAI is excluded.** The gpt-5 lineup on OpenRouter is reasoning-mandatory
   (`reasoning: {enabled:false}` → HTTP 400), incompatible with the panel's design; DeepSeek
   and a 4B Gemma control replaced the two OpenAI slots (2026-07-11).
