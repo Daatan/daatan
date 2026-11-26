@@ -147,6 +147,30 @@ describe('forecast page routes hand ForecastDetailClient the same data (daatan#2
     expect(withoutLocaleParts(localized!)).toEqual(withoutLocaleParts(canonical!))
   })
 
+  it.each([
+    ['canonical', () => CanonicalPage({ params: Promise.resolve({ id: SLUG }) })],
+    ['localized', () => LocalePage({ params: Promise.resolve({ locale: 'ru', id: SLUG }) })],
+  ])('%s: the real creator goes to admins only; the AI panel to viewers who opted in', async (_route, renderPage) => {
+    m.findUniqueUser.mockResolvedValue({ showAiPanel: true })
+    m.getRealCreator.mockResolvedValue({ id: 'r1', name: 'Real', username: 'real' })
+    m.getPanelSeries.mockResolvedValue([{ model: 'm', points: [] }])
+
+    m.auth.mockResolvedValue({ user: { id: 'u2', role: 'USER' } })
+    const user = clientProps(await renderPage())!
+    expect(user.realCreator).toBeNull()
+    expect(user.showAiPanel).toBe(true)
+    expect(user.aiPanelSeries).toHaveLength(1)
+
+    m.auth.mockResolvedValue({ user: { id: 'u3', role: 'ADMIN' } })
+    expect(clientProps(await renderPage())!.realCreator).toEqual({ id: 'r1', name: 'Real', username: 'real' })
+
+    m.auth.mockResolvedValue(null)
+    const anon = clientProps(await renderPage())!
+    expect(anon.realCreator).toBeNull()
+    expect(anon.showAiPanel).toBe(false)
+    expect(anon.aiPanelSeries).toEqual([])
+  })
+
   it('the localized page gets the abstention, the evidence count and the merged sources', async () => {
     const props = clientProps(await LocalePage({ params: Promise.resolve({ locale: 'he', id: SLUG }) }))!
     expect((props.initialContextSnapshots as { insufficientData?: boolean }[])[0].insufficientData).toBe(true)
