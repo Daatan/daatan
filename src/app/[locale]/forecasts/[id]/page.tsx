@@ -10,134 +10,22 @@ import { getCanonicalSlugForAlias } from '@/lib/services/forecast'
 import { buildForecastDescription, buildForecastKeywords, publicDetailsText } from '@/lib/forecast-seo'
 import { ogLocale } from '@/lib/og-locale'
 import { isForecastViewableByVisitor } from '@/lib/forecast-visibility'
-import { listComments } from '@/lib/services/comment'
-import type { Comment } from '@/components/comments/CommentThread'
 import { JsonLd } from '@/components/JsonLd'
-import { slimContextSnapshots } from '@/lib/slim-context-snapshots'
-import { getContextTimeline, getProbabilityHistory } from '@/lib/services/context'
-import { getContributingSources } from '@/lib/services/forecast-sources'
 import { getAppName, getAppUrl } from '@/lib/branding'
 import { authorJsonLd } from '@/lib/author-json-ld'
-import { getPanelSeries } from '@/lib/services/ai-panel-read'
 import { communityProbability } from '@/lib/forecast-math'
 import {
   forecastFaqJsonLd,
-  latestProbabilityUpdateISO,
   type ForecastSeoCopy,
   type ForecastSeoLocale,
 } from '@/lib/forecast-seo-schema'
-import type { Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
-import { getRealCreator } from '@/lib/services/daatan-author'
 import ForecastDetailClient from '@/app/forecasts/[id]/ForecastDetailClient'
+import { getForecastDetail, loadForecastDetailProps } from '@/app/forecasts/[id]/_forecast/detail-data'
 import RelatedForecasts from '@/components/forecasts/RelatedForecasts'
 
 
-const SSR_COMMENT_LIMIT = 50
-
-async function getInitialComments(predictionId: string): Promise<Comment[]> {
-  const { comments } = await listComments({ predictionId, page: 1, limit: SSR_COMMENT_LIMIT })
-  return comments.map((c) => ({
-    ...c,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-    deletedAt: c.deletedAt ? c.deletedAt.toISOString() : null,
-  })) as Comment[]
-}
-
-async function getInitialContextSnapshots(predictionId: string): Promise<ContextSnapshot[]> {
-  const data = await getContextTimeline(predictionId)
-  if (!data) return []
-  return slimContextSnapshots(data.contextSnapshots.map((s) => ({
-    id: s.id,
-    summary: s.summary,
-    sources: (s.sources as ContextSnapshot['sources']) ?? [],
-    createdAt: s.createdAt.toISOString(),
-    externalProbability: s.externalProbability,
-    externalReasoning: s.externalReasoning,
-    oracleSnapshot: (s.oracleSnapshot as ContextSnapshot['oracleSnapshot']) ?? null,
-  })))
-}
-
 interface Props {
   params: Promise<{ locale: string; id: string }>
-}
-
-async function getPrediction(idOrSlug: string) {
-  const prediction = await prisma.prediction.findFirst({
-    where: {
-      OR: [{ id: idOrSlug }, { slug: idOrSlug }],
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          image: true,
-          rs: true,
-          eloRating: true,
-          role: true,
-        },
-      },
-      newsAnchor: true,
-      options: { orderBy: { displayOrder: 'asc' } },
-      commitments: {
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true, username: true, image: true } },
-          option: { select: { id: true, text: true } },
-        },
-      },
-      externalMarket: {
-        include: {
-          snapshots: {
-            orderBy: { createdAt: 'asc' },
-            select: { createdAt: true, probability: true },
-          },
-        },
-      },
-      _count: { select: { commitments: true } },
-    },
-  })
-
-  if (!prediction) return null
-
-  const { outcomePayload, evidenceLinks } = prediction
-  return {
-    ...prediction,
-    createdAt: prediction.createdAt.toISOString(),
-    resolveByDatetime: prediction.resolveByDatetime.toISOString(),
-    contextUpdatedAt: prediction.contextUpdatedAt?.toISOString(),
-    publishedAt: prediction.publishedAt?.toISOString(),
-    resolvedAt: prediction.resolvedAt?.toISOString(),
-    lockedAt: prediction.lockedAt?.toISOString(),
-    claimDeadline: prediction.claimDeadline?.toISOString() ?? null,
-    outcomePayload:
-      outcomePayload && typeof outcomePayload === 'object' && !Array.isArray(outcomePayload)
-        ? outcomePayload
-        : undefined,
-    evidenceLinks: Array.isArray(evidenceLinks)
-      ? evidenceLinks.filter((x): x is string => typeof x === 'string')
-      : undefined,
-    commitments: prediction.commitments.map((c) => ({
-      ...c,
-      createdAt: c.createdAt.toISOString(),
-    })),
-    externalMarket: prediction.externalMarket
-      ? {
-          provider: prediction.externalMarket.provider,
-          slug: prediction.externalMarket.slug,
-          url: prediction.externalMarket.url,
-          question: prediction.externalMarket.question,
-          outcomes: prediction.externalMarket.outcomes,
-          resolved: prediction.externalMarket.resolved,
-          snapshots: prediction.externalMarket.snapshots.map((s) => ({
-            createdAt: s.createdAt.toISOString(),
-            probability: s.probability,
-          })),
-        }
-      : null,
-  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -240,7 +128,7 @@ function ForecastLoading() {
 
 export default async function LocaleForecastDetailPage({ params }: Props) {
   const { locale, id: idOrSlug } = await params
-  const prediction = await getPrediction(idOrSlug)
+  const prediction = await getForecastDetail(idOrSlug)
 
   if (!prediction) {
     // A retired slug 308-redirects to the current canonical slug (locale-prefixed).
@@ -267,33 +155,8 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
     notFound()
   }
 
-  // The AI panel is a hidden, opt-in source (docs/LASSO.md §8), same gate as the
-  // canonical /forecasts/[id] route: only load and pass its series when THIS viewer
-  // enabled it in Settings. Read from the DB rather than the session token so the
-  // toggle takes effect without re-login. Anonymous viewers never see it.
-  const showAiPanel = session?.user?.id
-    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { showAiPanel: true } }))
-        ?.showAiPanel ?? false
-    : false
-  // Who really created a forecast published as Daatan (#2301): admins only, never in props otherwise.
-  const realCreator = session?.user?.role === 'ADMIN' ? await getRealCreator(prediction.id) : null
-
-  const [initialComments, initialContextSnapshots, initialContributingSources, probabilityHistory, panelSeries] = await Promise.all([
-    getInitialComments(prediction.id),
-    getInitialContextSnapshots(prediction.id),
-    getContributingSources(prediction.id),
-    getProbabilityHistory(prediction.id),
-    showAiPanel ? getPanelSeries(prediction.id) : Promise.resolve([]),
-  ])
-  // Chart series: includes kind='clock' glide requotes (unlike the event
-  // timeline above) so the daily time-decay adjustment shows as movement.
-  const initialProbabilityHistory = probabilityHistory.map((s) => ({
-    id: s.id,
-    createdAt: s.createdAt.toISOString(),
-    externalProbability: s.externalProbability,
-    kind: s.kind,
-  }))
-  const lastUpdatedISO = latestProbabilityUpdateISO(prediction.updatedAt, initialProbabilityHistory)
+  const detailProps = await loadForecastDetailProps(prediction, session?.user)
+  const { lastUpdatedISO } = detailProps
 
   // Apply cached translations — never triggers Gemini, read-only
   const translations = await getCachedPredictionTranslation(prediction.id, locale)
@@ -448,18 +311,7 @@ export default async function LocaleForecastDetailPage({ params }: Props) {
       {claimReviewJsonLd && <JsonLd data={claimReviewJsonLd} />}
       {faqJsonLd && <JsonLd data={faqJsonLd} />}
       <Suspense fallback={<ForecastLoading />}>
-        <ForecastDetailClient
-          initialData={localizedPrediction}
-          isLocalized={isLocalized}
-          initialComments={initialComments}
-          initialContextSnapshots={initialContextSnapshots}
-          initialProbabilityHistory={initialProbabilityHistory}
-          initialContributingSources={initialContributingSources}
-          lastUpdatedISO={lastUpdatedISO}
-          aiPanelSeries={panelSeries}
-          showAiPanel={showAiPanel}
-          realCreator={realCreator}
-        />
+        <ForecastDetailClient initialData={localizedPrediction} isLocalized={isLocalized} {...detailProps} />
       </Suspense>
       {prediction.isPublic && <RelatedForecasts predictionId={prediction.id} linkLocale={locale} uiLocale={locale} />}
     </>
