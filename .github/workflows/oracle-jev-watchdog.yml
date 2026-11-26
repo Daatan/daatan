@@ -1,6 +1,7 @@
 name: Oracle Jev Watchdog
 #
-# Pings Telegram when the Oracle's Jev calls start failing (daatan#1792).
+# Pings Telegram when the Oracle's Jev calls start failing (daatan#1792), and when its
+# POST /relevance endpoint starts failing or goes quiet (daatan#2275, see the end of this header).
 #
 # Jev is the cheap pre-extraction gate in retro's oracle-api (retro#850). It is fail-open:
 # when every call errors — a 402 from an exhausted balance or a hit key limit, a provider
@@ -20,6 +21,15 @@ name: Oracle Jev Watchdog
 #     provider with retro's infra/jev-provider.sh), so it is actionable, not noise.
 #   • If the SSM call itself fails the run goes red rather than alerting — box/agent health
 #     is watched elsewhere (oracle-ec2-status-check-failed).
+#
+# /relevance (daatan#2275): the same SSM call also runs scripts/check-oracle-relevance.sh, which
+# applies the same state machine (own state file) to uvicorn's `POST /relevance` access lines.
+# An hour is broken when non-2xx responses are at least half of its calls, or when it had fewer
+# than 20 calls — judge v2 calls it ~1,500-2,000 times an hour, so a quiet hour means the
+# caller stopped or oracle-api stopped logging. From 2026-11-18 17:33 to 11-20 ~11:20 UTC every
+# call returned 502 (retro#1090); news-indexer's judge v2 retired 726 articles without a
+# verdict and nothing alerted for ~41h. Clean channel: an outage needs a fix in retro and a
+# re-queue of the articles judge v2 gave up on.
 
 on:
   schedule:
@@ -27,7 +37,7 @@ on:
   workflow_dispatch:
     inputs:
       test_message:
-        description: 'Send a sample message regardless of the verdict (to check the Telegram leg)'
+        description: 'Send a sample message for each check (Jev and /relevance) regardless of the verdict (to check the Telegram leg)'
         type: choice
         options: [none, alert, blip, recovered]
         default: none
@@ -44,7 +54,7 @@ concurrency:
 
 jobs:
   check:
-    name: Jev health
+    name: Jev and /relevance health
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -60,7 +70,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
-      - name: Run the check on the Oracle box
+      - name: Run the checks on the Oracle box
         id: check
         env:
           TEST_MESSAGE: ${{ inputs.test_message || 'none' }}
@@ -69,12 +79,13 @@ jobs:
           [[ "$TEST_MESSAGE" =~ ^(none|alert|blip|recovered)$ ]] || { echo "::error::test_message must be none, alert, blip or recovered"; exit 1; }
           # Ship the script's content (no secrets in it) rather than a token-bearing curl —
           # same reasoning as watchdog.yml's disk check (daatan#1726).
-          SCRIPT_B64=$(base64 -w 0 scripts/check-oracle-jev.sh)
+          JEV_B64=$(base64 -w 0 scripts/check-oracle-jev.sh)
+          REL_B64=$(base64 -w 0 scripts/check-oracle-relevance.sh)
           CMD_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --instance-ids "$ORACLE_INSTANCE_ID" \
-            --comment "Oracle Jev watchdog" \
-            --parameters commands='["echo '"$SCRIPT_B64"' | base64 -d | bash"]' \
+            --comment "Oracle watchdog: Jev + /relevance" \
+            --parameters commands='["echo '"$JEV_B64"' | base64 -d | bash","echo '"$REL_B64"' | base64 -d | bash"]' \
             --query Command.CommandId --output text)
 
           STATUS=""; OUT=""
@@ -93,29 +104,52 @@ jobs:
             exit 1
           fi
 
-          LINE=$(printf '%s\n' "$OUT" | grep '^JEV|' | tail -1)
-          [ -n "$LINE" ] || { echo "::error::no JEV| line in output"; exit 1; }
-          # TOP stays last so a stray '|' in it can't shift the other fields.
-          IFS='|' read -r _ ACTION HOUR ERR OK NBROKEN NHOURS FIRST LAST TOP <<< "$LINE"
-          {
-            echo "action=$ACTION"
-            echo "hour=$HOUR"
-            echo "err=$ERR"; echo "ok=$OK"
-            echo "nbroken=$NBROKEN"; echo "nhours=$NHOURS"; echo "first=$FIRST"; echo "last=$LAST"
-            echo "top_b64=$(printf '%s' "$TOP" | base64 -w 0)"
-          } >> "$GITHUB_OUTPUT"
+          # Each check's outputs are written before either can fail the run, so one check's
+          # error doesn't swallow the other's alert (the notify steps run unless cancelled).
+          FAILED=""
+          LINE=$(printf '%s\n' "$OUT" | grep '^JEV|' | tail -1 || true)
+          if [ -n "$LINE" ]; then
+            # TOP stays last so a stray '|' in it can't shift the other fields.
+            IFS='|' read -r _ ACTION HOUR ERR OK NBROKEN NHOURS FIRST LAST TOP <<< "$LINE"
+            {
+              echo "action=$ACTION"
+              echo "hour=$HOUR"
+              echo "err=$ERR"; echo "ok=$OK"
+              echo "nbroken=$NBROKEN"; echo "nhours=$NHOURS"; echo "first=$FIRST"; echo "last=$LAST"
+              echo "top_b64=$(printf '%s' "$TOP" | base64 -w 0)"
+            } >> "$GITHUB_OUTPUT"
+            [ "$ACTION" = "error" ] && FAILED+="Jev check script: $TOP. "
+          else
+            FAILED+="no JEV| line in output. "
+          fi
+
+          RLINE=$(printf '%s\n' "$OUT" | grep '^REL|' | tail -1 || true)
+          if [ -n "$RLINE" ]; then
+            IFS='|' read -r _ R_ACTION R_HOUR R_ERR R_OK R_NBROKEN R_NHOURS R_FIRST R_LAST R_REASON R_STATUS R_TOP <<< "$RLINE"
+            {
+              echo "rel_action=$R_ACTION"
+              echo "rel_hour=$R_HOUR"
+              echo "rel_err=$R_ERR"; echo "rel_ok=$R_OK"
+              echo "rel_nbroken=$R_NBROKEN"; echo "rel_nhours=$R_NHOURS"; echo "rel_first=$R_FIRST"; echo "rel_last=$R_LAST"
+              echo "rel_reason=$R_REASON"; echo "rel_status=$R_STATUS"
+              echo "rel_top_b64=$(printf '%s' "$R_TOP" | base64 -w 0)"
+            } >> "$GITHUB_OUTPUT"
+            [ "$R_ACTION" = "error" ] && FAILED+="/relevance check script: $R_TOP. "
+          else
+            FAILED+="no REL| line in output. "
+          fi
+
           # Manual check of the Telegram leg: keep the real counts, force the message.
           if [ "$TEST_MESSAGE" != "none" ]; then
-            echo "action=$TEST_MESSAGE" >> "$GITHUB_OUTPUT"
-            echo "test=true" >> "$GITHUB_OUTPUT"
+            { echo "action=$TEST_MESSAGE"; echo "rel_action=$TEST_MESSAGE"; echo "test=true"; } >> "$GITHUB_OUTPUT"
           fi
-          if [ "$ACTION" = "error" ]; then
-            echo "::error::check script: $TOP"
+          if [ -n "$FAILED" ]; then
+            echo "::error::$FAILED"
             exit 1
           fi
 
-      - name: Notify Telegram
-        if: contains(fromJSON('["alert","blip","recovered"]'), steps.check.outputs.action)
+      - name: Notify Telegram (Jev)
+        if: ${{ !cancelled() && contains(fromJSON('["alert","blip","recovered"]'), steps.check.outputs.action) }}
         env:
           BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CLEAN: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
@@ -154,3 +188,52 @@ jobs:
             --data-urlencode "text=${MSG}" \
             -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
           echo "Sent: $ACTION"
+
+      - name: Notify Telegram (/relevance)
+        if: ${{ !cancelled() && contains(fromJSON('["alert","blip","recovered"]'), steps.check.outputs.rel_action) }}
+        env:
+          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CLEAN: ${{ secrets.TELEGRAM_CLEAN_CHAT_ID }}
+          NOISY: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ACTION: ${{ steps.check.outputs.rel_action }}
+          HOUR: ${{ steps.check.outputs.rel_hour }}
+          ERR: ${{ steps.check.outputs.rel_err }}
+          OK: ${{ steps.check.outputs.rel_ok }}
+          NBROKEN: ${{ steps.check.outputs.rel_nbroken }}
+          NHOURS: ${{ steps.check.outputs.rel_nhours }}
+          FIRST: ${{ steps.check.outputs.rel_first }}
+          LAST: ${{ steps.check.outputs.rel_last }}
+          REASON: ${{ steps.check.outputs.rel_reason }}
+          STATUS: ${{ steps.check.outputs.rel_status }}
+          TOP_B64: ${{ steps.check.outputs.rel_top_b64 }}
+          TEST: ${{ steps.check.outputs.test }}
+        run: |
+          CHAT="${CLEAN:-$NOISY}"
+          # The script already strips <>&"| from the status and error text, so both are HTML-safe.
+          TOP=$(printf '%s' "$TOP_B64" | base64 -d)
+          EFFECT='news-indexer judge v2 retries each article 4 times, then retires it with no verdict, so its coverage never reaches open forecasts.'
+          REQUEUE='Once fixed, re-queue the articles judge v2 gave up on during the outage (retro#1090 recovery).'
+          case "$ACTION" in
+            alert)
+              if [ "$REASON" = "quiet" ]; then
+                MSG=$(printf '🚨 <b>Oracle: /relevance has gone quiet</b>\n\nHour %s:00 (box time): %s calls (%s ok, %s errors); normally ~1,500-2,000 an hour. Broken %s of the last %s checked hours (since %s:00).\n\nEither news-indexer judge v2 stopped calling, its calls no longer reach the box, or oracle-api stopped logging.' \
+                  "$HOUR" "$((ERR + OK))" "$OK" "$ERR" "$NBROKEN" "$NHOURS" "$FIRST")
+              else
+                MSG=$(printf '🚨 <b>Oracle: /relevance is failing</b>\n\nHour %s:00 (box time): %s errors (mostly %s), %s ok. Broken %s of the last %s checked hours (since %s:00).\nMost common error: <code>%s</code>\n\n%s\n%s' \
+                  "$HOUR" "$ERR" "$STATUS" "$OK" "$NBROKEN" "$NHOURS" "$FIRST" "$TOP" "$EFFECT" "$REQUEUE")
+              fi ;;
+            blip)
+              MSG=$(printf '⚠️ <b>Oracle: /relevance was failing, now recovered</b>\n\nBroken %s of the last %s checked hours (%s:00 – %s:00, box time); hour %s:00 is fine again (%s ok, %s errors).\nMost common error: <code>%s</code>\n\n%s\n%s' \
+                "$NBROKEN" "$NHOURS" "$FIRST" "$LAST" "$HOUR" "$OK" "$ERR" "$TOP" "$EFFECT" "$REQUEUE") ;;
+            *)
+              MSG=$(printf '✅ <b>Oracle: /relevance recovered</b>\n\nHour %s:00 (box time): %s ok, %s errors.\nNow re-queue the articles judge v2 gave up on during the outage (retro#1090 recovery).' \
+                "$HOUR" "$OK" "$ERR") ;;
+          esac
+          if [ "$TEST" = "true" ]; then
+            MSG=$(printf '🧪 TEST — manual run with real counts, ignore\n\n%s' "$MSG")
+          fi
+          curl -sf -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" -d "disable_web_page_preview=true" >/dev/null
+          echo "Sent: /relevance $ACTION"

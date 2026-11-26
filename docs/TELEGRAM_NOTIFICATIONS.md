@@ -110,6 +110,23 @@ No state file (first run, or after deleting it) means a two-hour window and "pre
 
 A failed SSM call turns the run red instead of alerting (box health is covered by `oracle-ec2-status-check-failed`).
 
+### Oracul `/relevance` (same workflow, daatan#2275)
+
+The same SSM call also runs `scripts/check-oracle-relevance.sh`. It applies the same state machine, with its own state file `/var/lib/daatan-relevance-watchdog/state`, to uvicorn's `"POST /relevance HTTP/1.1" <status>` access lines in `oracle_log.txt`. Those lines carry no timestamp, so each is counted in the hour of the latest timestamped line before it.
+
+An hour is **broken** when non-2xx responses are at least half of its calls, or when it had **fewer than 20 calls**. news-indexer's judge v2 calls `/relevance` about 1,500–2,000 times an hour, every hour, so a quiet hour means the caller stopped, its calls stopped reaching the box, or oracle-api stopped logging. Unlike Jev, quiet hours count; the verdict is always taken on the last complete hour.
+
+Why: from 2026-11-18 17:33 to 11-20 ~11:20 UTC every call returned 502 (retro#1090). Judge v2 retried each article 4 times, then retired it with no verdict: 726 articles had to be re-queued by hand, and nothing alerted for ~41h.
+
+| Event | Icon | Trigger |
+|---|---|---|
+| `/relevance` failing | 🚨 | latest hour broken by errors and the previous state was ok — or still broken ≥6h after the last 🚨, as a reminder. Shows the top status (e.g. `502`) and the most common `relevance check failed … err=` text |
+| `/relevance` gone quiet | 🚨 | same trigger, but the latest hour had fewer than 20 calls |
+| `/relevance` failed and recovered between runs | ⚠️ | previous state ok, some hour since the last check was broken, the latest hour is fine again |
+| `/relevance` recovered | ✅ | previous state broken, the latest hour is not; reminds to re-queue the articles judge v2 gave up on |
+
+Clean channel (noisy fallback). `test_message` sends one sample for each check. An error from one check script still lets the other's message go out; the run then turns red.
+
 ---
 
 ## Retro drafts (`retro-simulations.yml` — daily 06:41 UTC)
