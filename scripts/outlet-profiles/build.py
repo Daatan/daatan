@@ -43,8 +43,13 @@ for dom, r in raw["outlets"].items():
         else: facts.setdefault(a["fact"], []).append(label(a["qid"], a["fact"]) if "qid" in a else a["label"])
         if a["source"] not in sources: sources.append(a["source"])
         notes.append(f"add {a['fact']}: {a['reason']}")
-    wiki = {}
+    wiki, links = {}, {}
     for lang, x in r["extracts"].items():
+        # The header's Wikipedia button (daatan#2349) links every article that is the outlet's own,
+        # including ones whose lead is dropped below as stale. An article that resolves to another
+        # item (enwiki "Ynet" -> Yedioth Ahronoth) is someone else's article, so it gets no link.
+        if x["wikibase_item"] == r["qid"]: links[lang] = x["url"]
+        else: notes.append(f"no {lang} link: {x['requested']!r} resolves to {x['wikibase_item']}, not {r['qid']}")
         drop = next((d for d in cur["drop_extract"] if d["outlet"] == dom and d["lang"] == lang), None)
         if drop: notes.append(f"drop {lang} paragraph: {drop['reason']}"); continue
         assert x["wikibase_item"] == r["qid"], (dom, lang)
@@ -53,9 +58,10 @@ for dom, r in raw["outlets"].items():
     if r["qid"]: rec["wikidata"] = r["qid"]
     if facts: rec["facts"] = {k: facts[k] for k in ORDER if k in facts}; rec["factSources"] = sources
     if wiki: rec["wikipedia"] = {l: wiki[l] for l in LANGS if l in wiki}
+    if links: rec["wikipediaLinks"] = {l: links[l] for l in LANGS if l in links}
     if dom in cur["researched"]:
         rec["researched"] = [{"text": {l: s[l] for l in LANGS if l in s}, "sources": s["sources"]} for s in cur["researched"][dom]]
-    if rec.get("facts") or rec.get("wikipedia") or rec.get("researched"):
+    if rec.get("facts") or rec.get("wikipedia") or rec.get("wikipediaLinks") or rec.get("researched"):
         out[dom] = rec
 
 json.dump(dict(sorted(out.items())), open(out_json, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -80,13 +86,14 @@ for dom, rec in out.items():
         for m in FLAG.finditer(x["text"]):
             s = x["text"]; i = m.start()
             L.append(f"- **{dom}** ({lang}): …{s[max(0, i-90):i+90].strip()}… [article]({x['url']})".replace("\n", " ")); break
-L += ["", "## 2. Per outlet", "", "| outlet | facts (en) | about: en / he / ru / eo | hand decisions |", "|---|---|---|---|"]
+L += ["", "## 2. Per outlet", "", "| outlet | facts (en) | about: en / he / ru / eo | Wikipedia links | hand decisions |", "|---|---|---|---|---|"]
 for dom in sorted(raw["outlets"]):
     rec = out.get(dom, {})
     f = rec.get("facts", {})
     fs = "; ".join(f"{k}: " + (str(v) if isinstance(v, int) else ", ".join(x["en"] for x in v)) for k, v in f.items()) or "—"
     ab = " / ".join(about(rec, l) for l in LANGS) if rec else "nothing shown"
-    L.append(f"| {dom} | {fs} | {ab} | {'<br>'.join(log.get(dom, [])) or '—'} |")
+    wl = ", ".join(f"[{l}]({u})" for l, u in rec.get("wikipediaLinks", {}).items()) or "—"
+    L.append(f"| {dom} | {fs} | {ab} | {wl} | {'<br>'.join(log.get(dom, [])) or '—'} |")
 L += ["", "## 3. Researched text (Daatan's own wording)", ""]
 for dom, rec in out.items():
     for s in rec.get("researched", []):
