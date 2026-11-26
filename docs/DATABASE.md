@@ -1153,7 +1153,10 @@ resolution time or `added_at`. The rule lives in `src/lib/services/outcome-cutof
 timezone, precedes the cutoff; a reading flagged `settled` never scores. It is applied in
 `loadResolvedPunditStances` (so every recalculation path) and, fix-forward, in
 `pushCredibilityFeedback` when a cutoff is on record at push time — retro's ledger is not
-rewritten. The elections app applies the same rule from the same table.
+rewritten. The elections app applies the same rule from the same table. The public source
+page's "Calls before the outcome" block (`/sources/[name]`, daatan#2340) uses the same rule
+and the same approved cutoffs to pick which of an outlet's articles count; it shows their
+mean lean, not a score.
 
 `pundit_tag_rating_archives` keeps the rows each recalculation replaced (`payload`, the
 previous row set verbatim) whenever the result changed. `scoring_version` names the rule
