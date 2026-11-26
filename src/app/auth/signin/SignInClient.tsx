@@ -75,7 +75,7 @@ export default function SignInClient() {
 
   return (
     <div className="min-h-screen bg-navy-800 flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full bg-navy-700 rounded-2xl shadow-sm border border-navy-600 p-8 space-y-8">
+      <div className="max-w-md w-full bg-navy-700 rounded-2xl shadow-xs border border-navy-600 p-8 space-y-8">
         <div className="flex flex-col items-center text-center">
           <Link href="/">
             <BrandLogo fallbackSrc="/logo-icon.svg" width={64} height={64} className="mb-4" />
@@ -111,7 +111,7 @@ export default function SignInClient() {
                 type="email"
                 required
                 disabled={isLoading}
-                className="w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
+                className="w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
                 placeholder={t('emailPlaceholder')}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -135,7 +135,7 @@ export default function SignInClient() {
                 type="password"
                 required
                 disabled={isLoading}
-                className="w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
+                className="w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 rounded-xl text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
                 placeholder={t('passwordPlaceholder')}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}

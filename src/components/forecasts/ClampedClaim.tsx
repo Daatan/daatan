@@ -50,7 +50,7 @@ export function ClampedClaim({
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v) }}
           aria-expanded={expanded}
-          className="relative z-[2] mt-1 text-xs font-medium text-cobalt-light hover:underline"
+          className="relative z-2 mt-1 text-xs font-medium text-cobalt-light hover:underline"
           data-testid="claim-toggle"
         >
           {expanded ? t('showLess') : t('showMore')}

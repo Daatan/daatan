@@ -37,7 +37,7 @@ export default async function Header({ locale, links, signedIn }: { locale: stri
   )
 
   return (
-    <header className="border-b border-[var(--hv5-line)] bg-[var(--hv5-bg)]">
+    <header className="border-b border-(--hv5-line) bg-(--hv5-bg)">
       <div className="flex h-16 items-center justify-between ps-2 pe-5 lg:hidden">
         {logo}
         <MobileMenu
@@ -68,25 +68,25 @@ export default async function Header({ locale, links, signedIn }: { locale: stri
             <Link
               key={i.href + i.label}
               href={i.href}
-              className={`${desktopVisibility[idx]} whitespace-nowrap text-base leading-6 font-medium text-[var(--hv5-body)] no-underline hover:text-white`}
+              className={`${desktopVisibility[idx]} whitespace-nowrap text-base leading-6 font-medium text-(--hv5-body) no-underline hover:text-white`}
             >
               {i.label}
             </Link>
           ))}
         </nav>
         <div className="flex shrink-0 items-center gap-[18px]">
-          <Link href={links.forecasts} aria-label={t('search')} className="flex h-11 w-11 items-center justify-center text-[var(--hv5-body)] hover:text-white">
+          <Link href={links.forecasts} aria-label={t('search')} className="flex h-11 w-11 items-center justify-center text-(--hv5-body) hover:text-white">
             <Search className="h-[22px] w-[22px]" strokeWidth={1.75} aria-hidden="true" />
           </Link>
           <Link
             href={signedIn ? links.profile : links.login}
-            className="text-base font-medium text-[var(--hv5-body)] no-underline hover:text-white"
+            className="text-base font-medium text-(--hv5-body) no-underline hover:text-white"
           >
             {signedIn ? t('profile') : t('login')}
           </Link>
           <Link
             href={links.create}
-            className="inline-flex h-11 items-center whitespace-nowrap rounded-lg bg-[var(--hv5-accent)] px-5 text-[17px] font-bold text-white no-underline hover:bg-[#4a8bd6]"
+            className="inline-flex h-11 items-center whitespace-nowrap rounded-lg bg-(--hv5-accent) px-5 text-[17px] font-bold text-white no-underline hover:bg-[#4a8bd6]"
           >
             {t('create')}
           </Link>

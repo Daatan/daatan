@@ -28,7 +28,7 @@
 | UI | React | 19.x |
 | Language | TypeScript | 5.x |
 | Runtime | Node.js | 24.x |
-| Styling | Tailwind CSS | 3.4.x |
+| Styling | Tailwind CSS | 4.3.x |
 | Database | PostgreSQL | 16 |
 | ORM | Prisma | 7.x |
 | Authentication | NextAuth.js (Auth.js v5) | 5.0.0-beta.x |
@@ -314,7 +314,7 @@ terraform/
 | `package.json` | Node.js dependencies and scripts |
 | `tsconfig.json` | TypeScript configuration |
 | `next.config.js` | Next.js configuration |
-| `tailwind.config.js` | Tailwind CSS configuration |
+| `src/app/globals.css` | Tailwind CSS 4 theme (`@theme`: brand colours, fonts) and global styles; `postcss.config.js` loads `@tailwindcss/postcss` |
 | `vitest.config.ts` | Vitest test configuration |
 | `vitest.config.integration.ts` | Integration tests (`npm run test:integration`, real Postgres on :5433) |
 | `playwright.config.ts` / `playwright.selfhost.config.ts` | Playwright E2E (`npm run test:e2e`, `npm run test:e2e:selfhost`) |

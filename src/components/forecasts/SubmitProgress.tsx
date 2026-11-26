@@ -50,7 +50,7 @@ export function SubmitProgress({ steps, activeEstimateMs }: SubmitProgressProps)
     <div className="mt-4 space-y-2" role="status" aria-live="polite">
       {steps.map((step) => (
         <div key={step.key} className="flex items-center gap-3 text-sm">
-          <span className="flex-shrink-0 w-4 flex justify-center">
+          <span className="shrink-0 w-4 flex justify-center">
             {step.state === 'done' ? (
               <Check className="w-4 h-4 text-green-400" />
             ) : step.state === 'active' ? (

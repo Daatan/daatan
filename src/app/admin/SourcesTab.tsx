@@ -238,7 +238,7 @@ export default function SourcesTab() {
                                 <span className="text-gray-600">—</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-gray-400 max-w-[22rem] truncate">
+                            <td className="px-3 py-2 text-gray-400 max-w-88 truncate">
                               {isUrl(s.locator) ? (
                                 <a href={s.locator} target="_blank" rel="noopener noreferrer"
                                    className="inline-flex items-center gap-1 text-blue-500 hover:underline">

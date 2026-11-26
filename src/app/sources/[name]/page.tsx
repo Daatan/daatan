@@ -321,7 +321,7 @@ export default async function OutletPublicPage({ params }: Props) {
                 return link ? [{ ...f, ...link }] : []
               })
               return (
-                <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 break-words">
+                <li key={`${p.url ?? 'row'}-${i}`} className="px-4 py-3 wrap-break-word">
                   {isUrl(p.url) ? (
                     <a href={p.url} target="_blank" rel="noopener noreferrer" dir="auto"
                        className="text-sm text-blue-400 hover:underline">
@@ -338,7 +338,7 @@ export default async function OutletPublicPage({ params }: Props) {
                     <div key={f.forecastId} className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs">
                       <Link href={f.href} dir="auto" className="text-cyan-400 hover:underline">{f.title}</Link>
                       {f.outcome && (
-                        <span className="px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-300">
+                        <span className="px-1.5 py-0.5 rounded-sm bg-navy-800 border border-navy-600 text-gray-300">
                           {OUTCOME_LABEL[f.outcome] ? t(OUTCOME_LABEL[f.outcome]) : f.outcome}
                         </span>
                       )}

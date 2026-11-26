@@ -30,7 +30,7 @@ export default function ContactPage() {
         </p>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Get in Touch</h2>
         </div>

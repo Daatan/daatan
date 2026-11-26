@@ -341,14 +341,14 @@ export default function ForecastCard({
       <Link
         href={forecastUrl}
         aria-label={shownClaim}
-        className="absolute inset-0 z-[1]"
+        className="absolute inset-0 z-1"
       />
 
       {/* Pinned to the card corner rather than given its own flex column, so the
           claim text and the footer rule can run the full width of the card. The
           header row reserves space for it with pr-7. */}
       {showMenu && (
-        <div className="absolute right-3 top-3 z-[2]" ref={menuRef}>
+        <div className="absolute right-3 top-3 z-2" ref={menuRef}>
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAdminMenu(v => !v) }}
             className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-navy-800 transition-colors"
@@ -508,7 +508,7 @@ export default function ForecastCard({
                     href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
                     prefetch={false}
                     title={t('filterByTagTooltip', { tag: topicLabel(tag.name) })}
-                    className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs lg:text-sm font-medium rounded-full border border-cobalt/20 transition-colors"
+                    className="relative z-2 px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs lg:text-sm font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
                     {topicLabel(tag.name)}
                   </Link>
@@ -524,7 +524,7 @@ export default function ForecastCard({
             {locale !== 'en' && translatedClaim && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTranslated(!showTranslated); }}
-                className={`relative z-[2] flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border transition-colors ${
+                className={`relative z-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider border transition-colors ${
                   showTranslated ? 'bg-blue-100 text-cobalt-light border-cobalt/30' : 'bg-navy-800 text-gray-500 border-navy-600'
                 }`}
                 title={showTranslated ? tt('showOriginal') : tt('translate')}
@@ -546,7 +546,7 @@ export default function ForecastCard({
               <div className="mb-4">
                 <FitHeadline
                   text={headline}
-                  className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
+                  className="text-base sm:text-lg sm:leading-7 lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
                 />
                 <ClampedClaim text={claim} className="mt-1 text-sm text-gray-400 leading-snug" />
               </div>
@@ -555,7 +555,7 @@ export default function ForecastCard({
                 <ClampedClaim
                   as="h2"
                   text={claim}
-                  className="text-base sm:text-lg lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
+                  className="text-base sm:text-lg sm:leading-7 lg:text-xl font-semibold text-white group-hover:text-cobalt-light transition-colors leading-snug"
                 />
               </div>
             )
@@ -580,7 +580,7 @@ export default function ForecastCard({
         </div>
 
         {canApprove && (
-          <div className="relative z-[2] flex-shrink-0 self-start mt-1 flex gap-2">
+          <div className="relative z-2 shrink-0 self-start mt-1 flex gap-2">
             <button
               onClick={handleApprove}
               disabled={isApproving}
@@ -604,7 +604,7 @@ export default function ForecastCard({
           </div>
         )}
 
-        <div className="flex-shrink-0 self-center">
+        <div className="shrink-0 self-center">
           <div
             className="w-8 h-8 rounded-full bg-navy-800 flex items-center justify-center group-hover:bg-cobalt/10 transition-colors"
             title={t('openForecastTooltip')}
@@ -622,10 +622,10 @@ export default function ForecastCard({
               "you committed" indicator remains down here. */}
           {prediction.userHasCommitted && (
             <div
-              className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-xs font-semibold max-w-[14rem]"
+              className="flex items-center gap-1 px-2 py-0.5 bg-cobalt/10 text-cobalt-light rounded-full text-xs font-semibold max-w-56"
               title={t('committedTooltip')}
             >
-              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate" dir="auto">
                 {prediction.userForecast?.probability != null
                   ? t('yourForecastLabel', { value: `${prediction.userForecast.probability}%` })
@@ -645,7 +645,7 @@ export default function ForecastCard({
           image={prediction.author.image}
           showAvatar={true}
           avatarSize={20}
-          className="relative z-[2] last:border-0"
+          className="relative z-2 last:border-0"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-2">

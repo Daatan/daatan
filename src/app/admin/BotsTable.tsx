@@ -265,7 +265,7 @@ export default function BotsTable() {
       )}
 
       {runResult && (
-        <div className="mb-6 border-2 border-cobalt/30 bg-cobalt/10 rounded-xl overflow-hidden shadow-sm">
+        <div className="mb-6 border-2 border-cobalt/30 bg-cobalt/10 rounded-xl overflow-hidden shadow-xs">
           <div className="bg-blue-600 px-4 py-2 flex justify-between items-center">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">{t('runSummary', { name: runResult.botName })}</h3>
             <button onClick={() => setRunResult(null)} aria-label="Dismiss" className="text-blue-100 hover:text-white">
@@ -285,7 +285,7 @@ export default function BotsTable() {
                 <p className="text-xs font-bold text-gray-500 uppercase">{t('detectionResults', { count: runResult.hotTopics.length })}</p>
                 <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   {runResult.hotTopics.map((topic, i) => (
-                    <div key={i} className="bg-navy-700 border rounded-lg p-3 text-sm shadow-sm group hover:border-blue-300 transition-colors">
+                    <div key={i} className="bg-navy-700 border rounded-lg p-3 text-sm shadow-xs group hover:border-blue-300 transition-colors">
                       <div className="font-semibold text-white group-hover:text-cobalt-light">{topic.title}</div>
                       <div className="text-[10px] text-gray-400 mt-0.5">{t('appearsInSources', { count: topic.sourceCount })}</div>
                       <div className="mt-2 space-y-1">
@@ -340,7 +340,7 @@ export default function BotsTable() {
           const logsLoading = loadingLogs.has(bot.id)
 
           return (
-            <div key={bot.id} className="border rounded-lg shadow-sm bg-navy-700 overflow-hidden">
+            <div key={bot.id} className="border rounded-lg shadow-xs bg-navy-700 overflow-hidden">
               <div className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -389,21 +389,21 @@ export default function BotsTable() {
 
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => setEditingBot(bot)} title={t('editConfig')}
-                      className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-cobalt/10 rounded transition-colors">
+                      className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-cobalt/10 rounded-sm transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button onClick={() => runBot(bot.id, true)} disabled={isRunning} title={t('testDryRun')}
-                      className="flex items-center gap-1 text-xs px-2 py-1.5 border border-amber-300 text-amber-400 bg-amber-900/20 hover:bg-amber-100 rounded transition-colors disabled:opacity-50">
+                      className="flex items-center gap-1 text-xs px-2 py-1.5 border border-amber-300 text-amber-400 bg-amber-900/20 hover:bg-amber-100 rounded-sm transition-colors disabled:opacity-50">
                       {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <FlaskConical className="w-3 h-3" />}
                       {t('test')}
                     </button>
                     <button onClick={() => runBot(bot.id, false)} disabled={isRunning} title={t('runNow')}
-                      className="flex items-center gap-1 text-xs px-2 py-1.5 border border-green-300 text-teal bg-teal/10 hover:bg-green-100 rounded transition-colors disabled:opacity-50">
+                      className="flex items-center gap-1 text-xs px-2 py-1.5 border border-green-300 text-teal bg-teal/10 hover:bg-green-100 rounded-sm transition-colors disabled:opacity-50">
                       {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                       {t('run')}
                     </button>
                     <button onClick={() => toggleActive(bot)} title={bot.isActive ? t('disable') : t('enable')}
-                      className={`p-1.5 rounded transition-colors ${bot.isActive ? 'text-green-600 hover:bg-red-900/20 hover:text-red-600' : 'text-gray-400 hover:bg-teal/10 hover:text-green-600'}`}>
+                      className={`p-1.5 rounded-sm transition-colors ${bot.isActive ? 'text-green-600 hover:bg-red-900/20 hover:text-red-600' : 'text-gray-400 hover:bg-teal/10 hover:text-green-600'}`}>
                       <Power className="w-4 h-4" />
                     </button>
                   </div>
@@ -433,7 +433,7 @@ export default function BotsTable() {
                       {botLogs.map((log) => (
                         <div key={log.id} className="px-4 py-3">
                           <div className="flex items-center gap-2 text-xs">
-                            <span className={`font-medium px-1.5 py-0.5 rounded ${actionBadge(log.action)}`}>
+                            <span className={`font-medium px-1.5 py-0.5 rounded-sm ${actionBadge(log.action)}`}>
                               {log.isDryRun ? '(dry) ' : ''}{log.action}
                             </span>
                             <span className="text-gray-400">{relativeTime(log.runAt)}</span>
@@ -444,7 +444,7 @@ export default function BotsTable() {
                           {log.generatedText && (
                             <details className="mt-1">
                               <summary className="text-xs text-blue-600 cursor-pointer">{t('generatedText')}</summary>
-                              <pre className="mt-1 text-xs text-text-secondary whitespace-pre-wrap bg-navy-800 p-2 rounded max-h-40 overflow-y-auto">
+                              <pre className="mt-1 text-xs text-text-secondary whitespace-pre-wrap bg-navy-800 p-2 rounded-sm max-h-40 overflow-y-auto">
                                 {log.generatedText}
                               </pre>
                             </details>

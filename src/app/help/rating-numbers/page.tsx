@@ -26,7 +26,7 @@ export default function RatingNumbersHelpPage() {
       <section>
         <h2 className="text-xl font-semibold text-white mb-3">The headline</h2>
         <p>
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">
             Oracul 63% → 71%
           </code>{' '}
           is the forecast&apos;s probability before/after this article. &quot;First estimate&quot;
@@ -41,9 +41,9 @@ export default function RatingNumbersHelpPage() {
         <p className="mb-3">
           One row per number the article&apos;s extraction produced — a row appears only when that
           value exists. The panel is in two parts. The rows above the{' '}
-          <em>not in estimate:</em> marker (<code className="bg-navy-800 px-1 rounded text-xs font-mono">stance</code>,{' '}
-          <code className="bg-navy-800 px-1 rounded text-xs font-mono">relevance</code>,{' '}
-          <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>) actually feed
+          <em>not in estimate:</em> marker (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">stance</code>,{' '}
+          <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">relevance</code>,{' '}
+          <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">range</code>) actually feed
           the Oracul&apos;s estimate today. Everything below the marker — <strong>author_lean</strong>,{' '}
           <strong>fact_signal</strong>, <strong>credibility</strong>, <strong>class</strong>,{' '}
           <strong>consensus</strong>, <strong>report_kind</strong>, <strong>reader</strong>,{' '}
@@ -68,19 +68,19 @@ export default function RatingNumbersHelpPage() {
           </thead>
           <tbody>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">stance</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">-1..+1</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">stance</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">-1..+1</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 Which way the article argues (− = no, + = yes; 0 = genuinely balanced or unclear).{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">(cert x.xx)</code> is
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">(cert x.xx)</code> is
                 the extractor&apos;s own confidence in that reading, not a second opinion — a
                 low-cert stance still counts in aggregation, just noisily. <strong>Live:</strong>{' '}
                 averaged into the Oracul&apos;s estimate today.
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">relevance</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">0..1</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">relevance</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">0..1</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 How on-topic the article is <em>for this specific claim</em> — a claim-aware
                 judgment, not a topic tag. <strong>Live:</strong> its <em>square</em> weights the
@@ -89,8 +89,8 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">author_lean</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">-1..+1</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">author_lean</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">-1..+1</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 The byline author&apos;s <em>own</em> directional forecast — do they personally
                 expect this to happen — separated from the facts they report. Null when the
@@ -100,19 +100,19 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">fact_signal</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">-1..+1</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">fact_signal</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">-1..+1</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 What the <em>reported facts alone</em> imply, with the author&apos;s framing and
                 assertions stripped out — the &quot;just the facts&quot; counterpart to{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">stance</code>.{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">stance</code>.{' '}
                 <strong>Shadow only:</strong> exists to let us later check whether facts and
                 framing actually agree; not read by the estimate.
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">credibility</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">≈0.5–1.5</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">credibility</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">≈0.5–1.5</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 An inferred credibility weight for this source/article. Only shown when it differs
                 from the neutral default (1.0) — most rows omit it. <strong>Shadow only:</strong>{' '}
@@ -122,70 +122,70 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">class</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">5 values</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">class</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">5 values</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 What <em>kind</em> of evidence the article&apos;s dominant claim is:{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">reported_fact</code>,{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">cited_probability</code>,{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">cited_share</code>{' '}
-                (e.g. a poll number), <code className="bg-navy-800 px-1 rounded text-xs font-mono">reporting</code>,
-                or <code className="bg-navy-800 px-1 rounded text-xs font-mono">opinion</code>.{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">reported_fact</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">cited_probability</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">cited_share</code>{' '}
+                (e.g. a poll number), <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">reporting</code>,
+                or <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">opinion</code>.{' '}
                 <strong>Shadow only:</strong> the eventual point of this field is to exclude{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">opinion</code>-class
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">opinion</code>-class
                 articles from credibility scoring — an opinion piece shouldn&apos;t move a
                 source&apos;s track record the way a reported fact should.
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">consensus</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">3 values</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">consensus</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">3 values</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 What <em>this article says most people expect</em> — as distinct from what the
-                author thinks (<code className="bg-navy-800 px-1 rounded text-xs font-mono">author_lean</code>):{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">expects_yes</code>,{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">expects_no</code> or{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">divided</code>; omitted
+                author thinks (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">author_lean</code>):{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">expects_yes</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">expects_no</code> or{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">divided</code>; omitted
                 when the article doesn&apos;t report a consensus. <strong>Shadow only:</strong> the
                 eventual use is spotting information every source shares (and so shouldn&apos;t be
                 counted once per source).
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">report_kind</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">2 values</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">report_kind</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">2 values</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 Does the quoted claim report the standing <em>situation</em>{' '}
-                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">level</code>: &quot;the
+                (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">level</code>: &quot;the
                 rate is 8.75%&quot;) or a <em>movement</em> in it{' '}
-                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">change</code>: &quot;the
+                (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">change</code>: &quot;the
                 rate was cut&quot;)? <strong>Shadow only:</strong> a level report measures the state
                 directly and should eventually reset the Oracul&apos;s recency handling rather
                 than decay out of it.
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">reader</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">3 levels</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">reader</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">3 levels</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 How confident the extractor is in its own <em>reading</em> of the quote — which is
-                a different question from the <code className="bg-navy-800 px-1 rounded text-xs font-mono">cert</code>{' '}
+                a different question from the <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">cert</code>{' '}
                 riding on <strong>stance</strong>, which is how firmly the <em>article</em> commits
                 to the claim. A flat, unhedged sentence the reader may have misparsed is high
                 certainty and low reader confidence. When a known reading trap applies it is named
-                in brackets (<code className="bg-navy-800 px-1 rounded text-xs font-mono">low (negation)</code>) —
+                in brackets (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">low (negation)</code>) —
                 that half is the useful one, because it says <em>which</em> misreading was a risk.
                 <strong> Shadow only:</strong> the eventual use is down-weighting articles the
                 extractor itself flagged as hard to read.
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">quantity</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">figure</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">quantity</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">figure</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 The number the quoted claim reports, with the relation the <em>article</em> asserts
-                about it (<code className="bg-navy-800 px-1 rounded text-xs font-mono">214 daily departures</code>,{' '}
-                <code className="bg-navy-800 px-1 rounded text-xs font-mono">&lt; 40 million tonnes</code>).
+                about it (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">214 daily departures</code>,{' '}
+                <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">&lt; 40 million tonnes</code>).
                 It is emphatically <em>not</em> a verdict on the forecast&apos;s own threshold —
                 asking a language model &quot;does 214 clear 250?&quot; is how you get a confident wrong
                 answer, so the number is extracted here and the comparison is done in code.
@@ -194,14 +194,14 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">grounds</td>
-              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono break-words">kind · basis</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">grounds</td>
+              <td className="p-1.5 sm:p-2 border-b border-navy-600 font-mono wrap-break-word">kind · basis</td>
               <td className="p-1.5 sm:p-2 border-b border-navy-600">
                 What the quoted claim&apos;s position <em>rests on</em> — the reason, not the
                 direction. The kind is one of six (a milestone that happened, an official statement,
                 a market or poll figure, an analyst&apos;s inference, a precedent or base rate, the
                 writer&apos;s own judgement), and the phrase after the dot names it
-                (<code className="bg-navy-800 px-1 rounded text-xs font-mono">official statement · the ministry&apos;s 12 March statement</code>).
+                (<code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">official statement · the ministry&apos;s 12 March statement</code>).
                 Three articles repeating one ministry statement agree for <em>one</em> reason;
                 three citing a milestone, a poll and a precedent agree for three — and the estimate
                 cannot currently tell those apart. This is not the <strong>class</strong> row:
@@ -210,8 +210,8 @@ export default function RatingNumbersHelpPage() {
               </td>
             </tr>
             <tr>
-              <td className="p-1.5 sm:p-2 font-mono break-words">range</td>
-              <td className="p-1.5 sm:p-2 font-mono break-words">CI %</td>
+              <td className="p-1.5 sm:p-2 font-mono wrap-break-word">range</td>
+              <td className="p-1.5 sm:p-2 font-mono wrap-break-word">CI %</td>
               <td className="p-1.5 sm:p-2">
                 The confidence interval around the headline estimate — how much uncertainty the
                 Oracul still has, not a property of this one article. Omitted when narrower than 2
@@ -230,7 +230,7 @@ export default function RatingNumbersHelpPage() {
           right?</strong> 1 = clearly wrong, 5 = spot on. Tap once; tapping again changes your
           vote. Anyone in the channel can vote — there&apos;s no separate sign-up, your Telegram
           identity is the only thing recorded, and the button labels update live with how many
-          people picked each score (e.g. <code className="bg-navy-800 px-1 rounded text-xs font-mono">3️⃣ ·1</code>).
+          people picked each score (e.g. <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">3️⃣ ·1</code>).
         </p>
         <p>
           Votes aren&apos;t cosmetic: they land in an admin dashboard where we review the rating
@@ -255,8 +255,8 @@ export default function RatingNumbersHelpPage() {
         <ul className="list-disc list-inside space-y-1 mb-2">
           <li>
             <strong>Probability</strong> — the headline move at the very top of the message (the{' '}
-            <code className="bg-navy-800 px-1 rounded text-xs font-mono">Oracul 63% → 71%</code>{' '}
-            line and the <code className="bg-navy-800 px-1 rounded text-xs font-mono">range</code>{' '}
+            <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">Oracul 63% → 71%</code>{' '}
+            line and the <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">range</code>{' '}
             row), i.e. the estimate itself rather than any one input to it.
           </li>
         </ul>
@@ -268,7 +268,7 @@ export default function RatingNumbersHelpPage() {
           recorded with your rating). The
           bot only DMs raters who&apos;ve started a chat with it before (a Telegram rule for all
           bots) — if you&apos;ve never messaged @DaatanClawBot directly, your rating still saves,
-          but the drilldown prompt will ask you to <code className="bg-navy-800 px-1 rounded text-xs font-mono">/start</code>{' '}
+          but the drilldown prompt will ask you to <code className="bg-navy-800 px-1 rounded-sm text-xs font-mono">/start</code>{' '}
           it and tap again to unlock the checklist. You can also just reply to either message with
           free text — it&apos;s saved as a note alongside your rating.
         </p>

@@ -120,7 +120,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               value={form.personaPrompt}
               onChange={(e) => setForm({ ...form, personaPrompt: e.target.value })}
               rows={3}
-              className="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-sm px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden"
               required
             />
           </Field>
@@ -130,7 +130,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               value={form.forecastPrompt}
               onChange={(e) => setForm({ ...form, forecastPrompt: e.target.value })}
               rows={3}
-              className="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-sm px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden"
               required
             />
           </Field>
@@ -140,7 +140,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               value={form.votePrompt}
               onChange={(e) => setForm({ ...form, votePrompt: e.target.value })}
               rows={3}
-              className="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-sm px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden"
               required
             />
           </Field>
@@ -154,7 +154,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               onChange={(e) => setForm({ ...form, newsSources: e.target.value })}
               rows={4}
               placeholder="https://feeds.bbci.co.uk/news/world/rss.xml"
-              className="w-full border rounded px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-sm px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-hidden"
             />
           </Field>
 
@@ -162,7 +162,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
             <input
               value={form.modelPreference}
               onChange={(e) => setForm({ ...form, modelPreference: e.target.value })}
-              className="w-full border rounded px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border rounded-sm px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-hidden"
             />
           </Field>
 
@@ -191,19 +191,19 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.canCreateForecasts}
                   onChange={(e) => setForm({ ...form, canCreateForecasts: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('canCreateForecasts')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.canVote}
                   onChange={(e) => setForm({ ...form, canVote: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('canVote')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.autoApprove}
                   onChange={(e) => setForm({ ...form, autoApprove: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                 {t('autoApproveForecasts')}
                 <span className="text-xs text-gray-400 font-normal">{t('skipApprovalQueue')}</span>
               </label>
@@ -212,25 +212,25 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.requireApprovalForForecasts}
                   onChange={(e) => setForm({ ...form, requireApprovalForForecasts: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('requireApproval')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.enableSentimentExtraction}
                   onChange={(e) => setForm({ ...form, enableSentimentExtraction: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('enableSentiment')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.enableRejectionTracking}
                   onChange={(e) => setForm({ ...form, enableRejectionTracking: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('enableRejection')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input type="checkbox" checked={form.showMetadataOnForecast}
                   onChange={(e) => setForm({ ...form, showMetadataOnForecast: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
                 {t('showMetadata')}
               </label>
             </div>
@@ -261,7 +261,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                   activeHoursStart: e.target.checked ? null : 8,
                   activeHoursEnd: e.target.checked ? null : 22,
                 })}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500" />
               {t('alwaysActive')}
             </label>
             {form.activeHoursStart != null && (
@@ -279,9 +279,9 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
 
           <Field label={t('tagFilter')} hint={t('tagFilterHint')}>
             <div className="mt-2 space-y-2">
-              <div className="flex flex-wrap gap-1.5 min-h-8 p-2 border rounded bg-navy-700">
+              <div className="flex flex-wrap gap-1.5 min-h-8 p-2 border rounded-sm bg-navy-700">
                 {form.tagFilter.map(slug => (
-                  <span key={slug} className="inline-flex items-center gap-1 bg-blue-100 text-cobalt-light px-2 py-0.5 rounded text-xs font-medium">
+                  <span key={slug} className="inline-flex items-center gap-1 bg-blue-100 text-cobalt-light px-2 py-0.5 rounded-sm text-xs font-medium">
                     {allTags.find(t => t.slug === slug)?.name ?? slug}
                     <button type="button" onClick={() => toggleTag(slug)} aria-label={`Remove ${allTags.find(t => t.slug === slug)?.name ?? slug}`} className="hover:text-blue-900">
                       <X className="w-3 h-3" />
@@ -296,7 +296,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                   onFocus={() => setShowTagSuggestions(true)}
                   placeholder={t('searchTags')}
                   aria-label={t('searchTags')}
-                  className="w-full border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full border rounded-sm px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -309,7 +309,7 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
                   }}
                 />
                 {showTagSuggestions && tagInput && (
-                  <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-navy-700 border rounded shadow-lg max-h-40 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-navy-700 border rounded-sm shadow-lg max-h-40 overflow-y-auto">
                     {filteredTags.map(tag => (
                       <button key={tag.id} type="button"
                         onClick={() => { toggleTag(tag.slug); setTagInput(''); setShowTagSuggestions(false) }}
@@ -330,11 +330,11 @@ export function EditBotModal({ bot, allTags, onSave, onClose }: Props) {
           </Field>
 
           <div className="flex justify-end gap-2 pt-2 pb-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded hover:bg-navy-800">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded-sm hover:bg-navy-800">
               {t('cancel')}
             </button>
             <button type="submit" disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700 disabled:opacity-50">
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
               {t('save')}
             </button>
@@ -368,7 +368,7 @@ function NumberField({ label, value, min, max, onChange }: {
       <label htmlFor={id} className="block text-xs font-medium text-gray-400 mb-1">{label}</label>
       <input id={id} type="number" value={value} min={min} max={max}
         onChange={(e) => onChange(parseInt(e.target.value) || min)}
-        className="w-full border rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+        className="w-full border rounded-sm px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden" />
     </div>
   )
 }

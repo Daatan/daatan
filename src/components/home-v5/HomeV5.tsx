@@ -24,7 +24,7 @@ export default async function HomeV5({ locale }: { locale: Locale }) {
   const source = getFeaturedSource(locale)
   const signedIn = Boolean((await auth())?.user)
   return (
-    <div dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale} className="hv5 min-h-screen bg-[var(--hv5-bg)] font-sans text-[var(--hv5-ink)] antialiased">
+    <div dir={isRtl(locale) ? 'rtl' : 'ltr'} lang={locale} className="hv5 min-h-screen bg-(--hv5-bg) font-sans text-(--hv5-ink) antialiased">
       <JsonLd data={siteJsonLd} />
       <HomeSeenMarker />
       <Header locale={locale} links={links} signedIn={signedIn} />

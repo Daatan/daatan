@@ -98,17 +98,17 @@ export default async function AiLeaderboardPage() {
                   <td className="px-2 sm:px-4 py-3 sm:py-4">
                     <span className="font-bold text-white text-sm sm:text-base">{m.label}</span>
                     {m.isOracle && (
-                      <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
+                      <span className="ml-2 rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-xs text-amber-300">
                         {t('oraculBadge')}
                       </span>
                     )}
                     {m.isMarket && (
-                      <span className="ml-2 rounded bg-pink-500/15 px-1.5 py-0.5 text-xs text-pink-300">
+                      <span className="ml-2 rounded-sm bg-pink-500/15 px-1.5 py-0.5 text-xs text-pink-300">
                         {t('marketBadge')}
                       </span>
                     )}
                     {m.isControl && (
-                      <span className="ml-2 rounded bg-navy-600 px-1.5 py-0.5 text-xs text-gray-400">
+                      <span className="ml-2 rounded-sm bg-navy-600 px-1.5 py-0.5 text-xs text-gray-400">
                         {t('controlBadge')}
                       </span>
                     )}

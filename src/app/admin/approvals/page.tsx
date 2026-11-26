@@ -288,7 +288,7 @@ export default function ApprovalsPage() {
                         return (
                         <div
                             key={p.id}
-                            className={`rounded-xl p-4 transition-all shadow-sm ${
+                            className={`rounded-xl p-4 transition-all shadow-xs ${
                                 isApproved
                                     ? 'bg-teal/10 border-2 border-green-400 opacity-75'
                                     : isRejected

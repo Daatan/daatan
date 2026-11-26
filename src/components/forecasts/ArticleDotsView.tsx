@@ -459,7 +459,7 @@ export function ArticleDotsView({
               )}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${SIDE_BADGE[activeDot.side]}`}>
+              <span className={`px-1.5 py-0.5 rounded-sm text-[11px] font-medium ${SIDE_BADGE[activeDot.side]}`}>
                 {voteText(activeDot)}
               </span>
               <span className="text-[11px] text-gray-500">
@@ -482,7 +482,7 @@ export function ArticleDotsView({
   // Portalled to <body> so no transformed/overflow-clipped ancestor on the forecast page can
   // capture the fixed-position sheet.
   return createPortal(
-    <div ref={backdropRef} className="fixed inset-0 z-[70] flex bg-black/70 sm:items-center sm:justify-center sm:p-6">
+    <div ref={backdropRef} className="fixed inset-0 z-70 flex bg-black/70 sm:items-center sm:justify-center sm:p-6">
       <div
         ref={panelRef}
         role="dialog"

@@ -120,7 +120,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                   onChange={(e) => handleOptionChange(index, e.target.value)}
                   placeholder={t('optionPlaceholder', { n: index + 1 })}
                   aria-label={t('optionPlaceholder', { n: index + 1 })}
-                  className="flex-1 px-4 py-2 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+                  className="flex-1 px-4 py-2 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
                   maxLength={500}
                 />
                 {options.length > 2 && (
@@ -169,7 +169,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                 },
               })}
               placeholder={t('metricPlaceholder')}
-              className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+              className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
             />
           </div>
 
@@ -189,7 +189,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                     direction: e.target.value as 'above' | 'below' | 'exactly',
                   },
                 })}
-                className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent bg-navy-700 text-white"
+                className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent bg-navy-700 text-white"
               >
                 <option value="above">{t('dirAbove')}</option>
                 <option value="below">{t('dirBelow')}</option>
@@ -214,7 +214,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
                   },
                 })}
                 placeholder="100000"
-                className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+                className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
               />
             </div>
           </div>
@@ -236,7 +236,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
             min={minDate}
             className={`w-full pl-12 pr-4 py-3 bg-navy-800 text-white rounded-lg border ${
               isDateInPast ? 'border-red-500' : 'border-navy-600'
-            } focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent`}
+            } focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent`}
           />
         </div>
         {isDateInPast && (
@@ -259,7 +259,7 @@ export const StepOutcome = ({ formData, updateFormData }: Props) => {
           placeholder={t('resolutionRulesPlaceholder')}
           rows={3}
           maxLength={2000}
-          className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"
+          className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"
         />
       </div>
     </div>

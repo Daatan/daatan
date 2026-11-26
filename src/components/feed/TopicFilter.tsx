@@ -39,7 +39,7 @@ export function TopicFilter({ selected, counts, onChange }: Props) {
                 onClick={() => toggle(tag)}
                 aria-pressed={isSelected}
                 className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${isSelected
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-blue-600 text-white shadow-xs'
                   : 'bg-navy-700 text-gray-300 hover:bg-navy-600 hover:text-white'
                 }`}
               >
@@ -51,7 +51,7 @@ export function TopicFilter({ selected, counts, onChange }: Props) {
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-gradient-to-l rtl:bg-gradient-to-r from-navy-900 to-transparent sm:hidden"
+          className="pointer-events-none absolute inset-y-0 inset-e-0 w-10 bg-linear-to-l rtl:bg-linear-to-r from-navy-900 to-transparent sm:hidden"
         />
       </div>
       {selected.length > 0 && (

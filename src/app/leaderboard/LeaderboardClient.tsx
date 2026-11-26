@@ -171,9 +171,9 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
           <button
             key={value}
             onClick={() => handleSort(value)}
-            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
               sortBy === value
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
             }`}
             aria-label={`Sort by ${label}`}
@@ -188,10 +188,10 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
       {/* Tag Filter */}
       {tags.length > 0 && (
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
-          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{t('filterByTopic')}:</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">{t('filterByTopic')}:</span>
           <button
             onClick={() => handleTagChange(null)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass(!selectedTag)}`}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 ${pillClass(!selectedTag)}`}
           >
             {t('allTopics')}
           </button>
@@ -199,7 +199,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
             <button
               key={tag.slug}
               onClick={() => handleTagChange(selectedTag === tag.slug ? null : tag.slug)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass(selectedTag === tag.slug)}`}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 ${pillClass(selectedTag === tag.slug)}`}
             >
               {tag.name}
             </button>
@@ -256,7 +256,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(profileHref(user)) } }}
                   role="button"
                   tabIndex={0}
-                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index !== undefined && index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''} ${lowSample ? 'opacity-70' : ''}`}
+                  className={`cursor-pointer hover:bg-white/5 focus:bg-white/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${index !== undefined && index < 3 && sortDir === 'best' ? 'bg-amber-400/5' : ''} ${lowSample ? 'opacity-70' : ''}`}
                 >
                   <td className="px-1 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-center">
@@ -266,9 +266,9 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                   <td className="px-2 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center gap-2 sm:gap-3">
                       {user.image ? (
-                        <Image src={user.image} alt="" width={36} height={36} className="rounded-full border border-navy-600 w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0" />
+                        <Image src={user.image} alt="" width={36} height={36} className="rounded-full border border-navy-600 w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
                       ) : (
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm flex-shrink-0">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
                           {user.name?.charAt(0) || user.username?.charAt(0) || '?'}
                         </div>
                       )}
@@ -279,7 +279,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                           </Link>
                           {lowSample && (
                             <span
-                              className="ms-2 align-middle inline-block px-1.5 py-0.5 rounded bg-navy-600 text-[10px] font-medium text-gray-400"
+                              className="ms-2 align-middle inline-block px-1.5 py-0.5 rounded-sm bg-navy-600 text-[10px] font-medium text-gray-400"
                               title={t('lowSampleHint', { min: MIN_RANKED_RESOLVED })}
                             >
                               {t('lowSampleBadge')}

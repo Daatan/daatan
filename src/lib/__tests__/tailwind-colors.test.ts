@@ -2,66 +2,128 @@
 /**
  * Brand colours must keep their Tailwind opacity variants (#2253).
  *
- * The colours in tailwind.config.js come from CSS variables in globals.css. Written as a bare
- * `var(--color-cobalt)`, Tailwind 3 cannot apply an opacity modifier and silently emits no rule
- * for `bg-cobalt/10`, `border-navy-600/50` etc. — 102 uses rendered transparent or with the
- * near-white default border for months. Each colour is now RGB channels plus `<alpha-value>`.
+ * Under Tailwind 3 the brand colours were bare `var(--color-cobalt)` values, which cannot
+ * take an opacity modifier: `bg-cobalt/10`, `border-navy-600/50` etc. emitted no rule, and
+ * 102 uses rendered transparent or with the near-white default border for months.
+ *
+ * Since Tailwind 4 (#2355) the theme lives in globals.css (`@theme`), and opacity variants
+ * are built with color-mix(). This test compiles the real globals.css with Tailwind and
+ * checks the generated rules, so a theme edit that breaks the variants fails here.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import postcss from 'postcss'
-import tailwindcss from 'tailwindcss'
-import type { Config } from 'tailwindcss'
-import tailwindConfig from '../../../tailwind.config.js'
+import tailwindcss from '@tailwindcss/postcss'
 
-const config = tailwindConfig as Config
-const globalsCss = readFileSync(path.resolve(__dirname, '../../app/globals.css'), 'utf-8')
+const root = path.resolve(__dirname, '../../..')
+const globalsPath = path.join(root, 'src/app/globals.css')
+const globalsCss = readFileSync(globalsPath, 'utf-8')
 
-function flatten(colors: Record<string, unknown>, prefix = ''): [string, string][] {
-  return Object.entries(colors).flatMap(([key, value]) => {
-    const name = key === 'DEFAULT' ? prefix : prefix ? `${prefix}-${key}` : key
-    return typeof value === 'string' ? [[name, value] as [string, string]] : flatten(value as Record<string, unknown>, name)
-  })
+const CANDIDATES = [
+  'bg-cobalt/10', 'border-navy-600/50', 'bg-navy-900/90', 'text-text-secondary/80', 'bg-teal/10',
+  'bg-navy-900', 'text-gray-500', 'font-sans', 'hover:bg-cobalt', 'text-xs', 'md:text-lg',
+]
+
+/** The body of the first rule whose selector is exactly `.<className>` (escaped), braces balanced. */
+function ruleBody(css: string, className: string): string | null {
+  const selector = '.' + className.replace(/[/:]/g, (c) => '\\' + c)
+  const start = css.indexOf(selector + ' {')
+  if (start === -1) return null
+  let depth = 0
+  for (let i = css.indexOf('{', start); i < css.length; i++) {
+    if (css[i] === '{') depth++
+    else if (css[i] === '}' && --depth === 0) return css.slice(css.indexOf('{', start) + 1, i)
+  }
+  return null
 }
 
-const colors = flatten((config.theme?.extend?.colors ?? {}) as Record<string, unknown>)
-const varColors = colors.filter(([, value]) => value.includes('var('))
+/** `--color-X: rgb(var(--color-X-rgb))` entries of the @theme block: [X, channel var name]. */
+function themeChannelColours(): [string, string][] {
+  const theme = globalsCss.match(/@theme\s*\{([\s\S]*?)\n\}/)
+  if (!theme) throw new Error('no @theme block in globals.css')
+  return [...theme[1].matchAll(/--color-([\w-]+):\s*rgb\(var\((--color-[\w-]+-rgb)\)\);/g)].map((m) => [m[1], m[2]])
+}
+
+let css = ''
+
+beforeAll(async () => {
+  // Compile only the candidates above instead of scanning the repo for class names.
+  const importLine = "@import 'tailwindcss';"
+  expect(globalsCss.split(importLine)).toHaveLength(2)
+  const input = globalsCss.replace(
+    importLine,
+    `@import 'tailwindcss' source(none);\n@source inline("${CANDIDATES.join(' ')}");`,
+  )
+  const result = await postcss([tailwindcss({ base: root, optimize: false })]).process(input, { from: globalsPath })
+  css = result.css
+}, 30_000)
 
 describe('tailwind brand colours', () => {
-  it('has the CSS-variable colours this test is about', () => {
-    expect(varColors.map(([name]) => name)).toEqual(expect.arrayContaining(['navy-600', 'cobalt', 'teal', 'text-secondary']))
+  it('maps the brand colours in @theme to RGB channel variables', () => {
+    expect(themeChannelColours().map(([name]) => name)).toEqual(
+      expect.arrayContaining(['navy-600', 'navy-900', 'cobalt', 'teal', 'text-secondary']),
+    )
   })
 
-  it.each(varColors)('%s takes an opacity modifier (rgb channels + <alpha-value>)', (_name, value) => {
-    expect(value).toMatch(/^rgb\(var\(--color-[\w-]+-rgb\) \/ <alpha-value>\)$/)
-  })
-
-  it.each(varColors)('%s points at channels defined in globals.css', (_name, value) => {
-    const varName = value.match(/--color-[\w-]+-rgb/)![0]
-    expect(globalsCss).toMatch(new RegExp(`${varName}:\\s*\\d{1,3} \\d{1,3} \\d{1,3};`))
+  it.each(themeChannelColours())('%s points at channels defined in globals.css', (_name, channelVar) => {
+    expect(globalsCss).toMatch(new RegExp(`${channelVar}:\\s*\\d{1,3} \\d{1,3} \\d{1,3};`))
   })
 
   it('keeps the plain --color-X names, derived from the channels, for direct var() users', () => {
     // layout.tsx (toasts) and the scrollbar rules use var(--color-navy-700) etc. directly.
-    for (const [, value] of varColors) {
-      const base = value.match(/--color-([\w-]+)-rgb/)![1]
-      expect(globalsCss).toContain(`--color-${base}:`)
+    for (const [, channelVar] of themeChannelColours()) {
+      const base = channelVar.match(/^--color-([\w-]+)-rgb$/)![1]
       expect(globalsCss).toMatch(new RegExp(`--color-${base}:\\s*rgb\\(var\\(--color-${base}-rgb\\)\\);`))
     }
   })
 
-  it('generates opacity variants, and plain classes keep full opacity', async () => {
-    const raw = 'bg-cobalt/10 border-navy-600/50 bg-navy-900/90 text-text-secondary/80 bg-teal/10 bg-navy-900'
-    const { css } = await postcss([
-      tailwindcss({ ...config, content: [{ raw, extension: 'html' }], corePlugins: { preflight: false } }),
-    ]).process('@tailwind utilities;', { from: undefined })
+  it.each([
+    ['bg-cobalt/10', 'background-color', 'cobalt', '10%'],
+    ['border-navy-600/50', 'border-color', 'navy-600', '50%'],
+    ['bg-navy-900/90', 'background-color', 'navy-900', '90%'],
+    ['text-text-secondary/80', 'color', 'text-secondary', '80%'],
+    ['bg-teal/10', 'background-color', 'teal', '10%'],
+  ])('generates %s with the brand colour at that opacity', (cls, property, colour, pct) => {
+    const body = ruleBody(css, cls)
+    expect(body, `no rule for .${cls}`).not.toBeNull()
+    const mix = new RegExp(
+      `${property}: color-mix\\(in \\w+, (?:var\\(--color-${colour}\\)|rgb\\(var\\(--color-${colour}-rgb\\)\\)) ${pct}, transparent\\)`,
+    )
+    expect(body).toMatch(mix)
+  })
 
-    expect(css).toMatch(/\.bg-cobalt\\\/10\s*\{\s*background-color: rgb\(var\(--color-cobalt-rgb\) \/ 0\.1\)/)
-    expect(css).toMatch(/\.border-navy-600\\\/50\s*\{\s*border-color: rgb\(var\(--color-navy-600-rgb\) \/ 0\.5\)/)
-    expect(css).toMatch(/\.bg-navy-900\\\/90\s*\{/)
-    expect(css).toMatch(/\.text-text-secondary\\\/80\s*\{/)
-    expect(css).toMatch(/\.bg-teal\\\/10\s*\{/)
-    expect(css).toMatch(/\.bg-navy-900\s*\{\s*--tw-bg-opacity: 1;\s*background-color: rgb\(var\(--color-navy-900-rgb\) \/ var\(--tw-bg-opacity, 1\)\)/)
+  it('keeps plain brand classes at full opacity', () => {
+    expect(ruleBody(css, 'bg-navy-900')).toMatch(/^\s*background-color: var\(--color-navy-900\);\s*$/)
+  })
+
+  it('keeps the contrast-safe gray-500 override', () => {
+    expect(ruleBody(css, 'text-gray-500')).toMatch(/color: var\(--color-gray-500\)/)
+    expect(css).toMatch(/--color-gray-500: #9aa5b4;/)
+  })
+})
+
+describe('Tailwind 3 behaviour kept after the v4 upgrade (#2355)', () => {
+  it('resolves the font stack where next/font defines its variables, not at :root', () => {
+    expect(ruleBody(css, 'font-sans')).toMatch(/font-family: var\(--font-inter\), var\(--font-heebo\), system-ui, sans-serif;/)
+  })
+
+  it('applies hover: on touch screens too (not gated on @media (hover: hover))', () => {
+    expect(css).toContain('hover\\:bg-cobalt')
+    expect(css).not.toContain('@media (hover: hover)')
+  })
+
+  it('keeps v3 line heights in rem, so a child with its own font size does not inherit a ratio', () => {
+    expect(css).toMatch(/--text-xs--line-height: 1rem;/)
+    expect(css).toMatch(/--text-lg--line-height: 1\.75rem;/)
+  })
+
+  it('keeps the v3 gray-200 default border colour instead of currentColor', () => {
+    expect(css).toMatch(/::file-selector-button\s*\{\s*border-color: var\(--color-gray-200, currentcolor\);/)
+  })
+
+  it('keeps the v3 placeholder colour and button cursor', () => {
+    expect(css).toMatch(/input::placeholder,\s*textarea::placeholder\s*\{\s*color: var\(--color-gray-400\);/)
+    expect(css).toMatch(/button:not\(:disabled\),\s*\[role='button'\]:not\(:disabled\)\s*\{\s*cursor: pointer;/)
   })
 })

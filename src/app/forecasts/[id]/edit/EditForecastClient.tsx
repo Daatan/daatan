@@ -280,7 +280,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
             onChange={(e) => handleChange('claimText', e.target.value)}
             rows={3}
             maxLength={500}
-            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             placeholder="What is the prediction?"
           />
           <p className="text-xs text-gray-400 mt-1 text-right">{formData.claimText.length}/500</p>
@@ -303,7 +303,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
                     onChange={(e) => handleOptionChange(index, e.target.value)}
                     placeholder={`Option ${index + 1}`}
                     aria-label={`Option ${index + 1}`}
-                    className="flex-1 px-4 py-2 bg-navy-800 text-white border border-navy-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-4 py-2 bg-navy-800 text-white border border-navy-600 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     maxLength={500}
                   />
                   {formData.options.length > 2 && (
@@ -342,7 +342,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
             value={formData.detailsText}
             onChange={(e) => handleChange('detailsText', e.target.value)}
             rows={5}
-            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Add more details, links, or context..."
           />
         </div>
@@ -358,7 +358,7 @@ export default function EditForecastClient({ id }: EditForecastClientProps) {
             value={formData.resolutionRules}
             onChange={(e) => handleChange('resolutionRules', e.target.value)}
             rows={3}
-            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-navy-600 rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="How will this be resolved? Which sources will be used?"
           />
         </div>

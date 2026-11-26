@@ -310,7 +310,7 @@ function RecentCallsTable({ rows }: { rows: RecentCall[] }) {
                   <td className={`py-2 pr-4 font-mono whitespace-nowrap ${statusClass(entry.status)}`}>
                     {entry.status}{entry.httpStatus != null ? ` (${entry.httpStatus})` : ''}
                   </td>
-                  <td className="py-2 pr-4 font-mono text-gray-400 max-w-[12rem] truncate">
+                  <td className="py-2 pr-4 font-mono text-gray-400 max-w-48 truncate">
                     {entry.failureReason ? (
                       <span className="text-amber-400" title={failureReasonTitle(entry.failureReason)}>{entry.failureReason}</span>
                     ) : '—'}
@@ -401,7 +401,7 @@ export default function OracleTab() {
             value={windowDays}
             onChange={e => setWindowDays(Number(e.target.value))}
             aria-label="Filter by time window"
-            className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-navy-600 bg-navy-700 rounded-sm p-1 text-sm outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             {WINDOW_OPTIONS.map(d => (
               <option key={d} value={d}>Last {d} {d === 1 ? 'day' : 'days'}</option>
@@ -410,7 +410,7 @@ export default function OracleTab() {
           <select
             value={source}
             onChange={e => setSource(e.target.value)}
-            className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-navy-600 bg-navy-700 rounded-sm p-1 text-sm outline-hidden focus:ring-2 focus:ring-blue-500"
             title="Filter by source workflow"
             aria-label="Filter by source workflow"
           >
@@ -422,7 +422,7 @@ export default function OracleTab() {
           <select
             value={callType}
             onChange={e => setCallType(e.target.value)}
-            className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-navy-600 bg-navy-700 rounded-sm p-1 text-sm outline-hidden focus:ring-2 focus:ring-blue-500"
             title="Filter by call type"
             aria-label="Filter by call type"
           >
@@ -434,7 +434,7 @@ export default function OracleTab() {
           <select
             value={status}
             onChange={e => setStatus(e.target.value)}
-            className="border border-navy-600 bg-navy-700 rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-navy-600 bg-navy-700 rounded-sm p-1 text-sm outline-hidden focus:ring-2 focus:ring-blue-500"
             title="Filter by call status"
             aria-label="Filter by call status"
           >

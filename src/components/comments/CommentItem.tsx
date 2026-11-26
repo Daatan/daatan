@@ -217,7 +217,7 @@ export default function CommentItem({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 aria-label="Edit comment"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
               <div className="flex gap-2">
@@ -242,7 +242,7 @@ export default function CommentItem({
             <div className="space-y-2">
               <p className="text-mist whitespace-pre-wrap">{translatedText ?? savedText}</p>
               {translatedText && (
-                <div className="flex items-center gap-1.5 text-[10px] text-blue-600/70 italic bg-cobalt/10/30 px-2 py-1 rounded w-fit">
+                <div className="flex items-center gap-1.5 text-[10px] text-blue-600/70 italic bg-cobalt/10/30 px-2 py-1 rounded-sm w-fit">
                   <Info className="w-3 h-3" />
                   <span>{t('disclaimer')}</span>
                 </div>

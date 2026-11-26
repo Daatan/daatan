@@ -33,7 +33,7 @@ export default function SettingsPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-white">{t('title')}</h1>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white mb-1">{t('preferences')}</h2>
           <p className="text-sm text-gray-500">{t('preferencesDescription')}</p>
@@ -45,7 +45,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mt-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mt-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white mb-1">{t('notifications')}</h2>
           <p className="text-sm text-gray-500">{t('notificationsDescription')}</p>
@@ -56,7 +56,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-red-900/50 rounded-xl shadow-sm overflow-hidden mt-6">
+      <div className="bg-navy-700 border border-red-900/50 rounded-xl shadow-xs overflow-hidden mt-6">
         <div className="p-6 border-b border-red-900/50">
           <h2 className="text-lg font-semibold text-red-400 mb-1">{t('dangerZone')}</h2>
           <p className="text-sm text-gray-500">{t('dangerZoneDescription')}</p>

@@ -164,7 +164,7 @@ export function PredictionsPage({
               onChange={e => setSearchInput(e.target.value)}
               placeholder={t('searchPlaceholder')}
               aria-label={t('searchPlaceholder')}
-              className="w-full bg-navy-700 text-white text-sm pl-9 pr-8 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
+              className="w-full bg-navy-700 text-white text-sm pl-9 pr-8 py-2 rounded-lg border border-navy-600 outline-hidden focus:border-blue-500 placeholder-gray-500"
             />
             {searchInput && (
               <button type="button" onClick={clearSearch} aria-label={t('clearSearch')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
@@ -185,7 +185,7 @@ export function PredictionsPage({
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === f
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
               }`}
             >

@@ -68,10 +68,10 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-mono uppercase tracking-widest text-gray-600">
             <span>{t('caseLabel')}</span><span>{t.rich('window', { hl })}</span>
           </div>
-          <h1 className="mt-4 text-4xl md:text-6xl font-black tracking-tight text-gray-900 leading-[1.05]">
+          <h1 className="mt-4 text-4xl md:text-6xl md:leading-none font-black tracking-tight text-gray-900 leading-[1.05]">
             {t.rich('h1', { hl: c => <span className="text-rose-700">{c}</span> })}
           </h1>
-          <p className="mt-5 max-w-2xl text-base md:text-lg text-gray-700 leading-relaxed">
+          <p className="mt-5 max-w-2xl text-base md:text-lg md:leading-7 text-gray-700 leading-relaxed">
             {t('lead', { count: pool.length.toLocaleString(locale) })}
           </p>
           <p className="mt-3 max-w-2xl text-sm text-gray-600 leading-relaxed">
@@ -81,7 +81,7 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
             {thesis.map(([g, big, unit, text, n, metric], i) => (
               <div key={g} className={`py-5 pe-5 ${i > 0 ? 'lg:ps-5 lg:border-s border-gray-200' : ''} ${i > 0 ? 'border-t sm:border-t-0' : ''} ${i === 1 || i === 3 ? 'sm:ps-5 sm:border-s' : ''} ${i >= 2 ? 'sm:border-t lg:border-t-0' : ''}`}>
                 <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-gray-700">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GROUP_COLOR[g] }} />{groupName(g)}
+                  <span className="w-2.5 h-2.5 rounded-xs" style={{ background: GROUP_COLOR[g] }} />{groupName(g)}
                 </div>
                 <div className="mt-2 text-4xl font-black text-gray-900 tabular-nums">{big}<span className="ms-1.5 text-sm font-normal text-gray-600">{unit}</span></div>
                 <div className="mt-1 font-mono text-[11px] text-gray-600">{t('nStat', { n: n.toLocaleString(locale) })} · {metric}</div>
@@ -96,7 +96,7 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{t('polls.h')}</h2>
           <p className="mt-2 max-w-2xl text-gray-700">{t('polls.intro')}</p>
-          <div className="mt-5 bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
+          <div className="mt-5 bg-white rounded-xl border border-gray-200 shadow-xs p-4 md:p-5">
             <PollChart polls={polls} />
           </div>
           <p className="mt-3 text-xs text-gray-600">{t('polls.foot', { count: polls.length })}</p>
@@ -105,10 +105,10 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
         <section className="mt-16">
           <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{t('trend.h')}</h2>
           <p className="mt-2 max-w-2xl text-gray-700">{t('trend.intro')}</p>
-          <div className="mt-5 bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5">
+          <div className="mt-5 bg-white rounded-xl border border-gray-200 shadow-xs p-4 md:p-5">
             <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-gray-700 mb-2">
               {GROUPS.map(g => (
-                <span key={g} className="inline-flex items-center gap-2"><i className="w-3.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{groupName(g)} <span className="font-mono text-gray-500">{byGroup[g].n}</span></span>
+                <span key={g} className="inline-flex items-center gap-2"><i className="w-3.5 h-[3px] rounded-sm" style={{ background: GROUP_COLOR[g] }} />{groupName(g)} <span className="font-mono text-gray-500">{byGroup[g].n}</span></span>
               ))}
               <span className="inline-flex items-center gap-2"><i className="w-2 h-2 rounded-full bg-gray-400/60" />{t('trend.oneArticle')}</span>
             </div>
@@ -144,9 +144,9 @@ export default function IsraelRetroReport({ rows, pool, polls }: { rows: ReportR
             {REGIONS.map(k => <SplitRow key={k} label={t(`region.${k}`)} a={byRegion[k]} />)}
           </div>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-gray-700">
-            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-teal-600" />{t('split.legendYes')}</span>
-            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-gray-300" />{t('split.legendUnsure')}</span>
-            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-sm bg-rose-600" />{t('split.legendNo')}</span>
+            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-xs bg-teal-600" />{t('split.legendYes')}</span>
+            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-xs bg-gray-300" />{t('split.legendUnsure')}</span>
+            <span className="inline-flex items-center gap-2"><i className="w-3 h-3 rounded-xs bg-rose-600" />{t('split.legendNo')}</span>
             <span className="font-mono text-gray-500">{t('split.legendRight')}</span>
           </div>
         </section>
@@ -204,9 +204,9 @@ function NumbersGuide() {
           <div className="flex items-baseline gap-3"><span className="text-3xl font-black text-gray-900">P</span><span className="text-sm text-gray-600">{t('numbers.range')}</span></div>
           <p className="mt-3 text-[15px] text-gray-700 leading-relaxed">{t.rich('numbers.def', { b })}</p>
           <div dir="ltr" className="relative mt-14 mb-12 mx-2">
-            <div className="h-2 rounded-full bg-gradient-to-r from-rose-500 via-gray-300 to-teal-600" />
+            <div className="h-2 rounded-full bg-linear-to-r from-rose-500 via-gray-300 to-teal-600" />
             {scaleMarks.map(([p, who], i) => (
-              <div key={who} className={`absolute flex flex-col w-40 whitespace-nowrap ${p < 0.15 ? '-translate-x-[6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
+              <div key={who} className={`absolute flex flex-col w-40 whitespace-nowrap ${p < 0.15 ? 'translate-x-[-6px] items-start text-left' : p > 0.85 ? '-translate-x-[calc(100%-6px)] items-end text-right' : '-translate-x-1/2 items-center text-center'} ${i % 2 ? 'top-3' : 'bottom-3 flex-col-reverse'}`} style={{ left: `${p * 100}%` }}>
                 <span className="w-px h-2.5 bg-gray-500" />
                 <span className="font-mono text-[11px] text-gray-900 font-medium">{p.toFixed(2)} {who}</span>
               </div>
@@ -431,7 +431,7 @@ function ChartTip({ tip, day, roll }: { tip: Tip; day: number; roll: Record<Grou
         const m = roll[g][tip.i]
         return (
           <div key={g} className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-gray-700"><i className="w-2.5 h-[3px] rounded" style={{ background: GROUP_COLOR[g] }} />{t(`group.${g}`)}</span>
+            <span className="flex items-center gap-2 text-gray-700"><i className="w-2.5 h-[3px] rounded-sm" style={{ background: GROUP_COLOR[g] }} />{t(`group.${g}`)}</span>
             <b className={`font-mono font-medium tabular-nums ${m == null ? 'text-gray-500' : ''}`}>{m == null ? t('trend.few') : pct(m)}</b>
           </div>
         )
@@ -497,7 +497,7 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
             <a href={r.url} target="_blank" rel="noopener noreferrer" dir="auto" className="mt-2 block font-semibold text-gray-900 hover:underline leading-snug">{r.title || r.url}</a>
             <div className="mt-0.5 font-mono text-xs text-gray-500">{r.domain} · {r.article_kind}{r.text_source === 'wayback' ? ` · ${t('table.archived')}` : ''}</div>
             <div className="mt-2 text-sm text-gray-800">
-              <span className="inline-block w-2 h-2 rounded-sm me-1.5" style={{ background: GROUP_COLOR[r.g] }} title={groupName(r.g)} />
+              <span className="inline-block w-2 h-2 rounded-xs me-1.5" style={{ background: GROUP_COLOR[r.g] }} title={groupName(r.g)} />
               {r.voice_name || '—'}{r.voice_affiliation && <span className="text-gray-600"> · {r.voice_affiliation}</span>}
             </div>
             <div className="mt-1 font-mono text-xs text-gray-600">{t('table.seatsLine', { seats: r.projected_bloc_seats ?? '—' })}{r.side === 'no61' && r.no61_kind && NO61_KINDS.includes(r.no61_kind) ? ` · ${t(`no61kind.${r.no61_kind}`)}` : ''} · {t('table.confidence', { c: (r.claim_strength ?? 0).toFixed(2) })}</div>
@@ -530,12 +530,12 @@ function ArticleTable({ rows }: { rows: ReportRow[] }) {
                   <div className="mt-0.5 font-mono text-xs text-gray-500">{r.domain} · {r.article_kind}{r.text_source === 'wayback' ? ` · ${t('table.archived')}` : ''}</div>
                 </td>
                 <td className="px-3 py-2.5 min-w-[150px] max-w-[220px]">
-                  <span className="inline-block w-2 h-2 rounded-sm me-1.5" style={{ background: GROUP_COLOR[r.g] }} title={groupName(r.g)} />
+                  <span className="inline-block w-2 h-2 rounded-xs me-1.5" style={{ background: GROUP_COLOR[r.g] }} title={groupName(r.g)} />
                   {r.voice_name || '—'}<span className="block text-xs text-gray-500 leading-snug">{r.voice_affiliation}</span>
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="relative w-16 h-1.5 bg-gray-100 rounded"><span className="absolute inset-y-0 left-0 rounded bg-gray-700" style={{ width: `${r.p61 * 100}%` }} /><span className="absolute -inset-y-0.5 left-1/2 w-px bg-gray-400" /></span>
+                    <span className="relative w-16 h-1.5 bg-gray-100 rounded-sm"><span className="absolute inset-y-0 left-0 rounded-sm bg-gray-700" style={{ width: `${r.p61 * 100}%` }} /><span className="absolute -inset-y-0.5 left-1/2 w-px bg-gray-400" /></span>
                     <span className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-medium ${SIDE_PILL[r.side]}`}>{r.p61.toFixed(2)} {t(`side.${r.side}`)}</span>
                   </div>
                   <div className="mt-0.5 font-mono text-xs text-gray-500">{t('table.confidence', { c: (r.claim_strength ?? 0).toFixed(2) })}</div>

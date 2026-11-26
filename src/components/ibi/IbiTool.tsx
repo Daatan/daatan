@@ -290,14 +290,14 @@ export default function IbiTool() {
         <h2 className="font-semibold text-gray-300">Article</h2>
         <div className="flex gap-2">
           <input
-            className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
             value={state.articleUrl}
             onChange={e => setState(s => ({ ...s, articleUrl: e.target.value }))}
             placeholder="Article URL"
             aria-label="Article URL"
           />
           <input
-            className="w-36 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+            className="w-36 bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
             type="date"
             value={state.articleDate}
             onChange={e => setState(s => ({ ...s, articleDate: e.target.value }))}
@@ -306,14 +306,14 @@ export default function IbiTool() {
           <button
             onClick={fetchArticle}
             disabled={fetchLoading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-white"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-sm text-white"
           >
             {fetchLoading ? '...' : 'Fetch'}
           </button>
         </div>
         {fetchError && <p className="text-red-400">{fetchError}</p>}
         {articlePreview && (
-          <pre className="text-xs text-gray-400 bg-gray-800 rounded p-3 overflow-auto max-h-32 whitespace-pre-wrap">
+          <pre className="text-xs text-gray-400 bg-gray-800 rounded-sm p-3 overflow-auto max-h-32 whitespace-pre-wrap">
             {articlePreview}…
           </pre>
         )}
@@ -324,7 +324,7 @@ export default function IbiTool() {
         <h2 className="font-semibold text-gray-300">Stage 1 — Extract Forecasts</h2>
         <ModelSelect model={s1Model} custom={s1ModelCustom} onModel={setS1Model} onCustom={setS1ModelCustom} />
         <textarea
-          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs focus:outline-none focus:border-blue-500 h-40 resize-y"
+          className="w-full bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 text-xs focus:outline-hidden focus:border-blue-500 h-40 resize-y"
           value={s1Prompt}
           onChange={e => setS1Prompt(e.target.value)}
           aria-label="Extraction prompt"
@@ -332,7 +332,7 @@ export default function IbiTool() {
         <button
           onClick={runStage1}
           disabled={s1Loading}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-white"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-sm text-white"
         >
           {s1Loading ? 'Running…' : 'Run Extraction'}
         </button>
@@ -340,14 +340,14 @@ export default function IbiTool() {
         {s1Output && (
           <>
             <textarea
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs h-40 resize-y focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 text-xs h-40 resize-y focus:outline-hidden focus:border-blue-500"
               value={s1Output}
               onChange={e => setS1Output(e.target.value)}
               aria-label="Extraction output"
             />
             <button
               onClick={proceedToStage2}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-sm text-white"
             >
               Next → Consensus Search
             </button>
@@ -360,14 +360,14 @@ export default function IbiTool() {
         <h2 className="font-semibold text-gray-300">Stage 2 — Consensus Search</h2>
         <div className="flex gap-2">
           <input
-            className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
             value={s2Query}
             onChange={e => setS2Query(e.target.value)}
             placeholder="Search query"
             aria-label="Search query"
           />
           <input
-            className="w-36 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+            className="w-36 bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
             type="date"
             value={s2DateTo}
             onChange={e => setS2DateTo(e.target.value)}
@@ -377,7 +377,7 @@ export default function IbiTool() {
           <button
             onClick={runSearch}
             disabled={s2SearchLoading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-white"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-sm text-white"
           >
             {s2SearchLoading ? '...' : 'Search'}
           </button>
@@ -412,7 +412,7 @@ export default function IbiTool() {
 
         <ModelSelect model={s2Model} custom={s2ModelCustom} onModel={setS2Model} onCustom={setS2ModelCustom} />
         <textarea
-          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 text-xs focus:outline-none focus:border-blue-500 h-40 resize-y"
+          className="w-full bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 text-xs focus:outline-hidden focus:border-blue-500 h-40 resize-y"
           value={s2ConsensusPrompt}
           onChange={e => setS2ConsensusPrompt(e.target.value)}
           aria-label="Consensus prompt"
@@ -420,7 +420,7 @@ export default function IbiTool() {
         <button
           onClick={runConsensus}
           disabled={s2Loading || selectedUrls.size === 0}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded text-white"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-sm text-white"
         >
           {s2Loading ? 'Analyzing…' : 'Analyze Consensus'}
         </button>
@@ -430,7 +430,7 @@ export default function IbiTool() {
           <>
             <div className="space-y-2">
               {state.consensusResults.map((r, i) => (
-                <div key={i} className="bg-gray-800 rounded p-3 text-xs">
+                <div key={i} className="bg-gray-800 rounded-sm p-3 text-xs">
                   <span className="text-blue-400">{r.title}</span>
                   <span className="text-gray-500 ml-2">{r.source}</span>
                   <span className={`ml-2 font-bold ${r.probability !== null ? probColor(r.probability) : 'text-gray-500'}`}>
@@ -442,7 +442,7 @@ export default function IbiTool() {
             </div>
             <button
               onClick={proceedToStage3}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-sm text-white"
             >
               Next → Compare
             </button>
@@ -486,7 +486,7 @@ export default function IbiTool() {
         {stage === 3 && (
           <button
             onClick={exportJson}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-white"
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-sm text-white"
           >
             Export JSON
           </button>
@@ -507,7 +507,7 @@ function ModelSelect({
   return (
     <div className="flex gap-2 items-center">
       <select
-        className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+        className="bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
         value={model}
         onChange={e => onModel(e.target.value)}
         aria-label="Model"
@@ -518,7 +518,7 @@ function ModelSelect({
       </select>
       {model === '__custom__' && (
         <input
-          className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-blue-500"
+          className="flex-1 bg-gray-800 border border-gray-700 rounded-sm px-3 py-2 text-gray-100 focus:outline-hidden focus:border-blue-500"
           value={custom}
           onChange={e => onCustom(e.target.value)}
           placeholder="provider/model-name"

@@ -82,7 +82,7 @@ export default function UsersTable() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, email, or username..."
               aria-label="Search by name, email, or username..."
-              className="pl-10 pr-4 py-2 border border-navy-600 rounded-lg w-full bg-navy-700 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="pl-10 pr-4 py-2 border border-navy-600 rounded-lg w-full bg-navy-700 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-hidden"
             />
           </div>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
@@ -97,7 +97,7 @@ export default function UsersTable() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto border rounded-lg shadow-sm">
+          <div className="overflow-x-auto border rounded-lg shadow-xs">
             <table className="w-full border-collapse bg-navy-700">
               <thead className="bg-navy-800 text-text-secondary text-sm font-semibold uppercase tracking-wider">
                 <tr>
@@ -116,7 +116,7 @@ export default function UsersTable() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-white group-hover:underline">{u.name}</span>
                           {u.isBot && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-cobalt/20 text-cobalt-light font-mono">BOT</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded-sm bg-cobalt/20 text-cobalt-light font-mono">BOT</span>
                           )}
                         </div>
                         <div className="text-xs text-gray-500 font-mono"><bdi>@{u.username || 'unknown'}</bdi></div>
@@ -128,7 +128,7 @@ export default function UsersTable() {
                         value={u.role}
                         onChange={(e) => updateRole(u.id, e.target.value)}
                         aria-label="Change user role"
-                        className={`border rounded p-1 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${u.role === 'ADMIN' ? 'bg-purple-900/20 text-purple-800 border-purple-200' :
+                        className={`border rounded p-1 text-sm outline-hidden focus:ring-2 focus:ring-blue-500 ${u.role === 'ADMIN' ? 'bg-purple-900/20 text-purple-800 border-purple-200' :
                           u.role === 'RESOLVER' ? 'bg-cobalt/10 text-cobalt-light border-cobalt/30' :
                             'bg-navy-700 text-white border-navy-600'
                           }`}
@@ -152,14 +152,14 @@ export default function UsersTable() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 Next
               </button>

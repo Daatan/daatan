@@ -150,7 +150,7 @@ export default function ActivityFeedPage() {
                 {(() => {
                   const action = describeAction(item)
                   return (
-                    <div className="flex-1 bg-navy-700 rounded-xl border border-navy-600 p-4 hover:border-cobalt/30 hover:shadow-sm transition-all">
+                    <div className="flex-1 bg-navy-700 rounded-xl border border-navy-600 p-4 hover:border-cobalt/30 hover:shadow-xs transition-all">
                       {/* Action line: user + verb + coloured choice chip + CU + timestamp */}
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2 flex-wrap text-sm text-text-secondary">
@@ -162,7 +162,7 @@ export default function ActivityFeedPage() {
                             className="font-semibold text-white"
                           />
                           <span>{action.verb}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${action.chipClass}`}>
+                          <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider border ${action.chipClass}`}>
                             {action.chipText}
                           </span>
                           <span className="text-gray-500">·</span>

@@ -106,7 +106,7 @@ export default async function AuthorPublicPage({ params }: Props) {
             <tbody>
               {publications.map((p) => (
                 <tr key={p.id} className="border-t border-navy-700 first:border-t-0">
-                  <td className="px-3 py-2 max-w-[26rem]">
+                  <td className="px-3 py-2 max-w-104">
                     {isUrl(p.url) ? (
                       <a href={p.url} target="_blank" rel="noopener noreferrer"
                          className="inline-flex items-center gap-1 text-blue-500 hover:underline truncate">

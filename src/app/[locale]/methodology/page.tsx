@@ -42,7 +42,7 @@ function HeMethodologyPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-white">שיטת הניקוד של דעתן</h1>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">בקצרה</h2>
         </div>
@@ -56,7 +56,7 @@ function HeMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Brier Score — כיול</h2>
         </div>
@@ -77,7 +77,7 @@ function HeMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">דירוג ELO — עוצמה מול יריב</h2>
         </div>
@@ -93,7 +93,7 @@ function HeMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Glicko-2 — מיומנות מותאמת אי-ודאות</h2>
         </div>
@@ -112,7 +112,7 @@ function HeMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">שיטות ניקוד נוספות</h2>
         </div>
@@ -146,7 +146,7 @@ function RuMethodologyPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-white">Методика подсчёта очков Daatan</h1>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Вкратце</h2>
         </div>
@@ -162,7 +162,7 @@ function RuMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Brier Score — калибровка</h2>
         </div>
@@ -185,7 +185,7 @@ function RuMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Рейтинг ELO — сила относительно соперника</h2>
         </div>
@@ -203,7 +203,7 @@ function RuMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Glicko-2 — мастерство с учётом неопределённости</h2>
         </div>
@@ -225,7 +225,7 @@ function RuMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Дополнительные системы подсчёта очков</h2>
         </div>
@@ -261,7 +261,7 @@ function EoMethodologyPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-white">La poentado-metodo de Daatan</h1>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Mallonge</h2>
         </div>
@@ -277,7 +277,7 @@ function EoMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Brier-Poentaro — kalibrado</h2>
         </div>
@@ -300,7 +300,7 @@ function EoMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">ELO-rangigo — forto kompare al kontraŭulo</h2>
         </div>
@@ -318,7 +318,7 @@ function EoMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Glicko-2 — kapablo adaptita al necerteco</h2>
         </div>
@@ -340,7 +340,7 @@ function EoMethodologyPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Pliaj poentaj sistemoj</h2>
         </div>

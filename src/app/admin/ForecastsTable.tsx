@@ -47,7 +47,7 @@ export default function ForecastsTable() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by claim, author, or email..."
               aria-label="Search by claim, author, or email..."
-              className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none"
+              className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-hidden"
             />
           </div>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
@@ -74,14 +74,14 @@ export default function ForecastsTable() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 Next
               </button>

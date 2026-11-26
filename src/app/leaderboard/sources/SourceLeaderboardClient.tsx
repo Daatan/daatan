@@ -178,8 +178,8 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
               rel="nofollow"
               href={boardHref(v, sort, dir, tag)}
               aria-current={v === view ? 'page' : undefined}
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                v === view ? 'bg-blue-600 text-white shadow-sm' : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                v === view ? 'bg-blue-600 text-white shadow-xs' : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
               }`}
             >
               <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -191,13 +191,13 @@ export default function SourceLeaderboardClient({ authorRows, outletRows, hidden
 
       {tags.length > 0 && (
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
-          <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{tl('filterByTopic')}:</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">{tl('filterByTopic')}:</span>
           {[{ slug: null, name: tl('allTopics') }, ...tags].map(tg => (
             <Link
               key={tg.slug ?? 'all'}
               rel="nofollow"
               href={boardHref(view, sort, dir, tg.slug)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${pillClass((tag ?? null) === tg.slug)}`}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 ${pillClass((tag ?? null) === tg.slug)}`}
             >
               {tg.name}
             </Link>

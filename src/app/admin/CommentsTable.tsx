@@ -83,7 +83,7 @@ export default function CommentsTable() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('searchComments')}
               aria-label={t('searchComments')}
-              className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none"
+              className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-hidden"
             />
           </div>
           <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
@@ -98,7 +98,7 @@ export default function CommentsTable() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto border rounded-lg shadow-sm">
+          <div className="overflow-x-auto border rounded-lg shadow-xs">
             <table className="w-full border-collapse bg-navy-700">
               <thead className="bg-navy-800 text-text-secondary text-sm font-semibold uppercase tracking-wider">
                 <tr>
@@ -131,7 +131,7 @@ export default function CommentsTable() {
                       {!c.deletedAt && (
                         <button
                           onClick={() => deleteComment(c.id)}
-                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-900/20"
+                          className="text-red-600 hover:text-red-800 p-1 rounded-sm hover:bg-red-900/20"
                           title={t('deleteComment')}
                           aria-label={t('deleteComment')}
                         >
@@ -152,14 +152,14 @@ export default function CommentsTable() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 {t('previous')}
               </button>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-navy-800"
+                className="px-3 py-1 border rounded-sm disabled:opacity-50 hover:bg-navy-800"
               >
                 {t('next')}
               </button>

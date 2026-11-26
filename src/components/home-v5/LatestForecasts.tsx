@@ -25,7 +25,7 @@ export async function getLatestBlockData(locale: string): Promise<{ forecasts: F
   }
 }
 
-const TEXT_LINK = 'text-base font-semibold text-[var(--hv5-accent-2)] underline decoration-1 underline-offset-[5px] md:text-[17px]'
+const TEXT_LINK = 'text-base font-semibold text-(--hv5-accent-2) underline decoration-1 underline-offset-[5px] md:text-[17px]'
 
 /**
  * A small, crawlable block of the newest forecasts and the busiest topics (daatan#2027). The
@@ -46,14 +46,14 @@ export default async function LatestForecasts({
   const t = await getTranslations({ locale, namespace: 'HomeV5.latest' })
   const topicLabel = await getTopicLabel(locale)
   return (
-    <section aria-labelledby="hv5-latest" className="bg-[var(--hv5-bg)] pt-16 md:pt-[120px]">
+    <section aria-labelledby="hv5-latest" className="bg-(--hv5-bg) pt-16 md:pt-[120px]">
       <div className={CONTAINER}>
         <h2 id="hv5-latest" className="m-0 text-[24px] font-extrabold leading-[1.2] text-white md:text-[32px]">{t('title')}</h2>
         {forecasts.length > 0 && (
           <ul className="m-0 mt-6 grid list-none grid-cols-1 gap-x-10 p-0 md:mt-9 md:grid-cols-2">
             {forecasts.map((f) => (
               <li key={f.id} className="border-t border-[#1e3858] py-4">
-                <Link href={f.href} dir="auto" className="text-[17px] font-semibold leading-[1.45] text-[var(--hv5-ink)] no-underline hover:text-white hover:underline">
+                <Link href={f.href} dir="auto" className="text-[17px] font-semibold leading-[1.45] text-(--hv5-ink) no-underline hover:text-white hover:underline">
                   {f.text}
                 </Link>
               </li>
@@ -62,11 +62,11 @@ export default async function LatestForecasts({
         )}
         {tags.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center gap-3 md:mt-8">
-            <span className="text-sm text-[var(--hv5-muted)]">{t('topics')}</span>
+            <span className="text-sm text-(--hv5-muted)">{t('topics')}</span>
             <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
               {tags.map((tag) => (
                 <li key={tag.slug}>
-                  <Link href={`/tags/${tag.slug}`} className="block rounded-full border border-[#2c4f7c] px-3 py-[3px] text-sm leading-[1.4] text-[var(--hv5-accent-2)] no-underline hover:bg-white/5">
+                  <Link href={`/tags/${tag.slug}`} className="block rounded-full border border-[#2c4f7c] px-3 py-[3px] text-sm leading-[1.4] text-(--hv5-accent-2) no-underline hover:bg-white/5">
                     {topicLabel(tag.name)}
                   </Link>
                 </li>

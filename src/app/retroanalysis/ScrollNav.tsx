@@ -42,7 +42,7 @@ export default function ScrollNav() {
       onClick={go}
       aria-label={atEnd ? t('backToTop') : t('nextSection')}
       title={atEnd ? t('backToTop') : t('nextSection')}
-      className="fixed end-4 bottom-6 md:end-8 md:bottom-8 z-40 grid place-items-center w-12 h-12 rounded-full bg-gray-900/90 text-white shadow-lg ring-1 ring-white/20 hover:bg-gray-700 transition-colors"
+      className="fixed inset-e-4 bottom-6 md:inset-e-8 md:bottom-8 z-40 grid place-items-center w-12 h-12 rounded-full bg-gray-900/90 text-white shadow-lg ring-1 ring-white/20 hover:bg-gray-700 transition-colors"
     >
       <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden
         className={`transition-transform ${atEnd ? 'rotate-180' : ''}`}>

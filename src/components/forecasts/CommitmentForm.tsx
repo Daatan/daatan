@@ -173,7 +173,7 @@ export default function CommitmentForm({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-cobalt/30 bg-cobalt/10/30 p-4 shadow-sm overflow-hidden">
+    <div className="space-y-4 rounded-xl border border-cobalt/30 bg-cobalt/10/30 p-4 shadow-xs overflow-hidden">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-white flex items-center gap-2">
           {isUpdate ? t('updateCommitment') : t('makeCommitment')}
@@ -203,13 +203,13 @@ export default function CommitmentForm({
       {prediction.outcomeType === 'BINARY' ? (
         <div className="flex gap-2">
           <button type="button" onClick={() => handleSubmit(true)} disabled={isSubmitting}
-            className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+            className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all shadow-xs ${
               isCurrentOption(true) ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-navy-700 text-text-secondary hover:bg-teal/10 hover:text-teal'
             } disabled:opacity-50 disabled:cursor-not-allowed`}>
             {isSubmitting ? '...' : isUpdate && isCurrentOption(true) ? t('update') : t('willHappen')}
           </button>
           <button type="button" onClick={() => handleSubmit(false)} disabled={isSubmitting}
-            className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+            className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all shadow-xs ${
               isCurrentOption(false) ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-navy-700 text-text-secondary hover:bg-red-900/20 hover:text-red-400'
             } disabled:opacity-50 disabled:cursor-not-allowed`}>
             {isSubmitting ? '...' : isUpdate && isCurrentOption(false) ? t('update') : t('wontHappen')}
@@ -219,7 +219,7 @@ export default function CommitmentForm({
         <div className="space-y-2">
           {prediction.options?.map((option) => (
             <button key={option.id} type="button" onClick={() => handleSubmit(option.id)} disabled={isSubmitting}
-              className={`w-full text-left rounded-lg px-4 py-3 text-sm font-medium transition-all shadow-sm flex items-center justify-between ${
+              className={`w-full text-left rounded-lg px-4 py-3 text-sm font-medium transition-all shadow-xs flex items-center justify-between ${
                 isCurrentOption(option.id) ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-navy-700 text-white hover:bg-cobalt/10 hover:text-cobalt-light'
               } disabled:opacity-50 disabled:cursor-not-allowed`}>
               <span>{option.text}</span>

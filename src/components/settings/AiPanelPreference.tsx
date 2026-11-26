@@ -54,7 +54,7 @@ export default function AiPanelPreference() {
       <button
         onClick={toggle}
         disabled={enabled == null || saving}
-        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
           enabled ? 'bg-blue-600' : 'bg-navy-600'
         } disabled:opacity-50`}
         role="switch"

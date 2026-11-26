@@ -26,16 +26,16 @@ function Rings({ side }: { side: 'start' | 'end' }) {
 export default async function ClosingCta({ locale, links }: { locale: string; links: HomeLinks }) {
   const t = await getTranslations({ locale, namespace: 'HomeV5' })
   return (
-    <section className="relative overflow-hidden bg-[var(--hv5-panel)]">
-      <div className="pointer-events-none absolute -start-[140px] top-1/2 hidden -translate-y-1/2 md:block rtl:-scale-x-100" aria-hidden="true">
+    <section className="relative overflow-hidden bg-(--hv5-panel)">
+      <div className="pointer-events-none absolute inset-s-[-140px] top-1/2 hidden -translate-y-1/2 md:block rtl:-scale-x-100" aria-hidden="true">
         <Rings side="start" />
       </div>
-      <div className="pointer-events-none absolute -end-[140px] top-1/2 hidden -translate-y-1/2 md:block rtl:-scale-x-100" aria-hidden="true">
+      <div className="pointer-events-none absolute inset-e-[-140px] top-1/2 hidden -translate-y-1/2 md:block rtl:-scale-x-100" aria-hidden="true">
         <Rings side="end" />
       </div>
       <div className={`${CONTAINER} relative flex flex-col items-center py-16 text-center md:py-24`}>
         <h2 className="m-0 text-[30px] font-extrabold leading-[1.2] text-white md:text-[40px]">{t('cta.title')}</h2>
-        <p className="mt-3.5 text-lg leading-[1.55] text-[var(--hv5-body)] md:text-xl">{t('cta.subtitle')}</p>
+        <p className="mt-3.5 text-lg leading-[1.55] text-(--hv5-body) md:text-xl md:leading-7">{t('cta.subtitle')}</p>
         <div className="mt-9 flex w-full flex-col justify-center gap-3.5 sm:w-auto sm:flex-row">
           <PrimaryButton href={links.forecasts}>{t('hero.ctaForecasts')}</PrimaryButton>
           <OutlineButton href={links.sources}>{t('hero.ctaSources')}</OutlineButton>
