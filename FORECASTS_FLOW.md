@@ -233,7 +233,7 @@ Resolution starts when:
 1. `resolve_by_datetime` arrives (the `transition-expired-predictions` cron, every 15 min, moves `active` → `pending`). A date-only deadline (stored as 23:59 UTC) ends at **midnight in Israel** at the end of that date, 2–3 h before the stamp; any other stamp is an exact time (`deadlineEndsAt` in `src/lib/utils/date.ts`, daatan#2030), **OR**
 2. An earlier authoritative source enables resolution
 
-Nothing else moves `active` → `pending`, so an edit that moves a `pending` forecast's deadline to one that has not ended puts it back to `active` (daatan#2262): staking reopens and it leaves Awaiting Resolution. A retro simulation stays as it is.
+An edit that moves a `pending` forecast's deadline to one that has not ended puts it back to `active` (daatan#2262, `reopensOnNewDeadline` in `src/lib/services/forecast.ts`): staking reopens and it leaves Awaiting Resolution. A retro simulation stays as it is.
 
 ---
 

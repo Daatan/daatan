@@ -271,10 +271,10 @@ breaks determinism at `temperature: 0`.
 
 ### AWS/GCP credits: not about cost — about not having a single point of failure
 
-Of the five, only `qwen3-235b-a22b-2507` exists on Bedrock
-(`qwen.qwen3-235b-a22b-2507-v1:0`, eu-central-1). Bedrock carries OpenAI's and Google's
-*open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models; xAI and
-DeepSeek's own hosted checkpoint are absent entirely. Substituting open-weights cousins
+Of the five members when this was first decided, only `qwen3-235b-a22b-2507` existed on
+Bedrock (`qwen.qwen3-235b-a22b-2507-v1:0`, eu-central-1). Bedrock carried OpenAI's and
+Google's *open-weights* lines (`gpt-oss-*`, `gemma-3-*`), not their flagship API models;
+xAI and DeepSeek's own hosted checkpoint were absent entirely. Substituting open-weights cousins
 under the same member label would poison the per-member comparison, so DeepSeek, Grok,
 and Gemma stayed on OpenRouter — Gemini, whose flagship API *is* a first-party Google
 surface, moved to Vertex instead (daatan#1513). That changed in daatan#2283: DeepSeek V3.2,
