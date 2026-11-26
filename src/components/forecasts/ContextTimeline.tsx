@@ -139,7 +139,7 @@ type Props = {
 }
 
 /** Map a snapshot's persisted probability + Oracul CI (if any) into the callback shape. */
-const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
+export const toAiEstimate = (snap: Snapshot | undefined): AiEstimate | null => {
   if (!snap) return null
   // The latest run abstained — surface "Insufficient evidence", not a stale number.
   if (snap.insufficientData) return { probability: null, abstained: true }

@@ -19,6 +19,7 @@ import { findNearForecasts } from '@/lib/services/retro-generator/check'
 import type { PoolReport } from '@/lib/services/retro-generator/types'
 import {
   findTopicSuggestions,
+  renderSuggestPrompt,
   validateSuggestions,
   MAX_SUGGESTIONS,
   SUGGEST_DEFAULTS,
@@ -76,10 +77,20 @@ describe('validateSuggestions', () => {
     ['deadline_out_of_range', { deadline: '2035-01-01' }],
     ['no_rules', { resolutionRules: ' ' }],
     ['claim_too_long', { claim: `${'x'.repeat(490)} by {DEADLINE}.` }],
+    ['non_event_wording', { claim: 'Iran will cease all missile and drone attacks on Bahrain by {DEADLINE}.' }],
+    ['non_event_wording', { claim: 'Matan Kahana will remain Knesset speaker by {DEADLINE}.' }],
+    ['non_event_wording', { claim: "Gadi Eisenkot's mandate will expire without a government by {DEADLINE}." }],
+    ['non_event_wording', { claim: 'Iran will not attack Bahrain for 30 consecutive days by {DEADLINE}.' }],
+    ['non_event_wording', { claim: 'The S&P 500 will close lower for ten consecutive trading days by {DEADLINE}.' }],
   ])('skips a question with %s', (reason, over) => {
     const out = validateSuggestions({ stories: [{ title: 'Coalition', groups: [1], questions: [question(over)] }] }, groups, forecasts, now)
     expect(out.suggestions).toEqual([])
     expect(out.skipped.map((s) => s.reason)).toEqual([reason])
+  })
+
+  it('keeps a claim where the non-event word is only part of another word', () => {
+    const out = validateSuggestions({ stories: [{ title: 'Hostages', groups: [1], questions: [question({ claim: 'The remaining hostages will be released by {DEADLINE}.' })] }] }, groups, forecasts, now)
+    expect(out.suggestions).toHaveLength(1)
   })
 
   it('gives a group to the first story that claims it, and drops a story left with none', () => {
@@ -110,6 +121,13 @@ describe('validateSuggestions', () => {
 
   it('treats a malformed answer as no stories', () => {
     expect(validateSuggestions({ stories: 'nope' }, groups, forecasts, now)).toEqual({ stories: [], suggestions: [], skipped: [] })
+  })
+})
+
+describe('renderSuggestPrompt', () => {
+  it('offers a step deadline at the end of the month about three months out', () => {
+    const out = renderSuggestPrompt('{{today}}|{{minDeadline}}|{{stepDeadline}}|{{defaultDeadline}}', groups, forecasts, now)
+    expect(out).toBe('2026-11-24|2026-12-01|2027-02-28|2027-12-31')
   })
 })
 

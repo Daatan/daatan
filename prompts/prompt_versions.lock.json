@@ -194,9 +194,9 @@
       "schema_chars": null
     },
     "topic-suggest": {
-      "version": "v1",
-      "hash": "b28c67df4d570a23",
-      "chars": 3528,
+      "version": "v2",
+      "hash": "0305fa7f2bcf9b1a",
+      "chars": 5598,
       "schema": "topicSuggestSchema",
       "schema_hash": "cc26041087d0917f",
       "schema_chars": 1371

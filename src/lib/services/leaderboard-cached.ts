@@ -2,6 +2,7 @@ import { unstable_cache } from 'next/cache'
 import { getLeaderboard, type SortBy } from '@/lib/services/leaderboard'
 import {
   getSourceLeaderboard,
+  type OutletLeaderboardRow,
   type SourceLeaderboardView,
   type SourceSortBy,
 } from '@/lib/services/sourceLeaderboard'
@@ -33,3 +34,12 @@ export const getCachedSourceLeaderboard = unstable_cache(
   ['leaderboard-sources-api'],
   { revalidate: 300, tags: ['leaderboard-sources'] },
 )
+
+/** Outlets on the public sources board. Only their /sources pages are indexed and listed in the
+ *  sitemap; a source below the board's threshold is a thin page (daatan#2337). Reads the board's
+ *  own default cache entry. When the Oracul is unreachable the board is empty, so this fails
+ *  closed: noindex and no sitemap entries, as the pages then show no track record either. */
+export async function getBoardOutlets(): Promise<OutletLeaderboardRow[]> {
+  const board = await getCachedSourceLeaderboard('outlets', 'skillConservative', null)
+  return board.outletRows
+}

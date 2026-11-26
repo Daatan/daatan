@@ -1,7 +1,8 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 
 interface SpeedometerProps {
-  percentage?: number // Market average (default needle)
+  /** Community average (grey tick). null = no commitments yet: no tick (daatan#2323). */
+  percentage?: number | null
   userPercentage?: number // Thick interactive needle
   aiPercentage?: number // AI mark
   /** Lower bound of AI confidence interval (0–100). Renders a translucent band when paired with aiCiHigh. */
@@ -28,7 +29,7 @@ export default function Speedometer({
   size = 'md',
   onUserPercentageChange,
 }: SpeedometerProps) {
-  const safeMarketPct = isNaN(percentage) ? 50 : Math.min(100, Math.max(0, percentage))
+  const safeMarketPct = percentage == null || isNaN(percentage) ? 50 : Math.min(100, Math.max(0, percentage))
 
   const sizes = {
     xs: { width: 64, height: 40, strokeWidth: 4, fontSize: '10px', needleBase: 3.5, pivotRadius: 2.5 },
@@ -274,11 +275,12 @@ export default function Speedometer({
           )
         })()}
 
-        {/* Market Mark (tick) */}
-        {(() => {
+        {/* Community Mark (tick) */}
+        {percentage !== null && (() => {
           const { x1, y1, x2, y2 } = getTickEnds(safeMarketPct)
           return (
             <line
+              data-testid="community-tick"
               x1={x1} y1={y1} x2={x2} y2={y2}
               stroke={theme.needleMarket}
               strokeWidth={2}

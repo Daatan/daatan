@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { Bot, Medal, Newspaper, Swords, Trophy } from 'lucide-react'
+import { brierGrade, type BrierGrade } from '@/lib/utils/brier-grade'
 
 // Shared by the user, AI-panel, source and versus leaderboards so the boards read as one surface.
 // No hooks: the AI and versus boards are server components.
@@ -60,11 +61,15 @@ export const HEAD_CELL = 'py-4 text-[10px] sm:text-xs font-bold uppercase tracki
 export const BODY = 'divide-y divide-gray-100/10'
 
 /** Lower Brier is better. 0.25 is a coin flip; colour by how far below that a score is. */
+const BRIER_TONE: Record<BrierGrade, string> = {
+  excellent: 'text-emerald-400',
+  good: 'text-lime-400',
+  fair: 'text-yellow-400',
+  poor: 'text-red-400',
+}
+
 export function brierTone(brier: number): string {
-  if (brier <= 0.1) return 'text-emerald-400'
-  if (brier <= 0.2) return 'text-lime-400'
-  if (brier < 0.25) return 'text-yellow-400'
-  return 'text-red-400'
+  return BRIER_TONE[brierGrade(brier)]
 }
 
 /** The active column's figure is the one the board is ranked by, so it reads largest. */

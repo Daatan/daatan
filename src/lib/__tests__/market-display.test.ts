@@ -7,6 +7,8 @@ import {
   marketDeadlineMismatch,
   marketDivergenceBound,
   marketDivergenceGap,
+  latestMarketReading,
+  MARKET_STALE_HOURS,
 } from '../market-display'
 
 describe('marketDisplayProbability', () => {
@@ -39,15 +41,40 @@ describe('trackedOutcomeLabel', () => {
 
 describe('marketLineName', () => {
   it('labels a plain link with the provider', () => {
-    expect(marketLineName('Polymarket', false, null)).toBe('Polymarket')
+    expect(marketLineName('Polymarket', null, null)).toBe('Polymarket')
   })
 
   it('flags inversion in the legend', () => {
-    expect(marketLineName('Polymarket', true, null)).toBe('Polymarket, inverted')
+    expect(marketLineName('Polymarket', 'inverted', null)).toBe('Polymarket, inverted')
   })
 
   it('names the tracked outcome for non-Yes/No markets', () => {
-    expect(marketLineName('Polymarket', false, 'Knicks')).toBe('"Knicks" (Polymarket)')
+    expect(marketLineName('Polymarket', null, 'Knicks')).toBe('"\u2068Knicks\u2069" (Polymarket)')
+  })
+})
+
+// daatan#2323
+describe('latestMarketReading', () => {
+  const now = Date.parse('2026-11-25T12:00:00Z')
+  const snaps = [
+    { createdAt: '2026-11-20T00:00:00Z', probability: 30 },
+    { createdAt: '2026-11-25T04:25:00Z', probability: 34 },
+  ]
+
+  it('reads the newest snapshot, polarity-adjusted', () => {
+    expect(latestMarketReading(snaps, false, now)).toEqual({ probability: 34, at: '2026-11-25T04:25:00Z', stale: false })
+    expect(latestMarketReading(snaps, true, now)?.probability).toBe(66)
+  })
+
+  it('marks a price older than the stale window', () => {
+    const old = [{ createdAt: '2026-11-23T11:00:00Z', probability: 34 }]
+    expect(MARKET_STALE_HOURS).toBe(48)
+    expect(latestMarketReading(old, false, now)?.stale).toBe(true)
+    expect(latestMarketReading([{ createdAt: '2026-11-23T13:00:00Z', probability: 34 }], false, now)?.stale).toBe(false)
+  })
+
+  it('is null with no snapshot', () => {
+    expect(latestMarketReading([], false, now)).toBeNull()
   })
 })
 

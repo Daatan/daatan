@@ -16,6 +16,7 @@ vi.mock('@/lib/prisma', () => ({
 
 import { prisma } from '@/lib/prisma'
 import { GET, PATCH } from '../route'
+import { FEED_TAGS_MAX } from '@/lib/validations/api-inputs'
 
 const findUnique = vi.mocked(prisma.user.findUnique)
 const update = vi.mocked(prisma.user.update)
@@ -97,7 +98,7 @@ describe('PATCH /api/user/preferences', () => {
   })
 
   it('400s on bad feedTags or an empty body, writing nothing', async () => {
-    for (const bad of [{ feedTags: 'AI' }, { feedTags: [1] }, { feedTags: [''] }, { feedTags: ['x'.repeat(51)] }, { feedTags: Array(21).fill('AI') }, {}]) {
+    for (const bad of [{ feedTags: 'AI' }, { feedTags: [1] }, { feedTags: [''] }, { feedTags: ['x'.repeat(51)] }, { feedTags: Array(FEED_TAGS_MAX + 1).fill('AI') }, {}]) {
       const res = await PATCH(patchReq(bad), CTX)
       expect(res.status).toBe(400)
     }

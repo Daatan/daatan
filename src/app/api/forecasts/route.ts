@@ -15,6 +15,7 @@ import { toError } from '@/lib/utils/error'
 import { withRetry } from '@/lib/utils/retry'
 import { findClaimTextDeadlineMismatch } from '@/lib/utils/extractDatesFromText'
 import { formatDisplayDate } from '@/lib/utils/date'
+import { tagSlug } from '@/lib/utils/tag-slug'
 import { getOrCreateDaatanUser } from '@/lib/services/daatan-author'
 
 const log = createLogger('api-forecasts')
@@ -84,7 +85,8 @@ export async function GET(request: NextRequest) {
     if (query.tags) {
       const tagNames = query.tags.split(',').map(t => t.trim()).filter(Boolean)
       if (tagNames.length > 0) {
-        where.tags = { some: { name: { in: tagNames } } }
+        // By slug, so the "Politics" topic also finds a tag stored as "politics" (daatan#2330).
+        where.tags = { some: { slug: { in: tagNames.map(tagSlug) } } }
       }
     }
 

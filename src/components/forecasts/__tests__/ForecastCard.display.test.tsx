@@ -4,6 +4,8 @@ import { useSession } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import ForecastCard, { Prediction } from '../ForecastCard'
 import messages from '../../../../messages/en.json'
+import heMessages from '../../../../messages/he.json'
+import ruMessages from '../../../../messages/ru.json'
 
 const renderWithIntl = (ui: React.ReactElement) =>
   render(<NextIntlClientProvider locale="en" messages={messages}>{ui}</NextIntlClientProvider>)
@@ -208,5 +210,39 @@ describe('ForecastCard navigation link', () => {
       renderWithIntl(<ForecastCard prediction={{ ...basePrediction, status: 'PENDING', resolveByDatetime: deadline }} />)
       expect(screen.queryByText('Expires today')).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('ForecastCard topic chips (daatan#2330)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as never)
+  })
+
+  it('translates standard topics in any spelling and leaves other tags as stored', () => {
+    const prediction = { ...basePrediction, tags: [{ name: 'politics', slug: 'politics' }, { name: 'Israel', slug: 'israel' }] }
+    render(<NextIntlClientProvider locale="ru" messages={ruMessages}><ForecastCard prediction={prediction} /></NextIntlClientProvider>)
+    expect(screen.getByRole('link', { name: 'Политика' })).toHaveAttribute('href', '/tags/politics')
+    expect(screen.getByRole('link', { name: 'Israel' })).toBeInTheDocument()
+  })
+})
+
+describe('ForecastCard in Hebrew (daatan#2333)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(useSession).mockReturnValue({ data: null, status: 'unauthenticated' } as never)
+  })
+
+  it('shows the deadline in the page language, not "Mar 19, 2027"', () => {
+    const prediction = { ...basePrediction, resolveByDatetime: '2027-03-19T12:00:00.000Z' }
+    render(<NextIntlClientProvider locale="he" messages={heMessages}><ForecastCard prediction={prediction} /></NextIntlClientProvider>)
+    expect(document.body.textContent).toContain(new Date('2027-03-19T12:00:00.000Z').toLocaleDateString('he', { month: 'short', day: 'numeric', year: 'numeric' }))
+    expect(document.body.textContent).not.toMatch(/Mar 19, 2027/)
+  })
+
+  it('links the Hebrew forecast page, so crawlers reach translated pages through links (daatan#2336)', () => {
+    const prediction = { ...basePrediction, slug: 'will-x-happen' }
+    render(<NextIntlClientProvider locale="he" messages={heMessages}><ForecastCard prediction={prediction} /></NextIntlClientProvider>)
+    expect(screen.getByRole('link', { name: basePrediction.claimText })).toHaveAttribute('href', '/he/forecasts/will-x-happen')
   })
 })

@@ -8,14 +8,27 @@ import { useTranslations } from 'next-intl'
 import ForecastCard, { Prediction } from '@/components/forecasts/ForecastCard'
 import { ForecastCardSkeleton } from '@/components/forecasts/ForecastCardSkeleton'
 import EmptyState from '@/components/ui/EmptyState'
+import { TopicFilter } from '@/components/feed/TopicFilter'
+import { useRememberedTopics } from '@/components/feed/useRememberedTopics'
+import type { TopicCounts } from '@/lib/topics'
 
 type FilterStatus = 'ACTIVE' | 'PENDING' | 'RESOLVED' | 'CLOSING_SOON' | 'ALL'
+
+function forecastsHref(q: string, tags: string[]): string {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (tags.length > 0) params.set('tags', tags.join(','))
+  return `/forecasts${params.size ? `?${params}` : ''}`
+}
 
 export function PredictionsPage({
   initialPredictions,
   pagination,
+  topicCounts = {},
 }: {
   initialPredictions?: Prediction[]
+  /** Open forecasts per topic slug, for ordering the topic chips (daatan#2330). */
+  topicCounts?: TopicCounts
   /** Server-rendered prev/next links for the SSR page (daatan#2027); they describe the default view only. */
   pagination?: React.ReactNode
 }) {
@@ -23,6 +36,7 @@ export function PredictionsPage({
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialQ = searchParams.get('q') ?? ''
+  const urlTags = searchParams.get('tags')?.split(',').filter(Boolean) ?? null
 
   const [predictions, setPredictions] = useState<Prediction[]>(initialPredictions ?? [])
   const [isLoading, setIsLoading] = useState(!initialPredictions?.length)
@@ -31,8 +45,10 @@ export function PredictionsPage({
   const [searchInput, setSearchInput] = useState(initialQ)
   const [activeQuery, setActiveQuery] = useState(initialQ)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  // Skip the first client-side fetch when SSR data covers the default view (ACTIVE, no query)
-  const ssrConsumed = useRef(!!(initialPredictions?.length) && !initialQ)
+  // Same remembered topics as the home feed (daatan#2330).
+  const [selectedTags, chooseTopics] = useRememberedTopics(urlTags)
+  // Skip the first client-side fetch when SSR data covers the default view (ACTIVE, no query, no topics)
+  const ssrConsumed = useRef(!!(initialPredictions?.length) && !initialQ && !urlTags?.length)
   // The SSR page links stop describing the list once the client has fetched its own.
   const [showingSsrPage, setShowingSsrPage] = useState(true)
 
@@ -47,7 +63,7 @@ export function PredictionsPage({
   }
 
   useEffect(() => {
-    if (ssrConsumed.current && filter === 'ACTIVE' && !activeQuery) {
+    if (ssrConsumed.current && filter === 'ACTIVE' && !activeQuery && selectedTags.length === 0) {
       ssrConsumed.current = false
       return
     }
@@ -65,6 +81,7 @@ export function PredictionsPage({
         else if (filter === 'CLOSING_SOON') url += '&status=ACTIVE&closingSoon=true'
 
         if (activeQuery) url += `&q=${encodeURIComponent(activeQuery)}`
+        if (selectedTags.length > 0) url += `&tags=${encodeURIComponent(selectedTags.join(','))}`
 
         const response = await fetch(url)
         if (response.ok) {
@@ -84,21 +101,24 @@ export function PredictionsPage({
     }
 
     fetchPredictions()
-  }, [filter, activeQuery])
+  }, [filter, activeQuery, selectedTags])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     const q = searchInput.trim()
     setActiveQuery(q)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    router.replace(`/forecasts${params.size ? `?${params}` : ''}`)
+    router.replace(forecastsHref(q, selectedTags))
   }
 
   const clearSearch = () => {
     setSearchInput('')
     setActiveQuery('')
-    router.replace('/forecasts')
+    router.replace(forecastsHref('', selectedTags))
+  }
+
+  const handleTopics = (tags: string[]) => {
+    chooseTopics(tags)
+    router.replace(forecastsHref(activeQuery, tags), { scroll: false })
   }
 
   const filterLabel = {
@@ -147,7 +167,7 @@ export function PredictionsPage({
               className="w-full bg-navy-700 text-white text-sm pl-9 pr-8 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
             />
             {searchInput && (
-              <button type="button" onClick={clearSearch} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+              <button type="button" onClick={clearSearch} aria-label={t('clearSearch')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -173,6 +193,8 @@ export function PredictionsPage({
             </button>
           ))}
         </div>
+
+        <TopicFilter selected={selectedTags} counts={topicCounts} onChange={handleTopics} />
       </div>
 
       {/* Loading */}
@@ -198,7 +220,7 @@ export function PredictionsPage({
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-full text-xs font-medium">
                   <Search className="w-3 h-3" />
                   {activeQuery}
-                  <button onClick={clearSearch} aria-label="Clear search" className="hover:text-white ml-0.5">
+                  <button onClick={clearSearch} aria-label={t('clearSearch')} className="hover:text-white ml-0.5">
                     <X className="w-3 h-3" />
                   </button>
                 </span>

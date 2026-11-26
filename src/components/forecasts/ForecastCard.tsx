@@ -35,7 +35,9 @@ import {
   PenLine,
 } from 'lucide-react'
 import { UserLink } from '@/components/UserLink'
+import { forecastHref } from '@/lib/forecast-href'
 import Speedometer from './Speedometer'
+import { useTopicLabel } from '@/components/feed/useTopicLabel'
 
 export type Prediction = {
   id: string
@@ -100,6 +102,7 @@ export default function ForecastCard({
   const { data: session } = useSession()
   const router = useRouter()
   const t = useTranslations('forecast')
+  const topicLabel = useTopicLabel()
   const tt = useTranslations('translate')
   const locale = useLocale()
   const nowMs = useNowMs()
@@ -254,7 +257,8 @@ export default function ForecastCard({
 
   const formatDate = (date: string | Date) => {
     if (!isMounted) return ''
-    return new Date(date).toLocaleDateString('en-US', {
+    // In the reader's language (daatan#2333): a Hebrew page showed "MAR 19, 2027".
+    return new Date(date).toLocaleDateString(locale, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -324,8 +328,10 @@ export default function ForecastCard({
   }
 
   const badge = getStatusBadge(prediction.status)
-  const forecastUrl = `/forecasts/${prediction.slug || prediction.id}`
+  const forecastUrl = forecastHref(prediction.slug || prediction.id, locale)
   const showMenu = !canApprove && (canAdminister || canResolve)
+  // The claim as shown, so a screen reader reads the same language as the page (daatan#2333).
+  const shownClaim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
 
   return (
     <div className="group relative block p-4 sm:p-5 bg-navy-700 border border-navy-600 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
@@ -334,7 +340,7 @@ export default function ForecastCard({
           offers "open in new tab". Interactive children sit above it via z-[2]. */}
       <Link
         href={forecastUrl}
-        aria-label={prediction.claimText}
+        aria-label={shownClaim}
         className="absolute inset-0 z-[1]"
       />
 
@@ -501,10 +507,10 @@ export default function ForecastCard({
                     key={tag.name}
                     href={tag.slug ? `/tags/${tag.slug}` : `/?tags=${encodeURIComponent(tag.name)}`}
                     prefetch={false}
-                    title={t('filterByTagTooltip', { tag: tag.name })}
+                    title={t('filterByTagTooltip', { tag: topicLabel(tag.name) })}
                     className="relative z-[2] px-2 py-0.5 bg-cobalt/10 text-cobalt-light hover:bg-cobalt/20 text-[10px] sm:text-xs lg:text-sm font-medium rounded-full border border-cobalt/20 transition-colors"
                   >
-                    {tag.name}
+                    {topicLabel(tag.name)}
                   </Link>
                 ))}
               </>
@@ -532,7 +538,7 @@ export default function ForecastCard({
           {/* Claim Text. With a headline (#1814) the headline is the title and the
               full claim sits under it; without one, the claim is the title as before. */}
           {(() => {
-            const claim = showTranslated && translatedClaim ? translatedClaim : prediction.claimText
+            const claim = shownClaim
             const headline = prediction.headline
               ? (showTranslated && translatedHeadline ? translatedHeadline : prediction.headline)
               : null

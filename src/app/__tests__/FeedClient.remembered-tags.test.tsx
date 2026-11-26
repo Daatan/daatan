@@ -1,8 +1,9 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { useSession } from 'next-auth/react'
 import messages from '../../../messages/en.json'
+import ruMessages from '../../../messages/ru.json'
 
 // daatan#2203: the home feed remembers the tag filter — localStorage for guests, the
 // account for signed-in users — and applies it only when the URL names no tags.
@@ -62,11 +63,10 @@ describe('FeedClient remembered tags (daatan#2203)', () => {
 
   it('guest: toggling and clearing a tag is remembered, clear persists an empty list', async () => {
     renderFeed()
-    fireEvent.click(screen.getByTitle(messages.feed.filterHints.tags))
     fireEvent.click(screen.getByRole('button', { name: 'AI' }))
     expect(JSON.parse(localStorage.getItem('daatan_feed_tags')!)).toEqual(['AI'])
 
-    fireEvent.click(screen.getByLabelText('Clear all selected tags'))
+    fireEvent.click(screen.getByRole('button', { name: messages.topics.clear }))
     expect(JSON.parse(localStorage.getItem('daatan_feed_tags')!)).toEqual([])
   })
 
@@ -80,5 +80,25 @@ describe('FeedClient remembered tags (daatan#2203)', () => {
     await waitFor(() => expect(prefPatches()).toHaveLength(1))
     expect(JSON.parse(prefPatches()[0][1].body)).toEqual({ feedTags: ['Economy', 'AI'] })
     expect(localStorage.getItem('daatan_feed_tags')).toBeNull()
+  })
+})
+
+describe('FeedClient topic chips (daatan#2330)', () => {
+  it('shows the topics without a toggle, translated, most-open first, and hides empty ones', async () => {
+    render(
+      <NextIntlClientProvider locale="ru" messages={ruMessages}>
+        <FeedClient topicCounts={{ economy: 3, politics: 9, ai: 0 }} />
+      </NextIntlClientProvider>,
+    )
+    const chips = within(screen.getByRole('group', { name: ruMessages.topics.filterLabel })).getAllByRole('button')
+    expect(chips.map((c) => c.textContent)).toEqual(['Политика', 'Экономика'])
+  })
+
+  it('picks several topics and asks for forecasts with any of them', async () => {
+    renderFeed()
+    fireEvent.click(screen.getByRole('button', { name: 'Politics' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Economy' }))
+    await waitFor(() => expect(feedCalls().some((u) => u.includes(`tags=${encodeURIComponent('Politics,Economy')}`))).toBe(true))
+    expect(screen.getByTestId('topics-selected')).toHaveTextContent('2 topics')
   })
 })

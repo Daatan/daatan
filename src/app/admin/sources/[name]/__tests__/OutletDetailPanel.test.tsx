@@ -92,6 +92,31 @@ describe('OutletDetailPanel', () => {
     expect(body.wikipedia_url).toBe('https://en.wikipedia.org/wiki/Reuters')
   })
 
+  it('edits the display name and description per language and saves both maps (news-indexer#557)', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(url.includes('shadow-score')
+          ? { rows: [] }
+          : { ...baseDetail, displayName: { en: 'Reuters World' }, description: { en: 'Wire service.' } }),
+      }),
+    )
+    renderWithIntl(<OutletDetailPanel name="Reuters" />)
+    await waitFor(() => expect(screen.getByDisplayValue('Reuters World')).toBeInTheDocument())
+    expect(screen.getByDisplayValue('Wire service.')).toBeInTheDocument()
+
+    const [heName, heDescription] = screen.getAllByLabelText('he')
+    fireEvent.change(heName, { target: { value: 'רויטרס' } })
+    fireEvent.change(heDescription, { target: { value: 'סוכנות ידיעות.' } })
+    fireEvent.click(screen.getByRole('button', { name: /Save/ }))
+
+    await waitFor(() => expect(mockFetch.mock.calls.some(([, opts]) => opts?.method === 'PUT')).toBe(true))
+    const putCall = mockFetch.mock.calls.find(([, opts]) => opts?.method === 'PUT')
+    const body = JSON.parse(putCall![1].body)
+    expect(body.display_name).toEqual({ en: 'Reuters World', he: 'רויטרס' })
+    expect(body.description).toEqual({ en: 'Wire service.', he: 'סוכנות ידיעות.' })
+  })
+
   it('fills the Wikipedia URL from a picked lookup result', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('shadow-score')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ rows: [] }) })

@@ -6,9 +6,10 @@ import { JsonLd } from '@/components/JsonLd'
 import PaginationLinks, { pageHref, parsePageParam } from '@/components/ui/PaginationLinks'
 import { getAppUrl } from '@/lib/branding'
 import { FEED_PAGE_SIZE, getFeedPage, isPageOutOfRange } from './feed-page'
+import { getOpenTopicCounts } from '@/lib/services/topic-counts'
 
 interface Props {
-  searchParams: Promise<{ page?: string | string[] }>
+  searchParams: Promise<{ page?: string | string[]; tags?: string | string[] }>
 }
 
 const TITLE = 'Forecasts — Browse Predictions'
@@ -16,19 +17,23 @@ const TITLE = 'Forecasts — Browse Predictions'
 // Each ?page=N is its own crawlable page with a self-canonical (daatan#2027); page 1 keeps the
 // bare /forecasts canonical.
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const page = parsePageParam((await searchParams).page)
+  const params = await searchParams
+  const page = parsePageParam(params.page)
   const url = pageHref('/forecasts', page)
   return {
     title: page > 1 ? `${TITLE} — Page ${page}` : TITLE,
     description: 'Browse open and resolved predictions on DAATAN. Stake your reputation on geopolitics, economics, technology, and more. Track accuracy with Brier scores and ELO rankings.',
     alternates: { canonical: url },
     openGraph: { url, type: 'website' },
+    // A topic-filtered view renders client-side over the unfiltered SSR page; keep it out of the
+    // index (same as the home feed's ?tags=).
+    ...(params.tags ? { robots: { index: false, follow: false } } : {}),
   }
 }
 
 export default async function ForecastsPage({ searchParams }: Props) {
   const page = parsePageParam((await searchParams).page)
-  const { predictions, totalPages } = await getFeedPage(page)
+  const [{ predictions, totalPages }, topicCounts] = await Promise.all([getFeedPage(page), getOpenTopicCounts()])
   if (isPageOutOfRange(page, totalPages)) notFound()
 
   const t = await getTranslations('forecastsFeed')
@@ -51,6 +56,7 @@ export default async function ForecastsPage({ searchParams }: Props) {
       <JsonLd data={itemListJsonLd} />
       <PredictionsPage
         initialPredictions={predictions}
+        topicCounts={topicCounts}
         pagination={
           <PaginationLinks
             base="/forecasts"

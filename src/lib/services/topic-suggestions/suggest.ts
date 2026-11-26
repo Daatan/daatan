@@ -35,6 +35,8 @@ export const MAX_QUESTIONS_PER_STORY = 3
 export const MAX_SUGGESTIONS = 12
 /** A question must stay open at least this long, or nobody gets to forecast it. */
 export const MIN_HORIZON_DAYS = 7
+/** A step on the way usually lands within months: its default deadline is the end of the month this many days out. */
+export const STEP_HORIZON_DAYS = 90
 const MAX_HORIZON_DAYS = 5 * 366
 /**
  * At or above this cosine a suggestion repeats a forecast's wording (rewordings of one claim
@@ -42,6 +44,15 @@ const MAX_HORIZON_DAYS = 5 * 366
  * `coveredBy`, which is the real dedupe.
  */
 export const DUPLICATE_MIN_SCORE = 0.95
+/**
+ * Wording for a non-event: something stopping, lasting, not happening, or a streak. Such a claim
+ * comes true by default, cannot be confirmed, or is a statistic. The prompt forbids it, yet
+ * gemini-2.5-flash still wrote "Iran will cease all attacks on Bahrain" and, when that word was
+ * gated, "Iran will not attack Bahrain for 30 consecutive days" (#2308). Repeats ("another",
+ * "again") are a real forecast form (#2094), so only the prompt steers those; "stay" is left out
+ * because a court grants one.
+ */
+export const NON_EVENT_WORDING = /\b(?:ceases?|remains?|continues?|expires?|consecutive|will not|won't)\b/i
 /**
  * The whole run, measured from the route's start, stops the model call here: the workflow's
  * curl gives up at 118 s, and a Vertex timeout (60 s) followed by the Oracul fallback (up to
@@ -133,19 +144,27 @@ function forecastLine(f: OpenForecast, i: number): string {
   return `[${i + 1}] (resolves by ${f.resolveByDatetime.toISOString().slice(0, 10)}) ${f.claimText}`
 }
 
-export function deadlineBounds(now: Date): { min: Date; max: Date; fallback: Date } {
+export function deadlineBounds(now: Date): { min: Date; max: Date; fallback: Date; step: Date } {
+  const out = new Date(now.getTime() + STEP_HORIZON_DAYS * DAY_MS)
   return {
     min: new Date(now.getTime() + MIN_HORIZON_DAYS * DAY_MS),
     max: new Date(now.getTime() + MAX_HORIZON_DAYS * DAY_MS),
     fallback: new Date(getDefaultHorizon(now).iso),
+    step: new Date(Date.UTC(out.getUTCFullYear(), out.getUTCMonth() + 1, 0, 23, 59, 59)),
   }
 }
 
 export async function buildSuggestPrompt(groups: SuggestionGroup[], forecasts: OpenForecast[], now: Date): Promise<string> {
-  const { min, fallback } = deadlineBounds(now)
-  return fillPrompt(await getPromptTemplate('topic-suggest'), {
+  return renderSuggestPrompt(await getPromptTemplate('topic-suggest'), groups, forecasts, now)
+}
+
+/** Fill a topic-suggest template; separate so scripts/replay-topic-suggest.ts can try a draft. */
+export function renderSuggestPrompt(template: string, groups: SuggestionGroup[], forecasts: OpenForecast[], now: Date): string {
+  const { min, fallback, step } = deadlineBounds(now)
+  return fillPrompt(template, {
     today: now.toISOString().slice(0, 10),
     defaultDeadline: fallback.toISOString().slice(0, 10),
+    stepDeadline: step.toISOString().slice(0, 10),
     minDeadline: min.toISOString().slice(0, 10),
     groups: groups.map(groupBlock).join('\n'),
     forecasts: forecasts.length ? forecasts.map(forecastLine).join('\n') : '(none)',
@@ -167,9 +186,9 @@ export interface ValidatedAnswer {
 
 /**
  * Check the model's answer against what it was shown. Pure, so the gate is testable without a
- * model: every question needs the {DEADLINE} token, a real deadline inside the horizon and
- * rules; one the model marks as covered is reported, not suggested; a group counts for one
- * story only; caps per story and per run.
+ * model: every question needs the {DEADLINE} token, a real deadline inside the horizon, rules
+ * and no non-event wording; one the model marks as covered is reported, not suggested; a group
+ * counts for one story only; caps per story and per run.
  */
 export function validateSuggestions(
   raw: Record<string, unknown>,
@@ -211,6 +230,8 @@ export function validateSuggestions(
         continue
       }
       const skip = (reason: string, detail?: string) => skipped.push({ reason, story: title, claim: claimTemplate || undefined, detail })
+      const nonEvent = claimTemplate.match(NON_EVENT_WORDING)
+      if (nonEvent) { skip('non_event_wording', nonEvent[0]); continue }
       if (!claimTemplate.includes('{DEADLINE}')) { skip('no_deadline_token'); continue }
       const deadline = parseDeadline(String(q?.deadline ?? '').trim())
       if (!deadline) { skip('bad_deadline', String(q?.deadline ?? '')); continue }

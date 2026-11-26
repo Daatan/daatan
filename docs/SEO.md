@@ -40,6 +40,12 @@ Payload: `initialContextSnapshots` is projected through `slimContextSnapshots`
 carries every source's `claimsDetail` shadow layer, which was ~1.4 MB of the 1.6 MB forecast page
 (daatan#1871). If a client component starts reading another `oracleSnapshot` field, add it there.
 
+Both forecast routes (`/forecasts/[id]` and `/[locale]/forecasts/[id]`) load the forecast and every
+`ForecastDetailClient` prop through `src/app/forecasts/[id]/_forecast/detail-data.ts`. Only the
+per-locale parts stay in the routes: translations, metadata, JSON-LD and URLs. The locale route used to
+keep its own copy, which drifted for months: no abstention flag, no evidence count, and indexer-only
+sources (daatan#2351). `__tests__/page-parity.test.tsx` fails if the two routes' props diverge again.
+
 ## Structured data (JSON-LD)
 
 A forecast page emits up to five JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the
@@ -60,6 +66,21 @@ the same structured-data strength as the English canonical):
    - `offers`: free Offer (`price: "0"`, `InStock`) pointing at the forecast URL — Google warns "Missing field 'offers'" without it
 4. **ClaimReview** (`schema.org/ClaimReview`, public + resolved correct/wrong only) — the forecast's resolution as a fact-check, with `author` + `creator` (DAATAN Organization), `reviewRating`, and an `itemReviewed` Claim carrying the forecast author as `author` + `creator`.
 5. **FAQPage** (`schema.org/FAQPage`, public forecasts only, #1295) — one `Question`/`Answer` pair wrapping the claim in question form ("What are the chances that …?", past-tense "Did this come true: …?" once resolved), pure builders in `src/lib/forecast-seo-schema.ts`. `dateModified` is valid here because FAQPage subtypes CreativeWork. Google restricted FAQ rich results to authoritative government/health sites in Aug 2023, so this earns no Search carousel on daatan.com — it's aimed at AI-search/LLM extraction (ChatGPT, Perplexity, AI Overviews), not a Google rich result. (A visible on-page question/answer line mirroring it was removed in #1635; the JSON-LD is built server-side and unaffected.)
+
+### Source pages (`/sources/[name]`, daatan#2339)
+
+A source page emits one `WebPage` whose `about` is an `Organization`: name, the outlet's site
+(its first news-indexer domain), its bundled `logo` when it has one ([OUTLET_LOGOS.md](./OUTLET_LOGOS.md))
+and `sameAs` links to its Wikipedia article (the admin's link, else the one the button shows, daatan#2349) and Telegram channel. It is identity only: the Brier grade and the board rank are not encoded as a rating.
+The visible profile (Wikidata facts, Wikipedia lead, [OUTLET_PROFILES.md](./OUTLET_PROFILES.md)) is not
+put in the JSON-LD or the meta description: the Wikipedia text is CC BY-SA and shown only with its attribution.
+The type stays `Organization`, not `NewsMediaOrganization`, because the board also carries
+personal sites and think tanks.
+
+Its meta description leads with the board's own numbers for an outlet on the board (Brier,
+resolved predictions, head-to-head rank, read from the same cached board as `robots`), followed
+by the news-indexer description when there is one. Off the board the page is `noindex` and keeps
+the generic sentence.
 
 ### Freshness: `dateModified` vs. `updatedAt`
 
@@ -93,7 +114,7 @@ Every JSON-LD payload is HTML-escaped before being injected into its `<script ty
 `src/app/sitemap.ts` — dynamically generates the sitemap from live DB data (queries cached 1h).
 It returns an empty sitemap unless `APP_ENV=production`, so staging is never submitted. Included pages:
 
-- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/activity`, `/tags` — daily;
+- Static routes (`staticRouteDefs`): `/`, `/forecasts`, `/leaderboard`, `/leaderboard/sources`, `/activity`, `/tags` — daily;
   `/who-foresaw` — weekly; `/about`, `/methodology`, `/privacy`, `/terms`, `/disclaimer`,
   `/accessibility`, `/contact` — monthly. `/who-foresaw` is the "Who foresaw X?" hub
   (daatan#2217): it is `noindex` while empty, and its event pages and the source board
@@ -115,6 +136,13 @@ It returns an empty sitemap unless `APP_ENV=production`, so staging is never sub
 - Tags with at least one public **ACTIVE** forecast (`/tags/[slug]`) — daily. Same filter as
   the tag page itself (`VISIBLE_TAG_PREDICTION_WHERE` in `src/lib/services/tag.ts`, daatan#2028),
   so no sitemap entry lands on an empty tag page.
+- Source pages (`/sources/[name]`) for every outlet on the public sources board, i.e. at least
+  `SOURCE_LEADERBOARD_MIN_PREDICTIONS` scored forecasts (`getBoardOutlets()` in
+  `src/lib/services/leaderboard-cached.ts`, daatan#2337) — weekly. The same check decides the
+  page's `robots`: on the board it is indexed, below the threshold it is `noindex` as a thin page.
+  When the Oracul is unreachable the board reads as empty, so this fails closed: source pages
+  are `noindex` and left out of the sitemap, as they then show no track record either. Author pages
+  (`/authors/[author]/[outlet]`) stay `noindex` and unlisted: one byline at one outlet is thin.
 
 The sitemap is submitted to Google Search Console. Re-submission is not needed on content updates — Google re-crawls on its own schedule.
 
@@ -176,6 +204,13 @@ through the sitemap. `src/lib/services/crawl-links.ts` (every reader wrapped in
 
 Links use the same visibility filter as `/forecasts` and `/tags/<slug>`, so each lands on a
 page that shows the target.
+
+Forecast cards link the forecast page in the reader's language: `forecastHref()`
+(`src/lib/forecast-href.ts`) gives `/he/forecasts/<slug>` on a Hebrew page and the root path in
+English. Until daatan#2336 every card linked the English page, so `/he/forecasts` and
+`/ru/forecasts` had no link to a translated forecast. Google reached those pages mostly through
+the sitemap and hreflang, and in November 2026 left 115 of them "Discovered – currently not
+indexed".
 
 `/leaderboard` and `/leaderboard/sources` are server-rendered too (daatan#2212). Before, they were
 client pages that fetched `/api/leaderboard*` after hydration. `robots.txt` disallows `/api/`, so

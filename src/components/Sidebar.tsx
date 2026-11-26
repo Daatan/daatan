@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 
 import { useTranslations, useLocale } from 'next-intl'
+import { ELECTIONS_URL, electionsUrl } from '@/lib/elections-url'
 
 type NavItem = {
   href: string
@@ -48,10 +49,6 @@ type NavItem = {
   // Extra paths (locale prefix stripped) on which this item is shown as current.
   alsoActiveOn?: string[]
 }
-
-// Separate Next.js app, not part of white-label branding — SaaS-only, hidden
-// on self-host below alongside the other SaaS-only routes.
-const ELECTIONS_URL = 'https://elections.daatan.com'
 
 const navItems: NavItem[] = [
   // Opening /forecasts also marks the feed as seen, so the site root shows the feed from then on
@@ -170,7 +167,9 @@ const Sidebar = () => {
 
   const navLinks = filteredNavItems.map(item => ({
     ...item,
-    href: currentLocale !== 'en' && LOCALIZED_NAV_ROUTES.includes(item.href) ? `/${currentLocale}${item.href}` : item.href,
+    href: item.href === ELECTIONS_URL
+      ? electionsUrl(currentLocale)
+      : currentLocale !== 'en' && LOCALIZED_NAV_ROUTES.includes(item.href) ? `/${currentLocale}${item.href}` : item.href,
     label: t(item.labelKey)
   }))
 
@@ -254,7 +253,7 @@ const Sidebar = () => {
             onClick={handleToggleMenu}
             onKeyDown={handleKeyDown}
             className="p-2 rounded-lg hover:bg-navy-800 transition-colors"
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
             aria-expanded={isMobileMenuOpen}
             tabIndex={0}
           >
@@ -295,7 +294,7 @@ const Sidebar = () => {
           <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} alt="" />
           <div className="min-w-0">
             <span className="block text-lg font-bold text-white leading-tight">{appName}</span>
-            <p className="text-sm text-text-secondary">{t('tagline')}</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase leading-snug tracking-[0.05em] text-text-secondary">{t('tagline')}</p>
             <span className="text-[11px] text-text-subtle font-mono">v{VERSION}</span>
           </div>
         </Link>
