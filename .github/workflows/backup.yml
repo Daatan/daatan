@@ -25,8 +25,8 @@ jobs:
   backup:
     name: Run DB backup
     runs-on: ubuntu-latest
-    # Backup poll ≤25 min + restore verification poll ≤35 min + setup/alert.
-    timeout-minutes: 75
+    # Backup poll ≤25 min + restore verification poll ≤55 min + setup/alert.
+    timeout-minutes: 90
     permissions:
       id-token: write
       contents: read
@@ -118,8 +118,10 @@ jobs:
           # Wait for the result: this used to be fire-and-forget, so the job stayed
           # green while every verification failed for weeks (#1808). A failure here
           # fails the job, which triggers the Telegram step below.
-          # The restore runs in a memory-capped throwaway container and takes several
-          # minutes — SSM timeout 20 min, polled for up to 21.
+          # The restore runs in a memory-capped throwaway container. --timeout-seconds
+          # is only SSM's delivery timeout; the run itself gets AWS-RunShellScript's
+          # default 3600 s, and verify-backup.sh stops its own restore at 3000 s
+          # (VERIFY_RESTORE_TIMEOUT default) with a Telegram alert (daatan#2303).
           COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=instanceids,Values=$INSTANCE_ID" \
@@ -137,8 +139,10 @@ jobs:
             --query "Command.CommandId")
           echo "Command ID: $COMMAND_ID"
 
-          # Up to 35 min: restoring the ~4 GB dump took 22 min on 2026-11-14 (daatan#2168).
-          for i in $(seq 1 210); do
+          # Up to 55 min, just past the script's 50-min restore budget: restoring the
+          # ~4 GB dump took 22 min on 2026-11-14 (daatan#2168) and 25 min for 4.7 GB on
+          # 2026-11-20 (daatan#2303).
+          for i in $(seq 1 330); do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" --details \
               --query "CommandInvocations[0].Status" --output text)
@@ -157,7 +161,7 @@ jobs:
             fi
             sleep 10
           done
-          echo "❌ Backup restore verification did not finish in 35 minutes"
+          echo "❌ Backup restore verification did not finish in 55 minutes"
           exit 1
 
       - name: Alert via Telegram on failure
