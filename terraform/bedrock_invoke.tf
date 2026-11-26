@@ -10,9 +10,12 @@
 #   is hostage to one third-party credential — which is exactly how it failed on
 #   2026-07-10 (a dead key, 401 on every call). Since v1.45.0 the roster's Qwen member
 #   runs on Bedrock: `qwen.qwen3-235b-a22b-2507-v1:0` is the same model as OpenRouter's
-#   `qwen/qwen3-235b-a22b-2507`, runs on the account's own credentials (i.e. AWS
-#   credits), and is the roster's only non-reasoning member — so it carries none of the
-#   hidden-token cost risk the other four do.
+#   `qwen/qwen3-235b-a22b-2507`, on the account's own credentials (i.e. AWS credits).
+#   Since daatan#2283 no member uses OpenRouter: of the five ungrounded members, four
+#   run on Bedrock (Qwen, DeepSeek V3.2, Mistral Large 3, and the Gemma 3 4B control)
+#   and Gemini Flash-Lite runs on Vertex. The grounded twins of Qwen and DeepSeek call
+#   the same model ids, so they need no grant of their own. Every Bedrock member must be
+#   a model that doesn't reason (`PANEL_PARAMS` in src/lib/llm/registry.ts).
 #
 # WHY A DATA SOURCE, NOT `aws_iam_role.ec2_role`
 #   Both backends now own their own `aws_iam_role.ec2_role` (confirmed via `terraform
@@ -39,10 +42,11 @@
 # MODEL ARN SHAPE
 #   Foundation-model ARNs carry no account id, but they DO carry the region, and a model
 #   is granted only in the region the roster calls it in (`PanelMember.region`, default
-#   eu-central-1). Since daatan#2283 DeepSeek V3.2 and Gemma 3 4B run in us-east-1:
-#   neither has an eu-central-1 deployment. All three were verified
-#   `inferenceTypesSupported = ["ON_DEMAND"]` in their region (2026-11-23), so they are
-#   invocable directly and need no inference-profile ARN.
+#   eu-central-1). Qwen runs in eu-central-1. Since daatan#2283 DeepSeek V3.2, Mistral
+#   Large 3 and Gemma 3 4B run in us-east-1 (`BEDROCK_US_REGION`): none of the three has
+#   an eu-central-1 deployment. All four were verified
+#   `inferenceTypesSupported = ["ON_DEMAND"]` in their region (ListFoundationModels,
+#   2026-11-26), so they are invocable directly and need no inference-profile ARN.
 #
 # RUNBOOK (never a blanket apply)
 #   Staging first:
@@ -57,7 +61,8 @@
 locals {
   # Bedrock models invocable by the AI panel, each in the region the roster calls it in.
   # Keep in sync with the `route: 'bedrock'` entries (and their `region`) in
-  # src/lib/llm/panel/roster.ts.
+  # `PANEL_MEMBERS` and `GROUNDED_PANEL_MEMBERS` in src/lib/llm/registry.ts;
+  # src/lib/llm/panel/__tests__/roster.test.ts fails if a Bedrock member is missing here.
   panel_bedrock_models = [
     { region = var.aws_region, model = "qwen.qwen3-235b-a22b-2507-v1:0" },
     { region = "us-east-1", model = "deepseek.v3.2" },
