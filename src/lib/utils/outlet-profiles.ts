@@ -20,6 +20,8 @@ export interface OutletProfileData {
   factSources?: string[]
   /** Unmodified Wikipedia text (CC BY-SA 4.0), per language. */
   wikipedia?: Partial<Record<string, { text: string; url: string; revision: string }>>
+  /** The outlet's own article per language, including ones whose lead is not shown (daatan#2349). */
+  wikipediaLinks?: Partial<Record<string, string>>
   researched?: { text: Localized; sources: string[] }[]
 }
 
@@ -36,6 +38,8 @@ export interface OutletProfile {
   facts: { key: FactKey; value: string }[]
   factSources: string[]
   about: OutletAbout | null
+  /** The header's Wikipedia button: the reader's language, else English, else any (daatan#2349). */
+  wikipedia: { url: string; lang: string } | null
 }
 
 function pick(l: Localized, locale: string): string {
@@ -71,7 +75,10 @@ export function outletProfile(keys: Iterable<string | null>, locale: string): Ou
         sources: [...new Set(p.researched.flatMap(s => s.sources))],
       }
     }
-    return { facts, factSources: facts.length > 0 ? p.factSources ?? [] : [], about }
+    const links = p.wikipediaLinks ?? {}
+    const linkLang = [locale, 'en', ...Object.keys(links)].find(l => links[l])
+    const wikipedia = linkLang ? { url: links[linkLang]!, lang: linkLang } : null
+    return { facts, factSources: facts.length > 0 ? p.factSources ?? [] : [], about, wikipedia }
   }
   return null
 }

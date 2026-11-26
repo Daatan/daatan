@@ -124,15 +124,19 @@ export default async function OutletPublicPage({ params }: Props) {
   const t = await getTranslations('outletPage')
   const tBoard = await getTranslations('sourceLeaderboard')
 
-  const links = [
-    ...(detail.wikipediaUrl ? [{ label: t('wikipedia'), url: detail.wikipediaUrl }] : []),
+  // The admin's link wins; otherwise the outlet's own article, from Wikidata (daatan#2349).
+  const wikipedia: { url: string; lang?: string } | null = detail.wikipediaUrl
+    ? { url: detail.wikipediaUrl }
+    : profile?.wikipedia ?? null
+  const links: { label: string; url: string; lang?: string }[] = [
+    ...(wikipedia ? [{ label: t('wikipedia'), url: wikipedia.url, lang: wikipedia.lang }] : []),
     ...(detail.telegramChannel ? [{ label: t('telegram'), url: telegramHref(detail.telegramChannel) }] : []),
     ...detail.links,
   ]
 
   // Identity only (daatan#2339): who the outlet is and where it lives, not its grade.
   const site = detail.domains[0] ? `https://${detail.domains[0]}` : null
-  const sameAs = [detail.wikipediaUrl, detail.telegramChannel ? telegramHref(detail.telegramChannel) : null]
+  const sameAs = [wikipedia?.url, detail.telegramChannel ? telegramHref(detail.telegramChannel) : null]
     .filter((u): u is string => !!u)
   const pageJsonLd = {
     '@context': 'https://schema.org',
@@ -251,7 +255,7 @@ export default async function OutletPublicPage({ params }: Props) {
         {links.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {links.map((l, i) => (
-              <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+              <a key={i} href={l.url} hrefLang={l.lang} target="_blank" rel="noopener noreferrer"
                  className="inline-flex items-center gap-1.5 rounded-full border border-navy-600 px-3 py-1 text-xs text-gray-300 hover:border-gray-500 hover:text-white">
                 {l.label} <ExternalLink className="w-3 h-3" />
               </a>

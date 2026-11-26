@@ -35,6 +35,20 @@ describe('outlet profile data', () => {
     }
   })
 
+  it('links each outlet only to its own article, matching the lead shown for that language (daatan#2349)', () => {
+    for (const [name, p] of entries) {
+      for (const [lang, url] of Object.entries(p.wikipediaLinks ?? {})) {
+        expect(LOCALES, name).toContain(lang)
+        expect(url, name).toMatch(new RegExp(`^https://${lang}\\.wikipedia\\.org/wiki/`))
+        const lead = p.wikipedia?.[lang]
+        if (lead) expect(url, name).toBe(lead.url)
+      }
+    }
+    // enwiki "Ynet" and "Ynetnews" redirect to the Yedioth Ahronoth article.
+    expect(OUTLET_PROFILES['ynet.co.il'].wikipediaLinks?.en).toBeUndefined()
+    expect(OUTLET_PROFILES['ynetnews.com'].wikipediaLinks).toBeUndefined()
+  })
+
   it('labels the sources of one list with distinct hosts, so no two links read the same', () => {
     for (const [name, p] of entries) {
       for (const list of [p.factSources ?? [], [...new Set((p.researched ?? []).flatMap(s => s.sources))]]) {
@@ -91,6 +105,22 @@ describe('outletProfile', () => {
     expect(outletProfile([null, 'maariv', 'kikar.co.il'], 'en')?.about).toMatchObject({ kind: 'wikipedia' })
     expect(outletProfile(['maariv', null], 'en')).toBeNull()
     expect(outletProfile(['constructor', 'toString'], 'en')).toBeNull()
+  })
+
+  it('links Wikipedia in the reader’s language, else English, else any language it has (daatan#2349)', () => {
+    expect(outletProfile(['theguardian.com'], 'ru')?.wikipedia).toEqual({ url: 'https://ru.wikipedia.org/wiki/The_Guardian', lang: 'ru' })
+    expect(outletProfile(['hnaftali.com'], 'he')?.wikipedia).toEqual({ url: 'https://en.wikipedia.org/wiki/Hananya_Naftali', lang: 'en' })
+    expect(outletProfile(['srugim.co.il'], 'en')?.wikipedia?.lang).toBe('he')
+    expect(outletProfile(['ynet.co.il'], 'en')?.wikipedia).toEqual({ url: 'https://he.wikipedia.org/wiki/Ynet', lang: 'he' })
+  })
+
+  it('still links an article whose lead is not shown, and links nothing without one (daatan#2349)', () => {
+    const bbc = outletProfile(['bbc.com'], 'en')
+    expect(bbc?.about?.kind).toBe('researched')
+    expect(bbc?.wikipedia).toEqual({ url: 'https://en.wikipedia.org/wiki/BBC_News', lang: 'en' })
+    for (const name of ['ynetnews.com', 'oilprice.com', 'newsletter.amitsegal.net']) {
+      expect(outletProfile([name], 'en')?.wikipedia, name).toBeNull()
+    }
   })
 
   it('gives a profile with no facts no fact sources', () => {

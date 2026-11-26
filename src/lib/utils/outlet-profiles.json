@@ -47,6 +47,12 @@
         "url": "https://eo.wikipedia.org/wiki/Agentejo_Anadolu",
         "revision": "9512467"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Anadolu_Agency",
+      "he": "https://he.wikipedia.org/wiki/%D7%A1%D7%95%D7%9B%D7%A0%D7%95%D7%AA_%D7%90%D7%A0%D7%90%D7%93%D7%95%D7%9C%D7%95",
+      "ru": "https://ru.wikipedia.org/wiki/%D0%90%D0%BD%D0%B0%D0%B4%D0%BE%D0%BB%D1%83_(%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D0%BE%D0%B5_%D0%B0%D0%B3%D0%B5%D0%BD%D1%82%D1%81%D1%82%D0%B2%D0%BE)",
+      "eo": "https://eo.wikipedia.org/wiki/Agentejo_Anadolu"
     }
   },
   "al-monitor.com": {
@@ -97,6 +103,11 @@
         "url": "https://ru.wikipedia.org/wiki/%D0%90%D0%BB%D1%8C-%D0%9C%D0%BE%D0%BD%D0%B8%D1%82%D0%BE%D1%80",
         "revision": "117725648"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Al-Monitor",
+      "he": "https://he.wikipedia.org/wiki/%D7%90%D7%9C-%D7%9E%D7%95%D7%A0%D7%99%D7%98%D7%95%D7%A8",
+      "ru": "https://ru.wikipedia.org/wiki/%D0%90%D0%BB%D1%8C-%D0%9C%D0%BE%D0%BD%D0%B8%D1%82%D0%BE%D1%80"
     }
   },
   "aljazeera.com": {
@@ -161,6 +172,10 @@
         "url": "https://ru.wikipedia.org/wiki/Al_Jazeera_English",
         "revision": "154750341"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Al_Jazeera_English",
+      "ru": "https://ru.wikipedia.org/wiki/Al_Jazeera_English"
     }
   },
   "aljazeera.net": {
@@ -219,6 +234,11 @@
         "url": "https://eo.wikipedia.org/wiki/Al-%C4%9Cazira",
         "revision": "9475015"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Al_Jazeera_Arabic",
+      "ru": "https://ru.wikipedia.org/wiki/%D0%90%D0%BB%D1%8C-%D0%94%D0%B6%D0%B0%D0%B7%D0%B8%D1%80%D0%B0",
+      "eo": "https://eo.wikipedia.org/wiki/Al-%C4%9Cazira"
     }
   },
   "bbc.co.uk": {
@@ -252,6 +272,10 @@
     "factSources": [
       "https://www.wikidata.org/wiki/Q1160945"
     ],
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/BBC_News",
+      "ru": "https://ru.wikipedia.org/wiki/BBC_News"
+    },
     "researched": [
       {
         "text": {
@@ -296,6 +320,10 @@
     "factSources": [
       "https://www.wikidata.org/wiki/Q1160945"
     ],
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/BBC_News",
+      "ru": "https://ru.wikipedia.org/wiki/BBC_News"
+    },
     "researched": [
       {
         "text": {
@@ -350,6 +378,11 @@
         "url": "https://en.wikipedia.org/wiki/CNBC",
         "revision": "1383901332"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/CNBC",
+      "he": "https://he.wikipedia.org/wiki/CNBC",
+      "ru": "https://ru.wikipedia.org/wiki/CNBC"
     }
   },
   "finance.yahoo.com": {
@@ -382,6 +415,11 @@
         "url": "https://ru.wikipedia.org/wiki/Yahoo!_Finance",
         "revision": "149911441"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Yahoo_Finance",
+      "he": "https://he.wikipedia.org/wiki/Yahoo!_Finance",
+      "ru": "https://ru.wikipedia.org/wiki/Yahoo!_Finance"
     }
   },
   "foreignpolicy.com": {
@@ -428,6 +466,12 @@
         "url": "https://en.wikipedia.org/wiki/Foreign_Policy",
         "revision": "1387699016"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Foreign_Policy",
+      "he": "https://he.wikipedia.org/wiki/Foreign_Policy",
+      "ru": "https://ru.wikipedia.org/wiki/Foreign_Policy",
+      "eo": "https://eo.wikipedia.org/wiki/Foreign_Policy"
     }
   },
   "fortune.com": {
@@ -468,6 +512,12 @@
         "url": "https://en.wikipedia.org/wiki/Fortune_(magazine)",
         "revision": "1387696285"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Fortune_(magazine)",
+      "he": "https://he.wikipedia.org/wiki/%D7%A4%D7%95%D7%A8%D7%A6'%D7%9F",
+      "ru": "https://ru.wikipedia.org/wiki/Fortune_(%D0%B6%D1%83%D1%80%D0%BD%D0%B0%D0%BB)",
+      "eo": "https://eo.wikipedia.org/wiki/Fortune"
     }
   },
   "gatestoneinstitute.org": {
@@ -505,6 +555,10 @@
         "url": "https://he.wikipedia.org/wiki/%D7%9E%D7%9B%D7%95%D7%9F_%D7%92%D7%99%D7%99%D7%98%D7%A1%D7%98%D7%95%D7%9F",
         "revision": "42122216"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Gatestone_Institute",
+      "he": "https://he.wikipedia.org/wiki/%D7%9E%D7%9B%D7%95%D7%9F_%D7%92%D7%99%D7%99%D7%98%D7%A1%D7%98%D7%95%D7%9F"
     }
   },
   "hnaftali.com": {
@@ -515,6 +569,9 @@
         "url": "https://en.wikipedia.org/wiki/Hananya_Naftali",
         "revision": "1384297717"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Hananya_Naftali"
     }
   },
   "independent.co.uk": {
@@ -565,6 +622,12 @@
         "url": "https://ru.wikipedia.org/wiki/The_Independent",
         "revision": "154547560"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/The_Independent",
+      "he": "https://he.wikipedia.org/wiki/%D7%90%D7%99%D7%A0%D7%93%D7%A4%D7%A0%D7%93%D7%A0%D7%98",
+      "ru": "https://ru.wikipedia.org/wiki/The_Independent",
+      "eo": "https://eo.wikipedia.org/wiki/The_Independent"
     }
   },
   "jns.org": {
@@ -600,6 +663,11 @@
         "url": "https://ru.wikipedia.org/wiki/%D0%95%D0%B2%D1%80%D0%B5%D0%B9%D1%81%D0%BA%D0%B8%D0%B9_%D0%BD%D0%BE%D0%B2%D0%BE%D1%81%D1%82%D0%BD%D0%BE%D0%B9_%D1%81%D0%B8%D0%BD%D0%B4%D0%B8%D0%BA%D0%B0%D1%82",
         "revision": "155055696"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Jerusalem_News_Syndicate",
+      "he": "https://he.wikipedia.org/wiki/%D7%A1%D7%99%D7%A0%D7%93%D7%99%D7%A7%D7%98_%D7%94%D7%97%D7%93%D7%A9%D7%95%D7%AA_%D7%94%D7%99%D7%94%D7%95%D7%93%D7%99",
+      "ru": "https://ru.wikipedia.org/wiki/%D0%95%D0%B2%D1%80%D0%B5%D0%B9%D1%81%D0%BA%D0%B8%D0%B9_%D0%BD%D0%BE%D0%B2%D0%BE%D1%81%D1%82%D0%BD%D0%BE%D0%B9_%D1%81%D0%B8%D0%BD%D0%B4%D0%B8%D0%BA%D0%B0%D1%82"
     }
   },
   "jpost.com": {
@@ -668,6 +736,12 @@
         "url": "https://eo.wikipedia.org/wiki/The_Jerusalem_Post",
         "revision": "9164639"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/The_Jerusalem_Post",
+      "he": "https://he.wikipedia.org/wiki/%D7%92'%D7%A8%D7%95%D7%96%D7%9C%D7%9D_%D7%A4%D7%95%D7%A1%D7%98",
+      "ru": "https://ru.wikipedia.org/wiki/The_Jerusalem_Post",
+      "eo": "https://eo.wikipedia.org/wiki/The_Jerusalem_Post"
     }
   },
   "kikar.co.il": {
@@ -706,6 +780,10 @@
         "url": "https://he.wikipedia.org/wiki/%D7%9B%D7%99%D7%9B%D7%A8_%D7%94%D7%A9%D7%91%D7%AA_(%D7%90%D7%AA%D7%A8_%D7%90%D7%99%D7%A0%D7%98%D7%A8%D7%A0%D7%98)",
         "revision": "43198708"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Kikar_HaShabbat_(website)",
+      "he": "https://he.wikipedia.org/wiki/%D7%9B%D7%99%D7%9B%D7%A8_%D7%94%D7%A9%D7%91%D7%AA_(%D7%90%D7%AA%D7%A8_%D7%90%D7%99%D7%A0%D7%98%D7%A8%D7%A0%D7%98)"
     }
   },
   "kyivpost.com": {
@@ -756,6 +834,11 @@
         "url": "https://eo.wikipedia.org/wiki/Kyiv_Post",
         "revision": "7489894"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Kyiv_Post",
+      "ru": "https://ru.wikipedia.org/wiki/Kyiv_Post",
+      "eo": "https://eo.wikipedia.org/wiki/Kyiv_Post"
     }
   },
   "lemonde.fr": {
@@ -809,6 +892,12 @@
         "url": "https://eo.wikipedia.org/wiki/Le_Monde",
         "revision": "9291703"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Le_Monde",
+      "he": "https://he.wikipedia.org/wiki/%D7%9C%D7%94_%D7%9E%D7%95%D7%A0%D7%93",
+      "ru": "https://ru.wikipedia.org/wiki/Le_Monde",
+      "eo": "https://eo.wikipedia.org/wiki/Le_Monde"
     }
   },
   "meduza.io": {
@@ -860,6 +949,10 @@
         "url": "https://ru.wikipedia.org/wiki/Meduza",
         "revision": "156289051"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Meduza_(website)",
+      "ru": "https://ru.wikipedia.org/wiki/Meduza"
     }
   },
   "middleeasteye.net": {
@@ -898,6 +991,10 @@
         "url": "https://he.wikipedia.org/wiki/Middle_East_Eye",
         "revision": "44170638"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Middle_East_Eye",
+      "he": "https://he.wikipedia.org/wiki/Middle_East_Eye"
     }
   },
   "newsletter.amitsegal.net": {
@@ -1002,6 +1099,10 @@
         "url": "https://ru.wikipedia.org/wiki/%D0%A3%D0%BA%D1%80%D0%B0%D0%B8%D0%BD%D1%81%D0%BA%D0%B0%D1%8F_%D0%BF%D1%80%D0%B0%D0%B2%D0%B4%D0%B0",
         "revision": "155541398"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Ukrainska_Pravda",
+      "ru": "https://ru.wikipedia.org/wiki/%D0%A3%D0%BA%D1%80%D0%B0%D0%B8%D0%BD%D1%81%D0%BA%D0%B0%D1%8F_%D0%BF%D1%80%D0%B0%D0%B2%D0%B4%D0%B0"
     }
   },
   "srugim.co.il": {
@@ -1035,6 +1136,9 @@
         "url": "https://he.wikipedia.org/wiki/%D7%A1%D7%A8%D7%95%D7%92%D7%99%D7%9D_(%D7%90%D7%AA%D7%A8_%D7%90%D7%99%D7%A0%D7%98%D7%A8%D7%A0%D7%98)",
         "revision": "44087450"
       }
+    },
+    "wikipediaLinks": {
+      "he": "https://he.wikipedia.org/wiki/%D7%A1%D7%A8%D7%95%D7%92%D7%99%D7%9D_(%D7%90%D7%AA%D7%A8_%D7%90%D7%99%D7%A0%D7%98%D7%A8%D7%A0%D7%98)"
     },
     "researched": [
       {
@@ -1084,6 +1188,10 @@
         "url": "https://he.wikipedia.org/wiki/%D7%98%D7%94%D7%A8%D7%90%D7%9F_%D7%98%D7%99%D7%99%D7%9E%D7%A1",
         "revision": "43443018"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/Tehran_Times",
+      "he": "https://he.wikipedia.org/wiki/%D7%98%D7%94%D7%A8%D7%90%D7%9F_%D7%98%D7%99%D7%99%D7%9E%D7%A1"
     }
   },
   "theguardian.com": {
@@ -1146,6 +1254,12 @@
         "url": "https://eo.wikipedia.org/wiki/The_Guardian",
         "revision": "9487780"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/The_Guardian",
+      "he": "https://he.wikipedia.org/wiki/%D7%94%D7%92%D7%A8%D7%93%D7%99%D7%90%D7%9F",
+      "ru": "https://ru.wikipedia.org/wiki/The_Guardian",
+      "eo": "https://eo.wikipedia.org/wiki/The_Guardian"
     }
   },
   "thehill.com": {
@@ -1192,6 +1306,11 @@
         "url": "https://en.wikipedia.org/wiki/The_Hill_(newspaper)",
         "revision": "1385079998"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/The_Hill_(newspaper)",
+      "he": "https://he.wikipedia.org/wiki/The_Hill",
+      "ru": "https://ru.wikipedia.org/wiki/The_Hill"
     }
   },
   "timesofindia.indiatimes.com": {
@@ -1254,6 +1373,12 @@
         "url": "https://eo.wikipedia.org/wiki/The_Times_of_India",
         "revision": "9140585"
       }
+    },
+    "wikipediaLinks": {
+      "en": "https://en.wikipedia.org/wiki/The_Times_of_India",
+      "he": "https://he.wikipedia.org/wiki/%D7%98%D7%99%D7%99%D7%9E%D7%A1_%D7%90%D7%95%D7%A3_%D7%90%D7%99%D7%A0%D7%93%D7%99%D7%94",
+      "ru": "https://ru.wikipedia.org/wiki/The_Times_of_India",
+      "eo": "https://eo.wikipedia.org/wiki/The_Times_of_India"
     }
   },
   "ynet.co.il": {
@@ -1291,6 +1416,10 @@
         "url": "https://ru.wikipedia.org/wiki/Ynet",
         "revision": "152504532"
       }
+    },
+    "wikipediaLinks": {
+      "he": "https://he.wikipedia.org/wiki/Ynet",
+      "ru": "https://ru.wikipedia.org/wiki/Ynet"
     },
     "researched": [
       {

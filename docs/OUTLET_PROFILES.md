@@ -29,6 +29,11 @@ with its own article (logos are the opposite, see [OUTLET_LOGOS.md](./OUTLET_LOG
 - **A Wikipedia link must be the outlet's own article.** The build asserts that every lead's
   `wikibase_item` is the outlet's item; a redirect to a parent (enwiki "Ynet" → Yedioth Ahronoth)
   is dropped in `curation.json`.
+- **The header's Wikipedia button** (daatan#2349) uses `wikipediaLinks`: the outlet's own article in
+  every language that has one, including languages whose lead was dropped as stale (the article is
+  still the outlet's). It skips any sitelink that resolves to another item: enwiki "Ynet" and
+  "Ynetnews" get no link. The page picks the reader's language, then English, then any language,
+  and a `wikipediaUrl` entered in `/admin/sources/<name>` wins over all of them.
 - **Researched text is Daatan's own wording**, every sentence with its sources. Facts only, no
   characterisation; for a person's newsletter, only their professional role.
 - **No live calls.** The page reads the bundled JSON; nothing is fetched per request.

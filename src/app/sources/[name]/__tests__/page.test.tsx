@@ -333,6 +333,27 @@ describe('sources/[name] page', () => {
     expect(findProps(tree, p => p.href === 'https://www.wikidata.org/wiki/Q6262613')?.children).toBe('wikidata.org')
   })
 
+  it('links the outlet’s own Wikipedia article when the admin entered none (daatan#2349)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'bbc.com', domains: [] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'bbc.com' }) })
+    const button = findProps(tree, p => p.hrefLang === 'en')
+    expect(button?.href).toBe('https://en.wikipedia.org/wiki/BBC_News')
+    expect(collectText(button?.children)).toContain('wikipedia')
+    const data = findProps(tree, p => typeof p.data === 'object' && p.data !== null && '@type' in p.data)?.data as
+      { about: { sameAs: string[] } }
+    expect(data.about.sameAs).toEqual(['https://en.wikipedia.org/wiki/BBC_News'])
+  })
+
+  it('keeps the admin’s Wikipedia link over the article from Wikidata (daatan#2349)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({
+      ...sampleDetail, name: 'bbc.com', domains: [], wikipediaUrl: 'https://en.wikipedia.org/wiki/BBC',
+    })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'bbc.com' }) })
+    expect(findProps(tree, p => p.href === 'https://en.wikipedia.org/wiki/BBC')).toBeDefined()
+    // BBC_News still appears, as the researched text's cited source, but not as the button.
+    expect(findProps(tree, p => p.hrefLang !== undefined)).toBeUndefined()
+  })
+
   it('shows researched text with its sources, by exact name rather than the canonical outlet', async () => {
     mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynetnews', domains: ['ynetnews.com'] })
     const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynetnews' }) })
