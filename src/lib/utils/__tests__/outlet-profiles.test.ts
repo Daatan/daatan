@@ -35,6 +35,15 @@ describe('outlet profile data', () => {
     }
   })
 
+  it('labels the sources of one list with distinct hosts, so no two links read the same', () => {
+    for (const [name, p] of entries) {
+      for (const list of [p.factSources ?? [], [...new Set((p.researched ?? []).flatMap(s => s.sources))]]) {
+        const hosts = list.map(sourceLabel)
+        expect(new Set(hosts).size, name).toBe(hosts.length)
+      }
+    }
+  })
+
   it('has an English label for every fact value and only known fact keys', () => {
     for (const [name, p] of entries) {
       for (const [k, v] of Object.entries(p.facts ?? {})) {

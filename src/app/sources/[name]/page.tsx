@@ -78,6 +78,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+/** About three lines on a phone; a longer outlet paragraph folds behind "Show more". */
+const ABOUT_FOLD_CHARS = 280
+
 export default async function OutletPublicPage({ params }: Props) {
   const { name } = await params
 
@@ -186,10 +189,25 @@ export default async function OutletPublicPage({ params }: Props) {
         )}
 
         {profile?.about && (
-          // Direction from the text's language: a Hebrew paragraph that opens with a Latin name would read as LTR under dir="auto".
-          <p lang={profile.about.lang} dir={profile.about.lang === 'he' ? 'rtl' : 'ltr'} className="mt-4 max-w-2xl text-gray-300 leading-relaxed">
-            {profile.about.text}
-          </p>
+          <div className="mt-4 max-w-2xl">
+            {/* A long lead folds to four lines so the stats stay near the top; the text stays whole in the DOM. CSS-only, no client JS. */}
+            {profile.about.text.length > ABOUT_FOLD_CHARS && <input type="checkbox" id="outlet-about-more" className="peer sr-only" />}
+            {/* Direction from the text's language: a Hebrew paragraph that opens with a Latin name would read as LTR under dir="auto". */}
+            <p
+              lang={profile.about.lang}
+              dir={profile.about.lang === 'he' ? 'rtl' : 'ltr'}
+              className={profile.about.text.length > ABOUT_FOLD_CHARS
+                ? 'text-gray-300 leading-relaxed line-clamp-4 peer-checked:line-clamp-none'
+                : 'text-gray-300 leading-relaxed'}
+            >
+              {profile.about.text}
+            </p>
+            {profile.about.text.length > ABOUT_FOLD_CHARS && (
+              <label htmlFor="outlet-about-more" className="mt-1 inline-block cursor-pointer text-sm text-blue-400 hover:underline peer-checked:hidden peer-focus-visible:underline">
+                {t('showMore')}
+              </label>
+            )}
+          </div>
         )}
 
         {profile && (profile.factSources.length > 0 || profile.about) && (

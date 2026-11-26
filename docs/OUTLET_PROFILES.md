@@ -19,7 +19,11 @@ with its own article (logos are the opposite, see [OUTLET_LOGOS.md](./OUTLET_LOG
 
 - **Wikipedia text is CC BY-SA 4.0.** Show it unmodified, never translated or shortened, with the
   article link and the licence link beside it; the JSON keeps the revision it was taken from. It
-  stays out of the meta description and the JSON-LD.
+  stays out of the meta description and the JSON-LD. A paragraph over 280 characters folds to four
+  lines behind "Show more" (CSS only): the whole text is in the page, only the display folds.
+- **A lead that is stale or contradicts the facts is dropped**, with the evidence, in
+  `curation.json` (`drop_extract`): non-English leads in particular often name a former owner or
+  editor. The locale then falls back to the English lead.
 - **Wikidata is CC0**, but a fact is shown only when it holds now: deprecated statements and those
   with an end time (P582) are dropped, and preferred-rank ones win when present.
 - **A Wikipedia link must be the outlet's own article.** The build asserts that every lead's

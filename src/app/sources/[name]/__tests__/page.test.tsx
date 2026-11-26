@@ -336,6 +336,19 @@ describe('sources/[name] page', () => {
     expect(findProps(tree, p => p.lang === 'he')).toMatchObject({ dir: 'rtl' })
   })
 
+  it('folds a long lead behind Show more without cutting the text, and leaves a short one open', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'theguardian.com', domains: [] })
+    const long = await OutletPublicPage({ params: Promise.resolve({ name: 'theguardian.com' }) })
+    expect(findProps(long, p => p.lang === 'en')?.className).toContain('line-clamp-4')
+    expect(findProps(long, p => p.htmlFor === 'outlet-about-more')).toBeDefined()
+    expect(collectText(long).some(x => x.endsWith('It is considered a newspaper of record in the UK.'))).toBe(true)
+
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'kikar.co.il', domains: [] })
+    const short = await OutletPublicPage({ params: Promise.resolve({ name: 'kikar.co.il' }) })
+    expect(findProps(short, p => p.lang === 'en')?.className).not.toContain('line-clamp')
+    expect(findProps(short, p => p.htmlFor === 'outlet-about-more')).toBeUndefined()
+  })
+
   it('shows no profile block for an outlet without one', async () => {
     mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, domains: ['maariv.co.il'] })
     const texts = collectText(await OutletPublicPage({ params }))

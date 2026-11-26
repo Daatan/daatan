@@ -91,9 +91,11 @@ L += ["", "## 3. Researched text (Daatan's own wording)", ""]
 for dom, rec in out.items():
     for s in rec.get("researched", []):
         L.append(f"- **{dom}**: {s['text']['en']} — sources: " + ", ".join(s["sources"]))
-L += ["", "## 4. Full English paragraphs", ""]
-for dom, rec in out.items():
-    x = rec.get("wikipedia", {}).get("en")
-    if x: L.append(f"**{dom}** ([article]({x['url']})): {x['text']}\n")
+L += ["", "## 4. Every paragraph shown, by language", ""]
+for lang in LANGS:
+    L += [f"### {lang}", ""]
+    for dom, rec in out.items():
+        x = rec.get("wikipedia", {}).get(lang)
+        if x: L.append(f"**{dom}** ([article]({x['url']}), {len(x['text'])} chars): {x['text']}\n")
 open(out_review, "w", encoding="utf-8").write("\n".join(L) + "\n")
 print(len(out), "profiles")

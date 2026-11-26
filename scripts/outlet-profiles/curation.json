@@ -10,6 +10,86 @@
    "outlet": "ynetnews.com",
    "lang": "en",
    "reason": "enwiki 'Ynetnews' redirects to the Yedioth Ahronoth article (item Q1132126), not the outlet"
+  },
+  {
+   "outlet": "bbc.com",
+   "lang": "en",
+   "reason": "stale: says Deborah Turness is CEO of BBC News; she resigned in November 2025 (https://www.cbsnews.com/news/bbc-director-tim-davie-head-of-news-deborah-turness-resignation-trump-speech-edit)"
+  },
+  {
+   "outlet": "bbc.co.uk",
+   "lang": "en",
+   "reason": "stale: says Deborah Turness is CEO of BBC News; she resigned in November 2025 (https://www.cbsnews.com/news/bbc-director-tim-davie-head-of-news-deborah-turness-resignation-trump-speech-edit)"
+  },
+  {
+   "outlet": "bbc.com",
+   "lang": "ru",
+   "reason": "stale: says Fran Unsworth heads BBC News; enwiki: Turness succeeded her in 2022"
+  },
+  {
+   "outlet": "bbc.co.uk",
+   "lang": "ru",
+   "reason": "stale: says Fran Unsworth heads BBC News; enwiki: Turness succeeded her in 2022"
+  },
+  {
+   "outlet": "aa.com.tr",
+   "lang": "ru",
+   "reason": "stale: names Şenol Kazancı as head; Serdar Karagöz replaced him in 2021 (https://www.dailysabah.com/turkey/serdar-karagoz-appointed-as-manager-of-turkeys-anadolu-agency/news)"
+  },
+  {
+   "outlet": "cnbc.com",
+   "lang": "he",
+   "reason": "stale: says NBC Universal owns it; enwiki lead: owned by Versant"
+  },
+  {
+   "outlet": "cnbc.com",
+   "lang": "ru",
+   "reason": "stale: says NBC Universal owns it; enwiki lead: owned by Versant"
+  },
+  {
+   "outlet": "fortune.com",
+   "lang": "he",
+   "reason": "stale: says Warner Bros. Discovery publishes it; enwiki lead: Fortune Media Group Holdings"
+  },
+  {
+   "outlet": "fortune.com",
+   "lang": "ru",
+   "reason": "stale: says Time Inc. publishes it; enwiki lead: Fortune Media Group Holdings (sold in 2018)"
+  },
+  {
+   "outlet": "fortune.com",
+   "lang": "eo",
+   "reason": "stale: says Time Inc./Time Warner publishes it; enwiki lead: Fortune Media Group Holdings (sold in 2018)"
+  },
+  {
+   "outlet": "foreignpolicy.com",
+   "lang": "he",
+   "reason": "stale: says David Rothkopf owns it; enwiki: published by The FP Group, a division of Graham Holdings"
+  },
+  {
+   "outlet": "thehill.com",
+   "lang": "he",
+   "reason": "stale: says News Communications owns it; enwiki: owned by Nexstar Media Group since 2021"
+  },
+  {
+   "outlet": "thehill.com",
+   "lang": "ru",
+   "reason": "stale: says News Communications owns it; enwiki: owned by Nexstar Media Group since 2021"
+  },
+  {
+   "outlet": "independent.co.uk",
+   "lang": "eo",
+   "reason": "stale: describes a printed morning paper; enwiki lead: the last printed edition was in March 2016"
+  },
+  {
+   "outlet": "foreignpolicy.com",
+   "lang": "ru",
+   "reason": "stale: says it appears every two months; enwiki lead: four print issues a year"
+  },
+  {
+   "outlet": "foreignpolicy.com",
+   "lang": "eo",
+   "reason": "stale: says six print issues a year; enwiki lead: four print issues a year"
   }
  ],
  "keep_only": [
@@ -63,7 +143,7 @@
   {
    "outlet": "foreignpolicy.com",
    "fact": "owner",
-   "reason": "Wikidata says The Washington Post Company, hewiki says David Rothkopf; no agreement"
+   "reason": "Wikidata names The Washington Post Company, the former name of Graham Holdings; replaced below"
   },
   {
    "outlet": "independent.co.uk",
@@ -134,6 +214,24 @@
    },
    "source": "https://oilprice.com/about-us",
    "reason": "own About page: 'owned by Advanced Media Solutions'"
+  },
+  {
+   "outlet": "foreignpolicy.com",
+   "fact": "owner",
+   "label": {
+    "en": "Graham Holdings"
+   },
+   "source": "https://en.wikipedia.org/wiki/Foreign_Policy",
+   "reason": "enwiki: published by The FP Group, a division of Graham Holdings Company"
+  },
+  {
+   "outlet": "thehill.com",
+   "fact": "owner",
+   "label": {
+    "en": "Nexstar Media Group"
+   },
+   "source": "https://en.wikipedia.org/wiki/The_Hill_(newspaper)",
+   "reason": "enwiki: owned by Nexstar Media Group since 2021"
   }
  ],
  "researched": {
@@ -191,6 +289,26 @@
     "ru": "Ynetnews — англоязычный новостной сайт группы «Едиот», запущенный в 2005 году. Совмещает материалы «Едиот ахронот» и Ynet с собственными публикациями.",
     "sources": [
      "https://www.editorandpublisher.com/stories/israels-yedioth-abronoth-launches-english-web-site,110696"
+    ]
+   }
+  ],
+  "bbc.com": [
+   {
+    "en": "BBC News is the division of the British Broadcasting Corporation (BBC) that gathers and broadcasts news in the UK and around the world, with some 50 foreign bureaus.",
+    "he": "BBC News היא החטיבה של תאגיד השידור הבריטי (BBC) שאוספת ומשדרת חדשות בבריטניה וברחבי העולם, ולה כ-50 לשכות בחו\"ל.",
+    "ru": "BBC News — подразделение Британской вещательной корпорации (Би-би-си), которое собирает и выпускает новости о Великобритании и мире; у него около 50 зарубежных бюро.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/BBC_News"
+    ]
+   }
+  ],
+  "bbc.co.uk": [
+   {
+    "en": "BBC News is the division of the British Broadcasting Corporation (BBC) that gathers and broadcasts news in the UK and around the world, with some 50 foreign bureaus.",
+    "he": "BBC News היא החטיבה של תאגיד השידור הבריטי (BBC) שאוספת ומשדרת חדשות בבריטניה וברחבי העולם, ולה כ-50 לשכות בחו\"ל.",
+    "ru": "BBC News — подразделение Британской вещательной корпорации (Би-би-си), которое собирает и выпускает новости о Великобритании и мире; у него около 50 зарубежных бюро.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/BBC_News"
     ]
    }
   ]

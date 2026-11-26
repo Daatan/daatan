@@ -42,11 +42,6 @@
         "url": "https://he.wikipedia.org/wiki/%D7%A1%D7%95%D7%9B%D7%A0%D7%95%D7%AA_%D7%90%D7%A0%D7%90%D7%93%D7%95%D7%9C%D7%95",
         "revision": "42583410"
       },
-      "ru": {
-        "text": "Агентство «Анадолу», Анатолийское агентство — крупнейшее турецкое государственное информационное агентство, старейшее в Турции. Создано 6 апреля 1920 года Мустафой Кемалем Ататюрком. В настоящее время агентство является акционерным обществом: 49 % акций принадлежат государству, 51 % — частным вкладчикам. Девиз АА — «Достоверная, объективная и оперативная журналистика». С 3 августа 2011 года должность генерального директора и председателя Совета директоров АА занимает Шенол Казанджи.",
-        "url": "https://ru.wikipedia.org/wiki/%D0%90%D0%BD%D0%B0%D0%B4%D0%BE%D0%BB%D1%83_(%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D0%BE%D0%B5_%D0%B0%D0%B3%D0%B5%D0%BD%D1%82%D1%81%D1%82%D0%B2%D0%BE)",
-        "revision": "156117818"
-      },
       "eo": {
         "text": "Agentejo Anadolu estas ŝtate posedata novaĵagentejo en Turkio, do ĝi estas ŝtata entrepreno.",
         "url": "https://eo.wikipedia.org/wiki/Agentejo_Anadolu",
@@ -257,18 +252,18 @@
     "factSources": [
       "https://www.wikidata.org/wiki/Q1160945"
     ],
-    "wikipedia": {
-      "en": {
-        "text": "BBC News is an operational business division of the British Broadcasting Corporation (BBC) responsible for the gathering and broadcasting of news and current affairs in the UK and around the world. The department is the world's largest broadcast news organisation and generates about 120 hours of radio and television output each day, as well as online news coverage. The service has over 5,500 journalists working across its output including in 50 foreign news bureaus where more than 250 foreign correspondents are stationed. Deborah Turness has been the CEO of news and current affairs since September 2022.",
-        "url": "https://en.wikipedia.org/wiki/BBC_News",
-        "revision": "1385485015"
-      },
-      "ru": {
-        "text": "BBC News — операционное подразделение компании Би-би-си (BBC), отвечающее за сбор и трансляцию новостей и текущих событий. Этот отдел является крупнейшей в мире вещательной новостной организацией и ежедневно транслирует около 120 часов теле- и радиовещания, а также освещает новости в Интернете. BBC News содержит 50 зарубежных новостных бюро с более чем 250 корреспондентами по всему миру. С января 2018 года директором по новостям и текущим событиям является Фрэн Ансворт.",
-        "url": "https://ru.wikipedia.org/wiki/BBC_News",
-        "revision": "150945123"
+    "researched": [
+      {
+        "text": {
+          "en": "BBC News is the division of the British Broadcasting Corporation (BBC) that gathers and broadcasts news in the UK and around the world, with some 50 foreign bureaus.",
+          "he": "BBC News היא החטיבה של תאגיד השידור הבריטי (BBC) שאוספת ומשדרת חדשות בבריטניה וברחבי העולם, ולה כ-50 לשכות בחו\"ל.",
+          "ru": "BBC News — подразделение Британской вещательной корпорации (Би-би-си), которое собирает и выпускает новости о Великобритании и мире; у него около 50 зарубежных бюро."
+        },
+        "sources": [
+          "https://en.wikipedia.org/wiki/BBC_News"
+        ]
       }
-    }
+    ]
   },
   "bbc.com": {
     "wikidata": "Q1160945",
@@ -301,18 +296,18 @@
     "factSources": [
       "https://www.wikidata.org/wiki/Q1160945"
     ],
-    "wikipedia": {
-      "en": {
-        "text": "BBC News is an operational business division of the British Broadcasting Corporation (BBC) responsible for the gathering and broadcasting of news and current affairs in the UK and around the world. The department is the world's largest broadcast news organisation and generates about 120 hours of radio and television output each day, as well as online news coverage. The service has over 5,500 journalists working across its output including in 50 foreign news bureaus where more than 250 foreign correspondents are stationed. Deborah Turness has been the CEO of news and current affairs since September 2022.",
-        "url": "https://en.wikipedia.org/wiki/BBC_News",
-        "revision": "1385485015"
-      },
-      "ru": {
-        "text": "BBC News — операционное подразделение компании Би-би-си (BBC), отвечающее за сбор и трансляцию новостей и текущих событий. Этот отдел является крупнейшей в мире вещательной новостной организацией и ежедневно транслирует около 120 часов теле- и радиовещания, а также освещает новости в Интернете. BBC News содержит 50 зарубежных новостных бюро с более чем 250 корреспондентами по всему миру. С января 2018 года директором по новостям и текущим событиям является Фрэн Ансворт.",
-        "url": "https://ru.wikipedia.org/wiki/BBC_News",
-        "revision": "150945123"
+    "researched": [
+      {
+        "text": {
+          "en": "BBC News is the division of the British Broadcasting Corporation (BBC) that gathers and broadcasts news in the UK and around the world, with some 50 foreign bureaus.",
+          "he": "BBC News היא החטיבה של תאגיד השידור הבריטי (BBC) שאוספת ומשדרת חדשות בבריטניה וברחבי העולם, ולה כ-50 לשכות בחו\"ל.",
+          "ru": "BBC News — подразделение Британской вещательной корпорации (Би-би-си), которое собирает и выпускает новости о Великобритании и мире; у него около 50 зарубежных бюро."
+        },
+        "sources": [
+          "https://en.wikipedia.org/wiki/BBC_News"
+        ]
       }
-    }
+    ]
   },
   "cnbc.com": {
     "wikidata": "Q1023912",
@@ -354,16 +349,6 @@
         "text": "The Consumer News and Business Channel (CNBC) is an American business news channel owned by Versant. The network broadcasts live business news and analysis programming during the morning, daytime business day, and early-evening hours, with the remaining hours filled by business-related documentaries and reality television programming, as well as occasional sports presentations from USA Sports. CNBC operates an accompanying financial news website, CNBC.com, which includes news articles, video and podcast content, as well as subscription-based services. CNBC's headquarters and main studios are located in Englewood Cliffs, New Jersey, while it also maintains a studio at the Nasdaq MarketSite in Times Square, New York City, it also broadcasts shows directly from the floor of the New York Stock Exchange.",
         "url": "https://en.wikipedia.org/wiki/CNBC",
         "revision": "1383901332"
-      },
-      "he": {
-        "text": "CNBC היא רשת טלוויזיה אמריקאית המשדרת חדשות כלכליות ברחבי העולם. בעלי הרשת הוא תאגיד NBC Universal.",
-        "url": "https://he.wikipedia.org/wiki/CNBC",
-        "revision": "43999080"
-      },
-      "ru": {
-        "text": "«CNBC» (Си-эн-би-си́) — американский кабельный и спутниковый телеканал новостей бизнеса. До 1991 года официально назывался «Consumer News and Business Channel». Принадлежит компании NBC Universal. Штаб-квартира находится в городе Энглвуд-Клифс, штат Нью-Джерси.",
-        "url": "https://ru.wikipedia.org/wiki/CNBC",
-        "revision": "151700548"
       }
     }
   },
@@ -426,31 +411,22 @@
           "ru": "английский",
           "eo": "angla"
         }
+      ],
+      "owner": [
+        {
+          "en": "Graham Holdings"
+        }
       ]
     },
     "factSources": [
-      "https://www.wikidata.org/wiki/Q1063573"
+      "https://www.wikidata.org/wiki/Q1063573",
+      "https://en.wikipedia.org/wiki/Foreign_Policy"
     ],
     "wikipedia": {
       "en": {
         "text": "Foreign Policy is an American news publication founded in 1970 focused on global affairs, current events, and domestic and international policy. It produces content daily on its website and app, and in four print issues annually.",
         "url": "https://en.wikipedia.org/wiki/Foreign_Policy",
         "revision": "1387699016"
-      },
-      "he": {
-        "text": "Foreign Policy הוא כתב עת דו-שבועי אמריקאי העוסק בפוליטיקה, ביחסים בינלאומיים, במדיניות הפנים ובמדיניות החוץ של ארצות הברית ובעסקים. המגזין בבעלות דייוויד רות'קופף.",
-        "url": "https://he.wikipedia.org/wiki/Foreign_Policy",
-        "revision": "42409853"
-      },
-      "ru": {
-        "text": "Foreign Policy — американский журнал со штаб-квартирой в столице США. Тираж более ста тысяч экземпляров, выходит каждые два месяца. Ежегодно публикует собственную версию списка ста мировых мыслителей (The FP Top 100 Global Thinkers).",
-        "url": "https://ru.wikipedia.org/wiki/Foreign_Policy",
-        "revision": "153830537"
-      },
-      "eo": {
-        "text": "Foreign Policy (litere: Fremda Politiko) estas usona revuo pri la politiko de Usono, fondita en 1970, kiu koncentriĝas pri tutmondaj informoj, aktualaj eventoj kaj usona interna kaj ĉefe internacia politikoj. Ĝi ĉiutage produktas enhavojn sur sia retejo kaj ĉiujare eldonas ses presitajn eldonojn. La 26- an de decembro 2008, la Fondumo Caringie Internacia por la Paco rangigis FP kiel unu el la plej bonaj pensfabrikoj de la mondo.",
-        "url": "https://eo.wikipedia.org/wiki/Foreign_Policy",
-        "revision": "8561732"
       }
     }
   },
@@ -491,21 +467,6 @@
         "text": "Fortune is an American global business magazine headquartered in New York City. It is published by Fortune Media Group Holdings, a global business media company. The publication was founded by Henry Luce in 1929. The magazine competes with Forbes and Bloomberg Businessweek in the national business magazine category and distinguishes itself with long, in-depth feature articles.",
         "url": "https://en.wikipedia.org/wiki/Fortune_(magazine)",
         "revision": "1387696285"
-      },
-      "he": {
-        "text": "Fortune הוא כתב עת אמריקאי לענייני כלכלה, מבית האחים וורנר דיסקברי. כתב העת מופיע ברציפות מפברואר 1930 וידוע בפרט בשל פרסום דירוג החברות של כתב העת Fortune, המדרג את 500 החברות הגדולות בעולם,. כתב העת מפורסם גם ברשת האינטרנט באתר CNNMoney.com, יחד עם כתב העת Money. מדי מספר גליונות, מפרסם כתב העת גיליון נושא המוקדש לנושא מסוים בכלכלה העולמית כגון סחר חוץ, גיליונות המוקדשים למאמרי עומק וניתוח על כלכלותיהן של מדינות שונות או תחומים תעשייתיים, טכנולוגיים ומסחריים שונים וכדומה.",
-        "url": "https://he.wikipedia.org/wiki/%D7%A4%D7%95%D7%A8%D7%A6'%D7%9F",
-        "revision": "44037487"
-      },
-      "ru": {
-        "text": "«Форчун» — широко известный американский деловой журнал, который издается компанией Time Inc. Основан Генри Льюсом в 1930 году, в составе издательского бизнеса, который включал в себя журналы Time, Life, Fortune и Sports Illustrated и дорос до размеров конгломерата Time Warner.",
-        "url": "https://ru.wikipedia.org/wiki/Fortune_(%D0%B6%D1%83%D1%80%D0%BD%D0%B0%D0%BB)",
-        "revision": "152615208"
-      },
-      "eo": {
-        "text": "Fortune estas anglalingva revuo pri negocoj eldonita de la firmao Time Inc., dividaĵo de la konzerno Time Warner. Ĝi estis fondita de Henry Luce kaj Britton Hadden en februaro 1930, kvar monatojn post la borsa krizo de 1929, kiu kaŭzis la tiel nomatan Grandan Depresion.",
-        "url": "https://eo.wikipedia.org/wiki/Fortune",
-        "revision": "8405715"
       }
     }
   },
@@ -603,11 +564,6 @@
         "text": "«Индепе́ндент» — британское интернет-издание. Изначально ежедневная газета, после банкротства в 2010 году была выкуплена предпринимателем Александром Лебедевым, а 20 марта 2016 года преобразована в электронную версию.",
         "url": "https://ru.wikipedia.org/wiki/The_Independent",
         "revision": "154547560"
-      },
-      "eo": {
-        "text": "The Independent estas britia nacia matena ĵurnalo publikata en Londono de la entrepreno Independent Print Limited, posedata ekde 2010 de Aleksandr Lebedev kaj de ties filo Jevgenij Lebedev. Ĝi havas kromnomon la Indy, dum la dimanĉa eldono, The Independent on Sunday, estas la Sindy. Aperinta en 1986, ĝi estas unu el la plej junaj bitiaj naciaj tagĵurnaloj. La ĉiutaga eldono ricevis titolon National Newspaper of the Year de 2004 fare de la British Press Awards.",
-        "url": "https://eo.wikipedia.org/wiki/The_Independent",
-        "revision": "9276918"
       }
     }
   },
@@ -1219,26 +1175,22 @@
           "ru": "английский",
           "eo": "angla"
         }
+      ],
+      "owner": [
+        {
+          "en": "Nexstar Media Group"
+        }
       ]
     },
     "factSources": [
-      "https://www.wikidata.org/wiki/Q7739683"
+      "https://www.wikidata.org/wiki/Q7739683",
+      "https://en.wikipedia.org/wiki/The_Hill_(newspaper)"
     ],
     "wikipedia": {
       "en": {
         "text": "The Hill, formed in 1994, is an American newspaper and digital media company based in Washington, D.C. Focusing on politics, policy, business and international relations, The Hill's coverage includes the U.S. Congress, the presidency and executive branch, and election campaigns, among other topics, describes itself as centrist and nonpartisan.",
         "url": "https://en.wikipedia.org/wiki/The_Hill_(newspaper)",
         "revision": "1385079998"
-      },
-      "he": {
-        "text": "The Hill הוא אתר חדשות אמריקאי, הפועל מוושינגטון הבירה, שהחל כעיתון בשנת 1994. האתר בבעלות \"הוצאת Capitol Hill\", שבעצמה כפופה לבעלות \".News Communications, Inc\".",
-        "url": "https://he.wikipedia.org/wiki/The_Hill",
-        "revision": "42410098"
-      },
-      "ru": {
-        "text": "The Hill, транскрипция «Хилл» — — американское печатное и интернет-издание о политике. Принадлежит компании News Communications.",
-        "url": "https://ru.wikipedia.org/wiki/The_Hill",
-        "revision": "146829635"
       }
     }
   },
