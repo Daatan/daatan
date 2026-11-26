@@ -1312,6 +1312,16 @@
     "backToLeaderboard": "Back to source leaderboard",
     "wikipedia": "Wikipedia",
     "telegram": "Telegram channel",
+    "fact": {
+      "founded": "Founded",
+      "country": "Country",
+      "headquarters": "Headquarters",
+      "language": "Language",
+      "owner": "Owner"
+    },
+    "factsFrom": "Facts:",
+    "fromWikipedia": "Text from Wikipedia",
+    "researchedFrom": "Written by Daatan from:",
     "trackRecord": "Accuracy",
     "skill": "Skill",
     "brier": "Brier",
