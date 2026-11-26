@@ -19,20 +19,20 @@ export default async function Footer({ locale, links }: { locale: string; links:
     { href: links.terms, label: t('footer.terms') },
   ]
   return (
-    <footer className="border-t border-[var(--hv5-line)] bg-[var(--hv5-bg)]">
+    <footer className="border-t border-(--hv5-line) bg-(--hv5-bg)">
       <div className={`${CONTAINER} pb-14 pt-12`}>
         <div className="flex flex-wrap items-center justify-between gap-7">
           <Image src="/home-v5/logo.png" alt="Daatan" width={292} height={129} className="h-9 w-auto" />
           <nav aria-label={t('footer.label')} className="flex flex-wrap gap-x-[26px] gap-y-3.5">
             {items.map((i) => (
-              <Link key={i.href + i.label} href={i.href} className="text-[15px] text-[var(--hv5-muted)] no-underline hover:text-white">
+              <Link key={i.href + i.label} href={i.href} className="text-[15px] text-(--hv5-muted) no-underline hover:text-white">
                 {i.label}
               </Link>
             ))}
-            <CookieSettingsLink className="text-[15px] text-[var(--hv5-muted)] hover:text-white bg-transparent border-0 p-0 cursor-pointer" />
+            <CookieSettingsLink className="text-[15px] text-(--hv5-muted) hover:text-white bg-transparent border-0 p-0 cursor-pointer" />
           </nav>
         </div>
-        <p className="m-0 mt-8 max-w-[52em] text-sm leading-[1.6] text-[var(--hv5-muted)]">{t('footer.disclaimer')}</p>
+        <p className="m-0 mt-8 max-w-[52em] text-sm leading-[1.6] text-(--hv5-muted)">{t('footer.disclaimer')}</p>
       </div>
     </footer>
   )

@@ -532,7 +532,7 @@ export default function ForecastDetailClient({
           </div>
         </div>
 
-        <h1 className="text-base leading-[1.15] sm:text-3xl sm:leading-tight font-bold text-white tracking-tight mb-3 xl:mb-4 break-words">
+        <h1 className="text-base leading-[1.15] sm:text-3xl sm:leading-tight font-bold text-white tracking-tight mb-3 xl:mb-4 wrap-break-word">
           {showTranslated && translatedFields?.claimText ? translatedFields.claimText : prediction.claimText}
         </h1>
 
@@ -625,7 +625,7 @@ export default function ForecastDetailClient({
             <div className="flex flex-col items-center">
               <div className="w-full max-w-lg relative rounded-3xl border border-navy-600 bg-navy-700 p-5 sm:p-10 xl:p-12 flex flex-col items-center justify-center shadow-2xl overflow-hidden">
                 {/* Background glow */}
-                <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-linear-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
                 <Speedometer
                   percentage={communityProb}
@@ -784,7 +784,7 @@ export default function ForecastDetailClient({
             <div className="w-full max-w-2xl mx-auto">
               <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
                 {/* Background glow */}
-                <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-linear-to-b from-blue-500/5 to-transparent pointer-events-none" />
                 
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-8 text-center">{t('marketDistribution')}</h3>
                 

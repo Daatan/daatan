@@ -190,7 +190,7 @@ export default function NotificationPreferences() {
                   <button
                     onClick={() => togglePreference(pref.type, 'inApp')}
                     disabled={saving === pref.type}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                       pref.inApp ? 'bg-blue-600' : 'bg-navy-600'
                     } disabled:opacity-50`}
                     role="switch"
@@ -209,7 +209,7 @@ export default function NotificationPreferences() {
                     <button
                       onClick={() => togglePreference(pref.type, 'browserPush')}
                       disabled={saving === pref.type}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                         pref.browserPush ? 'bg-blue-600' : 'bg-navy-600'
                       } disabled:opacity-50`}
                       role="switch"

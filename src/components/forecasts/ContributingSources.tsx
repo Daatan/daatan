@@ -209,7 +209,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     return (
       <span
         title={pct != null ? `${sideMeta[side].label} · ${t('badgeHint', { pct })}` : sideMeta[side].label}
-        className={`shrink-0 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded ${sideMeta[side].badge}`}
+        className={`shrink-0 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-sm ${sideMeta[side].badge}`}
       >
         {arrow}{side !== 'neutral' && pct != null ? ` ${pct}%` : ''}
       </span>
@@ -223,7 +223,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
     <span
       title={t('settledHint')}
       data-testid="settling-source-flag"
-      className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300"
+      className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300"
     >
       <Gavel className="w-2.5 h-2.5" aria-hidden="true" />
       {t('settledBadge')}
@@ -348,7 +348,7 @@ export function ContributingSources({ sources }: { sources: ContributingSource[]
           <span className="shrink-0 text-[10px] text-gray-500">{g.articles.length}</span>
           <span
             title={t('sourceRange', { count: g.articles.length })}
-            className="shrink-0 text-[10px] tabular-nums text-gray-400 px-1.5 py-0.5 rounded border border-navy-600"
+            className="shrink-0 text-[10px] tabular-nums text-gray-400 px-1.5 py-0.5 rounded-sm border border-navy-600"
           >
             {g.range.min}–{g.range.max}%
           </span>

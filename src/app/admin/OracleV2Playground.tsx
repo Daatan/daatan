@@ -119,22 +119,22 @@ export default function OracleV2Playground() {
       <div className="flex flex-col lg:flex-row gap-4">
         <aside className="w-full lg:w-80 shrink-0 flex flex-col gap-3 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <label className="text-xs uppercase tracking-wide text-gray-500">Question
-            <textarea className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-2 text-sm min-h-[80px]" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Will Israel withdraw its troops from southern Lebanon by December 31, 2026?" />
+            <textarea className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-2 text-sm min-h-[80px]" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Will Israel withdraw its troops from southern Lebanon by December 31, 2026?" />
           </label>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <label>Depth (1–6)<select className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={depth} onChange={(e) => setDepth(+e.target.value)}>{[1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
-            <label>Keep / node<input type="number" min={1} max={10} className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxPrecursors} onChange={(e) => setMaxPrecursors(+e.target.value)} /></label>
-            <label>Forecast calls<input type="number" min={1} max={80} className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxCalls} onChange={(e) => setMaxCalls(+e.target.value)} /></label>
-            <label>Articles / call<input type="number" min={3} max={30} className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxArticles} onChange={(e) => setMaxArticles(+e.target.value)} /></label>
-            <label className="col-span-2">Deadline (optional)<input type="date" className="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></label>
+            <label>Depth (1–6)<select className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={depth} onChange={(e) => setDepth(+e.target.value)}>{[1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
+            <label>Keep / node<input type="number" min={1} max={10} className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxPrecursors} onChange={(e) => setMaxPrecursors(+e.target.value)} /></label>
+            <label>Forecast calls<input type="number" min={1} max={80} className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxCalls} onChange={(e) => setMaxCalls(+e.target.value)} /></label>
+            <label>Articles / call<input type="number" min={3} max={30} className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={maxArticles} onChange={(e) => setMaxArticles(+e.target.value)} /></label>
+            <label className="col-span-2">Deadline (optional)<input type="date" className="mt-1 w-full rounded-sm border border-gray-300 dark:border-gray-600 bg-transparent p-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></label>
           </div>
           <div className="flex gap-2">
-            <button className="flex-1 rounded bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-50" disabled={busy || !question.trim()} onClick={run}>Run</button>
-            <button className="rounded border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm" onClick={() => { const id = window.prompt('job id'); if (id) watch(id.trim()) }}>Load job…</button>
+            <button className="flex-1 rounded-sm bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-50" disabled={busy || !question.trim()} onClick={run}>Run</button>
+            <button className="rounded-sm border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm" onClick={() => { const id = window.prompt('job id'); if (id) watch(id.trim()) }}>Load job…</button>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500"><span className={`inline-block w-2 h-2 rounded-full ${dotClass}`} />{status}</div>
           {job?.result && (
-            <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+            <div className="rounded-sm border border-gray-200 dark:border-gray-700 p-3">
               <div className="text-2xl font-mono">{pct(job.result.propagated_p)} <span className="text-xs text-gray-500 font-sans">propagated</span></div>
               <div className="text-base font-mono">{pct(job.result.flat_p)} <span className="text-xs text-gray-500 font-sans">flat (v1)</span></div>
               {job.result.note && <div className="text-xs text-gray-500 mt-1">{job.result.note}</div>}
@@ -164,12 +164,12 @@ export default function OracleV2Playground() {
             <div className="p-3 text-sm max-h-[360px] overflow-auto">
               {pane === 'node' && (node ? <NodePanel n={node} job={job!} /> : <span className="text-gray-400">Click a node.</span>)}
               {pane === 'prompts' && (job?.prompts.length ? job.prompts.map((p) => (
-                <details key={p.id} className="mb-2 rounded border border-gray-200 dark:border-gray-700">
+                <details key={p.id} className="mb-2 rounded-sm border border-gray-200 dark:border-gray-700">
                   <summary className="cursor-pointer px-2 py-1 text-blue-600">{p.id} · {p.step} · {p.node_id} · {p.model} · {p.elapsed_ms ?? '…'} ms{p.error && <span className="text-red-500"> · {p.error}</span>}</summary>
                   <div className="px-2 pb-2">
-                    {p.messages.map((m, i) => <pre key={i} className="whitespace-pre-wrap text-xs bg-gray-100 dark:bg-gray-800 rounded p-2 my-1 max-h-64 overflow-auto">[{m.role}]{'\n'}{m.content}</pre>)}
+                    {p.messages.map((m, i) => <pre key={i} className="whitespace-pre-wrap text-xs bg-gray-100 dark:bg-gray-800 rounded-sm p-2 my-1 max-h-64 overflow-auto">[{m.role}]{'\n'}{m.content}</pre>)}
                     <div className="text-xs uppercase text-gray-500">response</div>
-                    <pre className="whitespace-pre-wrap text-xs bg-gray-100 dark:bg-gray-800 rounded p-2 my-1 max-h-64 overflow-auto">{p.response ?? '(pending)'}</pre>
+                    <pre className="whitespace-pre-wrap text-xs bg-gray-100 dark:bg-gray-800 rounded-sm p-2 my-1 max-h-64 overflow-auto">{p.response ?? '(pending)'}</pre>
                     {p.usage != null && <div className="text-xs text-gray-500 font-mono">usage {JSON.stringify(p.usage)}</div>}
                   </div>
                 </details>

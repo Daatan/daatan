@@ -43,7 +43,7 @@ const mdComponents: Components = {
   a: ({ node, ...p }) => <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...p} />,
   strong: ({ node, ...p }) => <strong className="font-semibold text-white" {...p} />,
   em: ({ node, ...p }) => <em className="italic" {...p} />,
-  code: ({ node, ...p }) => <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300" {...p} />,
+  code: ({ node, ...p }) => <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300" {...p} />,
   blockquote: ({ node, ...p }) => <blockquote className="border-l-4 border-navy-600 pl-4 italic text-gray-400 my-3" {...p} />,
   hr: ({ node, ...p }) => <hr className="border-navy-600 my-5" {...p} />,
 }
@@ -106,7 +106,7 @@ function SaasAboutPage() {
       </div>
 
       {/* Why DAATAN? */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Why DAATAN?</h2>
         </div>
@@ -148,7 +148,7 @@ function SaasAboutPage() {
       </div>
 
       {/* How It Works */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">How It Works</h2>
         </div>
@@ -201,7 +201,7 @@ function SaasAboutPage() {
       </div>
 
       {/* Scoring System */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">How Scoring Works</h2>
         </div>
@@ -273,7 +273,7 @@ function SaasAboutPage() {
       </div>
 
       {/* Key Features */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Key Features</h2>
         </div>
@@ -308,7 +308,7 @@ function SaasAboutPage() {
       </div>
 
       {/* Resources */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Resources & Community</h2>
         </div>
@@ -341,7 +341,7 @@ function SaasAboutPage() {
       </div>
 
       {/* Contact & Version */}
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Contact & Info</h2>
         </div>

@@ -448,7 +448,7 @@ export default function OutletDetailPanel({ name }: Props) {
             <tbody>
               {data.publications.map((p, i) => (
                 <tr key={i} className="border-t border-navy-700">
-                  <td className="px-3 py-2 max-w-[26rem]">
+                  <td className="px-3 py-2 max-w-104">
                     {isUrl(p.url) ? (
                       <a href={p.url} target="_blank" rel="noopener noreferrer"
                          className="inline-flex items-center gap-1 text-blue-500 hover:underline truncate">

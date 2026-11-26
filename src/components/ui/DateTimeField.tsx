@@ -19,7 +19,7 @@ import { formatDdmmyyyy, parseDdmmyyyy, parseTime24 } from '@/lib/utils/date'
 
 const FIELD_CLASSES =
   'py-3 border rounded-xl text-sm bg-navy-800 text-white placeholder:text-text-subtle ' +
-  'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+  'focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
 interface DateTimeFieldProps {
   /** id of the date input, for an external <label htmlFor>. */

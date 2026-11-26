@@ -32,11 +32,11 @@ export const Button = React.forwardRef<HTMLButtonElement & HTMLAnchorElement, Bu
     const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100'
     
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm',
+      primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-xs',
       secondary: 'bg-navy-700 text-white hover:bg-navy-600',
       outline: 'border border-gray-300 bg-transparent hover:bg-navy-800 text-text-secondary',
       ghost: 'bg-transparent hover:bg-navy-700 text-gray-400',
-      danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+      danger: 'bg-red-600 text-white hover:bg-red-700 shadow-xs',
     }
 
     const sizes = {

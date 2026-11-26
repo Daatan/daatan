@@ -29,7 +29,6 @@ export default defineConfig({
         'src/test/**',
         'src/types/**',
         'next.config.js',
-        'tailwind.config.js',
         'postcss.config.js',
       ],
       thresholds: {

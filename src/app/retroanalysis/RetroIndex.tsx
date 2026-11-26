@@ -66,10 +66,10 @@ export default function RetroIndex() {
           <span className="inline-block px-4 py-1 bg-gray-900 text-white text-[10px] tracking-widest font-bold rounded-full mb-4 uppercase">
             {t(`${k}.tag`)}
           </span>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight leading-tight">
+          <h1 className="text-3xl md:text-5xl md:leading-none font-extrabold text-gray-900 mb-4 tracking-tight leading-tight">
             {t(`${k}.title`)}
           </h1>
-          <p className="text-gray-600 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-gray-600 text-sm md:text-base md:leading-6 max-w-2xl mx-auto leading-relaxed">
             {t(`${k}.description`)}
           </p>
           {activeAnalysis.reportHref && (
@@ -87,7 +87,7 @@ export default function RetroIndex() {
           {columns.map(({ key, side, items }) => {
             const c = COLUMN_STYLE[side]
             return (
-              <div key={key} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+              <div key={key} className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden flex flex-col">
                 <div className={`${c.header} p-5 flex justify-between items-center`}>
                   <div className="flex items-center gap-3">
                     <span className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center ${c.badge}`}>
@@ -103,7 +103,7 @@ export default function RetroIndex() {
                   </div>
                 </div>
 
-                <div className="p-6 flex-grow">
+                <div className="p-6 grow">
                   <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${c.dot}`}></span>
                     {t(`${k}.${side}.sublabel`)}

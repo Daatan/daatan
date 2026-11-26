@@ -101,7 +101,7 @@ export default function InvitesTable() {
       ) : invites.length === 0 ? (
         <div className="text-center py-12 text-gray-500 text-sm">No invites yet.</div>
       ) : (
-        <div className="overflow-x-auto border rounded-lg shadow-sm">
+        <div className="overflow-x-auto border rounded-lg shadow-xs">
           <table className="w-full border-collapse bg-navy-700">
             <thead className="bg-navy-800 text-text-secondary text-sm font-semibold uppercase tracking-wider">
               <tr>
@@ -116,9 +116,9 @@ export default function InvitesTable() {
                 <tr key={inv.id} className="hover:bg-navy-800 transition-colors">
                   <td className="p-3">
                     {inv.acceptedAt ? (
-                      <span className="text-xs px-2 py-0.5 rounded bg-green-900/20 text-green-400">Accepted</span>
+                      <span className="text-xs px-2 py-0.5 rounded-sm bg-green-900/20 text-green-400">Accepted</span>
                     ) : (
-                      <span className="text-xs px-2 py-0.5 rounded bg-amber-900/20 text-amber-400">Pending</span>
+                      <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-900/20 text-amber-400">Pending</span>
                     )}
                   </td>
                   <td className="p-3 text-right text-xs text-gray-500">{new Date(inv.createdAt).toLocaleString()}</td>

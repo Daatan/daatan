@@ -97,7 +97,7 @@ export default function MethodologyPage() {
           (Brier Score). The other systems on this page, Glicko-2 chief among them, are still
           computed and available through the API but are no longer displayed. Every system except
           Reputation Score can be filtered to a single topic via the leaderboard&apos;s{' '}
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">
             ?tag=
           </code>{' '}
           parameter. This page defines each one, gives its formula, and works a numeric
@@ -111,7 +111,7 @@ export default function MethodologyPage() {
           The Brier Score measures how well a forecaster&apos;s stated confidence matches
           reality. It is the squared distance between the probability a user assigned and the
           actual outcome. Lower is better — a perfect forecaster scores{' '}
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">
             0
           </code>
           .
@@ -207,16 +207,16 @@ actual_A   = 1 if brier_A < brier_B, 0 if worse, 0.5 if tied`}
         <h2 className="text-xl font-semibold text-white mb-3">Glicko-2 — uncertainty-aware skill</h2>
         <p>
           Glicko-2 is ELO&apos;s more cautious cousin: it tracks not just a skill estimate (
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">μ</code>
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">μ</code>
           ) but the system&apos;s <em>uncertainty</em> about that estimate (
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">σ</code>
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">σ</code>
           ). The leaderboard ranks by{' '}
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">
             μ − 3σ
           </code>{' '}
           — a conservative floor, not the raw estimate — so a single lucky call can never
           outrank a high-volume, consistently accurate forecaster. Every user starts at{' '}
-          <code className="bg-navy-800 px-1.5 py-0.5 rounded text-sm font-mono text-amber-300">
+          <code className="bg-navy-800 px-1.5 py-0.5 rounded-sm text-sm font-mono text-amber-300">
             μ=1500, σ=350
           </code>
           .

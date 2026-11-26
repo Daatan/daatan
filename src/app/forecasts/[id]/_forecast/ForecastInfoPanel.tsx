@@ -50,7 +50,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
     <>
       <div className={variant === 'mobile' ? 'grid grid-cols-2 gap-3 mb-5' : 'grid grid-cols-1 gap-3'}>
         {variant === 'desktop' && (
-          <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+          <div className="p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-xs">
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">
               <User className="w-3.5 h-3.5" />
               {t('author')}
@@ -78,7 +78,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
         )}
 
         {showDates && (
-          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-xs`}>
             <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
               <Calendar className="w-3.5 h-3.5" />
               {dateLabel('creationDateShort', 'creationDate')}
@@ -90,7 +90,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
         )}
 
         {showDates && (
-          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm`}>
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-xs`}>
             <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
               <Calendar className="w-3.5 h-3.5" />
               {dateLabel('deadlineShort', 'deadline')}
@@ -102,7 +102,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
         )}
 
         {showTags && (
-          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-sm ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
+          <div className={`${cardPadding} border border-navy-600 rounded-xl bg-navy-700 shadow-xs ${variant === 'mobile' ? 'col-span-2 sm:col-span-1' : ''}`}>
             <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-400 ${labelMargin}`}>
               <Target className="w-3.5 h-3.5" />
               Tags
@@ -114,7 +114,7 @@ export function ForecastInfoPanel({ prediction, variant = 'desktop', section = '
                     key={tag.id}
                     href={`/tags/${tag.slug}`}
                     title={t('filterByTagTooltip', { tag: tag.name })}
-                    className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded border border-navy-600 transition-colors"
+                    className="px-2 py-0.5 bg-navy-800 text-gray-400 hover:text-white hover:border-cobalt hover:bg-navy-600 text-[10px] font-bold uppercase tracking-wider rounded-sm border border-navy-600 transition-colors"
                   >
                     {tag.name}
                   </Link>

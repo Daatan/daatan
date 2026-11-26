@@ -15,7 +15,7 @@ export default function AuthErrorClient() {
 
   return (
     <div className="min-h-screen bg-navy-800 flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full bg-navy-700 rounded-2xl shadow-sm border border-navy-600 p-8 text-center space-y-6">
+      <div className="max-w-md w-full bg-navy-700 rounded-2xl shadow-xs border border-navy-600 p-8 text-center space-y-6">
         <div className="flex justify-center">
           <div className="p-3 bg-red-900/20 rounded-full">
             <AlertCircle className="w-8 h-8 text-red-600" />
@@ -31,7 +31,7 @@ export default function AuthErrorClient() {
              error === 'OAuthSignin' ? (
                <>
                  Google sign-in failed. Add this to your Google OAuth client&apos;s Authorized redirect URIs in Google Cloud Console:{' '}
-                 <code className="block mt-2 p-2 bg-navy-700 rounded text-sm break-all">
+                 <code className="block mt-2 p-2 bg-navy-700 rounded-sm text-sm break-all">
                    {typeof window !== 'undefined' ? `${window.location.origin}/api/auth/callback/google` : 'https://your-domain.com/api/auth/callback/google'}
                  </code>
                  {' '}Also verify GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set on the server.

@@ -34,14 +34,14 @@ export function BoardTabs({ active, labels, ariaLabel }: {
   return (
     <nav
       aria-label={ariaLabel}
-      className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 bg-navy-900/90 backdrop-blur-sm flex border-b border-navy-600 mb-6 overflow-x-auto scrollbar-hide"
+      className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 bg-navy-900/90 backdrop-blur-xs flex border-b border-navy-600 mb-6 overflow-x-auto scrollbar-hide"
     >
       {BOARDS.map(({ board, href, icon: Icon }) => (
         <Link
           key={board}
           href={href}
           aria-current={board === active ? 'page' : undefined}
-          className={`-mb-px flex flex-1 sm:flex-none flex-shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-1.5 sm:px-5 py-3 text-xs sm:text-base font-semibold transition-colors ${
+          className={`-mb-px flex flex-1 sm:flex-none shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 px-1.5 sm:px-5 py-3 text-xs sm:text-base font-semibold transition-colors ${
             board === active
               ? 'border-cobalt text-white'
               : 'border-transparent text-gray-400 hover:border-navy-600 hover:text-white'
@@ -55,7 +55,7 @@ export function BoardTabs({ active, labels, ariaLabel }: {
   )
 }
 
-export const TABLE_CARD = 'bg-navy-700 border border-navy-600 rounded-2xl shadow-sm'
+export const TABLE_CARD = 'bg-navy-700 border border-navy-600 rounded-2xl shadow-xs'
 export const HEAD_ROW = 'bg-navy-800 border-b border-navy-600'
 export const HEAD_CELL = 'py-4 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider'
 export const BODY = 'divide-y divide-gray-100/10'
@@ -99,7 +99,7 @@ export function ColumnHint({ id, children }: { id: string; children: ReactNode }
     <span
       id={id}
       role="tooltip"
-      className="pointer-events-none hidden group-hover:block group-has-[:focus-visible]:block absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
+      className="pointer-events-none hidden group-hover:block group-has-focus-visible:block absolute right-0 top-full z-20 mt-1 w-48 sm:w-64 rounded-lg border border-navy-600 bg-navy-800 p-3 text-left text-xs font-normal normal-case tracking-normal leading-relaxed text-gray-300 shadow-lg"
     >
       {children}
     </span>

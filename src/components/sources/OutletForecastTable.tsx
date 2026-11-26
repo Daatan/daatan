@@ -25,9 +25,9 @@ const MOBILE_SORTS: OutletForecastSort[] = ['default', 'lastArticle', 'lean', 'a
 const STATE_STYLE: Record<OutletForecastState, string> = {
   open: 'text-gray-400',
   pending: 'text-amber-300',
-  cameTrue: 'px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300',
-  didNotHappen: 'px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300',
-  annulled: 'px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-400',
+  cameTrue: 'px-1.5 py-0.5 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-300',
+  didNotHappen: 'px-1.5 py-0.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-rose-300',
+  annulled: 'px-1.5 py-0.5 rounded-sm bg-navy-800 border border-navy-600 text-gray-400',
 }
 
 const STATE_LABEL: Record<OutletForecastState, string> = {
@@ -131,7 +131,7 @@ export default function OutletForecastTable({ rows }: { rows: OutletForecastRow[
       <ul className="sm:hidden rounded-lg border border-navy-600 divide-y divide-navy-700">
         {shown.map((r) => (
           <li key={r.forecastId} className="px-3 py-3">
-            <Link href={r.href} dir="auto" className="block text-sm text-white hover:underline hover:text-cyan-300 break-words">
+            <Link href={r.href} dir="auto" className="block text-sm text-white hover:underline hover:text-cyan-300 wrap-break-word">
               {r.title}
             </Link>
             <div className="mt-2 flex items-center gap-3">
@@ -178,7 +178,7 @@ export default function OutletForecastTable({ rows }: { rows: OutletForecastRow[
             {shown.map((r) => (
               <tr key={r.forecastId} className="hover:bg-navy-800/50">
                 <td className="px-3 py-2.5">
-                  <Link href={r.href} dir="auto" className="text-white hover:underline hover:text-cyan-300 break-words">
+                  <Link href={r.href} dir="auto" className="text-white hover:underline hover:text-cyan-300 wrap-break-word">
                     {r.title}
                   </Link>
                 </td>

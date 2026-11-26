@@ -138,7 +138,7 @@ export default async function RootLayout({
       <body className={`${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-lg focus:bg-navy-900 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-100 focus:rounded-lg focus:bg-navy-900 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
         >
           {t('skipToContent')}
         </a>

@@ -46,7 +46,7 @@ function HeAboutPage() {
         <Link href="/he/home" className="text-sm text-cobalt-light hover:underline">תצוגה מקדימה: עיצוב דף הבית החדש ←</Link>
       </p>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">מה זה דעתן?</h2>
         </div>
@@ -65,7 +65,7 @@ function HeAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">מה עושים כאן?</h2>
         </div>
@@ -82,7 +82,7 @@ function HeAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">איך תחזית עובדת?</h2>
         </div>
@@ -103,7 +103,7 @@ function HeAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">מה נבנה לאורך זמן?</h2>
         </div>
@@ -124,7 +124,7 @@ function HeAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">למי זה מתאים?</h2>
         </div>
@@ -142,7 +142,7 @@ function HeAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">מי עומד מאחורי דעתן?</h2>
         </div>
@@ -177,7 +177,7 @@ function RuAboutPage() {
         <Link href="/ru/home" className="text-sm text-cobalt-light hover:underline">Предпросмотр: новый дизайн главной страницы →</Link>
       </p>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Что такое Daatan?</h2>
         </div>
@@ -199,7 +199,7 @@ function RuAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Что здесь делают?</h2>
         </div>
@@ -216,7 +216,7 @@ function RuAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Как работает прогноз?</h2>
         </div>
@@ -240,7 +240,7 @@ function RuAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Что строится со временем?</h2>
         </div>
@@ -263,7 +263,7 @@ function RuAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Кому это подходит?</h2>
         </div>
@@ -283,7 +283,7 @@ function RuAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Кто стоит за Daatan?</h2>
         </div>
@@ -319,7 +319,7 @@ function EoAboutPage() {
         <Link href="/eo/home" className="text-sm text-cobalt-light hover:underline">Antaŭrigardo: nova dezajno de la hejmpaĝo →</Link>
       </p>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Kio estas Daatan?</h2>
         </div>
@@ -340,7 +340,7 @@ function EoAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Kion oni faras ĉi tie?</h2>
         </div>
@@ -357,7 +357,7 @@ function EoAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Kiel funkcias prognozo?</h2>
         </div>
@@ -380,7 +380,7 @@ function EoAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Kio konstruiĝas dum la tempo?</h2>
         </div>
@@ -403,7 +403,7 @@ function EoAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Por kiu ĝi taŭgas?</h2>
         </div>
@@ -423,7 +423,7 @@ function EoAboutPage() {
         </div>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">Kiu staras malantaŭ Daatan?</h2>
         </div>

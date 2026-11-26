@@ -45,7 +45,7 @@ export function ProfileTabs({
           <Link
             key={key}
             href={buildProfileUrl(pathname, { tab: key }, searchParams)}
-            className={`flex-shrink-0 px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${
+            className={`shrink-0 px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${
               activeTab === key
                 ? 'bg-navy-700 border border-b-0 border-navy-600 text-white -mb-px'
                 : 'text-gray-400 hover:text-gray-200'

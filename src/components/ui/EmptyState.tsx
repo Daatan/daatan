@@ -36,7 +36,7 @@ export default function EmptyState({
     <div
       className={
         isCard
-          ? 'bg-navy-700 border border-navy-600 rounded-2xl p-12 text-center shadow-sm'
+          ? 'bg-navy-700 border border-navy-600 rounded-2xl p-12 text-center shadow-xs'
           : 'bg-navy-800 border-2 border-dashed border-navy-600 rounded-2xl p-8 text-center'
       }
     >

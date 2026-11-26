@@ -119,7 +119,7 @@ export default function AuthorsTab() {
   const setDraft = (id: string, patch: Partial<{ name: string; notes: string; alias: string; outlet: string }>) =>
     setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }))
 
-  const inputClass = 'px-3 py-1.5 text-sm bg-navy-900 border border-navy-600 rounded-md text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500'
+  const inputClass = 'px-3 py-1.5 text-sm bg-navy-900 border border-navy-600 rounded-md text-white placeholder:text-gray-600 focus:outline-hidden focus:border-blue-500'
 
   return (
     <div>
@@ -148,13 +148,13 @@ export default function AuthorsTab() {
         <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('authorsAddTitle')}</h3>
         <div className="flex flex-wrap gap-2 items-center p-4 rounded-lg border border-navy-600 bg-navy-800">
           <input
-            className={`${inputClass} flex-1 min-w-[10rem]`}
+            className={`${inputClass} flex-1 min-w-40`}
             placeholder={t('authorsNamePlaceholder')}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
           <input
-            className={`${inputClass} flex-1 min-w-[10rem]`}
+            className={`${inputClass} flex-1 min-w-40`}
             placeholder={t('authorsNotesPlaceholder')}
             value={newNotes}
             onChange={(e) => setNewNotes(e.target.value)}
@@ -181,12 +181,12 @@ export default function AuthorsTab() {
               <div key={p.id} className="p-4 rounded-lg border border-navy-600 bg-navy-800">
                 <div className="flex flex-wrap gap-2 items-center mb-3">
                   <input
-                    className={`${inputClass} flex-1 min-w-[9rem] font-semibold`}
+                    className={`${inputClass} flex-1 min-w-36 font-semibold`}
                     value={draft.name}
                     onChange={(e) => setDraft(p.id, { name: e.target.value })}
                   />
                   <input
-                    className={`${inputClass} flex-1 min-w-[9rem]`}
+                    className={`${inputClass} flex-1 min-w-36`}
                     placeholder={t('authorsNotesPlaceholder')}
                     value={draft.notes}
                     onChange={(e) => setDraft(p.id, { notes: e.target.value })}

@@ -64,12 +64,12 @@ function VoterRow({
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="font-medium text-white text-sm truncate">{commitment.user.name}</span>
             {isCurrentUser && (
-              <span className="text-[10px] font-semibold px-1 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50 shrink-0">
+              <span className="text-[10px] font-semibold px-1 py-0.5 rounded-sm bg-blue-900/40 text-blue-300 border border-blue-700/50 shrink-0">
                 {t('youBadge')}
               </span>
             )}
             {isAuthor && (
-              <span className="text-[10px] font-semibold px-1 py-0.5 rounded bg-amber-900/30 text-amber-300/90 border border-amber-700/40 shrink-0 uppercase tracking-wide">
+              <span className="text-[10px] font-semibold px-1 py-0.5 rounded-sm bg-amber-900/30 text-amber-300/90 border border-amber-700/40 shrink-0 uppercase tracking-wide">
                 {t('author')}
               </span>
             )}
@@ -91,7 +91,7 @@ function VoterRow({
           {canRemove && !isConfirming && (
             <button
               onClick={onStartConfirm}
-              className="p-1 rounded text-red-500 hover:bg-red-900/20 transition-colors"
+              className="p-1 rounded-sm text-red-500 hover:bg-red-900/20 transition-colors"
               aria-label="Remove vote"
             >
               <Trash2 className="w-3 h-3" />
@@ -101,14 +101,14 @@ function VoterRow({
       </div>
 
       {isCurrentUser && isConfirming && (
-        <div className="mt-2 rounded border border-red-800/50 bg-red-900/10 p-2">
+        <div className="mt-2 rounded-sm border border-red-800/50 bg-red-900/10 p-2">
           <p className="text-xs text-red-300 mb-1.5">Remove your vote? This cannot be undone.</p>
           {removeError && <p className="text-xs text-red-400 mb-1.5">{removeError}</p>}
           <div className="flex gap-1.5">
             <button
               onClick={onConfirmRemove}
               disabled={isRemoving}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-sm bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
             >
               {isRemoving && <Loader2 className="w-3 h-3 animate-spin" />}
               {isRemoving ? 'Removing...' : 'Confirm'}
@@ -116,7 +116,7 @@ function VoterRow({
             <button
               onClick={onCancelConfirm}
               disabled={isRemoving}
-              className="flex-1 rounded border border-gray-600 px-2 py-1 text-xs font-semibold text-gray-300 hover:bg-navy-800 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-sm border border-gray-600 px-2 py-1 text-xs font-semibold text-gray-300 hover:bg-navy-800 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -287,12 +287,12 @@ export function CommitmentsHistory({ prediction, currentUserId, authorId, onRemo
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium text-white truncate">{commitment.user.name}</span>
                     {isCurrentUser && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50 shrink-0">
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm bg-blue-900/40 text-blue-300 border border-blue-700/50 shrink-0">
                         {t('youBadge')}
                       </span>
                     )}
                     {commitment.user.id === authorId && (
-                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300/90 border border-amber-700/40 uppercase tracking-wide shrink-0">
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm bg-amber-900/30 text-amber-300/90 border border-amber-700/40 uppercase tracking-wide shrink-0">
                         {t('author')}
                       </span>
                     )}

@@ -85,7 +85,7 @@ export default function CommitmentsPage() {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-navy-600 rounded w-1/4 mb-8"></div>
+          <div className="h-8 bg-navy-600 rounded-sm w-1/4 mb-8"></div>
           {[1, 2, 3].map(i => (
             <div key={i} className="h-32 bg-navy-700 rounded-xl"></div>
           ))}
@@ -119,7 +119,7 @@ export default function CommitmentsPage() {
           {commitments.map((commitment) => (
             <div 
               key={commitment.id}
-              className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+              className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-shadow"
             >
               <div className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

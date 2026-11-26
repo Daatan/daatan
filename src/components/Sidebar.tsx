@@ -208,7 +208,7 @@ const Sidebar = () => {
               placeholder={ff('searchPlaceholder')}
               aria-label={ff('searchPlaceholder')}
               type="search"
-              className="flex-1 min-w-0 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
+              className="flex-1 min-w-0 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-hidden focus:border-blue-500 placeholder-gray-500"
               onKeyDown={e => { if (e.key === 'Escape') { setMobileSearchOpen(false); setSearchQuery('') } }}
             />
             {searchQuery && (
@@ -283,7 +283,7 @@ const Sidebar = () => {
       {/* Sidebar */}
       <aside
         className={`
-          fixed start-0 top-0 h-screen w-64 bg-navy-900 border-e border-navy-600 flex flex-col z-50
+          fixed inset-s-0 top-0 h-screen w-64 bg-navy-900 border-e border-navy-600 flex flex-col z-50
           transform transition-transform duration-300 ease-in-out
           lg:translate-x-0 lg:rtl:translate-x-0
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}
@@ -294,7 +294,7 @@ const Sidebar = () => {
           <BrandLogo fallbackSrc="/logo-icon.png" width={48} height={48} alt="" />
           <div className="min-w-0">
             <span className="block text-lg font-bold text-white leading-tight">{appName}</span>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase leading-snug tracking-[0.05em] text-text-secondary">{t('tagline')}</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase leading-snug tracking-wider text-text-secondary">{t('tagline')}</p>
             <span className="text-[11px] text-text-subtle font-mono">v{VERSION}</span>
           </div>
         </Link>
@@ -315,7 +315,7 @@ const Sidebar = () => {
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder={ff('searchPlaceholder')}
                     aria-label={ff('searchPlaceholder')}
-                    className="flex-1 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500"
+                    className="flex-1 bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-hidden focus:border-blue-500 placeholder-gray-500"
                     onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
                   />
                   <button type="button" onClick={() => setSearchOpen(false)} aria-label={c('close')} className="p-1 text-gray-400 hover:text-white">
@@ -352,7 +352,7 @@ const Sidebar = () => {
                   <span className="relative">
                     <Icon className="w-5 h-5" />
                     {item.href === '/notifications' && hasMounted && unreadCount > 0 && (
-                      <span className="absolute -top-1.5 -end-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-600 rounded-full">
+                      <span className="absolute -top-1.5 -inset-e-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-600 rounded-full">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
@@ -395,7 +395,7 @@ const Sidebar = () => {
             <div className="animate-pulse flex items-center gap-3 px-4 py-3">
               <div className="w-8 h-8 bg-navy-700 rounded-full" />
               <div className="flex-1">
-                <div className="h-4 bg-navy-700 rounded w-24" />
+                <div className="h-4 bg-navy-700 rounded-sm w-24" />
               </div>
             </div>
           ) : effectiveStatus === 'authenticated' && session?.user ? (

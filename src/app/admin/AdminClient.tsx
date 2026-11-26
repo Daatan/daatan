@@ -202,13 +202,13 @@ function ForecastsTab() {
             aria-label={t('searchForecasts')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-          className="px-3 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 border border-navy-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           aria-label={t('colStatus')}
         >
           <option value="">{t('allStatuses')}</option>
@@ -230,7 +230,7 @@ function ForecastsTab() {
         <p className="text-center text-gray-500 py-12">{t('noForecastsFound')}</p>
       ) : (
         <>
-          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -362,7 +362,7 @@ function CommentsTab() {
             aria-label={t('searchComments')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
@@ -370,7 +370,7 @@ function CommentsTab() {
             type="checkbox"
             checked={showDeleted}
             onChange={(e) => { setShowDeleted(e.target.checked); setPage(1) }}
-            className="rounded border-gray-300"
+            className="rounded-sm border-gray-300"
           />
           {t('showDeleted')}
         </label>
@@ -522,7 +522,7 @@ function UsersTab() {
           aria-label={t('searchUsers')}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -534,7 +534,7 @@ function UsersTab() {
         <p className="text-center text-gray-500 py-12">{t('noUsersFound')}</p>
       ) : (
         <>
-          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-navy-700 border border-navy-600 rounded-xl overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -602,7 +602,7 @@ function UsersTab() {
                           onChange={(e) => updateRole(u.id, e.target.value as AdminUser['role'])}
                           disabled={updatingId === u.id}
                           aria-label="Change user role"
-                          className="text-xs border border-navy-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          className="text-xs border border-navy-600 rounded-sm px-2 py-1 focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                         >
                           <option value="USER">{t('roleUser')}</option>
                           <option value="RESOLVER">{t('roleResolver')}</option>

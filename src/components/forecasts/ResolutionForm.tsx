@@ -260,7 +260,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
   const isMultipleChoice = outcomeType === 'MULTIPLE_CHOICE'
 
   return (
-    <form onSubmit={handleSubmit} className="bg-navy-700 rounded-lg border border-navy-600 p-6 space-y-6 shadow-sm">
+    <form onSubmit={handleSubmit} className="bg-navy-700 rounded-lg border border-navy-600 p-6 space-y-6 shadow-xs">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Resolve Forecast</h3>
         {aiResearch && (
@@ -459,7 +459,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
               type="checkbox"
               checked={pinAcknowledged}
               onChange={(e) => setPinAcknowledged(e.target.checked)}
-              className="rounded border-amber-500/50"
+              className="rounded-sm border-amber-500/50"
             />
             I&apos;ve reviewed the Oracul&apos;s estimate and confirm this resolution
           </label>
@@ -482,7 +482,7 @@ export function ResolutionForm({ predictionId, outcomeType, options, settled, co
               type="checkbox"
               checked={earlyAcknowledged}
               onChange={(e) => setEarlyAcknowledged(e.target.checked)}
-              className="rounded border-amber-500/50"
+              className="rounded-sm border-amber-500/50"
             />
             I confirm this resolution before the deadline
           </label>

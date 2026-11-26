@@ -1,99 +1,200 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-/* ── DAATAN COLOR SYSTEM ─────────────────────────────────── */
-:root {
-  /* Each colour is RGB channels (`--color-X-rgb`) with `--color-X` derived from them, so
-     Tailwind can apply opacity modifiers (`bg-cobalt/10`) via `rgb(var(--color-X-rgb) / <alpha>)`.
-     A bare hex `var()` drops every `/NN` class from the build (#2253). Change the -rgb value. */
-  /* Primary: Deep Navy */
-  --color-navy-900-rgb: 11 31 51; /* #0B1F33 */
-  --color-navy-900:     rgb(var(--color-navy-900-rgb));
-  --color-navy-800-rgb: 14 38 61; /* #0E263D */
-  --color-navy-800:     rgb(var(--color-navy-800-rgb));
-  --color-navy-700-rgb: 19 44 69; /* #132C45 */
-  --color-navy-700:     rgb(var(--color-navy-700-rgb));
-  --color-navy-600-rgb: 28 58 90; /* #1C3A5A */
-  --color-navy-600:     rgb(var(--color-navy-600-rgb));
+/* Tailwind 4 (#2355): the theme lives in this file; there is no tailwind.config.js. */
 
-  /* Secondary: Cobalt Blue */
-  --color-cobalt-rgb:       47 107 255; /* #2F6BFF */
-  --color-cobalt:           rgb(var(--color-cobalt-rgb));
-  --color-cobalt-hover-rgb: 36 89 214; /* #2459D6 */
-  --color-cobalt-hover:     rgb(var(--color-cobalt-hover-rgb));
-  --color-cobalt-light-rgb: 91 140 255; /* #5B8CFF */
-  --color-cobalt-light:     rgb(var(--color-cobalt-light-rgb));
-  --color-cobalt-soft-rgb:  234 241 255; /* #EAF1FF */
-  --color-cobalt-soft:      rgb(var(--color-cobalt-soft-rgb));
+/* v4 applies `hover:` only on devices that can hover, so a tap on a touch screen would no
+   longer open hover-only UI (the group-hover tooltips in FeedClient and LeaderboardParts).
+   Keep the v3 behaviour. */
+@custom-variant hover (&:hover);
 
-  /* Accent: Analytical Teal */
-  --color-teal-rgb:       46 196 182; /* #2EC4B6 */
-  --color-teal:           rgb(var(--color-teal-rgb));
-  --color-teal-hover-rgb: 37 167 152; /* #25A798 */
-  --color-teal-hover:     rgb(var(--color-teal-hover-rgb));
-  --color-teal-soft-rgb:  230 250 248; /* #E6FAF8 */
-  --color-teal-soft:      rgb(var(--color-teal-soft-rgb));
+/* Brand colours for Tailwind utilities. Their values live in :root below as RGB channels;
+   change the -rgb values there, not here. v4 builds opacity variants (`bg-cobalt/10`,
+   `border-navy-600/50`) with color-mix(), so each of these takes a `/NN` modifier (#2253);
+   src/lib/__tests__/tailwind-colors.test.ts compiles this file and checks that. */
+@theme {
+  /* PRIMARY: Deep Navy */
+  --color-navy-900: rgb(var(--color-navy-900-rgb));
+  --color-navy-800: rgb(var(--color-navy-800-rgb));
+  --color-navy-700: rgb(var(--color-navy-700-rgb));
+  --color-navy-600: rgb(var(--color-navy-600-rgb));
 
-  /* Neutrals */
-  --color-white:          #FFFFFF;
-  --color-mist-rgb:           230 233 239; /* #E6E9EF */
-  --color-mist:               rgb(var(--color-mist-rgb));
-  --color-text-secondary-rgb: 178 190 208; /* #B2BED0 — was #A0AEC0, bumped for contrast */
-  --color-text-secondary:     rgb(var(--color-text-secondary-rgb));
-  --color-text-subtle-rgb:    154 165 180; /* #9AA5B4 — was #6B7280 (3.6:1), now ~6.7:1 on navy-900 */
-  --color-text-subtle:        rgb(var(--color-text-subtle-rgb));
+  /* SECONDARY: Cobalt Blue (actions, buttons, focus) */
+  --color-cobalt: rgb(var(--color-cobalt-rgb));
+  --color-cobalt-hover: rgb(var(--color-cobalt-hover-rgb));
+  --color-cobalt-light: rgb(var(--color-cobalt-light-rgb));
+  --color-cobalt-soft: rgb(var(--color-cobalt-soft-rgb));
 
-  /* App is unconditionally dark-themed (not tied to prefers-color-scheme) — without this,
-     native form controls (select dropdown popups, date pickers, scrollbars) render with the
-     browser's default light chrome regardless of our own dark styling. */
-  color-scheme: dark;
+  /* ACCENT: Analytical Teal (data, accuracy, results — use sparingly) */
+  --color-teal: rgb(var(--color-teal-rgb));
+  --color-teal-hover: rgb(var(--color-teal-hover-rgb));
+  --color-teal-soft: rgb(var(--color-teal-soft-rgb));
+
+  /* NEUTRALS */
+  --color-mist: rgb(var(--color-mist-rgb));
+  --color-text-secondary: rgb(var(--color-text-secondary-rgb));
+  --color-text-subtle: rgb(var(--color-text-subtle-rgb));
+
+  /* WCAG AA override: Tailwind's default gray-500 (#6B7280) and gray-600 (#4B5563) fail
+     contrast on the dark navy backgrounds used throughout this app. Remapped to values that
+     reach ≥4.5:1 on navy-900 (#0B1F33). The rest are Tailwind 3's grays, unchanged. */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af; /* unchanged — already passes (~6.8:1) */
+  --color-gray-500: #9aa5b4; /* was #6B7280 (3.6:1) → now ~6.7:1 */
+  --color-gray-600: #7d8fa3; /* was #4B5563 (2.3:1) → now ~5.1:1 */
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+
+  /* Legacy aliases kept for backward compat */
+  --color-primary: rgb(var(--color-cobalt-rgb));
+  --color-sidebar-bg: rgb(var(--color-navy-900-rgb));
+  --color-sidebar-hover: rgb(var(--color-navy-800-rgb));
+  --color-sidebar-active: rgb(var(--color-navy-700-rgb));
+  --color-sidebar-text: rgb(var(--color-mist-rgb));
+  --color-sidebar-muted: rgb(var(--color-text-secondary-rgb));
+
+  /* Tailwind 3 line heights. v4 makes them unitless ratios, which a child with its own font
+     size inherits as a ratio: an 11px pill inside `text-xs` got 14.7px instead of 16px, and
+     every card on the energy-2022 report lost a pixel. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
 }
 
-/* ── BASE ────────────────────────────────────────────────── */
-html {
-  touch-action: manipulation;
-  -ms-touch-action: manipulation;
-  /* clip (not hidden) blocks horizontal overflow without turning html/body
-     into scroll containers, so position:sticky descendants keep working.
-     Same reasoning as the overflow-x-clip classes in layout.tsx (PR #983). */
-  overflow-x: clip;
+/* next/font defines --font-inter and --font-heebo on <body>, not on :root, so the stack must
+   not be resolved at :root: `inline` writes it into the font-sans utility itself. */
+@theme inline {
+  --font-sans: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
 }
 
-body {
-  background-color: var(--color-navy-900);
-  color: var(--color-white);
-  font-family: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  touch-action: manipulation;
-  -webkit-text-size-adjust: 100%;
-  overflow-x: clip;
+/* Tailwind 3 defaults that v4 changed, kept so the upgrade does not restyle the app:
+   border colour (v4: currentColor), placeholder colour (v4: the text colour at 50%) and the
+   pointer cursor on buttons (v4: the default arrow). */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
-/* `color-scheme: dark` above themes the native <select> popup chrome, but on some
-   Chrome/Linux builds individual <option> rows still fall back to light-on-light —
-   only the browser-highlighted selected row stays legible. Set colors explicitly. */
-select option {
-  background-color: var(--color-navy-800);
-  color: var(--color-white);
+@layer base {
+  /* ── DAATAN COLOR SYSTEM ─────────────────────────────────── */
+  :root {
+    /* Each colour is RGB channels (`--color-X-rgb`) with `--color-X` derived from them. The
+       @theme block above maps them to Tailwind colours, opacity variants included (#2253).
+       Change the -rgb value; `--color-X` is also used directly via var() in CSS and inline styles. */
+    /* Primary: Deep Navy */
+    --color-navy-900-rgb: 11 31 51; /* #0B1F33 */
+    --color-navy-900:     rgb(var(--color-navy-900-rgb));
+    --color-navy-800-rgb: 14 38 61; /* #0E263D */
+    --color-navy-800:     rgb(var(--color-navy-800-rgb));
+    --color-navy-700-rgb: 19 44 69; /* #132C45 */
+    --color-navy-700:     rgb(var(--color-navy-700-rgb));
+    --color-navy-600-rgb: 28 58 90; /* #1C3A5A */
+    --color-navy-600:     rgb(var(--color-navy-600-rgb));
+
+    /* Secondary: Cobalt Blue */
+    --color-cobalt-rgb:       47 107 255; /* #2F6BFF */
+    --color-cobalt:           rgb(var(--color-cobalt-rgb));
+    --color-cobalt-hover-rgb: 36 89 214; /* #2459D6 */
+    --color-cobalt-hover:     rgb(var(--color-cobalt-hover-rgb));
+    --color-cobalt-light-rgb: 91 140 255; /* #5B8CFF */
+    --color-cobalt-light:     rgb(var(--color-cobalt-light-rgb));
+    --color-cobalt-soft-rgb:  234 241 255; /* #EAF1FF */
+    --color-cobalt-soft:      rgb(var(--color-cobalt-soft-rgb));
+
+    /* Accent: Analytical Teal */
+    --color-teal-rgb:       46 196 182; /* #2EC4B6 */
+    --color-teal:           rgb(var(--color-teal-rgb));
+    --color-teal-hover-rgb: 37 167 152; /* #25A798 */
+    --color-teal-hover:     rgb(var(--color-teal-hover-rgb));
+    --color-teal-soft-rgb:  230 250 248; /* #E6FAF8 */
+    --color-teal-soft:      rgb(var(--color-teal-soft-rgb));
+
+    /* Neutrals */
+    --color-white:          #FFFFFF;
+    --color-mist-rgb:           230 233 239; /* #E6E9EF */
+    --color-mist:               rgb(var(--color-mist-rgb));
+    --color-text-secondary-rgb: 178 190 208; /* #B2BED0 — was #A0AEC0, bumped for contrast */
+    --color-text-secondary:     rgb(var(--color-text-secondary-rgb));
+    --color-text-subtle-rgb:    154 165 180; /* #9AA5B4 — was #6B7280 (3.6:1), now ~6.7:1 on navy-900 */
+    --color-text-subtle:        rgb(var(--color-text-subtle-rgb));
+
+    /* App is unconditionally dark-themed (not tied to prefers-color-scheme) — without this,
+       native form controls (select dropdown popups, date pickers, scrollbars) render with the
+       browser's default light chrome regardless of our own dark styling. */
+    color-scheme: dark;
+  }
+
+  /* ── BASE ────────────────────────────────────────────────── */
+  html {
+    touch-action: manipulation;
+    -ms-touch-action: manipulation;
+    /* clip (not hidden) blocks horizontal overflow without turning html/body
+       into scroll containers, so position:sticky descendants keep working.
+       Same reasoning as the overflow-x-clip classes in layout.tsx (PR #983). */
+    overflow-x: clip;
+  }
+
+  body {
+    background-color: var(--color-navy-900);
+    color: var(--color-white);
+    font-family: var(--font-inter), var(--font-heebo), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
+  }
+
+  /* `color-scheme: dark` above themes the native <select> popup chrome, but on some
+     Chrome/Linux builds individual <option> rows still fall back to light-on-light —
+     only the browser-highlighted selected row stays legible. Set colors explicitly. */
+  select option {
+    background-color: var(--color-navy-800);
+    color: var(--color-white);
+  }
 }
 
-/* ── ACCESSIBILITY ──────────────────────────────────────── */
-/* Keyboard-only focus ring (`:focus-visible` skips mouse/touch clicks) so every
-   interactive element gets a visible indicator even where a component doesn't
-   define its own — existing `focus:ring-*` utility classes still layer on top. */
-:focus-visible {
-  outline: 2px solid var(--color-cobalt-light);
-  outline-offset: 2px;
+/* Stays in the utilities layer, after the generated utilities, as it was after them in v3:
+   it beats a bare `outline-hidden` (same specificity, later) but not `focus:outline-hidden`. */
+@layer utilities {
+  /* ── ACCESSIBILITY ──────────────────────────────────────── */
+  /* Keyboard-only focus ring (`:focus-visible` skips mouse/touch clicks) so every
+     interactive element gets a visible indicator even where a component doesn't
+     define its own — existing `focus:ring-*` utility classes still layer on top. */
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt-light);
+    outline-offset: 2px;
+  }
 }
 
 /* ── COMPONENTS ─────────────────────────────────────────── */
-@layer components {
-  .input-dark {
-    @apply border border-navy-600 bg-navy-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500;
-  }
+@utility input-dark {
+  @apply border border-navy-600 bg-navy-700 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500;
 }
 
 /* ── UTILITIES ───────────────────────────────────────────── */

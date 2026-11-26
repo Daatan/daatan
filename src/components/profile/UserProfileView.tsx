@@ -57,10 +57,10 @@ export async function UserProfileView({
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       {/* Profile Header */}
-      <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-10 shadow-sm mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-10 shadow-xs mb-6">
         <div className="flex flex-col md:flex-row items-center gap-8">
           {/* Avatar */}
-          <div className="relative flex-shrink-0">
+          <div className="relative shrink-0">
             {user.image ? (
               <Image
                 src={user.image}
@@ -147,7 +147,7 @@ export async function UserProfileView({
           </div>
 
           {/* ELO card — the headline rating; per-tag when a tag is selected */}
-          <div className="bg-gray-900 text-white p-6 rounded-3xl shadow-lg text-center flex-shrink-0 w-full md:w-auto md:min-w-[148px] md:max-w-[220px]">
+          <div className="bg-gray-900 text-white p-6 rounded-3xl shadow-lg text-center shrink-0 w-full md:w-auto md:min-w-[148px] md:max-w-[220px]">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Swords className="w-4 h-4 text-orange-400" />
               <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
@@ -310,12 +310,12 @@ function CommitmentCard({
     <div className="relative group">
       <ForecastCard prediction={commitment.prediction} />
       <div className="absolute top-3 right-3 flex flex-col items-end gap-1 pointer-events-none">
-        <span className="px-2 py-0.5 bg-navy-900/90 border border-navy-600 text-xs font-bold rounded-full text-blue-300 backdrop-blur-sm">
+        <span className="px-2 py-0.5 bg-navy-900/90 border border-navy-600 text-xs font-bold rounded-full text-blue-300 backdrop-blur-xs">
           {probLabel}
         </span>
         {showScores && commitment.brierScore !== null && (
           <span
-            className={`px-2 py-0.5 text-xs font-bold rounded-full backdrop-blur-sm ${
+            className={`px-2 py-0.5 text-xs font-bold rounded-full backdrop-blur-xs ${
               isCorrect
                 ? 'bg-teal/20 text-teal border border-teal/30'
                 : 'bg-red-900/30 text-red-400 border border-red-800/30'

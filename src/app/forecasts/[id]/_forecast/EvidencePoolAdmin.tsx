@@ -240,7 +240,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
           {buildChains(articles).map(({ head, priors }) => {
             const chainOpen = expandedChains.has(head.id)
             return (
-              <li key={head.id} className="rounded bg-navy-800">
+              <li key={head.id} className="rounded-sm bg-navy-800">
                 <div className="flex items-start justify-between gap-3 text-xs px-2 py-1.5">
                   <label className="flex flex-1 items-start gap-2 min-w-0 cursor-pointer">
                     <input
@@ -262,7 +262,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
                         <ExternalLink className="w-3 h-3 shrink-0" />
                         {head.status !== 'COMPLETE' && (
                           <span
-                            className={`shrink-0 px-1 py-px rounded text-[9px] font-semibold uppercase tracking-wide ${STATUS_BADGE[head.status]}`}
+                            className={`shrink-0 px-1 py-px rounded-sm text-[9px] font-semibold uppercase tracking-wide ${STATUS_BADGE[head.status]}`}
                           >
                             {head.status}
                           </span>
@@ -286,7 +286,7 @@ export function EvidencePoolAdmin({ predictionId }: Props) {
                       onChange={e => e.target.value && setDispute(head, e.target.value as DisputeStatus)}
                       aria-label={`Dispute status for ${head.title ?? head.url}`}
                       title="Public dispute status of this URL, in every forecast (elections#225)"
-                      className={`bg-navy-900 border border-navy-600 rounded px-1 py-px text-[10px] ${head.disputeStatus === 'disputed' ? 'text-amber-400' : head.disputeStatus === 'hidden' ? 'text-red-400' : 'text-gray-500'}`}
+                      className={`bg-navy-900 border border-navy-600 rounded-sm px-1 py-px text-[10px] ${head.disputeStatus === 'disputed' ? 'text-amber-400' : head.disputeStatus === 'hidden' ? 'text-red-400' : 'text-gray-500'}`}
                     >
                       <option value="" disabled>no dispute</option>
                       {(Object.keys(DISPUTE_LABEL) as DisputeStatus[]).map(s => (

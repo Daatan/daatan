@@ -19,7 +19,7 @@ function CallColumn({ heading, calls }: { heading: string; calls: OutletCall[] }
           {calls.slice(0, CALLS_SHOWN).map((c) => (
             <li key={c.forecastId}>
               {/* dir="auto": most titles are Hebrew (see the publications list). */}
-              <Link href={c.href} dir="auto" className="block text-sm text-white hover:underline hover:text-cyan-300 break-words">
+              <Link href={c.href} dir="auto" className="block text-sm text-white hover:underline hover:text-cyan-300 wrap-break-word">
                 {c.title}
               </Link>
               <p className="mt-0.5 text-xs text-gray-400">

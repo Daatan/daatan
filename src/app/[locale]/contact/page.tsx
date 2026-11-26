@@ -45,7 +45,7 @@ export default async function LocaleContactPage({ params }: { params: Promise<{ 
         <p className="text-sm text-text-secondary">{t('intro')}</p>
       </div>
 
-      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-sm overflow-hidden mb-6">
+      <div className="bg-navy-700 border border-navy-600 rounded-xl shadow-xs overflow-hidden mb-6">
         <div className="p-6 border-b border-navy-600">
           <h2 className="text-lg font-semibold text-white">{t('getInTouch')}</h2>
         </div>

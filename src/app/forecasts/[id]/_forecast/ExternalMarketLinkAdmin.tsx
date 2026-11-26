@@ -222,7 +222,7 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
               {suggestions.map(s => (
                 <li
                   key={`${s.provider}-${s.externalId}`}
-                  className="text-xs px-2 py-1.5 rounded bg-navy-800 text-gray-300 flex items-center justify-between gap-2"
+                  className="text-xs px-2 py-1.5 rounded-sm bg-navy-800 text-gray-300 flex items-center justify-between gap-2"
                 >
                   <a
                     href={s.url}
@@ -246,7 +246,7 @@ export function ExternalMarketLinkAdmin({ prediction }: Props) {
                       onClick={() => link(s.url)}
                       disabled={busy}
                       aria-label={`Link ${s.question}`}
-                      className="px-2 py-0.5 font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded disabled:opacity-50"
+                      className="px-2 py-0.5 font-semibold bg-pink-600 hover:bg-pink-500 text-white rounded-sm disabled:opacity-50"
                     >
                       Link
                     </button>

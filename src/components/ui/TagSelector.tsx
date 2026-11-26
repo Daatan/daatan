@@ -77,7 +77,7 @@ export function TagSelector({
                         <button
                             onClick={() => removeTag(tag)}
                             aria-label={`Remove ${tag}`}
-                            className="text-blue-400 hover:text-blue-600 focus:outline-none"
+                            className="text-blue-400 hover:text-blue-600 focus:outline-hidden"
                         >
                             <X className="w-3 h-3" />
                         </button>
@@ -96,7 +96,7 @@ export function TagSelector({
                         onKeyDown={handleKeyDown}
                         placeholder={selectedTags.length === 0 ? placeholder : ""}
                         aria-label={placeholder}
-                        className="w-full h-8 bg-transparent focus:outline-none text-sm"
+                        className="w-full h-8 bg-transparent focus:outline-hidden text-sm"
                         disabled={selectedTags.length >= maxTags}
                     />
 

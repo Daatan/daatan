@@ -45,7 +45,7 @@ export function CreateBotForm({ onCreated, onCancel }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t('displayNamePlaceholder')}
-            className="border rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="border rounded-sm px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-hidden"
             required
             minLength={2}
           />
@@ -55,7 +55,7 @@ export function CreateBotForm({ onCreated, onCancel }: Props) {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-sm text-sm hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             {t('create')}

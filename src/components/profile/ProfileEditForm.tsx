@@ -121,7 +121,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-sm">
+    <form onSubmit={handleSubmit} className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-xs">
       <div className="space-y-6">
         {/* Avatar Upload */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-6 border-b border-navy-600">
@@ -129,7 +129,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
             src={formData.avatarUrl} 
             name={user.name || user.username} 
             size={80} 
-            className="ring-4 ring-white shadow-sm"
+            className="ring-4 ring-white shadow-xs"
           />
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-white">{t('profilePicture')}</h3>
@@ -170,7 +170,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder={t('displayNamePlaceholder')}
-            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
             maxLength={60}
           />
           <p className="text-xs text-gray-500 mt-1">{t('displayNameHelper')}</p>
@@ -188,7 +188,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             placeholder={t('usernamePlaceholder')}
-            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
             maxLength={30}
           />
           <p className="text-xs text-gray-500 mt-1">{t('usernameHelper')}</p>
@@ -206,7 +206,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
             value={formData.website}
             onChange={(e) => setFormData({ ...formData, website: e.target.value })}
             placeholder={t('websitePlaceholder')}
-            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
+            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent"
           />
           <p className="text-xs text-gray-500 mt-1">{t('websiteHelper')}</p>
         </div>
@@ -225,7 +225,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
               value={formData.twitterHandle}
               onChange={(e) => setFormData({ ...formData, twitterHandle: e.target.value.replace('@', '') })}
               placeholder={t('twitterPlaceholder')}
-              className="flex-1 px-4 py-3 border border-navy-600 rounded-r-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 border border-navy-600 rounded-r-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               maxLength={15}
             />
           </div>
@@ -239,7 +239,7 @@ export default function ProfileEditForm({ user }: ProfileEditFormProps) {
               type="checkbox"
               checked={formData.emailNotifications}
               onChange={(e) => setFormData({ ...formData, emailNotifications: e.target.checked })}
-              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-gray-400" />

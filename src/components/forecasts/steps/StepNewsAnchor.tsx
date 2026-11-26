@@ -281,7 +281,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder={t('urlPlaceholder')}
-                className={`w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isUrl ? 'border-blue-300 bg-cobalt/10/30' : 'border-navy-600'}`}
+                className={`w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isUrl ? 'border-blue-300 bg-cobalt/10/30' : 'border-navy-600'}`}
               />
             </div>
             {isMarketUrl && (
@@ -324,7 +324,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={isSearching ? t('fetchingTitle') : t('enterHeadline')}
                 disabled={isSearching}
-                className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-navy-800"
+                className="w-full px-4 py-3 rounded-lg border border-navy-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-navy-800"
               />
               {isSearching && (
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-blue-500" />
@@ -337,7 +337,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             <button
               onClick={handleMagicExtract}
               disabled={!isUrl || isSearching || isExtracting}
-              className="flex-[2] py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md active:scale-[0.98]"
+              className="flex-2 py-3.5 px-6 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xs hover:shadow-md active:scale-[0.98]"
             >
               {isExtracting ? (
                 <>
@@ -384,7 +384,7 @@ export const StepNewsAnchor = ({ formData, updateFormData }: Props) => {
             type="checkbox"
             checked={skipNews}
             onChange={(e) => handleSkipNewsToggle(e.target.checked)}
-            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="w-5 h-5 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-sm font-medium text-text-secondary group-hover:text-white">
             {t('createWithoutUrl')}

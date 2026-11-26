@@ -23,7 +23,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 const inputCls =
-  'w-full bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-none focus:border-blue-500 placeholder-gray-500'
+  'w-full bg-navy-800 text-white text-sm px-3 py-2 rounded-lg border border-navy-600 outline-hidden focus:border-blue-500 placeholder-gray-500'
 
 export default function SettingsPanel() {
   const [data, setData] = useState<Settings | null>(null)

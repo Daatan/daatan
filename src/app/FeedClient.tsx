@@ -174,7 +174,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
       {/* Welcome Section — sticky so "New Forecast" stays in place while scrolling.
           Negative margins break out of the page padding so the bar spans full width;
           px-* re-aligns its content with the cards below. top-16 clears the mobile header. */}
-      <div className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 bg-navy-900/90 backdrop-blur-sm border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="sticky top-16 lg:top-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 bg-navy-900/90 backdrop-blur-xs border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-cobalt/10 rounded-lg">
             <Home className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
@@ -196,12 +196,12 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
       <div className="mb-6 space-y-3">
         <div className="overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-2 min-w-max">
-            <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <Filter className="w-4 h-4 text-gray-400 shrink-0" />
             <button
               onClick={() => handleSetFilter('ACTIVE')}
               title={t('filterHints.open')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'ACTIVE'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-cobalt/10 text-cobalt-light border border-cobalt/30 hover:bg-blue-100'
                 }`}
             >
@@ -211,7 +211,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
               onClick={() => handleSetFilter('CLOSING_SOON')}
               title={t('filterHints.closingSoon')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'CLOSING_SOON'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
                 }`}
             >
@@ -221,7 +221,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
               onClick={() => handleSetFilter('PENDING')}
               title={t('filterHints.awaitingResolution')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'PENDING'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
                 }`}
             >
@@ -232,7 +232,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
                 onClick={() => handleSetFilter('NEEDS_REVIEW')}
               title={t('filterHints.needsReview')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'NEEDS_REVIEW'
-                  ? 'bg-purple-600 text-white shadow-sm'
+                  ? 'bg-purple-600 text-white shadow-xs'
                   : 'bg-purple-900/20 text-purple-300 hover:bg-purple-900/40 border border-purple-700/50'
                   }`}
               >
@@ -243,7 +243,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
               onClick={() => handleSetFilter('RESOLVED')}
               title={t('filterHints.resolved')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'RESOLVED'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
                 }`}
             >
@@ -253,7 +253,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
               onClick={() => handleSetFilter('ALL')}
               title={t('filterHints.all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === 'ALL'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-navy-700 text-text-secondary hover:bg-navy-600'
                 }`}
             >
@@ -263,14 +263,14 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
             {/* Sort — hidden for Closing Soon (has its own implicit ordering) */}
             {filter !== 'CLOSING_SOON' && (
               <>
-                <div className="w-px h-5 bg-navy-600 mx-1 flex-shrink-0" />
+                <div className="w-px h-5 bg-navy-600 mx-1 shrink-0" />
                 <button
                   onClick={handleToggleSortOrder}
                   className="p-1.5 rounded-lg bg-navy-700 hover:bg-navy-600 text-gray-400 hover:text-white transition-all group relative"
                   title={sortOrder === 'asc' ? t('sortOrder.asc') : t('sortOrder.desc')}
                 >
                   <ArrowDownUp className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                     {sortOrder === 'asc' ? t('sortOrder.asc') : t('sortOrder.desc')}
                   </span>
                 </button>
@@ -285,7 +285,7 @@ export default function FeedClient({ initialPredictions, topicCounts = {} }: Fee
                     onClick={() => handleSetSort(value)}
                     title={t(`sortHints.${value}`)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === value
-                      ? 'bg-gray-800 text-white shadow-sm'
+                      ? 'bg-gray-800 text-white shadow-xs'
                       : 'bg-navy-700 text-gray-400 hover:bg-navy-600'
                     }`}
                   >

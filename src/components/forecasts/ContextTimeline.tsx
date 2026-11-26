@@ -363,7 +363,7 @@ export default function ContextTimeline({
           with CSS `hidden` picking which one shows, so everything stays part of
           the SSR HTML for SEO even while visually collapsed. */}
       {currentContext && (
-        <div id={`context-panel-${predictionId}`} className="p-3 xl:p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-sm">
+        <div id={`context-panel-${predictionId}`} className="p-3 xl:p-4 border border-navy-600 rounded-xl bg-navy-700 shadow-xs">
           {mobilePreview.isTruncated && (
             <p className={`text-gray-300 whitespace-pre-wrap leading-relaxed xl:hidden ${mobileCollapsed ? 'block' : 'hidden'}`}>
               {mobilePreview.preview}…
@@ -443,8 +443,8 @@ export default function ContextTimeline({
                     <span
                       className={
                         isOracle
-                          ? 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                          : 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-500/15 text-gray-400 border border-gray-500/30'
+                          ? 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-gray-500/15 text-gray-400 border border-gray-500/30'
                       }
                       title={
                         isOracle
@@ -456,7 +456,7 @@ export default function ContextTimeline({
                     </span>
                     {oracle?.settled && (
                       <span
-                        className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-amber-500/15 text-amber-300 border border-amber-500/30"
                         title={t('settledHint')}
                       >
                         {t('settledBadge')}
@@ -522,7 +522,7 @@ export default function ContextTimeline({
               {previousSnapshots.map((snap) => (
                 <div key={snap.id} className="relative">
                   {/* Timeline dot */}
-                  <div className="absolute -left-[1.3rem] top-1 w-2.5 h-2.5 rounded-full bg-gray-300 border-2 border-white" />
+                  <div className="absolute left-[-1.3rem] top-1 w-2.5 h-2.5 rounded-full bg-gray-300 border-2 border-white" />
                   <div className="text-xs text-gray-400 mb-1" suppressHydrationWarning>
                     {formatDate(snap.createdAt)}
                   </div>

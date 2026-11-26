@@ -690,7 +690,7 @@ export default function ExpressForecastClient({
     <div className="space-y-6">
       {/* Input Step */}
       {step === 'input' && (
-        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-xs">
           <label htmlFor="prediction-input" className="block text-sm font-bold text-text-secondary mb-3">
             {t('inputLabel')}
           </label>
@@ -699,7 +699,7 @@ export default function ExpressForecastClient({
             value={userInput}
             onChange={(e) => handleUserInputChange(e.target.value)}
             placeholder={t('inputPlaceholder')}
-            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"
+            className="w-full px-4 py-3 bg-navy-800 text-white placeholder:text-text-subtle border border-navy-600 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cobalt focus:border-transparent resize-none"
             rows={3}
             maxLength={1000} // Increased for URLs
           />
@@ -715,7 +715,7 @@ export default function ExpressForecastClient({
               type="checkbox"
               checked={skipSources}
               onChange={(e) => setSkipSources(e.target.checked)}
-              className="w-4 h-4 rounded border-navy-500 bg-navy-800 accent-cobalt"
+              className="w-4 h-4 rounded-sm border-navy-500 bg-navy-800 accent-cobalt"
             />
             <span className="text-sm text-text-secondary">
               {t('skipSources')}
@@ -725,7 +725,7 @@ export default function ExpressForecastClient({
 
           {error && (
             <div className="mt-4 bg-red-900/20 border border-red-800/50 text-red-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -760,7 +760,7 @@ export default function ExpressForecastClient({
 
       {/* Progress Steps */}
       {(['checking', 'searching', 'analyzing', 'generating'] as Step[]).includes(step) && (
-        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-8 shadow-sm">
+        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-8 shadow-xs">
           <div className="max-w-md mx-auto">
             <div className="flex items-center justify-center mb-6">
               <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
@@ -814,7 +814,7 @@ export default function ExpressForecastClient({
 
       {/* Error Step */}
       {step === 'error' && (
-        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-8 shadow-sm">
+        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-8 shadow-xs">
           <div className="max-w-md mx-auto text-center">
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
@@ -827,7 +827,7 @@ export default function ExpressForecastClient({
               <div className="text-left text-sm bg-navy-800 border border-navy-600 rounded-lg p-4 mb-4 space-y-2">
                 <div>
                   <span className="text-gray-400">{t('searchedFor')}: </span>
-                  <span className="text-white font-mono break-words">{noArticlesDetails.searchedFor}</span>
+                  <span className="text-white font-mono wrap-break-word">{noArticlesDetails.searchedFor}</span>
                 </div>
                 <div className="text-gray-300">{t('whatToTryNextHeader')}</div>
                 <ul className="list-disc list-inside text-gray-300 space-y-1">
@@ -860,7 +860,7 @@ export default function ExpressForecastClient({
 
       {/* Review Step */}
       {step === 'review' && generated && (
-        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="bg-navy-700 border border-navy-600 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex justify-between items-start border-b border-navy-600 pb-4">
             <div>
               <h2 className="text-xl font-bold text-white mb-1">{t('reviewTitle')}</h2>
@@ -932,7 +932,7 @@ export default function ExpressForecastClient({
                   aria-label="Claim text"
                   value={editForm?.claimText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, claimText: e.target.value }) : null)}
-                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   rows={3}
                 />
               ) : (
@@ -1070,7 +1070,7 @@ export default function ExpressForecastClient({
                       onKeyDown={e => e.key === 'Enter' && addTag()}
                       placeholder={t('addTagPlaceholder')}
                       aria-label={t('addTagPlaceholder')}
-                      className="px-3 py-1 rounded-full text-sm w-32 border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 rounded-full text-sm w-32 border border-navy-600 bg-navy-800 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     />
                     <button onClick={addTag} aria-label="Add tag" className="p-1 text-blue-600 hover:bg-cobalt/10 rounded-full">
                       <Plus className="w-4 h-4" />
@@ -1111,7 +1111,7 @@ export default function ExpressForecastClient({
                             onChange={(e) => handleOptionChange(index, e.target.value)}
                             placeholder={t('optionPlaceholder', { n: index + 1 })}
                             aria-label={t('optionPlaceholder', { n: index + 1 })}
-                            className="flex-1 px-3 py-2 rounded-lg text-sm border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="flex-1 px-3 py-2 rounded-lg text-sm border border-navy-600 bg-navy-800 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             maxLength={500}
                           />
                           {(editForm?.options || []).length > 2 && (
@@ -1162,7 +1162,7 @@ export default function ExpressForecastClient({
                   aria-label="Context"
                   value={editForm?.detailsText}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, detailsText: e.target.value }) : null)}
-                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   rows={4}
                 />
               ) : (
@@ -1184,7 +1184,7 @@ export default function ExpressForecastClient({
                   aria-label="Resolution rules"
                   value={editForm?.resolutionRules}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm(prev => prev ? ({ ...prev, resolutionRules: e.target.value }) : null)}
-                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border border-navy-600 bg-navy-800 text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   rows={2}
                 />
               ) : (
@@ -1269,7 +1269,7 @@ export default function ExpressForecastClient({
                   className="flex items-center justify-between gap-4 p-4 border border-emerald-500/30 bg-emerald-500/10 rounded-xl hover:border-emerald-400 transition-colors"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-white mb-1 break-words" dir="auto">{generated.market.question}</p>
+                    <p className="font-medium text-white mb-1 wrap-break-word" dir="auto">{generated.market.question}</p>
                     <p className="text-sm text-gray-500 inline-flex items-center gap-1">
                       {generated.market.providerLabel}
                       <ExternalLink className="w-3 h-3" />
@@ -1341,7 +1341,7 @@ export default function ExpressForecastClient({
                 rejected publish left the review screen unchanged (#1787). */}
             {error && !isEditing && (
               <div role="alert" className="bg-red-900/20 border border-red-800/50 text-red-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
             )}

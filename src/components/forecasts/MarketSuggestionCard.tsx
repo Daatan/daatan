@@ -51,7 +51,7 @@ export function MarketSuggestionCard({ match, onLink, onDismiss }: Props) {
         rel="noopener noreferrer"
         className="mt-2 block p-3 rounded-lg border border-pink-500/20 bg-navy-800/60 hover:border-pink-400 hover:bg-pink-500/10 transition-colors"
       >
-        <p className="text-sm sm:text-base text-white font-medium whitespace-normal break-words" dir="auto">
+        <p className="text-sm sm:text-base text-white font-medium whitespace-normal wrap-break-word" dir="auto">
           {match.question}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
