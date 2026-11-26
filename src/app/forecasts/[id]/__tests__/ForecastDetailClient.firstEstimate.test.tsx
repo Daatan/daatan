@@ -79,15 +79,14 @@ const mockFetch = (forecast: Record<string, unknown>, timeline: () => unknown[])
 const contextCalls = (fn: ReturnType<typeof vi.fn>) =>
   fn.mock.calls.filter(([url]) => String(url).endsWith('/context')).length
 
-const renderPage = async (data: Record<string, unknown>, initialContextSnapshots: unknown[] = []) => {
-  await act(async () => {
-    render(wrap(
-      <ForecastDetailClient
-        initialData={data as never}
-        initialContextSnapshots={initialContextSnapshots as never}
-      />,
-    ))
-  })
+const page = (data: Record<string, unknown>, props: Record<string, unknown> = {}) => wrap(
+  <ForecastDetailClient initialData={data as never} initialContextSnapshots={[]} {...props} />,
+)
+
+const renderPage = async (data: Record<string, unknown>, props: Record<string, unknown> = {}) => {
+  let result!: ReturnType<typeof render>
+  await act(async () => { result = render(page(data, props)) })
+  return result
 }
 
 const advance = async (ms: number) => {
@@ -135,6 +134,23 @@ describe('ForecastDetailClient — waiting for the first Oracul estimate (daatan
 
     await advance(FIRST_ESTIMATE_POLL_MS * 3)
     expect(contextCalls(fetchMock)).toBe(2)
+  })
+
+  it('does not call the new number unevidenced off the pre-estimate pool count', async () => {
+    const data = makePrediction()
+    mockFetch(data, () => [snapshot()])
+    // The server counted the pool before the estimate landed: empty.
+    const { rerender } = await renderPage(data, { usableEvidenceCount: 0 })
+    await advance(FIRST_ESTIMATE_POLL_MS)
+    expect(screen.getByText(`${enMessages.forecast.legendAI} 59%`)).toBeInTheDocument()
+    expect(screen.queryByTestId('unevidenced-notice')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ai-how-estimated')).not.toBeInTheDocument()
+
+    // router.refresh() brings props computed after the estimate.
+    await act(async () => {
+      rerender(page(data, { usableEvidenceCount: 3, initialContextSnapshots: [snapshot()] }))
+    })
+    expect(screen.getByTestId('ai-how-estimated')).toHaveTextContent('Based on 3 sources')
   })
 
   it('an abstaining first run shows "Insufficient evidence"', async () => {

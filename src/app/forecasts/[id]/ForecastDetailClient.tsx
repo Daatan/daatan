@@ -257,6 +257,11 @@ export default function ForecastDetailClient({
     // Chart, timeline and contributing sources come from server props.
     router.refresh()
   })
+  // The server counted an empty pool before the estimate landed; until the refresh
+  // brings props computed after it, the count is unknown, not zero.
+  const evidenceCount = firstEstimateArrived && (initialContextSnapshots?.length ?? 0) === 0
+    ? null
+    : usableEvidenceCount
 
   const handleCommitError = async (response: Response) => {
     const data = await response.json().catch(() => ({}))
@@ -674,7 +679,7 @@ export default function ForecastDetailClient({
                     from "never had evidence" since daatan#1473, and collapsing them here
                     would undo that at the last mile). Not shown when the run abstained —
                     that case already hides the needle above. */}
-                {!aiAbstained && aiVal != null && usableEvidenceCount === 0 && (
+                {!aiAbstained && aiVal != null && evidenceCount === 0 && (
                   <div
                     className="mt-4 w-full flex items-start gap-2 text-left text-xs text-gray-400 bg-navy-800/60 border border-navy-600 rounded-lg px-3 py-2"
                     data-testid="unevidenced-notice"
@@ -687,13 +692,13 @@ export default function ForecastDetailClient({
                 {/* daatan#1806: say what the number (or its absence) rests on, and link
                     the explainer. Three states; an abstention keeps its own label and
                     an unknown source count (null) gets no line rather than a guess. */}
-                {!aiAbstained && (aiVal == null || usableEvidenceCount != null) && (
+                {!aiAbstained && (aiVal == null || evidenceCount != null) && (
                   <p className="mt-3 w-full text-left text-xs text-gray-400" data-testid="ai-how-estimated">
                     {aiVal == null
                       ? (firstEstimateDeadlineMs != null ? t('aiHowEstimating') : t('aiHowNoSources'))
-                      : usableEvidenceCount === 0
+                      : evidenceCount === 0
                         ? t('aiHowModelOnly')
-                        : t('aiHowEvidence', { count: usableEvidenceCount ?? 0 })}
+                        : t('aiHowEvidence', { count: evidenceCount ?? 0 })}
                     {' · '}
                     <Link href="/help/rating-numbers" className="underline hover:text-gray-200">
                       {t('aiHowLink')}
