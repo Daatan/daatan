@@ -272,7 +272,7 @@ Refresh the AI context for a forecast: fetches web articles for the claim, asks 
 
 **Probability source (tried in order):**
 
-1. **TruthMachine Oracle API** (`POST ${ORACLE_URL}/forecast`) — calibrated multi-source estimate. Used when `ORACLE_URL` and `ORACLE_API_KEY` are set and the Oracle returns a non-placeholder response with at least one usable article. See [docs/LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md#oracle-api-integration). When this path is taken, the full Oracle payload (mean, std, 95% CI, per-source stance/certainty/credibility) is persisted on the snapshot in the `oracleSnapshot` field and surfaced in the UI.
+1. **TruthMachine Oracle API** (`POST ${ORACLE_URL}/forecast`) — calibrated multi-source estimate. Used when `ORACLE_URL` and `ORACLE_API_KEY` are set and the Oracle returns a non-placeholder response with at least one usable article. See [docs/LLM_ARCHITECTURE.md](./LLM_ARCHITECTURE.md#oracul-api-integration). When this path is taken, the full Oracle payload (mean, std, 95% CI, per-source stance/certainty/credibility) is persisted on the snapshot in the `oracleSnapshot` field and surfaced in the UI.
 2. **LLM `guessChances`** (Gemini → Oracle → OpenRouter → Ollama fallback) — used when the forecast Oracle path is unconfigured, times out, returns `placeholder: true`, or the API version is incompatible. Snapshots from this path have `oracleSnapshot = null`.
 
 The chosen source is recorded in `externalReasoning` on the snapshot (`"TruthMachine Oracle (calibrated multi-source estimate)"` vs the LLM-generated justification).
@@ -570,6 +570,9 @@ Clear a false-positive settlement latch (`Prediction.settled`, which `recordEsti
 
 ### `POST /api/admin/forecasts/[id]/unresolve` — Admin
 Revert a mistaken resolution (daatan#2077) from the snapshot the resolve route wrote (`unresolvePrediction` in `src/lib/services/prediction-unresolve.ts`). **Body** `{ reason }` (1–2000 chars, `400` otherwise). Restores the recorded ratings and commitments and puts the forecast back to `ACTIVE`, or `PENDING` if its deadline has passed, so it can be resolved again; notifications already sent are kept. Then tells news-indexer the forecast is unresolved and, for a binary `correct`/`wrong` resolution, retracts the credibility feedback it sent. Returns `{ status }`. `404` unknown forecast; `400` not resolved; `409` when no matching snapshot exists (admin status override, or a resolution older than snapshots — revert by hand), or a later scored resolution touched the same users (revert that one first).
+
+### `POST /api/admin/forecasts/[id]/retract-credibility` — Admin or `x-cron-secret`
+Withdraw one forecast's credibility feedback from retro's source and author ledgers without unresolving it (daatan#2273, `retractCredibilityFeedback` in `src/lib/services/evidence-pool.ts`): for readings that scored the wrong event, e.g. a forecast whose resolution rules inverted its claim. Calls retro's idempotent `DELETE /leaderboard/ingest/{id}` (30 s). No body. Returns `{ predictionId, retro }` (retro's own response). `404` unknown forecast; `409` when ledger writes are off here (only `APP_ENV=production` writes them — see `docs/DATABASE.md` "Credibility feedback loop") or the Oracul is not configured; `502` when retro refuses or doesn't answer. It does not stop a later re-push: the resolved-forecast backfills push every match again, so exclude the bad pool rows first. Auth: an ADMIN session, or the `x-cron-secret` header (`BOT_RUNNER_SECRET`).
 
 ### `GET /api/admin/forecasts/[id]/external-market`
 Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search (at most 2 markets kept per source event) re-ranked by embedding similarity with a deadline-gap penalty. Only candidates whose similarity clears a relevance floor are returned, each with a `score` (0–100 match); a claim with no real equivalent returns `[]` rather than the least-bad markets, and suggestions are suppressed entirely when embeddings are unavailable. Suggestion only; an admin confirms via POST.
@@ -910,8 +913,9 @@ like huge outliers. Detector 1 re-derives Gate-0's window check directly (never 
 persisted `evidence_weight` column, which is unrelated to the temporal window — see the
 module docstring in `src/lib/services/evidence-second-opinion.ts`), and for an in-window
 article whose stance deviates ≥20pp from its forecast's published `confidence`, gets a
-second opinion on that same article from a stronger model (`EVIDENCE_SECOND_OPINION_MODEL`,
-default Sonnet 5.5). It escalates only when the cheap and expensive readings disagree with
+second opinion on that same article from a stronger model (`EVIDENCE_SECOND_OPINION` in
+`src/lib/llm/registry.ts`, Sonnet 5.5 on Bedrock; the `EVIDENCE_SECOND_OPINION_MODEL` env var
+still overrides it). It escalates only when the cheap and expensive readings disagree with
 **each other** by ≥15pp — agreement, even against the published number, is treated as real
 new evidence the normal ingestion path already self-heals from. Detector 2 is pure SQL, no
 model calls: flags a same-source stance drift ≥25pp between an older and a newer article on

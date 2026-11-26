@@ -32,7 +32,7 @@
 | Database | PostgreSQL | 16 |
 | ORM | Prisma | 7.x |
 | Authentication | NextAuth.js (Auth.js v5) | 5.0.0-beta.x |
-| Testing | Vitest | 4.x |
+| Testing | Vitest | 5.x |
 | Linting | ESLint (flat config, React Compiler rules) | 10.x |
 | Containerization | Docker | Latest |
 | Reverse Proxy | Nginx | Alpine |
@@ -40,7 +40,7 @@
 | Cloud | AWS (EC2, Route 53, S3) | - |
 | IaC | Terraform | 1.x |
 | CI/CD | GitHub Actions | - |
-| AI Integration | Gemini `gemini-2.5-flash` via Vertex AI (primary; Developer-API key leg for self-host) → Oracul `/llm` (AWS Bedrock / Amazon Nova) → OpenRouter → Ollama; OpenRouter also serves three of the five AI-panel members and the bots | - |
+| AI Integration | Gemini `gemini-2.5-flash` via Vertex AI (primary; Developer-API key leg for self-host) → Oracul `/llm` (AWS Bedrock / Amazon Nova) → OpenRouter → Ollama; every model, leg and param is one entry in `src/lib/llm/registry.ts` (#2287). OpenRouter also serves the bots; the five AI-panel members run four on Bedrock and one on Vertex (daatan#2283) | - |
 | Forecast Oracul | TruthMachine Oracul API (`oracle.daatan.com`) — calibrated multi-source probability estimates | 1.x (app accepts API major `1` only — `EXPECTED_API_MAJOR_VERSIONS` in `src/lib/services/oracle.ts`) |
 | Prompts | In-code registry `PROMPTS` in `src/lib/llm/bedrock-prompts.ts`, mirrored in `prompts/*.txt` and pinned by `prompts/prompt_versions.lock.json` (#1658) | - |
 | Email | Resend | - |
@@ -214,8 +214,8 @@ src/
 │   ├── authors/                # Pundit/author pages
 │   ├── create/                 # Forecast creation
 │   ├── help/                   # Help pages (rating-numbers)
-│   ├── home-v5/                # Landing page; served at / in place (rewrite) to first-time visitors (#1840)
-│   ├── leaderboard/            # User rankings (+ ai/, sources/)
+│   ├── home/                   # Landing page at /home (/home-v5 until #2222, now a 301); served at / in place (rewrite) to first-time visitors (#1840)
+│   ├── leaderboard/            # User rankings (+ ai/, sources/, versus/)
 │   ├── notifications/          # User notifications
 │   ├── forecasts/              # Forecast views
 │   ├── oracle-v2/              # Chrome-free Oracul 2.0 playground (admin)
@@ -223,6 +223,7 @@ src/
 │   ├── retroanalysis/          # Retroanalysis case studies
 │   ├── settings/               # User settings
 │   ├── sources/                # Per-source pages (sources/[name])
+│   ├── who-foresaw/            # "Who foresaw it?" retro event pages + retro-only source board (SaaS only, docs/RETRO_SIMULATIONS.md)
 │   ├── globals.css             # Global styles
 │   ├── layout.tsx              # Root layout
 │   └── page.tsx                # Homepage
@@ -242,6 +243,7 @@ src/
 │   │   │   ├── oracle.ts       # Oracul /llm — Bedrock / Amazon Nova fallback
 │   │   │   ├── ollama.ts       # Ollama (self-hosted fallback)
 │   │   │   └── openrouter.ts   # OpenRouter (fallback + bots)
+│   │   ├── registry.ts         # Model registry: every model, chain leg, stage param and panel member (#2287)
 │   │   ├── bedrock-prompts.ts  # In-code prompt registry (PROMPTS); name is historical (#1658)
 │   │   ├── service.ts          # ResilientLLMService (ordered provider chain)
 │   │   ├── types.ts            # LLMProvider, LLMRequest, LLMResponse
@@ -256,7 +258,7 @@ src/
 │   └── next-auth.d.ts          # NextAuth type extensions
 ├── auth.ts / auth.config.ts    # Auth.js v5 (Node config / Edge-safe base config)
 ├── env.ts                      # Validated env schema
-└── proxy.ts                    # Next 16 proxy (formerly middleware.ts): locale, auth gate, home-v5 rewrite, noindex headers
+└── proxy.ts                    # Next 16 proxy (formerly middleware.ts): locale, auth gate, first-visit /home rewrite, noindex headers
 ```
 
 ### Scripts Directory
@@ -500,6 +502,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 | `requote.yml` | 05:31 daily | `/api/cron/requote` — temporal-model daily requote |
 | `pundit-ratings-recalculate.yml` | 06:15 daily | `/api/admin/pundit-ratings/recalculate` |
 | `cert-expiry.yml` | 06:17 daily | Served-cert expiry watch |
+| `retro-simulations.yml` | 06:41 daily | `/api/admin/retro/candidates` then `/api/admin/retro/simulate` per candidate — the retro generator, apply mode on production; a manual dispatch is dry-run by default (see `docs/RETRO_SIMULATIONS.md`) |
 | `heartbeat.yml` | 09:00 daily | `/api/cron/heartbeat` — daily "alive" signal |
 | `evidence-health.yml` | 10:23 daily | `/api/cron/evidence-health` — evidence-pipeline regression digest |
 | `relation-typer.yml` | 11:37 daily | `/api/cron/relation-typer` — types forecast pairs into `question_relations` |
@@ -514,7 +517,7 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 
 Since #1952 the scheduled workflows target production only (staging is normally off, #2089); `cert-expiry.yml` checks staging only while it is running.
 
-Manual-only workflows: `rollback.yml`, `staging-up.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917). `android-release.yml` uploads to a Play testing track on `android-v*` tags, `android/**` pushes to `main` and dispatch, and on the 1st of each month (05:23) builds without uploading (see `android/README.md`); `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
+Manual-only workflows: `rollback.yml`, `staging-up.yml`, `release-selfhost.yml`, `backfill-english-canonical.yml`, `backfill-oracle-sources.yml`, `backfill-tags.yml` (re-push resolved forecasts' topic tags to the Oracul, #1917), `topic-suggestions.yml` (`/api/admin/topic-suggestions`: forward questions from this week's topics, shown in the run summary and a `topic-suggestions` artifact, nothing written, #2308). `android-release.yml` uploads to a Play testing track on `android-v*` tags, `android/**` pushes to `main` and dispatch, and on the 1st of each month (05:23) builds without uploading (see `android/README.md`); `version.yml`, `terraform-validate.yml` (when `terraform/**` changes) and `docker-build-check.yml` (builds both images without pushing when `Dockerfile`/`.dockerignore` change, #1960) run on pull requests. Dependabot (`.github/dependabot.yml`) opens weekly npm, Docker and GitHub Actions update PRs.
 
 #### Deploy Workflow (`deploy.yml`)
 

@@ -49,7 +49,7 @@ DAaTAn is a reputation-based product that enables testing understanding and fore
 | Auth | Auth.js v5 / NextAuth (Google OAuth + email/password; OIDC for self-host) |
 | Hosting | AWS EC2 (eu-central-1) |
 | Storage | AWS S3 (avatars) |
-| LLM | Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also serves three of the five AI-panel members and the bots |
+| LLM | Gemini via Vertex AI (primary) → Oracul `/llm` (AWS Bedrock / Nova) → OpenRouter → Ollama; OpenRouter also serves the bots. The five AI-panel members run four on Bedrock and one on Vertex (daatan#2283) |
 | Forecast Oracul | TruthMachine Oracul API (`oracle.daatan.com`) — calibrated multi-source probability estimates |
 | Prompts | In git: `src/lib/llm/bedrock-prompts.ts` + `prompts/*.txt`, pinned by `prompts/prompt_versions.lock.json` |
 | Container | Docker + Nginx |

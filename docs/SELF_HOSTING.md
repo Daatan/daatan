@@ -279,6 +279,8 @@ See [`.env.selfhost.example`](../.env.selfhost.example) for the full annotated l
 
 - **Required:** `DATABASE_URL`, `POSTGRES_PASSWORD`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `DAATAN_EDITION`, `APP_URL`
 - **Branding (optional seeds — editable in Admin → Settings):** `APP_NAME`, `APP_LOGO_URL`, `EMAIL_FROM`
+- **Contact address (env only):** `CONTACT_EMAIL` — the address shown on the about, contact, accessibility and legal pages; defaults to `office@<APP_URL host>`
 - **Auth:** `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_PROVIDER_NAME`, `OIDC_ADMIN_EMAILS`, `ALLOWED_EMAIL_DOMAINS`, `SELF_HOST_OPEN_SIGNUP`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAIL` (admin(s) promoted by the on-demand seed — §4e)
 - **Storage:** `STORAGE_DRIVER`, `UPLOADS_BUCKET_NAME`, `S3_ENDPOINT`, `STORAGE_LOCAL_PATH`, `AWS_REGION`
 - **AI (a key enables it):** `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`; `ORACLE_URL`/`ORACLE_API_KEY` add "Analyze"; `ENABLE_AI_FEATURES` (override), `ENABLE_EXTERNAL_MARKETS`
+- **Diagnostics (optional):** `LOG_LEVEL` (pino level; default `info` in production, `debug` otherwise), `NEXTAUTH_DEBUG=true` (NextAuth debug logging, for sign-in trouble)
