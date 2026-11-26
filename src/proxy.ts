@@ -19,7 +19,9 @@ export default auth((req) => {
     }
   }
 
-  // First visit: anonymous visitors without the cookie land on the home-v5 page (#1840).
+  // First visit: anonymous visitors without the cookie who open the root (/, /he, /ru, /eo)
+  // with no feed filter get the landing page, /home or /<locale>/home (#1840, #2222). Not in
+  // self-hosted editions.
   const homeTarget = homeV5RootTarget({
     pathname,
     searchParams: req.nextUrl.searchParams,
@@ -35,7 +37,8 @@ export default auth((req) => {
 
   if (homeTarget) {
     // Served in place (rewrite, not a redirect): one request fewer for a first visit, and crawlers
-    // get a 200 at "/" instead of a temporary redirect. The page's own canonical stays /home.
+    // get a 200 at "/" instead of a temporary redirect. The page canonicalizes to the root, not
+    // /home (daatan#2057).
     requestHeaders.set('x-pathname', homeTarget)
     const url = req.nextUrl.clone()
     url.pathname = homeTarget
