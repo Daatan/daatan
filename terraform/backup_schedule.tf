@@ -57,6 +57,16 @@ resource "aws_iam_role_policy" "backup_scheduler" {
   })
 }
 
+locals {
+  # SSM limit for one scheduled backup + restore verification (daatan#2303).
+  # The run measured 42m48s on 2026-11-20 (dump ~17 min, restore 1515 s for a
+  # 4.7 GB dump) and every run after it hit the old 45-min limit. The limit is
+  # an upper bound, not a sleep. verify-backup.sh gets the deadline it implies
+  # (VERIFY_DEADLINE below) and stops a slow restore with an alert before SSM
+  # would SIGKILL it silently.
+  db_backup_execution_timeout = 7200
+}
+
 resource "aws_scheduler_schedule" "db_backup" {
   name        = "daatan-prod-db-backup"
   description = "Prod DB backup + restore verification via SSM at 04:00 and 16:00 UTC (#1957)"
@@ -78,10 +88,12 @@ resource "aws_scheduler_schedule" "db_backup" {
       InstanceIds  = [aws_instance.production.id]
       Comment      = "Scheduled DB backup (EventBridge, #1957)"
       Parameters = {
-        # On-box limit: backup ~10 min + restore verification up to ~20 min.
-        executionTimeout = ["2700"]
+        executionTimeout = [tostring(local.db_backup_execution_timeout)]
         commands = [
           "set -e",
+          # Taken first, so the deadline counts the backup's time too. 60 s
+          # short of the SSM limit, for the alert and container cleanup.
+          "export VERIFY_DEADLINE=$(( $(date +%s) + ${local.db_backup_execution_timeout - 60} ))",
           # Same environment as deploy.yml's SSM steps; HOME also lets the
           # scripts read Telegram credentials from ~/app/.env for alerts.
           "export HOME=/home/ubuntu",

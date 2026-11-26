@@ -77,12 +77,16 @@ IMAGE=$(docker inspect -f '{{.Config.Image}}' "$DB_CONTAINER")
 
 # Find latest backup
 echo "Looking for latest backup in s3://${S3_BUCKET}/backups/ ..."
-LATEST=$(aws s3 ls "s3://${S3_BUCKET}/backups/" | sort | tail -1 | awk '{print $4}')
+LATEST_LINE=$(aws s3 ls "s3://${S3_BUCKET}/backups/" | sort | tail -1)
+LATEST=$(awk '{print $4}' <<< "$LATEST_LINE")
 if [ -z "$LATEST" ]; then
     send_alert "No backup files found in S3 bucket"
     exit 1
 fi
-echo "Latest backup: $LATEST"
+SIZE_BYTES=$(awk '{print $3}' <<< "$LATEST_LINE")
+[[ "$SIZE_BYTES" =~ ^[0-9]+$ ]] || SIZE_BYTES=0
+SIZE_MIB=$(( SIZE_BYTES / 1048576 ))
+echo "Latest backup: $LATEST ($SIZE_MIB MiB)"
 
 # A container left over from a killed run would make `docker run` fail.
 cleanup
@@ -130,18 +134,52 @@ for role in $ROLES; do
         -c "CREATE ROLE \"$role\" NOLOGIN;"
 done
 
+# Restore time budget (daatan#2303). The scheduled SSM command passes
+# VERIFY_DEADLINE, the epoch second by which the whole command must be done
+# (terraform/backup_schedule.tf). The restore gets what is left of it minus a
+# margin for the alert and cleanup, so a slow restore stops and alerts here.
+# Without the budget, SSM's executionTimeout SIGKILLed the run mid-restore:
+# no trap ran, no alert fired, and every scheduled run from 2026-11-20 ended
+# TimedOut unnoticed. Manual runs (backup.yml) pass no deadline and get the
+# fixed default.
+RESTORE_TIMEOUT="${VERIFY_RESTORE_TIMEOUT:-3000}"
+if [ -n "${VERIFY_DEADLINE:-}" ]; then
+    LEFT=$(( VERIFY_DEADLINE - $(date +%s) - 120 ))
+    if [ "$LEFT" -lt "$RESTORE_TIMEOUT" ]; then
+        RESTORE_TIMEOUT=$LEFT
+    fi
+fi
+if [ "$RESTORE_TIMEOUT" -lt 60 ]; then
+    send_alert "no time left to restore $LATEST before the SSM time limit (budget ${RESTORE_TIMEOUT}s): the backup step ran long"
+    exit 1
+fi
+
 # Restore, streamed from S3. ON_ERROR_STOP: without it psql exits 0 even when
-# statements fail, so a "successful" restore proved nothing.
-echo "Restoring $LATEST into $VERIFY_CONTAINER..."
+# statements fail, so a "successful" restore proved nothing. timeout stops only
+# the docker exec client; the restore still running inside the container is
+# stopped by cleanup (docker rm -f) on exit.
+echo "Restoring $LATEST into $VERIFY_CONTAINER (time budget ${RESTORE_TIMEOUT}s)..."
 START=$(date +%s)
 if ! aws s3 cp --no-progress "s3://${S3_BUCKET}/backups/$LATEST" - \
     | gunzip -c \
-    | docker exec -i "$VERIFY_CONTAINER" psql -U "$DB_USER" -d "$VERIFY_DB" -q -v ON_ERROR_STOP=1 >/dev/null; then
+    | timeout --kill-after=30 "$RESTORE_TIMEOUT" \
+        docker exec -i "$VERIFY_CONTAINER" psql -U "$DB_USER" -d "$VERIFY_DB" -q -v ON_ERROR_STOP=1 >/dev/null; then
+    ELAPSED=$(( $(date +%s) - START ))
+    if [ "$ELAPSED" -ge "$RESTORE_TIMEOUT" ]; then
+        send_alert "restore of $LATEST ($SIZE_MIB MiB) did not finish within its ${RESTORE_TIMEOUT}s budget; stopped before the SSM time limit"
+        exit 1
+    fi
     OOM=$(docker inspect -f '{{.State.OOMKilled}}' "$VERIFY_CONTAINER" 2>/dev/null || echo unknown)
     send_alert "pg restore failed for $LATEST (container OOMKilled=$OOM, limit $VERIFY_MEMORY)"
     exit 1
 fi
-echo "Restore took $(( $(date +%s) - START ))s"
+ELAPSED=$(( $(date +%s) - START ))
+# Seconds per GiB of compressed dump: the number to watch as the DB grows.
+if [ "$SIZE_MIB" -gt 0 ]; then
+    echo "Restore took ${ELAPSED}s for $SIZE_MIB MiB (~$(( ELAPSED * 1024 / SIZE_MIB ))s per GiB of dump, budget ${RESTORE_TIMEOUT}s)"
+else
+    echo "Restore took ${ELAPSED}s (budget ${RESTORE_TIMEOUT}s)"
+fi
 
 # Sanity check: users table must have at least one row. The Prisma model is
 # User but the table is mapped to "users". `|| true` so a query error reaches
