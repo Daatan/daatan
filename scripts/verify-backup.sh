@@ -141,13 +141,15 @@ done
 # Without the budget, SSM's executionTimeout SIGKILLed the run mid-restore:
 # no trap ran, no alert fired, and every scheduled run from 2026-11-20 ended
 # TimedOut unnoticed. Manual runs (backup.yml) pass no deadline and get the
-# fixed default.
-RESTORE_TIMEOUT="${VERIFY_RESTORE_TIMEOUT:-3000}"
+# fixed default. The default must not cap a scheduled run: the first version
+# did, so the 120-min SSM limit still left the restore only 50 min.
 if [ -n "${VERIFY_DEADLINE:-}" ]; then
-    LEFT=$(( VERIFY_DEADLINE - $(date +%s) - 120 ))
-    if [ "$LEFT" -lt "$RESTORE_TIMEOUT" ]; then
-        RESTORE_TIMEOUT=$LEFT
+    RESTORE_TIMEOUT=$(( VERIFY_DEADLINE - $(date +%s) - 120 ))
+    if [ -n "${VERIFY_RESTORE_TIMEOUT:-}" ] && [ "$VERIFY_RESTORE_TIMEOUT" -lt "$RESTORE_TIMEOUT" ]; then
+        RESTORE_TIMEOUT=$VERIFY_RESTORE_TIMEOUT
     fi
+else
+    RESTORE_TIMEOUT="${VERIFY_RESTORE_TIMEOUT:-3000}"
 fi
 if [ "$RESTORE_TIMEOUT" -lt 60 ]; then
     send_alert "no time left to restore $LATEST before the SSM time limit (budget ${RESTORE_TIMEOUT}s): the backup step ran long"

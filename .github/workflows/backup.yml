@@ -25,7 +25,8 @@ jobs:
   backup:
     name: Run DB backup
     runs-on: ubuntu-latest
-    # Backup poll ≤25 min + restore verification poll ≤55 min + setup/alert.
+    # Backup poll ≤25 min + restore verification poll ≤55 min + setup/alert. The two
+    # polls use separate 60-min AWS sessions (see "Refresh AWS credentials").
     timeout-minutes: 90
     permissions:
       id-token: write
@@ -102,6 +103,18 @@ jobs:
             exit 1
           fi
 
+      # The AWS session lasts 60 min (the role's MaxSessionDuration is 3600 s), and
+      # backup + verify together take longer. On 2026-11-26 the token expired
+      # mid-poll after 60 min, the job failed and alerted, and the restore check
+      # on the box passed 3 min later (daatan#2303). Fresh credentials here give
+      # the verify step its own 60 min, so its poll must stay under that.
+      - name: Refresh AWS credentials for the verify step
+        if: steps.backup.outputs.status == 'success'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
       - name: Verify backup restore via SSM
         if: steps.backup.outputs.status == 'success'
         env:
@@ -140,9 +153,12 @@ jobs:
           echo "Command ID: $COMMAND_ID"
 
           # Up to 55 min, just past the script's 50-min restore budget: restoring the
-          # ~4 GB dump took 22 min on 2026-11-14 (daatan#2168) and 25 min for 4.7 GB on
-          # 2026-11-20 (daatan#2303).
-          for i in $(seq 1 330); do
+          # ~4 GB dump took 22 min on 2026-11-14 (daatan#2168), 25 min for 4.7 GB on
+          # 2026-11-20 and 39 min for 5.6 GiB on 2026-11-26 (daatan#2303). Bounded by
+          # the clock, not a loop count: each poll takes ~11 s, so 330 polls ran ~61
+          # min, past the 60-min session.
+          POLL_UNTIL=$(( $(date +%s) + 55 * 60 ))
+          while [ "$(date +%s)" -lt "$POLL_UNTIL" ]; do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" --details \
               --query "CommandInvocations[0].Status" --output text)
