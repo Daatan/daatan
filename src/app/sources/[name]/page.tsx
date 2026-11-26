@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Fragment } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -7,6 +8,7 @@ import { ExternalLink, Newspaper } from 'lucide-react'
 import { getPublicOutletDetail } from '@/lib/services/outlets'
 import { localizedText, telegramHref } from '@/lib/utils/outlet-identity'
 import { outletLogo } from '@/lib/utils/outlet-logos'
+import { outletProfile, sourceLabel } from '@/lib/utils/outlet-profiles'
 import { getOutletForecastRows, getPublicForecastLinks } from '@/lib/services/outlet-forecasts'
 import { groupPublications } from '@/lib/utils/group-publications'
 import { sortOutletForecasts } from '@/lib/utils/outlet-forecasts'
@@ -76,6 +78,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+/** About three lines on a phone; a longer outlet paragraph folds behind "Show more". */
+const ABOUT_FOLD_CHARS = 280
+
 export default async function OutletPublicPage({ params }: Props) {
   const { name } = await params
 
@@ -107,6 +112,8 @@ export default async function OutletPublicPage({ params }: Props) {
 
   const shownName = localizedText(detail.displayName, locale) ?? detail.name
   const description = localizedText(detail.description, locale)
+  // Exact names, not canonical ones: an alias domain is a different outlet with its own article.
+  const profile = outletProfile([detail.name, ...detail.domains], locale)
   const articleTotal = forecastRows.reduce((n, r) => n + r.articles, 0)
   const lastArticle = forecastRows.reduce<string | null>((d, r) => (!d || r.lastArticle > d ? r.lastArticle : d), null)
   const date = (iso: string) =>
@@ -169,6 +176,75 @@ export default async function OutletPublicPage({ params }: Props) {
         </div>
 
         {description && <p dir="auto" className="mt-4 max-w-2xl text-gray-300 leading-relaxed">{description}</p>}
+
+        {profile && profile.facts.length > 0 && (
+          <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
+            {profile.facts.map(f => (
+              <div key={f.key}>
+                <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">{t(`fact.${f.key}`)}</dt>
+                <dd dir="auto" className="mt-0.5 text-sm text-gray-200">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {profile?.about && (
+          <div className="mt-4 max-w-2xl">
+            {/* A long lead folds to four lines so the stats stay near the top; the text stays whole in the DOM. CSS-only, no client JS. */}
+            {profile.about.text.length > ABOUT_FOLD_CHARS && <input type="checkbox" id="outlet-about-more" className="peer sr-only" />}
+            {/* Direction from the text's language: a Hebrew paragraph that opens with a Latin name would read as LTR under dir="auto". */}
+            <p
+              lang={profile.about.lang}
+              dir={profile.about.lang === 'he' ? 'rtl' : 'ltr'}
+              className={profile.about.text.length > ABOUT_FOLD_CHARS
+                ? 'text-gray-300 leading-relaxed line-clamp-4 peer-checked:line-clamp-none'
+                : 'text-gray-300 leading-relaxed'}
+            >
+              {profile.about.text}
+            </p>
+            {profile.about.text.length > ABOUT_FOLD_CHARS && (
+              <label htmlFor="outlet-about-more" className="mt-1 inline-block cursor-pointer text-sm text-blue-400 hover:underline peer-checked:hidden peer-focus-visible:underline">
+                {t('showMore')}
+              </label>
+            )}
+          </div>
+        )}
+
+        {profile && (profile.factSources.length > 0 || profile.about) && (
+          <p className="mt-2 max-w-2xl text-xs text-gray-500">
+            {profile.factSources.length > 0 && (
+              <>
+                {t('factsFrom')}{' '}
+                {profile.factSources.map((u, i) => (
+                  <Fragment key={u}>
+                    {i > 0 && ', '}
+                    <a href={u} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">{sourceLabel(u)}</a>
+                  </Fragment>
+                ))}
+              </>
+            )}
+            {profile.factSources.length > 0 && profile.about && ' · '}
+            {profile.about?.kind === 'wikipedia' && (
+              // CC BY-SA 4.0 asks for the article link and the licence next to the text.
+              <>
+                <a href={profile.about.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">{t('fromWikipedia')}</a>
+                {', '}
+                <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer license" className="whitespace-nowrap underline hover:text-gray-300">CC BY-SA 4.0</a>
+              </>
+            )}
+            {profile.about?.kind === 'researched' && (
+              <>
+                {t('researchedFrom')}{' '}
+                {profile.about.sources.map((u, i) => (
+                  <Fragment key={u}>
+                    {i > 0 && ', '}
+                    <a href={u} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">{sourceLabel(u)}</a>
+                  </Fragment>
+                ))}
+              </>
+            )}
+          </p>
+        )}
 
         {links.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">

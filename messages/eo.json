@@ -1312,6 +1312,16 @@
     "backToLeaderboard": "Reen al la rangolisto de fontoj",
     "wikipedia": "Vikipedio",
     "telegram": "Telegram-kanalo",
+    "fact": {
+      "founded": "Fondita",
+      "country": "Lando",
+      "headquarters": "Sidejo",
+      "language": "Lingvo",
+      "owner": "Posedanto"
+    },
+    "factsFrom": "Faktoj:",
+    "fromWikipedia": "Teksto el Vikipedio",
+    "researchedFrom": "Verkita de Daatan laŭ:",
     "trackRecord": "Precizeco",
     "skill": "Lerteco",
     "brier": "Brier",

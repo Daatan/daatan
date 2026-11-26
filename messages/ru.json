@@ -1312,6 +1312,16 @@
     "backToLeaderboard": "Назад к таблице источников",
     "wikipedia": "Википедия",
     "telegram": "Телеграм-канал",
+    "fact": {
+      "founded": "Основано",
+      "country": "Страна",
+      "headquarters": "Штаб-квартира",
+      "language": "Язык",
+      "owner": "Владелец"
+    },
+    "factsFrom": "Факты:",
+    "fromWikipedia": "Текст из Википедии",
+    "researchedFrom": "Составлено Daatan по источникам:",
     "trackRecord": "Точность",
     "skill": "Навык",
     "brier": "Brier",

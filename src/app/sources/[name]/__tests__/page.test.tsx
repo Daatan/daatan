@@ -308,6 +308,55 @@ describe('sources/[name] page', () => {
     expect(data.about).not.toHaveProperty('logo')
   })
 
+  it('shows Wikidata facts and the Wikipedia lead with its licence (daatan#2345)', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'kikar.co.il', domains: [] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'kikar.co.il' }) })
+    const texts = collectText(tree)
+    expect(texts).toEqual(expect.arrayContaining(['fact.founded', '2009', 'fact.country', 'Israel', 'fromWikipedia', 'CC BY-SA 4.0']))
+    expect(texts.some(x => x.startsWith('Kikar HaShabbat is'))).toBe(true)
+    expect(findProps(tree, p => p.href === 'https://en.wikipedia.org/wiki/Kikar_HaShabbat_(website)')).toBeDefined()
+    expect(findProps(tree, p => p.href === 'https://creativecommons.org/licenses/by-sa/4.0/')).toBeDefined()
+    expect(findProps(tree, p => p.href === 'https://www.wikidata.org/wiki/Q6262613')?.children).toBe('wikidata.org')
+  })
+
+  it('shows researched text with its sources, by exact name rather than the canonical outlet', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynetnews', domains: ['ynetnews.com'] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynetnews' }) })
+    const texts = collectText(tree)
+    expect(texts).toContain('researchedFrom')
+    expect(texts).not.toContain('fromWikipedia')
+    expect(texts.some(x => x.startsWith('Ynetnews is the English-language'))).toBe(true)
+    expect(findProps(tree, p => typeof p.href === 'string' && p.href.startsWith('https://www.editorandpublisher.com/'))).toBeDefined()
+  })
+
+  it('sets the paragraph direction from its language, not its first letter', async () => {
+    mockLocale.value = 'he'
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'Ynetnews', domains: ['ynetnews.com'] })
+    const tree = await OutletPublicPage({ params: Promise.resolve({ name: 'Ynetnews' }) })
+    expect(findProps(tree, p => p.lang === 'he')).toMatchObject({ dir: 'rtl' })
+  })
+
+  it('folds a long lead behind Show more without cutting the text, and leaves a short one open', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'theguardian.com', domains: [] })
+    const long = await OutletPublicPage({ params: Promise.resolve({ name: 'theguardian.com' }) })
+    expect(findProps(long, p => p.lang === 'en')?.className).toContain('line-clamp-4')
+    expect(findProps(long, p => p.htmlFor === 'outlet-about-more')).toBeDefined()
+    expect(collectText(long).some(x => x.endsWith('It is considered a newspaper of record in the UK.'))).toBe(true)
+
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, name: 'kikar.co.il', domains: [] })
+    const short = await OutletPublicPage({ params: Promise.resolve({ name: 'kikar.co.il' }) })
+    expect(findProps(short, p => p.lang === 'en')?.className).not.toContain('line-clamp')
+    expect(findProps(short, p => p.htmlFor === 'outlet-about-more')).toBeUndefined()
+  })
+
+  it('shows no profile block for an outlet without one', async () => {
+    mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, domains: ['maariv.co.il'] })
+    const texts = collectText(await OutletPublicPage({ params }))
+    expect(texts.some(x => x.startsWith('fact.'))).toBe(false)
+    expect(texts).not.toContain('fromWikipedia')
+    expect(texts).not.toContain('researchedFrom')
+  })
+
   it('links a Telegram channel stored as a full URL without prefixing it again', async () => {
     mockGetPublicOutletDetail.mockResolvedValue({ ...sampleDetail, telegramChannel: 'https://t.me/ynetnewslatest' })
     const texts = collectText(await OutletPublicPage({ params }))
