@@ -40,6 +40,12 @@ Payload: `initialContextSnapshots` is projected through `slimContextSnapshots`
 carries every source's `claimsDetail` shadow layer, which was ~1.4 MB of the 1.6 MB forecast page
 (daatan#1871). If a client component starts reading another `oracleSnapshot` field, add it there.
 
+Both forecast routes (`/forecasts/[id]` and `/[locale]/forecasts/[id]`) load the forecast and every
+`ForecastDetailClient` prop through `src/app/forecasts/[id]/_forecast/detail-data.ts`. Only the
+per-locale parts stay in the routes: translations, metadata, JSON-LD and URLs. The locale route used to
+keep its own copy, which drifted for months: no abstention flag, no evidence count, and indexer-only
+sources (daatan#2351). `__tests__/page-parity.test.tsx` fails if the two routes' props diverge again.
+
 ## Structured data (JSON-LD)
 
 A forecast page emits up to five JSON-LD scripts (`src/app/forecasts/[id]/page.tsx`; the
