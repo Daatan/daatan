@@ -79,11 +79,18 @@ for ((i = N - 1; i >= 0; i--)); do
   HOURS+="$(date -d "@$((H1_EPOCH - i * 3600))" '+%Y-%m-%d %H')|"
 done
 
-# The log is ~1 GB and ~9k lines an hour (multi-line payloads); 300k lines (~22 MB) covers
-# the 12-hour cap with margin for bursts without reading the whole file.
-OUT=$(tail -n 300000 "$LOG" | awk -v hours="$HOURS" -v prev="$PREV_STATE" \
-    -v now="$T" -v last_alert="$LAST_ALERT" -v realert="$REALERT_SECS" '
+# Read the log backwards and stop once its timestamps fall two hours before the window, so
+# every checked hour is read in full however fast the log grows. A fixed `tail -n 300000`
+# used to cover ~20h on a normal day but only ~6.5h at the ~45k lines/h of the 11-18/20
+# /relevance outage (retro#1090), so the start of a long outage fell outside the 12h
+# look-back. The hour just before the window is still read, for lines written slightly out of
+# order. head caps a log with no parseable timestamps (~1 GB/2M lines, ~3 GB file in 2026-11);
+# tac only reads as far back as awk asks for.
+STOP_H=$(date -d "@$((H1_EPOCH - N * 3600))" '+%Y-%m-%d %H')
+OUT=$(tac "$LOG" 2>/dev/null | head -n 2000000 2>/dev/null | LC_ALL=C awk -v hours="$HOURS" -v stop="$STOP_H" \
+    -v prev="$PREV_STATE" -v now="$T" -v last_alert="$LAST_ALERT" -v realert="$REALERT_SECS" '
   BEGIN { n = split(hours, H, "|") - 1; for (i = 1; i <= n; i++) want[H[i]] = 1 }
+  /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:/ && substr($0, 1, 13) < stop { exit }
   index($0, "event=jev_gate ") == 0 { next }
   { h = substr($0, 1, 13) }
   !(h in want) { next }
