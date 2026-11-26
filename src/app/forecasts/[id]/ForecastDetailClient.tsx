@@ -30,7 +30,7 @@ import { ModeratorResolutionSection } from './ModeratorResolutionSection'
 import CommentThread, { type Comment } from '@/components/comments/CommentThread'
 import ConfidenceSlider from '@/components/forecasts/ConfidenceSlider'
 import Speedometer from '@/components/forecasts/Speedometer'
-import ContextTimeline, { type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
+import ContextTimeline, { toAiEstimate, type AiEstimate, type Snapshot as ContextSnapshot } from '@/components/forecasts/ContextTimeline'
 import { SourceLinks, settlingSources } from '@/components/forecasts/SourceLinks'
 import { RoleBadge } from '@/components/RoleBadge'
 import { UserLink } from '@/components/UserLink'
@@ -48,6 +48,7 @@ import { AwaitingResolutionAdmin } from './_forecast/AwaitingResolutionAdmin'
 import { SettledLatchAdmin } from './_forecast/SettledLatchAdmin'
 import { RevertResolutionAdmin } from './_forecast/RevertResolutionAdmin'
 import { EvidencePoolAdmin } from './_forecast/EvidencePoolAdmin'
+import { firstEstimateDeadline, useFirstEstimatePoll } from './_forecast/useFirstEstimatePoll'
 import { communityProbability } from '@/lib/forecast-math'
 import { latestMarketReading, marketDisplayProbability, marketLineName, trackedOutcomeLabel } from '@/lib/market-display'
 import { formatDisplayDate, isDeadlineToday } from '@/lib/utils/date'
@@ -235,6 +236,32 @@ export default function ForecastDetailClient({
 
     triggerTranslation()
   }, [prediction, locale, translatedFields])
+
+  // A just-published forecast gets its first Oracul estimate ~40 s later, in the
+  // background (daatan#2347): wait for it here instead of leaving the reader to reload.
+  const [firstEstimateArrived, setFirstEstimateArrived] = useState(false)
+  const firstEstimateDeadlineMs = prediction
+    ? firstEstimateDeadline(
+        prediction,
+        firstEstimateArrived || aiEstimate != null || (initialContextSnapshots?.length ?? 0) > 0,
+        nowMs,
+      )
+    : null
+  useFirstEstimatePoll(prediction?.id ?? id, firstEstimateDeadlineMs, (latest) => {
+    setFirstEstimateArrived(true)
+    setAiEstimate(toAiEstimate(latest))
+    fetch(`/api/forecasts/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setPrediction(data) })
+      .catch(() => {})
+    // Chart, timeline and contributing sources come from server props.
+    router.refresh()
+  })
+  // The server counted an empty pool before the estimate landed; until the refresh
+  // brings props computed after it, the count is unknown, not zero.
+  const evidenceCount = firstEstimateArrived && (initialContextSnapshots?.length ?? 0) === 0
+    ? null
+    : usableEvidenceCount
 
   const handleCommitError = async (response: Response) => {
     const data = await response.json().catch(() => ({}))
@@ -526,6 +553,8 @@ export default function ForecastDetailClient({
           summary, unified into one section (replaces the old separate top
           paragraph + collapsible "Situation" panel). */}
       <ContextTimeline
+        // Seeds its snapshots from props once; remount when a refresh brings a newer one.
+        key={initialContextSnapshots?.[0]?.id ?? 'none'}
         predictionId={prediction.id}
         initialContext={showTranslated && translatedFields?.detailsText ? translatedFields.detailsText : prediction.detailsText}
         initialContextUpdatedAt={prediction.contextUpdatedAt}
@@ -576,7 +605,8 @@ export default function ForecastDetailClient({
           const commitmentsOpen = prediction.status === 'ACTIVE' && !commitmentsLocked
           const aiLegend: AiLegendState = aiAbstained
             ? { kind: 'abstained' }
-            : aiVal != null ? { kind: 'value', value: aiVal } : { kind: 'none' }
+            : aiVal != null ? { kind: 'value', value: aiVal }
+            : firstEstimateDeadlineMs != null ? { kind: 'pending' } : { kind: 'none' }
           const linkedMarket = prediction.externalMarket
           const marketReading = linkedMarket
             ? latestMarketReading(linkedMarket.snapshots, prediction.externalMarketInverted ?? false, nowMs)
@@ -649,7 +679,7 @@ export default function ForecastDetailClient({
                     from "never had evidence" since daatan#1473, and collapsing them here
                     would undo that at the last mile). Not shown when the run abstained —
                     that case already hides the needle above. */}
-                {!aiAbstained && aiVal != null && usableEvidenceCount === 0 && (
+                {!aiAbstained && aiVal != null && evidenceCount === 0 && (
                   <div
                     className="mt-4 w-full flex items-start gap-2 text-left text-xs text-gray-400 bg-navy-800/60 border border-navy-600 rounded-lg px-3 py-2"
                     data-testid="unevidenced-notice"
@@ -662,13 +692,13 @@ export default function ForecastDetailClient({
                 {/* daatan#1806: say what the number (or its absence) rests on, and link
                     the explainer. Three states; an abstention keeps its own label and
                     an unknown source count (null) gets no line rather than a guess. */}
-                {!aiAbstained && (aiVal == null || usableEvidenceCount != null) && (
+                {!aiAbstained && (aiVal == null || evidenceCount != null) && (
                   <p className="mt-3 w-full text-left text-xs text-gray-400" data-testid="ai-how-estimated">
                     {aiVal == null
-                      ? t('aiHowNoSources')
-                      : usableEvidenceCount === 0
+                      ? (firstEstimateDeadlineMs != null ? t('aiHowEstimating') : t('aiHowNoSources'))
+                      : evidenceCount === 0
                         ? t('aiHowModelOnly')
-                        : t('aiHowEvidence', { count: usableEvidenceCount ?? 0 })}
+                        : t('aiHowEvidence', { count: evidenceCount ?? 0 })}
                     {' · '}
                     <Link href="/help/rating-numbers" className="underline hover:text-gray-200">
                       {t('aiHowLink')}

@@ -8,6 +8,8 @@ import { formatDisplayDateTime } from '@/lib/utils/date'
 export type AiLegendState =
   | { kind: 'value'; value: number }
   | { kind: 'abstained' }
+  /** A just-published forecast whose first Oracul estimate is still running (daatan#2347). */
+  | { kind: 'pending' }
   | { kind: 'none' }
 
 export interface LegendMarket {
@@ -66,6 +68,11 @@ export function EstimateLegend({ community, you, ai, market }: Props) {
           <div className="flex items-center gap-2" title={t('numbersAi')}>
             <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full" />
             <span className="text-amber-400/70">{t('legendAI')} · {t('aiInsufficientEvidence')}</span>
+          </div>
+        ) : ai.kind === 'pending' ? (
+          <div className="flex items-center gap-2" title={t('numbersAi')} data-testid="ai-estimating">
+            <div className="w-3 h-1 bg-[#FBBF24]/40 rounded-full animate-pulse" />
+            <span className="text-amber-400/70">{t('legendAI')} · {t('aiEstimating')}</span>
           </div>
         ) : ai.kind === 'value' ? (
           <div className="flex items-center gap-2" title={t('numbersAi')}>
