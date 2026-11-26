@@ -1312,6 +1312,16 @@
     "backToLeaderboard": "חזרה לטבלת דירוג המקורות",
     "wikipedia": "ויקיפדיה",
     "telegram": "ערוץ טלגרם",
+    "fact": {
+      "founded": "נוסד",
+      "country": "מדינה",
+      "headquarters": "מטה",
+      "language": "שפה",
+      "owner": "בעלות"
+    },
+    "factsFrom": "עובדות:",
+    "fromWikipedia": "הטקסט מתוך ויקיפדיה",
+    "researchedFrom": "נכתב על ידי Daatan על סמך:",
     "trackRecord": "דיוק",
     "skill": "כישורים",
     "brier": "Brier",

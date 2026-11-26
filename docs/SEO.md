@@ -66,6 +66,8 @@ the same structured-data strength as the English canonical):
 A source page emits one `WebPage` whose `about` is an `Organization`: name, the outlet's site
 (its first news-indexer domain), its bundled `logo` when it has one ([OUTLET_LOGOS.md](./OUTLET_LOGOS.md))
 and `sameAs` links to its Wikipedia article and Telegram channel. It is identity only: the Brier grade and the board rank are not encoded as a rating.
+The visible profile (Wikidata facts, Wikipedia lead, [OUTLET_PROFILES.md](./OUTLET_PROFILES.md)) is not
+put in the JSON-LD or the meta description: the Wikipedia text is CC BY-SA and shown only with its attribution.
 The type stays `Organization`, not `NewsMediaOrganization`, because the board also carries
 personal sites and think tanks.
 

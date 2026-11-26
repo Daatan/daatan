@@ -1,0 +1,198 @@
+{
+ "_doc": "Hand decisions over profiles-raw.json for daatan#2345. Every entry carries its reason and source.",
+ "drop_extract": [
+  {
+   "outlet": "ynet.co.il",
+   "lang": "en",
+   "reason": "enwiki 'Ynet' redirects to the Yedioth Ahronoth article (item Q1132126), not the outlet"
+  },
+  {
+   "outlet": "ynetnews.com",
+   "lang": "en",
+   "reason": "enwiki 'Ynetnews' redirects to the Yedioth Ahronoth article (item Q1132126), not the outlet"
+  }
+ ],
+ "keep_only": [
+  {
+   "outlet": "cnbc.com",
+   "fact": "owner",
+   "values": [
+    "Q135832869"
+   ],
+   "reason": "enwiki lead: 'owned by Versant'; NBCUniversal is the former owner"
+  },
+  {
+   "outlet": "pravda.com.ua",
+   "fact": "owner",
+   "values": [
+    "Q4037598"
+   ],
+   "reason": "enwiki lead: the new owner (2021) is Dragon Capital's CEO; Prytula is not called an owner there"
+  },
+  {
+   "outlet": "timesofindia.indiatimes.com",
+   "fact": "owner",
+   "values": [
+    "Q972645"
+   ],
+   "reason": "second value has no label; enwiki/eowiki leads name The Times Group"
+  },
+  {
+   "outlet": "timesofindia.indiatimes.com",
+   "fact": "founded",
+   "values": [
+    "1838"
+   ],
+   "reason": "enwiki/eowiki leads give 1838; 1898 is in no lead"
+  },
+  {
+   "outlet": "independent.co.uk",
+   "fact": "language",
+   "values": [
+    "Q1860"
+   ],
+   "reason": "'British English' duplicates 'English'"
+  }
+ ],
+ "omit": [
+  {
+   "outlet": "al-monitor.com",
+   "fact": "owner",
+   "reason": "leads say Jamal Daniel launched it, not that he owns it"
+  },
+  {
+   "outlet": "foreignpolicy.com",
+   "fact": "owner",
+   "reason": "Wikidata says The Washington Post Company, hewiki says David Rothkopf; no agreement"
+  },
+  {
+   "outlet": "independent.co.uk",
+   "fact": "owner",
+   "reason": "only eowiki agrees with Wikidata (Lebedev, 'since 2010'); likely stale"
+  },
+  {
+   "outlet": "lemonde.fr",
+   "fact": "headquarters",
+   "reason": "Wikidata value is a street address, not a city"
+  }
+ ],
+ "add": [
+  {
+   "outlet": "kikar.co.il",
+   "fact": "country",
+   "qid": "Q801",
+   "source": "https://en.wikipedia.org/wiki/Kikar_HaShabbat_(website)",
+   "reason": "enwiki lead: 'Hebrew–language Israeli news website'"
+  },
+  {
+   "outlet": "middleeasteye.net",
+   "fact": "country",
+   "qid": "Q145",
+   "source": "https://en.wikipedia.org/wiki/Middle_East_Eye",
+   "reason": "enwiki lead: 'United Kingdom-based'"
+  },
+  {
+   "outlet": "aljazeera.net",
+   "fact": "language",
+   "qid": "Q13955",
+   "source": "https://en.wikipedia.org/wiki/Al_Jazeera_Arabic",
+   "reason": "enwiki lead: 'Arabic-language'"
+  },
+  {
+   "outlet": "jns.org",
+   "fact": "founded",
+   "year": 2011,
+   "source": "https://ru.wikipedia.org/wiki/Еврейский_новостной_синдикат",
+   "reason": "ruwiki lead: 'основанное в 2011 году'"
+  },
+  {
+   "outlet": "srugim.co.il",
+   "fact": "language",
+   "qid": "Q9288",
+   "source": "https://www.srugim.co.il/",
+   "reason": "the site publishes in Hebrew"
+  },
+  {
+   "outlet": "ynetnews.com",
+   "fact": "country",
+   "qid": "Q801",
+   "source": "https://www.editorandpublisher.com/stories/israels-yedioth-abronoth-launches-english-web-site,110696",
+   "reason": "E&P 2005: launched by the Israeli Yedioth Group"
+  },
+  {
+   "outlet": "oilprice.com",
+   "fact": "founded",
+   "year": 2009,
+   "source": "https://oilprice.com/about-us",
+   "reason": "own About page: 'Since its founding in 2009'"
+  },
+  {
+   "outlet": "oilprice.com",
+   "fact": "owner",
+   "label": {
+    "en": "Advanced Media Solutions"
+   },
+   "source": "https://oilprice.com/about-us",
+   "reason": "own About page: 'owned by Advanced Media Solutions'"
+  }
+ ],
+ "researched": {
+  "oilprice.com": [
+   {
+    "en": "OilPrice.com is an energy news website covering oil and gas, alternative energy and the geopolitics of energy.",
+    "he": "OilPrice.com הוא אתר חדשות אנרגיה המסקר נפט וגז, אנרגיה חלופית והגאופוליטיקה של האנרגיה.",
+    "ru": "OilPrice.com — новостной сайт об энергетике: нефть и газ, альтернативная энергетика и геополитика энергоресурсов.",
+    "sources": [
+     "https://oilprice.com/about-us"
+    ]
+   }
+  ],
+  "newsletter.amitsegal.net": [
+   {
+    "en": "It's Noon in Israel is an English-language newsletter by the Israeli journalist Amit Segal, sent every morning six days a week.",
+    "he": "It's Noon in Israel הוא ניוזלטר באנגלית של העיתונאי עמית סגל, הנשלח בכל בוקר שישה ימים בשבוע.",
+    "ru": "It's Noon in Israel — англоязычная рассылка израильского журналиста Амита Сегаля, выходит каждое утро шесть дней в неделю.",
+    "sources": [
+     "https://newsletter.amitsegal.net/about"
+    ]
+   },
+   {
+    "en": "Segal is the political commentator of Israel's Channel 12 News.",
+    "he": "סגל הוא הפרשן הפוליטי של חדשות 12.",
+    "ru": "Сегаль — политический комментатор новостей 12-го канала Израиля.",
+    "sources": [
+     "https://en.wikipedia.org/wiki/Amit_Segal"
+    ]
+   }
+  ],
+  "srugim.co.il": [
+   {
+    "en": "Srugim is an Israeli Hebrew-language news and content website for the religious-Zionist public, founded in 2010.",
+    "ru": "Srugim — израильский новостной сайт на иврите для религиозно-сионистской аудитории, основан в 2010 году.",
+    "sources": [
+     "https://he.wikipedia.org/wiki/סרוגים_(אתר_אינטרנט)",
+     "https://www.wikidata.org/wiki/Q16132624"
+    ]
+   }
+  ],
+  "ynet.co.il": [
+   {
+    "en": "Ynet is an Israeli news and content website, part of the Yedioth Ahronoth group, launched in 2000.",
+    "sources": [
+     "https://he.wikipedia.org/wiki/Ynet",
+     "https://www.wikidata.org/wiki/Q2738307"
+    ]
+   }
+  ],
+  "ynetnews.com": [
+   {
+    "en": "Ynetnews is the English-language news website of the Yedioth group, launched in 2005. It combines material from Yedioth Ahronoth and Ynet with original reporting.",
+    "he": "Ynetnews הוא אתר החדשות בשפה האנגלית של קבוצת ידיעות, שהושק ב-2005. הוא משלב חומרים מ\"ידיעות אחרונות\" ומ-ynet עם תוכן מקורי.",
+    "ru": "Ynetnews — англоязычный новостной сайт группы «Едиот», запущенный в 2005 году. Совмещает материалы «Едиот ахронот» и Ynet с собственными публикациями.",
+    "sources": [
+     "https://www.editorandpublisher.com/stories/israels-yedioth-abronoth-launches-english-web-site,110696"
+    ]
+   }
+  ]
+ }
+}
