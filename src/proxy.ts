@@ -20,7 +20,8 @@ export default auth((req) => {
   }
 
   // First visit: anonymous visitors without the cookie who open the root (/, /he, /ru, /eo)
-  // with no feed filter get the landing page, /home or /<locale>/home (#1840, #2222).
+  // with no feed filter get the landing page, /home or /<locale>/home (#1840, #2222). Not in
+  // self-hosted editions.
   const homeTarget = homeV5RootTarget({
     pathname,
     searchParams: req.nextUrl.searchParams,
