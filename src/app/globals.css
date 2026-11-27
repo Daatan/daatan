@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './tailwind-v3-palette.css';
 
 /* Tailwind 4 (#2355): the theme lives in this file; there is no tailwind.config.js. */
 

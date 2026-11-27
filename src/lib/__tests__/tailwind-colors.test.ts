@@ -23,6 +23,7 @@ const globalsCss = readFileSync(globalsPath, 'utf-8')
 const CANDIDATES = [
   'bg-cobalt/10', 'border-navy-600/50', 'bg-navy-900/90', 'text-text-secondary/80', 'bg-teal/10',
   'bg-navy-900', 'text-gray-500', 'font-sans', 'hover:bg-cobalt', 'text-xs', 'md:text-lg',
+  'bg-blue-600', 'text-green-400', 'bg-rose-500/50',
 ]
 
 /** The body of the first rule whose selector is exactly `.<className>` (escaped), braces balanced. */
@@ -120,6 +121,18 @@ describe('Tailwind 3 behaviour kept after the v4 upgrade (#2355)', () => {
 
   it('keeps the v3 gray-200 default border colour instead of currentColor', () => {
     expect(css).toMatch(/::file-selector-button\s*\{\s*border-color: var\(--color-gray-200, currentcolor\);/)
+  })
+
+  it('keeps the v3 default palette in hex instead of v4 oklch', () => {
+    const palette = readFileSync(path.join(root, 'src/app/tailwind-v3-palette.css'), 'utf-8')
+    const values = [...palette.matchAll(/--color-([a-z]+)-(\d+): (#[0-9a-f]{6});/g)]
+    expect(new Set(values.map((m) => m[1])).size).toBe(21)
+    expect(values).toHaveLength(21 * 11)
+    expect(palette).not.toMatch(/:\s*oklch\(/)
+    expect(css).toMatch(/--color-blue-600: #2563eb;/)
+    expect(css).toMatch(/--color-green-400: #4ade80;/)
+    expect(ruleBody(css, 'bg-rose-500/50')).toMatch(/color-mix\(in \w+, var\(--color-rose-500\) 50%, transparent\)/)
+    expect(css).toMatch(/--color-rose-500: #f43f5e;/)
   })
 
   it('keeps the v3 placeholder colour and button cursor', () => {
