@@ -529,11 +529,15 @@ kept, and every backup is restore-verified in a throwaway, memory-capped contain
   once the root disk filled). A failed `pg_dump` fails the run and the partial object is
   removed; so is a result under 256 KiB or under half the newest existing backup.
   `backup.yml` waits up to 25 min for the dump and 55 min for the restore verification, and
-  fails if either runs out.
+  fails if either runs out. Each wait runs on its own 60-min AWS session: the job re-assumes
+  the role before the verify step, because the role's `MaxSessionDuration` is 3600 s and the
+  two waits together run longer. Keep the verify wait under 60 min. On 2026-11-26 a single
+  session expired mid-wait: the job failed and alerted, and the restore check passed 3 min later.
 - **Time limits (daatan#2303).** The scheduled SSM command may run 120 min
   (`db_backup_execution_timeout` in `backup_schedule.tf`). It exports `VERIFY_DEADLINE`, and
   `verify-backup.sh` gives the restore whatever is left of it (50 min on manual runs, which pass
-  no deadline). A restore that runs out of budget stops and alerts. Before this, SSM's limit
+  no deadline; the 50-min default does not cap scheduled runs). A restore that runs out of
+  budget stops and alerts. Before this, SSM's limit
   SIGKILLed the run mid-restore: no trap ran, nothing alerted, and every scheduled verification
   from 2026-11-20 ended `TimedOut` for days. Each successful run logs seconds per GiB of dump,
   the number to watch as the DB grows.
