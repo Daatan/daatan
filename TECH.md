@@ -314,7 +314,7 @@ terraform/
 | `package.json` | Node.js dependencies and scripts |
 | `tsconfig.json` | TypeScript configuration |
 | `next.config.js` | Next.js configuration |
-| `src/app/globals.css` | Tailwind CSS 4 theme (`@theme`: brand colours, fonts) and global styles; `postcss.config.js` loads `@tailwindcss/postcss` |
+| `src/app/globals.css` | Tailwind CSS 4 theme (`@theme`: brand colours, fonts) and global styles; `postcss.config.js` loads `@tailwindcss/postcss`. `src/app/tailwind-v3-palette.css` pins the Tailwind 3 default palette (hex) over v4's oklch one |
 | `vitest.config.ts` | Vitest test configuration |
 | `vitest.config.integration.ts` | Integration tests (`npm run test:integration`, real Postgres on :5433) |
 | `playwright.config.ts` / `playwright.selfhost.config.ts` | Playwright E2E (`npm run test:e2e`, `npm run test:e2e:selfhost`) |
