@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { Avatar } from '../Avatar'
+import { Avatar, toAvatarSrc } from '../Avatar'
+import { BrandingProvider } from '../BrandingProvider'
 
 describe('Avatar Component', () => {
   describe('initials generation', () => {
@@ -76,6 +77,38 @@ describe('Avatar Component', () => {
       render(<Avatar src="/photo.jpg" name="Photo User" size={48} />)
       const img = screen.getByAltText('Photo User')
       expect(img).toBeInTheDocument()
+    })
+
+    // #2362: /_next/image answers 400 for an absolute URL whose host is not in remotePatterns,
+    // which is how the Daatan account's avatar is stored.
+    const optimizedUrl = (alt: string) => new URL(screen.getByAltText(alt).getAttribute('src')!, 'http://x').searchParams.get('url')
+
+    it('serves an avatar on this site by path, so the optimizer accepts it', () => {
+      render(<Avatar src="https://daatan.com/logo-icon-192.png" name="Daatan" size={32} />)
+      expect(optimizedUrl('Daatan')).toBe('/logo-icon-192.png')
+    })
+
+    it('uses the app URL from branding, as on a self-hosted instance', () => {
+      render(
+        <BrandingProvider value={{ appName: 'Forecasting', logoUrl: null, appUrl: 'https://forecasts.example.org' }}>
+          <Avatar src="https://forecasts.example.org/logo-icon-192.png" name="Daatan" size={32} />
+        </BrandingProvider>,
+      )
+      expect(optimizedUrl('Daatan')).toBe('/logo-icon-192.png')
+    })
+
+    it('leaves a Google avatar absolute', () => {
+      render(<Avatar src="https://lh3.googleusercontent.com/a/abc=s96-c" name="Google User" size={32} />)
+      expect(optimizedUrl('Google User')).toBe('https://lh3.googleusercontent.com/a/abc=s96-c')
+    })
+  })
+
+  describe('toAvatarSrc', () => {
+    it('strips only this site\'s own origin', () => {
+      expect(toAvatarSrc('https://daatan.com/a.png', 'https://daatan.com')).toBe('/a.png')
+      expect(toAvatarSrc('https://daatan.com.evil.test/a.png', 'https://daatan.com')).toBe('https://daatan.com.evil.test/a.png')
+      expect(toAvatarSrc('https://staging.daatan.com/a.png', 'https://daatan.com')).toBe('https://staging.daatan.com/a.png')
+      expect(toAvatarSrc('/api/uploads/avatars/u/x.webp', 'https://daatan.com')).toBe('/api/uploads/avatars/u/x.webp')
     })
   })
 })

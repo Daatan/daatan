@@ -36,7 +36,7 @@ A fresh checkout boots with no Google, no AWS, no daatan.com — given only DB +
 - `getAppName()` — for `self_hosted`: admin setting (DB) → `APP_NAME` env → the neutral default `"Forecasting"`. `getAppUrl()` — for `self_hosted`: `APP_URL` → `NEXTAUTH_URL`, and **throws** (fail-fast) if neither is set. `saas`/unset returns the `DAATAN` / `https://daatan.com` literals (ignoring `NEXTAUTH_URL`, so prod+staging stay byte-identical).
 - `shouldIndex()` — self-host is always `noindex`; SaaS indexes in production only. Drives `layout.tsx` robots, `robots.ts`, `sitemap.ts`.
 - `getVerificationTokens()` — the exact Google/Bing tokens for SaaS; `null` (suppressed) for self-host.
-- `getBranding()` → `BrandingProvider` (`useBranding()`); `BrandLogo` renders the bundled asset via `next/image` (no override) or a plain `<img>` when `APP_LOGO_URL` is set (avoids next/image remote-pattern config). Sidebar + auth screens consume it.
+- `getBranding()` → `BrandingProvider` (`useBranding()`); `BrandLogo` renders the bundled asset via `next/image` (no override) or a plain `<img>` when `APP_LOGO_URL` is set (avoids next/image remote-pattern config). Sidebar + auth screens consume it. It also carries `appUrl` (`getAppUrl()`), which `Avatar` uses to serve avatars stored as absolute URLs on this site by path, since `/_next/image` rejects hosts outside `remotePatterns` (#2362).
 
 ### 5. Packaging (Phase 4 — PR #961)
 - `.github/workflows/release-selfhost.yml` (manual dispatch) builds the app (`runner`) + migrations images and pushes to `ghcr.io/<owner>/daatan-selfhost:<version>`. Dispatch-only — never touches the SaaS ECR/EC2 pipeline.

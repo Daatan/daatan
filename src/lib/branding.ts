@@ -74,11 +74,13 @@ export interface Branding {
   appName: string
   /** Operator logo override (any URL), or null to use each surface's bundled asset. */
   logoUrl: string | null
+  /** `getAppUrl()`, so client components can recognise absolute URLs on this site (#2362). */
+  appUrl: string
 }
 
 /** Snapshot handed to the client BrandingProvider from the root layout. */
 export function getBranding(): Branding {
-  return { appName: getAppName(), logoUrl: getLogoOverride() }
+  return { appName: getAppName(), logoUrl: getLogoOverride(), appUrl: getAppUrl() }
 }
 
 /**
