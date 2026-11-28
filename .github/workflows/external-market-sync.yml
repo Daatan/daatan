@@ -9,6 +9,12 @@ name: External Market Sync
 #   A GitHub Actions runner makes the HTTP request; the EC2 app process does the
 #   work (provider fetch → DB write). Same mechanism as heartbeat.yml /
 #   search-health.yml — not an EC2 crontab.
+#
+# FALLBACK (daatan#2325): this "hourly" cron ran only 2–3 times a day. The
+# hourly trigger is EventBridge Scheduler → SSM (terraform/market_sync_schedule.tf,
+# at :47). Once that schedule has a run of on-time Success invocations, drop
+# the schedule below and keep workflow_dispatch, as backup.yml did. An overlap
+# is harmless: an unchanged price writes no snapshot.
 
 on:
   schedule:

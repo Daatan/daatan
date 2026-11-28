@@ -21,6 +21,8 @@
 #                   -target=aws_iam_role_policy.github_actions_backup_freshness
 # --------------------------------------------------------------------
 
+# Shared: market_sync_schedule.tf (#2325) sends its hourly command with this
+# role too. Its policy already covers that: same document, same instance.
 resource "aws_iam_role" "backup_scheduler" {
   name        = "daatan-backup-scheduler"
   description = "EventBridge Scheduler role: may only send AWS-RunShellScript to the prod instance (DB backup)"
