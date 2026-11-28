@@ -49,13 +49,13 @@ describe('branding (SaaS / unset edition — must match the old literals)', () =
 
   it('getBranding snapshot defaults to DAATAN with no logo override', async () => {
     const b = await load()
-    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: null })
+    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: null, appUrl: 'https://daatan.com' })
   })
 
   it('getBranding carries the APP_LOGO_URL override', async () => {
     mockEnv.APP_LOGO_URL = 'https://cdn.example/logo.png'
     const b = await load()
-    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: 'https://cdn.example/logo.png' })
+    expect(b.getBranding()).toEqual({ appName: 'DAATAN', logoUrl: 'https://cdn.example/logo.png', appUrl: 'https://daatan.com' })
   })
 
   it('emits the exact Google + Bing verification tokens', async () => {
@@ -116,6 +116,7 @@ describe('branding (self_hosted)', () => {
   })
 
   it('the admin-set DB logo overrides APP_LOGO_URL env; getBranding carries it', async () => {
+    mockEnv.APP_URL = 'https://forecast.acme.example'
     mockEnv.APP_LOGO_URL = 'https://cdn/env.png'
     settingStore['app_logo_url'] = 'https://cdn/admin.png'
     const b = await load()
@@ -124,9 +125,16 @@ describe('branding (self_hosted)', () => {
   })
 
   it('getAppLogoUrl falls back to the bundled asset when nothing is set', async () => {
+    mockEnv.APP_URL = 'https://forecast.acme.example'
     const b = await load()
     expect(b.getAppLogoUrl()).toBe('/logo-icon.svg')
     expect(b.getBranding().logoUrl).toBeNull()
+  })
+
+  it('getBranding carries the operator APP_URL for client components (#2362)', async () => {
+    mockEnv.APP_URL = 'https://forecast.acme.example/'
+    const b = await load()
+    expect(b.getBranding().appUrl).toBe('https://forecast.acme.example')
   })
 
   it('still fails fast when APP_URL is missing (operationally required)', async () => {

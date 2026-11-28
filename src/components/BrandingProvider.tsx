@@ -7,7 +7,7 @@ import type { Branding } from '@/lib/branding'
 // always provides the real server-resolved value; this default only applies to
 // components rendered outside the provider (e.g. isolated tests), keeping their
 // output unchanged.
-const DEFAULT: Branding = { appName: 'DAATAN', logoUrl: null }
+const DEFAULT: Branding = { appName: 'DAATAN', logoUrl: null, appUrl: 'https://daatan.com' }
 
 const BrandingContext = createContext<Branding>(DEFAULT)
 

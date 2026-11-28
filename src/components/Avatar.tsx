@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useState, useMemo } from 'react'
+import { useBranding } from '@/components/BrandingProvider'
 
 interface AvatarProps {
   src: string | null | undefined
@@ -43,8 +44,19 @@ const getColorIndex = (name: string | null | undefined): number => {
   return Math.abs(hash) % AVATAR_COLORS.length
 }
 
+/**
+ * next/image optimizes relative paths and the hosts in `images.remotePatterns` (next.config.js);
+ * for any other absolute URL `/_next/image` answers 400 and the avatar falls back to initials.
+ * The Daatan account's avatar is stored as an absolute URL on this site, because its profile OG
+ * image and JSON-LD need one (#2301), so an avatar on this site is served by path (#2362).
+ */
+export function toAvatarSrc(src: string, appUrl: string): string {
+  return src.startsWith(`${appUrl}/`) ? src.slice(appUrl.length) : src
+}
+
 export function Avatar({ src, name, size = 32, className = '' }: AvatarProps) {
   const [imageError, setImageError] = useState(false)
+  const { appUrl } = useBranding()
 
   const initials = useMemo(() => getInitials(name), [name])
   const color = useMemo(() => AVATAR_COLORS[getColorIndex(name)], [name])
@@ -66,7 +78,7 @@ export function Avatar({ src, name, size = 32, className = '' }: AvatarProps) {
 
   return (
     <Image
-      src={src}
+      src={toAvatarSrc(src, appUrl)}
       alt={name || 'User'}
       width={size}
       height={size}

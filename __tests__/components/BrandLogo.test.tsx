@@ -6,7 +6,7 @@ import { BrandingProvider } from '@/components/BrandingProvider'
 describe('BrandLogo', () => {
   it('renders the operator logo override with the app name as alt', () => {
     render(
-      <BrandingProvider value={{ appName: 'Acme Forecasting', logoUrl: 'https://cdn.example/logo.png' }}>
+      <BrandingProvider value={{ appName: 'Acme Forecasting', logoUrl: 'https://cdn.example/logo.png', appUrl: 'https://forecasts.example' }}>
         <BrandLogo fallbackSrc="/logo-icon.svg" width={40} height={40} />
       </BrandingProvider>,
     )
