@@ -1,5 +1,5 @@
 import { getLocale, getTranslations } from 'next-intl/server'
-import Image from 'next/image'
+import { UserImage } from '@/components/UserImage'
 import { TrendingUp, Award, Settings, Globe, Sparkles, Swords } from 'lucide-react'
 import { Twitter } from '@/components/icons/BrandIcons'
 import { ShareProfileButton } from '@/components/profile/ShareProfileButton'
@@ -62,7 +62,7 @@ export async function UserProfileView({
           {/* Avatar */}
           <div className="relative shrink-0">
             {user.image ? (
-              <Image
+              <UserImage
                 src={user.image}
                 alt={user.name || ''}
                 width={128}

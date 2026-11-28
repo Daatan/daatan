@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { Avatar, toAvatarSrc } from '../Avatar'
+import { Avatar } from '../Avatar'
+import { toAvatarSrc } from '@/lib/avatar-src'
 import { BrandingProvider } from '../BrandingProvider'
 
 describe('Avatar Component', () => {

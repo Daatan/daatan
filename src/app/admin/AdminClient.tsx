@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { UserImage } from '@/components/UserImage'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import {
@@ -253,7 +253,7 @@ function ForecastsTab() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {p.author.image ? (
-                            <Image src={p.author.image} alt="" width={24} height={24} className="rounded-full" />
+                            <UserImage src={p.author.image} alt="" width={24} height={24} className="rounded-full" />
                           ) : (
                             <div className="w-6 h-6 rounded-full bg-navy-600 flex items-center justify-center text-xs font-bold text-gray-500">
                               {p.author.name?.charAt(0) || '?'}
@@ -399,7 +399,7 @@ function CommentsTab() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {c.author.image ? (
-                          <Image src={c.author.image} alt="" width={20} height={20} className="rounded-full" />
+                          <UserImage src={c.author.image} alt="" width={20} height={20} className="rounded-full" />
                         ) : (
                           <div className="w-5 h-5 rounded-full bg-navy-600 flex items-center justify-center text-[10px] font-bold text-gray-500">
                             {c.author.name?.charAt(0) || '?'}
@@ -553,7 +553,7 @@ function UsersTab() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {u.image ? (
-                            <Image src={u.image} alt="" width={28} height={28} className="rounded-full" />
+                            <UserImage src={u.image} alt="" width={28} height={28} className="rounded-full" />
                           ) : (
                             <div className="w-7 h-7 rounded-full bg-navy-600 flex items-center justify-center text-xs font-bold text-gray-500">
                               {u.name?.charAt(0) || '?'}

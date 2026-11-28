@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useState, useCallback, type ReactNode } from 'react'
-import Image from 'next/image'
+import { UserImage } from '@/components/UserImage'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Trophy, Loader2, Target, TrendingDown, Swords, Bot, Users } from 'lucide-react'
@@ -266,7 +266,7 @@ export default function LeaderboardClient({ initialUsers, initialTags, initialTa
                   <td className="px-2 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center gap-2 sm:gap-3">
                       {user.image ? (
-                        <Image src={user.image} alt="" width={36} height={36} className="rounded-full border border-navy-600 w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
+                        <UserImage src={user.image} alt="" width={36} height={36} className="rounded-full border border-navy-600 w-8 h-8 sm:w-10 sm:h-10 shrink-0" />
                       ) : (
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
                           {user.name?.charAt(0) || user.username?.charAt(0) || '?'}
