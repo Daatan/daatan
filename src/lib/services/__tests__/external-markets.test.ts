@@ -229,6 +229,24 @@ describe('polymarketProvider.fetchMarket', () => {
     expect(await polymarketProvider.fetchMarket('nope')).toBeNull()
   })
 
+  // Gamma leaves closed markets out of /markets?slug= unless closed=true (daatan#2366).
+  it('finds a closed market with a second, closed=true lookup', async () => {
+    const closedRow = gammaRow({ closed: true, outcomePrices: '["0", "1"]' })
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/markets?slug=')) return jsonResponse(url.includes('closed=true') ? [closedRow] : [])
+      return jsonResponse(null, false, 404)
+    })
+
+    const m = await polymarketProvider.fetchMarket('will-x-happen')
+
+    expect(m).toMatchObject({ externalId: '0xabc', closed: true, resolvedOutcome: 'No', yesProbability: 0 })
+    const urls = vi.mocked(global.fetch).mock.calls.map(c => String(c[0]))
+    expect(urls[0]).toMatch(/\/markets\?slug=will-x-happen$/)
+    expect(urls[1]).toMatch(/\/markets\?slug=will-x-happen&closed=true$/)
+    expect(urls.some(u => u.includes('/events?'))).toBe(false)
+  })
+
   it('returns null on a non-OK response', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(null, false, 500))
     expect(await polymarketProvider.fetchMarket('boom')).toBeNull()
@@ -290,6 +308,27 @@ describe('resolveMarketByUrl', () => {
     expect(prisma.externalMarket.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { provider_externalId: { provider: 'POLYMARKET', externalId: '0xabc' } },
+      }),
+    )
+  })
+
+  it('refuses a closed market unless allowClosed, without caching it', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow({ closed: true, outcomePrices: '["1", "0"]' })]))
+
+    expect(await resolveMarketByUrl('https://polymarket.com/event/will-x-happen')).toBeNull()
+    expect(prisma.externalMarket.upsert).not.toHaveBeenCalled()
+  })
+
+  it('links a closed market when allowClosed (admin manual link), stored as resolved', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse([gammaRow({ closed: true, outcomePrices: '["1", "0"]' })]))
+    vi.mocked(prisma.externalMarket.upsert).mockResolvedValue({ id: 'm1' } as never)
+
+    const result = await resolveMarketByUrl('https://polymarket.com/event/will-x-happen', { allowClosed: true })
+
+    expect(result).toEqual({ id: 'm1' })
+    expect(prisma.externalMarket.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ resolved: true, resolvedOutcome: 'Yes' }),
       }),
     )
   })
@@ -632,6 +671,28 @@ describe('syncLinkedMarkets', () => {
 
     beforeEach(() => {
       global.fetch = gammaFetchMock([])
+    })
+
+    it('records a closed market as resolved and skips the divergence check', async () => {
+      vi.mocked(prisma.externalMarket.findMany).mockResolvedValue([
+        { id: 'm1', slug: 'will-x-happen', externalId: '0xabc', provider: 'POLYMARKET', predictions: [prediction()] },
+      ] as never)
+      global.fetch = gammaFetchMock([], [gammaRow({ closed: true, outcomePrices: '["0", "1"]' })])
+      vi.mocked(getLatestEvidenceEstimate).mockResolvedValue({ externalProbability: 90, createdAt: new Date() } as never)
+
+      const result = await syncLinkedMarkets()
+
+      expect(result).toEqual({ synced: 1, failed: 0 })
+      expect(prisma.externalMarket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'm1' },
+          data: expect.objectContaining({ resolved: true, resolvedOutcome: 'No' }),
+        }),
+      )
+      // market 0 vs ours 90 would be a 90pt gap on an open market.
+      expect(getLatestEvidenceEstimate).not.toHaveBeenCalled()
+      expect(prisma.prediction.updateMany).not.toHaveBeenCalled()
+      expect(notifyMarketDivergence).not.toHaveBeenCalled()
     })
 
     it('notifies and stamps the alert when the gap first crosses the threshold', async () => {
