@@ -139,6 +139,24 @@ describe('UserProfileView Component', () => {
     expect(screen.getByText('1520')).toBeInTheDocument() // ELO in the header card
   })
 
+  it('serves a header avatar stored on this site by path, so next/image accepts it (#2362)', async () => {
+    const render$ = async (image: string) => render(await UserProfileView({
+      user: { ...mockUser, name: 'Daatan', image },
+      isOwnProfile: false,
+      userTags: [],
+      selectedTag: null,
+      scores: mockScores,
+      tabData: mockTabData,
+    }))
+
+    const { unmount } = await render$('https://daatan.com/logo-icon-192.png')
+    expect(screen.getByAltText('Daatan')).toHaveAttribute('src', '/logo-icon-192.png')
+    unmount()
+
+    await render$('https://lh3.googleusercontent.com/a/abc=s96-c')
+    expect(screen.getByAltText('Daatan')).toHaveAttribute('src', 'https://lh3.googleusercontent.com/a/abc=s96-c')
+  })
+
   it('renders "Edit profile" link only for own profile', async () => {
     const ownProfile = await UserProfileView({
       user: mockUser,
