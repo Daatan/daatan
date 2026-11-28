@@ -297,6 +297,7 @@ terraform/
 ├── telegram_alerts.tf          # Lambda forwarding infra alerts to Telegram (#1726)
 ├── staging_schedule.tf         # EventBridge Scheduler daily backstop stop for staging (#2089)
 ├── backup_schedule.tf          # EventBridge Scheduler → SSM: primary prod DB backup trigger, 04:00/16:00 UTC (#1957)
+├── market_sync_schedule.tf     # EventBridge Scheduler → SSM: hourly :47 linked-market price sync (#2325)
 ├── logging.tf                  # CloudWatch log group for app/nginx/postgres container logs (#1788)
 ├── variables.tf                # Input variables
 ├── outputs.tf                  # Output values
@@ -383,6 +384,7 @@ tests/
 | S3 Bucket | Avatar/upload storage | `daatan-uploads-prod-272007598366`, `daatan-uploads-staging-272007598366` |
 | ECR | Container registry | `daatan-app` repository (app + `-migrations` images) |
 | EventBridge Scheduler | Staging backstop stop | Stops staging at 03:00 UTC every day, in case its own stop timer did not fire (`terraform/staging_schedule.tf`, #2089) |
+| EventBridge Scheduler | Hourly market sync | At :47 every hour, sends SSM `AWS-RunShellScript` to prod, which curls `/api/cron/external-market-sync` with the cron secret from `~/app/.env` (`terraform/market_sync_schedule.tf`, #2325). Reuses the `daatan-backup-scheduler` role |
 | Security Group | Firewall | HTTP, HTTPS (port 22 blocked — use SSM for server access) |
 | IAM Role | EC2 Profile (prod) | `daatan-ec2-role-prod` — SSM + S3 backup/upload access (prod buckets) + Secrets Manager (`daatan-env-prod`) |
 | IAM Role | EC2 Profile (staging) | `daatan-ec2-role-staging` — SSM + S3 backup/upload access (staging buckets) + Secrets Manager (`daatan-env-staging`) |
@@ -492,8 +494,8 @@ Most hit an `/api/cron/*` (or admin) endpoint on the app; all also allow manual 
 |----------|----------|---------|
 | `watchdog.yml` | every 5 min (GitHub actually runs it ~every 4 h) | HTTP health + version drift, plus SSM disk/CPU/memory checks on the EC2 hosts. **Secondary** uptime check — the primary is the Route53 health check + `prod-daatan-com-down` alarm (`terraform/monitoring.tf`, #1956) |
 | `transition-expired-predictions.yml` | every 15 min | `/api/cron/transition-expired-predictions` |
-| `search-health.yml` | hourly | `/api/cron/search-health` on production (Oracul search-provider credits) |
-| `external-market-sync.yml` | hourly :17 | `/api/cron/external-market-sync` — refresh linked Polymarket/Kalshi prices |
+| `search-health.yml` | hourly (runs ~3×/day in practice; enough for a health check, so it stays on GitHub, #2325) | `/api/cron/search-health` on production (Oracul search-provider credits) |
+| `external-market-sync.yml` | hourly :17 (runs ~3×/day in practice) | `/api/cron/external-market-sync` — refresh linked Polymarket/Kalshi prices. Fallback only: the hourly trigger is EventBridge Scheduler → SSM (`terraform/market_sync_schedule.tf`, #2325); this cron is retired once that schedule shows a run of on-time successes |
 | `news-indexer-watchdog.yml` | every 2 h :17 | news-indexer disk + pipeline health via its `/stats` |
 | `oracle-jev-watchdog.yml` | hourly :12 (GitHub runs it every 3–7 h) | Telegram alert when the Oracul's Jev calls start failing (#1792) |
 | `backfill-embeddings.yml` | 02:23 daily | `/api/cron/backfill-embeddings` |

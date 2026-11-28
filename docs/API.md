@@ -1009,7 +1009,7 @@ Refreshes every cached Polymarket/Kalshi market that at least one forecast
 links to: pulls the latest YES price, writes an `ExternalMarketPriceSnapshot`
 (only on a real price change — drives the "Market" chart line), and updates
 resolution status. Auth: `x-cron-secret` header. Best-effort per market, never
-throws. Triggered hourly by `.github/workflows/external-market-sync.yml`.
+throws. Triggered hourly at :47 by EventBridge Scheduler → SSM on the prod box (`terraform/market_sync_schedule.tf`, #2325). `.github/workflows/external-market-sync.yml` is a fallback until it is retired: its hourly cron ran only ~3×/day.
 
 ### `GET /api/cron/transition-expired-predictions`
 Transitions `ACTIVE` predictions past their `resolveByDatetime` to `PENDING`.
