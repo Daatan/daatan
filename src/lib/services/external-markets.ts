@@ -423,10 +423,15 @@ export const polymarketProvider: MarketProvider = {
   },
 
   async fetchMarket(slug: string): Promise<NormalizedMarket | null> {
-    const rows = await gammaFetch<Record<string, unknown>[]>(
-      `/markets?slug=${encodeURIComponent(slug)}`,
-    )
-    if (rows && rows.length > 0) return normalizeGammaMarket(rows[0])
+    // Gamma's /markets leaves closed markets out unless asked (daatan#2366). Without
+    // the second lookup a linked market that closes is never found again, so its
+    // resolution is never recorded and every sync counts it as failed.
+    for (const closedParam of ['', '&closed=true']) {
+      const rows = await gammaFetch<Record<string, unknown>[]>(
+        `/markets?slug=${encodeURIComponent(slug)}${closedParam}`,
+      )
+      if (rows && rows.length > 0) return normalizeGammaMarket(rows[0])
+    }
 
     // No market by that slug. Polymarket shows grouped events at `/event/{event}`
     // with no market segment, so a pasted URL often yields the *event* slug —
@@ -768,8 +773,14 @@ async function upsertMarket(m: NormalizedMarket): Promise<ExternalMarket> {
 /**
  * Resolve a pasted market URL (any supported provider) into a cached market row.
  * Returns null if the URL is unsupported/unparseable or the market can't be fetched.
+ * A closed market also returns null unless `allowClosed`: only an admin linking a
+ * market to an existing forecast may pick one (daatan#2366). A new forecast built
+ * on a closed market would ask a question that is already answered.
  */
-export async function resolveMarketByUrl(url: string): Promise<ExternalMarket | null> {
+export async function resolveMarketByUrl(
+  url: string,
+  { allowClosed = false }: { allowClosed?: boolean } = {},
+): Promise<ExternalMarket | null> {
   const provider = getProviderForUrl(url)
   if (!provider) {
     log.warn({ url }, 'No provider matches that market URL')
@@ -783,6 +794,10 @@ export async function resolveMarketByUrl(url: string): Promise<ExternalMarket | 
   const market = await provider.fetchMarket(id)
   if (!market) {
     log.warn({ id, provider: provider.id }, 'Provider returned no market for id')
+    return null
+  }
+  if (market.closed && !allowClosed) {
+    log.info({ id, provider: provider.id }, 'Market is closed; not linking it')
     return null
   }
   return upsertMarket(market)
@@ -836,6 +851,7 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
       }
       const latest = await provider.fetchMarket(cached.slug)
       if (!latest) {
+        log.warn({ marketId: cached.id, provider: cached.provider, slug: cached.slug }, 'Linked market not found at its provider')
         failed++
         continue
       }
@@ -887,7 +903,11 @@ export async function syncLinkedMarkets(): Promise<{ synced: number; failed: num
         }),
       ])
       synced++
-      await checkMarketDivergence(cached.predictions ?? [], latest.yesProbability, latest.endDate)
+      // A closed market's price is its settled outcome, not an estimate to
+      // diverge from, and its forecasts are usually resolved already.
+      if (!latest.closed) {
+        await checkMarketDivergence(cached.predictions ?? [], latest.yesProbability, latest.endDate)
+      }
     } catch (err) {
       log.error({ marketId: cached.id, err: String(err) }, 'Failed to sync market')
       failed++

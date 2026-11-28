@@ -50,7 +50,8 @@ export const POST = withAuth(
     })
     if (!prediction) return apiError('Forecast not found', 404)
 
-    const market = await resolveMarketByUrl(url)
+    // An admin may link a closed market, e.g. to show how it settled (daatan#2366).
+    const market = await resolveMarketByUrl(url, { allowClosed: true })
     if (!market) return apiError('Could not resolve a market from that URL', 422)
 
     await prisma.prediction.update({

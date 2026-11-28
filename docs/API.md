@@ -341,7 +341,7 @@ Called by the create wizard after the claim step, and by the Express review scre
 ---
 
 ### `POST /api/forecasts/import-market` — Auth
-Resolve a pasted Polymarket / Kalshi market URL into a forecast prefill for the create wizard. **Body** `{ url }`. Caches the market and returns `{ externalMarketId, provider, providerLabel, claimText, resolveByDatetime, url }` — the market question becomes the claim, the market end date (or `null`) the resolve-by date. `404` when external markets are disabled on the instance; `422` for an unsupported URL or a market that can't be loaded.
+Resolve a pasted Polymarket / Kalshi market URL into a forecast prefill for the create wizard. **Body** `{ url }`. Caches the market and returns `{ externalMarketId, provider, providerLabel, claimText, resolveByDatetime, url }` — the market question becomes the claim, the market end date (or `null`) the resolve-by date. `404` when external markets are disabled on the instance; `422` for an unsupported URL, a market that can't be loaded, or a market that has already closed (a new forecast on it would ask an answered question, daatan#2366).
 
 ---
 
@@ -578,7 +578,7 @@ Withdraw one forecast's credibility feedback from retro's source and author ledg
 Candidate external markets (Polymarket / Kalshi) matching the forecast's claim — keyword search (at most 2 markets kept per source event) re-ranked by embedding similarity with a deadline-gap penalty. Only candidates whose similarity clears a relevance floor are returned, each with a `score` (0–100 match); a claim with no real equivalent returns `[]` rather than the least-bad markets, and suggestions are suppressed entirely when embeddings are unavailable. Suggestion only; an admin confirms via POST.
 
 ### `POST /api/admin/forecasts/[id]/external-market`
-Link a market by pasted URL. **Body** `{ url }`. On first link the market's full provider-side price history is backfilled (Polymarket CLOB `prices-history`, best-effort, capped at 400 points) so the chart's Market line starts at the market's birth, then the current price is seeded; the hourly `external-market-sync` cron owns the series from there. Resets `inverted` to false.
+Link a market by pasted URL. **Body** `{ url }`. A closed market may be linked too; it is stored as resolved with its outcome (daatan#2366). On first link the market's full provider-side price history is backfilled (Polymarket CLOB `prices-history`, best-effort, capped at 400 points) so the chart's Market line starts at the market's birth, then the current price is seeded; the hourly `external-market-sync` cron owns the series from there. Resets `inverted` to false.
 
 ### `PATCH /api/admin/forecasts/[id]/external-market`
 Set the link's polarity. **Body** `{ inverted: boolean }` — mark the linked market as asking the *opposite* question (e.g. claim "X will not win" vs market "Will X win?"). Stored per-prediction (`externalMarketInverted`); the UI then displays 100 − market price everywhere and labels the Market line "(inverted)". `409` when no market is linked.

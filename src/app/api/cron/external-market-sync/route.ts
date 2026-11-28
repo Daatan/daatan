@@ -17,8 +17,9 @@ const log = createLogger('cron-external-market-sync')
  * Read-only against each provider's API; best-effort (never throws). Hourly is
  * plenty — prices move slowly relative to the chart's resolution.
  *
- * Triggered hourly by the External Market Sync GitHub Actions workflow
- * (.github/workflows/external-market-sync.yml), same as heartbeat/search-health.
+ * Triggered hourly at :47 by EventBridge Scheduler → SSM
+ * (terraform/market_sync_schedule.tf, daatan#2325). The cron in
+ * .github/workflows/external-market-sync.yml is a fallback.
  */
 export async function GET(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
